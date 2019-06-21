@@ -1,0 +1,12 @@
+# IDE configs
+.idea
+
+# temporary files
+*.o
+*.a
+
+# build stuffs
+cmake-build*/
+build/
+CMakeCache.txt
+CMakeFiles
