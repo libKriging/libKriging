@@ -34,7 +34,6 @@ before_install:
       # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
       # choco --help
       clang++ --version
-      choco install make
     fi
   - cmake --version
 
@@ -44,9 +43,17 @@ script:
   - cd ${TRAVIS_BUILD_DIR}
   - echo ${PWD}
   - mkdir build && cd build
-  - cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${MODE} || cat CMakeFiles/CMakeOutput.log
-  - ls -l
-  - make
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "linux" || "$TRAVIS_OS_NAME" == "osx" ]]; then
+      cmake .. -DCMAKE_BUILD_TYPE=${MODE}
+      cmake --build .
+    fi
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
+      cmake ..
+      ls -l
+      cmake --build . --target ALL_BUILD --config ${MODE}
+    fi
   - ctest -C ${MODE}
 
 #addons:

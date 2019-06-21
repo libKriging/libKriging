@@ -1,5 +1,5 @@
 add_library(Kriging
-        SHARED
+        STATIC
         TestClass.cpp)
 
 # Version on library name
