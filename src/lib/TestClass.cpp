@@ -1,5 +1,7 @@
 #include "include/libKriging/TestClass.h"
 
+#include <typeinfo>
+
 TestClass::
 TestClass() = default;
 
