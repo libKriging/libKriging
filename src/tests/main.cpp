@@ -10,4 +10,5 @@ int main() {
     std::unique_ptr<TestClass> x(new TestClass());
     std::cout << x->f() << std::endl;
 
+    return 0;
 }
