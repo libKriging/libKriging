@@ -21,29 +21,39 @@ before_install:
   - echo $PATH
   - >
     if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      apt-get --help ; g++ --version
+      # apt-get --help
+      g++ --version
     fi
   - >
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      brew --help ; clang++ --version
+      # brew --help
+      clang++ --version
     fi
   - >
     if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-      choco --help
       # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
+      # choco --help
       clang++ --version
-      # msvc /help # not found in PATH
+      choco install make
     fi
   - cmake --version
 
 # Build steps
 script:
+  # - set -eo pipefail
   - cd ${TRAVIS_BUILD_DIR}
   - echo ${PWD}
   - mkdir build && cd build
-  - cmake ..
+  - cmake .. -G "Unix Makefiles" || cat CMakeFiles/CMakeOutput.log
+  - ls -l
   - make
-  - ./src/tests/tests
+  - ctest
+
+#addons:
+#  artifacts:
+#    debug: false
+#    paths:
+#      - ${HOME}/build
 
 after_success:
   - cd ${TRAVIS_BUILD_DIR}
