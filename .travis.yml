@@ -34,6 +34,7 @@ before_install:
       clang++ --version
       # msvc /help # not found in PATH
     fi
+  - cmake --version
 
 # Build steps
 script:
