@@ -1,4 +1,11 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.12)
+
+# CMake utils
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Forbids in-source builds (placed before PROJECT keyword)
+set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
 # VERSION must follow pattern : <major>.<minor>.<patch>
 set(KRIGING_VERSION_MAJOR 0)
