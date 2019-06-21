@@ -39,7 +39,10 @@ before_install:
 script:
   - cd ${TRAVIS_BUILD_DIR}
   - echo ${PWD}
-  - ls -l
+  - mkdir build && cd build
+  - cmake ..
+  - make
+  - ./src/tests/tests
 
 after_success:
   - cd ${TRAVIS_BUILD_DIR}
