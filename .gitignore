@@ -1,9 +1,39 @@
 # IDE configs
 .idea
 
-# compiler temporary files
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
 *.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
 *.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# code coverage files
+*.gcov
+*.gcda
+*.gcno
 
 # editor backup files
 .\#*
