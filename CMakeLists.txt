@@ -18,6 +18,16 @@ project(libKriging
         DESCRIPTION "LibKriging")
 # PORJECT_VERSION now contains also KRIGING_VERSION
 
+#------------------------------------------------------
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+#------------------------------------------------------
+
 set(CMAKE_CXX_STANDARD 11)
 
+#------------------------------------------------------
+
 add_subdirectory(src)
+add_subdirectory(tests)
+enable_testing()
