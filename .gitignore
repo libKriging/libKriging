@@ -1,12 +1,20 @@
 # IDE configs
 .idea
 
-# temporary files
+# compiler temporary files
 *.o
 *.a
+
+# editor backup files
+.\#*
+*~
+
+# macOS metadata files
+.DS_Store
 
 # build stuffs
 cmake-build*/
 build/
 CMakeCache.txt
 CMakeFiles
+
