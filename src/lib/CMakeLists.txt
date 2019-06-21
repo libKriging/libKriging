@@ -23,6 +23,7 @@ target_include_directories(Kriging PUBLIC
 # Create install rule for your library. Use variables CMAKE_INSTALL_*DIR defined in GNUInstallDir
 include(GNUInstallDirs)
 
+# https://cmake.org/cmake/help/latest/command/install.html
 install(TARGETS Kriging
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
