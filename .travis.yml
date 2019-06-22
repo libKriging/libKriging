@@ -1,5 +1,8 @@
 language: bash
 
+# Doc
+# - Travis Job Lifecycle : https://docs.travis-ci.com/user/job-lifecycle/
+
 matrix:
   include:
     - os: linux
@@ -15,35 +18,58 @@ matrix:
       env:
         - MODE=Debug
     - os: windows
-      # https://travis-ci.community/c/environments/windows
+      # Help : https://travis-ci.community/c/environments/windows
+      # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
+      # use `choco` command
       env:
         - MODE=Debug
+    - os: linux
+      dist: xenial
+      compiler: clang
+      env:
+        - MODE=Coverage
+      addons:
+        apt:
+          update: true
+          packages:
+            - lcov
+#    # Disabled because too long
+#    - os: osx
+#      osx_image: xcode9.4
+#      env:
+#        - MODE=Coverage
+#      addons:
+#        homebrew:
+#          update: true
+#          packages:
+#            - lcov
 
-before_install:
-  - echo $PATH
+install:
   - >
-    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      # apt-get --help
-      g++ --version
+    if [[ "$MODE" == "Coverage" ]]; then
+      if [[ "$TRAVIS_OS_NAME" == "linux" || "$TRAVIS_OS_NAME" == "osx" ]]; then
+        gem install coveralls-lcov
+      fi
+      if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
+      echo "Coverage not supported for Windows"
+      travis_terminate 1
+      fi
     fi
-  - >
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      # brew --help
-      clang++ --version
-    fi
-  - >
-    if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-      # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
-      # choco --help
-      clang++ --version
-    fi
-  - cmake --version
 
-# Build steps
+before_script:
+  - > # to debug environment use 'true'
+    if ( false ); then
+      echo $PATH
+      if [[ "$TRAVIS_OS_NAME" == "linux" || "$TRAVIS_OS_NAME" == "osx" ]]; then
+        c++ --version
+      fi
+      cmake --version
+    fi
+  - >
+
 script:
   # - set -eo pipefail
   - cd ${TRAVIS_BUILD_DIR}
-  - echo ${PWD}
   - mkdir build && cd build
   - >
     if [[ "$TRAVIS_OS_NAME" == "linux" || "$TRAVIS_OS_NAME" == "osx" ]]; then
@@ -53,10 +79,15 @@ script:
   - >
     if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
       cmake ..
-      ls -l
       cmake --build . --target ALL_BUILD --config ${MODE}
     fi
-  - ctest -C ${MODE}
+  - >
+    if [[ "$MODE" == "Coverage" ]]; then
+      # Windows os has been filtered out in install step
+      make coverage
+    else
+      ctest -C ${MODE}
+    fi
 
 #addons:
 #  artifacts:
@@ -65,5 +96,9 @@ script:
 #      - ${HOME}/build
 
 after_success:
-  - cd ${TRAVIS_BUILD_DIR}
-  - echo "Success"
+  - cd ${TRAVIS_BUILD_DIR}/build
+  - >
+    if [[ "$MODE" == "Coverage" ]]; then
+      lcov --list coverage.info
+      coveralls-lcov coverage.info
+    fi
