@@ -1,21 +1,23 @@
 language: bash
 
-env:
-  - MODE=Debug
-
-#os:
-#  - linux
-#  - osx
-#  - windows
-
 matrix:
   include:
     - os: linux
       dist: xenial
+      env:
+        - MODE=Debug
+    - os: linux
+      dist: xenial
+      env:
+        - MODE=Release
     - os: osx
       osx_image: xcode9.4
+      env:
+        - MODE=Debug
     - os: windows
       # https://travis-ci.community/c/environments/windows
+      env:
+        - MODE=Debug
 
 before_install:
   - echo $PATH
