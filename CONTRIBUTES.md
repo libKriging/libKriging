@@ -46,6 +46,8 @@ The subject contains succinct description of the change:
 * don't capitalize first letter
 * no dot (.) at the end
 
+To skip Travis CI build, the HEAD commit message on push must contain `[skip ci]`.
+
 # Message Body
 Just as in the **Subject**, use the imperative, present tense: "change" not "changed" nor "changes". 
 The body should include the motivation for the change and contrast this with previous behavior.
@@ -90,4 +92,11 @@ revert:
 revert: feature(python): add 'custom expression' option
 
 This reverts commit 667ecc1654a317a13331b17617d973392f415f02.
+```
+
+skip ci:
+```
+doc: fix minor mispelling [skip ci]
+
+CI build is a waste of time for a so tiny mispelling fix. 
 ```
