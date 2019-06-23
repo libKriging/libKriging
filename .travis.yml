@@ -5,25 +5,30 @@ language: bash
 
 matrix:
   include:
-    - os: linux
+    - name: "Linux Debug"
+      os: linux
       dist: xenial
       env:
         - MODE=Debug
-    - os: linux
+    - name: "Linux Release"
+      os: linux
       dist: xenial
       env:
         - MODE=Release
-    - os: osx
+    - name: "MacOS Debug"
+      os: osx
       osx_image: xcode9.4
       env:
         - MODE=Debug
-    - os: windows
+    - name: "Windows Debug"
+      os: windows
       # Help : https://travis-ci.community/c/environments/windows
       # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
       # use `choco` command
       env:
         - MODE=Debug
-    - os: linux
+    - name: "Linux Coverage"
+      os: linux
       dist: xenial
       compiler: clang
       env:
@@ -34,7 +39,8 @@ matrix:
           packages:
             - lcov
 #    # Disabled because too long
-#    - os: osx
+#    - name: "MacOS Coverage"
+#      os: osx
 #      osx_image: xcode9.4
 #      env:
 #        - MODE=Coverage
