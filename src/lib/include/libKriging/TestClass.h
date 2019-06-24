@@ -2,11 +2,12 @@
 #define LIBKRIGING_TESTCLASS_H
 
 #include <string>
+#include "libKriging_EXPORTS.h"
 
 class TestClass {
 public:
-    TestClass();
-    std::string f();
+    LIBKRIGING_EXPORT TestClass();
+    LIBKRIGING_EXPORT std::string f();
 };
 
 #endif //LIBKRIGING_TESTCLASS_H

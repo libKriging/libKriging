@@ -2,6 +2,8 @@
 
 #include "libKriging/TestFunction.h"
 
+#include <memory>
+
 int main() {
     std::cout << "libKriging function tests" << std::endl;
 

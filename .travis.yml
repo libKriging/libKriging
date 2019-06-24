@@ -10,23 +10,32 @@ matrix:
       dist: xenial
       env:
         - MODE=Debug
+
     - name: "Linux Release"
       os: linux
       dist: xenial
       env:
         - MODE=Release
+
     - name: "MacOS Debug"
       os: osx
       osx_image: xcode9.4
       env:
         - MODE=Debug
+
+    # Help : https://travis-ci.community/c/environments/windows
+    # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
+    # use `choco` command as package command
     - name: "Windows Debug"
       os: windows
-      # Help : https://travis-ci.community/c/environments/windows
-      # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
-      # use `choco` command
       env:
         - MODE=Debug
+
+#    - name: "Windows Release"
+#      os: windows
+#      env:
+#        - MODE=Release
+
     - name: "Linux Coverage"
       os: linux
       dist: xenial
@@ -38,6 +47,7 @@ matrix:
           update: true
           packages:
             - lcov
+
 #    # Disabled because too long
 #    - name: "MacOS Coverage"
 #      os: osx
@@ -86,6 +96,8 @@ script:
     if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
       cmake ..
       cmake --build . --target ALL_BUILD --config ${MODE}
+      # add library directory search PATH for executables
+      export PATH=$PWD/src/lib/${MODE}:$PATH
     fi
   - >
     if [[ "$MODE" == "Coverage" ]]; then

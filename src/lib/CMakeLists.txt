@@ -1,12 +1,20 @@
 add_library(Kriging
-        STATIC
+        SHARED
         TestClass.cpp include/libKriging/TestClass.h
         TestFunction.cpp include/libKriging/TestFunction.h)
+
+include (GenerateExportHeader)
+GENERATE_EXPORT_HEADER(Kriging # generates the export header `lib`_EXPORTS.h automatically
+        BASE_NAME LIBKRIGING
+        EXPORT_MACRO_NAME LIBKRIGING_EXPORT
+        EXPORT_FILE_NAME libKriging_EXPORTS.h
+        STATIC_DEFINE SHARED_EXPORTS_BUILT_AS_STATIC)
 
 # Version on library name
 set_target_properties(Kriging PROPERTIES VERSION ${KRIGING_VERSION})
 # and a symlink with major number of version
 set_target_properties(Kriging PROPERTIES SOVERSION ${KRIGING_VERSION_MAJOR})
+
 
 # Declare public API of your library.
 # This API will be installed for third-party application.
@@ -16,9 +24,14 @@ set_target_properties(Kriging PROPERTIES SOVERSION ${KRIGING_VERSION_MAJOR})
 ## Pass top directory in included directories to avoid relative include path as ../lib/include/libKriging.h
 ## target_include_directories(Kriging PRIVATE .)
 ## target_include_directories (Kriging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(Kriging PUBLIC
+target_include_directories(Kriging
+        PUBLIC
+        # path of the headers afterinstallation
+        $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
+        # path of the headers before installation
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include/> # <prefix>/include/libKriging
+        # path of the generated headers before installation
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
         )
 
 # Create install rule for your library. Use variables CMAKE_INSTALL_*DIR defined in GNUInstallDir

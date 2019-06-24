@@ -1,5 +1,5 @@
 #include "libKriging/TestFunction.h"
 
-int f() {
+LIBKRIGING_EXPORT int f() {
     return 42;
 }
