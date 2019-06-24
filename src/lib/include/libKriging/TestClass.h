@@ -2,7 +2,7 @@
 #define LIBKRIGING_TESTCLASS_H
 
 #include <string>
-#include "libKriging_EXPORTS.h"
+#include "libKriging_exports.h"
 
 class TestClass {
 public:

@@ -6,9 +6,7 @@ add_library(Kriging
 include (GenerateExportHeader)
 GENERATE_EXPORT_HEADER(Kriging # generates the export header `lib`_EXPORTS.h automatically
         BASE_NAME LIBKRIGING
-        EXPORT_MACRO_NAME LIBKRIGING_EXPORT
-        EXPORT_FILE_NAME libKriging_EXPORTS.h
-        STATIC_DEFINE SHARED_EXPORTS_BUILT_AS_STATIC)
+        EXPORT_FILE_NAME libKriging_exports.h)
 
 # Version on library name
 set_target_properties(Kriging PROPERTIES VERSION ${KRIGING_VERSION})
