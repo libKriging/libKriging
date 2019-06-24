@@ -92,7 +92,7 @@ script:
       # Windows os has been filtered out in install step
       make coverage
     else
-      ctest -C ${MODE}
+      ctest -C ${MODE} # --verbose
     fi
 
 #addons:

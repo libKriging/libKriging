@@ -1,6 +1,7 @@
 add_library(Kriging
         STATIC
-        TestClass.cpp)
+        TestClass.cpp include/libKriging/TestClass.h
+        TestFunction.cpp include/libKriging/TestFunction.h)
 
 # Version on library name
 set_target_properties(Kriging PROPERTIES VERSION ${KRIGING_VERSION})

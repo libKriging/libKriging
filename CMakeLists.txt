@@ -105,7 +105,7 @@ enable_testing()
 
 add_custom_target(run_unit_tests
         COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT}
-        DEPENDS unit_tests
+        DEPENDS ${ALL_TESTS}
         COMMENT "Executing unit tests."
         )
 
@@ -135,7 +135,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
             # TODO verify what is the better input coverage_full or coverage_ctest
             #COMMAND ${LCOV} --extract coverage_full.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
             COMMAND ${LCOV} --extract coverage_ctest.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
-            DEPENDS unit_tests
+            DEPENDS ${ALL_TESTS}
             COMMENT "Running test coverage."
             WORKING_DIRECTORY "${LIBKRIGING_BINARY_DIR}"
             )
