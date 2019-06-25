@@ -99,13 +99,33 @@ script:
       # add library directory search PATH for executables
       export PATH=$PWD/src/lib/${MODE}:$PATH
     fi
+
   - >
     if [[ "$MODE" == "Coverage" ]]; then
       # Windows os has been filtered out in install step
-      make coverage
+      cmake --build . --target coverage --config Coverage
     else
       ctest -C ${MODE} # --verbose
     fi
+
+  - >
+    cmake --build . --target install --config ${MODE}
+    # Show installation directory content
+    find installed/strip
+    # Cleanup compiled libs to check right path finding
+    rm -fr src/lib
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "linux" || "$TRAVIS_OS_NAME" == "osx" ]]; then
+      # add library directory search PATH for executables
+      export LD_LIBRARY_PATH=$PWD/installed/lib:$LD_LIBRARY_PATH
+      ctest -C ${MODE}
+    fi
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
+      # add library directory search PATH for executables
+      export PATH=$PWD/installed/bin:$PATH
+    fi
+  -> ctest -C ${MODE}
 
 #addons:
 #  artifacts:
