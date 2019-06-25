@@ -2,6 +2,12 @@
 [![Coverage Status](https://coveralls.io/repos/github/MASCOTNUM/libKriging/badge.svg?branch=master)](https://coveralls.io/github/MASCOTNUM/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+Table of contents
+
+1. [Installation](#installation)
+    1. [Requirements](#requirements)
+    1. [Compilation and unit tests](#compilation-and-unit-tests)
+    1. [Deployment](#deployment)
 
 # Installation
 
@@ -84,14 +90,14 @@ PS: *`$NAME`* represents an absolute path of your choice
   ctest -C ${MODE}
   ```
    
-### Deployment
+## Deployment
 
 To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
 first `cmake` configuration command.
 
-If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directoty is `{BUILD}/installed`.
+If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directoty is `${BUILD}/installed`.
 
-# For Linux and MacOS
+### For Linux and MacOS
 
 e.g.:
 ```shell
@@ -104,7 +110,7 @@ cmake --build . --target install
 make install
 ```
 
-# For Windows
+### For Windows
 
 e.g.:
 ```shell
