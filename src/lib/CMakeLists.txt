@@ -6,7 +6,7 @@ add_library(Kriging
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html
 #   To build shared libraries in Windows, we set CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS to TRUE.
-#   See https://cmake.org/cmake/help/v3.4/variable/CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS.html
+#   See https://cmake.org/cmake/help/v3.11/prop_tgt/WINDOWS_EXPORT_ALL_SYMBOLS.html
 #   See https://blog.kitware.com/create-dlls-on-windows-without-declspec-using-new-cmake-export-all-feature/
 #   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
@@ -32,19 +32,36 @@ set_target_properties(Kriging PROPERTIES SOVERSION ${KRIGING_VERSION_MAJOR})
 ## target_include_directories (Kriging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(Kriging
         PUBLIC
-        # path of the headers afterinstallation
-        $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
-        # path of the headers before installation
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        # path of the generated headers before installation
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+            # path of the headers afterinstallation
+            $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
+            # path of the headers before installation
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            # path of the generated headers before installation
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
 # Create install rule for your library. Use variables CMAKE_INSTALL_*DIR defined in GNUInstallDir
-#include(GNUInstallDirs)
-
+include(GNUInstallDirs)
 # https://cmake.org/cmake/help/latest/command/install.html
-#install(TARGETS Kriging
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-#install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# https://pabloariasal.github.io/2018/02/19/its-time-to-do-cmake-right/
+install(TARGETS Kriging
+        EXPORT libKriging-export
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT devel
+        )
+install(EXPORT libKriging-export
+        FILE libKriging.cmake
+        NAMESPACE libKriging::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
+        )
+install(DIRECTORY
+        include/libKriging
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        )
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
+        )

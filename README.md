@@ -26,13 +26,13 @@
 ### Preamble
 
 We assume that:
-  * [libKriging](https://github.com/MASCOTNUM/libKriging.git) code is available locally in directory *`$LIBKRIGING`*  
-  * you have built a fresh new directory *`$BUILD`*
-  * following commands are executed in *`$BUILD`* directory 
+  * [libKriging](https://github.com/MASCOTNUM/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*  
+  * you have built a fresh new directory *`${BUILD}`*
+  * following commands are executed in *`${BUILD}`* directory 
   
 PS: *`$NAME`* represents an absolute path of your choice
 
- Select your compilation *`$MODE`* between: 
+ Select your compilation *`${MODE}`* between: 
   * `Release` : produce an optimized code
   * `Debug` (default) : produce a debug code
   * `Coverage` : for code coverage analysis (not yet tested with Windows)
@@ -40,39 +40,77 @@ PS: *`$NAME`* represents an absolute path of your choice
 ### Compilation for Linux and MacOS
   * Configure
   ```shell
-  cmake -DCMAKE_BUILD_TYPE=$MODE $LIBKRIGING
+  cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
   ```
   * Build
   ```shell
   cmake --build .
+  # aka with classical makefiles
+  make  
   ```
   * Run tests
   ```shell
   ctest
+  # aka with classical makefiles
+  make test  
   ```
   
   * if you have selected `Coverage` mode, you can generate code coverage analysis over all tests using
   ```shell
+  cmake --build . --target coverage --config Coverage
+  # aka with classical makefiles
   make coverage
    ```
   or 
   ```shell
+  cmake --build . --target coverage-report --config Coverage
+  # aka with classical makefiles
   make coverage-report
    ```
-  to produce an html report located in `$BUILD/coverage/index.html`
+  to produce an html report located in `${BUILD}/coverage/index.html`
    
 ### Compilation for Windows
   * Configure
   ```shell
-  cmake $LIBKRIGING
+  cmake ${LIBKRIGING}
   ```
   * Build
   ```shell
-  cmake --build . --target ALL_BUILD --config $MODE
+  cmake --build . --target ALL_BUILD --config ${MODE}
   ```
   * Run tests
   ```shell
-  export PATH=$BUILD/src/lib/$MODE:$PATH
-  ctest -C $MODE
+  export PATH=${BUILD}/src/lib/${MODE}:$PATH
+  ctest -C ${MODE}
   ```
    
+### Deployment
+
+To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
+first `cmake` configuration command.
+
+If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directoty is `{BUILD}/installed`.
+
+# For Linux and MacOS
+
+e.g.:
+```shell
+cmake -DCMAKE_BUILD_TYPE=${MODE} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING}
+```
+and then 
+```shell
+cmake --build . --target install
+# aka with classical makefiles
+make install
+```
+
+# For Windows
+
+e.g.:
+```shell
+cmake -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
+```
+and then 
+```shell
+cmake --build . --target install --config ${MODE}
+```

@@ -20,6 +20,13 @@ project(libKriging
 
 #------------------------------------------------------
 
+# Prevent from root system installation
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set (CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installed" CACHE PATH "default install path" FORCE )
+endif()
+
+#------------------------------------------------------
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 #------------------------------------------------------
