@@ -3,6 +3,14 @@ add_library(Kriging
         TestClass.cpp include/libKriging/TestClass.h
         TestFunction.cpp include/libKriging/TestFunction.h)
 
+# TODO check if this method is useful
+# * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html
+#   To build shared libraries in Windows, we set CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS to TRUE.
+#   See https://cmake.org/cmake/help/v3.4/variable/CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS.html
+#   See https://blog.kitware.com/create-dlls-on-windows-without-declspec-using-new-cmake-export-all-feature/
+#   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
+# https://cmake.org/cmake/help/v3.11/module/GenerateExportHeader.html
 include (GenerateExportHeader)
 GENERATE_EXPORT_HEADER(Kriging # generates the export header `lib`_EXPORTS.h automatically
         BASE_NAME LIBKRIGING
