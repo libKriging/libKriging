@@ -125,7 +125,8 @@ script:
       # add library directory search PATH for executables
       export PATH=$PWD/installed/bin:$PATH
     fi
-  -> ctest -C ${MODE}
+  - >
+    ctest -C ${MODE}
 
 #addons:
 #  artifacts:
