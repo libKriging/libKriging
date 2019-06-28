@@ -3,9 +3,6 @@ language: bash
 # Doc
 # - Travis Job Lifecycle : https://docs.travis-ci.com/user/job-lifecycle/
 
-env:
-  - DEBUG_CI=true
-
 matrix:
   include:
     - name: "Linux Debug"
@@ -69,6 +66,32 @@ matrix:
 #          update: true
 #          packages:
 #            - lcov
+
+    - name: "R Linux"
+      os: linux
+      dist: xenial
+      env:
+        - DEBUG_CI=true
+        - BUILD_NAME="r-linux-macos"
+      addons:
+        apt:
+          update: true
+          packages:
+            - r-base
+            - r-base-core
+            - r-base-dev
+
+    - name: "R MacOS"
+      os: osx
+      osx_image: xcode9.4
+      env:
+        - DEBUG_CI=true
+        - BUILD_NAME="r-linux-macos"
+      addons:
+        homebrew:
+          update: true
+          packages:
+            - r
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh

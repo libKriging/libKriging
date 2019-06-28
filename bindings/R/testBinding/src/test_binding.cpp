@@ -8,6 +8,8 @@
 // FIXME: collision with Rinternals
 //#include <iostream>
 
+#include <memory>
+
 #include <libKriging/libKriging.h>
 
 extern "C" SEXP test_binding() {

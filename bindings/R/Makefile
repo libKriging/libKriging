@@ -5,13 +5,20 @@ build:
 	# R CMD build testBinding
 
 	# build package after build
-	R CMD INSTALL --build testBinding
+	mkdir -p ./Rlibs
+	R CMD INSTALL -l ./Rlibs --build testBinding
 
 remove:
-	R CMD REMOVE testBinding
+	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE testBinding
 
 test:
 	# output in tty
-	Rscript testBinding/test/test.R
+	export R_LIBS=$(PWD)/Rlibs && Rscript testBinding/test/test.R
 	# output in .Rout file
-	R CMD BATCH testBinding/test/test.R
+	export R_LIBS=$(PWD)/Rlibs && R CMD BATCH testBinding/test/test.R
+
+clean:
+	rm -fr testBinding/src/installed
+	rm -fr testBinding/src/build
+	rm -fr testBinding/src/testBinding.*
+	rm -fr testBinding/src/test_binding.o
