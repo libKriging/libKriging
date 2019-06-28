@@ -9,6 +9,13 @@ TestClass() = default;
 LIBKRIGING_EXPORT
 std::string
 TestClass::
-f() {
+name() {
     return typeid(this).name();
+}
+
+LIBKRIGING_EXPORT
+int
+TestClass::
+f() {
+    return 42;
 }
