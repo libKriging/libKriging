@@ -1,7 +1,10 @@
+# SHARED or STATIC type if defined using BUILD_SHARED_LIBS variable
+# ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
+# default value is defined in root CMakeLists.txt
 add_library(Kriging
-        SHARED
         TestClass.cpp include/libKriging/TestClass.h
-        TestFunction.cpp include/libKriging/TestFunction.h)
+        TestFunction.cpp include/libKriging/TestFunction.h
+        )
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html

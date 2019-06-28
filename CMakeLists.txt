@@ -27,6 +27,21 @@ endif()
 
 #------------------------------------------------------
 
+# Default behaviour is to build shared library
+# Change its behaviour using -DBUILD_SHARED_LIBS:BOOL=OFF
+if (NOT DEFINED BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS on
+            CACHE BOOL "Global flag to cause add_library to create shared libraries if on"
+            FORCE)
+endif()
+if (BUILD_SHARED_LIBS)
+    message(STATUS "Build shared library")
+else()
+    message(STATUS "Build static library")
+endif()
+
+#------------------------------------------------------
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 #------------------------------------------------------
