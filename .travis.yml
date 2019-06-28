@@ -49,7 +49,7 @@ matrix:
       dist: xenial
       compiler: clang
       env:
-        - BUILD_NAME="linux-macos-coverage"
+        - BUILD_NAME="linux-macos"
         - MODE=Coverage
       addons:
         apt:
