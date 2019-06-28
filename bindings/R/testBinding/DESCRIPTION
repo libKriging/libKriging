@@ -1,0 +1,13 @@
+Package: testBinding
+Type: Package
+Title: Test wrapper
+Version: 0.0-0
+Date: 2019-06-28
+Author: Pascal Havé <hpwxf@haveneer.com>
+Maintainer: Pascal Havé <hpwxf@haveneer.com>
+Description: A package that demonstrates how to wrap
+             a library using local library.
+License: Apache (>= 2)
+Encoding: UTF-8
+Depends: R (>= 2.14)
+Collate: testBindingWrapper.R

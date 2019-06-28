@@ -1,0 +1,8 @@
+# Import required packages
+# none so far
+
+# Load dynamic libraries (shared object files)
+useDynLib(testBinding)
+
+# Export functions defined in R code
+export("test_binding")
