@@ -3,9 +3,11 @@ cmake_minimum_required(VERSION 3.10)
 # CMake utils
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Forbids in-source builds (placed before PROJECT keyword)
-set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+## Forbids in-source builds (placed before PROJECT keyword)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+# Partially disabled since Armadillo do not preserve its source directory when
+# this is due to line: configure_file(${PROJECT_SOURCE_DIR}/examples/Makefile.cmake ${PROJECT_SOURCE_DIR}/examples/Makefile)
+# set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
 # VERSION must follow pattern : <major>.<minor>.<patch>
 set(KRIGING_VERSION_MAJOR 0)
@@ -16,7 +18,7 @@ set(KRIGING_VERSION "${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING
 project(libKriging
         VERSION ${KRIGING_VERSION}
         DESCRIPTION "LibKriging")
-# PORJECT_VERSION now contains also KRIGING_VERSION
+# PROJECT_VERSION now contains also KRIGING_VERSION
 
 #------------------------------------------------------
 
@@ -24,6 +26,11 @@ project(libKriging
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set (CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installed" CACHE PATH "default install path" FORCE )
 endif()
+
+#------------------------------------------------------
+
+# Dependencies
+add_subdirectory(dependencies/armadillo-code)
 
 #------------------------------------------------------
 
