@@ -14,7 +14,7 @@ fi
 
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=${MODE}
+cmake .. -DCMAKE_INSTALL_PREFIX:PATH=./installed -DCMAKE_BUILD_TYPE=${MODE}
 cmake --build .
 
 if [[ "$MODE" == "Coverage" ]]; then
