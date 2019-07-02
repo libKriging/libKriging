@@ -75,10 +75,10 @@ PS: *`$NAME`* represents an absolute path of your choice
    ```
   to produce an html report located in `${BUILD}/coverage/index.html`
    
-### Compilation for Windows
+### Compilation for Windows 64bits
   * Configure
   ```shell
-  cmake ${LIBKRIGING}
+  cmake -DCMAKE_GENERATOR_PLATFORM=x64 ${LIBKRIGING}
   ```
   * Build
   ```shell
@@ -110,11 +110,11 @@ cmake --build . --target install
 make install
 ```
 
-### For Windows
+### For Windows 64bits
 
 e.g.:
 ```shell
-cmake -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
+cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
 ```
 and then 
 ```shell

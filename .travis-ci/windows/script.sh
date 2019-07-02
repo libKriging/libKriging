@@ -14,7 +14,7 @@ fi
 
 mkdir build
 cd build
-cmake ..
+cmake .. -DCMAKE_GENERATOR_PLATFORM=x64
 cmake --build . --target ALL_BUILD --config ${MODE}
 # add library directory search PATH for executables
 export PATH=$PWD/src/lib/${MODE}:$PATH
