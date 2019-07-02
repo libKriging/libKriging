@@ -14,7 +14,7 @@ fi
 
 mkdir build
 cd build
-cmake .. -DCMAKE_GENERATOR_PLATFORM=x64
+cmake .. -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 cmake --build . --target ALL_BUILD --config ${MODE}
 # add library directory search PATH for executables
 export PATH=$PWD/src/lib/${MODE}:$PATH
@@ -31,4 +31,7 @@ cmake --build . --target install --config ${MODE}
 rm -fr src/lib
 # add library directory search PATH for executables
 export PATH=$PWD/installed/bin:$PATH
+# add OpenBLAS DLL library path
+export PATH=$HOME/Miniconda3/Library/bin:$PATH
+
 ctest -C ${MODE}

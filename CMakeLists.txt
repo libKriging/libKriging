@@ -31,6 +31,9 @@ endif()
 
 #------------------------------------------------------
 
+option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for finding libs")
+list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
+
 # Dependencies
 add_subdirectory(dependencies/armadillo-code)
 
