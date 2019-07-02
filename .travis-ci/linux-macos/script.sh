@@ -25,7 +25,7 @@ fi
 
 cmake --build . --target install --config ${MODE}
 # Show installation directory content
-find installed
+# find installed
 # Cleanup compiled libs to check right path finding
 rm -fr src/lib
 # add library directory search PATH for executables
