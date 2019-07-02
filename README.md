@@ -9,6 +9,26 @@ Table of contents
     1. [Compilation and unit tests](#compilation-and-unit-tests)
     1. [Deployment](#deployment)
 
+# Get the code
+
+When to clone this repository don't forget to initialize submodule.
+
+While cloning:
+```
+git clone --recurse-submodules https://github.com/MASCOTNUM/libKriging.git
+```
+
+After cloning:
+```
+git clone --recursive https://github.com/MASCOTNUM/libKriging.git
+git submodule update --init --recursive
+```
+
+When you checkout a branch
+```
+git checkout --recurse-submodules master
+```
+
 # Installation
 
 ## Requirements
