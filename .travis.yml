@@ -34,9 +34,6 @@ matrix:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
 
-    # Help : https://travis-ci.community/c/environments/windows
-    # Pre-installed packages: https://docs.travis-ci.com/user/reference/windows/
-    # use `choco` command as package command
     - name: "Windows Debug"
       os: windows
       env:
