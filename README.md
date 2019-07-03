@@ -39,7 +39,7 @@ git checkout --recurse-submodules master
      
   |   Compiler/OS    | Linux        | MacOS                    | Windows       |
   |:----------------:|:-------------|:-------------------------|:--------------|
-  |       GCC        | **5.4**, 8.3 |                          |               |
+  |       GCC        | **5.4**, 8.3 |                          | **4.9.3** (R) |
   |      Clang       | 7.1          | AppleClang **9.1**, 10.0 |               |
   | MS Visual Studio |              |                          | **15 (2017)** |
   
