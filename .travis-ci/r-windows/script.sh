@@ -20,11 +20,11 @@ export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 
-# Crazy hack is R try to call 'g++ ' as compiler
+# Crazy hack since R try to call 'g++ ' as compiler
 # Message looks like:
 # /usr/bin/sh: line 8: g++ : command not found
 #       with a space here ^
-# ln -sf "$(which g++).exe" "$(which g++) .exe"
+ln -sf "$(which g++).exe" "$(which g++) .exe"
 
 cd bindings/R
 make clean
