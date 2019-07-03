@@ -1,0 +1,49 @@
+## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
+## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
+
+PKG_CFLAGS=
+PKG_CPPFLAGS=-Iinstalled/include
+PKG_CXXFLAGS=-std=c++11
+PKG_LIBS=-Linstalled/lib -lKriging
+
+## GNU Makefile mode using R compilers
+EXT=a
+
+## Visual studio mode using Visual studio compilers
+# EXT=lib
+
+## To build libKriging before
+all: installed/lib/libKriging.$(EXT)
+
+$(SHLIB): installed/lib/libKriging.$(EXT)
+
+## Visual studio mode
+## Final link is not compatible (incompatile ABI) but everything before is ok
+#installed/lib/libKriging.lib:
+#	rm -fr build
+#	mkdir -p build
+#	cd build \
+#		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
+#			-DBUILD_SHARED_LIBS=off \
+#			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+#			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
+#			-DCMAKE_GENERATOR_PLATFORM=x64 \
+#			-DEXTRA_SYSTEM_LIBRARY_PATH=$(EXTRA_SYSTEM_LIBRARY_PATH) \
+#			../../../../.. \
+#		&& cmake --build . --target install --config Release
+
+## GNU Makefile mode
+installed/lib/libKriging.a:
+	rm -fr build
+	mkdir -p build
+	cd build \
+		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CC="$(CC)" CXXFLAGS="$(CXXFLAGS)" cmake \
+			-G "Unix Makefiles" \
+			-DBUILD_SHARED_LIBS=off \
+			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
+			-DEXTRA_SYSTEM_LIBRARY_PATH=$(EXTRA_SYSTEM_LIBRARY_PATH) \
+			-DCMAKE_BUILD_TYPE=Release \
+			../../../../.. \
+		&& cmake --build . --target install
+

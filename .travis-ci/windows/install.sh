@@ -10,10 +10,11 @@ if [[ "$MODE" == "Coverage" ]]; then
     travis_terminate 1
 fi
 
-TMPDIR=$(mktemp -d)
-curl -o ${TMPDIR}/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f ${BASEDIR})
+
+TMPDIR=$(mktemp -d)
+curl -o ${TMPDIR}/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
 cd ${TMPDIR}
 ${BASEDIR}/install_conda.bat
 cd ${BASEDIR}

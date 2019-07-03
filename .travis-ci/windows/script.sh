@@ -12,9 +12,12 @@ echo
     cd ${TRAVIS_BUILD_DIR}
 fi
 
+# OpenBLAS installation
+export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
+
 mkdir build
 cd build
-cmake .. -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
+cmake .. -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}
 cmake --build . --target ALL_BUILD --config ${MODE}
 # add library directory search PATH for executables
 export PATH=$PWD/src/lib/${MODE}:$PATH

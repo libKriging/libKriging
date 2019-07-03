@@ -81,6 +81,7 @@ matrix:
         - BUILD_NAME="r-linux-macos"
       addons:
         apt:
+          update: true
           packages:
             - liblapack-dev
             - r-base
@@ -98,6 +99,12 @@ matrix:
           update: true
           packages:
             - r
+
+    - name: "R Windows"
+      os: windows
+      env:
+        - DEBUG_CI=true
+        - BUILD_NAME="r-windows"
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh
