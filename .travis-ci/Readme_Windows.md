@@ -52,7 +52,7 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
 
     ```
     # bash script
-    choco install cmake
+    choco install -y cmake
     export PATH='C:\Program Files\CMake\bin':$PATH
     git clone --recurse-submodules https://github.com/haveneer/libKriging.git
     cd libKriging
