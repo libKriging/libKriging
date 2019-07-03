@@ -56,7 +56,7 @@ We assume that:
   * you have built a fresh new directory *`${BUILD}`*
   * following commands are executed in *`${BUILD}`* directory 
   
-PS: *`$NAME`* represents an absolute path of your choice
+PS: *`${NAME}`* represents a word or an absolute path of your choice
 
  Select your compilation *`${MODE}`* between: 
   * `Release` : produce an optimized code
@@ -65,50 +65,51 @@ PS: *`$NAME`* represents an absolute path of your choice
 
 ### Compilation for Linux and MacOS
   * Configure
-  ```shell
-  cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
-  ```
+      ```shell
+      cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
+      ```
   * Build
-  ```shell
-  cmake --build .
-  # aka with classical makefiles
-  make  
-  ```
+      ```shell
+      cmake --build .
+      # aka with classical makefiles
+      make  
+      ```
   * Run tests
-  ```shell
-  ctest
-  # aka with classical makefiles
-  make test  
-  ```
+      ```shell
+      ctest
+      # aka with classical makefiles
+      make test  
+      ```
   
-  * if you have selected `Coverage` mode, you can generate code coverage analysis over all tests using
-  ```shell
-  cmake --build . --target coverage --config Coverage
-  # aka with classical makefiles
-  make coverage
-   ```
+  * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
+      ```shell
+      cmake --build . --target coverage --config Coverage
+      # aka with classical makefiles
+      make coverage
+       ```
   or 
-  ```shell
-  cmake --build . --target coverage-report --config Coverage
-  # aka with classical makefiles
-  make coverage-report
-   ```
+      ```shell
+      cmake --build . --target coverage-report --config Coverage
+      # aka with classical makefiles
+      make coverage-report
+       ```
   to produce an html report located in `${BUILD}/coverage/index.html`
    
 ### Compilation for Windows 64bits
   * Configure
-  ```shell
-  cmake -DCMAKE_GENERATOR_PLATFORM=x64 ${LIBKRIGING}
-  ```
+      ```shell
+      cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
+      ```
+      where `EXTRA_SYSTEM_LIBRARY_PATH` is an extra path where libraries (e.g. OpenBLAS) can be found.
   * Build
-  ```shell
-  cmake --build . --target ALL_BUILD --config ${MODE}
-  ```
+      ```shell
+      cmake --build . --target ALL_BUILD --config ${MODE}
+      ```
   * Run tests
-  ```shell
-  export PATH=${BUILD}/src/lib/${MODE}:$PATH
-  ctest -C ${MODE}
-  ```
+      ```shell
+      export PATH=${BUILD}/src/lib/${MODE}:$PATH
+      ctest -C ${MODE}
+      ```
    
 ## Deployment
 
@@ -134,7 +135,7 @@ make install
 
 e.g.:
 ```shell
-cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
+cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
 ```
 and then 
 ```shell
