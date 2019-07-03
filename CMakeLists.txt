@@ -153,6 +153,9 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
         message(FATAL_ERROR "lcov not found, cannot perform coverage.")
     endif()
 
+    # Don't forget '' around each pattern
+    set(LCOV_EXCLUDE_PATTERN "'${LIBKRIGING_SOURCE_DIR}/dependencies/*'")
+
     add_custom_target(coverage
             # Cleanup previously generated profiling data
             COMMAND ${LCOV} --base-directory ${LIBKRIGING_SOURCE_DIR} --directory ${LIBKRIGING_BINARY_DIR} --zerocounters
@@ -166,9 +169,8 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
             # Combine base and ctest results
             COMMAND ${LCOV} --add-tracefile coverage_base.info --add-tracefile coverage_ctest.info --output-file coverage_full.info
             # Extract only project data (--no-capture or --remove options may be used to select collected data)
-            # TODO verify what is the better input coverage_full or coverage_ctest
-            #COMMAND ${LCOV} --extract coverage_full.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
-            COMMAND ${LCOV} --extract coverage_ctest.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
+            COMMAND ${LCOV} --remove coverage_full.info ${LCOV_EXCLUDE_PATTERN} --output-file coverage_filtered.info
+            COMMAND ${LCOV} --extract coverage_filtered.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
             DEPENDS all_test_binaries
             COMMENT "Running test coverage."
             WORKING_DIRECTORY "${LIBKRIGING_BINARY_DIR}"
