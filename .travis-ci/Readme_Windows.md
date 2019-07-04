@@ -62,12 +62,19 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
     MODE=Release
     EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
     cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ..
-    cmake --build . --target ALL_BUILD --config ${RELEASE}
+    cmake --build . --target ALL_BUILD --config ${MODE}
     export PATH=${BUILD}/src/bin/${MODE}:$PATH
     export PATH=$HOME/Miniconda3/Library/bin:$PATH
     ctest -C ${MODE}
     ```
     
+    If you need R tools, replace `.travis-ci/windows/install.sh` nu '.travis-ci/r-windows/install.sh` and extend search PATH (as described at the end of install command)
+    ```
+    export PATH="/c/Program Files/make/make-4.2.1/bin":\$PATH
+    export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
+    export PATH="/c/Rtools/mingw_64/bin":$PATH
+    ```
+
 * For file edition
 Using bash shell:
     ```

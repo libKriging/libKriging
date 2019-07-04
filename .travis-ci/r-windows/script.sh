@@ -16,7 +16,7 @@ export PATH="/c/Program Files/make/make-4.2.1/bin":${PATH}
 
 # R shortcut (and tools with absolute path) by Chocolatey
 export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
-# Required to desambiguish with Chocolatey GCC installation
+# Required to disambiguate with Chocolatey GCC installation
 export PATH="/c/Rtools/mingw_64/bin":$PATH
 
 ## R shortcut (and tools) by Anaconda
