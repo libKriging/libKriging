@@ -21,6 +21,7 @@ if [ ! -d "C:/Rtools" ]; then
     # https://cran.r-project.org/bin/windows/Rtools
     curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
     ${BASEDIR}/install_rtools.bat
+    export PATH="/c/Rtools/mingw_64/bin":$PATH
 fi
 if [[ "$DEBUG_CI" != true ]]; then
 echo
@@ -36,6 +37,7 @@ fi
 ## https://anaconda.org/r/r
 ## https://anaconda.org/r/rtools
 #${HOME}/Miniconda3/condabin/conda.bat install -y -c r r rtools
+#export PATH=\$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH
 #if [[ "$DEBUG_CI" != true ]]; then
 #echo
 #echo 'Add following paths:'
@@ -44,3 +46,10 @@ fi
 #echo 'export PATH=\$HOME/Miniconda3/Rtools/mingw_64/bin:\$PATH'
 #echo
 #fi
+
+
+# Crazy hack since R try to call 'g++ ' as compiler
+# Message looks like:
+# /usr/bin/sh: line 8: g++ : command not found
+#       with a space here ^
+ln -sf "$(which g++).exe" "$(which g++) .exe"
