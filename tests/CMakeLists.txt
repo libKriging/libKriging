@@ -1,6 +1,3 @@
-# Prepare Catch2 libray (header only)
-target_include_directories(Catch2 INTERFACE ${CATCH_INCLUDE_DIR})
-
 # target_link_libraries links the executable to the library.
 # Since the library has public include directories we will use those link directories when building
 
