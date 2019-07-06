@@ -194,7 +194,14 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
                 WORKING_DIRECTORY "${LIBKRIGING_BINARY_DIR}"
                 )
     endif()
-
+else()
+    add_custom_target(coverage
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMAND ${CMAKE_COMMAND} -E echo "*** Use CMAKE_BUILD_TYPE=Coverage option in cmake configuration to enable code coverage ***"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMENT "Inform about not available code coverage."
+            )
+    add_custom_target(coverage-report DEPENDS coverage)
 endif()
 
 # Previous implementation using gcovr
