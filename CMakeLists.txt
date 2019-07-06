@@ -134,6 +134,10 @@ add_subdirectory(src)
 
 #------------------------------------------------------
 
+set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
+include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
+add_subdirectory("${CATCH_MODULE_PATH}")
+
 add_subdirectory(tests)
 enable_testing()
 
