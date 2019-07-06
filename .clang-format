@@ -1,0 +1,18 @@
+---
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# customized using https://zed0.co.uk/clang-format-configurator/
+---
+BasedOnStyle: Chromium
+AllowShortBlocksOnASingleLine: 'false'
+AllowShortCaseLabelsOnASingleLine: 'false'
+AllowShortIfStatementsOnASingleLine: 'false'
+AllowShortLoopsOnASingleLine: 'false'
+AlwaysBreakTemplateDeclarations: 'Yes'
+BinPackParameters: 'false'
+BreakBeforeBinaryOperators: All
+BreakInheritanceList: BeforeComma
+ColumnLimit: '120'
+CompactNamespaces: 'false'
+ForEachMacros: ['SECTION']
+FixNamespaceComments: 'true'
+UseTab: Never

@@ -203,3 +203,24 @@ else()
             )
     add_custom_target(coverage-report DEPENDS coverage)
 endif()
+
+#------------------------------------------------------
+
+# search for clang-format and add target
+find_program(CLANG_FORMAT clang-format)
+if (CLANG_FORMAT)
+    add_custom_target(clang-format
+            COMMAND echo "running ${CLANG_FORMAT} ..."
+            COMMAND ${CMAKE_COMMAND}
+            -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
+            -DCLANG_FORMAT="${CLANG_FORMAT}"
+            -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
+else ()
+    message(WARNING "clang-format no found!")
+    add_custom_target(clang-format
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMAND ${CMAKE_COMMAND} -E echo "*** code formatting not available since clang-format has not been found ***"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMENT "Inform about not available code coverage."
+            )
+endif()
