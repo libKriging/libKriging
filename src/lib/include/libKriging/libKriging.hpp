@@ -3,4 +3,4 @@
 
 #include "TestClass.hpp"
 
-#endif //LIBKRIGING_LIBKRIGING_H
+#endif  // LIBKRIGING_LIBKRIGING_H

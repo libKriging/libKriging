@@ -5,10 +5,10 @@
 #include "libKriging_exports.h"
 
 class TestClass {
-public:
-    LIBKRIGING_EXPORT TestClass();
-    LIBKRIGING_EXPORT std::string name();
-    LIBKRIGING_EXPORT int f();
+ public:
+  LIBKRIGING_EXPORT TestClass();
+  LIBKRIGING_EXPORT std::string name();
+  LIBKRIGING_EXPORT int f();
 };
 
-#endif //LIBKRIGING_TESTCLASS_HPP
+#endif  // LIBKRIGING_TESTCLASS_HPP
