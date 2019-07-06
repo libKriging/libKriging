@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://gitlab.com/conradsnicta/armadillo-code.git
+	branch = 9.500.x
+	commit = 5af8157f392083c2a16740b426ada2af111b2f6e
+	parent = f448ab5d18001cfcdaab7239149a8128bd6bffb4
+	method = merge
+	cmdver = 0.4.0
