@@ -11,23 +11,13 @@ Table of contents
 
 # Get the code
 
-When to clone this repository don't forget to initialize submodule.
-
-While cloning:
+Just clone it:
 ```
-git clone --recurse-submodules https://github.com/MASCOTNUM/libKriging.git
+git clone https://github.com/MASCOTNUM/libKriging.git
 ```
 
-After cloning:
-```
-git clone --recursive https://github.com/MASCOTNUM/libKriging.git
-git submodule update --init --recursive
-```
-
-When you checkout a branch
-```
-git checkout --recurse-submodules master
-```
+Dependencies are plugged in as [subrepo](https://github.com/ingydotnet/git-subrepo) components.
+If you want to manage then, you need to install [subrepo](https://github.com/ingydotnet/git-subrepo) (for normal usage, this is not required).
 
 # Installation
 
