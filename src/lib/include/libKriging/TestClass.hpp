@@ -1,5 +1,5 @@
-#ifndef LIBKRIGING_TESTCLASS_H
-#define LIBKRIGING_TESTCLASS_H
+#ifndef LIBKRIGING_TESTCLASS_HPP
+#define LIBKRIGING_TESTCLASS_HPP
 
 #include <string>
 #include "libKriging_exports.h"
@@ -11,4 +11,4 @@ public:
     LIBKRIGING_EXPORT int f();
 };
 
-#endif //LIBKRIGING_TESTCLASS_H
+#endif //LIBKRIGING_TESTCLASS_HPP

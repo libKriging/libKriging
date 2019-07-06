@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "libKriging/TestClass.h"
+#include "libKriging/TestClass.hpp"
 
 #include <memory>
 

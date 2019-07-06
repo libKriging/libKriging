@@ -2,8 +2,8 @@
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
-        TestClass.cpp include/libKriging/TestClass.h
-        TestFunction.cpp include/libKriging/TestFunction.h
+        TestClass.cpp include/libKriging/TestClass.hpp
+        TestFunction.cpp include/libKriging/TestFunction.hpp
         )
 
 # TODO check if this method is useful

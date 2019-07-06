@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "libKriging/TestFunction.h"
+#include "libKriging/TestFunction.hpp"
 
 #include <memory>
 

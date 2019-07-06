@@ -1,6 +1,6 @@
 #ifndef LIBKRIGING_LIBKRIGING_H
 #define LIBKRIGING_LIBKRIGING_H
 
-#include "TestClass.h"
+#include "TestClass.hpp"
 
 #endif //LIBKRIGING_LIBKRIGING_H

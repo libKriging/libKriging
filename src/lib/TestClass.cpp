@@ -1,4 +1,4 @@
-#include "include/libKriging/TestClass.h"
+#include "include/libKriging/TestClass.hpp"
 
 #include <typeinfo>
 
