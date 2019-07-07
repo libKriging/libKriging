@@ -9,4 +9,5 @@ if [[ "$DEBUG_CI" == true ]]; then
     echo $PATH
     c++ --version
     cmake --version
+    R --version
 fi

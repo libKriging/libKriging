@@ -79,14 +79,8 @@ matrix:
       env:
         - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
-      addons:
-        apt:
-          update: true
-          packages:
-            - liblapack-dev
-            - r-base
-            - r-base-core
-            - r-base-dev
+      language: r
+      r: release
 
     - name: "R MacOS"
       os: osx
@@ -94,11 +88,8 @@ matrix:
       env:
         - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
-      addons:
-        homebrew:
-          update: true
-          packages:
-            - r
+      language: r
+      r: release
 
     - name: "R Windows"
       os: windows
