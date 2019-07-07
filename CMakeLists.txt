@@ -224,3 +224,12 @@ else ()
             COMMENT "Inform about not available code coverage."
             )
 endif()
+
+#------------------------------------------------------
+
+# Custom install.lib target whuch does not compile tests
+ADD_CUSTOM_TARGET(install.lib
+        ${CMAKE_COMMAND}
+        -DBUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -P ${CMAKE_BINARY_DIR}/cmake_install.cmake)
+ADD_DEPENDENCIES(install.lib Kriging armadillo)
