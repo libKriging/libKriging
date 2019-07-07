@@ -6,3 +6,4 @@ useDynLib(testBinding)
 
 # Export functions defined in R code
 export("test_binding")
+export("test_binding2")

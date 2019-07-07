@@ -13,7 +13,7 @@ target_link_libraries(function_unit_test LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries function_unit_test)
 
 add_executable(armadillo_example armadillo_example.cpp)
-target_link_libraries(armadillo_example LINK_PUBLIC armadillo)
+target_link_libraries(armadillo_example LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries armadillo_example)
 
 add_executable(catch2_unit_test catch2_unit_test.cpp)

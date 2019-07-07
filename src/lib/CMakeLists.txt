@@ -4,7 +4,9 @@
 add_library(Kriging
         TestClass.cpp include/libKriging/TestClass.hpp
         TestFunction.cpp include/libKriging/TestFunction.hpp
-        )
+        ArmadilloTestClass.cpp include/libKriging/ArmadilloTestClass.hpp)
+
+target_link_libraries(Kriging PUBLIC armadillo)
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html

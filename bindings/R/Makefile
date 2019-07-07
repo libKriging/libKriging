@@ -26,7 +26,7 @@ clean:
 	rm -fr testBinding/src/installed
 	rm -fr testBinding/src/build
 	rm -fr testBinding/src/testBinding.*
-	rm -fr testBinding/src/test_binding.o
+	rm -fr testBinding/src/*.o
 
 uninstall:
 	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE testBinding
