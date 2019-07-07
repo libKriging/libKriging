@@ -12,6 +12,6 @@ echo
 fi
 
 cd bindings/R
-make clean
+make veryclean
 make
 make test

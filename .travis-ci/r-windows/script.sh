@@ -27,6 +27,6 @@ export PATH="/c/Rtools/mingw_64/bin":$PATH
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 
 cd bindings/R
-make clean
+make veryclean
 make
 make test

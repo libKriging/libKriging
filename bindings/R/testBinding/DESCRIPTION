@@ -9,5 +9,7 @@ Description: A package that demonstrates how to wrap
              a library using local library.
 License: Apache (>= 2)
 Encoding: UTF-8
-Depends: R (>= 2.14)
+Imports: Rcpp (>= 0.12.11)
+LinkingTo: Rcpp, RcppArmadillo
+Depends: RhpcBLASctl, R (>= 2.14)
 Collate: testBindingWrapper.R

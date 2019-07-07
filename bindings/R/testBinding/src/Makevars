@@ -22,4 +22,4 @@ installed/lib/libKriging.a:
 			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
 			-DCMAKE_BUILD_TYPE=Release \
 			../../../../.. \
-		&& cmake --build . --target install
+		&& cmake --build . --target install.lib

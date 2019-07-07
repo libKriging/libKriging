@@ -1,18 +1,22 @@
 all: build
 
-build:
+build: ./Rlibs/testBinding
+./Rlibs/testBinding: prepare
 	## build package before build
 	# R CMD build testBinding
 
 	## build package after build
 	mkdir -p ./Rlibs
 	## --no-multiarch is only usefull for windows with visual studio mode
-	R CMD INSTALL --no-multiarch -l ./Rlibs --build testBinding
+	export R_LIBS=$(PWD)/Rlibs && R CMD INSTALL --no-multiarch -l ./Rlibs --build testBinding
 
-remove:
-	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE testBinding
+prepare: ./Rlibs/.prepared
+./Rlibs/.prepared:
+	mkdir -p ./Rlibs
+	export R_LIBS=$(PWD)/Rlibs && Rscript testBinding/install/install.R
+	date >> ./Rlibs/.prepared
 
-test:
+test: ./Rlibs/testBinding
 	## output in tty
 	export R_LIBS=$(PWD)/Rlibs && Rscript testBinding/test/test.R
 	## output in .Rout file
@@ -23,3 +27,9 @@ clean:
 	rm -fr testBinding/src/build
 	rm -fr testBinding/src/testBinding.*
 	rm -fr testBinding/src/test_binding.o
+
+uninstall:
+	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE testBinding
+
+veryclean: clean
+	rm -fr ./Rlibs

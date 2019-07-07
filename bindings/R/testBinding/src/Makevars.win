@@ -46,7 +46,5 @@ installed/lib/libKriging.a:
 			-DEXTRA_SYSTEM_LIBRARY_PATH=$(EXTRA_SYSTEM_LIBRARY_PATH) \
 			-DCMAKE_BUILD_TYPE=Release \
 			../../../../.. \
-		|| cat $(HOME)/build/haveneer/libKriging/bindings/R/testBinding/src/build/CMakeFiles/CMakeOutput.log
-	cd build \
-		&& cmake --build . --target install
+		&& cmake --build . --target install.lib
 
