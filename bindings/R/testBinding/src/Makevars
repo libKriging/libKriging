@@ -1,25 +1,57 @@
 ## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
-PKG_CFLAGS=
-PKG_CPPFLAGS=-Iinstalled/include
-PKG_LIBS=-Linstalled/lib -lKriging
+MAKE_SHARED_LIBS=on
 
-## To build libKriging before
-all: installed/lib/libKriging.a
+## Using shared libs with Linux|MacOS requires to copy libKriging*.(so|dylib) and libarmadillo*.(so|dylib)
+## next to testBinding.so (in installation directory)
+## then rpath of testBinding may be simplify updated
+## Linux: $ chrpath -r '${ORIGIN}' ./Rlibs/testBinding/libs/testBinding.so
+##        $ chrpath -l ./Rlibs/testBinding/libs/testBinding.so # print rpath to verify
+## MacOS: $ otool -l ./Rlibs/testBinding/libs/testBinding.so | grep LC_RPATH -A2 # get LC_RPATH to remove (and more)
+##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/testBinding/libs/testBinding.so
 
-$(SHLIB): installed/lib/libKriging.a
+ifeq ("$(MAKE_SHARED_LIBS)","on")
+	INSTALL_SUFFIX=-$(shell uname -s)-shared
+	EXTRA_PKG_LIBS= -Wl,-rpath,$(PWD)/installed$(INSTALL_SUFFIX)/lib
+
+	ifeq ("$(shell uname -s)","Linux")
+		LIB_SUFFIX=so
+		# Adds local directory of a lib in its rpath
+		# Makefile constant '$${ORIGIN}' is expanded as '${ORIGIN}'
+		EXTRA_PKG_LIBS:=-Wl,-rpath,'$${ORIGIN}' $(EXTRA_PKG_LIBS)
+	else # Darwin aka MacOS
+		LIB_SUFFIX=dylib
+		# local path is @rpath or @loader_path and is implicitly set by default in LC_RPATH
+		# https://wincent.com/wiki/@executable_path,_@load_path_and_@rpath
+		EXTRA_PKG_LIBS:=-Wl,-rpath,'@loader_path' $(EXTRA_PKG_LIBS)
+	endif
+else
+	LIB_SUFFIX=a
+	INSTALL_SUFFIX=-$(shell uname -s)-static
+endif
 
 CXX_STD = CXX11
 
-installed/lib/libKriging.a:
+PKG_CFLAGS=
+PKG_CPPFLAGS=-Iinstalled$(INSTALL_SUFFIX)/include
+# https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
+
+PKG_LIBS=-Linstalled$(INSTALL_SUFFIX)/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)
+
+## To build libKriging before
+all: installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
+
+$(SHLIB): installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
+
+installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX):
 	rm -fr build
 	mkdir -p build
 	cd build \
 		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
-			-DBUILD_SHARED_LIBS=off \
+			-DBUILD_SHARED_LIBS=$(MAKE_SHARED_LIBS) \
 			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
+			-DCMAKE_INSTALL_PREFIX:PATH=../installed$(INSTALL_SUFFIX) \
 			-DCMAKE_BUILD_TYPE=Release \
 			../../../../.. \
 		&& cmake --build . --target install.lib

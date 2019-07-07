@@ -31,6 +31,15 @@ endif()
 
 #------------------------------------------------------
 
+set(CMAKE_CXX_STANDARD 11)
+
+#------------------------------------------------------
+
+# Generate position independant (aka -fPIC) code even for static libs
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+#------------------------------------------------------
+
 option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for finding libs")
 list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
@@ -55,10 +64,6 @@ endif()
 #------------------------------------------------------
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-#------------------------------------------------------
-
-set(CMAKE_CXX_STANDARD 11)
 
 #------------------------------------------------------
 

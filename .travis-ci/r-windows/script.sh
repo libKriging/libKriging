@@ -25,6 +25,8 @@ export PATH="/c/Rtools/mingw_64/bin":$PATH
 
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
+# and libomp.dll, flang.dll, flangrti.dll, openblas.dll
+export PATH=${HOME}/Miniconda3/Library/bin:$PATH
 
 cd bindings/R
 make veryclean

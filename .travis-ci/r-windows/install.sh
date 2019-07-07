@@ -23,13 +23,16 @@ if [ ! -d "C:/Rtools" ]; then
     ${BASEDIR}/install_rtools.bat
     export PATH="/c/Rtools/mingw_64/bin":$PATH
 fi
+
+# For R packaging
+choco install -y zip
+
 if [[ "$DEBUG_CI" != true ]]; then
 echo
 echo 'Add following paths:'
 echo 'export PATH="/c/Program Files/make/make-4.2.1/bin":\$PATH'
 echo 'export PATH="/c/Program Files/R/R-3.6.0/bin":\$PATH'
 echo 'export PATH="/c/Rtools/mingw_64/bin":\$PATH'
-echo
 fi
 
 ## Using Anaconda
@@ -44,9 +47,14 @@ fi
 #echo 'export PATH="/c/Program Files/make/make-4.2.1/bin":\$PATH'
 #echo 'export PATH=\$HOME/Miniconda3/Scripts:\$PATH'
 #echo 'export PATH=\$HOME/Miniconda3/Rtools/mingw_64/bin:\$PATH'
-#echo
 #fi
 
+if [[ "$DEBUG_CI" != true ]]; then
+# We need an access to libomp.dll, flang.dll, flangrti.dll, openblas.dll
+# located in ${HOME}/Miniconda3/Library/bin
+echo 'export PATH=\$HOME/Miniconda3/Library/bin:\$PATH'
+echo
+fi
 
 # Crazy hack since R try to call 'g++ ' as compiler
 # Message looks like:

@@ -1,50 +1,64 @@
 ## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
+MAKE_SHARED_LIBS=off
+
+RCC=$(shell R CMD config CC)
+ifeq ($(shell $(RCC) --version 2>&1 | grep -c "MinGW-W64"), 1)
+	COMPILER_ID:=MinGW
+else
+	COMPILER_ID:=$(error "Unknown compiler $(RCC)")
+endif
+
+ifeq ("$(MAKE_SHARED_LIBS)","on")
+	LIB_SUFFIX=dll
+	INSTALL_SUFFIX=-$(shell uname -s)-shared-$(COMPILER_ID)
+else
+	LIB_SUFFIX=a
+	INSTALL_SUFFIX=-$(shell uname -s)-static-$(COMPILER_ID)
+endif
+
 PKG_CFLAGS=
-PKG_CPPFLAGS=-Iinstalled/include
+PKG_CPPFLAGS=-Iinstalled$(INSTALL_SUFFIX)/include
 PKG_CXXFLAGS=-std=c++11
-PKG_LIBS=-Linstalled/lib -lKriging
-
-## GNU Makefile mode using R compilers
-EXT=a
-
-## Visual studio mode using Visual studio compilers
-# EXT=lib
+PKG_LIBS=-Linstalled$(INSTALL_SUFFIX)/lib -lKriging -larmadillo ${EXTRA_SYSTEM_LIBRARY_PATH}/openblas.lib $(EXTRA_PKG_LIBS)
 
 ## To build libKriging before
-all: installed/lib/libKriging.$(EXT)
+all: installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
 
-$(SHLIB): installed/lib/libKriging.$(EXT)
+$(SHLIB): installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
 
-## Visual studio mode
-## Final link is not compatible (incompatile ABI) but everything before is ok
-#installed/lib/libKriging.lib:
-#	rm -fr build
-#	mkdir -p build
-#	cd build \
-#		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
-#			-DBUILD_SHARED_LIBS=off \
-#			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-#			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
-#			-DCMAKE_GENERATOR_PLATFORM=x64 \
-#			-DEXTRA_SYSTEM_LIBRARY_PATH=$(EXTRA_SYSTEM_LIBRARY_PATH) \
-#			../../../../.. \
-#		&& cmake --build . --target install --config Release
-
-## GNU Makefile mode
-installed/lib/libKriging.a:
-	echo "HOME = $(HOME)"
+installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX):
+ifeq ("${EXTRA_SYSTEM_LIBRARY_PATH}","")
+	$(error EXTRA_SYSTEM_LIBRARY_PATH environment variable must be set!)
+else
+	$(info EXTRA_SYSTEM_LIBRARY_PATH is set with ${EXTRA_SYSTEM_LIBRARY_PATH})
+endif
 	rm -fr build
 	mkdir -p build
+
+ifeq ("$(COMPILER_ID)","MinGW")
+	## GNU Makefile mode using R compilers
 	cd build \
 		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
 			-G "Unix Makefiles" \
-			-DBUILD_SHARED_LIBS=off \
+			-DBUILD_SHARED_LIBS=$(MAKE_SHARED_LIBS) \
 			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-			-DCMAKE_INSTALL_PREFIX:PATH=../installed \
-			-DEXTRA_SYSTEM_LIBRARY_PATH=$(EXTRA_SYSTEM_LIBRARY_PATH) \
+			-DCMAKE_INSTALL_PREFIX:PATH=../installed$(INSTALL_SUFFIX) \
+			-DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} \
 			-DCMAKE_BUILD_TYPE=Release \
 			../../../../.. \
 		&& cmake --build . --target install.lib
-
+else
+	## Visual studio mode using Visual studio compilers
+	## Final link is not compatible (incompatile ABI) but everything before is ok
+	cd build \
+		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
+			-DBUILD_SHARED_LIBS=$(MAKE_SHARED_LIBS) \
+			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+			-DCMAKE_INSTALL_PREFIX:PATH=../installed$(INSTALL_SUFFIX) \
+			-DCMAKE_GENERATOR_PLATFORM=x64 \
+			-DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} \
+			../../../../.. \
+		&& cmake --build . --target install.lib --config Release
+endif
