@@ -216,7 +216,7 @@ if (CLANG_FORMAT)
             -DCLANG_FORMAT="${CLANG_FORMAT}"
             -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
 else ()
-    message(WARNING "clang-format no found!")
+    message(WARNING "clang-format no found; clang-format target is not available.")
     add_custom_target(clang-format
             COMMAND ${CMAKE_COMMAND} -E echo ""
             COMMAND ${CMAKE_COMMAND} -E echo "*** code formatting not available since clang-format has not been found ***"
