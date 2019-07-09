@@ -33,6 +33,11 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
     # bash script (once per installation)
     choco install -y cmake
     ```
+  * Get libKriging repository
+    ```
+    git clone https://github.com/haveneer/libKriging.git
+    cd libKriging
+    ```
   * Install project dependencies  
     ```
     # bash script from libKriging repository clone (once per installation)
@@ -43,51 +48,16 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
     # bash script (once per shell)
     export PATH='C:\Program Files\CMake\bin':$PATH
     ```
-
-* Complete startup script (all-in-one)
+  * Build libKriging
     ```
-    REM cmd script (once per installation)
-    @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
-    ```
-
-    ```
-    # bash script
-    choco install -y cmake
-    export PATH='C:\Program Files\CMake\bin':$PATH
-    git clone https://github.com/haveneer/libKriging.git
-    cd libKriging
     .travis-ci/windows/install.sh
-    mkdir build
-    cd build
-    MODE=Release
-    EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
-    export PATH=${HOME}/Miniconda3/Library/bin:$PATH
-
-    cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ..
-    cmake --build . --target ALL_BUILD --config ${MODE}
-    export PATH=${BUILD}/src/bin/${MODE}:$PATH
-    ctest -C ${MODE}
     ```
-    
-    And if you build R tools, this command flow becomes:
-     ```
-    # bash script
-    choco install -y cmake
-    export PATH='C:\Program Files\CMake\bin':$PATH
-    git clone https://github.com/haveneer/libKriging.git
-    cd libKriging
-    .travis-ci/r-windows/install.sh
-    cd bindins/R
-    
-    export PATH="/c/Program Files/make/make-4.2.1/bin":$PATH
-    export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
-    export PATH="/c/Rtools/mingw_64/bin":$PATH
-    export PATH=${HOME}/Miniconda3/Library/bin:$PATH
 
-    export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib    
-    # if necessary: make uninstall ; make clean
-    #           or: make veryclean
-    make    
+  For R development, use scripts in `.travis-ci/r-windows` instead of `.travis-ci/windows`.
+  
+  To get paths to load to launch command by hand, use:
+    ```
+    export DEBUG_CI=true
     ```
 
 * For file edition
@@ -101,11 +71,4 @@ Using bash shell:
     # dependency walker
     curl -Lo depends22_x64.zip http://www.dependencywalker.com/depends22_x64.zip
     ``` 
-
-
-
-
-
- NOTA : installation bizarre de R: 
- 
- CMake: Check for working CXX compiler: C:/Rtools/mingw_64/bin/g++ .exe
+    
