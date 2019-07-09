@@ -85,7 +85,7 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
        ```
   to produce an html report located in `${BUILD}/coverage/index.html`
    
-### Compilation for Windows 64bits
+### Compilation for Windows 64bits avec Visual Studio
   * Configure
       ```shell
       cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
@@ -121,7 +121,7 @@ cmake --build . --target install
 make install
 ```
 
-### For Windows 64bits
+### For Windows 64bits avec Visual Studio
 
 e.g.:
 ```shell

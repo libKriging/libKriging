@@ -31,7 +31,7 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
   * Install tools 
     ```
     # bash script (once per installation)
-    choco install cmake
+    choco install -y cmake
     ```
   * Install project dependencies  
     ```
@@ -54,33 +54,58 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
     # bash script
     choco install -y cmake
     export PATH='C:\Program Files\CMake\bin':$PATH
-    git clone --recurse-submodules https://github.com/haveneer/libKriging.git
+    git clone https://github.com/haveneer/libKriging.git
     cd libKriging
     .travis-ci/windows/install.sh
     mkdir build
     cd build
     MODE=Release
     EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
+    export PATH=${HOME}/Miniconda3/Library/bin:$PATH
+
     cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ..
     cmake --build . --target ALL_BUILD --config ${MODE}
     export PATH=${BUILD}/src/bin/${MODE}:$PATH
-    export PATH=$HOME/Miniconda3/Library/bin:$PATH
     ctest -C ${MODE}
     ```
     
-    If you need R tools, replace `.travis-ci/windows/install.sh` nu '.travis-ci/r-windows/install.sh` and extend search PATH (as described at the end of install command)
-    ```
-    export PATH="/c/Program Files/make/make-4.2.1/bin":\$PATH
+    And if you build R tools, this command flow becomes:
+     ```
+    # bash script
+    choco install -y cmake
+    export PATH='C:\Program Files\CMake\bin':$PATH
+    git clone https://github.com/haveneer/libKriging.git
+    cd libKriging
+    .travis-ci/r-windows/install.sh
+    cd bindins/R
+    
+    export PATH="/c/Program Files/make/make-4.2.1/bin":$PATH
     export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
     export PATH="/c/Rtools/mingw_64/bin":$PATH
+    export PATH=${HOME}/Miniconda3/Library/bin:$PATH
+
+    export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib    
+    # if necessary: make uninstall ; make clean
+    #           or: make veryclean
+    make    
     ```
 
 * For file edition
 Using bash shell:
     ```
     # bash script
-    curl -o npp.7.7.1.Installer.exe https://notepad-plus-plus.org/repository/7.x/7.7.1/npp.7.7.1.Installer.exe
-    ./npp.7.7.1.Installer.exe
-    rm ./npp.7.7.1.Installer.exe
+    # Notepad++
+    curl -o ${HOME}/Downloads/npp.7.7.1.Installer.exe https://notepad-plus-plus.org/repository/7.x/7.7.1/npp.7.7.1.Installer.exe
+    ${HOME}/Downloads/npp.7.7.1.Installer.exe
+    
+    # dependency walker
+    curl -Lo depends22_x64.zip http://www.dependencywalker.com/depends22_x64.zip
     ``` 
 
+
+
+
+
+ NOTA : installation bizarre de R: 
+ 
+ CMake: Check for working CXX compiler: C:/Rtools/mingw_64/bin/g++ .exe
