@@ -34,12 +34,12 @@ MAKE_SHARED_LIBS=on
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f ${BASEDIR})
 
-DO_TEST=false \
+BUILD_TEST=false \
     MODE=Release \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}" \
-    ${BASEDIR}/../linux-macos/script.sh
+    ${BASEDIR}/../linux-macos/build.sh
 
 export LIBKRIGING_PATH=${PWD}/build/installed
 export PATH=${LIBKRIGING_PATH}/bin:${PATH}
@@ -48,4 +48,4 @@ cd bindings/R
 make uninstall || true
 make clean
 MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make
-make test
+
