@@ -7,11 +7,32 @@ fi
 
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-echo
     cd ${TRAVIS_BUILD_DIR}
 fi
 
+# MacOS + Shared : OK
+# MacOS + Static : there is a bug with dependant libs not found
+# Linux + Shared : OK
+# Linux + Static : OK
+MAKE_SHARED_LIBS=on
+
+# to get readlink on MacOS (no effect on Linux)
+if [[ -d /usr/local/opt/coreutils/libexec/gnubin ]]; then
+    export PATH=/usr/local/opt/coreutils/libexec/gnubin:$PATH
+fi
+BASEDIR=$(dirname "$0")
+BASEDIR=$(readlink -f ${BASEDIR})
+
+DO_TEST=false \
+    MODE=Release \
+    CC=$(R CMD config CC) \
+    CXX=$(R CMD config CXX) \
+    EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS}" \
+    ${BASEDIR}/../linux-macos/script.sh
+
+export LIBKRIGING_PATH=${PWD}/build/installed
+
 cd bindings/R
-make veryclean
-make
-make test
+make uninstall || true
+make clean
+MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make

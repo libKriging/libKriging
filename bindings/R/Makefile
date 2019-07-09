@@ -1,7 +1,14 @@
+
+ifeq ("${MAKE_SHARED_LIBS}","")
+	MAKE_SHARED_LIBS=$(error MAKE_SHARED_LIBS variable must be set")
+endif
+ifeq ("${LIBKRIGING_PATH}","")
+	LIBKRIGING_PATH=$(error LIBKRIGING_PATH variable must be set")
+endif
+
 all: build
 
-build: ./Rlibs/testBinding/.installed
-./Rlibs/testBinding/.installed: ./Rlibs/.prepared
+build: ./Rlibs/.prepared
 	## build package before build
 	# R CMD build testBinding
 
@@ -26,8 +33,6 @@ test: ./Rlibs/testBinding/.installed
 	export R_LIBS=$(PWD)/Rlibs && R CMD BATCH testBinding/test/test.R
 
 clean:
-	rm -fr testBinding/src/installed*
-	rm -fr testBinding/src/build*
 	rm -fr testBinding/src/testBinding.*
 	rm -fr testBinding/src/*.o
 

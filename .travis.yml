@@ -90,6 +90,11 @@ matrix:
         - BUILD_NAME="r-linux-macos"
       language: r
       r: release
+      addons:
+        homebrew:
+          update: false
+          packages:
+            - coreutils
 
     - name: "R Windows"
       os: windows

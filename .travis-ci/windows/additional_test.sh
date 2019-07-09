@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+if [[ "$DEBUG_CI" == true ]]; then
+  set -x
+fi
+
+cd build
+
+# Cleanup compiled libs to check right path finding
+rm -fr src/lib
+# add library directory search PATH for executables
+export PATH=$PWD/installed/bin:$PATH
+# add OpenBLAS DLL library path
+export PATH=$HOME/Miniconda3/Library/bin:$PATH
+
+ctest -C ${MODE} # --verbose

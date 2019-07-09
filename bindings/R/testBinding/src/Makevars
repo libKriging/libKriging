@@ -1,8 +1,6 @@
 ## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
-MAKE_SHARED_LIBS=on
-
 ## Using shared libs with Linux|MacOS requires to copy libKriging*.(so|dylib) and libarmadillo*.(so|dylib)
 ## next to testBinding.so (in installation directory)
 ## then rpath of testBinding may be simplify updated
@@ -12,8 +10,7 @@ MAKE_SHARED_LIBS=on
 ##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/testBinding/libs/testBinding.so
 
 ifeq ("$(MAKE_SHARED_LIBS)","on")
-	INSTALL_SUFFIX=-$(shell uname -s)-shared
-	EXTRA_PKG_LIBS= -Wl,-rpath,$(PWD)/installed$(INSTALL_SUFFIX)/lib
+	EXTRA_PKG_LIBS= -Wl,-rpath,${LIBKRIGING_PATH}/lib
 
 	ifeq ("$(shell uname -s)","Linux")
 		LIB_SUFFIX=so
@@ -28,30 +25,13 @@ ifeq ("$(MAKE_SHARED_LIBS)","on")
 	endif
 else
 	LIB_SUFFIX=a
-	INSTALL_SUFFIX=-$(shell uname -s)-static
 endif
 
 CXX_STD = CXX11
 
 PKG_CFLAGS=
-PKG_CPPFLAGS=-Iinstalled$(INSTALL_SUFFIX)/include
+PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
+PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)
 
-PKG_LIBS=-Linstalled$(INSTALL_SUFFIX)/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)
-
-## To build libKriging before
-all: installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
-
-$(SHLIB): installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX)
-
-installed$(INSTALL_SUFFIX)/lib/libKriging.$(LIB_SUFFIX):
-	rm -fr build
-	mkdir -p build
-	cd build \
-		&& CC="$(CC)" CFLAGS="$(CFLAGS)" CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS)" cmake \
-			-DBUILD_SHARED_LIBS=$(MAKE_SHARED_LIBS) \
-			-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
-			-DCMAKE_INSTALL_PREFIX:PATH=../installed$(INSTALL_SUFFIX) \
-			-DCMAKE_BUILD_TYPE=Release \
-			../../../../.. \
-		&& cmake --build . --target install.lib
+$(SHLIB): ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)

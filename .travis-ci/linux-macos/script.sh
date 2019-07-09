@@ -7,27 +7,38 @@ fi
 
 # Default configuration when used out of travis-ci
 MODE=${MODE:-Debug}
+EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
+DO_TEST=${DO_TEST:-true}
+
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-echo
     cd ${TRAVIS_BUILD_DIR}
 fi
 
-mkdir build
+mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=${MODE}
-cmake --build .
+cmake \
+  -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=${MODE} \
+  ${EXTRA_CMAKE_OPTIONS} \
+  ..
 
-if [[ "$MODE" == "Coverage" ]]; then
-  cmake --build . --target coverage --config Coverage
+if [[ "$DO_TEST" == "true" ]]; then
+    cmake --build .
+
+    if [[ "$MODE" == "Coverage" ]]; then
+        cmake --build . --target coverage --config Coverage
+    else
+        ctest -C ${MODE} # --verbose
+    fi
+
+    cmake --build . --target install --config ${MODE}
+    # Show installation directory content
+    # find installed
 else
-  ctest -C ${MODE} # --verbose
+    # faster install target if tests are not required
+    cmake --build . --target install.lib
 fi
 
-cmake --build . --target install --config ${MODE}
-# Show installation directory content
-# find installed
-# Cleanup compiled libs to check right path finding
-rm -fr src/lib
-# add library directory search PATH for executables
-export LD_LIBRARY_PATH=$PWD/installed/lib:${LD_LIBRARY_PATH}
-ctest -C ${MODE}
+
+
+
