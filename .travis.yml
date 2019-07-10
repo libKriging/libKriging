@@ -115,3 +115,11 @@ script:
 
 after_success:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
+
+cache:
+  directories:
+  - bindings/R/Rlibs
+  - $HOME/Miniconda3
+  - /c/Rtools
+  
+  

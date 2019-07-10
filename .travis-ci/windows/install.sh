@@ -13,13 +13,13 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f ${BASEDIR})
 
-TMPDIR=$(mktemp -d)
-curl -o ${TMPDIR}/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-cd ${TMPDIR}
-${BASEDIR}/install_conda.bat
-cd ${BASEDIR}
-rm -fr ${TMPDIR}
+if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
+	curl -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+	cd ${HOME}/Downloads
+	${BASEDIR}/install_conda.bat
+	cd ${BASEDIR}
+fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
-$HOME/Miniconda3/condabin/conda.bat install -y -c conda-forge openblas
+$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge openblas

@@ -17,12 +17,14 @@ choco install -y make --version 4.2.1
 # Using chocolatey and manual command
 # https://chocolatey.org/packages/R.Project
 choco install -y r.project --version 3.6.0
-if [ ! -d "C:/Rtools" ]; then
+if [ ! -f "C:/Rtools/VERSION.txt" ]; then
     # https://cran.r-project.org/bin/windows/Rtools
     curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
     ${BASEDIR}/install_rtools.bat
-    export PATH="/c/Rtools/mingw_64/bin":$PATH
+else
+	echo "Rtools installation detected: nothing to do"
 fi
+export PATH="/c/Rtools/mingw_64/bin":$PATH
 
 # For R packaging
 choco install -y zip
