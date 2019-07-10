@@ -50,7 +50,7 @@ Package list is available here: [https://anaconda.org/search](https://anaconda.o
     ```
   * Build libKriging
     ```
-    .travis-ci/windows/install.sh
+    .travis-ci/windows/build.sh
     ```
 
   For R development, use scripts in `.travis-ci/r-windows` instead of `.travis-ci/windows`.
