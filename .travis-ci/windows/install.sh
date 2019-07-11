@@ -22,4 +22,4 @@ fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
-$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge openblas
+$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge openblas liblapack
