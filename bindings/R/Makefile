@@ -1,5 +1,5 @@
 
-all: check build
+all: .check build
 
 include ./check.mk
 

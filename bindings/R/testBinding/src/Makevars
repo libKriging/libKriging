@@ -34,6 +34,6 @@ PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
 PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)
 
-$(SHLIB): check ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+$(SHLIB): .check ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
 
 include ../../check.mk
