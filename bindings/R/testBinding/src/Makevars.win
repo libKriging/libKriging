@@ -1,7 +1,7 @@
 ## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
-ifeq ("$(MAKE_SHARED_LIBS)","on")
+ifneq ("${MAKE_SHARED_LIBS}","off")
 	LIB_SUFFIX=dll
 else
 	LIB_SUFFIX=a
@@ -13,4 +13,6 @@ PKG_CXXFLAGS=-std=c++11
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
 PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo ${EXTRA_SYSTEM_LIBRARY_PATH}/openblas.lib $(EXTRA_PKG_LIBS)
 
-$(SHLIB): ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+$(SHLIB): check ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+
+include ../../common.mk

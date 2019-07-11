@@ -9,7 +9,7 @@
 ## MacOS: $ otool -l ./Rlibs/testBinding/libs/testBinding.so | grep LC_RPATH -A2 # get LC_RPATH to remove (and more)
 ##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/testBinding/libs/testBinding.so
 
-ifeq ("$(MAKE_SHARED_LIBS)","on")
+ifneq ("${MAKE_SHARED_LIBS}","off")
 	EXTRA_PKG_LIBS= -Wl,-rpath,${LIBKRIGING_PATH}/lib
 
 	ifeq ("$(shell uname -s)","Linux")
@@ -34,4 +34,6 @@ PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
 PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)
 
-$(SHLIB): ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+$(SHLIB): check ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+
+include ../../common.mk

@@ -1,12 +1,7 @@
 
-ifeq ("${MAKE_SHARED_LIBS}","")
-	MAKE_SHARED_LIBS=$(error MAKE_SHARED_LIBS variable must be set")
-endif
-ifeq ("${LIBKRIGING_PATH}","")
-	LIBKRIGING_PATH=$(error LIBKRIGING_PATH variable must be set")
-endif
+all: check build
 
-all: build
+include ./common.mk
 
 build: ./Rlibs/.prepared
 	## build package before build
