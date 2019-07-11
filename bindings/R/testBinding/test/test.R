@@ -1,6 +1,6 @@
 library(testBinding)
-test_binding_1()
-test_binding_2()
+test_binding1()
+test_binding2()
 
 
  set.seed(42)
