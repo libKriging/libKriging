@@ -48,3 +48,4 @@ build/
 CMakeCache.txt
 CMakeFiles
 
+.Rproj.user

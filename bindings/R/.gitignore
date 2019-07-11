@@ -1,3 +1,7 @@
 .Rhistory
+.Rproj.user
 *.Rout
 /Rlibs
+# Generated files
+RcppExports.cpp
+RcppExports.R
