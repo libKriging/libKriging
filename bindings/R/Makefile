@@ -1,7 +1,7 @@
 
 all: check build
 
-include ./common.mk
+include ./check.mk
 
 build: ./Rlibs/.prepared
 	## build package before build
