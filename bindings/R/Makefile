@@ -10,7 +10,7 @@ build: ./Rlibs/.prepared
 	## build package after build
 	mkdir -p ./Rlibs
 	## --no-multiarch is only usefull for windows with visual studio mode
-	export R_LIBS=$(PWD)/Rlibs && Rscript -e 'Rcpp::compileAttributes(pkgdir = "testBinding", verbose = TRUE)'
+	export R_LIBS=$(PWD)/Rlibs && Rscript -e "Rcpp::compileAttributes(pkgdir = 'testBinding', verbose = TRUE)"
 	export R_LIBS=$(PWD)/Rlibs && R CMD INSTALL --no-multiarch -l ./Rlibs --build testBinding
 	uname -a > ./Rlibs/testBinding/.installed
 	date >> ./Rlibs/testBinding/.installed
