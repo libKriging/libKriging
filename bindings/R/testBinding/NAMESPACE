@@ -1,9 +1,12 @@
 # Import required packages
-# none so far
-
-# Load dynamic libraries (shared object files)
-useDynLib(testBinding)
+#importFrom(Rcpp, evalCpp)
+#importFrom(RhpcBLASctl, blas_set_num_threads)
+#importFrom("stats", "rbinom")
 
 # Export functions defined in R code
-export("test_binding")
-export("test_binding2")
+exportPattern("^[[:alpha:]]+")
+#export("testBinding")
+#export("testBinding2")
+
+# Load dynamic libraries (shared object files)
+useDynLib(testBinding, .registration = TRUE)

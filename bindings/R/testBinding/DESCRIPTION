@@ -12,4 +12,4 @@ Encoding: UTF-8
 Imports: Rcpp (>= 0.12.11)
 LinkingTo: Rcpp, RcppArmadillo
 Depends: RhpcBLASctl, R (>= 2.14)
-Collate: testBindingWrapper.R
+#Collate: testBindingWrapper.R RcppExports.R
