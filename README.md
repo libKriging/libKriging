@@ -61,31 +61,39 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
   * Build
       ```shell
       cmake --build .
-      # aka with classical makefiles
+      ```
+      aka with classical makefiles
+      ```shell
       make  
       ```
   * Run tests
       ```shell
       ctest
-      # aka with classical makefiles
+      ```
+      aka with classical makefiles
+      ```shell
       make test  
       ```
   
   * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
       ```shell
       cmake --build . --target coverage --config Coverage
-      # aka with classical makefiles
+      ```
+      aka with classical makefiles
+      ```shell
       make coverage
-       ```
+      ```
   or 
       ```shell
       cmake --build . --target coverage-report --config Coverage
-      # aka with classical makefiles
+      ```
+      aka with classical makefiles
+      ```shell
       make coverage-report
-       ```
+      ```
   to produce an html report located in `${BUILD}/coverage/index.html`
    
-### Compilation for Windows 64bits avec Visual Studio
+### Compilation for Windows 64bits with Visual Studio
   * Configure
       ```shell
       cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
@@ -117,11 +125,13 @@ cmake -DCMAKE_BUILD_TYPE=${MODE} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} $
 and then 
 ```shell
 cmake --build . --target install
-# aka with classical makefiles
+```
+aka with classical makefiles
+```shell
 make install
 ```
 
-### For Windows 64bits avec Visual Studio
+### For Windows 64bits with Visual Studio
 
 e.g.:
 ```shell
