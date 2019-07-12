@@ -91,7 +91,7 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
       ```shell
       make coverage-report
       ```
-  to produce an html report located in `${BUILD}/coverage/index.html`
+      to produce an html report located in `${BUILD}/coverage/index.html`
    
 ### Compilation for Windows 64bits with Visual Studio
   * Configure
