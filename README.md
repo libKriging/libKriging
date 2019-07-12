@@ -83,7 +83,7 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
       ```shell
       make coverage
       ```
-  or 
+      or 
       ```shell
       cmake --build . --target coverage-report --config Coverage
       ```
