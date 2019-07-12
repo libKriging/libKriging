@@ -162,6 +162,13 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
         message(FATAL_ERROR "lcov not found, cannot perform coverage.")
     endif()
 
+    find_program (SED NAMES sed)
+    if (NOT SED)
+        message (FATAL_ERROR "Unable to find sed")
+    else()
+        # message(STATUS "sed found at ${SED}")
+    endif (NOT SED)
+
     # Don't forget '' around each pattern
     set(LCOV_EXCLUDE_PATTERN "'${LIBKRIGING_SOURCE_DIR}/dependencies/*'")
 
@@ -180,6 +187,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
             # Extract only project data (--no-capture or --remove options may be used to select collected data)
             COMMAND ${LCOV} --remove coverage_full.info ${LCOV_EXCLUDE_PATTERN} --output-file coverage_filtered.info
             COMMAND ${LCOV} --extract coverage_filtered.info '${LIBKRIGING_SOURCE_DIR}/*' --output-file coverage.info
+            COMMAND ${SED} -i.bak 's|SF:${LIBKRIGING_SOURCE_DIR}/|SF:|g' coverage.info
             DEPENDS all_test_binaries
             COMMENT "Running test coverage."
             WORKING_DIRECTORY "${LIBKRIGING_BINARY_DIR}"
