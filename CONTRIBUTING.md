@@ -1,3 +1,5 @@
+This file describes good practices to follow if you want to contribue to this project.
+
 # Commit Message Format
 (inspired from git commit message from angular style and git-commit-message-convention repository)
 
@@ -9,7 +11,7 @@
 <footer>
 ```
 
-# Types
+## Types
 
 | Type          | Description |
 |:-------------:|-------------|
@@ -35,11 +37,11 @@
 | `revert`      | for revert commit |
 | `wip`         | for work in progress commit |
 
-# Scope
+## Scope
 The scope could be anything specifying place or category of the commit change.
 For example tests, core, R, python, octave, etc...
 
-# Subject
+## Subject
 The subject contains succinct description of the change:
 
 * use the imperative, present tense: "change" not "changed" nor "changes"
@@ -48,11 +50,11 @@ The subject contains succinct description of the change:
 
 To skip Travis CI build, the HEAD commit message on push must contain `[skip ci]`.
 
-# Message Body
+## Message Body
 Just as in the **Subject**, use the imperative, present tense: "change" not "changed" nor "changes". 
 The body should include the motivation for the change and contrast this with previous behavior.
 
-# Message Footer
+## Message Footer
 The Message Footer should contain any information about **Notes** and also Message Footer 
 should be **recommended** [GitHub Issue](https://github.com/features#issues) ID Reference, 
 Ex. `Issue #27`, `Fixes #1`, `Closes #2`, `Resolves #3`.
@@ -61,12 +63,12 @@ Ex. `Issue #27`, `Fixes #1`, `Closes #2`, `Resolves #3`.
 The rest of the commit message is then used for this.
 
 
-# Revert
+## Revert
 If the commit reverts a previous commit, it should begin with **revert:**, 
 followed by the header of the reverted commit. In the body it should say: 
 `This reverts commit <hash>.`, where <hash> is the SHA of the commit being reverted.
 
-# Examples
+## Examples
 
 new feature:
 ```
