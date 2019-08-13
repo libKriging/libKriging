@@ -242,6 +242,39 @@ endif()
 
 #------------------------------------------------------
 
+# search for doxygen and add target
+# Require dot, treat the other components as optional
+# TODO: try https://codedocs.xyz for online docs
+find_package(Doxygen
+        QUIET
+        COMPONENTS dot
+        OPTIONAL_COMPONENTS mscgen dia)
+if (DOXYGEN_FOUND)
+    # set input and output files
+    set(DOXYGEN_IN ${LIBKRIGING_SOURCE_DIR}/docs/Doxyfile.in)
+    set(DOXYGEN_OUT ${CMAKE_BINARY_DIR}/Doxyfile)
+
+    # request to configure the file
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+
+    add_custom_target(doc # add ALL if build together with the code
+            COMMAND echo "running doc generation ..."
+            COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating API documentation with Doxygen"
+            VERBATIM)
+else ()
+    message(WARNING "doxygen no found; doc target is not available.")
+    add_custom_target(doc
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMAND ${CMAKE_COMMAND} -E echo "*** doc generation not available since doxygen has not been found ***"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
+            COMMENT "Inform about not available doc generation."
+            )
+endif()
+
+#------------------------------------------------------
+
 # Custom install.lib target whuch does not compile tests
 ADD_CUSTOM_TARGET(install.lib
         ${CMAKE_COMMAND}
