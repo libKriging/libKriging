@@ -1,8 +1,8 @@
 #ifndef LIBKRIGING_LIBKRIGING_H
 #define LIBKRIGING_LIBKRIGING_H
 
-#include "TestClass.hpp"
-#include "TestFunction.hpp"
-#include "ArmadilloTestClass.hpp"
+#include "DemoArmadilloClass.hpp"
+#include "DemoClass.hpp"
+#include "DemoFunction.hpp"
 
 #endif  // LIBKRIGING_LIBKRIGING_H

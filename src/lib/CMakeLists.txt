@@ -2,9 +2,9 @@
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
-        TestClass.cpp include/libKriging/TestClass.hpp
-        TestFunction.cpp include/libKriging/TestFunction.hpp
-        ArmadilloTestClass.cpp include/libKriging/ArmadilloTestClass.hpp)
+        DemoClass.cpp include/libKriging/DemoClass.hpp
+        DemoFunction.cpp include/libKriging/DemoFunction.hpp
+        DemoArmadilloClass.cpp include/libKriging/DemoArmadilloClass.hpp)
 
 target_link_libraries(Kriging PUBLIC armadillo)
 

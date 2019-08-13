@@ -1,5 +1,5 @@
 
-#include "libKriging/ArmadilloTestClass.hpp"
+#include "libKriging/DemoArmadilloClass.hpp"
 
 #include <armadillo>
 #include <iostream>
@@ -13,7 +13,7 @@ using namespace arma;
 // NOTE: the C++11 "auto" keyword is not recommended for use with Armadillo objects and functions
 
 LIBKRIGING_EXPORT
-ArmadilloTestClass::ArmadilloTestClass() {
+DemoArmadilloClass::DemoArmadilloClass() {
   cout << "Armadillo version: " << arma_version::as_string() << endl;
 
   mat A(2, 3);  // directly specify the matrix size (elements are uninitialised)

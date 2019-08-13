@@ -6,8 +6,8 @@ import(Rcpp)
 
 # Export functions defined in R code
 exportPattern("^[[:alpha:]]+")
-#export("testBinding")
-#export("testBinding2")
+#export("demoBinding")
+#export("demoBinding2")
 
 # Load dynamic libraries (shared object files)
 useDynLib(testBinding, .registration = TRUE)

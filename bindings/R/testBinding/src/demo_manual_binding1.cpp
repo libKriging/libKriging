@@ -2,9 +2,6 @@
  R callable function
  ***************************************************************************/
 
-// Required since libKriging.hpp has signatures with armadillo types
-#include <RcppArmadillo.h>
-
 #include <R.h>
 #include <Rdefines.h>
 
@@ -13,20 +10,21 @@
 
 #include <memory>
 
-#include <libKriging/libKriging.hpp>
+#include <libKriging/DemoClass.hpp>
 
-extern "C" SEXP test_binding2() {
+extern "C" SEXP demo_binding1() {
 
     //    std::cout << "libKriging class tests" << std::endl;
     printf("libKriging class tests\n");
 
-    std::unique_ptr<ArmadilloTestClass> x(new ArmadilloTestClass());
+    std::unique_ptr<DemoClass> x(new DemoClass());
+    int tmp = [&x]() { return x->f(); }();
 
     SEXP result;
 
     PROTECT(result = NEW_INTEGER(2));
     INTEGER(result)[0] = (int) 1;
-    INTEGER(result)[1] = (int) 2;
+    INTEGER(result)[1] = (int) tmp;
     UNPROTECT(1);
 
     return (result);

@@ -1,0 +1,8 @@
+#ifndef LIBKRIGING_DEMOFUNCTION_HPP
+#define LIBKRIGING_DEMOFUNCTION_HPP
+
+#include "libKriging_exports.h"
+
+LIBKRIGING_EXPORT int f();
+
+#endif  // LIBKRIGING_DEMOFUNCTION_HPP
