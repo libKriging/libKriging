@@ -5,8 +5,8 @@
 ;
 [subrepo]
 	remote = https://gitlab.com/conradsnicta/armadillo-code.git
-	branch = 9.500.x
-	commit = 5af8157f392083c2a16740b426ada2af111b2f6e
-	parent = f448ab5d18001cfcdaab7239149a8128bd6bffb4
+	branch = 9.600.x
+	commit = d193bf32871f7287b2047f1fb27ee4579537acc7
+	parent = 088b31a4dda998de4639cf888b345dc11840917a
 	method = merge
 	cmdver = 0.4.0

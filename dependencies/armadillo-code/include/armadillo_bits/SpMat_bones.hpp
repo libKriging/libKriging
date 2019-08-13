@@ -341,6 +341,8 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   inline const SpMat& replace(const eT old_val, const eT new_val);
   
+  inline const SpMat& clean(const pod_type threshold);
+  
   inline const SpMat& zeros();
   inline const SpMat& zeros(const uword in_elem);
   inline const SpMat& zeros(const uword in_rows, const uword in_cols);
@@ -651,6 +653,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline arma_hot arma_warn_unused eT get_value_csc(const uword i                         ) const;
   inline arma_hot arma_warn_unused eT get_value_csc(const uword in_row, const uword in_col) const;
   
+  inline arma_hot arma_warn_unused bool try_set_value_csc(const uword in_row, const uword in_col, const eT in_val);
   inline arma_hot arma_warn_unused bool try_add_value_csc(const uword in_row, const uword in_col, const eT in_val);
   inline arma_hot arma_warn_unused bool try_sub_value_csc(const uword in_row, const uword in_col, const eT in_val);
   inline arma_hot arma_warn_unused bool try_mul_value_csc(const uword in_row, const uword in_col, const eT in_val);
@@ -664,9 +667,9 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   arma_aligned mutable MapMat<eT> cache;
   arma_aligned mutable state_type sync_state;
-  // 0: cache needs to be updated from CSC
-  // 1: CSC needs to be updated from cache
-  // 2: no update required
+  // 0: cache needs to be updated from CSC (ie.   CSC has more recent data)
+  // 1: CSC needs to be updated from cache (ie. cache has more recent data)
+  // 2: no update required                 (ie. CSC and cache contain the same data)
   
   #if defined(ARMA_USE_CXX11)
   arma_aligned mutable std::mutex cache_mutex;
@@ -675,8 +678,10 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   arma_inline void invalidate_cache() const;
   arma_inline void invalidate_csc()   const;
   
-  inline void sync_cache() const;
-  inline void sync_csc()   const;
+  inline void sync_cache()        const;
+  inline void sync_cache_simple() const;
+  inline void sync_csc()          const;
+  inline void sync_csc_simple()   const;
   
   
   friend class SpValProxy< SpMat<eT> >;  // allow SpValProxy to call insert_element() and delete_element()
@@ -685,6 +690,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   friend class SpCol<eT>;
   friend class SpMat_MapMat_val<eT>;
   friend class SpSubview_MapMat_val<eT>;
+  friend class spdiagview<eT>;
   
   
   public:
