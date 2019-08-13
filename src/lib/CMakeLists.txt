@@ -4,7 +4,8 @@
 add_library(Kriging
         DemoClass.cpp include/libKriging/DemoClass.hpp
         DemoFunction.cpp include/libKriging/DemoFunction.hpp
-        DemoArmadilloClass.cpp include/libKriging/DemoArmadilloClass.hpp)
+        DemoArmadilloClass.cpp include/libKriging/DemoArmadilloClass.hpp
+        LinearRegression.cpp include/libKriging/LinearRegression.hpp)
 
 target_link_libraries(Kriging PUBLIC armadillo)
 

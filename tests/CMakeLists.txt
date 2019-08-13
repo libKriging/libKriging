@@ -20,6 +20,10 @@ add_executable(catch2_unit_test catch2_unit_test.cpp)
 target_link_libraries(catch2_unit_test LINK_PUBLIC Catch2)
 add_dependencies(all_test_binaries catch2_unit_test)
 
+add_executable(regression_unit_test regression_unit_test.cpp)
+target_link_libraries(regression_unit_test LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries regression_unit_test)
+
 enable_testing()
 
 # Manual test
@@ -29,3 +33,4 @@ add_test(NAME armadillo_example COMMAND armadillo_example)
 
 # Test using catch2 (parse catch tests)
 ParseAndAddCatchTests(catch2_unit_test)
+ParseAndAddCatchTests(regression_unit_test)

@@ -6,4 +6,7 @@
 #include "DemoClass.hpp"
 #include "DemoFunction.hpp"
 
+/** @defgroup Regression Regression */
+#include "LinearRegression.hpp"
+
 #endif  // LIBKRIGING_LIBKRIGING_H
