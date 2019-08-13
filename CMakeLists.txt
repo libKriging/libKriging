@@ -123,6 +123,11 @@ endif()
 
 #------------------------------------------------------
 
+# Required since RcppArmadillo uses it by defaut
+add_compile_definitions(ARMA_32BIT_WORD)
+
+#------------------------------------------------------
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")

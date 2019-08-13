@@ -16,7 +16,9 @@ class DemoArmadilloClass {
   /** \deprecated Demo only */
   LIBKRIGING_EXPORT DemoArmadilloClass();
   /** \deprecated Demo only */
-  static arma::vec getEigenValues(arma::mat M) { return arma::eig_sym(M); }
+  LIBKRIGING_EXPORT void test();
+  /** \deprecated Demo only */
+  LIBKRIGING_EXPORT arma::vec getEigenValues(const arma::Mat<double> & M);
 };
 
 #endif  // LIBKRIGING_DEMOARMADILLOCLASS_HPP

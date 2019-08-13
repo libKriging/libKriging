@@ -13,7 +13,10 @@ using namespace arma;
 // NOTE: the C++11 "auto" keyword is not recommended for use with Armadillo objects and functions
 
 LIBKRIGING_EXPORT
-DemoArmadilloClass::DemoArmadilloClass() {
+DemoArmadilloClass::DemoArmadilloClass() {}
+
+LIBKRIGING_EXPORT
+void DemoArmadilloClass::test() {
   cout << "Armadillo version: " << arma_version::as_string() << endl;
 
   mat A(2, 3);  // directly specify the matrix size (elements are uninitialised)
@@ -151,4 +154,9 @@ DemoArmadilloClass::DemoArmadilloClass() {
     }
 
   F.print("F:");
+}
+
+LIBKRIGING_EXPORT
+arma::vec DemoArmadilloClass::getEigenValues(const arma::mat & M) {
+  return arma::eig_sym(M);
 }
