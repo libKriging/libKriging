@@ -4,6 +4,9 @@
 #include <string>
 #include "libKriging_exports.h"
 
+/** This is a demo class about about class usage
+ *  @ingroup Demo Demo group
+ */
 class DemoClass {
  public:
   LIBKRIGING_EXPORT DemoClass();

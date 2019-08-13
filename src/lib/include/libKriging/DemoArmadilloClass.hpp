@@ -8,6 +8,9 @@
 #include "libKriging_exports.h"
 #include <armadillo>
 
+/** This is a demo class about about armadillo usage
+ *  @ingroup Demo Demo group
+ */
 class DemoArmadilloClass {
  public:
   LIBKRIGING_EXPORT DemoArmadilloClass();
