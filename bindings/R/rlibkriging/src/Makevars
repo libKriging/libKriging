@@ -2,12 +2,12 @@
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
 ## Using shared libs with Linux|MacOS requires to copy libKriging*.(so|dylib) and libarmadillo*.(so|dylib)
-## next to testBinding.so (in installation directory)
-## then rpath of testBinding may be simplify updated
-## Linux: $ chrpath -r '${ORIGIN}' ./Rlibs/testBinding/libs/testBinding.so
-##        $ chrpath -l ./Rlibs/testBinding/libs/testBinding.so # print rpath to verify
-## MacOS: $ otool -l ./Rlibs/testBinding/libs/testBinding.so | grep LC_RPATH -A2 # get LC_RPATH to remove (and more)
-##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/testBinding/libs/testBinding.so
+## next to rlibkriging.so (in installation directory)
+## then rpath of rlibkriging may be simplify updated
+## Linux: $ chrpath -r '${ORIGIN}' ./Rlibs/rlibkriging/libs/rlibkriging.so
+##        $ chrpath -l ./Rlibs/rlibkriging/libs/rlibkriging.so # print rpath to verify
+## MacOS: $ otool -l ./Rlibs/rlibkriging/libs/rlibkriging.so | grep LC_RPATH -A2 # get LC_RPATH to remove (and more)
+##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/rlibkriging/libs/rlibkriging.so
 
 ifneq ("${MAKE_SHARED_LIBS}","off")
 	EXTRA_PKG_LIBS= -Wl,-rpath,${LIBKRIGING_PATH}/lib

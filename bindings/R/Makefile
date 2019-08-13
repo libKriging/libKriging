@@ -5,35 +5,35 @@ include ./check.mk
 
 build: ./Rlibs/.prepared
 	## build package before build
-	# R CMD build testBinding
+	# R CMD build rlibkriging
 
 	## build package after build
 	mkdir -p ./Rlibs
 	## --no-multiarch is only usefull for windows with visual studio mode
-	export R_LIBS=$(PWD)/Rlibs && Rscript -e "Rcpp::compileAttributes(pkgdir = 'testBinding', verbose = TRUE)"
-	export R_LIBS=$(PWD)/Rlibs && R CMD INSTALL --no-multiarch -l ./Rlibs --build testBinding
-	uname -a > ./Rlibs/testBinding/.installed
-	date >> ./Rlibs/testBinding/.installed
+	export R_LIBS=$(PWD)/Rlibs && Rscript -e "Rcpp::compileAttributes(pkgdir = 'rlibkriging', verbose = TRUE)"
+	export R_LIBS=$(PWD)/Rlibs && R CMD INSTALL --no-multiarch -l ./Rlibs --build rlibkriging
+	uname -a > ./Rlibs/rlibkriging/.installed
+	date >> ./Rlibs/rlibkriging/.installed
 
 prepare: ./Rlibs/.prepared
 ./Rlibs/.prepared:
 	mkdir -p ./Rlibs
-	export R_LIBS=$(PWD)/Rlibs && Rscript testBinding/install/install.R
+	export R_LIBS=$(PWD)/Rlibs && Rscript rlibkriging/install/install.R
 	uname -a > ./Rlibs/.prepared
 	date >> ./Rlibs/.prepared
 
-test: ./Rlibs/testBinding/.installed
+test: ./Rlibs/rlibkriging/.installed
 	## output in tty
-	export R_LIBS=$(PWD)/Rlibs && Rscript testBinding/test/test.R
+	export R_LIBS=$(PWD)/Rlibs && Rscript rlibkriging/test/test.R
 	## output in .Rout file
-	export R_LIBS=$(PWD)/Rlibs && R CMD BATCH testBinding/test/test.R
+	export R_LIBS=$(PWD)/Rlibs && R CMD BATCH rlibkriging/test/test.R
 
 clean:
-	rm -fr testBinding/src/testBinding.*
-	rm -fr testBinding/src/*.o
+	rm -fr rlibkriging/src/rlibkriging.*
+	rm -fr rlibkriging/src/*.o
 
 uninstall:
-	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE testBinding
+	export R_LIBS=$(PWD)/Rlibs && R CMD REMOVE rlibkriging
 
 veryclean: clean
 	rm -fr ./Rlibs

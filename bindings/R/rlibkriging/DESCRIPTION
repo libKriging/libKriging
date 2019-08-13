@@ -1,4 +1,4 @@
-Package: testBinding
+Package: rlibkriging
 Type: Package
 Title: Test wrapper
 Version: 0.0-0
@@ -12,4 +12,4 @@ Encoding: UTF-8
 Imports: Rcpp (>= 0.12.11)
 LinkingTo: Rcpp, RcppArmadillo
 Depends: RhpcBLASctl, R (>= 2.14)
-#Collate: testBindingWrapper.R RcppExports.R
+#Collate: rlibkrigingWrapper.R RcppExports.R

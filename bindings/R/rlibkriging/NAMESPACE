@@ -10,4 +10,4 @@ exportPattern("^[[:alpha:]]+")
 #export("demoBinding2")
 
 # Load dynamic libraries (shared object files)
-useDynLib(testBinding, .registration = TRUE)
+useDynLib(rlibkriging, .registration = TRUE)
