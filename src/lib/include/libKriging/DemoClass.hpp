@@ -9,8 +9,11 @@
  */
 class DemoClass {
  public:
+  /** \deprecated Demo only */
   LIBKRIGING_EXPORT DemoClass();
+  /** \deprecated Demo only */
   LIBKRIGING_EXPORT std::string name();
+  /** \deprecated Demo only */
   LIBKRIGING_EXPORT int f();
 };
 
