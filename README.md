@@ -54,6 +54,7 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
   * `Coverage` : for code coverage analysis (not yet tested with Windows)
 
 ### Compilation for Linux and MacOS
+  
   * Configure
       ```shell
       cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
@@ -74,7 +75,14 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
       ```shell
       make test  
       ```
-  
+  * Buidl documentation (requires doxygen)
+      ```shell
+      cmake --build . --target doc
+      ```
+      aka with classical makefiles
+      ```shell
+      make doc
+      ```
   * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
       ```shell
       cmake --build . --target coverage --config Coverage
