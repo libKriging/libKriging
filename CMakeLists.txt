@@ -124,7 +124,9 @@ endif()
 #------------------------------------------------------
 
 # Required since RcppArmadillo uses it by defaut
-add_compile_definitions(ARMA_32BIT_WORD)
+# /D or -D definition headers are updated according to the compiler 'style'
+# Use windows style for easy checking on Unix
+add_definitions(/DARMA_32BIT_WORD)
 
 #------------------------------------------------------
 
