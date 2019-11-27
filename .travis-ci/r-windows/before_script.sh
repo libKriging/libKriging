@@ -6,7 +6,7 @@ if [[ "$DEBUG_CI" == true ]]; then
 fi
 
 if [[ "$DEBUG_CI" == true ]]; then
-    echo $PATH
+    echo "$PATH"
     c++ --version
     cmake --version
     export PATH="/c/Program Files/make/make-4.2.1/bin":${PATH}

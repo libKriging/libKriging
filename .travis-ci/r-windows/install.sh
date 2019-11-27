@@ -6,9 +6,9 @@ if [[ "$DEBUG_CI" == true ]]; then
 fi
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f ${BASEDIR})
+BASEDIR=$(readlink -f "${BASEDIR}")
 
-${BASEDIR}/../windows/install.sh
+"${BASEDIR}"/../windows/install.sh
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make
@@ -20,7 +20,7 @@ choco install -y r.project --version 3.6.0
 if [ ! -f "C:/Rtools/VERSION.txt" ]; then
     # https://cran.r-project.org/bin/windows/Rtools
     curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
-    ${BASEDIR}/install_rtools.bat
+    "${BASEDIR}"/install_rtools.bat
 else
 	echo "Rtools installation detected: nothing to do"
 fi
@@ -62,4 +62,4 @@ fi
 # Message looks like:
 # /usr/bin/sh: line 8: g++ : command not found
 #       with a space here ^
-ln -sf "$(which g++).exe" "$(which g++) .exe"
+ln -sf "$(command -v g++).exe" "$(command -v g++) .exe"

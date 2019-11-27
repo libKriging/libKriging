@@ -6,10 +6,10 @@ if [[ "$DEBUG_CI" == true ]]; then
 fi
 
 # to get readlink on MacOS (no effect on Linux)
-if [[ -d /usr/local/opt/coreutils/libexec/gnubin ]]; then
+if [[ -e /usr/local/opt/coreutils/libexec/gnubin/readlink ]]; then
     export PATH=/usr/local/opt/coreutils/libexec/gnubin:$PATH
 fi
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f ${BASEDIR})
+BASEDIR=$(readlink -f "${BASEDIR}")
 
-${BASEDIR}/../linux-macos/install.sh
+"${BASEDIR}"/../linux-macos/install.sh
