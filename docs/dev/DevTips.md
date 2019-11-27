@@ -6,6 +6,54 @@ Developer tips.
 
 There's missing a dynamic libray (.dll) while the program is loaded: check dependencies using [Dependenc Walker](http://www.dependencywalker.com).
 
+## `fatal error: 'math.h' file not found` on macOS
+
+More precisely:
+```
+$ clang++ test.cc
+In file included from test.cc:1:
+In file included from /usr/local/opt/llvm/bin/../include/c++/v1/cmath:305:
+/usr/local/opt/llvm/bin/../include/c++/v1/math.h:301:15: fatal error: 'math.h' file not found
+#include_next <math.h>
+              ^~~~~~~~
+1 error generated.
+```
+
+Usually, this should appear after major macOS upgrade. 
+
+Diagnotics:
+* It should be missing Xcode's Command Line Tools. To install it, you can use:  
+```shell
+xcode-select --install
+# to enable tools, you have to accept the associated license
+sudo xcodebuild -license accept
+```
+
+* It should be brew outdated local compiler. Then, you can upgrade it using:
+```shell
+$ brew upgrade llvm
+````
+
+(output example)
+```
+Updating Homebrew...
+==> Upgrading 1 outdated package:
+llvm 8.0.0_1 -> 9.0.0_1
+==> Upgrading llvm
+==> Installing dependencies for llvm: swig
+==> Installing llvm dependency: swig
+==> Downloading https://homebrew.bintray.com/bottles/swig-4.0.1.catalina.bottle.tar.gz
+==> Downloading from https://akamai.bintray.com/d4/d44eb5e2ae81970d131618c4ddd508d3d798e9465979a125454db75c3b9125e1?__gda__=exp=1574870202~
+######################################################################## 100.0%
+==> Pouring swig-4.0.1.catalina.bottle.tar.gz
+🍺  /usr/local/Cellar/swig/4.0.1: 723 files, 5.4MB
+==> Installing llvm
+==> Downloading https://homebrew.bintray.com/bottles/llvm-9.0.0_1.catalina.bottle.tar.gz
+==> Downloading from https://akamai.bintray.com/a8/a8e2475a1fc5a81f0da83a73d17fd54cc2a686f7b5d8e7ace9ea18885971415f?__gda__=exp=1574870210~
+######################################################################## 100.0%
+==> Pouring llvm-9.0.0_1.catalina.bottle.tar.gz
+```
+
 # Before changing compiler check ABI compatibility
 
 * GCC:

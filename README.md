@@ -27,14 +27,22 @@ If you want to manage then, you need to install [subrepo](https://github.com/ing
   
   Tested with:
      
-  |   Compiler/OS    | Linux        | MacOS                    | Windows       |
+  |   Compiler/OS    | Linux        | macOS                    | Windows       |
   |:----------------:|:-------------|:-------------------------|:--------------|
   |       GCC        | **5.4**, 8.3 |                          | **4.9.3** (R) |
-  |      Clang       | 7.1          | AppleClang **9.1**, 10.0 |               |
+  |      Clang       | 7.1          | AppleClang **9.1**<br>AppleClang 10.0 (Mojave)<br>AppleClang 11.0 (Catalina)<br>Clang 9.0|               |
   | MS Visual Studio |              |                          | **15 (2017)** |
   
   (bold values represent configurations used in Travis CI pipelines)
   
+  NB: Ensure C++ compiler is available. On macOS systems you will need to install Xcode
+     with additional Command Line Tools using:  
+     ```
+     xcode-select --install
+     sudo xcodebuild -license accept
+     ```
+     (should be done after macOS upgrade) 
+     
 * [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting) 
 
 ## Compilation and unit tests
@@ -42,8 +50,10 @@ If you want to manage then, you need to install [subrepo](https://github.com/ing
 ### Preamble
 
 We assume that:
-  * [libKriging](https://github.com/MASCOTNUM/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*  
-  * you have built a fresh new directory *`${BUILD}`*
+  * [libKriging](https://github.com/MASCOTNUM/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*
+    (could be a relative path like `..`)
+  * you have built a fresh new directory *`${BUILD}`* 
+    (should be an absolute path)
   * following commands are executed in *`${BUILD}`* directory 
   
 PS: *`${NAME}`* represents a word or an absolute path of your choice
