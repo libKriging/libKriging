@@ -7,7 +7,7 @@ fi
 
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-    cd ${TRAVIS_BUILD_DIR}
+    cd "${TRAVIS_BUILD_DIR}"
 fi
 
 # make
@@ -32,14 +32,14 @@ export PATH=${HOME}/Miniconda3/Library/bin:$PATH
 MAKE_SHARED_LIBS=on
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f ${BASEDIR})
+BASEDIR=$(readlink -f "${BASEDIR}")
 
 BUILD_TEST=false \
     MODE=Release \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}" \
-    ${BASEDIR}/../linux-macos/build.sh
+    "${BASEDIR}"/../linux-macos/build.sh
 
 export LIBKRIGING_PATH=${PWD}/build/installed
 export PATH=${LIBKRIGING_PATH}/bin:${PATH}

@@ -7,7 +7,7 @@ fi
 
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-    cd ${TRAVIS_BUILD_DIR}
+    cd "${TRAVIS_BUILD_DIR}"
 fi
 
 export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
