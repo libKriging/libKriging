@@ -44,7 +44,7 @@
 
 # build stuffs
 cmake-build*/
-build/
+build*/
 CMakeCache.txt
 CMakeFiles
 
