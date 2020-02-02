@@ -7,6 +7,12 @@ add_library(Kriging
         DemoArmadilloClass.cpp include/libKriging/DemoArmadilloClass.hpp
         LinearRegression.cpp include/libKriging/LinearRegression.hpp)
 
+if (CXX_CLANG_TIDY)
+    set_target_properties(Kriging
+            PROPERTIES
+            CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
+endif ()
+
 target_link_libraries(Kriging PUBLIC armadillo)
 
 # TODO check if this method is useful

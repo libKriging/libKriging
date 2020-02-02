@@ -24,6 +24,15 @@ add_executable(regression_unit_test regression_unit_test.cpp)
 target_link_libraries(regression_unit_test LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries regression_unit_test)
 
+# Can be enabled if necessary
+#if (CXX_CLANG_TIDY)
+#    foreach (bin ${all_test_binaries})
+#        set_target_properties(${bin}
+#                PROPERTIES
+#                CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
+#    endforeach ()
+#endif ()
+
 enable_testing()
 
 # Manual test

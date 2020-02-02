@@ -1,0 +1,16 @@
+Checks:          '*,-llvm-header-guard,-google-build-using-namespace,-clang-analyzer-alpha.clone.CloneChecker,-google-runtime-int,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-clang-analyzer-alpha.deadcode.UnreachableCode,-misc-use-after-move,-cppcoreguidelines-pro-type-vararg,-modernize-use-emplace,-cert-err60-cpp'
+
+# All checkers turned on, minus:
+#  * Proper header guards used (the check is very brittle and incorrectly assesses my guards)
+#  * Use of "using namespace" (the check fires even on non-global using namespace, which is daft)
+#  * Copy and paste detection (the check fires on unit test code which is by its nature very copy and paste)
+#  * Use of traditional integral types
+#  * Array to pointer decay (the check fires on static constexpr string arrays, daft)
+#  * Unreachable code (the check is too naive and misses CRTP injected code)
+#  * Use after move (my unit tests test semantics when you do this, most shouldn't need to disable this)
+#  * Use of printf
+#  * Use of push_back instead of emplace (unhelpful check, emplace isn't exception safe like push_back)
+#  * Throwing exception objects which aren't nothrow copy constructible (Dinkumware STL does this, not my fault)
+
+
+#CheckOptions:
