@@ -143,6 +143,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIBKRIGING_CXX_FLAGS}")
 
 #------------------------------------------------------
 
+# search for clang-tidy (while be used while adding library or executable)
+find_program(CLANG_TIDY clang-tidy)
+if (CLANG_TIDY)
+    if (CMAKE_BUILD_TYPE MATCHES Debug)
+        set(CXX_CLANG_TIDY ${CLANG_TIDY})
+        message(STATUS "Static analysis using clang-tidy is enabled while compiling.")
+    else ()
+        message(STATUS "Static analysis available but disabled in ${CMAKE_BUILD_TYPE} mode.")
+    endif ()
+else ()
+    message(STATUS "Static analysis not available.")
+endif ()
+
+#------------------------------------------------------
+
 add_subdirectory(src)
 
 #------------------------------------------------------
