@@ -12,7 +12,7 @@ BASEDIR=$(readlink -f "${BASEDIR}")
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make
-choco install -y make --version 4.2.1
+choco install -y make --version 4.3
 
 # Using chocolatey and manual command
 # https://chocolatey.org/packages/R.Project
@@ -32,7 +32,7 @@ choco install -y zip
 if [[ "$DEBUG_CI" != true ]]; then
 echo
 echo 'Add following paths:'
-echo 'export PATH="/c/Program Files/make/make-4.2.1/bin":$PATH'
+echo 'export PATH="/c/Program Files/make/make-4.3/bin":$PATH'
 echo 'export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH'
 echo 'export PATH="/c/Rtools/mingw_64/bin":$PATH'
 fi
@@ -46,7 +46,7 @@ fi
 #if [[ "$DEBUG_CI" != true ]]; then
 #echo
 #echo 'Add following paths:'
-#echo 'export PATH="/c/Program Files/make/make-4.2.1/bin":$PATH'
+#echo 'export PATH="/c/Program Files/make/make-4.3/bin":$PATH'
 #echo 'export PATH=$HOME/Miniconda3/Scripts:$PATH'
 #echo 'export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH'
 #fi
