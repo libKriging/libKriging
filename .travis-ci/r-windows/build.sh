@@ -11,7 +11,7 @@ if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
 fi
 
 # make
-export PATH="/c/Program Files/make/make-4.2.1/bin":${PATH}
+export PATH="/c/Program Files/make/make-4.3/bin":${PATH}
 
 # R shortcut (and tools with absolute path) by Chocolatey
 export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
