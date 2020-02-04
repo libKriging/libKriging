@@ -23,7 +23,7 @@ class LinearRegression {
    * @param X : matrix of size n * m
    * @return tuple(s,standard error)
    */
-  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec> apply(const arma::vec& y, const arma::mat& X);
+  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec> apply(const arma::vec y, const arma::mat X);
 };
 
 #endif  // LIBKRIGING_LINEARREGRESSION_HPP
