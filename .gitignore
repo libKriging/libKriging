@@ -50,3 +50,6 @@ CMakeCache.txt
 CMakeFiles
 
 .Rproj.user
+
+# armadillo 'in source' generated Makefile
+dependencies/armadillo-code/examples/Makefile
