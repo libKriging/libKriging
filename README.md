@@ -45,6 +45,38 @@ If you want to manage then, you need to install [subrepo](https://github.com/ing
      
 * [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting) 
 
+## Integrated scripts for CI
+
+Note: calling these scripts "by hand" should produce the same results than following "Compilation and unit tests" instructions (and it should be also easier).
+
+### Integration for Linux and MacOS
+
+With standard cmake & system libs:
+```shell
+cd libKriging
+.travis-ci/linux-macos/build.sh
+```
+
+With R specific cmake & system libs (needed for rlibkriging):
+```shell
+cd libKriging
+.travis-ci/r-linux-macos/build.sh
+```
+
+### Integration for Windows
+
+With standard cmake & system libs:
+```shell
+cd libKriging
+.travis-ci/windows/build.sh
+```
+
+With R specific cmake & system libs (needed for rlibkriging):
+```shell
+cd libKriging
+.travis-ci/r-windows/build.sh
+```
+
 ## Compilation and unit tests
 
 ### Preamble
