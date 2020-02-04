@@ -11,6 +11,7 @@ std::string DemoClass::name() {
 }
 
 LIBKRIGING_EXPORT
-int DemoClass::f() {
+int DemoClass::f() {  // NOLINT(readability-convert-member-functions-to-static)
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   return 42;
 }

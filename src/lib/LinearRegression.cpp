@@ -5,11 +5,13 @@
 #include "libKriging/LinearRegression.hpp"
 
 LIBKRIGING_EXPORT
-LinearRegression::LinearRegression() {}
+LinearRegression::LinearRegression() = default;
 
 LIBKRIGING_EXPORT
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::tuple<arma::colvec, arma::colvec> LinearRegression::apply(const arma::vec& y, const arma::mat& X) {
-  int n = X.n_rows, k = X.n_cols;
+  int n = X.n_rows;
+  int k = X.n_cols;
 
   arma::colvec coef = arma::solve(X, y);
   arma::colvec resid = y - X * coef;
