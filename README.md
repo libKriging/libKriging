@@ -23,6 +23,11 @@ If you want to manage then, you need to install [subrepo](https://github.com/ing
 
 ## Requirements
 * CMake ≥ 3.11
+
+  You can install it by hand (cf [cmake](https://cmake.org/download/)) or using automated method from `.travis-ci/<your-environment>/install.sh` script.
+
+  NB: On Windows, `choco` package manager requires admin rights, so that it could be simpler to do it by hand.
+  
 * C++ Compiler with C++11 support;
   
   Tested with:
@@ -43,7 +48,20 @@ If you want to manage then, you need to install [subrepo](https://github.com/ing
      ```
      (should be done after macOS upgrade) 
      
-* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting) 
+  NB: On Windows with R environment (R + Rtools), you can use R's recommanded compiler. See compilation woth R toolchain below.
+  
+* Linear algebra packages providing blas and lapack functions.
+  
+  You can use standard blas and lapack, OpenBlas, MKL.
+  
+  On Windows, the simplest method is to use Anaconda (cf `install.sh` scripts in `.travis-ci` or [Readme_Windows.md](.travis-ci/Readme_Windows.md)).
+  
+### Optional tools
+     
+* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting)
+* clang-format for automated code formatting
+* clang-tidy for static analysis
+* Doxygen for doc generation
 
 ## Compilation and unit tests
 
@@ -58,10 +76,12 @@ We assume that:
   
 PS: *`${NAME}`* represents a word or an absolute path of your choice
 
- Select your compilation *`${MODE}`* between: 
+Select your compilation *`${MODE}`* between: 
   * `Release` : produce an optimized code
   * `Debug` (default) : produce a debug code
   * `Coverage` : for code coverage analysis (not yet tested with Windows)
+
+Following commands are made for Unix shell. To use them with Windows use [Mingw](http://www.mingw.org) or [git-bash](https://gitforwindows.org) environment.
 
 ### Compilation for Linux and MacOS
   
@@ -126,7 +146,26 @@ PS: *`${NAME}`* represents a word or an absolute path of your choice
       export PATH=${BUILD}/src/lib/${MODE}:$PATH
       ctest -C ${MODE}
       ```
-   
+    
+### Compilation for Linux/Mac/Windows using R toolchain
+
+  With this method, you need [R](https://cran.r-project.org) (and [R-tools](https://cran.r-project.org/bin/windows/Rtools/) if you are on Windows).
+  
+  We assume you have previous requirements and also `make` command available in your `PATH`.
+  
+  * Configure
+      ```shell
+      CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
+      ```
+  * Build
+      ```shell
+      cmake --build .
+      ```
+  * Run tests
+      ```shell
+      ctest
+      ```
+       
 ## Deployment
 
 To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
