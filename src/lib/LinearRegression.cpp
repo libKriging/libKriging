@@ -9,7 +9,7 @@ LinearRegression::LinearRegression() = default;
 
 LIBKRIGING_EXPORT
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-std::tuple<arma::colvec, arma::colvec> LinearRegression::apply(const arma::vec& y, const arma::mat& X) {
+std::tuple<arma::colvec, arma::colvec> LinearRegression::apply(const arma::vec y, const arma::mat X) {
   int n = X.n_rows;
   int k = X.n_cols;
 
