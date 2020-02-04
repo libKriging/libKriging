@@ -38,6 +38,7 @@
 # editor backup files
 .\#*
 *~
+*.bak
 
 # macOS metadata files
 .DS_Store
