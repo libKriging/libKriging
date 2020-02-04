@@ -10,38 +10,46 @@ using namespace arma;
 // Armadillo documentation is available at:
 // http://arma.sourceforge.net/docs.html
 
-// NOTE: the C++11 "auto" keyword is not recommended for use with Armadillo objects and functions
+// NOTE:
+// * the C++11 "auto" keyword is not recommended for use with Armadillo objects and functions
+// * many NOLINT directives for clang-tidy since this a 'demo'
 
 LIBKRIGING_EXPORT
-DemoArmadilloClass::DemoArmadilloClass() {}
+DemoArmadilloClass::DemoArmadilloClass() = default;
 
 LIBKRIGING_EXPORT
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void DemoArmadilloClass::test() {
   cout << "Armadillo version: " << arma_version::as_string() << endl;
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   mat A(2, 3);  // directly specify the matrix size (elements are uninitialised)
 
   cout << "A.n_rows: " << A.n_rows << endl;  // .n_rows and .n_cols are read only
   cout << "A.n_cols: " << A.n_cols << endl;
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   A(1, 2) = 456.0;  // directly access an element (indexing starts at 0)
   A.print("A:");
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   A = 5.0;  // scalars are treated as a 1x1 matrix
   A.print("A:");
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   A.set_size(4, 5);  // change the size (data is not preserved)
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   A.fill(5.0);  // set all elements to a particular value
   A.print("A:");
 
   // endr indicates "end of row"
   // clang-format off
-  A << 0.165300 << 0.454037 << 0.995795 << 0.124098 << 0.047084 << endr
-    << 0.688782 << 0.036549 << 0.552848 << 0.937664 << 0.866401 << endr
-    << 0.348740 << 0.479388 << 0.506228 << 0.145673 << 0.491547 << endr
-    << 0.148678 << 0.682258 << 0.571154 << 0.874724 << 0.444632 << endr
-    << 0.245726 << 0.595218 << 0.409327 << 0.367827 << 0.385736 << endr;
+  A << 0.165300 << 0.454037 << 0.995795 << 0.124098 << 0.047084 << endr  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+    << 0.688782 << 0.036549 << 0.552848 << 0.937664 << 0.866401 << endr  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+    << 0.348740 << 0.479388 << 0.506228 << 0.145673 << 0.491547 << endr  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+    << 0.148678 << 0.682258 << 0.571154 << 0.874724 << 0.444632 << endr  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+    << 0.245726 << 0.595218 << 0.409327 << 0.367827 << 0.385736 << endr; // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   // clang-format on
 
   A.print("A:");
@@ -101,11 +109,13 @@ void DemoArmadilloClass::test() {
 
   // row vectors are treated like a matrix with one row
   rowvec r;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   r << 0.59119 << 0.77321 << 0.60275 << 0.35887 << 0.51683;
   r.print("r:");
 
   // column vectors are treated like a matrix with one column
   vec q;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   q << 0.14333 << 0.59478 << 0.14481 << 0.58558 << 0.60809;
   q.print("q:");
 
@@ -123,14 +133,16 @@ void DemoArmadilloClass::test() {
   cout << "accu(A % B) = " << accu(A % B) << endl;
 
   // example of a compound operation
-  B += 2.0 * A.t();
+  B += 2.0 * A.t();  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   B.print("B:");
 
   // imat specifies an integer matrix
   imat AA;
   imat BB;
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   AA << 1 << 2 << 3 << endr << 4 << 5 << 6 << endr << 7 << 8 << 9;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   BB << 3 << 2 << 1 << endr << 6 << 5 << 4 << endr << 9 << 8 << 7;
 
   // comparison of matrices (element-wise); output of a relational operator is a umat
@@ -141,22 +153,22 @@ void DemoArmadilloClass::test() {
   cube Q(B.n_rows, B.n_cols, 2);
 
   Q.slice(0) = B;
-  Q.slice(1) = 2.0 * B;
+  Q.slice(1) = 2.0 * B;  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
   Q.print("Q:");
 
   // 2D field of matrices; 3D fields are also supported
-  field<mat> F(4, 3);
+  field<mat> F(4, 3);  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
-  for (uword col = 0; col < F.n_cols; ++col)
+  for (uword col = 0; col < F.n_cols; ++col) {
     for (uword row = 0; row < F.n_rows; ++row) {
       F(row, col) = randu<mat>(2, 3);  // each element in field<mat> is a matrix
     }
-
+  }
   F.print("F:");
 }
 
 LIBKRIGING_EXPORT
-arma::vec DemoArmadilloClass::getEigenValues(const arma::mat & M) {
+arma::vec DemoArmadilloClass::getEigenValues(const arma::mat& M) {  // NOLINT(readability-convert-member-functions-to-static)
   return arma::eig_sym(M);
 }

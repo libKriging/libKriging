@@ -1,4 +1,17 @@
-Checks:          '*,-llvm-header-guard,-google-build-using-namespace,-clang-analyzer-alpha.clone.CloneChecker,-google-runtime-int,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-clang-analyzer-alpha.deadcode.UnreachableCode,-misc-use-after-move,-cppcoreguidelines-pro-type-vararg,-modernize-use-emplace,-cert-err60-cpp'
+Checks:  "\
+  *,\
+  -llvm-header-guard,\
+  -google-build-using-namespace,\
+  -clang-analyzer-alpha.clone.CloneChecker,\
+  -google-runtime-int,\
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,\
+  -clang-analyzer-alpha.deadcode.UnreachableCode,\
+  -misc-use-after-move,\
+  -cppcoreguidelines-pro-type-vararg,\
+  -modernize-use-emplace,\
+  -cert-err60-cpp,\
+  -modernize-use-trailing-return-type,\
+  -fuchsia-default-arguments-calls"
 
 # All checkers turned on, minus:
 #  * Proper header guards used (the check is very brittle and incorrectly assesses my guards)
@@ -11,6 +24,7 @@ Checks:          '*,-llvm-header-guard,-google-build-using-namespace,-clang-anal
 #  * Use of printf
 #  * Use of push_back instead of emplace (unhelpful check, emplace isn't exception safe like push_back)
 #  * Throwing exception objects which aren't nothrow copy constructible (Dinkumware STL does this, not my fault)
-
+#  * modernize function style to C++11 trailing return type
+#  * disallow usage of implicit optional arguments in calls
 
 #CheckOptions:
