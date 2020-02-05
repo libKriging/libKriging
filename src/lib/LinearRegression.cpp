@@ -32,7 +32,7 @@ std::tuple<arma::colvec, arma::colvec> LinearRegression::predict(const arma::mat
   // int k = X.n_cols;
 
   arma::colvec y = X * coef;
-  arma::colvec stderr = arma::sqrt(sig2 * arma::diagvec(arma::inv(arma::trans(X) * X)));
+  arma::colvec stderr = arma::sqrt(arma::diagvec(X * arma::diagmat(stderrest) * arma::trans(X)));
 
   return std::make_tuple(std::move(y), std::move(stderr));
 }
