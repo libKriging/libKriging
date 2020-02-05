@@ -8,3 +8,6 @@ demo_binding2 <- function() {
   result <- .Call("demo_binding2")
   return(result)
 }
+
+predict.LinearRegression <- function(object,X)
+    return(linear_regression_predict(object, X))
