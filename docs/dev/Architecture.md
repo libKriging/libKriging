@@ -1,5 +1,6 @@
+# libKriging Architecture #
 
-The architecture of libKriging is built on a C++ kernel with efficient kriging algorithms.
+The architecture of libKriging is built on a C++ kernel with efficient kriging algorithms
 
 Around this kernel, there are multiple bindings (today, only R binding is available). 
 These bindings are a thin layer around C++ kernel which call features from C++ kernel thru a light mapping
