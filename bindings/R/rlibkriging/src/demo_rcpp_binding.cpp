@@ -1,10 +1,9 @@
-#include <Rcpp.h>
 #include <RcppArmadillo.h>
 
 #include "libKriging/demo/DemoArmadilloClass.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List SEXP buildDemoArmadilloClass(std::string id, arma::mat M) {
+Rcpp::List buildDemoArmadilloClass(std::string id, arma::mat M) {
   DemoArmadilloClass* s = new DemoArmadilloClass{std::move(id), std::move(M)};
 
   Rcpp::XPtr<DemoArmadilloClass> impl_ptr(s);
