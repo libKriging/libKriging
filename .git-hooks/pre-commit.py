@@ -49,20 +49,20 @@ coveralls = "{SENTINEL}(https://coveralls.io/repos/github/" \
                                                              REPO=REPO)
 
 readme_lines = open("README.md").readlines()
-# with open("README.md", "w") as fh:
-for line in readme_lines:
-    if travis_sentinel_str in line and travis != line:
-        print("Replacing:\n\t{line}\nwith:\n\t{travis}".format(
-            line=line,
-            travis=travis))
-    #            fh.write(travis)
-    elif coveralls_sentinel_str in line and coveralls != line:
-        print("Replacing:\n\t{line}\nwith:\n\t{coveralls}".format(
-            line=line,
-            coveralls=coveralls))
-#            fh.write(coveralls)
-#        else:
-#            fh.write(line)
+with open("README.md", "w") as fh:
+    for line in readme_lines:
+        if travis_sentinel_str in line and travis != line:
+            print("Replacing:\n\t{line}\nwith:\n\t{travis}".format(
+                line=line,
+                travis=travis))
+            fh.write(travis)
+        elif coveralls_sentinel_str in line and coveralls != line:
+            print("Replacing:\n\t{line}\nwith:\n\t{coveralls}".format(
+                line=line,
+                coveralls=coveralls))
+            fh.write(coveralls)
+        else:
+            fh.write(line)
 
 subprocess.check_output(["git", "add", "README.md"])
 
