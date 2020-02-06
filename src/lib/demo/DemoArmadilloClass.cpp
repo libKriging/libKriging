@@ -1,5 +1,5 @@
 
-#include "libKriging/DemoArmadilloClass.hpp"
+#include "libKriging/demo/DemoArmadilloClass.hpp"
 
 #include <armadillo>
 #include <iostream>

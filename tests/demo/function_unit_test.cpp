@@ -1,8 +1,7 @@
 #include <iostream>
-
-#include "libKriging/DemoFunction.hpp"
-
 #include <memory>
+
+#include "libKriging/demo/DemoFunction.hpp"
 
 int main() {
   std::cout << "libKriging function tests" << std::endl;

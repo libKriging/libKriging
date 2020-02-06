@@ -1,5 +1,5 @@
 #include <RcppArmadillo.h>
-#include "libKriging/DemoArmadilloClass.hpp"
+#include "libKriging/demo/DemoArmadilloClass.hpp"
 
 // [[Rcpp::export]]
 arma::vec getEigenValues(arma::mat M) {

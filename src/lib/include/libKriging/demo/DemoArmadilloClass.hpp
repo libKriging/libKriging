@@ -6,7 +6,7 @@
 #define LIBKRIGING_DEMOARMADILLOCLASS_HPP
 
 #include <armadillo>
-#include "libKriging_exports.h"
+#include "libKriging/libKriging_exports.h"
 
 /** This is a demo class about about armadillo usage
  *  @ingroup Demo Demo group

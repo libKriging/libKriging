@@ -6,7 +6,7 @@
 #define LIBKRIGING_LINEARREGRESSION_HPP
 
 #include <armadillo>
-#include "libKriging_exports.h"
+#include "libKriging/libKriging_exports.h"
 
 /** Basic linear regression
  * @ingroup Regression

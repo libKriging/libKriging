@@ -13,7 +13,7 @@
 
 #include <memory>
 
-#include <libKriging/libKriging.hpp>
+#include <libKriging/demo/DemoArmadilloClass.hpp>
 
 extern "C" SEXP demo_binding2() {
 

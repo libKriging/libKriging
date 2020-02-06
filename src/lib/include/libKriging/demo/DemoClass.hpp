@@ -2,7 +2,7 @@
 #define LIBKRIGING_DEMOCLASS_HPP
 
 #include <string>
-#include "libKriging_exports.h"
+#include "libKriging/libKriging_exports.h"
 
 /** This is a demo class about about class usage
  *  @ingroup Demo Demo group
