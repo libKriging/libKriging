@@ -1,7 +1,27 @@
+#include <Rcpp.h>
 #include <RcppArmadillo.h>
+
 #include "libKriging/demo/DemoArmadilloClass.hpp"
 
 // [[Rcpp::export]]
-arma::vec getEigenValues(arma::mat M) {
-  return DemoArmadilloClass().getEigenValues(M);
+Rcpp::List SEXP buildDemoArmadilloClass(std::string id, arma::mat M) {
+  DemoArmadilloClass* s = new DemoArmadilloClass{std::move(id), std::move(M)};
+
+  Rcpp::XPtr<DemoArmadilloClass> impl_ptr(s);
+
+  Rcpp::List obj;
+  obj.attr("impl") = impl_ptr;
+  obj.attr("class") = "DemoArmadillo";
+
+  return obj;
+}
+
+// [[Rcpp::export]]
+arma::vec getEigenValues(Rcpp::List obj) {
+  if (!obj.inherits("DemoArmadillo"))
+    Rcpp::stop("Input must be a DemoArmadillo object");
+
+  SEXP impl = obj.attr("impl");
+  Rcpp::XPtr<DemoArmadilloClass> impl_ptr(impl);
+  return impl_ptr->getEigenValues();
 }

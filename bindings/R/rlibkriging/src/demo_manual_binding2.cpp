@@ -20,8 +20,6 @@ extern "C" SEXP demo_binding2() {
     //    std::cout << "libKriging class tests" << std::endl;
     printf("libKriging class tests\n");
 
-    std::unique_ptr<DemoArmadilloClass> x(new DemoArmadilloClass());
-
     SEXP result;
 
     PROTECT(result = NEW_INTEGER(2));
