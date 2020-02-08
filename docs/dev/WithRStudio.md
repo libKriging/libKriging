@@ -9,7 +9,7 @@ Follow steps writen in main [README.md](../../README.md) in sections
 
 ## 2. Starting with RStudio
 
-Start a new package project using `File > New Project... > New Directory > R Package using Rcpp Armadillo`
+If you have already clone libKriging, start a new package project using `File > New Project... > New Directory > R Package using Rcpp Armadillo`. You can also start a new package project using `File > New Project... > Version control > git` and fill "Repository URL" with 'https://github.com/MASCOTNUM/libKriging'.
 
 ## 3. Update configuration
 
