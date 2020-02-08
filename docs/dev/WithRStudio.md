@@ -1,4 +1,4 @@
-# Using C++ libKriging inside RStudio #
+# Using C++ libKriging inside RStudio
 
 We describe here how to embed `libKriging` C++ library in your own package built with RStudio.
 
@@ -28,8 +28,39 @@ by
 ```
 (this will bypass specific checks from rlibkriging compilation).
 
-## 3. At this point your new package should compile
+## 4. At this point your new package should compile
 
 You can use this method to prepare new R bindings. In that case, you should use `libKriging/bindings/R/rlibkriging` to do so.
 
 (DO NOT COMMIT previsouly modified `Makevars` or `Makevars.win`).
+
+# Quick installation on RStudio server
+
+Run these commands on the RStudio server
+
+## Get and build `libKriging`
+```
+system("git clone https://github.com/MASCOTNUM/libKriging.git ~/libKriging && mkdir -p ~/libKriging/build && cd libKriging/build && CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake .. && cmake --build . && cmake --build . --target install")
+```
+
+## Prepare R project
+```
+system("sed -i \"1s#^#LIBKRIGING_PATH=$HOME/libKriging/build/installed\\n#; $ s#.*#.check:#g\" ~/libKriging/bindings/R/rlibkriging/src/Makevars")
+```
+
+At this point, you can open `~/libKriging/bindings/R/rlibkriging` as a new R project. `Install & Restart` should be ok in your new RStudio project.
+
+## Update and build `libKriging`
+```
+system("cd ~/libKriging/build && git pull --rebase --autostash && cmake . && cmake --build . && cmake --build . --target install")
+```
+
+
+
+
+
+
+
+
+
+
