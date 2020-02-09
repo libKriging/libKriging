@@ -32,7 +32,7 @@ by
 
 You can use this method to prepare new R bindings. In that case, you should use `libKriging/bindings/R/rlibkriging` to do so.
 
-(DO NOT COMMIT previsouly modified `Makevars` or `Makevars.win`).
+(DO NOT COMMIT previously modified `Makevars` or `Makevars.win`).
 
 # Quick installation on RStudio server
 
@@ -40,7 +40,7 @@ Run these commands on the RStudio server
 
 ## Get and build `libKriging`
 ```
-system("git clone https://github.com/MASCOTNUM/libKriging.git ~/libKriging && mkdir -p ~/libKriging/build && cd libKriging/build && CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake .. && cmake --build . && cmake --build . --target install")
+system("git clone https://github.com/MASCOTNUM/libKriging.git ~/libKriging && mkdir -p ~/libKriging/build && cd ~/libKriging/build && CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake .. && cmake --build . && cmake --build . --target install")
 ```
 
 ## Prepare R project
