@@ -5,6 +5,8 @@
 LIBKRIGING_EXPORT
 OrdinaryKriging::OrdinaryKriging() {}
 
+//' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf (same variables names)
+//' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 LIBKRIGING_EXPORT
 std::tuple<arma::colvec, arma::colvec> OrdinaryKriging::fit(const arma::vec y, const arma::mat X, const arma::vec theta) {
   int n = X.n_rows, m = X.n_cols;
