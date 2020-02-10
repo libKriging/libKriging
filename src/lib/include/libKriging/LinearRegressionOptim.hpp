@@ -1,9 +1,5 @@
-//
-// Created by Pascal Havé on 2019-08-13.
-//
-
-#ifndef LIBKRIGING_LINEARREGRESSION_HPP
-#define LIBKRIGING_LINEARREGRESSION_HPP
+#ifndef LIBKRIGING_LINEARREGRESSIONOPTIM_HPP
+#define LIBKRIGING_LINEARREGRESSIONOPTIM_HPP
 
 #include <armadillo>
 #include "libKriging_exports.h"
@@ -11,10 +7,10 @@
 /** Basic linear regression
  * @ingroup Regression
  */
-class LinearRegression {
+class LinearRegressionOptim {
  public:
   /** Trivial constructor */
-  LIBKRIGING_EXPORT LinearRegression();
+  LIBKRIGING_EXPORT LinearRegressionOptim();
 
     // should be not exported ?
     LIBKRIGING_EXPORT arma::colvec coef;
@@ -34,4 +30,4 @@ class LinearRegression {
 
 };
 
-#endif  // LIBKRIGING_LINEARREGRESSION_HPP
+#endif  // LIBKRIGING_LINEARREGRESSIONOPTIM_HPP
