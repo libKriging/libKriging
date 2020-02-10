@@ -2,9 +2,7 @@
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
 ## If launching in command line .travis-ci/r-linux-macos/build.sh, this should be needed:
-#ROOT_DIR := /home/richet/Sync/Travail/MASCOTNUM/libKriging/github/snc-23/libKriging
-##$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-#LIBKRIGING_PATH = $(ROOT_DIR)/build/installed
+LIBKRIGING_PATH = /home/richet/Sync/Travail/MASCOTNUM/libKriging/github/snc-23/libKriging/build/installed
 
 ## Using shared libs with Linux|MacOS requires to copy libKriging*.(so|dylib) and libarmadillo*.(so|dylib)
 ## next to rlibkriging.so (in installation directory)

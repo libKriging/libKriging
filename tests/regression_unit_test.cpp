@@ -28,13 +28,19 @@ SCENARIO("a linear regression reveals randomly generated seed parameters", "[reg
       arma::vec y = X * sol;
 
       LinearRegression rl;  // linear regression object
-      std::tuple<arma::colvec, arma::colvec> ans = rl.apply(y, X);
+      rl.fit(y, X);
 
       THEN("the results are accurate") {
         INFO("dimensions are n=" << n << " m=" << m);
         const double eps = 10 * std::numeric_limits<double>::epsilon();
-        REQUIRE(arma::norm(sol - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps));
-        REQUIRE(arma::norm(std::get<1>(ans), "inf") == Approx(0).margin(10 * eps));
+        REQUIRE(arma::norm(sol - rl.coef, "inf") == Approx(0).margin(10 * eps));
+        REQUIRE(arma::norm(rl.stderrest, "inf") == Approx(0).margin(10 * eps));
+      }
+
+      THEN("the prediction are exact (for X at least)") {
+        std::tuple<arma::colvec, arma::colvec> ans = rl.predict(X);
+        const double eps = 10 * std::numeric_limits<double>::epsilon();
+        REQUIRE(arma::norm(y - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps));
       }
     }
     WHEN("value is computed with noise") {
@@ -46,12 +52,12 @@ SCENARIO("a linear regression reveals randomly generated seed parameters", "[reg
       y.for_each([&noise, &engine](arma::vec::elem_type& val) { val *= noise(engine); });
 
       LinearRegression rl;  // linear regression object
-      std::tuple<arma::colvec, arma::colvec> ans = rl.apply(y, X);
+      rl.fit(y, X);
 
       THEN("the results are almost accurate") {
         INFO("dimensions are n=" << n << " m=" << m);
-        REQUIRE(arma::norm(sol - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps));
-        REQUIRE(arma::norm(std::get<1>(ans), "inf") == Approx(0).margin(10 * eps));
+        REQUIRE(arma::norm(sol - rl.coef, "inf") == Approx(0).margin(10 * eps));
+        REQUIRE(arma::norm(rl.stderrest, "inf") == Approx(0).margin(10 * eps));
       }
     }
   }

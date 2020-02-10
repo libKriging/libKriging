@@ -7,17 +7,32 @@
 LIBKRIGING_EXPORT
 LinearRegression::LinearRegression() = default;
 
+LIBKRIGING_EXPORT arma::colvec coef;
+LIBKRIGING_EXPORT double sig2;
+LIBKRIGING_EXPORT arma::colvec stderrest;
+
+
 LIBKRIGING_EXPORT
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-std::tuple<arma::colvec, arma::colvec> LinearRegression::apply(const arma::vec y, const arma::mat X) {
+// returned object should hold error state instead of void
+void LinearRegression::fit(const arma::vec y, const arma::mat X) {
   int n = X.n_rows;
   int k = X.n_cols;
 
-  arma::colvec coef = arma::solve(X, y);
+  coef = arma::solve(X, y);
   arma::colvec resid = y - X * coef;
 
-  double sig2 = arma::as_scalar(arma::trans(resid) * resid / (n - k));
-  arma::colvec stderrest = arma::sqrt(sig2 * arma::diagvec(arma::inv(arma::trans(X) * X)));
+  sig2 = arma::as_scalar(arma::trans(resid) * resid / (n - k));
+  stderrest = arma::sqrt(sig2 * arma::diagvec(arma::inv(arma::trans(X) * X)));
+}
 
-  return std::make_tuple(std::move(coef), std::move(stderrest));
+std::tuple<arma::colvec, arma::colvec> LinearRegression::predict(const arma::mat X) {
+  // should test that X.n_cols == fit.X.n_cols
+  int n = X.n_rows;
+  // int k = X.n_cols;
+
+  arma::colvec y = X * coef;
+  arma::colvec stderr = arma::sqrt(arma::diagvec(X * arma::diagmat(stderrest) * arma::trans(X)));
+
+  return std::make_tuple(std::move(y), std::move(stderr));
 }
