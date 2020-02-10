@@ -1,6 +1,7 @@
 #include <RcppArmadillo.h>
 
 #include "libKriging/LinearRegression.hpp"
+#include "libKriging/LinearRegressionOptim.hpp"
 
 // [[Rcpp::export]]
 Rcpp::List linear_regression(arma::vec y, arma::mat X) {
@@ -15,6 +16,18 @@ Rcpp::List linear_regression(arma::vec y, arma::mat X) {
   return obj;
 }
 
+// [[Rcpp::export]]
+Rcpp::List linear_regression_optim(arma::vec y, arma::mat X) {
+  LinearRegressionOptim* rl = new LinearRegressionOptim();
+  rl->fit(std::move(y), std::move(X));
+
+  Rcpp::XPtr<LinearRegressionOptim> impl_ptr(rl);
+
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "LinearRegression";
+  return obj;
+}
 
 // [[Rcpp::export]]
 Rcpp::List linear_regression_predict(Rcpp::List linearRegression, arma::mat X) {

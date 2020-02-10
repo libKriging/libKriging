@@ -7,9 +7,9 @@
 LIBKRIGING_EXPORT
 LinearRegression::LinearRegression() = default;
 
-LIBKRIGING_EXPORT arma::colvec coef;
-LIBKRIGING_EXPORT double sig2;
-LIBKRIGING_EXPORT arma::colvec stderrest;
+// LIBKRIGING_EXPORT arma::colvec coef;
+// LIBKRIGING_EXPORT double sig2;
+// LIBKRIGING_EXPORT arma::colvec stderrest;
 
 
 LIBKRIGING_EXPORT
@@ -20,6 +20,7 @@ void LinearRegression::fit(const arma::vec y, const arma::mat X) {
   int k = X.n_cols;
 
   coef = arma::solve(X, y);
+  arma::cout<<"Coef: "<<coef<<arma::endl;
   arma::colvec resid = y - X * coef;
 
   sig2 = arma::as_scalar(arma::trans(resid) * resid / (n - k));

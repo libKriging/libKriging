@@ -6,6 +6,7 @@ add_library(Kriging
         demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
+        LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         OrdinaryKriging.cpp include/libKriging/OrdinaryKriging.hpp)
 
 if (CXX_CLANG_TIDY)
