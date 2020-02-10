@@ -46,6 +46,7 @@ list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 # Dependencies
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
+include_directories(SYSTEM dependencies/optim/header_only_version)
 
 #------------------------------------------------------
 
