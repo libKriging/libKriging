@@ -16,5 +16,5 @@ X[,2:ncol] = matrix(rexp(nrow*(ncol-1)))
 X[,1] = 1
 sol <- rexp(ncol)
 y <- X %*% sol
-ans <- linear_regression(y, X)
-norm(y - X %*% ans$coefficients)
+r <- linear_regression(y, X)
+(y - predict.LinearRegression(r,X)$y)/predict.LinearRegression(r,X)$stderr

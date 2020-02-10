@@ -4,7 +4,7 @@
 
 // [[Rcpp::export]]
 Rcpp::List linear_regression(arma::vec y, arma::mat X) {
-  LinearRegression* rl;
+  LinearRegression* rl = new LinearRegression();
   rl->fit(std::move(y), std::move(X));
 
   Rcpp::XPtr<LinearRegression> impl_ptr(rl);
