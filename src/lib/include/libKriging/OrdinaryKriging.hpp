@@ -2,7 +2,7 @@
 #define LIBKRIGING_ORDINARYKRIGING_HPP
 
 #include <armadillo>
-#include "libKriging_exports.h"
+#include "libKriging/libKriging_exports.h"
 #include "covariance.h"
 
 /** Ordinary kriging regression
