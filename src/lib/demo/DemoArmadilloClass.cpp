@@ -1,5 +1,5 @@
 
-#include "libKriging/DemoArmadilloClass.hpp"
+#include "libKriging/demo/DemoArmadilloClass.hpp"
 
 #include <armadillo>
 #include <iostream>
@@ -15,7 +15,20 @@ using namespace arma;
 // * many NOLINT directives for clang-tidy since this a 'demo'
 
 LIBKRIGING_EXPORT
-DemoArmadilloClass::DemoArmadilloClass() = default;
+DemoArmadilloClass::DemoArmadilloClass(std::string id, arma::Mat<double> M) : m_id(std::move(id)), m_m(std::move(M)) {
+  std::cout << "Building DemoArmadilloClass with matrix " << m_id << '\n';
+}
+
+LIBKRIGING_EXPORT
+DemoArmadilloClass::~DemoArmadilloClass() {
+  std::cout << "Destorying DemoArmadilloClass with matrix " << m_id << '\n';
+}
+
+LIBKRIGING_EXPORT
+arma::vec DemoArmadilloClass::getEigenValues() {
+  std::cout << "Calling DemoArmadilloClass::getEigenValues with matrix " << m_id << '\n';
+  return arma::eig_sym(m_m);
+}
 
 LIBKRIGING_EXPORT
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -166,9 +179,4 @@ void DemoArmadilloClass::test() {
     }
   }
   F.print("F:");
-}
-
-LIBKRIGING_EXPORT
-arma::vec DemoArmadilloClass::getEigenValues(const arma::mat& M) {  // NOLINT(readability-convert-member-functions-to-static)
-  return arma::eig_sym(M);
 }

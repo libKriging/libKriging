@@ -10,7 +10,7 @@
 
 #include <memory>
 
-#include <libKriging/DemoClass.hpp>
+#include <libKriging/demo/DemoClass.hpp>
 
 extern "C" SEXP demo_binding1() {
 

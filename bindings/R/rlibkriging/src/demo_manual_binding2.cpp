@@ -13,14 +13,12 @@
 
 #include <memory>
 
-#include <libKriging/libKriging.hpp>
+#include <libKriging/demo/DemoArmadilloClass.hpp>
 
 extern "C" SEXP demo_binding2() {
 
     //    std::cout << "libKriging class tests" << std::endl;
     printf("libKriging class tests\n");
-
-    std::unique_ptr<DemoArmadilloClass> x(new DemoArmadilloClass());
 
     SEXP result;
 

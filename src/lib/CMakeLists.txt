@@ -28,7 +28,7 @@ target_link_libraries(Kriging PUBLIC armadillo)
 include (GenerateExportHeader)
 GENERATE_EXPORT_HEADER(Kriging # generates the export header `lib`_EXPORTS.h automatically
         BASE_NAME LIBKRIGING
-        EXPORT_FILE_NAME libKriging_exports.h)
+        EXPORT_FILE_NAME libKriging/libKriging_exports.h)
 
 # Version on library name
 set_target_properties(Kriging PROPERTIES VERSION ${KRIGING_VERSION})
@@ -77,5 +77,5 @@ install(DIRECTORY
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
 install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
+        ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
         )
