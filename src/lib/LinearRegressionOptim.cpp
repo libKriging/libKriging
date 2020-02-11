@@ -78,7 +78,7 @@ std::tuple<arma::colvec, arma::colvec> LinearRegressionOptim::predict(const arma
   // int k = X.n_cols;
 
   arma::colvec y = X * m_coef;
-  arma::colvec stderr = arma::sqrt(arma::diagvec(X * arma::diagmat(m_stderrest) * arma::trans(X)));
+  arma::colvec stderr_v = arma::sqrt(arma::diagvec(X * arma::diagmat(m_stderrest) * arma::trans(X)));
 
-  return std::make_tuple(std::move(y), std::move(stderr));
+  return std::make_tuple(std::move(y), std::move(stderr_v));
 }
