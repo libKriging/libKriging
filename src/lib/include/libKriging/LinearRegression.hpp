@@ -17,10 +17,9 @@ class LinearRegression {
   /** Trivial constructor */
   LIBKRIGING_EXPORT LinearRegression();
 
-  // should be not exported ?
-  LIBKRIGING_EXPORT arma::colvec coef;
-  LIBKRIGING_EXPORT double sig2;
-  LIBKRIGING_EXPORT arma::colvec stderrest;
+  LIBKRIGING_EXPORT const arma::colvec& coef() const { return m_coef; };
+  LIBKRIGING_EXPORT const double& sig2() const { return m_sig2; };
+  LIBKRIGING_EXPORT const arma::colvec& stderrest() const { return m_stderrest; };
 
   /** True linear regression computation
    * has to find s such that y ~= X * s
@@ -32,6 +31,11 @@ class LinearRegression {
   LIBKRIGING_EXPORT void fit(const arma::vec& y, const arma::mat& X);
 
   LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec> predict(const arma::mat& X);
+
+ private:
+  arma::colvec m_coef;
+  double m_sig2;
+  arma::colvec m_stderrest;
 };
 
 #endif  // LIBKRIGING_LINEARREGRESSION_HPP
