@@ -52,7 +52,7 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, void* fn_data) {
 LIBKRIGING_EXPORT
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 // returned object should hold error state instead of void
-void LinearRegressionOptim::fit(const arma::vec y, const arma::mat X) {
+void LinearRegressionOptim::fit(const arma::vec & y, const arma::mat & X) {
   int n = X.n_rows;
   int k = X.n_cols;
 
@@ -73,9 +73,9 @@ void LinearRegressionOptim::fit(const arma::vec y, const arma::mat X) {
   stderrest = arma::sqrt(sig2 * arma::diagvec(arma::inv(arma::trans(X) * X)));
 }
 
-std::tuple<arma::colvec, arma::colvec> LinearRegressionOptim::predict(const arma::mat X) {
+std::tuple<arma::colvec, arma::colvec> LinearRegressionOptim::predict(const arma::mat & X) {
   // should test that X.n_cols == fit.X.n_cols
-  int n = X.n_rows;
+  // int n = X.n_rows;
   // int k = X.n_cols;
 
   arma::colvec y = X * coef;
