@@ -1,0 +1,277 @@
+#!/bin/bash
+## OptimLib config script
+
+function print_help
+{ 
+    echo "" ;
+    echo -e "\x1B[32mOptimLib Configuration Options:\033[0m" >&2 ;
+    echo "-c    Coverage build" ;
+    echo "-d    Development build" ;
+    echo "-g    Debugging build (optimization flags set to -O0 -g)" ;
+    echo "-h    Print help" ;
+    echo "-i    Install path (default: current directory)" ;
+    echo "        Example: /usr/local" ;
+    echo "-m    Specify the BLAS and Lapack libraries to link against" ; 
+    echo "        Examples: -m \"-lopenblas\" or -m \"-framework Accelerate\"" ;
+    echo "-o    Compiler optimization options; defaults to:" ;
+    echo "        -O3 -march=native -ffp-contract=fast -flto -DARMA_NO_DEBUG" ;
+    echo "-p    Enable OpenMP parallelization features" ;
+    #echo "-r    RcppArmadillo compatible build by setting the appropriate R library directories (R, Rcpp, and RcppArmadillo)" ;
+    #echo "        Example: -r \"/usr/local/R/lib/R/include /usr/local/R/lib/R/library/Rcpp/include /usr/local/R/lib/R/library/RcppArmadillo/include\"" ;
+    echo "" ;
+    echo "Special:" ;
+    echo "--header-only-version    Generate a header-only version of OptimLib" ;
+    echo "" ;
+}
+
+while getopts hcdgi:m:o:pr:-: option; do
+    case "${option}" in
+        -)
+            case "${OPTARG}" in
+                header-only-version)
+                    OPTIM_GEN_NEW_HEADERS="y";;
+                ?) print_help; exit 2;;
+            esac;;
+        h) print_help; exit 2;;
+        c) OPTIM_COVERAGE_BUILD="y";;
+        d) OPTIM_DEV_BUILD="y";;
+        g) OPTIM_DEBUG_BUILD="y";;
+        i) OPTIM_INSTALL_PATH=${OPTARG};;
+        m) OPTIM_MATRIX_OPS=${OPTARG};;
+        o) OPTIM_OPT=${OPTARG};;
+        p) OPTIM_PARALLEL="y";;
+        r) OPTIM_R_BUILD=${OPTARG};;
+        ?) print_help; exit 2;;
+    esac
+done
+
+if [ -z ${CC+x} ]; then 
+    CC=gcc
+fi
+if [ -z ${CXX+x} ]; then 
+    CXX=g++
+fi
+if [ -z ${FC+x} ]; then 
+    FC=gfortran
+fi
+
+# get working directory
+WDIR=${PWD}
+
+# compiler checks
+IS_DARWIN=$($CXX -dumpmachine 2>&1 | grep -i -c "darwin")
+GCC_COMPILER=$($CXX --version 2>&1 | grep -i -c -E "gcc")
+CLANG_COMPILER=$($CXX --version 2>&1 | grep -i -c -E "clang")
+APPLE_COMPILER=$($CXX --version 2>&1 | grep -i -c -E 'apple llvm')
+
+# generate header-only version of OptimLib
+
+if [[ "${OPTIM_GEN_NEW_HEADERS}" == "y" ]]; then
+    rm -rf ./header_only_version
+    mkdir ./header_only_version
+
+    cp -rf ./include/* ./header_only_version/
+
+    #
+
+    declare -a DIRS=("constrained" "line_search" "unconstrained" "zeros")
+
+    for dir_ in "${DIRS[@]}"; do
+        cd "$WDIR"/header_only_version/"$dir_"
+        file_names=`ls *.hpp`
+
+        for file_ in $file_names; do
+            file_=${file_%.hpp}
+            if [ "$IS_DARWIN" -eq "1" ]; then # macOS inplace replacement syntax changes a lot
+                sed -i '' -e "s|#endif|//\n|" $file_.hpp
+            else
+                sed -i -e "s|#endif|//\n|" $file_.hpp
+            fi
+            sed -e '1,/\[OPTIM_BEGIN\]/ d' $WDIR/src/"$dir_"/"$file_".cpp | sed -e "s|optimlib_inline|inline|" -e "s|optim::||" >> "$file_".hpp
+            echo -e "\n#endif" >> "$file_".hpp
+        done
+    done
+
+    exit 0
+fi
+
+#
+
+echo ""
+echo -e "\x1B[32mOptimLib Configuration...\033[0m" >&2 ;
+echo ""
+
+# look for Armadillo
+if [[ "${OPTIM_R_BUILD}" != "" ]]; then
+    ARMA_INCLUDE_PATH="."
+    for word in $OPTIM_R_BUILD
+    do
+        ARMA_INCLUDE_PATH="$ARMA_INCLUDE_PATH -I$word"
+    done
+fi
+
+if [ -z ${ARMA_INCLUDE_PATH+x} ]; then
+    
+    declare -a ARMA_DIRS=("${WDIR}/include" "/usr/include" "/usr/local/include" "/opt/include" "/opt/local/include")
+    ARMA_INCLUDE_PATH=
+
+    for i in "${ARMA_DIRS[@]}"; do
+        if [ -f "$i"/armadillo ]; then 
+            ARMA_INCLUDE_PATH="$i"
+            break
+        fi
+    done
+
+    if [[ $ARMA_INCLUDE_PATH == "" ]]; then
+        echo -e "\x1B[31m  - note: cannot find Armadillo files. Cloning from GitLab\033[0m" >&2 ;
+        echo ""
+
+        mkdir ${WDIR}/arma_tmp
+        git clone --single-branch https://gitlab.com/conradsnicta/armadillo-code.git ${WDIR}/arma_tmp > /dev/null 2>&1
+        mv ${WDIR}/arma_tmp/include/* ${WDIR}/include
+        rm -rf ${WDIR}/arma_tmp
+        ARMA_INCLUDE_PATH="./include"
+    fi
+fi
+
+# set build and optimization flags
+
+if [[ "${OPTIM_COVERAGE_BUILD}" == "y" ]]; then 
+    if [ "$GCC_COMPILER" -eq "1" ]; then
+        OPTIM_OPT_FLAGS="-g -O0 --coverage -fno-inline -fno-inline-small-functions -fno-default-inline"
+    else # clang:
+        OPTIM_OPT_FLAGS="-g -O0 --coverage -fno-inline"
+    fi
+elif [[ "${OPTIM_DEBUG_BUILD}" == "y" ]]; then
+    OPTIM_OPT_FLAGS="-O0 -g"
+else
+    if [[ "${OPTIM_OPT}" == "" ]]; then
+        OPTIM_OPT_FLAGS="-O3 -march=native -ffp-contract=fast -flto -DNDEBUG -DARMA_NO_DEBUG"
+    else
+        OPTIM_OPT_FLAGS="${OPTIM_OPT}"
+    fi
+
+    if [[ "${OPTIM_R_BUILD}" != "" ]]; then
+        OPTIM_OPT_FLAGS="${OPTIM_OPT_FLAGS} -DUSE_RCPP_ARMADILLO"
+    fi
+
+    if [[ "${OPTIM_PARALLEL}" == "y" ]]; then
+        OPTIM_OPT_FLAGS="${OPTIM_OPT_FLAGS} -fopenmp"
+    fi
+fi
+
+OPTIM_WARN_FLAGS="-Wall"
+
+# shared library name and install path
+
+OPTIM_SHLIB_NAME="liboptim.so"
+
+if [[ "${OPTIM_INSTALL_PATH}" == "" ]]; then
+    OPTIM_INSTALL_PATH="${WDIR}"
+    OPTIM_INSTALL_LIB_PATH="${WDIR}"
+else
+    OPTIM_INSTALL_LIB_PATH="${OPTIM_INSTALL_PATH}/lib"
+fi
+
+if [[ $OSTYPE == darwin* ]] ; then
+
+    OPTIM_SHLIB_FLAGS="-dynamiclib -install_name ${OPTIM_INSTALL_LIB_PATH}/${OPTIM_SHLIB_NAME} -Wl,-headerpad_max_install_names -undefined dynamic_lookup -single_module -multiply_defined suppress"
+    OPTIM_BLAS_LAPACK="-framework Accelerate"
+
+elif [[ $OSTYPE == *linux* ]] ; then
+
+    OPTIM_OPT_FLAGS="-fPIC ${OPTIM_OPT_FLAGS}"
+    OPTIM_SHLIB_FLAGS="-fPIC -shared -L${OPTIM_INSTALL_LIB_PATH} -Wl,-Bsymbolic-functions -Wl,-z,relro"
+
+    OPTIM_BLAS_LAPACK="-lblas -llapack"
+else
+    OPTIM_BLAS_LAPACK="-lblas -llapack"
+fi
+
+if [[ !(-z ${OPTIM_MATRIX_OPS+x}) ]]; then
+    OPTIM_BLAS_LAPACK="${OPTIM_MATRIX_OPS}"
+fi
+
+if [ "$IS_DARWIN" -eq "1" ] && [ "$GCC_COMPILER" -eq "1" ]; then
+    OPTIM_OPT_FLAGS="-Wa,-q ${OPTIM_OPT_FLAGS}"
+fi
+
+# final optimization checks
+
+if [[ "${OPTIM_COVERAGE_BUILD}" == "y" ]]; then 
+    OPTIM_SHLIB_FLAGS="--coverage ${OPTIM_SHLIB_FLAGS}"
+else
+    OPTIM_SHLIB_FLAGS="${OPTIM_OPT_FLAGS} ${OPTIM_SHLIB_FLAGS}"
+fi
+
+#
+# final print:
+
+echo "  - OS:            ${OSTYPE}"
+echo "  - C++ compiler:  ${CXX}"
+
+if [[ "${OPTIM_DEV_BUILD}" == "y" ]]; then
+    echo "  - Build version: development"
+elif [[ "${OPTIM_COVERAGE_BUILD}" == "y" ]]; then
+    echo "  - Build version: coverage"
+elif [[ "${OPTIM_DEBUG_BUILD}" == "y" ]]; then
+    echo "  - Build version: debug"
+elif [[ "${OPTIM_R_BUILD}" != "" ]]; then
+    echo "  - Build version: RcppArmadillo"
+else
+    echo "  - Build version: release"
+fi
+
+echo ""
+
+echo "  - ARMA_INCLUDE_PATH set to:"
+echo "    ${ARMA_INCLUDE_PATH}"
+echo "  - BLAS and Lapack libraries set to:"
+echo "    ${OPTIM_BLAS_LAPACK}"
+
+echo ""
+
+if [[ "${OPTIM_PARALLEL}" == "y" ]]; then
+    echo -e "  - OpenMP features: \x1B[32menabled\033[0m" >&2 ;
+else
+    echo -e "  - OpenMP features: \x1B[31mdisabled\033[0m" >&2 ;
+fi
+
+echo "  - optimization flags:"
+echo "    ${OPTIM_OPT_FLAGS}"
+
+echo ""
+
+echo "  - OptimLib install path:"
+echo "    ${OPTIM_INSTALL_PATH}"
+
+echo ""
+echo "  - Additional notes:"
+
+if [ "$APPLE_COMPILER" -eq "1" ] && [[ "${OPTIM_PARALLEL}" == "y" ]]; then
+    echo -e "    \x1B[31m- You have enabled OpenMP, but your C++ compiler does not\033[0m" >&2 ;
+    echo -e "    \x1B[31m  support this feature!\033[0m" >&2 ;
+fi
+
+if [ "$IS_DARWIN" -eq "1" ] && [ "$GCC_COMPILER" -eq "1" ]; then
+    echo "    - To enable AVX features, your compiler will use the Apple LLVM"
+    echo "      assembler"
+fi
+
+echo ""
+echo -e "\x1B[32mConfiguration completed. Creating Makefile... \c\033[0m" >&2 ;
+
+sed -e "s|@CC@|${CC}|" \
+    -e "s|@CXX@|${CXX}|" \
+    -e "s|@FC@|${FC}|" \
+    -e "s|@ARMA_INCLUDE_PATH@|${ARMA_INCLUDE_PATH}|" \
+    -e "s|@OPTIM_BLAS_LAPACK@|${OPTIM_BLAS_LAPACK}|" \
+    -e "s|@OPTIM_WARN_FLAGS@|${OPTIM_WARN_FLAGS}|" \
+    -e "s|@OPTIM_OPT_FLAGS@|${OPTIM_OPT_FLAGS}|" \
+    -e "s|@OPTIM_SHLIB_NAME@|${OPTIM_SHLIB_NAME}|" \
+    -e "s|@OPTIM_SHLIB_FLAGS@|${OPTIM_SHLIB_FLAGS}|" \
+    -e "s|@OPTIM_INSTALL_PATH@|${OPTIM_INSTALL_PATH}|" \
+    Makefile.in > Makefile
+
+echo -e "\x1B[32mdone.\033[0m" >&2 ;
+echo ""
