@@ -49,7 +49,9 @@ build*/
 CMakeCache.txt
 CMakeFiles
 
+# R project stuff
 .Rproj.user
+/bindings/R/rlibkriging/*.gz
 
 # armadillo 'in source' generated Makefile
 dependencies/armadillo-code/examples/Makefile
