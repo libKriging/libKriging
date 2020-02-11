@@ -13,9 +13,9 @@ class LinearRegressionOptim {
   /** Trivial constructor */
   LIBKRIGING_EXPORT LinearRegressionOptim();
 
-  LIBKRIGING_EXPORT const arma::colvec& coef() const { return m_coef; };
-  LIBKRIGING_EXPORT const double& sig2() const { return m_sig2; };
-  LIBKRIGING_EXPORT const arma::colvec& stderrest() const { return m_stderrest; };
+  const arma::colvec& coef() const { return m_coef; };
+  const double& sig2() const { return m_sig2; };
+  const arma::colvec& stderrest() const { return m_stderrest; };
 
   /** True linear regression computation
    * has to find s such that y ~= X * s
