@@ -33,7 +33,14 @@ class OrdinaryKriging {
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
 
-  double fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data);
+  struct OKModel {
+    arma::colvec y;
+    arma::mat X;
+    arma::mat T;
+    arma::colvec z;
+  };
+
+  double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel * okm_data);
 
  public:
   // at least, just call make_dist(kernel)

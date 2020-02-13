@@ -8,13 +8,6 @@
 //' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf (where CovMatrix<-R, Ft<-M, C<-T,
 // rho<-z) ' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
-struct OKModel {
-  arma::colvec y;
-  arma::mat X;
-  arma::mat T;
-  arma::colvec z;
-};
-
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
 arma::mat OrdinaryKriging::Cov2(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
@@ -112,10 +105,10 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
       OKModel okm_data{y, X, T, z};
       bool bfgs_ok = optim::bfgs(
           theta_tmp,
-          [this](const arma::vec& vals_inp, arma::vec* grad_out, void* opt_data) -> double {
-            return this->fit_ofn(vals_inp, grad_out, opt_data);
+          [this,&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+            return this->fit_ofn(vals_inp, grad_out, &okm_data);
           },
-          reinterpret_cast<OKModel*>(&okm_data),
+          nullptr,
           algo_settings);
       if (bfgs_ok) {
         double ll_tmp
@@ -140,8 +133,8 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
     sigma2 = (double)(parameters["sigma2"]);
 }
 
-double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data) {
-  OKModel* fd = reinterpret_cast<OKModel*>(okm_data);
+double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel * okm_data) {
+  OKModel* fd = okm_data;
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param)
