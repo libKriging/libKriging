@@ -2,9 +2,9 @@
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
-        DemoClass.cpp include/libKriging/DemoClass.hpp
-        DemoFunction.cpp include/libKriging/DemoFunction.hpp
-        DemoArmadilloClass.cpp include/libKriging/DemoArmadilloClass.hpp
+        demo/DemoClass.cpp include/libKriging/demo/DemoClass.hpp
+        demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
+        demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         OrdinaryKriging.cpp include/libKriging/OrdinaryKriging.hpp)
