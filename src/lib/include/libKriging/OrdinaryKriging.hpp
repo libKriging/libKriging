@@ -16,22 +16,28 @@ class OrdinaryKriging {
   arma::mat T;
   arma::colvec z;
 
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov;   // Covariance function
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> DCov;  // Covaraince function derivative vs. theta
+  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov;  // Covariance function
+  // FIXME add int in signature as in .cpp
+  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)>
+      DCov;  // Covaraince function derivative vs. theta
   arma::vec theta;
   double sigma2;
 
   // returns distance matrix form Xp to X
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::rowvec& theta);
+  // FIXME theta were arma::rowvec (fixed as in cpp)
+  // FIXME temporarily renamed as Cov2 (to remove conflict this Cov attribute)
+  LIBKRIGING_EXPORT arma::mat Cov2(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta);
   // same for one point
-  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::rowvec& theta);
+  LIBKRIGING_EXPORT arma::colvec Cov2(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
-  void make_Cov(const std::string& kernel);
+  void make_Cov(const std::string& covType);
+
+  double fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data);
 
  public:
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging(std::string kernel);
+  LIBKRIGING_EXPORT OrdinaryKriging(std::string covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

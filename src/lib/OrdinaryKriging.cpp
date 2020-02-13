@@ -16,15 +16,18 @@ struct OKModel {
 };
 
 // returns distance matrix form Xp to X
-LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, arma::colvec theta) {
+LIBKRIGING_EXPORT
+arma::mat OrdinaryKriging::Cov2(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
   // Should be tyaken from covariance.h from nestedKriging ?
   // return getCrossCorrMatrix(X,Xp,parameters,covType);
+
+  arma::uword n = 0;  // FIXME
 
   // Should bre replaced by for_each
   arma::mat R(n, n);
   R.zeros();
-  for (int i = 0; i < n; i++) {
-    for (int j = 0; j < i; j++) {
+  for (arma::uword i = 0; i < n; i++) {
+    for (arma::uword j = 0; j < i; j++) {
       R(i, j) = Cov(X.row(i), Xp.row(j), theta);
     }
   }
@@ -34,7 +37,10 @@ LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, arma::c
 }
 
 // same for one point
-LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, arma::colvec theta) {
+LIBKRIGING_EXPORT arma::colvec OrdinaryKriging::Cov2(const arma::mat& X,
+                                                     const arma::rowvec& x,
+                                                     const arma::colvec& theta) {
+  // FIXME mat(x) : an arma::mat from a arma::rowvec ?
   return CovX(&X, mat(x), theta).col(1);  // TODO to be optimized...
 }
 
@@ -44,7 +50,7 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
   //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
   Cov = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta) {
     double temp = 1;
-    for (int k = 0; k < theta.n_elems; k++) {
+    for (int k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
       temp *= exp(-0.5 * std::pow(d, 2));
     }
@@ -52,7 +58,7 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
   };
   DCov = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta, int dim) {
     double temp = 1;
-    for (int k = 0; k < theta.n_elems; k++) {
+    for (int k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
       temp *= exp(-0.5 * std::pow(d, 2));
       if (k == dim) {
@@ -77,13 +83,14 @@ LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(std::string covType) {
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
                                             const arma::mat X,
-                                            const std::map<std::string, T> parameters,
+                                            const std::map<std::string, T> parameters, // FIXME what is T type ?
                                             const std::string optim_objective,
                                             const std::string optim_method) {
   this->X = X;
   this->y = y;
 
-  if (optim_method.compare('none') == 0) {  // just keep given theta, no optimisation of ll
+  // FIXME what are m and d ??
+  if (optim_method.compare("none") == 0) {  // just keep given theta, no optimisation of ll
     theta = (arma::mat)(parameters["theta"]).row(0);
   } else if (optim_method.rfind('bfgs', 0) == 0) {
     arma::mat theta0;
@@ -99,21 +106,27 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
 
     double ll = -1 * INFINITY;
     for (int i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-      arma::mat theta_tmp = theta0.row(i);
+      arma::vec theta_tmp = theta0.row(i); // FIXME arma::mat replaced by arma::vec
       arma::mat T;
       arma::mat z;
       OKModel okm_data{y, X, T, z};
-      bool bfgs_ok = optim::bfgs(theta_tmp, fit_ofn, reinterpret_cast<OKModel*>(&okm_data), algo_settings);
+      bool bfgs_ok = optim::bfgs(
+          theta_tmp,
+          [this](const arma::vec& vals_inp, arma::vec* grad_out, void* opt_data) -> double {
+            return this->fit_ofn(vals_inp, grad_out, opt_data);
+          },
+          reinterpret_cast<OKModel*>(&okm_data),
+          algo_settings);
       if (bfgs_ok) {
         double ll_tmp
             = fit_ofn(theta_tmp,
                       nullptr,
-                      okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
+                      &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
         if (ll_tmp > ll) {
           theta = theta_tmp;
           ll = ll_tmp;
-          T = okm_data->T;
-          z = okm_data->z;
+          T = okm_data.T;
+          z = okm_data.z;
         }
       }
     }
@@ -127,7 +140,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
     sigma2 = (double)(parameters["sigma2"]);
 }
 
-double fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data) {
+double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data) {
   OKModel* fd = reinterpret_cast<OKModel*>(okm_data);
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
@@ -153,7 +166,7 @@ double fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data) {
   F.ones();
 
   // Allocate the matrix
-  arma::mat R = Cov(fd->X, fd->X, theta);
+  arma::mat R = Cov2(fd->X, fd->X, theta);  // FIXME use method not attribute ?
 
   // Cholesky decompostion of covariance matrix
   fd->T = trans(chol(R));
@@ -169,6 +182,7 @@ double fit_ofn(const arma::vec& theta, arma::vec* grad_out, void* okm_data) {
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
   double sigma2_hat = as_scalar(sum(pow(fd->z, 2)) / n);
 
+  // FIXME what is diag ? (trace of a matrix ??)
   double ll = -0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(diag(fd->T))) + n);
 
   if (grad_out) {
@@ -235,6 +249,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
 
   // ...
 
+  // FIXME what size ? (output tuple has 3 fields)
   if (withStd)
     if (withCov)
       return std::make_tuple(std::move(mean), std::move(stdev), std::move(cov));
@@ -274,7 +289,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   y = join_rows(y, newy);
 
   // rebuild starting parameters
-  std::map<std::string, T> parameters;
+  std::map<std::string, T> parameters; // FIXME what is T type ?
   parameters["sigma2"] = this->sigma2;
   parameters["theta"] = this->theta;
 
