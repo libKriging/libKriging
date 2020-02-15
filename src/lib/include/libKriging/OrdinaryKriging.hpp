@@ -25,8 +25,8 @@ class OrdinaryKriging {
   arma::colvec z;
 
   // FIXME TODO: do not use copy
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov_fun;  // Covariance function
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)>
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::rowvec&)> Cov_fun;  // Covariance function
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::rowvec&, int)>
       Cov_deriv;  // Covariance function derivative vs. theta
   arma::vec theta;
   double sigma2;
@@ -50,7 +50,7 @@ class OrdinaryKriging {
 
  public:
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging(std::string covType);
+  LIBKRIGING_EXPORT OrdinaryKriging(const std::string & covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

@@ -78,17 +78,17 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp, const ar
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   // if (covType.compareTo("gauss")==0)
   //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
-  Cov_fun = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta) {
+  Cov_fun = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::rowvec &theta) {
     double temp = 1;
-    for (int k = 0; k < theta.n_elem; k++) {
+    for (arma::uword k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
       temp *= exp(-0.5 * std::pow(d, 2));
     }
     return temp;
   };
-  Cov_deriv = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta, int dim) {
+  Cov_deriv = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::rowvec &theta, int dim) {
     double temp = 1;
-    for (int k = 0; k < theta.n_elem; k++) {
+    for (arma::uword k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
       temp *= exp(-0.5 * std::pow(d, 2));
       if (k == dim) {  //-0.5*(xi(k)-xj(k))*(-2)/(theta(k)^3);
@@ -100,8 +100,9 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
 }
 
 // at least, just call make_dist(kernel)
-LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(std::string covType) {
+LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string & covType) {
   make_Cov(covType);
+  // FIXME: sigma2 attribute not initialized
 }
 
 /** Fit the kriging object on (X,y):
@@ -114,12 +115,12 @@ LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(std::string covType) {
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const Parameters& parameters,
-                                            const std::string& optim_objective,
+                                            const std::string& optim_objective, // FIXME never used
                                             const std::string& optim_method) {
   this->X = X;
   this->y = y;
 
-  if (optim_method.compare("none") == 0) {  // just keep given theta, no optimisation of ll
+  if (optim_method == "none") {  // just keep given theta, no optimisation of ll
     theta = parameters.theta;
   } else if (optim_method.rfind("bfgs", 0) == 0) {
     arma::mat theta0;
@@ -135,7 +136,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     algo_settings.iter_max = 10;  // TODO change by default?
 
     double ll = -std::numeric_limits<double>::infinity(); // FIXME prefer use of C++ value without narrowing
-    for (int i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+    for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
       arma::vec theta_tmp = theta0.row(i);     // FIXME arma::mat replaced by arma::vec
       arma::mat T;
       arma::mat z;
@@ -160,14 +161,14 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
         }
       }
     }
-
   } else
     throw std::runtime_error("Not a suitable optim_method: " + optim_method);
 
-  if (not parameters.has_sigma2)
+  if (not parameters.has_sigma2) {
     sigma2 = arma::as_scalar(sum(pow(z, 2)) / X.n_rows);
-  else
+  } else {
     sigma2 = parameters.sigma2;
+  }
 }
 
 double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data) {
@@ -214,7 +215,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKM
 
   double ll = -0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(fd->T.diag())) + n);
 
-  if (grad_out) {
+  if (grad_out != nullptr) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikGrad.R
     //  logLik.derivative <- matrix(0,nparam,1)
     //  x <- backsolve(T,z)			# compute x := T^(-1)*z
@@ -300,7 +301,7 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
 
   // ...
 
-  return std::move(yp);
+  return yp; // NB: move not required due to copy ellision mechanism
 }
 
 /** Add new conditional data points to previous (X,y)
