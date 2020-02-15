@@ -10,24 +10,31 @@
  * @ingroup Regression
  */
 class OrdinaryKriging {
+ public:
+  struct Parameters {
+    double sigma2;
+    bool has_sigma2;
+    arma::vec theta;
+    bool has_theta;
+  };
+
  private:
   arma::mat X;
   arma::colvec y;
   arma::mat T;
   arma::colvec z;
 
+  // FIXME TODO: do not use copy
   std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov_fun;  // Covariance function
-  // FIXME add int in signature as in .cpp
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)> Cov_deriv;  // Covariance function derivative vs. theta
+  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)>
+      Cov_deriv;  // Covariance function derivative vs. theta
   arma::vec theta;
   double sigma2;
 
   // returns distance matrix form Xp to X
-  // FIXME theta were arma::rowvec (fixed as in cpp)
-  // FIXME temporarily renamed as Cov2 (to remove conflict this Cov attribute)
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta);
-  // same for one point
-  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
+  //  // same for one point
+  //  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -39,7 +46,7 @@ class OrdinaryKriging {
     arma::colvec z;
   };
 
-  double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel * okm_data);
+  double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);
 
  public:
   // at least, just call make_dist(kernel)
@@ -52,11 +59,11 @@ class OrdinaryKriging {
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT void fit(const arma::colvec y,
-                             const arma::mat X,
-                             const std::map<std::string, arma::vec> parameters,
-                             const std::string optim_method,
-                             const std::string optim_objective);
+  LIBKRIGING_EXPORT void fit(const arma::colvec& y,
+                             const arma::mat& X,
+                             const Parameters& parameters,
+                             const std::string& optim_method,
+                             const std::string& optim_objective);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
