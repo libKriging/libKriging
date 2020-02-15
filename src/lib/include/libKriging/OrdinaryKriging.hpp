@@ -16,19 +16,18 @@ class OrdinaryKriging {
   arma::mat T;
   arma::colvec z;
 
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov;  // Covariance function
+  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec)> Cov_fun;  // Covariance function
   // FIXME add int in signature as in .cpp
-  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)>
-      DCov;  // Covaraince function derivative vs. theta
+  std::function<double(arma::rowvec, arma::rowvec, arma::rowvec, int)> Cov_deriv;  // Covariance function derivative vs. theta
   arma::vec theta;
   double sigma2;
 
   // returns distance matrix form Xp to X
   // FIXME theta were arma::rowvec (fixed as in cpp)
   // FIXME temporarily renamed as Cov2 (to remove conflict this Cov attribute)
-  LIBKRIGING_EXPORT arma::mat Cov2(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta);
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta);
   // same for one point
-  LIBKRIGING_EXPORT arma::colvec Cov2(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
+  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -55,7 +54,7 @@ class OrdinaryKriging {
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec y,
                              const arma::mat X,
-                             const arma::vec parameters,
+                             const std::map<std::string, arma::vec> parameters, 
                              const std::string optim_method,
                              const std::string optim_objective);
 
