@@ -5,12 +5,13 @@
 #include <tuple>
 // #include "libKriging/covariance.h"
 
-//' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf (where CovMatrix<-R, Ft<-M, C<-T,
-// rho<-z) ' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
+//' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf
+//'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
+//' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov2(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
+arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
   // Should be tyaken from covariance.h from nestedKriging ?
   // return getCrossCorrMatrix(X,Xp,parameters,covType);
 
@@ -21,7 +22,7 @@ arma::mat OrdinaryKriging::Cov2(const arma::mat& X, const arma::mat& Xp, const a
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R(i, j) = Cov(X.row(i), Xp.row(j), theta);
+      R(i, j) = Cov_fun(X.row(i), Xp.row(j), theta);
     }
   }
   R = arma::symmatu(R);  // R + trans(R);
@@ -30,18 +31,18 @@ arma::mat OrdinaryKriging::Cov2(const arma::mat& X, const arma::mat& Xp, const a
 }
 
 // same for one point
-LIBKRIGING_EXPORT arma::colvec OrdinaryKriging::Cov2(const arma::mat& X,
-                                                     const arma::rowvec& x,
-                                                     const arma::colvec& theta) {
+LIBKRIGING_EXPORT arma::colvec OrdinaryKriging::Cov(const arma::mat& X,
+                                                    const arma::rowvec& x,
+                                                    const arma::colvec& theta) {
   // FIXME mat(x) : an arma::mat from a arma::rowvec ?
-  return CovX(&X, mat(x), theta).col(1);  // TODO to be optimized...
+  return OrdinaryKriging::Cov(&X, arma::mat(&x), &theta).col(1);  // TODO to be optimized...
 }
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   // if (covType.compareTo("gauss")==0)
   //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
-  Cov = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta) {
+  Cov_fun = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta) {
     double temp = 1;
     for (int k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
@@ -49,13 +50,13 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     }
     return temp;
   };
-  DCov = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta, int dim) {
+  Cov_deriv = [](arma::rowvec xi, arma::rowvec xj, arma::rowvec theta, int dim) {
     double temp = 1;
     for (int k = 0; k < theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / theta(k);
       temp *= exp(-0.5 * std::pow(d, 2));
-      if (k == dim) {
-        temp *= d / theta(k);  //-0.5*(xi(k)-xj(k))*(-2)/(theta(k)^3);
+      if (k == dim) { //-0.5*(xi(k)-xj(k))*(-2)/(theta(k)^3);
+        temp *= d / theta(k);
       }
     }
     return temp;
@@ -76,7 +77,7 @@ LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(std::string covType) {
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
                                             const arma::mat X,
-                                            const std::map<std::string, T> parameters, // FIXME what is T type ?
+                                            const std::map<std::string, arma::vec> parameters,
                                             const std::string optim_objective,
                                             const std::string optim_method) {
   this->X = X;
@@ -84,14 +85,14 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
 
   // FIXME what are m and d ??
   if (optim_method.compare("none") == 0) {  // just keep given theta, no optimisation of ll
-    theta = (arma::mat)(parameters["theta"]).row(0);
+    theta = (colvec)(parameters["theta"]);
   } else if (optim_method.rfind('bfgs', 0) == 0) {
     arma::mat theta0;
-    if (parameters.find("theta") == m.end()) {  // no theta given, so draw 10 random uniform starting values
+    if (parameters.find("theta") == parameters.end()) {  // no theta given, so draw 10 random uniform starting values
       int multistart = 10;  // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
-      theta0 = arma::randu(multistart, d);
+      theta0 = arma::randu(multistart, X.n_cols);
     } else {  // just use given theta(s) as starting values for multi-bfgs
-      theta0 = (arma::mat)(parameters["theta"]);
+      theta0 = arma::mat(parameters["theta"]);
     }
 
     optim::algo_settings_t algo_settings;
@@ -127,10 +128,10 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec y,
   } else
     throw std::runtime_error("Not a suitable optim_method: " + optim_method);
 
-  if (parameters.find("sigma2") == m.end())
+  if (parameters.find("sigma2") == parameters.end())
     sigma2 = arma::as_scalar(sum(pow(z, 2)) / X.n_rows);
   else
-    sigma2 = (double)(parameters["sigma2"]);
+    sigma2 = (double)(parameters["sigma2"](1));
 }
 
 double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel * okm_data) {
@@ -159,7 +160,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKM
   F.ones();
 
   // Allocate the matrix
-  arma::mat R = Cov2(fd->X, fd->X, theta);  // FIXME use method not attribute ?
+  arma::mat R = Cov(fd->X, fd->X, theta);  // FIXME use method not attribute ?
 
   // Cholesky decompostion of covariance matrix
   fd->T = trans(chol(R));
@@ -175,8 +176,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKM
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
   double sigma2_hat = as_scalar(sum(pow(fd->z, 2)) / n);
 
-  // FIXME what is diag ? (trace of a matrix ??)
-  double ll = -0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(diag(fd->T))) + n);
+  double ll = -0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(fd->T.diag())) + n);
 
   if (grad_out) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikGrad.R
@@ -211,7 +211,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKM
       gradR_k_upper.zeros();
       for (int i = 0; i < n; i++) {
         for (int j = 0; j < i; j++) {
-          gradR_k_upper(i, j) = OrdinaryKriging::DCov(fd->X.row(i), fd->X.row(j), theta, k);
+          gradR_k_upper(i, j) = OrdinaryKriging::Cov_deriv(fd->X.row(i), fd->X.row(j), theta, k);
         }
       }
       // gradR_k = symmatu(gradR_k);
@@ -247,11 +247,11 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
     if (withCov)
       return std::make_tuple(std::move(mean), std::move(stdev), std::move(cov));
     else
-      return std::make_tuple(std::move(mean), std::move(stdev));
+      return std::make_tuple(std::move(mean), std::move(stdev), nullptr);
   else if (withCov)
-    return std::make_tuple(std::move(mean), std::move(cov));
+    return std::make_tuple(std::move(mean), std::move(cov), nullptr);
   else
-    return std::make_tuple(std::move(mean));
+    return std::make_tuple(std::move(mean), nullptr, nullptr);
 }
 
 /** Draw sample trajectories of kriging at given points X'
@@ -282,8 +282,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   y = join_rows(y, newy);
 
   // rebuild starting parameters
-  std::map<std::string, T> parameters; // FIXME what is T type ?
-  parameters["sigma2"] = this->sigma2;
+  std::map<std::string, arma::vec> parameters;
+  arma::vec s2 = arma::vec(1); s2(1) = this->sigma2;
+  parameters["sigma2"] = s2;
   parameters["theta"] = this->theta;
 
   // re-fit
