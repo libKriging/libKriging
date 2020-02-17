@@ -98,7 +98,7 @@ LIBKRIGING_EXPORT
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   // if (covType.compareTo("gauss")==0)
   //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
-  Cov_fun = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::rowvec & _theta) {
+  Cov_fun = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::vec & _theta) {
     double temp = 1;
     for (arma::uword k = 0; k < _theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / _theta(k);
@@ -106,7 +106,7 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     }
     return temp;
   };
-  Cov_deriv = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::rowvec & _theta, int dim) {
+  Cov_deriv = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::vec & _theta, int dim) {
     double temp = 1;
     for (arma::uword k = 0; k < _theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / _theta(k);
@@ -118,18 +118,21 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     return temp;
   };
   
-  arma::cout << "make_Cov done." << arma::endl;
+  // arma::cout << "make_Cov done." << arma::endl;
 }
 
-// at least, just call make_dist(kernel)
+// at least, just call make_Cov(kernel)
 LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(){//const std::string & covType) {
   make_Cov("gauss");//covType);
   // FIXME: sigma2 attribute not initialized
 }
 
+// Objective function for fit : -logLikelihood
 double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {//void* okm_data){//
   // OrdinaryKriging::OKModel* fd = reinterpret_cast<OrdinaryKriging::OKModel*> (okm_data);
   OrdinaryKriging::OKModel* fd = okm_data;
+  
+  // arma::cout << "_theta:" << _theta << arma::endl;
   
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param)
@@ -276,7 +279,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   this->X = X;
   this->y = y;
   
-  arma::cout << "optim_method:" << optim_method << arma::endl;
+  // arma::cout << "optim_method:" << optim_method << arma::endl;
   
   if (optim_method == "none") {  // just keep given theta, no optimisation of ll
     theta = parameters.theta;
@@ -289,15 +292,17 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
-
+    
+    // arma::cout << "theta0:" << theta0 << arma::endl;
+    
     optim::algo_settings_t algo_settings;
     algo_settings.iter_max = 100;  // TODO change by default?
     algo_settings.vals_bound = true;
-    algo_settings.lower_bounds = arma::zeros(X.n_cols);
-    algo_settings.upper_bounds = arma::ones(X.n_cols);
+    algo_settings.lower_bounds = arma::zeros<arma::vec>(X.n_cols);
+    algo_settings.upper_bounds = 2*arma::ones<arma::vec>(X.n_cols);
     double minus_ll = std::numeric_limits<double>::infinity(); // FIXME prefer use of C++ value without narrowing
     for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec theta_tmp = theta0.row(i);     // FIXME arma::mat replaced by arma::vec
+      arma::vec theta_tmp = trans(theta0.row(i));     // FIXME arma::mat replaced by arma::vec
       arma::mat T;
       arma::mat z;
       OrdinaryKriging::OKModel okm_data{y, X, T, z, Cov_fun, Cov_deriv};
@@ -335,6 +340,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   } else {
     sigma2 = parameters.sigma2;
   }
+  
+  arma::cout << "sigma2:" << sigma2 << arma::endl;
+  
 }
 
 /** Compute the prediction for given points X'

@@ -28,11 +28,11 @@ class OrdinaryKriging {
   double sigma2;
 
   
-  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::rowvec&)> Cov_fun;  // Covariance function
-  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::rowvec&, int)> Cov_deriv;  // Covariance function derivative vs. theta
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> Cov_fun;  // Covariance function
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> Cov_deriv;  // Covariance function derivative vs. theta
   // returns distance matrix form Xp to X
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta);
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::colvec& theta);
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::vec& theta);
   //  // same for one point
   //  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
   
@@ -46,8 +46,8 @@ public:
     arma::mat X;
     arma::mat T;
     arma::colvec z;
-    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::colvec&)> cov_fun;
-    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::colvec&, int)> cov_deriv;
+    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> cov_fun;
+    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> cov_deriv;
   };
   
   // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);//void* okm_data); //
