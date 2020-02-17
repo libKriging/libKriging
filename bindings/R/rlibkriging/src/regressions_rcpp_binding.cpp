@@ -40,13 +40,50 @@ Rcpp::List linear_regression_predict(Rcpp::List linearRegression, arma::mat X) {
 }
 
 
-//#include "libKriging/OrdinaryKriging.hpp"
-//
-//// [[Rcpp::export]]
-//Rcpp::List ordinary_kriging(arma::vec y, arma::mat X,arma::vec theta) {
-//    OrdinaryKriging ok;
-//    auto ans = ok.fit(y, X, theta);
-//    return Rcpp::List::create(Rcpp::Named("class") = "OrdinaryKriging",
-//                              Rcpp::Named("gamma") = std::get<0>(ans),
-//                              Rcpp::Named("theta") = std::get<1>(ans));
-//}
+#include "libKriging/OrdinaryKriging.hpp"
+
+// [[Rcpp::export]]
+Rcpp::List ordinary_kriging(arma::vec y, arma::mat X) {
+  OrdinaryKriging* ok = new OrdinaryKriging();//"gauss"));
+  ok->fit(std::move(y), std::move(X));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+  
+  Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
+  
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "OrdinaryKriging";
+  return obj;
+}
+
+
+// [[Rcpp::export]]
+double ordinary_kriging_loglikelihood(Rcpp::List ordinaryKriging, arma::vec theta) {
+  if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
+  SEXP impl = ordinaryKriging.attr("object");
+  
+  Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
+  
+  return impl_ptr->logLikelihood(theta);
+}
+// [[Rcpp::export]]
+arma::vec ordinary_kriging_loglikelihoodgrad(Rcpp::List ordinaryKriging, arma::vec theta) {
+  if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
+  SEXP impl = ordinaryKriging.attr("object");
+  
+  Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
+  
+  return impl_ptr->logLikelihoodGrad(theta);
+}
+
+// [[Rcpp::export]]
+Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X) {
+  if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
+  SEXP impl = ordinaryKriging.attr("object");
+  
+  Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
+  
+  auto pred = impl_ptr->predict(X,true,false);
+  return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred),
+                            Rcpp::Named("stdev") = std::get<1>(pred));
+}
+
