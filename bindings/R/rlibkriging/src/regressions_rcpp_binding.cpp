@@ -87,4 +87,3 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X) {
                             Rcpp::Named("stdev") = std::get<1>(pred));
 }
 
-

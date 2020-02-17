@@ -85,4 +85,3 @@ for (x in seq(0,1,,11)){
 # lines(x,px$y+2*px$stderr,col='red')
 
 
-

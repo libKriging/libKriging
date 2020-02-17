@@ -94,6 +94,7 @@ LIBKRIGING_EXPORT
 //  return OrdinaryKriging::Cov(&X, arma::mat(&x), &theta).col(1);  // TODO to be optimized...
 //}
 
+
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   // if (covType.compareTo("gauss")==0)
@@ -117,10 +118,8 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     }
     return temp;
   };
-  
-  
-  arma::cout << "make_Cov done." << arma::endl;
-  
+ 
+  arma::cout << "make_Cov done." << arma::endl;  
 }
 
 // at least, just call make_dist(kernel)
@@ -133,6 +132,7 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   // OrdinaryKriging::OKModel* fd = reinterpret_cast<OrdinaryKriging::OKModel*> (okm_data);
   OrdinaryKriging::OKModel* fd = okm_data;
   
+
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param)
   //  model@covariance@sd2 <- 1		# to get the correlation matrix
@@ -339,7 +339,6 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   }
 }
 
-
 /** Compute the prediction for given points X'
  * @param Xp is m*d matrix of points where to predict output
  * @param std is true if return also stdev column vector
@@ -356,6 +355,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
 
   // ...
 
+  // FIXME what size ? (output tuple has 3 fields)
   if (withStd)
     if (withCov)
       return std::make_tuple(std::move(mean), std::move(stdev), std::move(cov));
