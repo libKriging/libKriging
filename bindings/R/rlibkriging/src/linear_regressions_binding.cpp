@@ -39,5 +39,3 @@ Rcpp::List linear_regression_predict(Rcpp::List linearRegression, arma::mat X) {
                             Rcpp::Named("stderr") = std::get<1>(pred));
 }
 
-
-

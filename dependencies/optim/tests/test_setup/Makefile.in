@@ -1,0 +1,34 @@
+
+# core compiling options
+CXX = @CXX@
+
+CXX_STD = -std=c++11
+OPT_FLAGS = @OPTIM_WARN_FLAGS@ @OPTIM_OPT_FLAGS@
+
+ARMA_INCLUDE_PATH = @ARMA_INCLUDE_PATH@
+
+# install location
+INSTALL_PATH=@OPTIM_INSTALL_PATH@
+
+# source directories
+OPTIM_HEADER_DIR = @OPTIM_INCLUDE_PATH@
+OPTIM_TEST_DIR = .
+
+# general flags
+CXXFLAGS = $(CXX_STD) $(OPT_FLAGS) -I$(ARMA_INCLUDE_PATH) -I$(OPTIM_HEADER_DIR)
+LIBS= -L@OPTIM_INSTALL_PATH@ -l@OPTIM_SHLIB_NAME@ @OPTIM_BLAS_LAPACK@
+
+# Optim Test Files
+SOURCES_OPTIM := $(shell find $(OPTIM_TEST_DIR) -name '*.cpp')
+OBJECTS_OPTIM := $(addprefix $(OPTIM_TEST_DIR)/,$(SOURCES_OPTIM:%.cpp=%.test))
+
+all: $(OBJECTS_OPTIM)
+
+# core Optim files
+$(OPTIM_TEST_DIR)/%.test: $(OPTIM_TEST_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@ $(LIBS)
+
+# cleanup and install
+.PHONY: clean
+clean:
+	@rm -rf *.so ./*.gcov ./*.gcno ./*.gcda ./*.dSYM ./*.test

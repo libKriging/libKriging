@@ -118,9 +118,7 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     return temp;
   };
   
-  
   arma::cout << "make_Cov done." << arma::endl;
-  
 }
 
 // at least, just call make_dist(kernel)
@@ -338,7 +336,6 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     sigma2 = parameters.sigma2;
   }
 }
-
 
 /** Compute the prediction for given points X'
  * @param Xp is m*d matrix of points where to predict output

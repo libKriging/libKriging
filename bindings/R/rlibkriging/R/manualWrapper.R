@@ -8,3 +8,4 @@ demo_binding2 <- function() {
   result <- .Call("demo_binding2")
   return(result)
 }
+
