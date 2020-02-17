@@ -13,3 +13,5 @@ Imports: Rcpp (>= 0.12.11)
 LinkingTo: Rcpp, RcppArmadillo
 Depends: RhpcBLASctl, R (>= 2.14)
 #Collate: rlibkrigingWrapper.R RcppExports.R
+Depends: methods
+Suggests: testthat
