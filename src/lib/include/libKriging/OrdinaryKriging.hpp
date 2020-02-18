@@ -18,13 +18,20 @@ class OrdinaryKriging {
     bool has_theta;
   };
 
+  const arma::mat& X() const { return m_X; };
+  const arma::colvec& y() const { return m_y; };
+  const arma::mat& T() const { return m_T; };
+  const arma::colvec& z() const { return m_z; };
+  const arma::vec& theta() const { return m_theta; };
+  const double& sigma2() const { return m_sigma2; };
+
  private:
-  arma::mat X;
-  arma::colvec y;
-  arma::mat T;
-  arma::colvec z;
-  arma::vec theta;
-  double sigma2;
+  arma::mat m_X;
+  arma::colvec m_y;
+  arma::mat m_T;
+  arma::colvec m_z;
+  arma::vec m_theta;
+  double m_sigma2;
 
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> Cov_fun;  // Covariance function
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)>

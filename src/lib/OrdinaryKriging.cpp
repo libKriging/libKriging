@@ -214,7 +214,7 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
 LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{y, X, T, z, Cov_fun, Cov_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, Cov_fun, Cov_deriv};
 
   return -fit_ofn(_theta, nullptr, &okm_data);
 }
@@ -222,7 +222,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta)
 LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{y, X, T, z, Cov_fun, Cov_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, Cov_fun, Cov_deriv};
 
   arma::vec grad(_theta.n_elem);
 
@@ -248,13 +248,13 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   std::string optim_method = "bfgs";
   Parameters parameters{0, false, arma::vec(1), false};
 
-  this->X = X;
-  this->y = y;
+  this->m_X = X;
+  this->m_y = y;
 
   // arma::cout << "optim_method:" << optim_method << arma::endl;
 
   if (optim_method == "none") {  // just keep given theta, no optimisation of ll
-    theta = parameters.theta;
+    m_theta = parameters.theta;
   } else if (optim_method.rfind("bfgs", 0) == 0) {
     arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -292,7 +292,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                     nullptr,
                     &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
       if (minus_ll_tmp < minus_ll) {
-        theta = std::move(theta_tmp);
+        m_theta = std::move(theta_tmp);
         minus_ll = minus_ll_tmp;
         T = std::move(okm_data.T);
         z = std::move(okm_data.z);
@@ -302,15 +302,15 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   } else
     throw std::runtime_error("Not a suitable optim_method: " + optim_method);
 
-  arma::cout << "theta:" << theta << arma::endl;
+  arma::cout << "theta:" << m_theta << arma::endl;
 
   if (!parameters.has_sigma2) {
-    sigma2 = arma::as_scalar(sum(pow(z, 2)) / X.n_rows);
+    m_sigma2 = arma::as_scalar(sum(pow(m_z, 2)) / X.n_rows);
   } else {
-    sigma2 = parameters.sigma2;
+    m_sigma2 = parameters.sigma2;
   }
 
-  arma::cout << "sigma2:" << sigma2 << arma::endl;
+  arma::cout << "sigma2:" << m_sigma2 << arma::endl;
 }
 
 /** Compute the prediction for given points X'
@@ -346,7 +346,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
  * @return output is m*nsim matrix of simulations at Xp
  */
 LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma::mat& Xp) {
-  arma::mat yp(X.n_rows, nsim);
+  arma::mat yp(m_X.n_rows, nsim);
 
   // ...
 
@@ -364,11 +364,11 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
                                                const std::string& optim_objective,
                                                const std::string& optim_method) {
   // rebuild data
-  X = join_rows(X, newX);
-  y = join_rows(y, newy);
+  m_X = join_rows(m_X, newX);
+  m_y = join_rows(m_y, newy);
 
   // rebuild starting parameters
-  Parameters parameters{this->sigma2, true, this->theta, true};
+  Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
-  this->fit(y, X);  //, parameters, optim_objective, optim_method);
+  this->fit(m_y, m_X);  //, parameters, optim_objective, optim_method);
 }
