@@ -99,23 +99,20 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
   // if (covType.compareTo("gauss")==0)
   //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
   Cov_fun = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::vec & _theta) {
-    double temp = 1;
+    double temp = 0;
     for (arma::uword k = 0; k < _theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / _theta(k);
-      temp *= exp(-0.5 * std::pow(d, 2));
+      temp += d*d;
     }
-    return temp;
+    return exp2(-0.5*temp);
   };
   Cov_deriv = [](const arma::rowvec &xi, const arma::rowvec &xj, const arma::vec & _theta, int dim) {
-    double temp = 1;
+    double temp = 0;
     for (arma::uword k = 0; k < _theta.n_elem; k++) {
       double d = (xi(k) - xj(k)) / _theta(k);
-      temp *= exp(-0.5 * std::pow(d, 2));
-      if (k == dim) {  //-0.5*(xi(k)-xj(k))*(-2)/(theta(k)^3);
-        temp *= std::pow(d, 2) / _theta(k);
-      }
+      temp += d*d;
     }
-    return temp;
+    return exp2(-.5*temp) * (xi(dim) - xj(dim))*(xi(dim) - xj(dim)) / (_theta(dim)*_theta(dim)*_theta(dim));
   };
   
   // arma::cout << "make_Cov done." << arma::endl;
