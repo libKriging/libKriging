@@ -75,4 +75,6 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, boo
     auto pred = impl_ptr->predict(X,false,false);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   }
+
+  // FIXME no default return
 }
