@@ -1,6 +1,9 @@
 ## See Section 1.2.1 "Using 'Makevars'" of Writing R Extensions
 ## https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Using-Makevars
 
+## If launching in command line .travis-ci/r-linux-macos/build.sh, this should be needed:
+LIBKRIGING_PATH = /home/richet/libKriging/build/installed
+
 ## Using shared libs with Linux|MacOS requires to copy libKriging*.(so|dylib) and libarmadillo*.(so|dylib)
 ## next to rlibkriging.so (in installation directory)
 ## then rpath of rlibkriging may be simplify updated
