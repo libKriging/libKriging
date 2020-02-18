@@ -1,25 +1,18 @@
 #include "libKriging/LinearRegressionOptim.hpp"
+
 // @ref: https://www.kthohr.com/optimlib.html
-// cd dependencies
-// git clone -b master --single-branch https://github.com/kthohr/optim ./optim
-// ./configure --header-only-version
-// then add include_directories(SYSTEM dependencies/optim/header_only_version) in libKriging/CMakeLists.txt
 #include <optim.hpp>
 
 LIBKRIGING_EXPORT
 LinearRegressionOptim::LinearRegressionOptim() : m_sig2{} {};
-
-// LIBKRIGING_EXPORT arma::colvec coef;
-// LIBKRIGING_EXPORT double sig2;
-// LIBKRIGING_EXPORT arma::colvec stderrest;
 
 struct err_fn_data {
   arma::vec y;
   arma::mat X;
 };
 
-double err_fn(const arma::vec& coef, arma::vec* grad_out, void* fn_data) {
-  err_fn_data* d = reinterpret_cast<err_fn_data*>(fn_data);
+double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) {
+  err_fn_data* d = fn_data;
 
   arma::vec y_est = d->X * coef;
 
@@ -29,7 +22,7 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, void* fn_data) {
   double err = arma::sum(arma::square(y_est - d->y));
   // std::cout<<"Err: "<<err<<std::endl;
 
-  if (grad_out) {
+  if (grad_out != nullptr) {
     int k = coef.n_elem;
     for (int i = 0; i < k; i++) {
       arma::vec coef2 = coef;
@@ -60,7 +53,13 @@ void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
   optim::algo_settings_t algo_settings;
   err_fn_data fn_data{y, X};
   algo_settings.iter_max = 10;
-  bool bfgs_ok = optim::bfgs(m_coef, err_fn, reinterpret_cast<err_fn_data*>(&fn_data), algo_settings);
+  bool bfgs_ok = optim::bfgs(
+      m_coef,
+      [&fn_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+        return err_fn(vals_inp, grad_out, &fn_data);
+      },
+      nullptr,
+      algo_settings);
   if (!bfgs_ok)
     throw std::runtime_error("BFGS failed");
 

@@ -16,41 +16,6 @@
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
-// Utilities
-// TODO: will be moved in utility file when this file will be ok
-// template<typename... Args>
-// std::string asString(Args&& ...args) {
-//  std::ostringstream oss;
-//  (void)(int[]){0, (void(oss << std::forward<Args>(args)), 0)...};
-//  return oss.str();
-//};
-//
-// class ParameterReader {
-// private:
-//  using Parameters = std::map<std::string, arma::vec>;
-//
-// public:
-//  explicit ParameterReader(const Parameters& parameters) : m_parameters(parameters) {}
-//
-//  const arma::vec& operator[](const std::string& name) const {
-//    auto finder = m_parameters.find(name);
-//    if (finder != m_parameters.end()) {
-//      return finder->second;
-//    }
-//    else {
-//      throw std::invalid_argument(asString("Parameter ",name," not found"));
-//    }
-//  }
-//
-//  bool has(const std::string& name) const {
-//    auto finder = m_parameters.find(name);
-//    return (finder != m_parameters.end());
-//  }
-//
-// private:
-//  const Parameters& m_parameters;
-//};
-
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
 arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
@@ -135,9 +100,7 @@ LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging() {  // const std::string & c
 }
 
 // Objective function for fit : -logLikelihood
-double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {  // void*
-                                                                                                    // okm_data){//
-  // OrdinaryKriging::OKModel* fd = reinterpret_cast<OrdinaryKriging::OKModel*> (okm_data);
+double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
   OrdinaryKriging::OKModel* fd = okm_data;
 
   // arma::cout << "_theta:" << _theta << arma::endl;
@@ -170,7 +133,6 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      // FIXME WARNING : theta parameter shadows theta attribute
       R(i, j) = fd->cov_fun(fd->X.row(i), fd->X.row(j), _theta);
     }
   }
@@ -183,7 +145,8 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
 
   // Compute intermediate useful matrices
   arma::mat M = solve(fd->T, F);
-  arma::mat Q, G;
+  arma::mat Q;
+  arma::mat G;
   qr_econ(Q, G, M);
   arma::colvec Yt = solve(fd->T, fd->y);
   arma::colvec beta = solve(G, trans(Q) * Yt);
@@ -309,11 +272,11 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = arma::zeros<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * arma::ones<arma::vec>(X.n_cols);
-    double minus_ll = std::numeric_limits<double>::infinity();  // FIXME prefer use of C++ value without narrowing
+    double minus_ll = std::numeric_limits<double>::infinity();
     for (arma::uword i = 0; i < theta0.n_rows; i++) {           // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec theta_tmp = trans(theta0.row(i));               // FIXME arma::mat replaced by arma::vec
-      arma::mat T;
-      arma::mat z;
+      arma::vec theta_tmp = trans(theta0.row(i));
+      arma::mat T; // FIXME shadows attribute
+      arma::mat z; // FIXME shadows attribute
       OrdinaryKriging::OKModel okm_data{y, X, T, z, Cov_fun, Cov_deriv};
       bool bfgs_ok = optim::bfgs(
           theta_tmp,
@@ -321,11 +284,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
             return fit_ofn(vals_inp, grad_out, &okm_data);
           },
           nullptr,
-          // fit_ofn,
-          // reinterpret_cast<OrdinaryKriging::OKModel*> (&okm_data),
           algo_settings);
 
-      // if (bfgs_ok) {
+      // if (bfgs_ok) { // FIXME always succeeds ?
       double minus_ll_tmp
           = fit_ofn(theta_tmp,
                     nullptr,

@@ -18,18 +18,18 @@ class OrdinaryKriging {
     bool has_theta;
   };
 
-  // private:
+ private:
   arma::mat X;
   arma::colvec y;
   arma::mat T;
   arma::colvec z;
-  // FIXME TODO: do not use copy
   arma::vec theta;
   double sigma2;
 
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> Cov_fun;  // Covariance function
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)>
       Cov_deriv;  // Covariance function derivative vs. theta
+
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::vec& theta);
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::vec& theta);
@@ -49,8 +49,7 @@ class OrdinaryKriging {
     std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> cov_deriv;
   };
 
-  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);//void* okm_data);
-  // //
+  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT OrdinaryKriging();  // const std::string & covType);
