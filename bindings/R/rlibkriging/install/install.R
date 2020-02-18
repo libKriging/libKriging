@@ -15,3 +15,4 @@ type <- switch(Sys.info()[['sysname']],
 install.packages("Rcpp", repos=repos, type=type)
 install.packages("RcppArmadillo", repos=repos, type=type)
 install.packages("RhpcBLASctl", repos=repos, type=type)
+install.packages("testthat", repos=repos, type=type)
