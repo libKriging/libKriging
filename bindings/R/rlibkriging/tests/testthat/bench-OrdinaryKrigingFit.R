@@ -3,7 +3,7 @@ registerDoSEQ()
 
 f = function(X) apply(X,1,function(x) sum(x^2))
 
-logn = seq(1,1.5,by=.1)
+logn = seq(1,2,by=.1)
 times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
 
 for (i in 1:length(logn)) {
@@ -26,5 +26,7 @@ for (i in 1:length(logn)) {
   print(max(abs(ordinary_kriging_model(r)$theta-k@covariance@range.val)))
 }
 
-plot(floor(10^logn),times$R,ylim=c(0,max(max(times$R),max(times$cpp))))
-points(floor(10^logn),times$cpp,col='red')
+plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R),min(times$cpp))),log(max(max(times$R),max(times$cpp)))),xlab="nb points",ylab="log(temps (s))")
+text(20,log(30),"DiceKriging")
+points(floor(10^logn),log(times$cpp),col='red')
+text(80,log(30),"libKriging",col = 'red')
