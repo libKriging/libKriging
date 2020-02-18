@@ -39,14 +39,3 @@ Rcpp::List linear_regression_predict(Rcpp::List linearRegression, arma::mat X) {
                             Rcpp::Named("stderr") = std::get<1>(pred));
 }
 
-
-//#include "libKriging/OrdinaryKriging.hpp"
-//
-//// [[Rcpp::export]]
-//Rcpp::List ordinary_kriging(arma::vec y, arma::mat X,arma::vec theta) {
-//    OrdinaryKriging ok;
-//    auto ans = ok.fit(y, X, theta);
-//    return Rcpp::List::create(Rcpp::Named("class") = "OrdinaryKriging",
-//                              Rcpp::Named("gamma") = std::get<0>(ans),
-//                              Rcpp::Named("theta") = std::get<1>(ans));
-//}

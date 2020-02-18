@@ -2,40 +2,58 @@
 #define LIBKRIGING_ORDINARYKRIGING_HPP
 
 #include <armadillo>
+
 #include "libKriging/libKriging_exports.h"
-#include "covariance.h"
+// #include "covariance.h"
 
 /** Ordinary kriging regression
  * @ingroup Regression
  */
 class OrdinaryKriging {
+ public:
+  struct Parameters {
+    double sigma2;
+    bool has_sigma2;
+    arma::vec theta;
+    bool has_theta;
+  };
 
-   CorrelationFunction k;
+ // private:
+  arma::mat X;
+  arma::colvec y;
+  arma::mat T;
+  arma::colvec z;
+  // FIXME TODO: do not use copy
+  arma::vec theta;
+  double sigma2;
 
-   arma::mat X;
-   arma::colvec y;
-
-  /* root distance function. Example for "gauss" kernel:
-   double temp = 1;
-   for (int k = 0; k < d; k++) {
-   double dij = (X(i,k)-X(j,k))/parameters(k);
-   temp *= exp(-0.5*std::pow(dij,2));
-   }
-   CovMatrix(i,j) = temp;
-   */
-  double dist(const arma::rowvec & xi, const arma::rowvec & xj);
-
+  
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> Cov_fun;  // Covariance function
+  std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> Cov_deriv;  // Covariance function derivative vs. theta
   // returns distance matrix form Xp to X
-  LIBKRIGING_EXPORT arma::mat distX(const arma::mat & Xp);
-  // same for one point
-  LIBKRIGING_EXPORT arma::colvec distX(const arma::rowvec & x);
-
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::vec& theta);
+  //  // same for one point
+  //  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
+  
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
-  void make_dist(const string & kernel);
+  void make_Cov(const std::string& covType);
 
 public:
+  
+  struct OKModel {
+    arma::colvec y;
+    arma::mat X;
+    arma::mat T;
+    arma::colvec z;
+    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> cov_fun;
+    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> cov_deriv;
+  };
+  
+  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);//void* okm_data); //
+
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging(string kernel);
+  LIBKRIGING_EXPORT OrdinaryKriging();//const std::string & covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -44,22 +62,31 @@ public:
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT void fit(const arma::colvec y, const arma::mat X, const arma::vec parameters, const string optim_method, const string optim_objective);
+  LIBKRIGING_EXPORT void fit(const arma::colvec& y,
+                             const arma::mat& X);//,
+                             // const Parameters& parameters,
+                             // const std::string& optim_method,
+                             // const std::string& optim_objective);
 
+                             LIBKRIGING_EXPORT double logLikelihood(const arma::vec& theta);         
+                             LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);         
+                             
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
    * @param std is true if return also stdev column vector
    * @param cov is true if return also cov matrix between Xp
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
-  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> predict(const arma::mat & Xp, const bool withStd, const bool withCov);
+  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> predict(const arma::mat& Xp,
+                                                                              bool withStd,
+                                                                              bool withCov);
 
   /** Draw sample trajectories of kriging at given points X'
    * @param Xp is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const arma::mat & Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const arma::mat& Xp);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output
@@ -67,8 +94,10 @@ public:
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT void update(const arma::vec & newy, const arma::mat & newX, const string & optim_method, const string & optim_objective);
-
+  LIBKRIGING_EXPORT void update(const arma::vec& newy,
+                                const arma::mat& newX,
+                                const std::string& optim_method,
+                                const std::string& optim_objective);
 };
 
 #endif  // LIBKRIGING_ORDINARYKRIGING_HPP
