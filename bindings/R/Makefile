@@ -24,9 +24,9 @@ prepare: ./Rlibs/.prepared
 
 test: ./Rlibs/rlibkriging/.installed
 	## output in tty
-	export R_LIBS=$(PWD)/Rlibs && Rscript rlibkriging/tests/testthat.R
-	## output in .Rout file
-	export R_LIBS=$(PWD)/Rlibs && R CMD BATCH rlibkriging/tests/testthat.R
+	export R_LIBS=$(PWD)/Rlibs && cd rlibkriging/tests && Rscript testthat.R
+#	## output in testthat.Rout file
+#	export R_LIBS=$(PWD)/Rlibs && cd rlibkriging/tests && R CMD BATCH testthat.R
 
 clean:
 	rm -fr rlibkriging/src/rlibkriging.*
