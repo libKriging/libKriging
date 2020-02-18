@@ -1,3 +1,6 @@
+# clang-tidy -dump-config : displays current config
+# clang -help : provides help about .clang-tidy config file
+
 Checks:  "\
   *,\
   -llvm-header-guard,\
@@ -27,4 +30,8 @@ Checks:  "\
 #  * modernize function style to C++11 trailing return type
 #  * disallow usage of implicit optional arguments in calls
 
+# Like in https://github.com/Kitware/CMake/blob/master/.clang-tidy
+#   pattern should be filtered as `find | grep -E PATTERN` do
+# Unfortunately, I did'nt succeed to enable it and filter out armadillo headers
+HeaderFilterRegex: 'src/lib/.*\.(hpp|cpp)$'
 #CheckOptions:
