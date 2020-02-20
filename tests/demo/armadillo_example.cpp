@@ -5,7 +5,7 @@
 int main() {
   const int n = 40;
   arma::mat X(n, n, arma::fill::randn);
-  arma::mat Z = X* X.t();
+  arma::mat Z = X * X.t();
 
   std::unique_ptr<DemoArmadilloClass> x(new DemoArmadilloClass("Z", Z));
   x->test();

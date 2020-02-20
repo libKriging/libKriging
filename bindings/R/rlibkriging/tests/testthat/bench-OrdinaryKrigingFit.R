@@ -1,7 +1,6 @@
 library(foreach)
 registerDoSEQ()
 
-f = function(X) apply(X,1,function(x) sum((x-.5)^2))
 
 logn = seq(1,2,by=.1)
 times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
@@ -9,7 +8,7 @@ times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
   d <- floor(2+i/3)
-  
+
   print(n)
   set.seed(123)
   X <- matrix(runif(n*d),ncol=d)

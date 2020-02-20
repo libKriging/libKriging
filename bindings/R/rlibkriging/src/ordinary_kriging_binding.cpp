@@ -22,12 +22,12 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
   
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
   
-  return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta,
-                            Rcpp::Named("sigma2") = impl_ptr->sigma2,
-                            Rcpp::Named("X") = impl_ptr->X,
-                            Rcpp::Named("y") = impl_ptr->y,
-                            Rcpp::Named("T") = impl_ptr->T,
-                            Rcpp::Named("z") = impl_ptr->z);
+  return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta(),
+                            Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+                            Rcpp::Named("X") = impl_ptr->X(),
+                            Rcpp::Named("y") = impl_ptr->y(),
+                            Rcpp::Named("T") = impl_ptr->T(),
+                            Rcpp::Named("z") = impl_ptr->z());
 }
 
 
@@ -75,4 +75,6 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, boo
     auto pred = impl_ptr->predict(X,false,false);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   }
+
+  // FIXME no default return
 }

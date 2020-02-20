@@ -6,7 +6,7 @@
 /** This is a demo class about about function usage
  *  @ingroup Demo Demo group
  *  \deprecated Demo only
-*/
+ */
 LIBKRIGING_EXPORT int f();
 
 #endif  // LIBKRIGING_DEMOFUNCTION_HPP

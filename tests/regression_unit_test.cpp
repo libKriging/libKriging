@@ -41,8 +41,9 @@ SCENARIO("a linear regression reveals randomly generated seed parameters", "[reg
 
       THEN("the prediction are exact (for X at least)") {
         std::tuple<arma::colvec, arma::colvec> ans = rl.predict(X);
-        const double eps = 1e-5;//1000 * std::numeric_limits<double>::epsilon();
-        INFO("y= " << y << " y_pred=" << std::get<0>(ans) << " diff=" << arma::norm(y - std::get<0>(ans), "inf") << " eps=" << eps);
+        const double eps = 1e-5;  // 1000 * std::numeric_limits<double>::epsilon();
+        INFO("y= " << y << " y_pred=" << std::get<0>(ans) << " diff=" << arma::norm(y - std::get<0>(ans), "inf")
+                   << " eps=" << eps);
         REQUIRE(arma::norm(y - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps));
       }
     }
@@ -52,7 +53,7 @@ SCENARIO("a linear regression reveals randomly generated seed parameters", "[reg
 
       // Add noise
       std::normal_distribution<double> noise(1, e);
-        y.for_each([&noise, &engine](arma::vec::elem_type& val) { val *= noise(engine); });
+      y.for_each([&noise, &engine](arma::vec::elem_type& val) { val *= noise(engine); });
 
       LinearRegression rl;  // linear regression object
       rl.fit(y, X);
@@ -65,9 +66,10 @@ SCENARIO("a linear regression reveals randomly generated seed parameters", "[reg
 
       THEN("the prediction are almost exact (for X at least)") {
         std::tuple<arma::colvec, arma::colvec> ans = rl.predict(X);
-        const double eps = 1e-5;//1000 * std::numeric_limits<double>::epsilon();
-        INFO("y= " << y << " y_pred=" << std::get<0>(ans) << " diff=" << arma::norm(y - std::get<0>(ans), "inf") << " eps=" << eps << " e=" << e);
-        REQUIRE(arma::norm(y - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps + 10*e));
+        const double eps = 1e-5;  // 1000 * std::numeric_limits<double>::epsilon();
+        INFO("y= " << y << " y_pred=" << std::get<0>(ans) << " diff=" << arma::norm(y - std::get<0>(ans), "inf")
+                   << " eps=" << eps << " e=" << e);
+        REQUIRE(arma::norm(y - std::get<0>(ans), "inf") == Approx(0).margin(10 * eps + 10 * e));
       }
     }
   }

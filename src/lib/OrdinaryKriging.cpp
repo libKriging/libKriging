@@ -1,54 +1,27 @@
+// clang-format off
+// MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
+#define _USE_MATH_DEFINES // required for Visual Studio
+#include <cmath>
+// clang-format on
+
 #include "libKriging/OrdinaryKriging.hpp"
 
 #include <armadillo>
 #include <optim.hpp>
 #include <tuple>
+
 // #include "libKriging/covariance.h"
 
 //' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
-// Utilities
-// TODO: will be moved in utility file when this file will be ok
-//template<typename... Args>
-//std::string asString(Args&& ...args) {
-//  std::ostringstream oss;
-//  (void)(int[]){0, (void(oss << std::forward<Args>(args)), 0)...};
-//  return oss.str();
-//};
-//
-//class ParameterReader {
-// private:
-//  using Parameters = std::map<std::string, arma::vec>;
-//
-// public:
-//  explicit ParameterReader(const Parameters& parameters) : m_parameters(parameters) {}
-//
-//  const arma::vec& operator[](const std::string& name) const {
-//    auto finder = m_parameters.find(name);
-//    if (finder != m_parameters.end()) {
-//      return finder->second;
-//    }
-//    else {
-//      throw std::invalid_argument(asString("Parameter ",name," not found"));
-//    }
-//  }
-//
-//  bool has(const std::string& name) const {
-//    auto finder = m_parameters.find(name);
-//    return (finder != m_parameters.end());
-//  }
-//
-// private:
-//  const Parameters& m_parameters;
-//};
-
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
+arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
   // Should be tyaken from covariance.h from nestedKriging ?
   // return getCrossCorrMatrix(X,Xp,parameters,covType);
+  
   arma::mat Xtnorm = trans(X); Xtnorm.each_col() /= theta;
   arma::mat Xptnorm = trans(Xp); Xptnorm.each_col() /= theta;
   
@@ -66,6 +39,13 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   }
   return R;
 }
+//// same for one point
+// LIBKRIGING_EXPORT arma::colvec OrdinaryKriging::Cov(const arma::mat& X,
+//                                                    const arma::rowvec& x,
+//                                                    const arma::colvec& theta) {
+//  // FIXME mat(x) : an arma::mat from a arma::rowvec ?
+//  return OrdinaryKriging::Cov(&X, arma::mat(&x), &theta).col(1);  // TODO to be optimized...
+//}
 
 // Optimized version when Xp=X
 LIBKRIGING_EXPORT
@@ -381,11 +361,11 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
  * @return output is m*nsim matrix of simulations at Xp
  */
 LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma::mat& Xp) {
-  arma::mat yp(X.n_rows, nsim);
+  arma::mat yp(m_X.n_rows, nsim);
 
   // ...
 
-  return yp; // NB: move not required due to copy ellision mechanism
+  return yp;  // NB: move not required due to copy ellision mechanism
 }
 
 /** Add new conditional data points to previous (X,y)
@@ -399,11 +379,11 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
                                                const std::string& optim_objective,
                                                const std::string& optim_method) {
   // rebuild data
-  X = join_rows(X, newX);
-  y = join_rows(y, newy);
+  m_X = join_rows(m_X, newX);
+  m_y = join_rows(m_y, newy);
 
   // rebuild starting parameters
-  Parameters parameters{this->sigma2, true, this->theta, true};
+  Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
-  this->fit(y, X);//, parameters, optim_objective, optim_method);
+  this->fit(m_y, m_X);  //, parameters, optim_objective, optim_method);
 }

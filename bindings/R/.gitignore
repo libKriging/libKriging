@@ -1,7 +1,14 @@
 .Rhistory
 .Rproj.user
+*.Rproj
 *.Rout
+.Rdata
+.Rbuildignore
 /Rlibs
+
 # Generated files
 RcppExports.cpp
 RcppExports.R
+/rlibkriging/tests/testthat/Rplots.pdf
+/*.gz
+/*.tgz
