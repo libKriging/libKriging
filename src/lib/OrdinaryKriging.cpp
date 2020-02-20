@@ -18,12 +18,12 @@
 
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp, const arma::colvec& theta) {
+arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   // Should be tyaken from covariance.h from nestedKriging ?
   // return getCrossCorrMatrix(X,Xp,parameters,covType);
   
-  arma::mat Xtnorm = trans(X); Xtnorm.each_col() /= theta;
-  arma::mat Xptnorm = trans(Xp); Xptnorm.each_col() /= theta;
+  arma::mat Xtnorm = trans(X); Xtnorm.each_col() /= m_theta;
+  arma::mat Xptnorm = trans(Xp); Xptnorm.each_col() /= m_theta;
   
   arma::uword n = X.n_rows;
   arma::uword np = Xp.n_rows;
@@ -53,7 +53,7 @@ LIBKRIGING_EXPORT
     // Should be tyaken from covariance.h from nestedKriging ?
     // return getCrossCorrMatrix(X,Xp,parameters,covType);
     
-    arma::mat Xtnorm = trans(X); Xtnorm.each_col() /= theta;
+    arma::mat Xtnorm = trans(X); Xtnorm.each_col() /= m_theta;
     arma::uword n = X.n_rows;
     
     // Should bre replaced by for_each
@@ -225,7 +225,7 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
 LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{y, X, T, z, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn(_theta, nullptr, &okm_data); 
 }
@@ -233,7 +233,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta)
 LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{y, X, T, z, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
   
@@ -259,13 +259,13 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   std::string optim_method="bfgs";
   Parameters parameters{0, false, arma::vec(1), false};
   
-  this->X = X;
-  this->y = y;
+  this->m_X = X;
+  this->m_y = y;
   
   // arma::cout << "optim_method:" << optim_method << arma::endl;
   
   if (optim_method == "none") {  // just keep given theta, no optimisation of ll
-    theta = parameters.theta;
+    m_theta = parameters.theta;
   } else if (optim_method.rfind("bfgs", 0) == 0) {
     arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -306,10 +306,10 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                       nullptr,
                       &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
         if (minus_ll_tmp < minus_ll) {
-          theta = std::move(theta_tmp);
+          m_theta = std::move(theta_tmp);
           minus_ll = minus_ll_tmp;
-          T = std::move(okm_data.T);
-          z = std::move(okm_data.z);
+          m_T = std::move(okm_data.T);
+          m_z = std::move(okm_data.z);
         }
       // }
     }
@@ -319,9 +319,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   // arma::cout << "theta:" << theta << arma::endl;
   
   if (not parameters.has_sigma2) {
-    sigma2 = arma::as_scalar(sum(pow(z, 2)) / X.n_rows);
+    m_sigma2 = arma::as_scalar(sum(pow(m_z, 2)) / X.n_rows);
   } else {
-    sigma2 = parameters.sigma2;
+    m_sigma2 = parameters.sigma2;
   }
   
   // arma::cout << "sigma2:" << sigma2 << arma::endl;
