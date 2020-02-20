@@ -36,30 +36,34 @@ class OrdinaryKriging {
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> Cov_fun;  // Covariance function
   std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)>
       Cov_deriv;  // Covariance function derivative vs. theta
-
+  
+  std::function<double(const arma::vec&, const arma::vec&)> CovNorm_fun;  // Covariance function on normalized data
+  std::function<double(const arma::vec&, const arma::vec&, int)> CovNorm_deriv;  // Covariance function derivative vs. theta
   // returns distance matrix form Xp to X
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp, const arma::vec& theta);
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::vec& theta);
+
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
   //  // same for one point
   //  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
-
+  
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
 
- public:
+public:
+  
   struct OKModel {
     arma::colvec y;
     arma::mat X;
     arma::mat T;
     arma::colvec z;
-    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&)> cov_fun;
-    std::function<double(const arma::rowvec&, const arma::rowvec&, const arma::vec&, int)> cov_deriv;
+    std::function<double(const arma::vec&, const arma::vec&)> covnorm_fun;
+    std::function<double(const arma::vec&, const arma::vec&, int)> covnorm_deriv;
   };
-
-  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);
+  
+  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);//void* okm_data); //
 
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging();  // const std::string & covType);
+  LIBKRIGING_EXPORT OrdinaryKriging();//const std::string & covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -76,7 +80,7 @@ class OrdinaryKriging {
 
   LIBKRIGING_EXPORT double logLikelihood(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
-
+                             
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
    * @param std is true if return also stdev column vector
