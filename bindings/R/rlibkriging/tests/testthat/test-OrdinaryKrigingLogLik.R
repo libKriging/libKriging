@@ -10,7 +10,7 @@ points(X,y)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
 ll = function(theta) DiceKriging::logLikFun(theta,k)
 plot(Vectorize(ll))
-for (x in seq(0,1,,11)){
+for (x in seq(0.01,1,,11)){
   envx = new.env()
   llx = DiceKriging::logLikFun(x,k,envx)
   gllx = DiceKriging::logLikGrad(x,k,envx)
@@ -19,12 +19,12 @@ for (x in seq(0,1,,11)){
 
 r <- ordinary_kriging(y, X)
 ll2 = function(theta) ordinary_kriging_loglikelihood(r,theta)
-plot(Vectorize(ll2),col='red')
-for (x in seq(0,1,,11)){
+plot(Vectorize(ll2),col='red',add=T)
+for (x in seq(0.01,1,,11)){
   envx = new.env()
   ll2x = ordinary_kriging_loglikelihood(r,x)
   gll2x = ordinary_kriging_loglikelihoodgrad(r,x)
-  arrows(x,ll2x,x+.1,ll2x+.1*gll2x)
+  arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 }
 
 precision <- 1e-8  # the following tests should work with it, since the computations are analytical
