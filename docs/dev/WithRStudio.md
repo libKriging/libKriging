@@ -31,6 +31,9 @@ by
 ### 2.b New package project using git 
 
 * You can also start a new package project using `File > New Project... > Version control > git` and fill `Repository URL` with https://github.com/MASCOTNUM/libKriging.
+* Use  `Build > Configure Build Tools...` to set up the location of rlibkriging package directory.
+  
+  It should be like: ![](images/RStudio-project-config.png)
 
 ### 2.c New project using existing R binding directory
 
