@@ -144,16 +144,16 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   fd->T = trans(chol(R));
 
   // Compute intermediate useful matrices
-  arma::mat M = solve(fd->T, F);
+  arma::mat M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, M);
-  arma::colvec Yt = solve(fd->T, fd->y);
-  arma::colvec beta = solve(G, trans(Q) * Yt);
+  arma::colvec Yt = solve(trimatl(fd->T), fd->y,arma::solve_opts::fast);
+  arma::colvec beta = solve(trimatu(G), trans(Q) * Yt,arma::solve_opts::fast);
   fd->z = Yt - M * beta;
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
-  double sigma2_hat = as_scalar(sum(pow(fd->z, 2)) / n);
+  double sigma2_hat = arma::accu(fd->z % fd->z) / n;
   // arma::cout << "sigma2_hat:" << sigma2_hat << arma::endl;
 
   double minus_ll = /*-*/ 0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(fd->T.diag())) + n);
@@ -183,22 +183,18 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
     arma::mat Rinv = inv_sympd(R);
     // arma::mat Rinv_upper = trimatu(Rinv);
 
-    arma::mat x = solve(trans(fd->T), fd->z);
+    arma::mat x = solve(trimatu(trans(fd->T)), fd->z,arma::solve_opts::fast);
     arma::mat xx = x * trans(x);
     // arma::mat xx_upper = trimatu(xx);
 
     for (arma::uword k = 0; k < fd->X.n_cols; k++) {
-      arma::mat gradR_k_upper(n, n);
-      gradR_k_upper.zeros();
+      arma::mat gradR_k_upper = arma::zeros(n, n);
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
           gradR_k_upper.at(j,i) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);
-      // gradR_k_upper = trans(gradR_k_upper);
-      // arma::mat gradR_k = symmatu(gradR_k_upper);
-      // gradR_k.diag().zeros();
 
       double terme1 = arma::accu(xx/*_upper*/ % gradR_k_upper) / sigma2_hat;//as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
       double terme2 = -arma::accu(Rinv/*_upper*/ % gradR_k_upper);//-arma::trace(Rinv * gradR_k);
