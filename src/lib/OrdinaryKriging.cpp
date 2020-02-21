@@ -33,7 +33,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < np; j++) {
       // FIXME WARNING : theta parameter shadows theta attribute
-      R(i, j) = CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
+      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
     }
   }
   return R;
@@ -54,7 +54,7 @@ LIBKRIGING_EXPORT
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
         // FIXME WARNING : theta parameter shadows theta attribute
-        R(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+        R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
       }
     }
     R = arma::symmatl(R);  // R + trans(R);
@@ -126,16 +126,14 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   
   // Define regression matrix
   arma::uword nreg = 1;
-  arma::mat F(n, nreg);
-  F.ones();
-
+  arma::mat F = arma::ones(n, nreg);
+  
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
-  arma::mat R(n, n);
-  R.zeros();
+  arma::mat R = arma::zeros(n,n);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R(i, j) = fd->covnorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      R.at(i, j) = fd->covnorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
   R = arma::symmatl(R);  // R + trans(R);
@@ -194,18 +192,17 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
       gradR_k_upper.zeros();
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k_upper(i,j) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j,i) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);
-      gradR_k_upper = trans(gradR_k_upper);
+      // gradR_k_upper = trans(gradR_k_upper);
       // arma::mat gradR_k = symmatu(gradR_k_upper);
       // gradR_k.diag().zeros();
 
-      double terme1
-          = arma::accu(xx /*_upper*/ % gradR_k_upper) / sigma2_hat;  // as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
-      double terme2 = -arma::accu(Rinv /*_upper*/ % gradR_k_upper);  //-arma::trace(Rinv * gradR_k);
-      (*grad_out)(k) = -(terme1 + terme2);
+      double terme1 = arma::accu(xx/*_upper*/ % gradR_k_upper) / sigma2_hat;//as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
+      double terme2 = -arma::accu(Rinv/*_upper*/ % gradR_k_upper);//-arma::trace(Rinv * gradR_k);
+      (*grad_out).at(k) = - (terme1 + terme2);
       // (*grad_out)(k) = - arma::accu(dot(xx / sigma2_hat - Rinv, gradR_k_upper));
     }
     // arma::cout << "Grad: " << *grad_out <<  arma::endl;
