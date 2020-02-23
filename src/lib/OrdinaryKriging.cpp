@@ -145,6 +145,8 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
 
   // Compute intermediate useful matrices
   arma::mat M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  
+  // Compute z
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, M);
@@ -179,8 +181,8 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
     //    # quick computation of trace(Rinv%*%gradR.k)
     //    logLik.derivative[k] <- terme1 + terme2
     //  }
-
-    arma::mat Rinv = inv_sympd(R);
+    arma::mat Linv = solve(trimatl(fd->T), arma::eye(n,n),arma::solve_opts::fast);
+    arma::mat Rinv = trans(Linv) * Linv;  //inv_sympd(R);
     // arma::mat Rinv_upper = trimatu(Rinv);
 
     arma::mat x = solve(trimatu(trans(fd->T)), fd->z,arma::solve_opts::fast);
