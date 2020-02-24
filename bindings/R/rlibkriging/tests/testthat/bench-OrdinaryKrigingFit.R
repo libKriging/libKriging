@@ -38,7 +38,7 @@ for (i in 1:length(logn)) {
   
 }
 
-plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R),min(times$cpp))),log(max(max(times$R),max(times$cpp)))),xlab="nb points",ylab="log(user_time (s))")
-text(20,0,"DiceKriging")
+plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R,na.rm = T),min(times$cpp,na.rm = T))),log(max(max(times$R,na.rm = T),max(times$cpp,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))")
+text(20,-1,"DiceKriging")
 points(floor(10^logn),log(times$cpp),col='red')
-text(80,0,"libKriging",col = 'red')
+text(80,-1,"libKriging",col = 'red')
