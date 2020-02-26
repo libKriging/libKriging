@@ -51,3 +51,4 @@ CMakeFiles
 
 # armadillo 'in source' generated Makefile
 dependencies/armadillo-code/examples/Makefile
+.Rproj.user

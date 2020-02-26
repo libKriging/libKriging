@@ -75,6 +75,8 @@ class OrdinaryKriging {
 
   LIBKRIGING_EXPORT double logLikelihood(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
+  LIBKRIGING_EXPORT double loofun(const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::vec loofungrad(const arma::vec& theta);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output

@@ -1,7 +1,7 @@
 library(testthat)
 
 f = function(X) apply(X,1,function(x) sum(x^2))
-n <- 2000
+n <- 100
 set.seed(123)
 X <- cbind(runif(n),runif(n),runif(n))
 y = f(X)

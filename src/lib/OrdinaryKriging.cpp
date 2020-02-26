@@ -214,6 +214,95 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   return minus_ll;
 }
 
+// Utility function for LOO
+arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
+  arma::mat D=trimatu(2*B);
+  D.diag() = B.diag();
+  D = (A*D)%A;
+  arma::colvec c = sum(D,1);
+
+  return c;
+}
+
+// Objective function for fit : -LOO
+double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+  OrdinaryKriging::OKModel* fd = okm_data;
+  
+  arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
+  
+  arma::uword n = fd->X.n_rows;
+  
+  // Define regression matrix
+  arma::uword nreg = 1;
+  arma::mat F(n, nreg);
+  F.ones();
+
+  // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
+  // Should be replaced by for_each
+  arma::mat R(n, n);
+  R.zeros();
+  for (arma::uword i = 0; i < n; i++) {
+    for (arma::uword j = 0; j < i; j++) {
+      R(i, j) = fd->covnorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+    }
+  }
+  R = arma::symmatl(R);  // R + trans(R);
+  R.diag().ones();
+  // arma::cout << "R:" << R << arma::endl;
+
+  // Cholesky decompostion of covariance matrix
+  fd->T = trans(chol(R));
+
+  // Compute intermediate useful matrices
+  // arma::mat M = solve(fd->T, F);
+  arma::mat M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  // arma::mat Rinv = inv_sympd(R); // didn't find chol2inv equivalent in armadillo
+  arma::mat Rinv = inv(trimatl(fd->T));
+  Rinv = trimatl(Rinv) * trimatl(Rinv);
+  arma::mat RinvF = Rinv * F;
+  arma::mat TM = chol(trans(M)*M); // Can be optimized with a crossprod equivalent in armadillo ? 
+  // arma::mat aux = solve(trans(TM), trans(RinvF));
+  arma::mat aux = solve(trimatl(trans(TM)), trans(RinvF),arma::solve_opts::fast);
+  arma::mat Q = Rinv - trans(aux)*aux; // Can be optimized with a crossprod equivalent in armadillo ?
+  arma::mat Qy = Q * fd->y;
+  arma::colvec sigma2LOO = 1/Q.diag();
+  arma::colvec errorsLOO = sigma2LOO % Qy;
+  double minus_loo = - arma::accu(errorsLOO % errorsLOO) / n;
+
+  if (grad_out != nullptr) {
+    //' @ref hhttps://github.com/cran/DiceKriging/blob/master/R/leaveOneOutGrad.R
+    // LOOfunDer <- matrix(0, nparam, 1)							
+		//for (k in 1:nparam) {
+		//	gradR.k <- covMatrixDerivative(model@covariance, X=model@X, C0=R, k=k)
+		//	diagdQ <- - diagABA(A=Q, B=gradR.k)
+		//	dsigma2LOO <- - (sigma2LOO^2) * diagdQ
+		//	derrorsLOO <- dsigma2LOO * Q.y - sigma2LOO * (Q%*%(gradR.k%*%Q.y))
+		//	LOOfunDer[k] <- 2*crossprod(errorsLOO, derrorsLOO)/model@n
+		//}
+
+    for (arma::uword k = 0; k < fd->X.n_cols; k++) {
+      arma::mat gradR_k(n, n);
+      gradR_k.zeros();
+      for (arma::uword i = 0; i < n; i++) {
+        for (arma::uword j = 0; j < i; j++) {
+          gradR_k(i,j) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
+        }
+      }
+      gradR_k /= _theta(k);
+      gradR_k = arma::symmatl(gradR_k);  // gradR_k + trans(gradR_k);
+      gradR_k.diag().zeros();
+
+      arma::colvec diagdQ = -DiagABA(Q,gradR_k);
+      arma::colvec dsigma2LOO = - sigma2LOO%sigma2LOO%diagdQ;
+      arma::colvec derrorsLOO = dsigma2LOO%Qy - sigma2LOO%(Q*(gradR_k*Qy));
+      (*grad_out)(k) = - 2*dot(errorsLOO, derrorsLOO)/n;
+    }
+    // arma::cout << "Grad: " << *grad_out <<  arma::endl;
+  }
+
+  return minus_loo;
+}
+
 LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
@@ -230,6 +319,26 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   arma::vec grad(_theta.n_elem);
 
   double ll = fit_ofn(_theta, &grad, &okm_data);
+
+  return -grad;
+}
+
+LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
+  arma::mat T;
+  arma::mat z;
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
+  
+  return -fit_ofn2(_theta, nullptr, &okm_data); 
+}
+
+LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta) {
+  arma::mat T;
+  arma::mat z;
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
+  
+  arma::vec grad(_theta.n_elem);
+
+  double ll = fit_ofn2(_theta, &grad, &okm_data);
 
   return -grad;
 }
@@ -285,14 +394,14 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-            return fit_ofn(vals_inp, grad_out, &okm_data);
+            return fit_ofn2(vals_inp, grad_out, &okm_data);
           },
           nullptr,
           algo_settings);
 
       // if (bfgs_ok) { // FIXME always succeeds ?
       double minus_ll_tmp
-          = fit_ofn(theta_tmp,
+          = fit_ofn2(theta_tmp,
                     nullptr,
                     &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
       if (minus_ll_tmp < minus_ll) {
