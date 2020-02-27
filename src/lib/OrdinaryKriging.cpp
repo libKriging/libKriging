@@ -151,8 +151,8 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   arma::mat G;
   qr_econ(Q, G, M);
   arma::colvec Yt = solve(fd->T, fd->y);
-  arma::colvec beta = solve(G, trans(Q) * Yt);
-  fd->z = Yt - M * beta;
+  fd->beta = solve(G, trans(Q) * Yt);
+  fd->z = Yt - M * fd->beta;
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
   double sigma2_hat = as_scalar(sum(pow(fd->z, 2)) / n);
@@ -225,7 +225,7 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
 }
 
 // Objective function for fit : -LOO
-double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+/*  double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
   OrdinaryKriging::OKModel* fd = okm_data;
   
   arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
@@ -301,12 +301,13 @@ double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::O
   }
 
   return minus_loo;
-}
+}*/
 
 LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
+  arma::colvec beta;
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn(_theta, nullptr, &okm_data); 
 }
@@ -314,7 +315,8 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta)
 LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
+  arma::colvec beta;
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
 
@@ -323,15 +325,15 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   return -grad;
 }
 
-LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
+/*LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
   OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn2(_theta, nullptr, &okm_data); 
-}
+}*/
 
-LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta) {
+/*LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat z;
   OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, CovNorm_fun, CovNorm_deriv};
@@ -341,7 +343,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
   double ll = fit_ofn2(_theta, &grad, &okm_data);
 
   return -grad;
-}
+}*/
 
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
@@ -390,18 +392,19 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::vec theta_tmp = trans(theta0.row(i));     // FIXME arma::mat replaced by arma::vec
       arma::mat T;
       arma::mat z;
-      OrdinaryKriging::OKModel okm_data{y, X, T, z, CovNorm_fun, CovNorm_deriv};
+      arma::colvec beta;
+      OrdinaryKriging::OKModel okm_data{y, X, T, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-            return fit_ofn2(vals_inp, grad_out, &okm_data);
+            return fit_ofn(vals_inp, grad_out, &okm_data);
           },
           nullptr,
           algo_settings);
 
       // if (bfgs_ok) { // FIXME always succeeds ?
       double minus_ll_tmp
-          = fit_ofn2(theta_tmp,
+          = fit_ofn(theta_tmp,
                     nullptr,
                     &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
       if (minus_ll_tmp < minus_ll) {
@@ -409,6 +412,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
         minus_ll = minus_ll_tmp;
         T = std::move(okm_data.T);
         z = std::move(okm_data.z);
+        beta = std::move(okm_data.beta);
       }
       // }
     }

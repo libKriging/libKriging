@@ -63,14 +63,29 @@ arma::vec  bench_ordinary_kriging_loglikelihood(Rcpp::List ordinaryKriging, arma
 }
 
 // [[Rcpp::export]]
-double benchmatMLE(const arma::mat& R,const arma::vec& y) {
-    
-  arma::uword n = R.n_rows;
+double benchmatMLE(const arma::mat& X, const arma::vec& y, arma::vec& theta) {
+  
+  arma::uword n = X.n_rows, m = X.n_cols;
   
   // Define regression matrix
   arma::uword nreg = 1;
   arma::mat F(n, nreg);
   F.ones();
+
+  arma::mat R(n,n); 
+  R.zeros();
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < i; j++) {
+      double temp = 1;
+      for (int k = 0; k < m; k++) {
+        double d = (X(i,k)-X(j,k))/theta(k);
+        temp *= exp(-0.5*d*d);
+      }
+      R.at(i,j) = temp;
+    }
+  }
+  R = arma::symmatl(R);  // R + trans(R);
+  R.diag().ones();
 
   // Cholesky decompostion of covariance matrix
   arma::mat T = trans(chol(R));

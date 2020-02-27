@@ -22,6 +22,7 @@ class OrdinaryKriging {
   const arma::colvec& y() const { return m_y; };
   const arma::mat& T() const { return m_T; };
   const arma::colvec& z() const { return m_z; };
+  const arma::colvec& beta() const { return m_beta; };
   const arma::vec& theta() const { return m_theta; };
   const double& sigma2() const { return m_sigma2; };
 
@@ -30,6 +31,7 @@ class OrdinaryKriging {
   arma::colvec m_y;
   arma::mat m_T;
   arma::colvec m_z;
+  arma::colvec m_beta;
   arma::vec m_theta;
   double m_sigma2;
 
@@ -51,6 +53,7 @@ class OrdinaryKriging {
     arma::mat X;
     arma::mat T;
     arma::colvec z;
+    arma::colvec beta;
     std::function<double(const arma::vec&, const arma::vec&)> covnorm_fun;
     std::function<double(const arma::vec&, const arma::vec&, int)> covnorm_deriv;
   };
