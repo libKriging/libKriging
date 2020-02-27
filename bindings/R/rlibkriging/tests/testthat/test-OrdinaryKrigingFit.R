@@ -24,7 +24,7 @@ y = f(X)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
 r <- ordinary_kriging(y, X)
 
-precision <- 1e-6
+precision <- 1e-2
 test_that(desc="fit of theta 2D is the same that DiceKriging one", 
           expect_true(relative_error(ordinary_kriging_model(r)$theta,k@covariance@range.val) < precision))
 
