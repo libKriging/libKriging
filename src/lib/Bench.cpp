@@ -5,6 +5,7 @@
 // clang-format on
 
 #include "libKriging/Bench.hpp"
+#include "libKriging/OrdinaryKriging.hpp"
 
 #include <armadillo>
 // #include <optim.hpp>
@@ -90,4 +91,24 @@ LIBKRIGING_EXPORT
       s = arma::inv_sympd(Rsympd);
     }
     return s;
+  }
+
+LIBKRIGING_EXPORT
+  double Bench::LogLik(OrdinaryKriging& ok, const arma::vec& theta) {
+    // arma::vec theta = 0.5*ones(ok->X().n_cols)
+    double s=0;
+    for (int i=0; i<n; i++) {
+      s += ok.logLikelihood(theta);
+    }
+    return s/n;
+  }
+
+LIBKRIGING_EXPORT
+  arma::vec Bench::LogLikGrad(OrdinaryKriging& ok, const arma::vec& theta) {
+    // arma::vec theta = 0.5*ones(ok->X().n_cols)
+    arma::vec s=arma::zeros(theta.n_elem);
+    for (int i=0; i<n; i++) {
+      s += ok.logLikelihoodGrad(theta);
+    }
+    return s/n;
   }

@@ -1,4 +1,4 @@
-logn = seq(1,2,by=.1)
+logn = seq(1,2.5,by=.1)
 times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
 N = 10000
 
