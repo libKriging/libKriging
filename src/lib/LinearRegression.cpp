@@ -14,7 +14,7 @@ void LinearRegression::fit(const arma::vec& y, const arma::mat& X) {
   int k = X.n_cols;
 
   m_coef = arma::solve(X, y);
-  arma::cout << "Coef: " << m_coef << arma::endl;
+  //  arma::cout << "Coef: " << m_coef << arma::endl;
   arma::colvec resid = y - X * m_coef;
 
   m_sig2 = arma::as_scalar(arma::trans(resid) * resid / (n - k));
