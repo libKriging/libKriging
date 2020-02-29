@@ -144,13 +144,13 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   fd->T = trans(chol(R));
 
   // Compute intermediate useful matrices
-  arma::mat M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
   arma::mat Q;
   arma::mat G;
-  qr_econ(Q, G, M);
+  qr_econ(Q, G, fd->M);
   arma::colvec Yt = solve(trimatl(fd->T), fd->y,arma::solve_opts::fast);
   fd->beta = solve(trimatu(G), trans(Q) * Yt,arma::solve_opts::fast);
-  fd->z = Yt - M * fd->beta;
+  fd->z = Yt - fd->M * fd->beta;
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
   double sigma2_hat = arma::accu(fd->z % fd->z) / n;
@@ -251,12 +251,12 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
 
   // Compute intermediate useful matrices
   // arma::mat M = solve(fd->T, F);
-  arma::mat M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
   // arma::mat Rinv = inv_sympd(R); // didn't find chol2inv equivalent in armadillo
   arma::mat Rinv = inv(trimatl(fd->T));
   Rinv = trimatl(Rinv) * trimatl(Rinv);
   arma::mat RinvF = Rinv * F;
-  arma::mat TM = chol(trans(M)*M); // Can be optimized with a crossprod equivalent in armadillo ? 
+  arma::mat TM = chol(trans(fd->M)*fd->M); // Can be optimized with a crossprod equivalent in armadillo ? 
   // arma::mat aux = solve(trans(TM), trans(RinvF));
   arma::mat aux = solve(trimatl(trans(TM)), trans(RinvF),arma::solve_opts::fast);
   arma::mat Q = Rinv - trans(aux)*aux; // Can be optimized with a crossprod equivalent in armadillo ?
@@ -301,18 +301,20 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
 
 LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
   arma::mat T;
+  arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn(_theta, nullptr, &okm_data); 
 }
 
 LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
+  arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
 
@@ -323,18 +325,20 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
 
 LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
   arma::mat T;
+  arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn2(_theta, nullptr, &okm_data); 
 }
 
 LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta) {
   arma::mat T;
+  arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
 
@@ -389,9 +393,10 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
       arma::vec theta_tmp = trans(theta0.row(i));     // FIXME arma::mat replaced by arma::vec
       arma::mat T;
+      arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{y, X, T, z, beta, CovNorm_fun, CovNorm_deriv};
+      OrdinaryKriging::OKModel okm_data{y, X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -409,6 +414,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
         m_theta = std::move(theta_tmp);
         minus_ll = minus_ll_tmp;
         m_T = std::move(okm_data.T);
+        m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
       }

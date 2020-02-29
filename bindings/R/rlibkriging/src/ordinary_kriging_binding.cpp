@@ -27,6 +27,7 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
                             Rcpp::Named("X") = impl_ptr->X(),
                             Rcpp::Named("y") = impl_ptr->y(),
                             Rcpp::Named("T") = impl_ptr->T(),
+                            Rcpp::Named("M") = impl_ptr->M(),
                             Rcpp::Named("z") = impl_ptr->z(),
                             Rcpp::Named("beta") = impl_ptr->beta());
 }
