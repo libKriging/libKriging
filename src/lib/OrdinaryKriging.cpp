@@ -427,6 +427,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
 
   if (!parameters.has_sigma2) {
     m_sigma2 = arma::as_scalar(sum(pow(m_z, 2)) / X.n_rows);
+    m_sigma2 = arma::as_scalar(accu(m_z%m_z) / X.n_rows);
   } else {
     m_sigma2 = parameters.sigma2;
   }
@@ -449,6 +450,8 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   arma::colvec pred_mean(m);
   arma::colvec pred_stdev(m);
   arma::mat pred_cov(m, m);
+  pred_stdev.zeros();
+  pred_cov.zeros();
 
   // Define regression matrix
   arma::uword nreg = 1;
@@ -469,6 +472,45 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   arma::mat Tinv_newdata = solve(trimatl(m_T), R,arma::solve_opts::fast);
   pred_mean = Ftest*m_beta + trans(Tinv_newdata)*m_z;
   
+  if (withStd){
+    double total_sd2 = m_sigma2;
+    // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
+    arma::colvec s2_predict_1 = m_sigma2 * trans(sum(Tinv_newdata % Tinv_newdata,0));
+    // Type = "UK"
+    // T.M <- chol(t(M)%*%M)
+    arma::mat TM = trans(chol(trans(m_M)*m_M));
+    // s2.predict.mat <- backsolve(t(T.M), t(F.newdata - t(Tinv.c.newdata)%*%M) , upper.tri = FALSE)
+    arma::mat s2_predict_mat = solve(trimatl(TM), trans(Ftest-trans(Tinv_newdata)*m_M),arma::solve_opts::fast);
+    // s2.predict.2 <- apply(s2.predict.mat, 2, crossprod)
+    arma::colvec s2_predict_2 = m_sigma2 * trans(sum(s2_predict_mat% s2_predict_mat,0));
+    // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
+    arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
+    s2_predict.elem( find(pred_stdev < 0) ).zeros();
+    pred_stdev = sqrt(s2_predict);
+    if (withCov) {
+      // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
+      arma::mat C_newdata(m,m);
+      for (arma::uword i = 0; i < m; i++) {
+        for (arma::uword j = 0; j < m; j++) {
+          C_newdata.at(i, j) = CovNorm_fun(Xpnorm.col(i), Xpnorm.col(j));
+        }
+      }
+      // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
+      // cond.cov <- cond.cov + crossprod(s2.predict.mat)
+      pred_cov = m_sigma2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
+    }
+  }else if (withCov){
+    arma::mat C_newdata(m,m);
+      for (arma::uword i = 0; i < m; i++) {
+        for (arma::uword j = 0; j < m; j++) {
+          C_newdata.at(i, j) = CovNorm_fun(Xpnorm.col(i), Xpnorm.col(j));
+        }
+      }
+      // Need to compute matrices computed in withStd case
+      arma::mat TM = trans(chol(trans(m_M)*m_M));
+      arma::mat s2_predict_mat = solve(trimatl(TM), trans(Ftest-trans(Tinv_newdata)*m_M),arma::solve_opts::fast);
+      pred_cov = m_sigma2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
+  }
 
   return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
   /*if (withStd)

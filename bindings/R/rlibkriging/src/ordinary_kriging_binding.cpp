@@ -92,7 +92,7 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, boo
   } else if (!stdev & cov) {
     auto pred = impl_ptr->predict(X,false,true);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred),
-                              Rcpp::Named("cov") = std::get<1>(pred));
+                              Rcpp::Named("cov") = std::get<2>(pred));
   } else if (!stdev & !cov) {
     auto pred = impl_ptr->predict(X,false,false);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
