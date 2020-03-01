@@ -498,7 +498,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
       // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
       // cond.cov <- cond.cov + crossprod(s2.predict.mat)
       pred_cov = m_sigma2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
-    }
+    } 
   }else if (withCov){
     arma::mat C_newdata(m,m);
       for (arma::uword i = 0; i < m; i++) {
@@ -530,9 +530,54 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
  * @return output is m*nsim matrix of simulations at Xp
  */
 LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma::mat& Xp) {
-  arma::mat yp(m_X.n_rows, nsim);
+  // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
+  double nugget_sim = 1e-10;
+  arma::uword m = Xp.n_rows;
+  arma::uword n = m_X.n_rows;
+  arma::mat yp(m, nsim);
 
-  // ...
+  // Define regression matrix
+  arma::uword nreg = 1;
+  arma::mat F_newdata(m, nreg);
+  F_newdata.ones();
+  arma::colvec y_trend = F_newdata * m_beta;
+
+  // Compute covariance between new data
+  arma::mat Sigma(m, m);
+  arma::mat Xpnorm = trans(Xp);
+  Xpnorm.each_col() /= m_theta;
+  for (arma::uword i = 0; i < m; i++) {
+    for (arma::uword j = 0; j < i; j++) {
+      Sigma.at(i, j) = CovNorm_fun(Xpnorm.col(i), Xpnorm.col(j));
+    }
+  }
+  Sigma = arma::symmatl(Sigma);  // R + trans(R);
+  Sigma.diag().ones();
+  // arma::mat T_newdata = chol(Sigma);
+  // Compute covariance between training data and new data to predict
+  // Sigma21 <- covMat1Mat2(object@covariance, X1 = object@X, X2 = newdata, nugget.flag = FALSE)
+  arma::mat Sigma21(n, m);
+  arma::mat Xtnorm = trans(m_X);
+  Xtnorm.each_col() /= m_theta;
+  for (arma::uword i = 0; i < n; i++) {
+    for (arma::uword j = 0; j < m; j++) {
+      Sigma21.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xpnorm.col(j));
+    }
+  }
+  // Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE
+  arma::mat Tinv_Sigma21 = solve(trimatl(m_T), Sigma21,arma::solve_opts::fast);
+  // y.trend.cond <- y.trend + t(Tinv.Sigma21) %*% object@z
+  y_trend += trans(Tinv_Sigma21) * m_z;
+  // Sigma.cond <- Sigma11 - t(Tinv.Sigma21) %*% Tinv.Sigma21 
+  arma::mat Sigma_cond = Sigma - trans(Tinv_Sigma21) * Tinv_Sigma21;
+  // T.cond <- chol(Sigma.cond + diag(nugget.sim, m, m))	
+  Sigma_cond.diag() += nugget_sim;
+  arma::mat T_cond = chol(m_sigma2*Sigma_cond);
+  // white.noise <- matrix(rnorm(m*nsim), m, nsim)
+  // y.rand.cond <- t(T.cond) %*% white.noise
+  // y <- matrix(y.trend.cond, m, nsim) + y.rand.cond	
+  yp.each_col() = y_trend;
+  yp += trans(T_cond) * arma::randn(m,nsim);
 
   return yp;  // NB: move not required due to copy ellision mechanism
 }
