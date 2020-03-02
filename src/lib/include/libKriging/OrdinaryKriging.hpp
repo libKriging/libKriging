@@ -33,9 +33,6 @@ class OrdinaryKriging {
   arma::vec m_theta;
   double m_sigma2;
 
-  std::function<double(const arma::vec&, const arma::vec&)> CovNorm_fun;  // Covariance function on normalized data
-  std::function<double(const arma::vec&, const arma::vec&, int)> CovNorm_deriv;  // Covariance function derivative vs. theta
-    
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
@@ -47,15 +44,11 @@ class OrdinaryKriging {
 
  public:
   struct OKModel {
-    arma::colvec y;
-    arma::mat X;
     arma::mat T;
     arma::colvec z;
-    std::function<double(const arma::vec&, const arma::vec&)> covnorm_fun;
-    std::function<double(const arma::vec&, const arma::vec&, int)> covnorm_deriv;
   };
 
-  // LIBKRIGING_EXPORT double fit_ofn(const arma::vec& theta, arma::vec* grad_out, OKModel* okm_data);
+  double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT OrdinaryKriging();  // const std::string & covType);
