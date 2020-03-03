@@ -5,6 +5,14 @@ language: bash
 
 matrix:
   include:
+    - name: "Guideline checks"
+      os: linux
+      dist: xenial
+      compiler: clang
+      env:
+        - DEBUG_CI=true
+        - BUILD_NAME="checks"
+
     - name: "Linux Debug"
       os: linux
       dist: xenial
