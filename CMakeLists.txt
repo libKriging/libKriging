@@ -254,6 +254,7 @@ if (CLANG_FORMAT)
             -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
             -DCLANG_FORMAT="${CLANG_FORMAT}"
             -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
+    message(STATUS "clang-format target for updating code format is available")
 else ()
     message(WARNING "clang-format no found; clang-format target is not available.")
     add_custom_target(clang-format
@@ -287,6 +288,7 @@ if (DOXYGEN_FOUND)
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
             COMMENT "Generating API documentation with Doxygen"
             VERBATIM)
+    message(STATUS "doc target for documentation generation is available")
 else ()
     message(WARNING "doxygen no found; doc target is not available.")
     add_custom_target(doc

@@ -1,5 +1,8 @@
 This file describes good practices to follow if you want to contribue to this project.
 
+* [Commit Message Format](#commit-message-format)
+* [Pull request procedure](#pull-request-procedure)
+
 # Commit Message Format
 (inspired from git commit message from angular style and git-commit-message-convention repository)
 
@@ -101,4 +104,60 @@ skip ci:
 doc: fix minor mispelling [skip ci]
 
 CI build is a waste of time for a so tiny mispelling fix. 
+```
+
+# Pull request procedure
+
+When you submit a pull request, be sure that 
+* your code is well formatted (use `cmake --build . --target clang-format` for force format using clang-format)
+  
+  it will be check by travis-ci
+  
+* you have removed useless debug outputs
+
+* you added tests for any new features
+
+* you have checked clang-tidy warnings (on your workstation or using travis-ci output)
+  
+  You can disable irrelevant warnings using `NOLINT` or `NOLINTNEXTLINE` special comments (see https://clang.llvm.org/extra/clang-tidy/#suppressing-undesired-diagnostics)
+  
+* Your commit history is clean
+
+  all your commits are 
+  * self-consistent
+  * with an explicit and descriptive message log
+  
+## Perfect Pull Request procedure
+
+If your PR passed without continuous integration error, you PR should be merged after being approved. 
+Meanwhile you can work on your branch (or a derived branch). After effective merge into main libKriging repository, you can merge it with your current branch to be up-to-date.
+
+## Non-perfect Pull Request procedure
+
+It occurs if any work is required by maintainer before an effective merge. 
+
+In that case, your commits could be changed (for binary removal, commit squash, fixing issues...). 
+This is usually done in a dedicated branch named `PR-XX`. After the effective merge of this branch `PR-XX`, you have to rebase your work on it.
+
+To rebase your work on it, you can:
+
+* If you have no new change
+```
+git remote add libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+git reset --hard libKriging/master # reset to main master version
+git push # update your fork with it
+```
+
+* If you have new changes
+
+```
+WORKING_BRANCH=master # defines which you want to rebase with main master version
+git checkout $WORKING_BRANCH
+git tag -f before-rebase # this tag references your version before rebase (thus, nothing can be lost)
+git remote add libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+NEW_COMMIT_BASE=      # set the id of the first new commit you want to rebase onto main master
+git rebase --onto libKriging/master $NEW_COMMIT_BASE # replay your commits on main master
+# if conflict occurs, solve them (you can use `git mergetool` to do it)
+git rebase --continue # continue rebase (after conflict resolution) 
+git push -f # update your fork with it (you have to force with -f since you rewrite history)
 ```
