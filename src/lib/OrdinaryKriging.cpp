@@ -348,7 +348,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
-                                            const std::string& regmodel="constant"){//,
+                                            const std::string& regmodel){//,
                                             // const Parameters& parameters,
                                             // const std::string& optim_objective, // will support "logLik" or "leaveOneOut"
                                             // const std::string& optim_method) {
