@@ -123,10 +123,7 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
   
   arma::uword n = fd->X.n_rows;
-  
-  // Define regression matrix
-  arma::uword nreg = 1;
-  arma::mat F = arma::ones(n, nreg);
+  arma::mat F = fd->F;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
@@ -227,11 +224,7 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
   arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
   
   arma::uword n = fd->X.n_rows;
-  
-  // Define regression matrix
-  arma::uword nreg = 1;
-  arma::mat F(n, nreg);
-  F.ones();
+  arma::mat F = fd->F;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
@@ -304,7 +297,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta)
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn(_theta, nullptr, &okm_data); 
 }
@@ -314,7 +307,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
 
@@ -328,7 +321,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   return -fit_ofn2(_theta, nullptr, &okm_data); 
 }
@@ -338,7 +331,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
   
   arma::vec grad(_theta.n_elem);
 
@@ -350,12 +343,14 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
  * @param X is n*d matrix of input
+ * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param parameters is starting value for hyper-parameters
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
-                                            const arma::mat& X){//,
+                                            const arma::mat& X,
+                                            const std::string& regmodel="constant"){//,
                                             // const Parameters& parameters,
                                             // const std::string& optim_objective, // will support "logLik" or "leaveOneOut"
                                             // const std::string& optim_method) {
@@ -380,6 +375,37 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
 
   this->m_X = newX;
   this->m_y = newy;
+
+  // Define regression matrix
+  arma::uword n = X.n_rows;
+  arma::uword d = X.n_cols;
+  arma::mat F;
+  if (regmodel=="constant"){
+    F.set_size(n,1);
+    F = arma::ones(n, 1);
+  }
+  if (regmodel=="linear"){
+    F.set_size(n,1+d);
+    F.col(0) = arma::ones(n, 1);
+    for (arma::uword i = 0; i < d; i++) {
+      F.col(i+1) = newX.col(i);
+    } 
+  }
+  if (regmodel=="quadratic"){
+    F.set_size(n,1+2*d+d*(d-1)/2);
+    F.col(0) = arma::ones(n, 1);
+    arma::uword count = 1;
+    for (arma::uword i = 0; i < d; i++) {
+      F.col(count) = newX.col(i);
+      count += 1;
+      for (arma::uword j = 0; j <= i; j++) {
+        F.col(count) = newX.col(i) % newX.col(j);
+        count += 1;
+      }
+    } 
+  }
+  m_regmodel = regmodel;
+  m_F = F;
 
   // arma::cout << "optim_method:" << optim_method << arma::endl;
 
@@ -410,7 +436,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{newy, newX, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+      OrdinaryKriging::OKModel okm_data{newy, newX, F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -468,20 +494,45 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   arma::mat pred_cov(m, m);
   pred_stdev.zeros();
   pred_cov.zeros();
+  
 
+  arma::mat Xtnorm = trans(m_X);
+  Xtnorm.each_col() /= m_theta;
+  arma::mat Xpnorm = Xp;
+  // Normalize Xp
+  Xpnorm.each_row() -= m_centerX;
+  Xpnorm.each_row() /= m_scaleX;
+  arma::mat Ftest;
   // Define regression matrix
-  arma::uword nreg = 1;
-  arma::mat Ftest(m, nreg);
-  Ftest.ones();
+  arma::uword d = m_X.n_cols;
+  if (m_regmodel=="constant"){
+    Ftest.set_size(m,1);
+    Ftest = arma::ones(m, 1);
+  }
+  if (m_regmodel=="linear"){
+    Ftest.set_size(m,1+d);
+    Ftest.col(0) = arma::ones(m, 1);
+    for (arma::uword i = 0; i < d; i++) {
+      Ftest.col(i+1) = Xpnorm.col(i);
+    } 
+  }
+  if (m_regmodel=="quadratic"){
+    Ftest.set_size(m,1+2*d+d*(d-1)/2);
+    Ftest.col(0) = arma::ones(m, 1);
+    arma::uword count = 1;
+    for (arma::uword i = 0; i < d; i++) {
+      Ftest.col(count) = Xpnorm.col(i);
+      count += 1;
+      for (arma::uword j = 0; j <= i; j++) {
+        Ftest.col(count) = Xpnorm.col(i) % Xpnorm.col(j);
+        count += 1;
+      }
+    } 
+  }
 
   // Compute covariance between training data and new data to predict
   arma::mat R(n, m);
-  arma::mat Xtnorm = trans(m_X);
-  Xtnorm.each_col() /= m_theta;
-  arma::mat Xpnorm = trans(Xp);
-  // Normalize Xp
-  Xpnorm.each_col() -= m_centerX;
-  Xpnorm.each_col() /= m_scaleX;
+  Xpnorm = trans(Xpnorm);
   Xpnorm.each_col() /= m_theta;
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
@@ -556,19 +607,46 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
   arma::mat yp(m, nsim);
-
+  
+  arma::mat Xpnorm = Xp;
+  // Normalize Xp
+  Xpnorm.each_row() -= m_centerX;
+  Xpnorm.each_row() /= m_scaleX;
   // Define regression matrix
-  arma::uword nreg = 1;
-  arma::mat F_newdata(m, nreg);
-  F_newdata.ones();
+  arma::uword d = m_X.n_cols;
+  arma::mat F_newdata;
+  if (m_regmodel=="constant"){
+    F_newdata.set_size(m,1);
+    F_newdata = arma::ones(m, 1);
+  }
+  if (m_regmodel=="linear"){
+    F_newdata.set_size(m,1+d);
+    F_newdata.col(0) = arma::ones(m, 1);
+    for (arma::uword i = 0; i < d; i++) {
+      F_newdata.col(i+1) = Xpnorm.col(i);
+    } 
+  }
+  if (m_regmodel=="quadratic"){
+    F_newdata.set_size(m,1+2*d+d*(d-1)/2);
+    F_newdata.col(0) = arma::ones(m, 1);
+    arma::uword count = 1;
+    for (arma::uword i = 0; i < d; i++) {
+      F_newdata.col(count) = Xpnorm.col(i);
+      count += 1;
+      for (arma::uword j = 0; j <= i; j++) {
+        F_newdata.col(count) = Xpnorm.col(i) % Xpnorm.col(j);
+        count += 1;
+      }
+    } 
+  }
+
   arma::colvec y_trend = F_newdata * m_beta;
+
+
 
   // Compute covariance between new data
   arma::mat Sigma(m, m);
-  arma::mat Xpnorm = trans(Xp);
-  // Normalize Xp
-  Xpnorm.each_col() -= m_centerX;
-  Xpnorm.each_col() /= m_scaleX;
+  Xpnorm = trans(Xpnorm);
   Xpnorm.each_col() /= m_theta;
   for (arma::uword i = 0; i < m; i++) {
     for (arma::uword j = 0; j < i; j++) {

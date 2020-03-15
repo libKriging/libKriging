@@ -3,9 +3,9 @@
 #include "libKriging/OrdinaryKriging.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List ordinary_kriging(arma::vec y, arma::mat X) {
+Rcpp::List ordinary_kriging(arma::vec y, arma::mat X, std::string regmodel="constant") {
   OrdinaryKriging* ok = new OrdinaryKriging();//"gauss"));
-  ok->fit(std::move(y), std::move(X));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+  ok->fit(std::move(y), std::move(X), std::move(regmodel));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
   
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
   
@@ -25,7 +25,13 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
   return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta(),
                             Rcpp::Named("sigma2") = impl_ptr->sigma2(),
                             Rcpp::Named("X") = impl_ptr->X(),
+                            Rcpp::Named("centerX") = impl_ptr->centerX(),
+                            Rcpp::Named("scaleX") = impl_ptr->scaleX(),
                             Rcpp::Named("y") = impl_ptr->y(),
+                            Rcpp::Named("centerY") = impl_ptr->centerY(),
+                            Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+                            Rcpp::Named("regmodel") = impl_ptr->regmodel(),
+                            Rcpp::Named("F") = impl_ptr->F(),
                             Rcpp::Named("T") = impl_ptr->T(),
                             Rcpp::Named("M") = impl_ptr->M(),
                             Rcpp::Named("z") = impl_ptr->z(),
