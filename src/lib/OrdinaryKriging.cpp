@@ -364,8 +364,22 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   std::string optim_method="bfgs";
   Parameters parameters{0, false, arma::vec(1), false};
 
-  this->m_X = X;
-  this->m_y = y;
+  // Normalization of inputs and output
+  arma::rowvec centerX = min(X,0);
+  arma::rowvec scaleX = max(X,0) - min(X,0);
+  double centerY = min(y);
+  double scaleY = max(y) - min(y);
+  m_centerX = centerX;
+  m_scaleX = scaleX;
+  m_centerY = centerY;
+  m_scaleY = scaleY;
+  arma::mat newX = X;
+  newX.each_row() -= centerX;
+  newX.each_row() /= scaleX;
+  arma::colvec newy = (y-centerY)/scaleY;
+
+  this->m_X = newX;
+  this->m_y = newy;
 
   // arma::cout << "optim_method:" << optim_method << arma::endl;
 
@@ -396,7 +410,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{y, X, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+      OrdinaryKriging::OKModel okm_data{newy, newX, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -428,6 +442,8 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   if (!parameters.has_sigma2) {
     m_sigma2 = arma::as_scalar(sum(pow(m_z, 2)) / X.n_rows);
     m_sigma2 = arma::as_scalar(accu(m_z%m_z) / X.n_rows);
+    // Un-normalize
+    m_sigma2 *= scaleY*scaleY;
   } else {
     m_sigma2 = parameters.sigma2;
   }
@@ -463,6 +479,9 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= m_theta;
   arma::mat Xpnorm = trans(Xp);
+  // Normalize Xp
+  Xpnorm.each_col() -= m_centerX;
+  Xpnorm.each_col() /= m_scaleX;
   Xpnorm.each_col() /= m_theta;
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
@@ -471,6 +490,8 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   }
   arma::mat Tinv_newdata = solve(trimatl(m_T), R,arma::solve_opts::fast);
   pred_mean = Ftest*m_beta + trans(Tinv_newdata)*m_z;
+  // Un-normalize predictor
+  pred_mean = m_centerY + m_scaleY*pred_mean;
   
   if (withStd){
     double total_sd2 = m_sigma2;
@@ -545,6 +566,9 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
   // Compute covariance between new data
   arma::mat Sigma(m, m);
   arma::mat Xpnorm = trans(Xp);
+  // Normalize Xp
+  Xpnorm.each_col() -= m_centerX;
+  Xpnorm.each_col() /= m_scaleX;
   Xpnorm.each_col() /= m_theta;
   for (arma::uword i = 0; i < m; i++) {
     for (arma::uword j = 0; j < i; j++) {
@@ -578,6 +602,8 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
   // y <- matrix(y.trend.cond, m, nsim) + y.rand.cond	
   yp.each_col() = y_trend;
   yp += trans(T_cond) * arma::randn(m,nsim);
+  // Un-normalize simulations
+  yp = m_centerY + m_scaleY*yp;
 
   return yp;  // NB: move not required due to copy ellision mechanism
 }

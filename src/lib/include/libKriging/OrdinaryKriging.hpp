@@ -19,7 +19,11 @@ class OrdinaryKriging {
   };
 
   const arma::mat& X() const { return m_X; };
+  const arma::rowvec& centerX() const { return m_centerX; };
+  const arma::rowvec& scaleX() const { return m_scaleX; };
   const arma::colvec& y() const { return m_y; };
+  const double& centerY() const { return m_centerY; };
+  const double& scaleY() const { return m_scaleY; };
   const arma::mat& T() const { return m_T; };
   const arma::mat& M() const { return m_M; };
   const arma::colvec& z() const { return m_z; };
@@ -29,7 +33,11 @@ class OrdinaryKriging {
 
  private:
   arma::mat m_X;
+  arma::rowvec m_centerX;
+  arma::rowvec m_scaleX;
   arma::colvec m_y;
+  double m_centerY;
+  double m_scaleY;
   arma::mat m_T;
   arma::mat m_M;
   arma::colvec m_z;
