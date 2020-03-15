@@ -123,7 +123,6 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
   
   arma::uword n = fd->X.n_rows;
-  arma::mat F = fd->F;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
@@ -141,7 +140,7 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   fd->T = trans(chol(R));
 
   // Compute intermediate useful matrices
-  fd->M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), fd->F,arma::solve_opts::fast);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
@@ -224,7 +223,6 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
   arma::mat Xtnorm = trans(fd->X); Xtnorm.each_col() /= _theta;
   
   arma::uword n = fd->X.n_rows;
-  arma::mat F = fd->F;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
@@ -244,11 +242,11 @@ arma::colvec DiagABA(const arma::mat& A,const arma::mat& B) {
 
   // Compute intermediate useful matrices
   // arma::mat M = solve(fd->T, F);
-  fd->M = solve(trimatl(fd->T), F,arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), fd->F,arma::solve_opts::fast);
   // arma::mat Rinv = inv_sympd(R); // didn't find chol2inv equivalent in armadillo
   arma::mat Rinv = inv(trimatl(fd->T));
   Rinv = trimatl(Rinv) * trimatl(Rinv);
-  arma::mat RinvF = Rinv * F;
+  arma::mat RinvF = Rinv * fd->F;
   arma::mat TM = chol(trans(fd->M)*fd->M); // Can be optimized with a crossprod equivalent in armadillo ? 
   // arma::mat aux = solve(trans(TM), trans(RinvF));
   arma::mat aux = solve(trimatl(trans(TM)), trans(RinvF),arma::solve_opts::fast);
