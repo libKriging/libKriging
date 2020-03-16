@@ -89,7 +89,8 @@ class OrdinaryKriging {
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec& y,
                              const arma::mat& X,
-                             const std::string& regmodel="constant");  //,
+                             const std::string& regmodel="constant",
+                             bool normalize=false);  //,
   // const Parameters& parameters,
   // const std::string& optim_method,
   // const std::string& optim_objective);

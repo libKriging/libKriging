@@ -342,13 +342,15 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
  * @param y is n length column vector of output
  * @param X is n*d matrix of input
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
+ * @param normalize is a boolean to enforce inputs/output normalization
  * @param parameters is starting value for hyper-parameters
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
-                                            const std::string& regmodel){//,
+                                            const std::string& regmodel,
+                                            bool normalize){//,
                                             // const Parameters& parameters,
                                             // const std::string& optim_objective, // will support "logLik" or "leaveOneOut"
                                             // const std::string& optim_method) {
@@ -357,11 +359,24 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   std::string optim_method="bfgs";
   Parameters parameters{0, false, arma::vec(1), false};
 
+  arma::uword n = X.n_rows;
+  arma::uword d = X.n_cols;
+  arma::rowvec centerX(d);
+  arma::rowvec scaleX(d);
+  double centerY;
+  double scaleY;
   // Normalization of inputs and output
-  arma::rowvec centerX = min(X,0);
-  arma::rowvec scaleX = max(X,0) - min(X,0);
-  double centerY = min(y);
-  double scaleY = max(y) - min(y);
+  if (normalize){
+    centerX = min(X,0);
+    scaleX = max(X,0) - min(X,0);
+    centerY = min(y);
+    scaleY = max(y) - min(y);
+  }else{
+    centerX.zeros();
+    scaleX.ones();
+    centerY = 0;
+    scaleY = 1;
+  }
   m_centerX = centerX;
   m_scaleX = scaleX;
   m_centerY = centerY;
@@ -375,8 +390,6 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   this->m_y = newy;
 
   // Define regression matrix
-  arma::uword n = X.n_rows;
-  arma::uword d = X.n_cols;
   arma::mat F;
   if (regmodel=="constant"){
     F.set_size(n,1);
