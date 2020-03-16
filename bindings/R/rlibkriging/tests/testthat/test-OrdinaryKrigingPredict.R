@@ -11,7 +11,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss")
 r <- ordinary_kriging(y,X)
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
-ptest <- predict(k,Xtest,type="UK",cov.compute = TRUE)
+ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE)
 Yktest <- ptest$mean
 sktest <- ptest$sd
 cktest <- c(ptest$cov)
