@@ -5,10 +5,13 @@
 // [[Rcpp::export]]
 Rcpp::List ordinary_kriging(arma::vec y, arma::mat X, std::string regmodel="constant", bool normalize=false) {
   OrdinaryKriging* ok = new OrdinaryKriging();//"gauss"));
-  ok->fit(std::move(y), std::move(X), std::move(regmodel), std::move(normalize));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
-  
+
+  ok->fit(std::move(y), std::move(X),
+      OrdinaryKriging::RegressionModelUtils::fromString(regmodel),
+      normalize);//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
-  
+
   Rcpp::List obj;
   obj.attr("object") = impl_ptr;
   obj.attr("class") = "OrdinaryKriging";
@@ -19,9 +22,9 @@ Rcpp::List ordinary_kriging(arma::vec y, arma::mat X, std::string regmodel="cons
 Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta(),
                             Rcpp::Named("sigma2") = impl_ptr->sigma2(),
                             Rcpp::Named("X") = impl_ptr->X(),
@@ -30,7 +33,7 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
                             Rcpp::Named("y") = impl_ptr->y(),
                             Rcpp::Named("centerY") = impl_ptr->centerY(),
                             Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-                            Rcpp::Named("regmodel") = impl_ptr->regmodel(),
+                            Rcpp::Named("regmodel") = OrdinaryKriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
                             Rcpp::Named("F") = impl_ptr->F(),
                             Rcpp::Named("T") = impl_ptr->T(),
                             Rcpp::Named("M") = impl_ptr->M(),
@@ -43,9 +46,9 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
 double ordinary_kriging_loglikelihood(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return impl_ptr->logLikelihood(theta);
 }
 
@@ -53,9 +56,9 @@ double ordinary_kriging_loglikelihood(Rcpp::List ordinaryKriging, arma::vec thet
 double ordinary_kriging_loofun(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return impl_ptr->loofun(theta);
 }
 
@@ -63,9 +66,9 @@ double ordinary_kriging_loofun(Rcpp::List ordinaryKriging, arma::vec theta) {
 arma::vec ordinary_kriging_loofungrad(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return impl_ptr->loofungrad(theta);
 }
 
@@ -73,9 +76,9 @@ arma::vec ordinary_kriging_loofungrad(Rcpp::List ordinaryKriging, arma::vec thet
 arma::vec ordinary_kriging_loglikelihoodgrad(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return impl_ptr->logLikelihoodGrad(theta);
 }
 
@@ -83,9 +86,9 @@ arma::vec ordinary_kriging_loglikelihoodgrad(Rcpp::List ordinaryKriging, arma::v
 Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, bool stdev, bool cov) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   if (stdev & cov) {
     auto pred = impl_ptr->predict(X,true,true);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred),
@@ -111,8 +114,8 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, boo
 arma::mat ordinary_kriging_simulate(Rcpp::List ordinaryKriging, int nsim, arma::mat X) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
-  
+
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
-  
+
   return impl_ptr->simulate(nsim,X);
 }
