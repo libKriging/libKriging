@@ -9,12 +9,28 @@
 #include <armadillo>
 #include <optim.hpp>
 #include <tuple>
+#include <cassert>
 
 // #include "libKriging/covariance.h"
 
 //' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
+
+/************************************************/
+/** implementation details forward declaration **/
+/************************************************/
+
+namespace {  // anonymous namespace for local implementation details
+auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
+                           const arma::mat& newX,
+                           arma::uword n,
+                           arma::uword d) -> arma::mat;
+}  // namespace
+
+/************************************************/
+/**      OrdinaryKriging implementation        **/
+/************************************************/
 
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
@@ -355,7 +371,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
-                                            const std::string& regmodel,
+                                            const RegressionModel& regmodel,
                                             bool normalize) {  //,
                                                                // const Parameters& parameters,
   // const std::string& optim_objective, // will support "logLik" or "leaveOneOut"
@@ -396,33 +412,8 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   this->m_y = newy;
 
   // Define regression matrix
-  arma::mat F;
-  if (regmodel == "constant") {
-    F.set_size(n, 1);
-    F = arma::ones(n, 1);
-  }
-  if (regmodel == "linear") {
-    F.set_size(n, 1 + d);
-    F.col(0) = arma::ones(n, 1);
-    for (arma::uword i = 0; i < d; i++) {
-      F.col(i + 1) = newX.col(i);
-    }
-  }
-  if (regmodel == "quadratic") {
-    F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
-    F.col(0) = arma::ones(n, 1);
-    arma::uword count = 1;
-    for (arma::uword i = 0; i < d; i++) {
-      F.col(count) = newX.col(i);
-      count += 1;
-      for (arma::uword j = 0; j <= i; j++) {
-        F.col(count) = newX.col(i) % newX.col(j);
-        count += 1;
-      }
-    }
-  }
   m_regmodel = regmodel;
-  m_F = F;
+  m_F = regressionModelMatrix(regmodel, newX, n, d);
 
   // arma::cout << "optim_method:" << optim_method << arma::endl;
 
@@ -453,7 +444,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{newy, newX, F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+      OrdinaryKriging::OKModel okm_data{newy, newX, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -517,33 +508,10 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
   // Normalize Xp
   Xpnorm.each_row() -= m_centerX;
   Xpnorm.each_row() /= m_scaleX;
-  arma::mat Ftest;
+
   // Define regression matrix
   arma::uword d = m_X.n_cols;
-  if (m_regmodel == "constant") {
-    Ftest.set_size(m, 1);
-    Ftest = arma::ones(m, 1);
-  }
-  if (m_regmodel == "linear") {
-    Ftest.set_size(m, 1 + d);
-    Ftest.col(0) = arma::ones(m, 1);
-    for (arma::uword i = 0; i < d; i++) {
-      Ftest.col(i + 1) = Xpnorm.col(i);
-    }
-  }
-  if (m_regmodel == "quadratic") {
-    Ftest.set_size(m, 1 + 2 * d + d * (d - 1) / 2);
-    Ftest.col(0) = arma::ones(m, 1);
-    arma::uword count = 1;
-    for (arma::uword i = 0; i < d; i++) {
-      Ftest.col(count) = Xpnorm.col(i);
-      count += 1;
-      for (arma::uword j = 0; j <= i; j++) {
-        Ftest.col(count) = Xpnorm.col(i) % Xpnorm.col(j);
-        count += 1;
-      }
-    }
-  }
+  arma::mat Ftest = regressionModelMatrix(m_regmodel, Xpnorm, m, d);
 
   // Compute covariance between training data and new data to predict
   arma::mat R(n, m);
@@ -624,36 +592,14 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
   arma::mat yp(m, nsim);
 
   arma::mat Xpnorm = Xp;
+
   // Normalize Xp
   Xpnorm.each_row() -= m_centerX;
   Xpnorm.each_row() /= m_scaleX;
+
   // Define regression matrix
   arma::uword d = m_X.n_cols;
-  arma::mat F_newdata;
-  if (m_regmodel == "constant") {
-    F_newdata.set_size(m, 1);
-    F_newdata = arma::ones(m, 1);
-  }
-  if (m_regmodel == "linear") {
-    F_newdata.set_size(m, 1 + d);
-    F_newdata.col(0) = arma::ones(m, 1);
-    for (arma::uword i = 0; i < d; i++) {
-      F_newdata.col(i + 1) = Xpnorm.col(i);
-    }
-  }
-  if (m_regmodel == "quadratic") {
-    F_newdata.set_size(m, 1 + 2 * d + d * (d - 1) / 2);
-    F_newdata.col(0) = arma::ones(m, 1);
-    arma::uword count = 1;
-    for (arma::uword i = 0; i < d; i++) {
-      F_newdata.col(count) = Xpnorm.col(i);
-      count += 1;
-      for (arma::uword j = 0; j <= i; j++) {
-        F_newdata.col(count) = Xpnorm.col(i) % Xpnorm.col(j);
-        count += 1;
-      }
-    }
-  }
+  arma::mat F_newdata = regressionModelMatrix(m_regmodel, Xpnorm, m, d);
 
   arma::colvec y_trend = F_newdata * m_beta;
 
@@ -717,4 +663,70 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
   this->fit(m_y, m_X);  //, parameters, optim_objective, optim_method);
+}
+
+/************************************************/
+/**          implementation details            **/
+/************************************************/
+
+namespace {  // anonymous namespace for local implementation details
+
+auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
+                           const arma::mat& newX,
+                           arma::uword n,
+                           arma::uword d) -> arma::mat {
+  arma::mat F;  // uses modern RTO to avoid returned object copy
+  switch (regmodel) {
+    case OrdinaryKriging::RegressionModel::Constant: {
+      F.set_size(n, 1);
+      F = arma::ones(n, 1);
+      return F;
+    } break;
+
+    case OrdinaryKriging::RegressionModel::Linear: {
+      F.set_size(n, 1 + d);
+      F.col(0) = arma::ones(n, 1);
+      for (arma::uword i = 0; i < d; i++) {
+        F.col(i + 1) = newX.col(i);
+      }
+      return F;
+    } break;
+
+    case OrdinaryKriging::RegressionModel::Quadratic: {
+      F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
+      F.col(0) = arma::ones(n, 1);
+      arma::uword count = 1;
+      for (arma::uword i = 0; i < d; i++) {
+        F.col(count) = newX.col(i);
+        count += 1;
+        for (arma::uword j = 0; j <= i; j++) {
+          F.col(count) = newX.col(i) % newX.col(j);
+          count += 1;
+        }
+      }
+      return F;
+    } break;
+  }
+}
+
+static char const* enum_RegressionModel_strings[] = {"constant", "linear", "quadratic"};
+
+}  // namespace
+
+OrdinaryKriging::RegressionModel OrdinaryKriging::RegressionModelUtils::fromString(const std::string& value) {
+  static auto begin = std::begin(enum_RegressionModel_strings);
+  static auto end = std::end(enum_RegressionModel_strings);
+
+  auto find = std::find(begin, end, value);
+  if (find != end) {
+    return static_cast<RegressionModel>(std::distance(begin, find));
+  } else {
+    // FIXME use std::optional as returned type
+    throw std::exception();
+  }
+}
+
+std::string OrdinaryKriging::RegressionModelUtils::toString(const OrdinaryKriging::RegressionModel& e) {
+  assert(static_cast<std::size_t>(e) < sizeof(enum_RegressionModel_strings));
+  return enum_RegressionModel_strings[static_cast<int>(e)];
 }
