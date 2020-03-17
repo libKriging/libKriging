@@ -19,23 +19,40 @@ class OrdinaryKriging {
   };
 
   const arma::mat& X() const { return m_X; };
+  const arma::rowvec& centerX() const { return m_centerX; };
+  const arma::rowvec& scaleX() const { return m_scaleX; };
   const arma::colvec& y() const { return m_y; };
+  const double& centerY() const { return m_centerY; };
+  const double& scaleY() const { return m_scaleY; };
+  const std::string& regmodel() const { return m_regmodel; };
+  const arma::mat& F() const { return m_F; };
   const arma::mat& T() const { return m_T; };
+  const arma::mat& M() const { return m_M; };
   const arma::colvec& z() const { return m_z; };
+  const arma::colvec& beta() const { return m_beta; };
   const arma::vec& theta() const { return m_theta; };
   const double& sigma2() const { return m_sigma2; };
 
  private:
   arma::mat m_X;
+  arma::rowvec m_centerX;
+  arma::rowvec m_scaleX;
   arma::colvec m_y;
+  double m_centerY;
+  double m_scaleY;
+  std::string m_regmodel;
+  arma::mat m_F;
   arma::mat m_T;
+  arma::mat m_M;
   arma::colvec m_z;
+  arma::colvec m_beta;
   arma::vec m_theta;
   double m_sigma2;
 
   std::function<double(const arma::vec&, const arma::vec&)> CovNorm_fun;  // Covariance function on normalized data
-  std::function<double(const arma::vec&, const arma::vec&, int)> CovNorm_deriv;  // Covariance function derivative vs. theta
-    
+  std::function<double(const arma::vec&, const arma::vec&, int)>
+      CovNorm_deriv;  // Covariance function derivative vs. theta
+
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
@@ -49,8 +66,11 @@ class OrdinaryKriging {
   struct OKModel {
     arma::colvec y;
     arma::mat X;
+    arma::mat F;
     arma::mat T;
+    arma::mat M;
     arma::colvec z;
+    arma::colvec beta;
     std::function<double(const arma::vec&, const arma::vec&)> covnorm_fun;
     std::function<double(const arma::vec&, const arma::vec&, int)> covnorm_deriv;
   };
@@ -63,18 +83,23 @@ class OrdinaryKriging {
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param X is n*d matrix of input
+   * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param parameters is starting value for hyper-parameters
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec& y,
-                             const arma::mat& X);  //,
+                             const arma::mat& X,
+                             const std::string& regmodel = "constant",
+                             bool normalize = false);  //,
   // const Parameters& parameters,
   // const std::string& optim_method,
   // const std::string& optim_objective);
 
   LIBKRIGING_EXPORT double logLikelihood(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
+  LIBKRIGING_EXPORT double loofun(const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::vec loofungrad(const arma::vec& theta);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
