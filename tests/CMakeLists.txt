@@ -16,6 +16,10 @@ add_executable(armadillo_example demo/armadillo_example.cpp)
 target_link_libraries(armadillo_example LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries armadillo_example)
 
+add_executable(enum_utils utils/enum_utils.cpp)
+target_link_libraries(enum_utils LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries enum_utils)
+
 add_executable(catch2_unit_test catch2_unit_test.cpp)
 target_link_libraries(catch2_unit_test LINK_PUBLIC Catch2)
 add_dependencies(all_test_binaries catch2_unit_test)
@@ -55,6 +59,7 @@ endif ()
 
 # Test using catch2 (parse catch tests)
 ParseAndAddCatchTests(catch2_unit_test)
+ParseAndAddCatchTests(enum_utils)
 ParseAndAddCatchTests(regression_unit_test)
 
 set(AdditionalCatchParameters --benchmark-samples 10)
