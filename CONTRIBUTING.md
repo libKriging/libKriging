@@ -132,6 +132,14 @@ When you submit a pull request, be sure that
 If your PR passed without continuous integration error, you PR should be merged after being approved. 
 Meanwhile you can work on your branch (or a derived branch). After effective merge into main libKriging repository, you can merge it with your current branch to be up-to-date.
 
+To do so:
+```
+# from your local repository
+git remote add --fetch libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+git merge --ff libKriging/master # update with merged master branch
+git push # update your fork with it
+```
+
 ## Non-perfect Pull Request procedure
 
 It occurs if any work is required by maintainer before an effective merge. 
@@ -143,7 +151,7 @@ To rebase your work on it, you can:
 
 * If you have no new change
 ```
-git remote add libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+git remote add --fetch libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
 git reset --hard libKriging/master # reset to main master version
 git push # update your fork with it
 ```
