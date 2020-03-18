@@ -3,7 +3,7 @@
 
 ## 1. Create your GitHub fork of https://github.com/MASCOTNUM/libKriging
    
-   To do so, use **Fork** (top right) button 
+   To do so, use [**Fork**] (top right) button 
 
    ![](docs/images/GitHub-screenshot-main.png)
 
@@ -13,7 +13,7 @@
    git clone git@github.com:*your-account*/libKriging.git 
    ```
 
-   Follow instructions in green **Clone or download** button
+   Follow instructions in green [**Clone or download**] button
 
    ![](docs/images/GitHub-screenshot-work.png)
    
@@ -48,7 +48,11 @@
    git push -u origin dev-my-new-feature:dev-my-new-feature
    ```
    
-## 4. Open a *Pull Request* using **New pull request** button
+## 4. Open a *Pull Request* using **[New pull request]** button
+
+   * Give an explicit title to your PR
+
+   * Add a summary to explain the proposed changes
 
    ![](docs/images/GitHub-screenshot-work.png)
 
