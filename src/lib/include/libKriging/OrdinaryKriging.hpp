@@ -123,7 +123,7 @@ class OrdinaryKriging {
    * @param nsim is number of simulations to draw
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const arma::mat& Xp, bool cond = true);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output

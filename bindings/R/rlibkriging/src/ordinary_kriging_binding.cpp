@@ -111,11 +111,11 @@ Rcpp::List ordinary_kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, boo
 }
 
 // [[Rcpp::export]]
-arma::mat ordinary_kriging_simulate(Rcpp::List ordinaryKriging, int nsim, arma::mat X) {
+arma::mat ordinary_kriging_simulate(Rcpp::List ordinaryKriging, int nsim, arma::mat X, bool cond=true) {
   if (! ordinaryKriging.inherits("OrdinaryKriging")) Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim,X);
+  return impl_ptr->simulate(nsim,X,cond);
 }
