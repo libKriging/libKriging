@@ -18,13 +18,20 @@ class OrdinaryKriging {
     bool has_theta;
   };
 
+  enum class RegressionModel { Constant, Linear, Quadratic };
+
+  struct RegressionModelUtils {
+    LIBKRIGING_EXPORT static RegressionModel fromString(const std::string & s);
+    LIBKRIGING_EXPORT static std::string toString(const RegressionModel & m);
+  };
+
   const arma::mat& X() const { return m_X; };
   const arma::rowvec& centerX() const { return m_centerX; };
   const arma::rowvec& scaleX() const { return m_scaleX; };
   const arma::colvec& y() const { return m_y; };
   const double& centerY() const { return m_centerY; };
   const double& scaleY() const { return m_scaleY; };
-  const std::string& regmodel() const { return m_regmodel; };
+  const RegressionModel& regmodel() const { return m_regmodel; };
   const arma::mat& F() const { return m_F; };
   const arma::mat& T() const { return m_T; };
   const arma::mat& M() const { return m_M; };
@@ -40,7 +47,7 @@ class OrdinaryKriging {
   arma::colvec m_y;
   double m_centerY;
   double m_scaleY;
-  std::string m_regmodel;
+  RegressionModel m_regmodel;
   arma::mat m_F;
   arma::mat m_T;
   arma::mat m_M;
@@ -90,7 +97,7 @@ class OrdinaryKriging {
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec& y,
                              const arma::mat& X,
-                             const std::string& regmodel = "constant",
+                             const RegressionModel& regmodel = RegressionModel::Constant,
                              bool normalize = false);  //,
   // const Parameters& parameters,
   // const std::string& optim_method,
