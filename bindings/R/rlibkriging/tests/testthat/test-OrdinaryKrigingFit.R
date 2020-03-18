@@ -7,7 +7,7 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",lower=0.001,upper=2)
 r <- ordinary_kriging(y, X)
 
 precision <- 1e-5
@@ -21,7 +21,8 @@ n <- 15
 set.seed(123)
 X <- cbind(runif(n),runif(n))
 y = f(X)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),
+                    lower=rep(0.001,ncol(X)),upper=rep(2*sqrt(ncol(X)),ncol(X)))
 r <- ordinary_kriging(y, X)
 
 precision <- 1e-5

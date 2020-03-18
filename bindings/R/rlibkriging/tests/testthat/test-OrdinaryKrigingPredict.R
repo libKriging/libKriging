@@ -7,7 +7,7 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",lower=rep(0.001,ncol(X)),upper=rep(2*sqrt(ncol(X)),ncol(X)))
 r <- ordinary_kriging(y,X)
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
