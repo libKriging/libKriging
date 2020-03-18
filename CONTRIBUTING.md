@@ -127,7 +127,7 @@ When you submit a pull request, be sure that
   * self-consistent
   * with an explicit and descriptive message log
   
-## Perfect Pull Request procedure
+## Perfect Pull Request procedure (most common case)
 
 If your PR passed without continuous integration error, you PR should be merged after being approved. 
 Meanwhile you can work on your branch (or a derived branch). After effective merge into main libKriging repository, you can merge it with your current branch to be up-to-date.
