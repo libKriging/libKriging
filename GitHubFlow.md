@@ -50,11 +50,13 @@
    
 ## 4. Open a *Pull Request* using **[New pull request]** button
 
+   ![](docs/images/GitHub-screenshot-work.png)
+
    * Give an explicit title to your PR
 
    * Add a summary to explain the proposed changes
 
-   ![](docs/images/GitHub-screenshot-work.png)
+   ![](docs/images/GitHub-screenshot-PR-submit.png)
 
 ## 5. Use *Pull Request* form
  
