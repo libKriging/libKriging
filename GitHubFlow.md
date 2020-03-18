@@ -9,9 +9,9 @@
 
 ## 2. Get a local working copy
 
-    ```
-    git clone git@github.com:*your-account*/libKriging.git 
-    ```
+   ```
+   git clone git@github.com:*your-account*/libKriging.git 
+   ```
 
    Follow instructions in green **Clone or download** button
 
