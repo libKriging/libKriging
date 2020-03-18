@@ -20,7 +20,7 @@
 
 //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
 // Covariance function on normalized data
-inline double CovNorm_fun(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) noexcept {
+inline double CovNorm_fun_gauss(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) noexcept {
   //    double temp = 0;
   //    for (arma::uword k = 0; k < xi.n_elem; k++) {
   //      double d = (xi(k) - xj(k));
@@ -33,7 +33,7 @@ inline double CovNorm_fun(arma::subview_col<double>&& xi, arma::subview_col<doub
   return exp(-0.5 * temp);
 };
 
-inline double CovNorm_deriv(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) noexcept {
+inline double CovNorm_deriv_gauss(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) noexcept {
   //    double temp = 0;
   //    for (arma::uword k = 0; k < xi.n_elem; k++) {
   //      double d = (xi(k) - xj(k));
@@ -67,7 +67,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < np; j++) {
       // FIXME WARNING : theta parameter shadows theta attribute
-      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
+      R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
     }
   }
   return R;
@@ -88,7 +88,7 @@ LIBKRIGING_EXPORT
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
         // FIXME WARNING : theta parameter shadows theta attribute
-        R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+        R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
       }
     }
     R = arma::symmatl(R);  // R + trans(R);
@@ -105,17 +105,19 @@ LIBKRIGING_EXPORT
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void OrdinaryKriging::make_Cov(const std::string& covType) {
-  // if (covType.compareTo("gauss")==0)
-
-  // functions moved above
+  if (covType.compare("gauss")==0) {
+    CovNorm_fun = CovNorm_fun_gauss;
+    CovNorm_deriv = CovNorm_deriv_gauss;
+  } else if (covType.compare("exp")==0) {
+    
+  } else throw std::invalid_argument("Unsupported covariance: " + covType);
 
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging() {  // const std::string & covType) {
-  make_Cov("gauss");                                    // covType);
-  // FIXME: sigma2 attribute not initialized
+LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string & covType) {
+  make_Cov(covType);      
 }
 
 // Objective function for fit : -logLikelihood

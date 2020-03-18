@@ -32,7 +32,9 @@ class OrdinaryKriging {
   arma::colvec m_z;
   arma::vec m_theta;
   double m_sigma2;
-
+  double CovNorm_fun(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj);
+  double CovNorm_deriv(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim);
+  
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
@@ -51,7 +53,7 @@ class OrdinaryKriging {
   double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging();  // const std::string & covType);
+  LIBKRIGING_EXPORT OrdinaryKriging(const std::string & covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
