@@ -7,10 +7,10 @@
 
    ![](docs/images/GitHub-screenshot-main.png)
 
-## 2. Get a local working copy
+## 2. Get a local working copy of your forked repository
 
    ```
-   git clone git@github.com:*your-account*/libKriging.git 
+   git clone git@github.com:{YOUR_ACCOUNT}/libKriging.git 
    ```
 
    Follow instructions in green [**Clone or download**] button
@@ -45,7 +45,7 @@
    
    ```
    # push it
-   git push -u origin dev-my-new-feature:dev-my-new-feature
+   git push -u origin dev-my-new-feature
    ```
    
 ## 4. Open a *Pull Request* using **[New pull request]** button
@@ -63,6 +63,8 @@
    Use *Pull Request* form to watch Travis Continuous Integration process and interact with the maintainer (code review, requested changes) 
 
    **Don't do any other change in the submitted branch other than those resquested to process this PR**
+   
+   Make changes on your branch as needed. Your pull request will update automatically.
    
    However, you can work in any other branch.
    
