@@ -3,6 +3,8 @@ This file describes good practices to follow if you want to contribue to this pr
 * [Commit Message Format](#commit-message-format)
 * [Pull request procedure](#pull-request-procedure)
 
+If you are not used to using GitHub, see [GitHub Flow guide](docs/GitHubFlow.md).
+
 # Commit Message Format
 (inspired from git commit message from angular style and git-commit-message-convention repository)
 

@@ -19,6 +19,8 @@ git clone https://github.com/MASCOTNUM/libKriging.git
 Dependencies are plugged in as [subrepo](https://github.com/ingydotnet/git-subrepo) components.
 If you want to manage then, you need to install [subrepo](https://github.com/ingydotnet/git-subrepo) (for normal usage, this is not required).
 
+If you want to contribute read [Contribution guide](CONTRIBUTING.md).
+
 # Installation
 
 ## Requirements

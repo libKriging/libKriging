@@ -5,7 +5,7 @@
    
    To do so, use [**Fork**] (top right) button 
 
-   ![](docs/images/GitHub-screenshot-main.png)
+   ![](images/GitHub-screenshot-main.png)
 
 ## 2. Get a local working copy of your forked repository
 
@@ -15,9 +15,9 @@
 
    Follow instructions in green [**Clone or download**] button
 
-   ![](docs/images/GitHub-screenshot-work.png)
+   ![](images/GitHub-screenshot-work.png)
    
-   ![](docs/images/tip.png) Advice is to also have a main repository as *remote*:
+   ![](images/tip.png) Advice is to also have a main repository as *remote*:
    
    ```
    # add main remote repository or fetch it
@@ -26,9 +26,9 @@
    
 ## 3. Do your changes.
 
-   Follow rules written in [CONTRIBUTING](CONTRIBUTING.md) section
+   Follow rules written in [CONTRIBUTING](../CONTRIBUTING.md) section
 
-   ![](docs/images/tip.png) Do you changes into a dedicated branch
+   ![](images/tip.png) Do you changes into a dedicated branch
    
    ```
    # new branch starting from your local branch
@@ -50,13 +50,13 @@
    
 ## 4. Open a *Pull Request* using **[New pull request]** button
 
-   ![](docs/images/GitHub-screenshot-work.png)
+   ![](images/GitHub-screenshot-work.png)
 
    * Give an explicit title to your PR
 
    * Add a summary to explain the proposed changes
 
-   ![](docs/images/GitHub-screenshot-PR-submit.png)
+   ![](images/GitHub-screenshot-PR-submit.png)
 
 ## 5. Use *Pull Request* form
  
@@ -68,7 +68,7 @@
    
    However, you can work in any other branch.
    
-   ![](docs/images/GitHub-screenshot-PR-form.png)
+   ![](images/GitHub-screenshot-PR-form.png)
 
 ## 6. For new developments
 
@@ -83,4 +83,8 @@ git merge --ff libKriging/master # update with merged master branch
 git push # update your fork with it
 ```
 
-  If your PR has been integrated after refactoring of the maintainer, the *merge* could not be straightforward (see [Non-perfect Pull Request procedure](CONTRIBUTING.md#non-perfect-pull-request-procedure)). 
+  If your PR has been integrated after refactoring of the maintainer, the *merge* could not be straightforward (see [Non-perfect Pull Request procedure](../CONTRIBUTING.md#non-perfect-pull-request-procedure)). 
+
+## Need lore info ?
+
+See official [GitHub documentation](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/github-flow)
