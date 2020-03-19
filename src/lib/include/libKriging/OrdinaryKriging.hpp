@@ -34,8 +34,9 @@ class OrdinaryKriging {
   double m_sigma2;
 
   std::function<double(const arma::vec&, const arma::vec&)> CovNorm_fun;  // Covariance function on normalized data
-  std::function<double(const arma::vec&, const arma::vec&, int)> CovNorm_deriv;  // Covariance function derivative vs. theta
-    
+  std::function<double(const arma::vec&, const arma::vec&, int)>
+      CovNorm_deriv;  // Covariance function derivative vs. theta
+
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
