@@ -16,6 +16,7 @@ LIBKRIGING_EXPORT Bench::Bench(int _n) {
   n = _n;
 }
 
+
 ////////////////// LogLik /////////////////////
 //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
 //  model@covariance <- vect2covparam(model@covariance, param)
@@ -53,39 +54,40 @@ LIBKRIGING_EXPORT Bench::Bench(int _n) {
 //    logLik.derivative[k] <- terme1 + terme2
 //  }
 
-LIBKRIGING_EXPORT
-arma::mat Bench::SolveTri(const arma::mat& Xtri, const arma::vec& y) {
-  arma::mat s;
-  for (int i = 0; i < n; i++) {
-    s = arma::solve(arma::trimatu(Xtri), y, arma::solve_opts::fast);
-  }
-  return s;
-}
 
 LIBKRIGING_EXPORT
-arma::mat Bench::CholSym(const arma::mat& Rsym) {
-  arma::mat s;
-  for (int i = 0; i < n; i++) {
-    s = arma::chol(Rsym);
+  arma::mat Bench::SolveTri(const arma::mat& Xtri, const arma::vec& y) {
+    arma::mat s;
+    for (int i=0; i<n; i++) {
+      s = arma::solve(arma::trimatu(Xtri), y,arma::solve_opts::fast);
+    }
+    return s;
   }
-  return s;
-}
 
 LIBKRIGING_EXPORT
-std::tuple<arma::mat, arma::mat> Bench::QR(const arma::mat& M) {
-  arma::mat Q;
-  arma::mat R;
-  for (int i = 0; i < n; i++) {
-    arma::qr_econ(Q, R, M);
+  arma::mat Bench::CholSym(const arma::mat& Rsym) {
+    arma::mat s;
+    for (int i=0; i<n; i++) {
+      s = arma::chol(Rsym);
+    }
+    return s;
   }
-  return std::make_tuple(std::move(Q), std::move(R));
-}
 
 LIBKRIGING_EXPORT
-arma::mat Bench::InvSymPD(const arma::mat& Rsympd) {
-  arma::mat s;
-  for (int i = 0; i < n; i++) {
-    s = arma::inv_sympd(Rsympd);
+  std::tuple<arma::mat, arma::mat> Bench::QR(const arma::mat& M) {
+    arma::mat Q;
+    arma::mat R;
+    for (int i=0; i<n; i++) {
+      arma::qr_econ(Q, R, M);
+    }
+    return std::make_tuple(std::move(Q), std::move(R));
   }
-  return s;
-}
+
+LIBKRIGING_EXPORT
+  arma::mat Bench::InvSymPD(const arma::mat& Rsympd) {
+    arma::mat s;
+    for (int i=0; i<n; i++) {
+      s = arma::inv_sympd(Rsympd);
+    }
+    return s;
+  }

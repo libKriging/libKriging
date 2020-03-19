@@ -25,4 +25,5 @@ arma::vec getEigenValues(Rcpp::List obj) {
   return impl_ptr->getEigenValues();
 }
 
+
 // TODO try to use modul for implicit access : http://www.deanbodenham.com/learn/rcpp-classes-part-2.html

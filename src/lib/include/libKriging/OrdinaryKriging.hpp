@@ -21,8 +21,8 @@ class OrdinaryKriging {
   enum class RegressionModel { Constant, Linear, Quadratic };
 
   struct RegressionModelUtils {
-    LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
-    LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
+    LIBKRIGING_EXPORT static RegressionModel fromString(const std::string & s);
+    LIBKRIGING_EXPORT static std::string toString(const RegressionModel & m);
   };
 
   const arma::mat& X() const { return m_X; };

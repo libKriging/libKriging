@@ -31,10 +31,11 @@ Rcpp::List linear_regression_optim(arma::vec y, arma::mat X) {
 
 // [[Rcpp::export]]
 Rcpp::List linear_regression_predict(Rcpp::List linearRegression, arma::mat X) {
-  if (!linearRegression.inherits("LinearRegression"))
-    Rcpp::stop("Input must be a LinearRegression object.");
+  if (! linearRegression.inherits("LinearRegression")) Rcpp::stop("Input must be a LinearRegression object.");
   SEXP impl = linearRegression.attr("object");
   Rcpp::XPtr<LinearRegression> impl_ptr(impl);
   auto pred = impl_ptr->predict(X);
-  return Rcpp::List::create(Rcpp::Named("y") = std::get<0>(pred), Rcpp::Named("stderr") = std::get<1>(pred));
+  return Rcpp::List::create(Rcpp::Named("y") = std::get<0>(pred),
+                            Rcpp::Named("stderr") = std::get<1>(pred));
 }
+
