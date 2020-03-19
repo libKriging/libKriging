@@ -1,4 +1,7 @@
+// clang-format off
+// Must before any other include
 #include <RcppArmadillo.h>
+// clang-format on
 
 #include "libKriging/LinearRegression.hpp"
 #include "libKriging/LinearRegressionOptim.hpp"
