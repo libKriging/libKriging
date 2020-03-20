@@ -114,7 +114,7 @@ LIBKRIGING_EXPORT
         R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
       }
     }
-  }
+  
   R = arma::symmatl(R);  // R + trans(R);
   R.diag().ones();
   return R;
@@ -516,10 +516,6 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   }
 
   // arma::cout << "sigma2:" << m_sigma2 << arma::endl;
-<<<<<<< HEAD
-
-=======
->>>>>>> bff4172a8e46eeb761d7ef297fe77c90aef70e34
 }
 
 /** Compute the prediction for given points X'

@@ -76,8 +76,8 @@ class OrdinaryKriging {
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    std::function<double(const arma::vec&, const arma::vec&)> covnorm_fun;
-    std::function<double(const arma::vec&, const arma::vec&, int)> covnorm_deriv;
+    std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> covnorm_fun;
+    std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )> covnorm_deriv;
   };
 
   double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
