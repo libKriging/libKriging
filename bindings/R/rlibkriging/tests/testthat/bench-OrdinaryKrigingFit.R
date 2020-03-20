@@ -20,7 +20,7 @@ for (i in 1:length(logn)) {
   )[1]
   
   times$cpp[i] = system.time(
-    try(r <- ordinary_kriging(y, X))
+    try(r <- ordinary_kriging(y, X,"gauss"))
   )[1]
   
   ll_cpp = ordinary_kriging_loglikelihood(r,ordinary_kriging_model(r)$theta)

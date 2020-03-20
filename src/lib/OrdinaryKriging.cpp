@@ -20,7 +20,7 @@
 
 //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
 // Covariance function on normalized data
-inline double CovNorm_fun_gauss(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) noexcept {
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
   //    double temp = 0;
   //    for (arma::uword k = 0; k < xi.n_elem; k++) {
   //      double d = (xi(k) - xj(k));
@@ -33,7 +33,7 @@ inline double CovNorm_fun_gauss(arma::subview_col<double>&& xi, arma::subview_co
   return exp(-0.5 * temp);
 };
 
-inline double CovNorm_deriv_gauss(arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) noexcept {
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
   //    double temp = 0;
   //    for (arma::uword k = 0; k < xi.n_elem; k++) {
   //      double d = (xi(k) - xj(k));
@@ -47,6 +47,15 @@ inline double CovNorm_deriv_gauss(arma::subview_col<double>&& xi, arma::subview_
 };
 
 
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+  auto&& diff = (xi - xj);
+  return exp(- arma::sum(arma::abs(diff)));
+};
+
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+  auto&& diff = (xi - xj);
+  return exp(- arma::sum(arma::abs(diff))) * fabs(xi(dim) - xj(dim));
+};
 
 
 
@@ -109,7 +118,8 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
     CovNorm_fun = CovNorm_fun_gauss;
     CovNorm_deriv = CovNorm_deriv_gauss;
   } else if (covType.compare("exp")==0) {
-    
+    CovNorm_fun = CovNorm_fun_exp;
+    CovNorm_deriv = CovNorm_deriv_exp;
   } else throw std::invalid_argument("Unsupported covariance: " + covType);
 
   // arma::cout << "make_Cov done." << arma::endl;

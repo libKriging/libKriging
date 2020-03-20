@@ -3,8 +3,8 @@
 #include "libKriging/OrdinaryKriging.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List ordinary_kriging(arma::vec y, arma::mat X) {
-  OrdinaryKriging* ok = new OrdinaryKriging();//"gauss"));
+Rcpp::List ordinary_kriging(arma::vec y, arma::mat X,std::string kernel) {
+  OrdinaryKriging* ok = new OrdinaryKriging(kernel);
   ok->fit(std::move(y), std::move(X));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
   
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
