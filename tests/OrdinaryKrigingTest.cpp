@@ -40,7 +40,7 @@ auto prepare_and_run_bench = [](auto&& bench) {
 
 TEST_CASE("workflow") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
-    OrdinaryKriging ok = OrdinaryKriging::OrdinaryKriging("gauss");
+    OrdinaryKriging ok = OrdinaryKriging("gauss");
     ok.fit(y, X);  // FIXME no move
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
@@ -51,7 +51,7 @@ TEST_CASE("workflow") {
 
 TEST_CASE("fit benchmark", "[.benchmark]") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
-    OrdinaryKriging ok = OrdinaryKriging::OrdinaryKriging("gauss");
+    OrdinaryKriging ok = OrdinaryKriging("gauss");
     BENCHMARK("OrdinaryKriging::fit#" + std::to_string(i)) {
       return ok.fit(y, X);  // FIXME no move
     };
@@ -60,7 +60,7 @@ TEST_CASE("fit benchmark", "[.benchmark]") {
 
 TEST_CASE("logLikelihood benchmark", "[.benchmark]") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
-    OrdinaryKriging ok = OrdinaryKriging::OrdinaryKriging("gauss");
+    OrdinaryKriging ok = OrdinaryKriging("gauss");
     ok.fit(y, X);  // FIXME no move
 
     const double theta = 0.5;
@@ -75,7 +75,7 @@ TEST_CASE("logLikelihood benchmark", "[.benchmark]") {
 
 TEST_CASE("logLikelihoodGrad benchmark", "[.benchmark]") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
-    OrdinaryKriging ok = OrdinaryKriging::OrdinaryKriging("gauss");
+    OrdinaryKriging ok = OrdinaryKriging("gauss");
     ok.fit(y, X);  // FIXME no move
 
     const double theta = 0.5;
