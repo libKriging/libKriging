@@ -164,7 +164,7 @@ git push # update your fork with it
 WORKING_BRANCH=master # defines which you want to rebase with main master version
 git checkout $WORKING_BRANCH
 git tag -f before-rebase # this tag references your version before rebase (thus, nothing can be lost)
-git remote add libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+git remote add --fetch libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
 NEW_COMMIT_BASE=      # set the id of the first new commit you want to rebase onto main master
 git rebase --onto libKriging/master $NEW_COMMIT_BASE # replay your commits on main master
 # if conflict occurs, solve them (you can use `git mergetool` to do it)
