@@ -38,4 +38,5 @@ test_that(desc="logLik is the same that DiceKriging one",
 
 test_that(desc="logLik Grad is the same that DiceKriging one", 
          expect_true(relative_error(ordinary_kriging_loglikelihoodgrad(r,x),DiceKriging::logLikGrad(x,k,xenv)) < precision))
+}
          
