@@ -17,7 +17,6 @@ LIBKRIGING_EXPORT Bench::Bench(int _n) {
   n = _n;
 }
 
-
 ////////////////// LogLik /////////////////////
 //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
 //  model@covariance <- vect2covparam(model@covariance, param)

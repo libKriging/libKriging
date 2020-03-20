@@ -8,24 +8,22 @@
 // FIXME: collision with Rinternals
 //#include <iostream>
 
+#include <libKriging/demo/DemoClass.hpp>
 #include <memory>
 
-#include <libKriging/demo/DemoClass.hpp>
-
 extern "C" SEXP demo_binding1() {
+  //    std::cout << "libKriging class tests" << std::endl;
+  printf("libKriging class tests\n");
 
-    //    std::cout << "libKriging class tests" << std::endl;
-    printf("libKriging class tests\n");
+  std::unique_ptr<DemoClass> x(new DemoClass());
+  int tmp = [&x]() { return x->f(); }();
 
-    std::unique_ptr<DemoClass> x(new DemoClass());
-    int tmp = [&x]() { return x->f(); }();
+  SEXP result;
 
-    SEXP result;
+  PROTECT(result = NEW_INTEGER(2));
+  INTEGER(result)[0] = (int)1;
+  INTEGER(result)[1] = (int)tmp;
+  UNPROTECT(1);
 
-    PROTECT(result = NEW_INTEGER(2));
-    INTEGER(result)[0] = (int) 1;
-    INTEGER(result)[1] = (int) tmp;
-    UNPROTECT(1);
-
-    return (result);
+  return (result);
 }

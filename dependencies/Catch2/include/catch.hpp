@@ -10,7 +10,7 @@
 #define TWOBLUECUBES_CATCH_HPP_INCLUDED
 
 #define CATCH_VERSION_MAJOR 2
-#define CATCH_VERSION_MINOR 9
+#define CATCH_VERSION_MINOR 11
 #define CATCH_VERSION_PATCH 1
 
 #ifdef __clang__
@@ -80,7 +80,7 @@
 #endif
 
 #if defined(CATCH_CONFIG_ENABLE_BENCHMARKING)
-#include "internal/benchmark/catch_benchmark.hpp"
+#include "internal/benchmark/catch_benchmarking_all.hpp"
 #endif
 
 #endif // ! CATCH_CONFIG_IMPL_ONLY

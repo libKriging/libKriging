@@ -1,4 +1,7 @@
+// clang-format off
+// Must before any other include
 #include <RcppArmadillo.h>
+// clang-format on
 
 #include "libKriging/demo/DemoArmadilloClass.hpp"
 
@@ -24,6 +27,5 @@ arma::vec getEigenValues(Rcpp::List obj) {
   Rcpp::XPtr<DemoArmadilloClass> impl_ptr(impl);
   return impl_ptr->getEigenValues();
 }
-
 
 // TODO try to use modul for implicit access : http://www.deanbodenham.com/learn/rcpp-classes-part-2.html
