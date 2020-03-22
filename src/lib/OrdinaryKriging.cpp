@@ -90,7 +90,6 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < np; j++) {
-      // FIXME WARNING : theta parameter shadows theta attribute
       R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
     }
   }
@@ -112,7 +111,6 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      // FIXME WARNING : theta parameter shadows theta attribute
       R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
@@ -196,11 +194,11 @@ double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
   fd->T = trans(chol(R));
 
   // Compute intermediate useful matrices
-  fd->M = solve(trimatl(fd->T), fd->F, arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), m_F, arma::solve_opts::fast);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
-  arma::colvec Yt = solve(trimatl(fd->T), fd->y, arma::solve_opts::fast);
+  arma::colvec Yt = solve(trimatl(fd->T), m_y, arma::solve_opts::fast);
   fd->beta = solve(trimatu(G), trans(Q) * Yt, arma::solve_opts::fast);
   fd->z = Yt - fd->M * fd->beta;
 
@@ -239,11 +237,11 @@ double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
     arma::mat xx = x * trans(x);
     // arma::mat xx_upper = trimatu(xx);
 
-    for (arma::uword k = 0; k < fd->X.n_cols; k++) {
+    for (arma::uword k = 0; k < m_X.n_cols; k++) {
       arma::mat gradR_k_upper = arma::zeros(n, n);
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k_upper.at(j, i) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j, i) = CovNorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);
@@ -274,13 +272,15 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 }
 
 // Objective function for fit : -LOO
-double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+double OrdinaryKriging::fit_ofn2(const arma::vec& _theta,
+                                 arma::vec* grad_out,
+                                 OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
 
-  arma::mat Xtnorm = trans(fd->X);
+  arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= _theta;
 
-  arma::uword n = fd->X.n_rows;
+  arma::uword n = m_X.n_rows;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
@@ -288,7 +288,7 @@ double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::O
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R(i, j) = fd->covnorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      R(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
   R = arma::symmatl(R);  // R + trans(R);
@@ -300,16 +300,16 @@ double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::O
 
   // Compute intermediate useful matrices
   // arma::mat M = solve(fd->T, F);
-  fd->M = solve(trimatl(fd->T), fd->F, arma::solve_opts::fast);
+  fd->M = solve(trimatl(fd->T), m_F, arma::solve_opts::fast);
   // arma::mat Rinv = inv_sympd(R); // didn't find chol2inv equivalent in armadillo
   arma::mat Rinv = inv(trimatl(fd->T));
   Rinv = trimatl(Rinv) * trimatl(Rinv);
-  arma::mat RinvF = Rinv * fd->F;
+  arma::mat RinvF = Rinv * m_F;
   arma::mat TM = chol(trans(fd->M) * fd->M);  // Can be optimized with a crossprod equivalent in armadillo ?
   // arma::mat aux = solve(trans(TM), trans(RinvF));
   arma::mat aux = solve(trimatl(trans(TM)), trans(RinvF), arma::solve_opts::fast);
   arma::mat Q = Rinv - trans(aux) * aux;  // Can be optimized with a crossprod equivalent in armadillo ?
-  arma::mat Qy = Q * fd->y;
+  arma::mat Qy = Q * m_y;
   arma::colvec sigma2LOO = 1 / Q.diag();
   arma::colvec errorsLOO = sigma2LOO % Qy;
   double minus_loo = -arma::accu(errorsLOO % errorsLOO) / n;
@@ -325,12 +325,12 @@ double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::O
     //	LOOfunDer[k] <- 2*crossprod(errorsLOO, derrorsLOO)/model@n
     //}
 
-    for (arma::uword k = 0; k < fd->X.n_cols; k++) {
+    for (arma::uword k = 0; k < m_X.n_cols; k++) {
       arma::mat gradR_k(n, n);
       gradR_k.zeros();
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k(i, j) = fd->covnorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k(i, j) = CovNorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k /= _theta(k);
@@ -353,7 +353,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta)
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
 
   return -fit_ofn(_theta, nullptr, &okm_data);
 }
@@ -363,7 +363,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
 
   arma::vec grad(_theta.n_elem);
 
@@ -377,7 +377,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
 
   return -fit_ofn2(_theta, nullptr, &okm_data);
 }
@@ -387,7 +387,7 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{m_y, m_X, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
 
   arma::vec grad(_theta.n_elem);
 
@@ -439,17 +439,18 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
   m_scaleX = scaleX;
   m_centerY = centerY;
   m_scaleY = scaleY;
-  arma::mat newX = X;
-  newX.each_row() -= centerX;
-  newX.each_row() /= scaleX;
-  arma::colvec newy = (y - centerY) / scaleY;
-
-  this->m_X = newX;
-  this->m_y = newy;
+  {  // FIXME why copies of newX and newy
+    arma::mat newX = X;
+    newX.each_row() -= centerX;
+    newX.each_row() /= scaleX;
+    arma::colvec newy = (y - centerY) / scaleY;
+    this->m_X = newX;
+    this->m_y = newy;
+  }
 
   // Define regression matrix
   m_regmodel = regmodel;
-  m_F = regressionModelMatrix(regmodel, newX, n, d);
+  m_F = regressionModelMatrix(regmodel, m_X, n, d);
 
   // arma::cout << "optim_method:" << optim_method << arma::endl;
 
@@ -473,14 +474,14 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);
-    double minus_ll = std::numeric_limits<double>::infinity();  // FIXME prefer use of C++ value without narrowing
-    for (arma::uword i = 0; i < theta0.n_rows; i++) {           // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec theta_tmp = trans(theta0.row(i));               // FIXME arma::mat replaced by arma::vec
+    double minus_ll = std::numeric_limits<double>::infinity();
+    for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+      arma::vec theta_tmp = trans(theta0.row(i));
       arma::mat T;
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{newy, newX, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
+      OrdinaryKriging::OKModel okm_data{T, M, z, beta};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data, this](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
