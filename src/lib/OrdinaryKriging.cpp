@@ -17,6 +17,46 @@
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
+//' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
+// Covariance function on normalized data
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+  //    double temp = 0;
+  //    for (arma::uword k = 0; k < xi.n_elem; k++) {
+  //      double d = (xi(k) - xj(k));
+  //      temp += d * d;
+  //    }
+
+  auto&& diff = (xi - xj);
+  const double temp = arma::dot(diff, diff);
+
+  return exp(-0.5 * temp);
+};
+
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+  //    double temp = 0;
+  //    for (arma::uword k = 0; k < xi.n_elem; k++) {
+  //      double d = (xi(k) - xj(k));
+  //      temp += d*d;
+  //    }
+
+  auto&& diff = (xi - xj);
+  const double temp = arma::dot(diff, diff);
+
+  return exp(-.5*temp) * (xi(dim) - xj(dim))*(xi(dim) - xj(dim));
+};
+
+
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+  auto&& diff = (xi - xj);
+  return exp(- arma::sum(arma::abs(diff)));
+};
+
+std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+  auto&& diff = (xi - xj);
+  return exp(- arma::sum(arma::abs(diff))) * fabs(xi(dim) - xj(dim));
+};
+
+
 /************************************************/
 /** implementation details forward declaration **/
 /************************************************/
@@ -35,8 +75,6 @@ auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
 arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
-  // Should be tyaken from covariance.h from nestedKriging ?
-  // return getCrossCorrMatrix(X,Xp,parameters,covType);
   arma::mat Xtnorm = trans(X);
   Xtnorm.each_col() /= m_theta;
   arma::mat Xptnorm = trans(Xp);
@@ -51,7 +89,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < np; j++) {
       // FIXME WARNING : theta parameter shadows theta attribute
-      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
+      R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
     }
   }
   return R;
@@ -59,23 +97,24 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
 
 // Optimized version when Xp=X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
-  // Should be tyaken from covariance.h from nestedKriging ?
-  // return getCrossCorrMatrix(X,Xp,parameters,covType);
+  arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
+    // Should be tyaken from covariance.h from nestedKriging ?
+    // return getCrossCorrMatrix(X,Xp,parameters,covType);
 
-  arma::mat Xtnorm = trans(X);
-  Xtnorm.each_col() /= m_theta;
-  arma::uword n = X.n_rows;
+    arma::mat Xtnorm = trans(X); 
+    Xtnorm.each_col() /= m_theta;
+    arma::uword n = X.n_rows;
 
-  // Should bre replaced by for_each
-  arma::mat R(n, n);
-  R.zeros();
-  for (arma::uword i = 0; i < n; i++) {
-    for (arma::uword j = 0; j < i; j++) {
-      // FIXME WARNING : theta parameter shadows theta attribute
-      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+    // Should bre replaced by for_each
+    arma::mat R(n, n);
+    R.zeros();
+    for (arma::uword i = 0; i < n; i++) {
+      for (arma::uword j = 0; j < i; j++) {
+        // FIXME WARNING : theta parameter shadows theta attribute
+        R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      }
     }
-  }
+  
   R = arma::symmatl(R);  // R + trans(R);
   R.diag().ones();
   return R;
@@ -90,36 +129,26 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void OrdinaryKriging::make_Cov(const std::string& covType) {
-  // if (covType.compareTo("gauss")==0)
-  //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
-  CovNorm_fun = [](const arma::vec& xi, const arma::vec& xj) {
-    double temp = 0;
-    for (arma::uword k = 0; k < xi.n_elem; k++) {
-      double d = (xi(k) - xj(k));
-      temp += d * d;
-    }
-    return exp(-0.5 * temp);
-  };
-  CovNorm_deriv = [](const arma::vec& xi, const arma::vec& xj, int dim) {
-    double temp = 0;
-    for (arma::uword k = 0; k < xi.n_elem; k++) {
-      double d = (xi(k) - xj(k));
-      temp += d * d;
-    }
-    return exp(-.5 * temp) * (xi(dim) - xj(dim)) * (xi(dim) - xj(dim));
-  };
+  if (covType.compare("gauss")==0) {
+    CovNorm_fun = CovNorm_fun_gauss;
+    CovNorm_deriv = CovNorm_deriv_gauss;
+  } else if (covType.compare("exp")==0) {
+    CovNorm_fun = CovNorm_fun_exp;
+    CovNorm_deriv = CovNorm_deriv_exp;
+  } else throw std::invalid_argument("Unsupported covariance: " + covType);
 
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging() {  // const std::string & covType) {
-  make_Cov("gauss");                                    // covType);
-  // FIXME: sigma2 attribute not initialized
+LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string & covType) {
+  make_Cov(covType);      
 }
 
 // Objective function for fit : -logLikelihood
-double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
+                                arma::vec* grad_out,
+                                OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
 
   // arma::cout << "_theta:" << _theta << arma::endl;
@@ -139,17 +168,21 @@ double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OK
   //  sigma2.hat <- compute.sigma2.hat(z)
   //  logLik <- -0.5*(model@n * log(2*pi*sigma2.hat) + 2*sum(log(diag(T))) + model@n)
 
-  arma::mat Xtnorm = trans(fd->X);
+  arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= _theta;
 
-  arma::uword n = fd->X.n_rows;
+  arma::uword n = m_X.n_rows;
+
+  // Define regression matrix
+  arma::uword nreg = 1;
+  arma::mat F = arma::ones(n, nreg);
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
-  arma::mat R = arma::zeros(n, n);
+  arma::mat R = arma::zeros(n,n);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = fd->covnorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
   R = arma::symmatl(R);  // R + trans(R);
@@ -447,7 +480,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       OrdinaryKriging::OKModel okm_data{newy, newX, m_F, T, M, z, beta, CovNorm_fun, CovNorm_deriv};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
-          [&okm_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+          [&okm_data, this](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
             return fit_ofn(vals_inp, grad_out, &okm_data);
           },
           nullptr,
