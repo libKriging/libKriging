@@ -6,9 +6,13 @@
 #include "libKriging/OrdinaryKriging.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List ordinary_kriging(arma::vec y, arma::mat X,std::string kernel, std::string regmodel = "constant", bool normalize = false) {
+Rcpp::List ordinary_kriging(arma::vec y,
+                            arma::mat X,
+                            std::string kernel,
+                            std::string regmodel = "constant",
+                            bool normalize = false) {
   OrdinaryKriging* ok = new OrdinaryKriging(kernel);
-  ok->fit(std::move(y), std::move(X));//, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+  ok->fit(std::move(y), std::move(X));  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
 
   ok->fit(std::move(y),
           std::move(X),
