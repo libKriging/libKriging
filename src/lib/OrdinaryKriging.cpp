@@ -19,43 +19,45 @@
 
 //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
 // Covariance function on normalized data
-std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
-  //    double temp = 0;
-  //    for (arma::uword k = 0; k < xi.n_elem; k++) {
-  //      double d = (xi(k) - xj(k));
-  //      temp += d * d;
-  //    }
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_gauss
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+        //    double temp = 0;
+        //    for (arma::uword k = 0; k < xi.n_elem; k++) {
+        //      double d = (xi(k) - xj(k));
+        //      temp += d * d;
+        //    }
 
-  auto&& diff = (xi - xj);
-  const double temp = arma::dot(diff, diff);
+        auto&& diff = (xi - xj);
+        const double temp = arma::dot(diff, diff);
 
-  return exp(-0.5 * temp);
-};
+        return exp(-0.5 * temp);
+      };
 
-std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_gauss = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
-  //    double temp = 0;
-  //    for (arma::uword k = 0; k < xi.n_elem; k++) {
-  //      double d = (xi(k) - xj(k));
-  //      temp += d*d;
-  //    }
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_gauss
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+        //    double temp = 0;
+        //    for (arma::uword k = 0; k < xi.n_elem; k++) {
+        //      double d = (xi(k) - xj(k));
+        //      temp += d*d;
+        //    }
 
-  auto&& diff = (xi - xj);
-  const double temp = arma::dot(diff, diff);
+        auto&& diff = (xi - xj);
+        const double temp = arma::dot(diff, diff);
 
-  return exp(-.5*temp) * (xi(dim) - xj(dim))*(xi(dim) - xj(dim));
-};
+        return exp(-.5 * temp) * (xi(dim) - xj(dim)) * (xi(dim) - xj(dim));
+      };
 
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_exp
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+        auto&& diff = (xi - xj);
+        return exp(-arma::sum(arma::abs(diff)));
+      };
 
-std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& )> CovNorm_fun_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
-  auto&& diff = (xi - xj);
-  return exp(- arma::sum(arma::abs(diff)));
-};
-
-std::function<double(arma::subview_col<double>&& , arma::subview_col<double>&& , int )>  CovNorm_deriv_exp = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
-  auto&& diff = (xi - xj);
-  return exp(- arma::sum(arma::abs(diff))) * fabs(xi(dim) - xj(dim));
-};
-
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_exp
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+        auto&& diff = (xi - xj);
+        return exp(-arma::sum(arma::abs(diff))) * fabs(xi(dim) - xj(dim));
+      };
 
 /************************************************/
 /** implementation details forward declaration **/
@@ -97,24 +99,24 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
 
 // Optimized version when Xp=X
 LIBKRIGING_EXPORT
-  arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
-    // Should be tyaken from covariance.h from nestedKriging ?
-    // return getCrossCorrMatrix(X,Xp,parameters,covType);
+arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
+  // Should be tyaken from covariance.h from nestedKriging ?
+  // return getCrossCorrMatrix(X,Xp,parameters,covType);
 
-    arma::mat Xtnorm = trans(X); 
-    Xtnorm.each_col() /= m_theta;
-    arma::uword n = X.n_rows;
+  arma::mat Xtnorm = trans(X);
+  Xtnorm.each_col() /= m_theta;
+  arma::uword n = X.n_rows;
 
-    // Should bre replaced by for_each
-    arma::mat R(n, n);
-    R.zeros();
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = 0; j < i; j++) {
-        // FIXME WARNING : theta parameter shadows theta attribute
-        R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
-      }
+  // Should bre replaced by for_each
+  arma::mat R(n, n);
+  R.zeros();
+  for (arma::uword i = 0; i < n; i++) {
+    for (arma::uword j = 0; j < i; j++) {
+      // FIXME WARNING : theta parameter shadows theta attribute
+      R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
-  
+  }
+
   R = arma::symmatl(R);  // R + trans(R);
   R.diag().ones();
   return R;
@@ -129,20 +131,21 @@ LIBKRIGING_EXPORT
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void OrdinaryKriging::make_Cov(const std::string& covType) {
-  if (covType.compare("gauss")==0) {
+  if (covType.compare("gauss") == 0) {
     CovNorm_fun = CovNorm_fun_gauss;
     CovNorm_deriv = CovNorm_deriv_gauss;
-  } else if (covType.compare("exp")==0) {
+  } else if (covType.compare("exp") == 0) {
     CovNorm_fun = CovNorm_fun_exp;
     CovNorm_deriv = CovNorm_deriv_exp;
-  } else throw std::invalid_argument("Unsupported covariance: " + covType);
+  } else
+    throw std::invalid_argument("Unsupported covariance: " + covType);
 
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string & covType) {
-  make_Cov(covType);      
+LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string& covType) {
+  make_Cov(covType);
 }
 
 // Objective function for fit : -logLikelihood
@@ -179,7 +182,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
-  arma::mat R = arma::zeros(n,n);
+  arma::mat R = arma::zeros(n, n);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
       R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
