@@ -56,6 +56,7 @@ else ()
     endif ()
 endif ()
 
+# ENABLE_STATIC_ANALYSIS default is AUTO
 string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)
 if (NOT DEFINED ENABLE_STATIC_ANALYSIS OR ENABLE_STATIC_ANALYSIS STREQUAL "")
     set(ENABLE_STATIC_ANALYSIS "AUTO" CACHE STRING
@@ -65,6 +66,19 @@ else ()
     string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_STATIC_ANALYSIS "${ENABLE_STATIC_ANALYSIS}")
     if (VALID_STATIC_ANALYSIS STREQUAL "") # /!\ IF(VALID_STATIC_ANALYSIS) is false when ENABLE_STATIC_ANALYSIS is OFF
         logFatalError("Invalid ENABLE_STATIC_ANALYSIS option '${ENABLE_STATIC_ANALYSIS}'; choose between ON, OFF and AUTO.")
+    endif ()
+endif ()
+
+# ENABLE_OCTAVE_BINDING default is AUTO
+string(TOUPPER "${ENABLE_OCTAVE_BINDING}" ENABLE_OCTAVE_BINDING)
+if (NOT DEFINED ENABLE_OCTAVE_BINDING OR ENABLE_OCTAVE_BINDING STREQUAL "")
+    set(ENABLE_OCTAVE_BINDING "AUTO" CACHE STRING
+            "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
+            FORCE)
+else ()
+    string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_OCTAVE_BINDING "${ENABLE_OCTAVE_BINDING}")
+    if (VALID_OCTAVE_BINDING STREQUAL "") # /!\ IF(VALID_OCTAVE_BINDING) is false when ENABLE_OCTAVE_BINDING is OFF
+        logFatalError("Invalid ENABLE_OCTAVE_BINDING option '${ENABLE_OCTAVE_BINDING}'; choose between ON, OFF and AUTO.")
     endif ()
 endif ()
 
@@ -199,31 +213,33 @@ find_program(OCTAVE_CONFIG_EXECUTABLE
         NAMES octave-config
         )
 if (OCTAVE_CONFIG_EXECUTABLE)
-    if (BUILD_SHARED_LIBS)
-        message(STATUS "Octave binding disabled since it requires static library mode")
-    else()
-        add_subdirectory(bindings/Octave)
-        message(STATUS "Octave binding enabled")
-    endif()
+    if (ENABLE_OCTAVE_BINDING STREQUAL "ON")
+        if (BUILD_SHARED_LIBS)
+            logFatalError("Octave binding requires static library mode")
+        else ()
+            add_subdirectory(bindings/Octave)
+            message(STATUS "Octave binding enabled")
+        endif ()
+    elseif (ENABLE_OCTAVE_BINDING STREQUAL "OFF")
+        message(STATUS "Octave binding available but disabled as requested.")
+    elseif (ENABLE_OCTAVE_BINDING STREQUAL "AUTO")
+        if (BUILD_SHARED_LIBS)
+            message(STATUS "Octave binding disabled since it requires static library mode")
+        else ()
+            add_subdirectory(bindings/Octave)
+            message(STATUS "Octave binding enabled")
+        endif ()
+    else ()
+        logFatalError("INTERNAL ERROR: value ${ENABLE_OCTAVE_BINDING} not managed")
+    endif ()
 else ()
-    message(STATUS "Octave binding build not available.")
-endif ()
-
-#------------------------------------------------------
-
-# search for octave-config (for building Octave's mex library)
-find_program(OCTAVE_CONFIG_EXECUTABLE
-        NAMES octave-config
-        )
-if (OCTAVE_CONFIG_EXECUTABLE)
-    if (BUILD_SHARED_LIBS)
-        message(STATUS "Octave binding disabled since it requires static library mode")
-    else()
-        add_subdirectory(bindings/Octave)
-        message(STATUS "Octave binding enabled")
-    endif()
-else ()
-    message(STATUS "Octave binding build not available.")
+    if (ENABLE_OCTAVE_BINDING STREQUAL "ON")
+        logFatalError("Octave binding requested but not available.")
+    elseif (ENABLE_OCTAVE_BINDING STREQUAL "OFF" OR ENABLE_OCTAVE_BINDING STREQUAL "AUTO")
+        message(STATUS "Octave binding not available.")
+    else ()
+        logFatalError("INTERNAL ERROR: value ${ENABLE_OCTAVE_BINDING} not managed")
+    endif ()
 endif ()
 
 #------------------------------------------------------
