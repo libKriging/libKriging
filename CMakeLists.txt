@@ -211,6 +211,23 @@ endif ()
 
 #------------------------------------------------------
 
+# search for octave-config (for building Octave's mex library)
+find_program(OCTAVE_CONFIG_EXECUTABLE
+        NAMES octave-config
+        )
+if (OCTAVE_CONFIG_EXECUTABLE)
+    if (BUILD_SHARED_LIBS)
+        message(STATUS "Octave binding disabled since it requires static library mode")
+    else()
+        add_subdirectory(bindings/Octave)
+        message(STATUS "Octave binding enabled")
+    endif()
+else ()
+    message(STATUS "Octave binding build not available.")
+endif ()
+
+#------------------------------------------------------
+
 add_subdirectory(src)
 
 #------------------------------------------------------
