@@ -31,8 +31,14 @@ endif()
 
 #------------------------------------------------------
 
+set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
+
+#------------------------------------------------------
 option(BUILD_SHARED_LIBS "Build the shared library" ON)
 #option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
+option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 
 #------------------------------------------------------
 # Check options
@@ -43,9 +49,9 @@ if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
             "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel Coverage"
             FORCE)
 else()
-    string(REGEX MATCH "(Debug|Release|RelWithDebInfo|MinSizeRel|Coverage)" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+    string(REGEX MATCH "^(Debug|Release|RelWithDebInfo|MinSizeRel|Coverage)$" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
     if(VALID_BUILD_TYPE STREQUAL "")
-        message(FATAL_ERROR "Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
+        logFatalError("Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
     endif()
 endif()
 
@@ -55,9 +61,9 @@ if(NOT DEFINED ENABLE_STATIC_ANALYSIS OR ENABLE_STATIC_ANALYSIS STREQUAL "")
             "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
             FORCE)
 else()
-    string(REGEX MATCH "(ON|OFF|AUTO)" VALID_STATIC_ANALYSIS "${ENABLE_STATIC_ANALYSIS}")
+    string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_STATIC_ANALYSIS "${ENABLE_STATIC_ANALYSIS}")
     if(VALID_STATIC_ANALYSIS STREQUAL "") # /!\ IF(VALID_STATIC_ANALYSIS) is false when ENABLE_STATIC_ANALYSIS is OFF
-        message(FATAL_ERROR "Invalid ENABLE_STATIC_ANALYSIS option '${ENABLE_STATIC_ANALYSIS}'; choose between ON, OFF and AUTO.")
+        logFatalError("Invalid ENABLE_STATIC_ANALYSIS option '${ENABLE_STATIC_ANALYSIS}'; choose between ON, OFF and AUTO.")
     endif()
 endif()
 
@@ -98,11 +104,6 @@ endif()
 #------------------------------------------------------
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-#------------------------------------------------------
-
-set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 #------------------------------------------------------
 
@@ -178,15 +179,15 @@ if (CLANG_TIDY)
             message(STATUS "Static analysis available but disabled in ${CMAKE_BUILD_TYPE} mode.")
         endif ()
     else()
-        message(FATAL_ERROR "INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
+        logFatalError("INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
     endif()
 else ()
     if (ENABLE_STATIC_ANALYSIS STREQUAL "ON")
-        message(FATAL_ERROR "Static analysis requested but not available.")
+        logFatalError("Static analysis requested but not available.")
     elseif(ENABLE_STATIC_ANALYSIS STREQUAL "OFF" OR ENABLE_STATIC_ANALYSIS STREQUAL "AUTO")
         message(STATUS "Static analysis not available.")
     else()
-        message(FATAL_ERROR "INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
+        logFatalError("INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
     endif()
 endif ()
 
@@ -216,13 +217,13 @@ add_custom_target(run_unit_tests
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     find_program(LCOV lcov)
     if(NOT LCOV)
-        message(FATAL_ERROR "lcov not found, cannot perform coverage.")
+        logFatalError("lcov not found, cannot perform coverage.")
     endif()
 
     # coveralls.io does not support striped paths
     #find_program (SED NAMES sed)
     #if (NOT SED)
-    #    message (FATAL_ERROR "Unable to find sed")
+    #    logFatalError("Unable to find sed")
     #else()
     #    # message(STATUS "sed found at ${SED}")
     #endif (NOT SED)
@@ -294,7 +295,7 @@ else ()
             COMMAND ${CMAKE_COMMAND} -E echo ""
             COMMAND ${CMAKE_COMMAND} -E echo "*** code formatting not available since clang-format has not been found ***"
             COMMAND ${CMAKE_COMMAND} -E echo ""
-            COMMENT "Inform about not available code coverage."
+            COMMENT "Inform about not available code format."
             )
 endif()
 
