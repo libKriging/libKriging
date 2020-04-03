@@ -31,6 +31,38 @@ endif()
 
 #------------------------------------------------------
 
+option(BUILD_SHARED_LIBS "Build the shared library" ON)
+#option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
+
+#------------------------------------------------------
+# Check options
+
+# Default build type is RelWIthDebInfo
+if(NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
+            "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel Coverage"
+            FORCE)
+else()
+    string(REGEX MATCH "(Debug|Release|RelWithDebInfo|MinSizeRel|Coverage)" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+    if(VALID_BUILD_TYPE STREQUAL "")
+        message(FATAL_ERROR "Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
+    endif()
+endif()
+
+string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)
+if(NOT DEFINED ENABLE_STATIC_ANALYSIS OR ENABLE_STATIC_ANALYSIS STREQUAL "")
+    set(ENABLE_STATIC_ANALYSIS "AUTO" CACHE STRING
+            "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
+            FORCE)
+else()
+    string(REGEX MATCH "(ON|OFF|AUTO)" VALID_STATIC_ANALYSIS "${ENABLE_STATIC_ANALYSIS}")
+    if(VALID_STATIC_ANALYSIS STREQUAL "") # /!\ IF(VALID_STATIC_ANALYSIS) is false when ENABLE_STATIC_ANALYSIS is OFF
+        message(FATAL_ERROR "Invalid ENABLE_STATIC_ANALYSIS option '${ENABLE_STATIC_ANALYSIS}'; choose between ON, OFF and AUTO.")
+    endif()
+endif()
+
+#------------------------------------------------------
+
 set(CMAKE_CXX_STANDARD 14)
 
 #------------------------------------------------------
@@ -109,20 +141,6 @@ mark_as_advanced(
         CMAKE_EXE_LINKER_FLAGS_COVERAGE
         CMAKE_SHARED_LINKER_FLAGS_COVERAGE )
 
-if(CMAKE_BUILD_TYPE)
-    string(REGEX MATCH "(Debug|Release|RelWithDebInfo|MinSizeRel|Coverage)" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-    if(NOT VALID_BUILD_TYPE)
-        message(FATAL_ERROR "Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
-    endif()
-endif()
-
-# Default build type is RelWIthDebInfo
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
-            "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel Coverage."
-            FORCE)
-endif()
-
 #------------------------------------------------------
 
 # Required since RcppArmadillo uses it by defaut
@@ -147,14 +165,29 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIBKRIGING_CXX_FLAGS}")
 # search for clang-tidy (while be used while adding library or executable)
 find_program(CLANG_TIDY clang-tidy)
 if (CLANG_TIDY)
-    if (CMAKE_BUILD_TYPE MATCHES Debug)
+    if (ENABLE_STATIC_ANALYSIS STREQUAL "ON")
         set(CXX_CLANG_TIDY ${CLANG_TIDY})
-        message(STATUS "Static analysis using clang-tidy is enabled while compiling.")
-    else ()
-        message(STATUS "Static analysis available but disabled in ${CMAKE_BUILD_TYPE} mode.")
-    endif ()
+        message(STATUS "Static analysis requested and enabled while compiling.")
+    elseif(ENABLE_STATIC_ANALYSIS STREQUAL "OFF")
+        message(STATUS "Static analysis available but disabled as requested.")
+    elseif(ENABLE_STATIC_ANALYSIS STREQUAL "AUTO")
+        if (CMAKE_BUILD_TYPE MATCHES Debug)
+            set(CXX_CLANG_TIDY ${CLANG_TIDY})
+            message(STATUS "Static analysis using clang-tidy is enabled while compiling.")
+        else ()
+            message(STATUS "Static analysis available but disabled in ${CMAKE_BUILD_TYPE} mode.")
+        endif ()
+    else()
+        message(FATAL_ERROR "INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
+    endif()
 else ()
-    message(STATUS "Static analysis not available.")
+    if (ENABLE_STATIC_ANALYSIS STREQUAL "ON")
+        message(FATAL_ERROR "Static analysis requested but not available.")
+    elseif(ENABLE_STATIC_ANALYSIS STREQUAL "OFF" OR ENABLE_STATIC_ANALYSIS STREQUAL "AUTO")
+        message(STATUS "Static analysis not available.")
+    else()
+        message(FATAL_ERROR "INTERNAL ERROR: value ${ENABLE_STATIC_ANALYSIS} not managed")
+    endif()
 endif ()
 
 #------------------------------------------------------
