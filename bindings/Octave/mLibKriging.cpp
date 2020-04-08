@@ -9,9 +9,6 @@
 #include "toys/func1.hpp"
 #include "toys/func_new.hpp"
 
-void func_new(int nlhs, void** plhs, int nrhs, const void** prhs);
-void func1(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]);
-
 void help_page() {
   mexPrintf(R"(
 mLibKriging help page
@@ -23,23 +20,25 @@ mLibKriging help page
 }
 
 /*
- y = randn (20,1)
- X = randn (20,1)
+ clear all
+ y = randn (20,1);
+ X = randn (20,1);
+ X2 = randn (20,1);
+ a=LinearRegression();
+ a.fit(y,X);
+ [y2,stderr] = a.predic(X2);
 
  load "y.mat"
  load "X.mat"
- clear mylibfunc; [y_pred, res] = mylibfunc(y,X)
  */
-void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  {
-    const char* nm = mexFunctionName();
+void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try {
+  const char* nm = mexFunctionName();
 #ifdef MEX_DEBUG
-    mexPrintf("You called MEX function: %s\n", nm);
-    mexPrintf("have %d inputs and %d outputs\n", nrhs, nlhs);
+  mexPrintf("You called MEX function: %s\n", nm);
+  mexPrintf("have %d inputs and %d outputs\n", nrhs, nlhs);
 #endif
-    if (std::strcmp(nm, "mLibKriging") != 0) {
-      mexErrMsgTxt("you call mLibKriging with an illegal name");
-    }
+  if (std::strcmp(nm, "mLibKriging") != 0) {
+    mexErrMsgTxt("you call mLibKriging with an illegal name");
   }
 
   if (nrhs < 1)
@@ -61,11 +60,16 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
       return func_new(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearRegression::delete"_hash:
       return func_delete(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearRegression::fit"_hash:
+      return func_fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "LinearRegression::predict"_hash:
+      return func_predict(nlhs, plhs, nrhs - 1, prhs + 1);
+
     case "func1"_hash:
       return func1(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "func_new"_hash:
-      return func_new(nlhs, plhs, nrhs - 1, prhs + 1);
     default:
       mexErrMsgIdAndTxt("mLibKriging:NoRoute", "No route to such command [%s]", command);
   }
+} catch (...) { // catch everything even end-of-scope event
+  mexErrMsgIdAndTxt("mLibKriging:exception", "unexcepted exception");
 }

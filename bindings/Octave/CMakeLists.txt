@@ -15,3 +15,6 @@ add_subdirectory(toys)
 
 add_mex_function(NAME mLibKriging SOURCES mLibKriging.cpp LINK_LIBRARIES Kriging OctaveShared OctaveToys)
 add_mex_function(NAME mypow2 SOURCES mypow2.cpp)
+add_mex_function(NAME mkStructure SOURCES mkStructure.cpp)
+add_mex_function(NAME demoStruct SOURCES demoStruct.cpp)
+add_mex_function(NAME mycell SOURCES mycell.cpp)

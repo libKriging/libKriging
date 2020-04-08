@@ -9,5 +9,7 @@
 
 void func_new(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]);
 void func_delete(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]);
+void func_fit(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]);
+void func_predict(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]);
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_TOYS_FUNC_NEW_HPP

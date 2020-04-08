@@ -1,31 +1,25 @@
-% Usage example
-% 
-% > a = value_class ();
-% > a.prop1 = 1;
-% > b = a;
-% > b.prop1 = 2;
-% > b.prop1
-% ⇒ ans =  2
-% > a.prop1
-% ⇒ ans =  1
-
-% to update class definition use
-% > clear classes
 classdef LinearRegression < handle
-    properties (Access = protected, Hidden, NonCopyable, Transient)
+    properties % (Access = protected, Hidden, NonCopyable, Transient)
         ref
     end
 
     methods
         function obj = LinearRegression()
             printf("New LinearRegression\n");
-            obj.ref = mLibKriging("LinearRegression::new");        
+            mLibKriging("LinearRegression::new", obj);
         end
         
-        function obj = delete(obj)
+        function delete(obj)
             printf("Delete LinearRegression\n")
-            mLibKriging("LinearRegression::delete",obj.ref)
-            obj.ref = 0;
+            mLibKriging("LinearRegression::delete",obj)
+        end
+        
+        function fit(obj, y, X)
+            mLibKriging("LinearRegression::fit", obj, y, X);
+        end
+        
+        function varargout = predict(obj, X)
+            [varargout{1:nargout}] = mLibKriging("LinearRegression::predict", obj, X);
         end
     end
 end
