@@ -1,5 +1,11 @@
+if (NOT LIBKRIGING_SOURCE_DIR)
+    message(FATAL_ERROR "LIBKRIGING_SOURCE_DIR not defined")
+endif ()
+
+include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
+
 if (NOT OCTAVE_CONFIG_EXECUTABLE)
-    logFatalError("octave-config is required while loading this CMakeLists.txt")
+    find_program(OCTAVE_CONFIG_EXECUTABLE NAMES octave-config)
 endif ()
 
 execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -p BINDIR
@@ -19,6 +25,10 @@ find_program(OCTAVE_MKOCTFILE
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CPPFLAGS
         OUTPUT_VARIABLE OCT_CPPFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(OCT_CPPFLAGS "${OCT_CPPFLAGS} -DMEX_DEBUG")
+endif ()
+
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CXXPICFLAG
         OUTPUT_VARIABLE OCT_CXXPICFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -95,7 +105,7 @@ macro(add_mex_function)
             SUFFIX ".mex")
     #mkoctfile compile = CXX OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS -I. -DMEX_DEBUG
     set_target_properties(${ARGS_NAME} PROPERTIES
-            COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS} -I. -DMEX_DEBUG")
+            COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}") 
     # https://stackoverflow.com/questions/48176641/linking-to-an-executable-under-osx-with-cmake si pb avec bundle_loader
     #mkoctfile link = CXX OCT_CXXFLAGS OCT_DLLDFLAGS OCT_LDFLAGS OCT_LFLAGS OCT_LIBS
     target_link_options(${ARGS_NAME}
