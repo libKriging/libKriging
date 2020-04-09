@@ -1,7 +1,3 @@
-//
-// Created by Pascal Havé on 08/04/2020.
-//
-
 #include "relative_error.hpp"
 
 #include <armadillo>

@@ -1,7 +1,3 @@
-//
-// Created by Pascal Havé on 07/04/2020.
-//
-
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 
@@ -40,7 +36,7 @@ class DestroyableT
     , NonCopyable {
  public:
   explicit DestroyableT(T* t) : Destroyable{t}, pointer{t} { debug("Building", pointer); }
-  ~DestroyableT() final {
+  ~DestroyableT() override {
     debug("Destroying", pointer);
     delete pointer;
   }

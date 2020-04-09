@@ -1,7 +1,3 @@
-//
-// Created by Pascal Havé on 07/04/2020.
-//
-
 #include "ObjectCollector.hpp"
 
 #include <iostream>

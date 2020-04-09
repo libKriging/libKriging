@@ -1,13 +1,8 @@
-#include <armadillo>
-#include <cassert>
-#include <map>
-#include <memory>
-#include <tuple>
-
+#include "LinearRegression_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
+#include "tools/MxException.hpp"
+#include "tools/MxMapper.hpp"
 #include "tools/string_hash.hpp"
-#include "toys/func1.hpp"
-#include "toys/func_new.hpp"
 
 void help_page() {
   mexPrintf(R"(
@@ -36,41 +31,35 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
 #ifdef MEX_DEBUG
   mexPrintf("You called MEX function: %s\n", nm);
   mexPrintf("have %d inputs and %d outputs\n", nrhs, nlhs);
-  //mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
+  // mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
 #endif
   if (std::strcmp(nm, "mLibKriging") != 0) {
-    mexErrMsgTxt("you call mLibKriging with an illegal name");
+    throw MxException("mLibKriging", "you call mLibKriging with an illegal name");
   }
 
   if (nrhs < 1)
     return help_page();
 
-  if (!mxIsChar(prhs[0]) || mxGetNumberOfDimensions(prhs[0]) != 2 || mxGetM(prhs[0]) != 1 || mxGetM(prhs[0]) != 1) {
-    mexErrMsgTxt("arg1 should be a command name (scalar string)");
-  }
-
-  char command[256];
-  if (mxGetString(prhs[0], command, 256) != 0) {
-    mexErrMsgTxt("cannot decode command name");
-  }
-
+  MxMapper input{"Input", std::min(1,nrhs), const_cast<mxArray**>(prhs)};
+  std::string command = input.get<0, std::string>("command");
+  
   switch (fnv_hash(command)) {
     case "help"_hash:
       return help_page();
     case "LinearRegression::new"_hash:
-      return func_new(nlhs, plhs, nrhs - 1, prhs + 1);
+      return LinearRegressionBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearRegression::delete"_hash:
-      return func_delete(nlhs, plhs, nrhs - 1, prhs + 1);
+      return LinearRegressionBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearRegression::fit"_hash:
-      return func_fit(nlhs, plhs, nrhs - 1, prhs + 1);
+      return LinearRegressionBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearRegression::predict"_hash:
-      return func_predict(nlhs, plhs, nrhs - 1, prhs + 1);
+      return LinearRegressionBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
 
-    case "func1"_hash:
-      return func1(nlhs, plhs, nrhs - 1, prhs + 1);
     default:
-      mexErrMsgIdAndTxt("mLibKriging:NoRoute", "No route to such command [%s]", command);
+      throw MxException("mLibKriging:NoRoute", "No route to such command [", command, "]");
   }
-} catch (...) { // catch everything even end-of-scope event
+} catch (MxException& e) {
+  mexErrMsgIdAndTxt(e.id, e.msg.c_str());
+} catch (...) {  // catch everything even end-of-scope event
   mexErrMsgIdAndTxt("mLibKriging:exception", "unexcepted exception");
 }

@@ -1,7 +1,3 @@
-//
-// Created by Pascal Havé on 07/04/2020.
-//
-
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_STRING_HASH_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_STRING_HASH_HPP
 
@@ -17,6 +13,10 @@ constexpr size_t fnv_hash(const char* input) {
   }
 
   return hash;
+}
+
+constexpr size_t fnv_hash(const std::string & input) {
+  return fnv_hash(input.c_str());
 }
 
 constexpr size_t operator"" _hash(const char *s, std::size_t) { return fnv_hash(s); }
