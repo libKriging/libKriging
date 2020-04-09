@@ -26,7 +26,7 @@ mLibKriging help page
  X2 = randn (20,1);
  a=LinearRegression();
  a.fit(y,X);
- [y2,stderr] = a.predic(X2);
+ [y2,stderr] = a.predict(X2);
 
  load "y.mat"
  load "X.mat"
@@ -36,6 +36,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
 #ifdef MEX_DEBUG
   mexPrintf("You called MEX function: %s\n", nm);
   mexPrintf("have %d inputs and %d outputs\n", nrhs, nlhs);
+  //mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
 #endif
   if (std::strcmp(nm, "mLibKriging") != 0) {
     mexErrMsgTxt("you call mLibKriging with an illegal name");

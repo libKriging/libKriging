@@ -5,11 +5,11 @@
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 
+#include <cassert>
 #include <map>
 #include <memory>
-#include <cassert>
 
-#include "Uncopyable.hpp"
+#include "NonCopyable.hpp"
 
 template <typename T>
 class DestroyableT;
@@ -37,17 +37,17 @@ class Destroyable {
 template <typename T>
 class DestroyableT
     : public Destroyable
-    , Uncopyable {
+    , NonCopyable {
  public:
   explicit DestroyableT(T* t) : Destroyable{t}, pointer{t} { debug("Building", pointer); }
-  ~DestroyableT() {
+  ~DestroyableT() final {
     debug("Destroying", pointer);
     delete pointer;
   }
   T* pointer;
 };
 
-class ObjectCollector : public Uncopyable {
+class ObjectCollector : public NonCopyable {
  public:
   using ref_t = uint64_t;
   
@@ -78,8 +78,9 @@ class ObjectCollector : public Uncopyable {
   template <typename T>
   static T* getObject(ref_t ref) {
     auto finder = instance().m_references.find(ref);
-    if (finder == instance().m_references.end())
+    if (finder == instance().m_references.end()) {
       return nullptr;  // TODO better error management
+    }
     T* ptr = finder->second->cast<T>();
     assert(ref == hash(ptr));
     return ptr;
