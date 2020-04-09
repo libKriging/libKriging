@@ -8,6 +8,7 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <variant>
 
 #include "../tools/NonCopyable.hpp"
 #include "../tools/ObjectCollector.hpp"
@@ -74,14 +75,77 @@ auto converter(mxArray*);
 template <typename T>
 void setter(T&, mxArray*&);
 
+// C++17 version
+#if 1
+template <typename... Ts>
+struct overload : Ts... {
+  // overload(Ts... ts) : Ts(ts)... {} // can be replaced by CTAD
+  using Ts::operator()...;
+};
+// Custom Template Argument Deduction Rules
+template <typename... Ts>
+overload(Ts...)->overload<Ts...>;
+#endif
+
+// C++14 version
+#if 0
+template <typename T, typename... Ts>
+struct Overloader : T, Overloader<Ts...> {
+  using T::operator();
+  using Overloader<Ts...>::operator();
+  // […]
+};
+
+template <typename T> struct Overloader<T> : T {
+  using T::operator();
+};
+
+template <typename... T>
+constexpr auto overload(T&&... t) {
+  return Overloader<T...>{std::forward<T>(t)...};
+}
+#endif
+
 namespace RequiresArg {
+using namespace std::string_literals;
 struct AtLeast {
-} atLeast;
+  unsigned n;
+};
+
 struct Exactly {
-} exactly;
-struct Autodetect {
-} autodetect;
-};  // namespace RequiresArg
+  unsigned n;
+};
+struct Range {
+  unsigned min, max;
+};
+struct Autodetect {};
+
+using Requirement = std::variant<AtLeast, Exactly, Range, Autodetect>;
+
+auto validate(const Requirement& v, const int n) {
+  return std::visit(overload{
+                        [n](const RequiresArg::AtLeast& x) { return (x.n <= n); },
+                        [n](const RequiresArg::Exactly& x) { return (x.n == n); },
+                        [n](const RequiresArg::Range& x) { return (x.min <= n && n <= x.max); },
+                        [](const RequiresArg::Autodetect&) { return true; }  // default
+                    },
+                    v);
+}
+
+auto describe(const Requirement& v) -> std::string {
+  return std::visit(
+      overload{
+          [](const RequiresArg::AtLeast& x) { return "at least "s + std::to_string(x.n) + " arguments"s; },
+          [](const RequiresArg::Exactly& x) { return "exactly "s + std::to_string(x.n) + " arguments"; },
+          [](const RequiresArg::Range& x) {
+            return "between "s + std::to_string(x.min) + " and " + std::to_string(x.max) + " arguments";
+          },
+          [](const RequiresArg::Autodetect&) { return "any number of arguments"s; }  // default
+      },
+      v);
+}
+
+}  // namespace RequiresArg
 
 class MxMapper : public NonCopyable {
  private:
@@ -96,36 +160,12 @@ class MxMapper : public NonCopyable {
   std::bitset<maxsize> m_accesses;
 
  public:
-  MxMapper(const char* name, const int n, mxArray** p, RequiresArg::AtLeast, const unsigned required_args)
-      : MxMapper(name, n, p, RequiredValue::eAtLeast, required_args) {}
-
-  MxMapper(const char* name, const int n, mxArray** p, RequiresArg::Exactly, const unsigned required_args)
-      : MxMapper(name, n, p, RequiredValue::eExactly, required_args) {}
-
-  MxMapper(const char* name, const int n, mxArray** p)
-      : MxMapper(name, n, p, RequiredValue::eAutodetect, autodetected) {}
-
-  MxMapper(const char* name, const int n, mxArray** p, RequiresArg::Autodetect)
-      : MxMapper(name, n, p, RequiredValue::eAutodetect, autodetected) {}
-
- private:
-  MxMapper(const char* name, const int n, mxArray** p, const RequiredValue requirement, const int required_args)
+  MxMapper(const char* name, const int n, mxArray** p, const RequiresArg::Requirement& requirement)
       : m_name(name), m_n(n), m_p(p) {
     assert(n < maxsize);
     assert(name != nullptr);
-    switch (requirement) {
-      case RequiredValue::eAtLeast:
-        if (required_args > n) {
-          mexErrMsgIdAndTxt("mLibKriging:args", "%s requires at least %d parameters", name, required_args);
-        }
-        break;
-      case RequiredValue::eExactly:
-        if (required_args != n) {
-          mexErrMsgIdAndTxt("mLibKriging:args", "%s requires exactly %d parameters", name, required_args);
-        }
-        break;
-      case RequiredValue::eAutodetect:
-        break;
+    if (!RequiresArg::validate(requirement, n)) {
+      mexErrMsgIdAndTxt("mLibKriging:args", "%s requires %s", name, RequiresArg::describe(requirement).c_str());
     }
   }
 
@@ -241,29 +281,29 @@ void setter<arma::vec>(arma::vec& v, mxArray*& x) {
 }
 
 void func_new(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::exactly, 1};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::exactly, 0};
+  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   buildObject<LinearRegression>(input.get<0, mxArray*>("object reference"));
 }
 
 void func_delete(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::exactly, 1};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::exactly, 0};
+  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   deleteObject(input.get<0, mxArray*>("object reference"));
 }
 
 void func_fit(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::exactly, 3};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::exactly, 0};
+  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* lin_reg = input.getObject<0, LinearRegression>("LinearRegression reference");
   lin_reg->fit(input.get<1, arma::vec>("vector"), input.get<2, arma::mat>("matrix"));
 }
 
 void func_predict(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
-  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::exactly, 2};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::atLeast, 1};  // TODO range
+  MxMapper input{"Input", nrhs, (mxArray**)prhs, RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* lin_reg = input.getObject<0, LinearRegression>("LinearRegression reference");
   auto [y_pred, stderr_v] = lin_reg->predict(input.get<1, arma::mat>("matrix"));
-  output.setOptional<0>(y_pred, "predicted response");
+  output.set<0>(y_pred, "predicted response");
   output.setOptional<1>(stderr_v, "prediction error");
 }
