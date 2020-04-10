@@ -75,8 +75,8 @@ def main():
   default_extensions = ','.join([
     # From clang/lib/Frontend/FrontendOptions.cpp, all lower case
     'c', 'h',  # C
-    'm',  # ObjC
-    'mm',  # ObjC++
+    #'m',  # ObjC     # disabled to avoid mismatch with matlab files
+    #'mm',  # ObjC++
     'cc', 'cp', 'cpp', 'c++', 'cxx', 'hh', 'hpp', 'hxx',  # C++
     'cu',  # CUDA
     # Other languages that clang-format supports
