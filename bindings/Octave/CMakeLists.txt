@@ -13,5 +13,14 @@ include(${LIBKRIGING_SOURCE_DIR}/cmake/configureOctave.cmake)
 add_subdirectory(tools)
 
 add_mex_function(NAME mLibKriging
-        SOURCES mLibKriging.cpp LinearRegression_binding.cpp LinearRegression_binding.hpp 
+        SOURCES mLibKriging.cpp LinearRegression_binding.cpp LinearRegression_binding.hpp
         LINK_LIBRARIES Kriging OctaveShared)
+
+install(TARGETS mLibKriging
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Octave
+        )
+
+install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Octave
+        )
