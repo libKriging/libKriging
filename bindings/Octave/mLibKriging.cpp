@@ -40,9 +40,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
   if (nrhs < 1)
     return help_page();
 
-  MxMapper input{"Input", std::min(1,nrhs), const_cast<mxArray**>(prhs)};
+  MxMapper input{"Input", std::min(1, nrhs), const_cast<mxArray**>(prhs)};
   std::string command = input.get<0, std::string>("command");
-  
+
   switch (fnv_hash(command)) {
     case "help"_hash:
       return help_page();
