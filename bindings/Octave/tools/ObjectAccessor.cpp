@@ -18,7 +18,7 @@ ObjectCollector::ref_t getObject(const mxArray* obj) {
 
 void destroyObject(mxArray* obj) {
   if (!ObjectCollector::hasInstance()) {
-#ifdef MEX_DEBUG    
+#ifdef MEX_DEBUG
     mexWarnMsgTxt("ObjectCollector already destroyed");
 #endif
     return;  // silent return. Destruction workflow is in progress (ObjectCollector already destroyed)
