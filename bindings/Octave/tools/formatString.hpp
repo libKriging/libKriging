@@ -3,7 +3,7 @@
 
 #include <sstream>
 
-constexpr auto formatString = [](auto &&arg, auto &&... args) {
+auto formatString = [](auto &&arg, auto &&... args) {
   std::ostringstream oss;
   oss << std::forward<decltype(arg)>(arg);
   ((oss << std::forward<decltype(args)>(args)), ...);
