@@ -29,8 +29,8 @@ mLibKriging help page
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try {
   const char* nm = mexFunctionName();
 #ifdef MEX_DEBUG
-  mexPrintf("You called MEX function: %s\n", nm);
-  mexPrintf("have %d inputs and %d outputs\n", nrhs, nlhs);
+  mexPrintf("  You called MEX function: %s\n", nm);
+  mexPrintf("  with %d inputs and %d outputs\n", nrhs, nlhs);
   // mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
 #endif
   if (std::strcmp(nm, "mLibKriging") != 0) {
@@ -42,6 +42,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
 
   MxMapper input{"Input", std::min(1, nrhs), const_cast<mxArray**>(prhs)};
   std::string command = input.get<0, std::string>("command");
+
+#ifdef MEX_DEBUG
+  mexPrintf("  with command: %s\n", command.c_str());
+#endif
 
   switch (fnv_hash(command)) {
     case "help"_hash:

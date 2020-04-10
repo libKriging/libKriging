@@ -17,8 +17,17 @@ ObjectCollector::ref_t getObject(const mxArray* obj) {
 }
 
 void destroyObject(mxArray* obj) {
+  if (!ObjectCollector::hasInstance()) {
+#ifdef MEX_DEBUG    
+    mexWarnMsgTxt("ObjectCollector already destroyed");
+#endif
+    return;  // silent return. Destruction workflow is in progress (ObjectCollector already destroyed)
+  }
+
   auto ref = getObject(obj);
-  ObjectCollector::unregisterObject(ref);
+  if (!ObjectCollector::unregisterObject(ref)) {
+    throw MxException("mLibKriging:nonExistingRef", "ObjectRef requested to unregister does not exist");
+  }
   mxArray* out = mxCreateNumericMatrix(0, 0, mxUINT64_CLASS, mxREAL);
   mxSetProperty(obj, 0, "ref", out);
 }

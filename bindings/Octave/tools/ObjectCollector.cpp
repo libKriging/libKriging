@@ -21,12 +21,13 @@ ObjectCollector& ObjectCollector::instance() {
   return *m_instance;
 }
 
-void ObjectCollector::unregisterObject(uint64_t ref) {
+bool ObjectCollector::unregisterObject(uint64_t ref) {
   auto finder = instance().m_references.find(ref);
   if (finder == instance().m_references.end()) {
-    return;  // TODO(pascal) better error management
+    return false;  // TODO(pascal) better error management
   }
   instance().m_references.erase(finder);
+  return true;
 }
 
 std::unique_ptr<ObjectCollector> ObjectCollector::m_instance;  // NOLINT(fuchsia-statically-constructed-objects)

@@ -11,6 +11,7 @@ classdef LinearRegression < handle
         end
         
         function delete(obj, varargin)
+            % disp(["ObjectRef = ", num2str(obj.ref)])
             % destroy the mex backend
             if ~isempty(obj.ref)
                 printf("Delete LinearRegression\n")

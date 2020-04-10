@@ -17,7 +17,6 @@ class Destroyable {
   explicit Destroyable(T*) : type(typeid(T).name()) {}
   virtual ~Destroyable() = default;
 
-  
  public:
   template <typename T>
   T* cast() {
@@ -46,7 +45,7 @@ class DestroyableT
 class ObjectCollector : public NonCopyable {
  public:
   using ref_t = uint64_t;
-  
+
  public:
   ObjectCollector();
   ~ObjectCollector();
@@ -55,6 +54,8 @@ class ObjectCollector : public NonCopyable {
   static ObjectCollector& instance();
 
  public:
+  static bool hasInstance() { return static_cast<bool>(m_instance); }
+
   template <typename T>
   static ref_t registerObject(T* t) {
     ref_t ref = hash(t);
@@ -69,7 +70,7 @@ class ObjectCollector : public NonCopyable {
     return ref;
   }
 
-  static void unregisterObject(ref_t ref);
+  static bool unregisterObject(ref_t ref);
 
   template <typename T>
   static T* getObject(ref_t ref) {
