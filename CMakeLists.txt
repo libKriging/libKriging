@@ -36,7 +36,8 @@ set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
 
 #------------------------------------------------------
-option(BUILD_SHARED_LIBS "Build the shared library" ON)
+
+#option(BUILD_SHARED_LIBS "Build the shared library" ON) # BUILD_SHARED_LIBS config should be after armadillo config
 #option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
 option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 
