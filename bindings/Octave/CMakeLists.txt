@@ -15,7 +15,3 @@ add_subdirectory(tools)
 add_mex_function(NAME mLibKriging
         SOURCES mLibKriging.cpp LinearRegression_binding.cpp LinearRegression_binding.hpp 
         LINK_LIBRARIES Kriging OctaveShared)
-add_mex_function(NAME mypow2 SOURCES mypow2.cpp)
-add_mex_function(NAME mkStructure SOURCES mkStructure.cpp)
-add_mex_function(NAME demoStruct SOURCES demoStruct.cpp)
-add_mex_function(NAME mycell SOURCES mycell.cpp)
