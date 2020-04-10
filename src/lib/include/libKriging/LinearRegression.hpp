@@ -17,9 +17,9 @@ class LinearRegression {
   /** Trivial constructor */
   LIBKRIGING_EXPORT LinearRegression();
 
-  const arma::colvec& coef() const { return m_coef; };
-  const double& sig2() const { return m_sig2; };
-  const arma::colvec& stderrest() const { return m_stderrest; };
+  [[nodiscard]] const arma::colvec& coef() const { return m_coef; };
+  [[nodiscard]] const double& sig2() const { return m_sig2; };
+  [[nodiscard]] const arma::colvec& stderrest() const { return m_stderrest; };
 
   /** True linear regression computation
    * has to find s such that y ~= X * s
@@ -34,7 +34,7 @@ class LinearRegression {
 
  private:
   arma::colvec m_coef;
-  double m_sig2;
+  double m_sig2{};
   arma::colvec m_stderrest;
 };
 

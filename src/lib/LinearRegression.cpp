@@ -5,7 +5,7 @@
 #include "libKriging/LinearRegression.hpp"
 
 LIBKRIGING_EXPORT
-LinearRegression::LinearRegression() : m_sig2{} {}
+LinearRegression::LinearRegression() = default;
 
 LIBKRIGING_EXPORT
 // returned object should hold error state instead of void
