@@ -34,7 +34,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
   // mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
 #endif
   if (std::strcmp(nm, "mLibKriging") != 0) {
-    throw MxException("mLibKriging", "you call mLibKriging with an illegal name");
+    throw MxException(LOCATION(), "mLibKriging:badMexFunction", "you call mLibKriging with an illegal name");
   }
 
   if (nrhs < 1)
@@ -60,7 +60,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return LinearRegressionBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
-      throw MxException("mLibKriging:NoRoute", "No route to such command [", command, "]");
+      throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");
   }
 } catch (MxException& e) {
   mexErrMsgIdAndTxt(e.id, e.msg.c_str());

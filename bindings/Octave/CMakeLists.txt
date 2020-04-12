@@ -7,6 +7,7 @@ project(libKriging-Octave
         DESCRIPTION "LibKriging's Octave binding")
 
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+set(LIBKRIGING_OCTAVE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 include(${LIBKRIGING_SOURCE_DIR}/cmake/configureOctave.cmake)
 
@@ -24,3 +25,5 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Octave
         )
+
+add_subdirectory(tests)
