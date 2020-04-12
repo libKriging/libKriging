@@ -1,6 +1,8 @@
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MXMAPPER_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MXMAPPER_HPP
 
+#include <bitset>
+
 #include "ObjectCollector.hpp"
 #include "RequiresArg.hpp"
 #include "mx_accessor.hpp"
@@ -30,7 +32,7 @@ class MxMapper : public NonCopyable {
   typename converter_trait<T>::type get(const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException("mLibKriging", "Unavailable parameter ", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter ", (msg) ? msg : "");
     }
     m_accesses.set(I);
     return converter<T>(m_p[I]);
@@ -49,7 +51,7 @@ class MxMapper : public NonCopyable {
   void set(T& t, const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException("mLibKriging", "Unavailable parameter %s", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter %s", (msg) ? msg : "");
     }
     m_accesses.set(I);
     setter<T>(t, m_p[I]);
@@ -69,13 +71,13 @@ class MxMapper : public NonCopyable {
   T* getObject(const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException("mLibKriging", "Unavailable parameter ", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter ", (msg) ? msg : "");
     }
     m_accesses.set(I);
     auto ref = get<I, ObjectRef>(msg);
     auto ptr = ObjectCollector::getObject<T>(ref);
     if (ptr == nullptr) {
-      throw MxException("mLibKriging", "Undefined reference object");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
     }
     return ptr;
   }

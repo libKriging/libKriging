@@ -1,3 +1,5 @@
+enable_testing()
+
 # target_link_libraries links the executable to the library.
 # Since the library has public include directories we will use those link directories when building
 
@@ -36,8 +38,6 @@ add_dependencies(all_test_binaries OrdinaryKrigingTest)
 #                CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
 #    endforeach ()
 #endif ()
-
-enable_testing()
 
 # Manual test
 add_test(NAME demo/class_unit_test COMMAND class_unit_test)

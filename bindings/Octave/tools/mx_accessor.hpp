@@ -33,26 +33,26 @@ inline auto converter<mxArray*>(mxArray* x) {
 template <>
 inline auto converter<std::string>(mxArray* x) {
   if (!mxIsChar(x) || mxGetNumberOfDimensions(x) != 2 || mxGetM(x) != 1 || mxGetM(x) != 1) {
-    throw MxException("mLibKriging", "not a string");
+    throw MxException(LOCATION(), "mLibKriging:badType", "not a string");
   }
 
-  char command[256];
-  if (mxGetString(x, command, 256) != 0) {
-    throw MxException("mLibKriging", "not a string");
+  char buffer[256];
+  if (mxGetString(x, buffer, 256) != 0) {
+    throw MxException(LOCATION(), "mLibKriging:badType", "not a string");
   }
 
-  return std::string{command};
+  return std::string{buffer};
 }
 
 template <>
 inline auto converter<arma::vec>(mxArray* x) {
   if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
-    throw MxException("mLibKriging", "not a vector of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", "not a vector of double");
   }
   const arma::uword nrow = mxGetM(x);
   const arma::uword ncol = mxGetN(x);
   if (ncol > 1) {
-    throw MxException("mLibKriging", "not a vector of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", "not a vector of double");
   }
   double* data = mxGetPr(x);
   return arma::vec{data, nrow, false, true};
@@ -61,7 +61,7 @@ inline auto converter<arma::vec>(mxArray* x) {
 template <>
 inline auto converter<arma::mat>(mxArray* x) {
   if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
-    throw MxException("mLibKriging", "not a matrix of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", "not a matrix of double");
   }
   const arma::uword nrow = mxGetM(x);
   const arma::uword ncol = mxGetN(x);

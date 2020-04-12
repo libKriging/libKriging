@@ -8,4 +8,4 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
-"${BASEDIR}"/../linux-macos/after_success.sh
+"${BASEDIR}"/../linux-macos/test.sh

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 
 ## Forbids in-source builds (placed before PROJECT keyword)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
@@ -7,6 +7,8 @@ project(libKriging-Octave
         DESCRIPTION "LibKriging's Octave binding")
 
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+set(LIBKRIGING_OCTAVE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+set(LIBKRIGING_OCTAVE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 include(${LIBKRIGING_SOURCE_DIR}/cmake/configureOctave.cmake)
 
@@ -24,3 +26,6 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Octave
         )
+
+enable_testing()
+add_subdirectory(tests)

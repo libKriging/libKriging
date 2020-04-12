@@ -13,11 +13,12 @@ template <typename T, typename... Args>
 ObjectCollector::ref_t buildObject(mxArray* obj, Args... args) {
   mxArray* objectRef = mxGetProperty(obj, 0, "ref");
   if (objectRef == nullptr) {
-    throw MxException("mLibKriging:badObject", "object does not contain 'ref' property");
+    throw MxException(LOCATION(), "mLibKriging:badObject", "object does not contain 'ref' property");
   }
 
   if (!mxIsEmpty(objectRef)) {
-    throw MxException("mLibKriging:alreadyBuilt", "object already contain a non empty 'ref' property");
+    throw MxException(
+        LOCATION(), "mLibKriging:objectAlreadyBuilt", "object already contain a non empty 'ref' property");
   }
 
   auto ref = ObjectCollector::registerObject(new T{args...});
