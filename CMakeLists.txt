@@ -252,8 +252,8 @@ set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
 include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
 add_subdirectory("${CATCH_MODULE_PATH}")
 
-add_subdirectory(tests)
 enable_testing()
+add_subdirectory(tests)
 
 add_custom_target(run_unit_tests
         COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT}

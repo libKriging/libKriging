@@ -8,4 +8,6 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
-"${BASEDIR}"/../linux-macos/after_success.sh
+CC=gcc-7 CXX=g++-7 \
+    EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=off -DENABLE_OCTAVE_BINDING=on -DDETECT_HDF5=false ${EXTRA_CMAKE_OPTIONS}" \
+    "${BASEDIR}"/../linux-macos/build.sh

@@ -19,7 +19,7 @@ cd build
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="${MODE}" \
-  "${EXTRA_CMAKE_OPTIONS}" \
+  $(eval echo ${EXTRA_CMAKE_OPTIONS}) \
   ..
 
 if [[ "$BUILD_TEST" == "true" ]]; then
