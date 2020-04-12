@@ -386,7 +386,7 @@ endif ()
 
 #------------------------------------------------------
 
-# Custom install.lib target whuch does not compile tests
+# Custom install.lib target which does not compile tests
 ADD_CUSTOM_TARGET(install.lib
         ${CMAKE_COMMAND}
         -DBUILD_TYPE=${CMAKE_BUILD_TYPE}
