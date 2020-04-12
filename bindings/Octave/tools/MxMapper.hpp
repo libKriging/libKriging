@@ -1,6 +1,8 @@
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MXMAPPER_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MXMAPPER_HPP
 
+#include <bitset>
+
 #include "ObjectCollector.hpp"
 #include "RequiresArg.hpp"
 #include "mx_accessor.hpp"

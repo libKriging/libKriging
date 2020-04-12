@@ -15,7 +15,7 @@ constexpr size_t fnv_hash(const char* input) {
   return hash;
 }
 
-constexpr size_t fnv_hash(const std::string& input) {
+size_t fnv_hash(const std::string& input) {
   return fnv_hash(input.c_str());
 }
 
