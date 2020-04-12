@@ -17,7 +17,8 @@ ObjectCollector::ref_t buildObject(mxArray* obj, Args... args) {
   }
 
   if (!mxIsEmpty(objectRef)) {
-    throw MxException(LOCATION(), "mLibKriging:objectAlreadyBuilt", "object already contain a non empty 'ref' property");
+    throw MxException(
+        LOCATION(), "mLibKriging:objectAlreadyBuilt", "object already contain a non empty 'ref' property");
   }
 
   auto ref = ObjectCollector::registerObject(new T{args...});
