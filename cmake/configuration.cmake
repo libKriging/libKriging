@@ -27,3 +27,6 @@ function(logFatalError message)
   message(FATAL_ERROR "${BoldRed}FATAL ERROR :${ColourReset} ${message}")
 endfunction()
 
+function(logWarning message)
+  message(WARNING "${BoldYellow}Warning :${ColourReset} ${message}")
+endfunction()
