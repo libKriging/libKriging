@@ -2,7 +2,7 @@
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 
 #include <cassert>
-#include <map>
+#include <unordered_map>
 #include <memory>
 
 #include "NonCopyable.hpp"
@@ -84,7 +84,7 @@ class ObjectCollector : public NonCopyable {
   }
 
  private:
-  std::map<ref_t, std::unique_ptr<Destroyable>> m_references;
+  std::unordered_map<ref_t, std::unique_ptr<Destroyable>> m_references;
   static std::unique_ptr<ObjectCollector> m_instance;
 
   template <typename T>
