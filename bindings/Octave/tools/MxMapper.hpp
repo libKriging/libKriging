@@ -48,7 +48,7 @@ class MxMapper : public NonCopyable {
   }
 
   template <int I, typename T>
-  void set(T& t, const char* msg = nullptr) {
+  void set(const T& t, const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
       throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter %s", (msg) ? msg : "");
@@ -58,7 +58,7 @@ class MxMapper : public NonCopyable {
   }
 
   template <int I, typename T>
-  void setOptional(T& t, const char* msg = nullptr) {
+  void setOptional(const T& t, const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
       return;
