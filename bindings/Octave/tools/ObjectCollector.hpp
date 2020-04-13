@@ -2,8 +2,8 @@
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_OBJECTCOLLECTOR_HPP
 
 #include <cassert>
-#include <unordered_map>
 #include <memory>
+#include <unordered_map>
 
 #include "NonCopyable.hpp"
 

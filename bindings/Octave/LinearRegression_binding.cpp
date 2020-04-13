@@ -10,9 +10,9 @@ void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  buildObject<LinearRegression>(input.get<0, mxArray*>("object reference"));
+                 RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set<0>(buildObject<LinearRegression>(), "new object reference");
 }
 
 void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
@@ -20,8 +20,9 @@ void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  destroyObject(input.get<0, mxArray*>("object reference"));
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  destroyObject(input.get<0, uint64_t>("object reference"));
+  output.set<0>(EmptyObject{}, "deleted object reference");
 }
 
 void fit(int nlhs, void** plhs, int nrhs, const void** prhs) {
