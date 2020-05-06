@@ -97,6 +97,7 @@ option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for
 list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
 # Dependencies
+set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 include_directories(SYSTEM dependencies/optim/header_only_version)
