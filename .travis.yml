@@ -10,8 +10,19 @@ matrix:
       dist: xenial
       compiler: clang
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="checks"
+      branches:
+        except:
+          - release
+
+    - name: "Publish release artifacts"
+      os: linux
+      dist: xenial
+      env:
+        - BUILD_NAME="checks"
+      branches:
+        only:
+          - release
 
     - name: "Linux Debug"
       os: linux
@@ -23,6 +34,9 @@ matrix:
         apt:
           packages:
             - liblapack-dev
+      branches:
+        except:
+          - release
 
     - name: "Linux Release"
       os: linux
@@ -34,6 +48,9 @@ matrix:
         apt:
           packages:
             - liblapack-dev
+      branches:
+        except:
+          - release
 
     - name: "MacOS Debug"
       os: osx
@@ -41,18 +58,27 @@ matrix:
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
+      branches:
+        except:
+          - release
 
     - name: "Windows Debug"
       os: windows
       env:
         - BUILD_NAME="windows"
         - MODE=Debug
+      branches:
+        except:
+          - release
 
 #    - name: "Windows Release"
 #      os: windows
 #      env:
 #        - BUILD_NAME="windows"
 #        - MODE=Release
+#      branches:
+#        except:
+#          - release      
 
     - name: "Linux Coverage"
       os: linux
@@ -67,6 +93,9 @@ matrix:
           packages:
             - liblapack-dev
             - lcov
+      branches:
+        except:
+          - release
 
 #    # Disabled because too long
 #    - name: "MacOS Coverage"
@@ -80,38 +109,47 @@ matrix:
 #          update: true
 #          packages:
 #            - lcov
+#      branches:
+#        except:
+#          - release
 
     - name: "Octave Linux"
       os: linux
       dist: bionic # bionic does not support Octave 5
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="octave-linux-macos"
       addons:
         apt:
           packages:
             - octave
             - octave-pkg-dev
+      branches:
+        except:
+          - release
 
     - name: "Octave MacOS"
       os: osx
       osx_image: xcode9.4
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="octave-linux-macos"
+      branches:
+        except:
+          - release
 
 #    - name: "Octave Windows"
 #      os: windows
 #      env:
-#        - DEBUG_CI=true
 #        - BUILD_NAME="octave-windows"
+#      branches:
+#        except:
+#          - release
 
     - name: "R Linux"
       os: linux
       dist: xenial
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
+        - MODE=Release
       language: r
       r: release
 
@@ -119,16 +157,16 @@ matrix:
       os: osx
       osx_image: xcode9.4
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
+        - MODE=Release
       language: r
       r: release
 
     - name: "R Windows"
       os: windows
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-windows"
+        - MODE=Release
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh
@@ -149,9 +187,31 @@ script:
 after_success:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
 
+after_script:
+  - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-deploy.sh"
+  - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+  - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+
+deploy:
+  provider: releases
+#  api_key: $API_DEPLOY_TOKEN
+  api_key: c6dee20d102d6d9db4fd1e3feadeeb6fb5001511
+  file: $DEPLOY_FILE
+  overwrite: true
+  skip_cleanup: true
+  on:
+    tags: true
+    branch: release
+    repo: MASCOTNUM/libKriging
+    condition: $MODE = "Release" && -e $DEPLOY_FILE
+
 # Cache update/upload is too slow and slow down the whole process
 #cache:
 #  directories:
 #  - bindings/R/Rlibs
 #  - $HOME/Miniconda3
 #  - /c/Rtools
+
+env:
+  global: 
+    - DEBUG_CI=true
