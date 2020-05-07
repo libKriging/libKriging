@@ -200,7 +200,6 @@ deploy:
   overwrite: true
   skip_cleanup: true
   on:
-    tags: true
     branch: release
     repo: MASCOTNUM/libKriging
     condition: $MODE = "Release" && -e $DEPLOY_FILE
