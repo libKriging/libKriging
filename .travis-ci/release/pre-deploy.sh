@@ -47,11 +47,10 @@ r-*)
       tar czvf "${DEPLOY_FILE}" -C deploy .
       ;;
     MSYS_NT*) # Windows
+      ARCH=Windows10
       unzip "${PREFIX}_${RVER}.zip" -d deploy
-      find build/installed/lib
-      cp -a build/installed/lib/libarmadillo.dll deploy/rlibkriging/libs/
-      cp -a build/installed/lib/libKriging.dll deploy/rlibkriging/libs/
-      find deploy
+      cp -a build/installed/lib/libarmadillo.dll deploy/rlibkriging/libs/x64/
+      cp -a build/installed/lib/libKriging.dll deploy/rlibkriging/libs/x64/
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.zip
       (cd deploy && zip -FS -r "../${DEPLOY_FILE}" rlibkriging)
       find -name "*rlibkriging*" -type f
