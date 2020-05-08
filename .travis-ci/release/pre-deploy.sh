@@ -49,10 +49,12 @@ r-*)
     MSYS_NT*) # Windows
       unzip "${PREFIX}_${RVER}.zip" -d deploy
       find build/installed/lib
-      cp -a build/installed/lib/armadillo.*.dll deploy/rlibkriging/libs/
-      cp -a build/installed/lib/Kriging.*.dll deploy/rlibkriging/libs/
+      cp -a build/installed/lib/libarmadillo.dll deploy/rlibkriging/libs/
+      cp -a build/installed/lib/libKriging.dll deploy/rlibkriging/libs/
+      find deploy
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.zip
       (cd deploy && zip -FS -r "../${DEPLOY_FILE}" rlibkriging)
+      find -name "*rlibkriging*" -type f
       ;;
     *)
       echo "Unknown OS [$ARCH]"
