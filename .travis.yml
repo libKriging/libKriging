@@ -200,7 +200,7 @@ deploy:
   skip_cleanup: true
   on:
     branch: release
-    repo: MASCOTNUM/libKriging
+    repo: libKriging/libKriging
     condition: $MODE = "Release" && -e $DEPLOY_FILE
 
 # Cache update/upload is too slow and slow down the whole process
