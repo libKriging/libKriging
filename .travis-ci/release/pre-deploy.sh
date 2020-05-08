@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eo pipefail
 
 if [[ "$DEBUG_CI" == true ]]; then
   set -x
@@ -27,13 +28,14 @@ case $BUILD_NAME in
 r-*)
   RVER=$(awk -F": " '/^Version:/ { print $2 }' ./bindings/R/rlibkriging/DESCRIPTION)
   PREFIX=bindings/R/rlibkriging
+  [ -d deploy ] && rm -fr deploy
   mkdir deploy
 
   case $ARCH in
     Linux)
       tar xzvf "${PREFIX}_${RVER}_R_x86_64-pc-linux-gnu.tar.gz" -C deploy 
-      cp -a build/installed/lib/libarmadillo.*.so deploy/rlibkriging/libs/
-      cp -a build/installed/lib/libKriging.*.so deploy/rlibkriging/libs/
+      cp -a build/installed/lib/libarmadillo.so.* deploy/rlibkriging/libs/
+      cp -a build/installed/lib/libKriging.so.* deploy/rlibkriging/libs/
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.tgz
       tar czvf "${DEPLOY_FILE}" -C deploy .
       ;;
