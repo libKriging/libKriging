@@ -1,9 +1,9 @@
-language: bash
+language: shell
 
 # Doc
 # - Travis Job Lifecycle : https://docs.travis-ci.com/user/job-lifecycle/
 
-matrix:
+jobs:
   include:
     - name: "Guideline checks"
       os: linux
@@ -13,15 +13,6 @@ matrix:
         - BUILD_NAME="checks"
       branches:
         except:
-          - release
-
-    - name: "Publish release artifacts"
-      os: linux
-      dist: xenial
-      env:
-        - BUILD_NAME="checks"
-      branches:
-        only:
           - release
 
     - name: "Linux Debug"
@@ -187,7 +178,7 @@ script:
 after_success:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
 
-after_script:
+before_deploy:
   - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-deploy.sh"
   - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
   - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"

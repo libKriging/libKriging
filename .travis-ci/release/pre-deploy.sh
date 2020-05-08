@@ -48,8 +48,9 @@ r-*)
       ;;
     MSYS_NT*) # Windows
       unzip "${PREFIX}_${RVER}.zip" -d deploy
-      cp -a build/installed/lib/libarmadillo.*.dll deploy/rlibkriging/libs/
-      cp -a build/installed/lib/libKriging.*.dll deploy/rlibkriging/libs/
+      find build/installed/lib
+      cp -a build/installed/lib/armadillo.*.dll deploy/rlibkriging/libs/
+      cp -a build/installed/lib/Kriging.*.dll deploy/rlibkriging/libs/
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.zip
       (cd deploy && zip -FS -r "../${DEPLOY_FILE}" rlibkriging)
       ;;
