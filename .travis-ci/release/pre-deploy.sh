@@ -31,7 +31,7 @@ r-*)
 
   case $ARCH in
     Linux)
-      tar xzvf "${PREFIX}_${RVER}.tgz" -C deploy 
+      tar xzvf "${PREFIX}_${RVER}_R_x86_64-pc-linux-gnu.tar.gz" -C deploy 
       cp -a build/installed/lib/libarmadillo.*.so deploy/rlibkriging/libs/
       cp -a build/installed/lib/libKriging.*.so deploy/rlibkriging/libs/
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.tgz
