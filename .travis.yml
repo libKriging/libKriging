@@ -194,8 +194,7 @@ after_script:
 
 deploy:
   provider: releases
-#  api_key: $API_DEPLOY_TOKEN
-  api_key: c6dee20d102d6d9db4fd1e3feadeeb6fb5001511
+  api_key: $API_DEPLOY_TOKEN
   file: $DEPLOY_FILE
   overwrite: true
   skip_cleanup: true
