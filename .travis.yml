@@ -11,9 +11,6 @@ jobs:
       compiler: clang
       env:
         - BUILD_NAME="checks"
-      branches:
-        except:
-          - release
 
     - name: "Linux Debug"
       os: linux
@@ -25,9 +22,6 @@ jobs:
         apt:
           packages:
             - liblapack-dev
-      branches:
-        except:
-          - release
 
     - name: "Linux Release"
       os: linux
@@ -39,9 +33,6 @@ jobs:
         apt:
           packages:
             - liblapack-dev
-      branches:
-        except:
-          - release
 
     - name: "MacOS Debug"
       os: osx
@@ -49,27 +40,18 @@ jobs:
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
-      branches:
-        except:
-          - release
 
     - name: "Windows Debug"
       os: windows
       env:
         - BUILD_NAME="windows"
         - MODE=Debug
-      branches:
-        except:
-          - release
 
 #    - name: "Windows Release"
 #      os: windows
 #      env:
 #        - BUILD_NAME="windows"
 #        - MODE=Release
-#      branches:
-#        except:
-#          - release      
 
     - name: "Linux Coverage"
       os: linux
@@ -84,9 +66,6 @@ jobs:
           packages:
             - liblapack-dev
             - lcov
-      branches:
-        except:
-          - release
 
 #    # Disabled because too long
 #    - name: "MacOS Coverage"
@@ -100,9 +79,6 @@ jobs:
 #          update: true
 #          packages:
 #            - lcov
-#      branches:
-#        except:
-#          - release
 
     - name: "Octave Linux"
       os: linux
@@ -114,26 +90,17 @@ jobs:
           packages:
             - octave
             - octave-pkg-dev
-      branches:
-        except:
-          - release
 
     - name: "Octave MacOS"
       os: osx
       osx_image: xcode9.4
       env:
         - BUILD_NAME="octave-linux-macos"
-      branches:
-        except:
-          - release
 
 #    - name: "Octave Windows"
 #      os: windows
 #      env:
 #        - BUILD_NAME="octave-windows"
-#      branches:
-#        except:
-#          - release
 
     - name: "R Linux"
       os: linux
@@ -177,8 +144,8 @@ script:
 
 after_success:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
-
-before_deploy:
+  # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+  # nor in before_deploy since the condition is checked before *deploy scripts    
   - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-deploy.sh"
   - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
   - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
