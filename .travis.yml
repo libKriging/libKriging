@@ -199,7 +199,7 @@ deploy:
   overwrite: true
   skip_cleanup: true
   on:
-    branch: release
+    tags: true
     repo: libKriging/libKriging
     condition: $MODE = "Release" && -e $DEPLOY_FILE
 

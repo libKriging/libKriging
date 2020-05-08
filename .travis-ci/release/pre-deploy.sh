@@ -14,8 +14,8 @@ fi
 
 ARCH=$(uname -s)
 
-TAG=$(git describe --tags --match "v[0-9]*" --exact-match)
-#TAG=$(echo "$TRAVIS_TAG" | grep -E '^v[[:digit:]]+\.[[:digit:]]+')
+#TAG=$(git describe --tags --match "v[0-9]*" --exact-match)
+TAG=$(echo "$TRAVIS_TAG" | grep -E '^v[[:digit:]]+\.[[:digit:]]+')
 if [ -z "$TAG" ]; then
   echo "No version tag: skip deploy" 
   exit 0 
