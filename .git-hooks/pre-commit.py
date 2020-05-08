@@ -30,10 +30,10 @@ BRANCH = subprocess.check_output(["git",
 
 # Output String with Variable substitution
 travis_sentinel_str = "[![Build Status]"
-travis = "{SENTINEL}(https://travis-ci.org/" \
+travis = "{SENTINEL}(https://travis-ci.com/" \
          "{GITHUB_USER}/{REPO}.svg?" \
          "branch={BRANCH})]" \
-         "(https://travis-ci.org/" \
+         "(https://travis-ci.com/" \
          "{GITHUB_USER}/{REPO})\n".format(SENTINEL=travis_sentinel_str,
                                           BRANCH=BRANCH.decode(),
                                           GITHUB_USER=GITHUB_USER,

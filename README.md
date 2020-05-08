@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/libKriging/libKriging.svg?branch=master)](https://travis-ci.org/libKriging/libKriging)
+[![Build Status](https://travis-ci.com/libKriging/libKriging.svg?branch=master)](https://travis-ci.com/libKriging/libKriging)
 [![Coverage Status](https://coveralls.io/repos/github/libKriging/libKriging/badge.svg?branch=master)](https://coveralls.io/github/libKriging/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
