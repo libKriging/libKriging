@@ -1,7 +1,7 @@
 
 # GitHub Workflow applied to libKriging 
 
-## 1. Create your GitHub fork of https://github.com/MASCOTNUM/libKriging
+## 1. Create your GitHub fork of https://github.com/libKriging/libKriging
    
    To do so, use [**Fork**] (top right) button 
 
@@ -21,7 +21,7 @@
    
    ```
    # add main remote repository or fetch it
-   git remote add --fetch libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging
+   git remote add --fetch libKriging https://github.com/libKriging/libKriging.git || git fetch libKriging
    ```
    
 ## 3. Do your changes.
@@ -78,7 +78,7 @@
 
 ```
 # from your local repository
-git remote add --fetch libKriging https://github.com/MASCOTNUM/libKriging.git || git fetch libKriging # add main remote repository or fetch it
+git remote add --fetch libKriging https://github.com/libKriging/libKriging.git || git fetch libKriging # add main remote repository or fetch it
 git merge --ff libKriging/master # update with merged master branch
 git push # update your fork with it
 ```

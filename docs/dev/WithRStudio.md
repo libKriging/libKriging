@@ -12,7 +12,7 @@ Follow steps writen in main [README.md](../../README.md) in sections
 Use one of these three methods:
 ### 2.a New package project (out of libKriging directory)
  
-* If you have already clone [libKriging](https://github.com/MASCOTNUM/libKriging), start a new package project using `File > New Project... > New Directory > R Package using Rcpp Armadillo`.
+* If you have already clone [libKriging](https://github.com/libKriging/libKriging), start a new package project using `File > New Project... > New Directory > R Package using Rcpp Armadillo`.
 
 * Then replace content of `Makevars` (or `Makevars.win` depending on your target architecture) using files from those from `libKriging/bindings/R/rlibkriging/src`.
 
@@ -30,7 +30,7 @@ by
 
 ### 2.b New package project using git 
 
-* You can also start a new package project using `File > New Project... > Version control > git` and fill `Repository URL` with https://github.com/MASCOTNUM/libKriging.
+* You can also start a new package project using `File > New Project... > Version control > git` and fill `Repository URL` with https://github.com/libKriging/libKriging.
 * Use  `Build > Configure Build Tools...` to set up the location of rlibkriging package directory.
   
   It should be like: ![](images/RStudio-project-config.png)
@@ -56,7 +56,7 @@ Run these commands on the RStudio server
 
 ## Get and build `libKriging`
 ```
-system("git clone https://github.com/MASCOTNUM/libKriging.git ~/libKriging && mkdir -p ~/libKriging/build && cd ~/libKriging/build && CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake .. && cmake --build . && cmake --build . --target install")
+system("git clone https://github.com/libKriging/libKriging.git ~/libKriging && mkdir -p ~/libKriging/build && cd ~/libKriging/build && CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake .. && cmake --build . && cmake --build . --target install")
 ```
 
 ## Prepare R project

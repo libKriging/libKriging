@@ -1,5 +1,6 @@
 library(testthat)
-
+install.packages(pkgs="rlibkriging_0.0-0.tgz", type="source", repos=NULL)
+library(rlibkriging)
 n <- 10
 X <- as.matrix(runif(n))
 y = 4*X+rnorm(n,0,.1)

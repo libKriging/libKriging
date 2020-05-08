@@ -9,7 +9,7 @@ void help_page() {
 mLibKriging help page
   the Octave/Matlab interface for libKriging
 
-  see https://github.com/MASCOTNUM/libKriging
+  see https://github.com/libKriging/libKriging
   
 )");
 }

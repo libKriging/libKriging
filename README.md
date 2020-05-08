@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/MASCOTNUM/libKriging.svg?branch=master)](https://travis-ci.org/MASCOTNUM/libKriging)
-[![Coverage Status](https://coveralls.io/repos/github/MASCOTNUM/libKriging/badge.svg?branch=master)](https://coveralls.io/github/MASCOTNUM/libKriging?branch=master)
+[![Build Status](https://travis-ci.org/libKriging/libKriging.svg?branch=master)](https://travis-ci.org/libKriging/libKriging)
+[![Coverage Status](https://coveralls.io/repos/github/libKriging/libKriging/badge.svg?branch=master)](https://coveralls.io/github/libKriging/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Table of contents
@@ -13,7 +13,7 @@ Table of contents
 
 Just clone it:
 ```
-git clone https://github.com/MASCOTNUM/libKriging.git
+git clone https://github.com/libKriging/libKriging.git
 ```
 
 Dependencies are plugged in as [subrepo](https://github.com/ingydotnet/git-subrepo) components.
@@ -102,7 +102,7 @@ cd libKriging
 ### Preamble
 
 We assume that:
-  * [libKriging](https://github.com/MASCOTNUM/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*
+  * [libKriging](https://github.com/libKriging/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*
     (could be a relative path like `..`)
   * you have built a fresh new directory *`${BUILD}`* 
     (should be an absolute path)
