@@ -44,7 +44,7 @@ r-*)
       DEPLOY_FILE=${PREFIX}_${ARCH}_${TAG}.tgz
       tar czvf "${DEPLOY_FILE}" -C deploy .
       ;;
-    Windows)
+    MSYS_NT*) # Windows
       unzip "${PREFIX}_${RVER}.zip" -d deploy
       cp -a build/installed/lib/libarmadillo.*.dll deploy/rlibkriging/libs/
       cp -a build/installed/lib/libKriging.*.dll deploy/rlibkriging/libs/
