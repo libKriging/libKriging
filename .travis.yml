@@ -1,16 +1,15 @@
-language: bash
+language: shell
 
 # Doc
 # - Travis Job Lifecycle : https://docs.travis-ci.com/user/job-lifecycle/
 
-matrix:
+jobs:
   include:
     - name: "Guideline checks"
       os: linux
       dist: xenial
       compiler: clang
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="checks"
 
     - name: "Linux Debug"
@@ -85,7 +84,6 @@ matrix:
       os: linux
       dist: bionic # bionic does not support Octave 5
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="octave-linux-macos"
       addons:
         apt:
@@ -97,21 +95,19 @@ matrix:
       os: osx
       osx_image: xcode9.4
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="octave-linux-macos"
 
 #    - name: "Octave Windows"
 #      os: windows
 #      env:
-#        - DEBUG_CI=true
 #        - BUILD_NAME="octave-windows"
 
     - name: "R Linux"
       os: linux
       dist: xenial
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
+        - MODE=Release
       language: r
       r: release
 
@@ -119,16 +115,16 @@ matrix:
       os: osx
       osx_image: xcode9.4
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-linux-macos"
+        - MODE=Release
       language: r
       r: release
 
     - name: "R Windows"
       os: windows
       env:
-        - DEBUG_CI=true
         - BUILD_NAME="r-windows"
+        - MODE=Release
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh
@@ -148,6 +144,25 @@ script:
 
 after_success:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
+  # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+  # nor in before_deploy since the condition is checked before *deploy scripts    
+  - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-deploy.sh"
+  - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+  - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+
+before_deploy: 
+  - echo "Before deploy"
+
+deploy:
+  provider: releases
+  api_key: $API_DEPLOY_TOKEN
+  file: $DEPLOY_FILE
+  overwrite: true
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: libKriging/libKriging
+    condition: $MODE = "Release" && -e $DEPLOY_FILE
 
 # Cache update/upload is too slow and slow down the whole process
 #cache:
@@ -155,3 +170,7 @@ after_success:
 #  - bindings/R/Rlibs
 #  - $HOME/Miniconda3
 #  - /c/Rtools
+
+env:
+  global: 
+    - DEBUG_CI=true
