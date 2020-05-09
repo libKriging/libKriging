@@ -461,6 +461,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
       int multistart = 10;        // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      arma::arma_rng::set_seed(123); // FIXME arbitrary seed for reproducible sequences
       theta0 = arma::randu(multistart, X.n_cols);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
