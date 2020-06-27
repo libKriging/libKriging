@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "AddDemo.hpp"
+#include "NumPyDemo.hpp"
 #ifndef DISABLE_KRIGING
 #include "LinearRegression_binding.hpp"
 #endif
@@ -10,6 +11,8 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(pylibkriging, m) {
   
+    load_test();
+    
     m.doc() = R"pbdoc(
         Pybind11 example plugin
         -----------------------
@@ -34,6 +37,8 @@ PYBIND11_MODULE(pylibkriging, m) {
 
         Some other explanation about the subtract function.
     )pbdoc");
+
+    m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
 
     m.attr("__version__") = VERSION_INFO;
     

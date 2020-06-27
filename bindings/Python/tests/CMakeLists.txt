@@ -36,3 +36,4 @@ endmacro()
 
 add_python_test(NAME canary FILENAME canary_test.py)
 add_python_test(NAME loading FILENAME loading_test.py)
+add_python_test(NAME numpy FILENAME NumPy_test.py)
