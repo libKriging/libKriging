@@ -1,0 +1,1 @@
+print("Trivial test to check environment")

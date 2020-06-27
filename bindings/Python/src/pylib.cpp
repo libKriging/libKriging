@@ -1,12 +1,15 @@
 #include <pybind11/pybind11.h>
+#include <iostream>
 
-int add(int i, int j) {
-    return i + j;
-}
+#include "AddDemo.hpp"
+#ifndef DISABLE_KRIGING
+#include "LinearRegression_binding.hpp"
+#endif
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(pylibkriging, m) {
+  
     m.doc() = R"pbdoc(
         Pybind11 example plugin
         -----------------------
@@ -32,9 +35,6 @@ PYBIND11_MODULE(pylibkriging, m) {
         Some other explanation about the subtract function.
     )pbdoc");
 
-#ifdef VERSION_INFO
     m.attr("__version__") = VERSION_INFO;
-#else
-    m.attr("__version__") = "dev";
-#endif
+    
 }
