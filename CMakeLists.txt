@@ -82,6 +82,19 @@ else ()
     endif ()
 endif ()
 
+# ENABLE_PYTHON_BINDING default is AUTO
+string(TOUPPER "${ENABLE_PYTHON_BINDING}" ENABLE_PYTHON_BINDING)
+if (NOT DEFINED ENABLE_PYTHON_BINDING OR ENABLE_PYTHON_BINDING STREQUAL "")
+    set(ENABLE_PYTHON_BINDING "AUTO" CACHE STRING
+            "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
+            FORCE)
+else ()
+    string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_PYTHON_BINDING "${ENABLE_PYTHON_BINDING}")
+    if (VALID_PYTHON_BINDING STREQUAL "") # /!\ IF(VALID_PYTHON_BINDING) is false when ENABLE_PYTHON_BINDING is OFF
+        logFatalError("Invalid ENABLE_PYTHON_BINDING option '${ENABLE_PYTHON_BINDING}'; choose between ON, OFF and AUTO.")
+    endif ()
+endif ()
+
 #------------------------------------------------------
 
 set(CMAKE_CXX_STANDARD 17)
@@ -240,6 +253,34 @@ else ()
         message(STATUS "Octave binding not available.")
     else ()
         logFatalError("INTERNAL ERROR: value '${ENABLE_OCTAVE_BINDING}' not managed")
+    endif ()
+endif ()
+
+#------------------------------------------------------
+
+# search for python-config (for building Python module)
+find_program(PYTHON_EXECUTABLE
+        NAMES python3
+        )
+if (PYTHON_EXECUTABLE)
+    if (ENABLE_PYTHON_BINDING STREQUAL "ON")
+        add_subdirectory(bindings/Python)
+        message(STATUS "Python binding enabled")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "OFF")
+        message(STATUS "PYTHON binding available but disabled as requested.")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "AUTO")
+        add_subdirectory(bindings/Python)
+        message(STATUS "Python binding enabled")
+    else ()
+        logFatalError("INTERNAL ERROR: value '${ENABLE_PYTHON_BINDING}' not managed")
+    endif ()
+else ()
+    if (ENABLE_PYTHON_BINDING STREQUAL "ON")
+        logFatalError("Python binding requested but not available.")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "OFF" OR ENABLE_PYTHON_BINDING STREQUAL "AUTO")
+        message(STATUS "Python binding not available.")
+    else ()
+        logFatalError("INTERNAL ERROR: value '${ENABLE_PYTHON_BINDING}' not managed")
     endif ()
 endif ()
 
