@@ -372,13 +372,27 @@ endif ()
 # search for clang-format and add target
 find_program(CLANG_FORMAT clang-format)
 if (CLANG_FORMAT)
-    add_custom_target(clang-format
-            COMMAND echo "running ${CLANG_FORMAT} ..."
-            COMMAND ${CMAKE_COMMAND}
-            -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
-            -DCLANG_FORMAT="${CLANG_FORMAT}"
-            -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
-    message(STATUS "clang-format target for updating code format is available")
+    exec_program(${CLANG_FORMAT} ARGS -version
+            OUTPUT_VARIABLE CLANG_FORMAT_RAW_VERSION)
+    string(REGEX MATCH "[1-9][0-9]*\\.[0-9]+\\.[0-9]+"
+            CLANG_FORMAT_VERSION ${CLANG_FORMAT_RAW_VERSION})
+    if (CLANG_FORMAT_VERSION VERSION_GREATER_EQUAL "6.0.0")
+        add_custom_target(clang-format
+                COMMAND echo "running ${CLANG_FORMAT} ..."
+                COMMAND ${CMAKE_COMMAND}
+                -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
+                -DCLANG_FORMAT="${CLANG_FORMAT}"
+                -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
+        message(STATUS "clang-format target for updating code format is available")
+    else()
+        message(WARNING "incompatible clang-format found (<6.0.0); clang-format target is not available.")
+        add_custom_target(clang-format
+                COMMAND ${CMAKE_COMMAND} -E echo ""
+                COMMAND ${CMAKE_COMMAND} -E echo "*** code formatting not available since clang-format version is incompatible ***"
+                COMMAND ${CMAKE_COMMAND} -E echo ""
+                COMMENT "Inform about not available code format."
+                )
+    endif()
 else ()
     message(WARNING "clang-format no found; clang-format target is not available.")
     add_custom_target(clang-format
