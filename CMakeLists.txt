@@ -9,11 +9,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # this is due to line: configure_file(${PROJECT_SOURCE_DIR}/examples/Makefile.cmake ${PROJECT_SOURCE_DIR}/examples/Makefile)
 # set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-# VERSION must follow pattern : <major>.<minor>.<patch>
-set(KRIGING_VERSION_MAJOR 0)
-set(KRIGING_VERSION_MINOR 0)
-set(KRIGING_VERSION_PATCH 0)
-set(KRIGING_VERSION "${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}")
+include(cmake/version.cmake)
 
 project(libKriging
         VERSION ${KRIGING_VERSION}
