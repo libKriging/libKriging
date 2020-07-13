@@ -36,6 +36,9 @@ class CMakeBuild(build_ext):
         if not extdir.endswith(os.path.sep):
             extdir += os.path.sep
 
+        print('extdir:', extdir)
+        print('Python executable', sys.executable)
+
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DDISABLE_KRIGING=TRUE',
@@ -53,6 +56,8 @@ class CMakeBuild(build_ext):
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j2']
 
+        print("version", self.distribution.get_version())
+
         env = os.environ.copy()
         env['CXXFLAGS'] = env.get('CXXFLAGS', '')
         print('env:', env['CXXFLAGS'])
@@ -63,9 +68,19 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
+file = open("../../cmake/version.cmake", "r")
+data = file.read()
+file.close()
+
+import re
+version_major = re.search(r"^set\(KRIGING_VERSION_MAJOR (\d+)\)$", data, re.M)
+version_minor = re.search(r"^set\(KRIGING_VERSION_MINOR (\d+)\)$", data, re.M)
+version_patch = re.search(r"^set\(KRIGING_VERSION_PATCH (\d+)\)$", data, re.M)
+version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
+
 setup(
     name='pylibkriging',
-    version='0.0.1',
+    version=version,
     author='Pascal Havé',
     author_email='hpwxf@haveneer.com',
     description='Python binding for LibKriging',

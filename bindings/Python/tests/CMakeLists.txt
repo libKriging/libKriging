@@ -19,7 +19,7 @@ macro(add_python_test)
     endif ()
 
     add_test(NAME Python/${ARGS_NAME}
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
+            COMMAND ${PYTHON_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
 
     if (ARGS_WILL_FAIL)
         set_tests_properties(Python/${ARGS_NAME}
@@ -37,3 +37,5 @@ endmacro()
 add_python_test(NAME canary FILENAME canary_test.py)
 add_python_test(NAME loading FILENAME loading_test.py)
 add_python_test(NAME numpy FILENAME NumPy_test.py)
+add_python_test(NAME LinearRegression FILENAME LinearRegression_test.py)
+add_python_test(NAME PyLinearRegression FILENAME PyLinearRegression_test.py)

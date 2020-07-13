@@ -1,5 +1,13 @@
 import pylibkriging as m
 
-assert m.__version__ == '0.0.0'
-assert m.add(1, 2) == 3
-assert m.subtract(1, 2) == -1
+
+def test_version():
+    assert m.__version__ == '0.0.0'
+
+
+def test_add():
+    assert m.add(1, 2) == 3
+
+
+def test_substract():
+    assert m.subtract(1, 2) == -1

@@ -1,27 +1,37 @@
 cmake_minimum_required(VERSION 3.1)
 project(pylibkriging)
 
+set(CMAKE_CXX_STANDARD 17)
+
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(LIBKRIGING_PYTHON_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(LIBKRIGING_PYTHON_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
-add_subdirectory(pybind11)
+include(${LIBKRIGING_SOURCE_DIR}/cmake/version.cmake)
 
-set(pylibkriging_SRCS src/pylib.cpp)
+set(ARMADILLO_ROOT_DIR ${LIBKRIGING_SOURCE_DIR}/dependencies/armadillo-code)
+set(PYBIND11_ROOT_DIR ${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11)
+set(CARMA_DEV_TARGET false)
+set(BUILD_TESTS on)
+set(BUILD_EXAMPLES on)
+add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
+
+set(pylibkriging_SRCS src/pylibkirging.cpp)
 list(APPEND pylibkriging_SRCS 
         src/AddDemo.cpp src/AddDemo.hpp
         src/NumPyDemo.cpp src/NumPyDemo.hpp
         )
-if (NOT DEFINED DISABLE_KRIGING)
+if (NOT DISABLE_KRIGING)
     list(APPEND pylibkriging_SRCS 
             src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
             )
 endif()
 
 pybind11_add_module(pylibkriging ${pylibkriging_SRCS})
-if (NOT DEFINED DISABLE_KRIGING)
-    target_link_libraries(pylibkriging PRIVATE Kriging)
+if (NOT DISABLE_KRIGING)
+    target_link_libraries(pylibkriging PRIVATE Kriging carma)
 else()
+    target_link_libraries(pylibkriging PRIVATE carma)
     target_compile_definitions(pylibkriging PUBLIC DISABLE_KRIGING)    
 endif()
 target_compile_definitions(pylibkriging PUBLIC VERSION_INFO=\"${KRIGING_VERSION}\")

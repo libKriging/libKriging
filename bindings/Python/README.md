@@ -16,6 +16,8 @@ invoke CMake and build the pybind11 module as specified in `CMakeLists.txt`.
 
 ```shell script
 python3 setup.py build --debug
+python3 setup.py build --release
+python3 setup.py build develop
 ```
 
 and then
@@ -23,4 +25,15 @@ and then
 ```python
 import pylibkriging
 pylibkriging.add(1, 2)
+```
+
+To test after a rebuild
+```python
+import importlib
+import pylibkriging as lk
+importlib.reload(lk)
+``` 
+
+```shell
+PYTHONPATH=../../../build/bindings/Python python3 -i -c "exec(open('LinearRegression.py').read())"
 ```

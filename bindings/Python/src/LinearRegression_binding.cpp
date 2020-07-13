@@ -1,39 +1,33 @@
-//
-// Created by Pascal Havé on 27/06/2020.
-//
-
 #include "LinearRegression_binding.hpp"
 
 #include <armadillo>
 #include <libKriging/LinearRegression.hpp>
 #include <random>
 
-#include <armadillo>
-#include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <armadillo>
 
-void load_test() {
-  std::mt19937 engine;    // the Mersenne Twister with a popular choice of parameters
-  uint32_t seed_val = 0;  // populate somehow (fixed value => reproducible)
-  engine.seed(seed_val);
+#include <carma/carma.h>
 
-  const int n = 40;
-  const int m = 3;
+PyLinearRegression::PyLinearRegression() : m_internal{new LinearRegression{}} {
+  std::cerr << __PRETTY_FUNCTION__ << " " << this << std::endl;
+}
 
-  arma::vec sol(m, arma::fill::randn);
-  arma::mat X(n, m);
-  std::normal_distribution<double> dist(1, 10);
-  X.col(0).fill(1);
-  X.cols(1, m - 1).imbue([&]() { return dist(engine); });
+PyLinearRegression::~PyLinearRegression() {
+  std::cerr << __PRETTY_FUNCTION__ << " " << this << std::endl;
+}
 
-  arma::vec y = X * sol;
+void PyLinearRegression::fit(const py::array_t<double>& y, const py::array_t<double>& X) {
+  std::cerr << __PRETTY_FUNCTION__ << " " << this << std::endl;
+  arma::mat mat_y = carma::arr_to_col<double>(y, true);
+  arma::mat mat_X = carma::arr_to_mat<double>(X, true);
+  m_internal->fit(mat_y, mat_X);
+}
 
-  LinearRegression rl;  // linear regression object
-  rl.fit(y, X);
-
-  std::tuple<arma::colvec, arma::colvec> ans = rl.predict(X);
-  const double eps = 1e-5;  // 1000 * std::numeric_limits<double>::epsilon();
-  std::cout << "diff=" << arma::norm(y - std::get<0>(ans), "inf")
-            << " eps=" << eps << "\n";
-  std::cout << "OK loading" << std::endl;
+std::tuple<py::array_t<double>, py::array_t<double>> PyLinearRegression::predict(const py::array_t<double>& X) {
+  std::cerr << __PRETTY_FUNCTION__ << " " << this << std::endl;
+  arma::mat mat_X = carma::arr_to_mat<double>(X, true);
+  auto [y_predict, y_stderr] = m_internal->predict(mat_X);
+  return std::make_tuple(carma::col_to_arr(y_predict, true), carma::col_to_arr(y_stderr, true));
 }

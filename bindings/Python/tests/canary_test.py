@@ -1,1 +1,3 @@
-print("Trivial test to check environment")
+
+def test_canary():
+    print("Trivial test to check environment")

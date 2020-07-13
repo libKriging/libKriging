@@ -11,5 +11,6 @@
 namespace py = pybind11;
 
 py::array_t<double> add_arrays(py::array_t<double> input1, py::array_t<double> input2);
+py::array_t<double> add_arrays2(py::array_t<double> input1, py::array_t<double> input2);
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_NUMPYDEMO_HPP
