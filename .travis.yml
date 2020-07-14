@@ -7,14 +7,14 @@ jobs:
   include:
     - name: "Guideline checks"
       os: linux
-      dist: xenial
+      dist: bionic
       compiler: clang
       env:
         - BUILD_NAME="checks"
 
     - name: "Linux Debug"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
@@ -25,7 +25,7 @@ jobs:
 
     - name: "Linux Release"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Release
@@ -55,7 +55,7 @@ jobs:
 
     - name: "Linux Coverage"
       os: linux
-      dist: xenial
+      dist: bionic
       compiler: clang
       env:
         - BUILD_NAME="linux-macos"
@@ -104,7 +104,7 @@ jobs:
 
     - name: "R Linux"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
