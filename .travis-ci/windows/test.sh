@@ -2,6 +2,7 @@
 set -eo pipefail
 
 if [[ "$DEBUG_CI" == true ]]; then
+  CTEST_FLAGS=--verbose
   set -x
 fi
 
@@ -19,4 +20,4 @@ export PATH=$PWD/installed/bin:$PATH
 # add OpenBLAS DLL library path
 export PATH=$HOME/Miniconda3/Library/bin:$PATH
 
-ctest -C ${MODE} # --verbose
+ctest -C "${MODE}" ${CTEST_FLAGS}
