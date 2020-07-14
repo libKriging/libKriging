@@ -93,7 +93,7 @@ jobs:
       env:
         - BUILD_NAME="octave-linux-macos"
         - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=off
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
@@ -107,7 +107,7 @@ jobs:
       env:
         - BUILD_NAME="octave-linux-macos"
         - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=on
+        - ENABLE_PYTHON_BINDING=off
 
 #    - name: "Octave Windows"
 #      os: windows
