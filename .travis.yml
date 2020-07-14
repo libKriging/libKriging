@@ -112,11 +112,12 @@ jobs:
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
-      language: r
-      r: release
       addons:
         apt:
           packages:
+            - r-base
+            - liblapack-dev
+            - gfortran
             - python3-pip
 
     - name: "R MacOS"
