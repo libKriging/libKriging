@@ -9,11 +9,14 @@ set(LIBKRIGING_PYTHON_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 include(${LIBKRIGING_SOURCE_DIR}/cmake/version.cmake)
 
-set(ARMADILLO_ROOT_DIR ${LIBKRIGING_SOURCE_DIR}/dependencies/armadillo-code)
-set(PYBIND11_ROOT_DIR ${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11)
+
+# force pybind11 to use the right python interpreter, it could be useful 
+# to define CMAKE_PREFIX_PATH with PYTHON_PREFIX_PATH (cf carma CMake config)
+# pybind11 is loading manually to be always available even if conditionally not loaded by carma
+add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11 pybind11)
 set(CARMA_DEV_TARGET false)
-set(BUILD_TESTS on)
-set(BUILD_EXAMPLES on)
+# following CACHE is required (cf https://cmake.org/cmake/help/git-stage/policy/CMP0077.html)
+set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
 set(pylibkriging_SRCS src/pylibkirging.cpp)
