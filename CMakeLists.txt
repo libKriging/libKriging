@@ -258,9 +258,12 @@ endif ()
 #------------------------------------------------------
 
 # search for python-config (for building Python module)
-find_program(PYTHON_EXECUTABLE
-        NAMES python3
-        )
+
+
+# force pybind11 to use the right python interpreter, it could be useful 
+# to define CMAKE_PREFIX_PATH with PYTHON_PREFIX_PATH (cf carma CMake config)
+# pybind11 is loading manually to be always available even if conditionally not loaded by carma
+add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11 pybind11)
 set(HAS_PYTHON_REQUIREMENT false)
 if (PYTHON_EXECUTABLE)
     set(HAS_PYTHON_REQUIREMENT true)

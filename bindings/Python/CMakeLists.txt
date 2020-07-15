@@ -9,11 +9,6 @@ set(LIBKRIGING_PYTHON_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 include(${LIBKRIGING_SOURCE_DIR}/cmake/version.cmake)
 
-
-# force pybind11 to use the right python interpreter, it could be useful 
-# to define CMAKE_PREFIX_PATH with PYTHON_PREFIX_PATH (cf carma CMake config)
-# pybind11 is loading manually to be always available even if conditionally not loaded by carma
-add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11 pybind11)
 set(CARMA_DEV_TARGET false)
 # following CACHE is required (cf https://cmake.org/cmake/help/git-stage/policy/CMP0077.html)
 # set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
