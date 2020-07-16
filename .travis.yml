@@ -18,6 +18,7 @@ jobs:
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
@@ -30,6 +31,7 @@ jobs:
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
@@ -42,12 +44,14 @@ jobs:
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
 
     - name: "Windows Debug"
       os: windows
       env:
         - BUILD_NAME="windows"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
 
 #    - name: "Windows Release"
 #      os: windows
@@ -88,6 +92,8 @@ jobs:
       dist: bionic # bionic does not support Octave 5
       env:
         - BUILD_NAME="octave-linux-macos"
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=off
       addons:
         apt:
           packages:
@@ -100,6 +106,8 @@ jobs:
       osx_image: xcode9.4
       env:
         - BUILD_NAME="octave-linux-macos"
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=on
 
 #    - name: "Octave Windows"
 #      os: windows
@@ -112,6 +120,7 @@ jobs:
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
@@ -126,6 +135,8 @@ jobs:
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+
       language: r
       r: release
 
@@ -134,6 +145,7 @@ jobs:
       env:
         - BUILD_NAME="r-windows"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=auto
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh
