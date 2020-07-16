@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-if [[ "$DEBUG_CI" == true ]]; then
+echo "DEBUG_CI=$DEBUG_CI" 
+
+if [[ "$DEBUG_CI" == "true" ]]; then
   CTEST_FLAGS=--verbose
   set -x
 fi

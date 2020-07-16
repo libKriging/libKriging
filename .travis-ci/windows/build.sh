@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-if [[ "$DEBUG_CI" == true ]]; then
+if [[ "$DEBUG_CI" == "true" ]]; then
   export VERBOSE=true
   set -x
 fi

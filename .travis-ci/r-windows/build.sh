@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-if [[ "$DEBUG_CI" == true ]]; then
+if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
