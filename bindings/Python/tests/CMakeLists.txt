@@ -1,3 +1,4 @@
+
 macro(add_python_test)
     set(options WILL_FAIL)
     set(oneValueArgs NAME FILENAME)
@@ -28,7 +29,7 @@ macro(add_python_test)
     endif ()
     set_tests_properties(Python/${ARGS_NAME}
             PROPERTIES
-            WORKING_DIRECTORY ${LIBKRIGING_PYTHON_BINARY_DIR}
+            WORKING_DIRECTORY "${LIBKRIGING_PYTHON_BINARY_DIR}"
             ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}"
             LABELS Python
             ${ARGS_PROPERTIES})
