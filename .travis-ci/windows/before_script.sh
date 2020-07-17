@@ -2,6 +2,9 @@
 set -eo pipefail
 
 if [[ "$DEBUG_CI" == "true" ]]; then
+    # export PATH=${HOME}/Miniconda3:$PATH
+    export PATH=/c/Python37:$PATH
+
     echo "PATH=$PATH"
 
     echo "CMake config: $(command -v cmake)"
@@ -17,9 +20,10 @@ if [[ "$DEBUG_CI" == "true" ]]; then
       R --version | sed 's/^/  /'
     fi
 
-    if ( command -v python3 >/dev/null 2>&1 ); then
-      echo "Python3 config: $(command -v python3)"
-      python3 --version | sed 's/^/  /'
+    # Python3 is named python in Windows 
+    if ( command -v python >/dev/null 2>&1 ); then
+      echo "Python config: $(command -v python)"
+      python --version | sed 's/^/  /'
     fi
 
     echo "EXTRA_CMAKE_OPTIONS = ${EXTRA_CMAKE_OPTIONS}"
