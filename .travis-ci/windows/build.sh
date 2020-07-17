@@ -2,6 +2,7 @@
 set -eo pipefail
 
 if [[ "$DEBUG_CI" == true ]]; then
+  export VERBOSE=true
   set -x
 fi
 
@@ -12,7 +13,7 @@ BUILD_TEST=${BUILD_TEST:-true}
 
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
 echo
-    cd ${TRAVIS_BUILD_DIR}
+    cd "${TRAVIS_BUILD_DIR}"
 fi
 
 # OpenBLAS installation
@@ -27,12 +28,12 @@ cmake \
   ..
 
 if [[ "$BUILD_TEST" == "true" ]]; then
-    cmake --build . --target ALL_BUILD --config ${MODE}
+    cmake --build . --target ALL_BUILD --config "${MODE}"
     # add library directory search PATH for executables
     export PATH=$PWD/src/lib/${MODE}:$PATH
 
-    cmake --build . --target install --config ${MODE}
+    cmake --build . --target install --config "${MODE}"
 else
     # faster install target if tests are not required
-    cmake --build . --target install.lib --config ${MODE}
+    cmake --build . --target install.lib --config "${MODE}"
 fi
