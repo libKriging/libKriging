@@ -16,7 +16,7 @@ include(${LIBKRIGING_SOURCE_DIR}/cmake/version.cmake)
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11 pybind11)
 set(CARMA_DEV_TARGET false)
 # following CACHE is required (cf https://cmake.org/cmake/help/git-stage/policy/CMP0077.html)
-set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
+# set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
 set(pylibkriging_SRCS src/pylibkirging.cpp)
@@ -41,3 +41,6 @@ target_compile_definitions(pylibkriging PUBLIC VERSION_INFO=\"${KRIGING_VERSION}
 
 enable_testing()
 add_subdirectory(tests)
+
+install(TARGETS pylibkriging
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Python)
