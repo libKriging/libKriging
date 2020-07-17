@@ -40,7 +40,7 @@ jobs:
 
     - name: "MacOS Debug"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
@@ -103,7 +103,7 @@ jobs:
 
     - name: "Octave MacOS"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
         - BUILD_NAME="linux-macos"
         - ENABLE_OCTAVE_BINDING=on
@@ -132,12 +132,11 @@ jobs:
 
     - name: "R MacOS"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
         - ENABLE_PYTHON_BINDING=on
-
       language: r
       r: release
 

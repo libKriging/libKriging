@@ -20,7 +20,8 @@ fi
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   case "$(uname -s)" in
    Darwin)
-     brew install octave gcc@7
+     # using brew in .travis-ci.yml is too slow or fails with "update: true"
+     brew install octave
      ;;
 
    Linux)
