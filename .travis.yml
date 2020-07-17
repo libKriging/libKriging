@@ -91,7 +91,7 @@ jobs:
       os: linux
       dist: bionic # bionic does not support Octave 5
       env:
-        - BUILD_NAME="octave-linux-macos"
+        - BUILD_NAME="linux-macos"
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=on
       addons:
@@ -105,7 +105,7 @@ jobs:
       os: osx
       osx_image: xcode9.4
       env:
-        - BUILD_NAME="octave-linux-macos"
+        - BUILD_NAME="linux-macos"
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=off
 

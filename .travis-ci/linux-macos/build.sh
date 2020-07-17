@@ -18,6 +18,10 @@ if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
 
+if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
+  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=off"
+fi
+
 mkdir -p build
 cd build
 cmake \
