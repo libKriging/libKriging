@@ -6,6 +6,8 @@ echo "DEBUG_CI=$DEBUG_CI"
 if [[ "$DEBUG_CI" == "true" ]]; then
   CTEST_FLAGS=--verbose
   set -x
+else
+  CTEST_FLAGS=--output-on-failure
 fi
 
 if [[ "$MODE" == "Coverage" ]]; then
