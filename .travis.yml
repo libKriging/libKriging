@@ -112,7 +112,8 @@ jobs:
 #    - name: "Octave Windows"
 #      os: windows
 #      env:
-#        - BUILD_NAME="octave-windows"
+#        - BUILD_NAME="windows"
+#        - ENABLE_OCTAVE_BINDING=on
 
     - name: "R Linux"
       os: linux
