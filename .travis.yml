@@ -109,11 +109,12 @@ jobs:
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=off
 
-#    - name: "Octave Windows"
-#      os: windows
-#      env:
-#        - BUILD_NAME="windows"
-#        - ENABLE_OCTAVE_BINDING=on
+    - name: "Octave Windows"
+      os: windows
+      env:
+        - BUILD_NAME="octave-windows"
+        - MODE=Release
+        - ENABLE_OCTAVE_BINDING=on
 
     - name: "R Linux"
       os: linux
