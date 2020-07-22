@@ -49,10 +49,11 @@ endif()
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p DL_LDFLAGS
         OUTPUT_VARIABLE OCT_DLLDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+separate_arguments(OCT_DLLDFLAGS) # transform in list
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LDFLAGS
         OUTPUT_VARIABLE OCT_LDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-separate_arguments(OCT_LDFLAGS)
+separate_arguments(OCT_LDFLAGS) # transform in list
 #execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LFLAGS
 #        OUTPUT_VARIABLE OCT_LFLAGS
 #        OUTPUT_STRIP_TRAILING_WHITESPACE)
