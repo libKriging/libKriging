@@ -43,7 +43,7 @@ fi
 ## https://anaconda.org/r/rtools
 #${HOME}/Miniconda3/condabin/conda.bat install -y -c r r rtools
 #export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH
-#if [[ "$DEBUG_CI" != true ]]; then
+#if [[ "$DEBUG_CI" != "true" ]]; then
 #echo
 #echo 'Add following paths:'
 #echo 'export PATH="/c/Program Files/make/make-4.3/bin":$PATH'
@@ -51,7 +51,7 @@ fi
 #echo 'export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH'
 #fi
 
-if [[ "$DEBUG_CI" != true ]]; then
+if [[ "$DEBUG_CI" != "true" ]]; then
 # We need an access to libomp.dll, flang.dll, flangrti.dll, openblas.dll
 # located in ${HOME}/Miniconda3/Library/bin
 echo 'export PATH=$HOME/Miniconda3/Library/bin:$PATH'

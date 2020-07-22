@@ -35,7 +35,6 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
 BUILD_TEST=false \
-    MODE=Release \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}" \
