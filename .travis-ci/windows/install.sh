@@ -57,5 +57,5 @@ fi
 
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
-  choco install --no-progress -y octave
+  choco install -y --no-progress octave.portable
 fi

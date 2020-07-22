@@ -3,6 +3,8 @@ set -eo pipefail
 
 if [[ "$DEBUG_CI" == "true" ]]; then
     echo "PATH=$PATH"
+    #export PATH=/c/Octave/Octave-5.2.0/mingw64/bin/:$PATH
+    export PATH=/c/ProgramData/chocolatey/lib/octave.portable/tools/octave-5.2.0-w64/mingw64/bin/:$PATH
 
     echo "C++ config: $(command -v c++)"
     c++ --version | sed 's/^/  /'

@@ -4,6 +4,8 @@ set -eo pipefail
 if [[ "$DEBUG_CI" == "true" ]]; then
     # export PATH=${HOME}/Miniconda3:$PATH
     export PATH=/c/Python37:$PATH
+    #export PATH=/c/Octave/Octave-5.2.0/mingw64/bin/:$PATH
+    export PATH=/c/ProgramData/chocolatey/lib/octave.portable/tools/octave-5.2.0-w64/mingw64/bin/:$PATH
 
     echo "PATH=$PATH"
 
