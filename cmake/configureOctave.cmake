@@ -14,7 +14,7 @@ execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -p BINDIR
 
 find_program(OCTAVE_EXECUTABLE
         HINTS ${OCTAVE_BIN_PATHS}
-        NAMES octave octave-cli
+        NAMES octave-cli octave
         )
 find_program(OCTAVE_MKOCTFILE
         HINTS ${OCTAVE_BIN_PATHS}

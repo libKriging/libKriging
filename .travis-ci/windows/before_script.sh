@@ -12,8 +12,8 @@ if [[ "$DEBUG_CI" == "true" ]]; then
     echo "CMake config: $(command -v cmake)"
     cmake --version | sed 's/^/  /'
     
-    if ( command -v octave >/dev/null 2>&1 ); then
-      echo "Octave config: $(command -v octave)"
+    if ( command -v octave-cli >/dev/null 2>&1 ); then
+      echo "Octave config: $(command -v octave-cli)"
       octave --version | sed 's/^/  /'
     fi
 

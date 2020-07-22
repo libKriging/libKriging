@@ -18,9 +18,9 @@ if [[ "$DEBUG_CI" == "true" ]]; then
       make --version | sed 's/^/  /'
     fi
 
-    if ( command -v octave >/dev/null 2>&1 ); then
-      echo "Octave config: $(command -v octave)"
-      octave --version | sed 's/^/  /'
+    if ( command -v octave-cli >/dev/null 2>&1 ); then
+      echo "Octave config: $(command -v octave-cli)"
+      octave-cli --version | sed 's/^/  /'
     fi
 
     # export PATH=${HOME}/Miniconda3/Scripts:${PATH}
