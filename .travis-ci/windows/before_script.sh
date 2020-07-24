@@ -22,7 +22,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
       R --version | sed 's/^/  /'
     fi
 
-    # Python3 is named python in Windows 
+    # Python3 is named python in Windows
     if ( command -v python >/dev/null 2>&1 ); then
       echo "Python config: $(command -v python)"
       python --version | sed 's/^/  /'
