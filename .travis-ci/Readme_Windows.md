@@ -67,8 +67,20 @@ Using bash shell:
     # Notepad++
     curl -o ${HOME}/Downloads/npp.7.7.1.Installer.exe https://notepad-plus-plus.org/repository/7.x/7.7.1/npp.7.7.1.Installer.exe
     ${HOME}/Downloads/npp.7.7.1.Installer.exe
-    
-    # dependency walker
+    ```  
+  
+* For dependency analysis
+    * dependency walker
+    ```
     curl -Lo depends22_x64.zip http://www.dependencywalker.com/depends22_x64.zip
+    # command line option: https://dependencywalker.com/help/html/hidr_command_line_help.htm
+    # ex:  ./depends.exe -f:1 -c -ot:output.txt file.exe
     ``` 
+    
+    * Dependencies (a modern replacement for dependency walker)
+    ```
+    curl -LO https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip
+    # https://github.com/lucasg/Dependencies
+    # https://stackoverflow.com/questions/49196859/how-to-output-dependency-walker-to-the-console
+    ```
     
