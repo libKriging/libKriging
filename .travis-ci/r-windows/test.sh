@@ -5,13 +5,16 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(readlink -f "${BASEDIR}")
+
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
 
-export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
-export PATH=${HOME}/Miniconda3/Library/bin:$PATH
+. ${BASEDIR}/loadenv.sh
+
 export LIBKRIGING_PATH=${PWD}/build/installed
 export PATH=${LIBKRIGING_PATH}/bin:${PATH}
 

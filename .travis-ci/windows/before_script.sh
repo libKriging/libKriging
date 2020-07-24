@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-if [[ "$DEBUG_CI" == "true" ]]; then
-    # export PATH=${HOME}/Miniconda3:$PATH
-    export PATH=/c/Python37:$PATH
-    #export PATH=/c/Octave/Octave-5.2.0/mingw64/bin/:$PATH
-    export PATH=/c/ProgramData/chocolatey/lib/octave.portable/tools/octave-5.2.0-w64/mingw64/bin/:$PATH
+BASEDIR=$(dirname "$0")
+BASEDIR=$(readlink -f "${BASEDIR}")
 
+if [[ "$DEBUG_CI" == "true" ]]; then
+    . ${BASEDIR}/loadenv.sh
     echo "PATH=$PATH"
 
     echo "CMake config: $(command -v cmake)"
@@ -24,7 +23,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     # Python3 is named python in Windows
     if ( command -v python >/dev/null 2>&1 ); then
-      echo "Python config: $(command -v python)"
+      echo "Python3 config: $(command -v python)"
       python --version | sed 's/^/  /'
     fi
 

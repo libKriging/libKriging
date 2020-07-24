@@ -5,34 +5,22 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(readlink -f "${BASEDIR}")
+
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
 
-# make
-export PATH="/c/Program Files/make/make-4.3/bin":${PATH}
-
-# R shortcut (and tools with absolute path) by Chocolatey
-export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH
-# Required to disambiguate with Chocolatey GCC installation
-export PATH="/c/Rtools/mingw_64/bin":$PATH
-
-## R shortcut (and tools) by Anaconda
-#export PATH=${HOME}/Miniconda3/Scripts:${PATH}
-#export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH
+. ${BASEDIR}/loadenv.sh
 
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
-# and libomp.dll, flang.dll, flangrti.dll, openblas.dll
-export PATH=${HOME}/Miniconda3/Library/bin:$PATH
 
 # Windows + Shared : OK
 # Windows + Static : OK
 MAKE_SHARED_LIBS=on
-
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
 
 BUILD_TEST=false \
     CC=$(R CMD config CC) \

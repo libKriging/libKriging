@@ -24,39 +24,18 @@ if [ ! -f "C:/Rtools/VERSION.txt" ]; then
 else
 	echo "Rtools installation detected: nothing to do"
 fi
-export PATH="/c/Rtools/mingw_64/bin":$PATH
 
 # For R packaging
 choco install -y zip
 
-if [[ "$DEBUG_CI" != true ]]; then
-echo
-echo 'Add following paths:'
-echo 'export PATH="/c/Program Files/make/make-4.3/bin":$PATH'
-echo 'export PATH="/c/Program Files/R/R-3.6.0/bin":$PATH'
-echo 'export PATH="/c/Rtools/mingw_64/bin":$PATH'
-fi
+. ${BASEDIR}/loadenv.sh
 
 ## Using Anaconda
 ## -c r : means "from 'r' channel"
 ## https://anaconda.org/r/r
 ## https://anaconda.org/r/rtools
 #${HOME}/Miniconda3/condabin/conda.bat install -y -c r r rtools
-#export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH
-#if [[ "$DEBUG_CI" != "true" ]]; then
-#echo
-#echo 'Add following paths:'
-#echo 'export PATH="/c/Program Files/make/make-4.3/bin":$PATH'
-#echo 'export PATH=$HOME/Miniconda3/Scripts:$PATH'
-#echo 'export PATH=$HOME/Miniconda3/Rtools/mingw_64/bin:$PATH'
-#fi
 
-if [[ "$DEBUG_CI" != "true" ]]; then
-# We need an access to libomp.dll, flang.dll, flangrti.dll, openblas.dll
-# located in ${HOME}/Miniconda3/Library/bin
-echo 'export PATH=$HOME/Miniconda3/Library/bin:$PATH'
-echo
-fi
 
 # Crazy hack since R try to call 'g++ ' as compiler
 # Message looks like:

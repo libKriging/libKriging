@@ -8,5 +8,6 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
-export PATH=/c/ProgramData/chocolatey/lib/octave.portable/tools/octave-5.2.0-w64/mingw64/bin/:$PATH
+. ${BASEDIR}/loadenv.sh
+
 "${BASEDIR}"/../linux-macos/test.sh
