@@ -5,8 +5,8 @@
 #ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_NUMPYDEMO_HPP
 #define LIBKRIGING_BINDINGS_PYTHON_SRC_NUMPYDEMO_HPP
 
-#include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
 
 namespace py = pybind11;
 

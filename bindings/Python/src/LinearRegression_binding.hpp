@@ -21,15 +21,15 @@ class PyLinearRegression {
   ~PyLinearRegression();
 
   void fit(const py::array_t<double>& y, const py::array_t<double>& X);
-  
+
   // TODO The result should be a namedtuple
   // see
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
-  std::tuple<py::array_t<double>,py::array_t<double>> predict(const py::array_t<double>& X);
- 
+  std::tuple<py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X);
+
  private:
-  std::unique_ptr<LinearRegression> m_internal; 
+  std::unique_ptr<LinearRegression> m_internal;
 };
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_LINEARREGRESSION_BINDING_HPP
