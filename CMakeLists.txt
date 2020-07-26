@@ -9,11 +9,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # this is due to line: configure_file(${PROJECT_SOURCE_DIR}/examples/Makefile.cmake ${PROJECT_SOURCE_DIR}/examples/Makefile)
 # set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
-# VERSION must follow pattern : <major>.<minor>.<patch>
-set(KRIGING_VERSION_MAJOR 0)
-set(KRIGING_VERSION_MINOR 0)
-set(KRIGING_VERSION_PATCH 0)
-set(KRIGING_VERSION "${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}")
+include(cmake/version.cmake)
 
 project(libKriging
         VERSION ${KRIGING_VERSION}
@@ -82,6 +78,19 @@ else ()
     endif ()
 endif ()
 
+# ENABLE_PYTHON_BINDING default is AUTO
+string(TOUPPER "${ENABLE_PYTHON_BINDING}" ENABLE_PYTHON_BINDING)
+if (NOT DEFINED ENABLE_PYTHON_BINDING OR ENABLE_PYTHON_BINDING STREQUAL "")
+    set(ENABLE_PYTHON_BINDING "AUTO" CACHE STRING
+            "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
+            FORCE)
+else ()
+    string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_PYTHON_BINDING "${ENABLE_PYTHON_BINDING}")
+    if (VALID_PYTHON_BINDING STREQUAL "") # /!\ IF(VALID_PYTHON_BINDING) is false when ENABLE_PYTHON_BINDING is OFF
+        logFatalError("Invalid ENABLE_PYTHON_BINDING option '${ENABLE_PYTHON_BINDING}'; choose between ON, OFF and AUTO.")
+    endif ()
+endif ()
+
 #------------------------------------------------------
 
 set(CMAKE_CXX_STANDARD 17)
@@ -98,6 +107,7 @@ list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
 # Dependencies
 set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
+set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 include_directories(SYSTEM dependencies/optim/header_only_version)
@@ -169,9 +179,16 @@ add_definitions(/DARMA_32BIT_WORD)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")
+    if (WIN32 AND MINGW) # https://stackoverflow.com/questions/16596876/object-file-has-too-many-sections
+        set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wa,-mbig-obj")
+    endif()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wsign-compare -Wunused -Wunused-member-function -Wunused-private-field")
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    # workaround like https://github.com/nlohmann/json/issues/1408
+    # to avoid error like: carma\third_party\armadillo-code\include\armadillo_bits/arma_str.hpp(194): error C2039: '_snprintf': is not a member of 'std' (compiling source file carma\tests\src\bindings.cpp) 
+    ADD_DEFINITIONS(-DHAVE_SNPRINTF)
 endif ()
 
 # Compiler flags
@@ -219,6 +236,7 @@ if (OCTAVE_CONFIG_EXECUTABLE)
             logFatalError("Octave binding requires static library mode")
         else ()
             add_subdirectory(bindings/Octave)
+            set(ENABLED_OCTAVE_BINDING ON)
             message(STATUS "Octave binding enabled")
         endif ()
     elseif (ENABLE_OCTAVE_BINDING STREQUAL "OFF")
@@ -228,6 +246,7 @@ if (OCTAVE_CONFIG_EXECUTABLE)
             message(STATUS "Octave binding disabled since it requires static library mode")
         else ()
             add_subdirectory(bindings/Octave)
+            set(ENABLED_OCTAVE_BINDING ON)
             message(STATUS "Octave binding enabled")
         endif ()
     else ()
@@ -240,6 +259,68 @@ else ()
         message(STATUS "Octave binding not available.")
     else ()
         logFatalError("INTERNAL ERROR: value '${ENABLE_OCTAVE_BINDING}' not managed")
+    endif ()
+endif ()
+
+#------------------------------------------------------
+
+# search for python-config (for building Python module)
+
+
+# force pybind11 to use the right python interpreter, it could be useful 
+# to define CMAKE_PREFIX_PATH with PYTHON_PREFIX_PATH (cf carma CMake config)
+# pybind11 is loading manually to be always available even if conditionally not loaded by carma
+if (PYTHON_PREFIX_PATH)
+    set(CMAKE_PREFIX_PATH_SAVED ${CMAKE_PREFIX_PATH})
+    list(APPEND CMAKE_PREFIX_PATH ${PYTHON_PREFIX_PATH})
+endif()
+add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/pybind11 pybind11)
+if (CMAKE_PREFIX_PATH_SAVED)
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH_SAVED})
+    unset(CMAKE_PREFIX_PATH_SAVED)
+endif()
+set(HAS_PYTHON_REQUIREMENT false)
+if (PYTHON_EXECUTABLE)
+    set(HAS_PYTHON_REQUIREMENT true)
+    set(PYTHON_REQUIRED_MODULE_LIST pytest numpy)
+    set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter found: ${PYTHON_EXECUTABLE}")
+    foreach(PYTHON_REQUIRED_MODULE ${PYTHON_REQUIRED_MODULE_LIST})
+        execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import ${PYTHON_REQUIRED_MODULE}"
+                        RESULT_VARIABLE PYTHON_IMPORT_RETCODE
+                        OUTPUT_QUIET ERROR_QUIET)
+        if (PYTHON_IMPORT_RETCODE EQUAL "0")
+            string(APPEND PYTHON_REQUIREMENT_INFO "\n\t✔ Module ${PYTHON_REQUIRED_MODULE} is available")
+        else()
+            string(APPEND PYTHON_REQUIREMENT_INFO "\n\t✘ Module ${PYTHON_REQUIRED_MODULE} is NOT available")
+            set(HAS_PYTHON_REQUIREMENT false)
+        endif()
+    endforeach()
+else()
+    set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter not found")
+endif()
+
+if (HAS_PYTHON_REQUIREMENT)
+    if (ENABLE_PYTHON_BINDING STREQUAL "ON")
+        add_subdirectory(bindings/Python)
+        set(ENABLED_PYTHON_BINDING ON)
+        message(STATUS "Python binding enabled")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "OFF")
+        message(STATUS "PYTHON binding available but disabled as requested.")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "AUTO")
+        add_subdirectory(bindings/Python)
+        set(ENABLED_PYTHON_BINDING ON)
+        message(STATUS "Python binding enabled")
+    else ()
+        logFatalError("INTERNAL ERROR: value '${ENABLE_PYTHON_BINDING}' not managed")
+    endif ()
+else ()
+    message(STATUS "Python requirement failure:\n${PYTHON_REQUIREMENT_INFO}")
+    if (ENABLE_PYTHON_BINDING STREQUAL "ON")
+        logFatalError("Python binding requested but not available.")
+    elseif (ENABLE_PYTHON_BINDING STREQUAL "OFF" OR ENABLE_PYTHON_BINDING STREQUAL "AUTO")
+        message(STATUS "Python binding not available.")
+    else ()
+        logFatalError("INTERNAL ERROR: value '${ENABLE_PYTHON_BINDING}' not managed")
     endif ()
 endif ()
 
@@ -334,13 +415,27 @@ endif ()
 # search for clang-format and add target
 find_program(CLANG_FORMAT clang-format)
 if (CLANG_FORMAT)
-    add_custom_target(clang-format
-            COMMAND echo "running ${CLANG_FORMAT} ..."
-            COMMAND ${CMAKE_COMMAND}
-            -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
-            -DCLANG_FORMAT="${CLANG_FORMAT}"
-            -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
-    message(STATUS "clang-format target for updating code format is available")
+    exec_program(${CLANG_FORMAT} ARGS -version
+            OUTPUT_VARIABLE CLANG_FORMAT_RAW_VERSION)
+    string(REGEX MATCH "[1-9][0-9]*\\.[0-9]+\\.[0-9]+"
+            CLANG_FORMAT_VERSION ${CLANG_FORMAT_RAW_VERSION})
+    if (CLANG_FORMAT_VERSION VERSION_GREATER_EQUAL "6.0.0")
+        add_custom_target(clang-format
+                COMMAND echo "running ${CLANG_FORMAT} ..."
+                COMMAND ${CMAKE_COMMAND}
+                -DLIBKRIGING_SOURCE_DIR="${LIBKRIGING_SOURCE_DIR}"
+                -DCLANG_FORMAT="${CLANG_FORMAT}"
+                -P ${LIBKRIGING_SOURCE_DIR}/cmake/ClangFormatProcess.cmake)
+        message(STATUS "clang-format target for updating code format is available")
+    else()
+        message(WARNING "incompatible clang-format found (<6.0.0); clang-format target is not available.")
+        add_custom_target(clang-format
+                COMMAND ${CMAKE_COMMAND} -E echo ""
+                COMMAND ${CMAKE_COMMAND} -E echo "*** code formatting not available since clang-format version is incompatible ***"
+                COMMAND ${CMAKE_COMMAND} -E echo ""
+                COMMENT "Inform about not available code format."
+                )
+    endif()
 else ()
     message(WARNING "clang-format no found; clang-format target is not available.")
     add_custom_target(clang-format
@@ -393,3 +488,9 @@ ADD_CUSTOM_TARGET(install.lib
         -DBUILD_TYPE=${CMAKE_BUILD_TYPE}
         -P ${CMAKE_BINARY_DIR}/cmake_install.cmake)
 ADD_DEPENDENCIES(install.lib Kriging armadillo)
+if (ENABLED_PYTHON_BINDING)
+    ADD_DEPENDENCIES(install.lib pylibkriging)
+endif()
+if (ENABLED_OCTAVE_BINDING)
+    ADD_DEPENDENCIES(install.lib mLibKriging)
+endif()

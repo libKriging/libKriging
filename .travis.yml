@@ -7,45 +7,51 @@ jobs:
   include:
     - name: "Guideline checks"
       os: linux
-      dist: xenial
+      dist: bionic
       compiler: clang
       env:
         - BUILD_NAME="checks"
 
     - name: "Linux Debug"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
             - liblapack-dev
+            - python3-pip
 
     - name: "Linux Release"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
             - liblapack-dev
+            - python3-pip
 
     - name: "MacOS Debug"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
 
     - name: "Windows Debug"
       os: windows
       env:
         - BUILD_NAME="windows"
         - MODE=Debug
+        - ENABLE_PYTHON_BINDING=on
 
 #    - name: "Windows Release"
 #      os: windows
@@ -55,7 +61,7 @@ jobs:
 
     - name: "Linux Coverage"
       os: linux
-      dist: xenial
+      dist: bionic
       compiler: clang
       env:
         - BUILD_NAME="linux-macos"
@@ -66,8 +72,9 @@ jobs:
           packages:
             - liblapack-dev
             - lcov
+            - python3-pip
 
-#    # Disabled because too long
+    #    # Disabled because too long
 #    - name: "MacOS Coverage"
 #      os: osx
 #      osx_image: xcode9.4
@@ -84,39 +91,53 @@ jobs:
       os: linux
       dist: bionic # bionic does not support Octave 5
       env:
-        - BUILD_NAME="octave-linux-macos"
+        - BUILD_NAME="linux-macos"
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
             - octave
             - octave-pkg-dev
+            - python3-pip
 
     - name: "Octave MacOS"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
-        - BUILD_NAME="octave-linux-macos"
+        - BUILD_NAME="linux-macos"
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=off
 
-#    - name: "Octave Windows"
-#      os: windows
-#      env:
-#        - BUILD_NAME="octave-windows"
+    - name: "Octave Windows"
+      os: windows
+      env:
+        - BUILD_NAME="octave-windows"
+        - MODE=Release
+        - ENABLE_OCTAVE_BINDING=on
 
     - name: "R Linux"
       os: linux
-      dist: xenial
+      dist: bionic
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
-      language: r
-      r: release
+        - ENABLE_PYTHON_BINDING=on
+      addons:
+        apt:
+          packages:
+            - r-base
+            - liblapack-dev
+            - gfortran
+            - python3-pip
 
     - name: "R MacOS"
       os: osx
-      osx_image: xcode9.4
+      osx_image: xcode11.3
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
       language: r
       r: release
 
@@ -125,6 +146,7 @@ jobs:
       env:
         - BUILD_NAME="r-windows"
         - MODE=Release
+        - ENABLE_PYTHON_BINDING=auto
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh

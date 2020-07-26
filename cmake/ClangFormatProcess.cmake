@@ -6,6 +6,7 @@ if(LIBKRIGING_SOURCE_DIR AND CLANG_FORMAT)
             ${LIBKRIGING_SOURCE_DIR}/src/**.[hc]pp
             ${LIBKRIGING_SOURCE_DIR}/tests/**.[hc]pp
             ${LIBKRIGING_SOURCE_DIR}/bindings/Octave/**.[hc]pp
+            ${LIBKRIGING_SOURCE_DIR}/bindings/Python/**.[hc]pp
             ${LIBKRIGING_SOURCE_DIR}/bindings/R/rlibkriging/**.[hc]pp
             )
 

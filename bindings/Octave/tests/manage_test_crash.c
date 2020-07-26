@@ -2,7 +2,7 @@
  * These code is able to convert any crash code (segfault, abort...) into a standard exit code.
  */
 
-#ifndef _MSC_VER
+#ifndef WIN32
 // inspired from
 // https://stackoverflow.com/questions/33693486/how-can-i-use-cmake-to-test-processes-that-are-expected-to-fail-with-an-exceptio
 
@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
   }
 }
 
-#else /* _MSC_VER */
+#else /* WIN32 */
 // inspired from
 // https://docs.microsoft.com/en-us/windows/win32/procthread/creating-processes
 
@@ -96,4 +96,4 @@ void _tmain(int argc, TCHAR* argv[]) {
   CloseHandle(pi.hThread);
 }
 
-#endif /* _MSC_VER */
+#endif /* WIN32 */

@@ -15,8 +15,7 @@ fi
 
 . ${BASEDIR}/loadenv.sh
 
-export LIBKRIGING_PATH=${PWD}/build/installed
-export PATH=${LIBKRIGING_PATH}/bin:${PATH}
+CC=gcc CXX=g++ \
+    EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}" \
+    "${BASEDIR}"/../linux-macos/build.sh
 
-cd bindings/R
-make test

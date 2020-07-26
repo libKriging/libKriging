@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-if [[ "$DEBUG_CI" == true ]]; then
+if [[ "$DEBUG_CI" == "true" ]]; then
+  export VERBOSE=true
   set -x
 fi
 
@@ -10,15 +11,44 @@ MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
 BUILD_TEST=${BUILD_TEST:-true}
 
+export ENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING:-auto}
+export ENABLE_PYTHON_BINDING=${ENABLE_PYTHON_BINDING:-auto}
+
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
+
+if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
+  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=off"
+fi
+
+case "$COMPILER" in 
+  gcc*)
+    export CXX=g++${COMPILER#gcc} 
+    export CC=gcc${COMPILER#gcc}
+    ;;
+  clang*)
+    export CXX=clang++${COMPILER#clang} 
+    export CC=clang${COMPILER#clang}
+    # initially was only for clang ≥ 7
+    # CXXFLAGS="-stdlib=libc++"
+    ;;
+  "")
+    # not defined: use default configuration
+    ;;
+  *)
+    echo "${COMPILER} not supported compiler"
+    exit 1
+    ;;
+esac
 
 mkdir -p build
 cd build
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="${MODE}" \
+  -DENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING} \
+  -DENABLE_PYTHON_BINDING=${ENABLE_PYTHON_BINDING} \
   $(eval echo ${EXTRA_CMAKE_OPTIONS}) \
   ..
 

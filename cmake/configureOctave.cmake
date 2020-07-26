@@ -14,14 +14,15 @@ execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -p BINDIR
 
 find_program(OCTAVE_EXECUTABLE
         HINTS ${OCTAVE_BIN_PATHS}
-        NAMES octave
+        NAMES octave-cli octave
         )
 find_program(OCTAVE_MKOCTFILE
         HINTS ${OCTAVE_BIN_PATHS}
         NAMES mkoctfile
         )
 
-#for i in ALL_CFLAGS ALL_CXXFLAGS ALL_FFLAGS ALL_LDFLAGS BLAS_LIBS CC CFLAGS CPICFLAG CPPFLAGS CXX CXXFLAGS CXXPICFLAG DL_LD DL_LDFLAGS F77 F77_INTEGER8_FLAG FFLAGS FPICFLAG INCFLAGS INCLUDEDIR LAPACK_LIBS LDFLAGS LD_CXX LD_STATIC_FLAG LFLAGS LIBDIR LIBOCTAVE LIBOCTINTERP OCTAVE_LINK_OPTS OCTINCLUDEDIR OCTAVE_LIBS OCTAVE_LINK_DEPS OCTLIBDIR OCT_LINK_DEPS OCT_LINK_OPTS RDYNAMIC_FLAG SPECIAL_MATH_LIB XTRA_CFLAGS XTRA_CXXFLAGS ; do echo $i=$(mkoctfile -p $i); done
+# below: shell script to list all paramters of mkoctfile
+#  for i in ALL_CFLAGS ALL_CXXFLAGS ALL_FFLAGS ALL_LDFLAGS BLAS_LIBS CC CFLAGS CPICFLAG CPPFLAGS CXX CXXFLAGS CXXPICFLAG DL_LD DL_LDFLAGS F77 F77_INTEGER8_FLAG FFLAGS FPICFLAG INCFLAGS INCLUDEDIR LAPACK_LIBS LDFLAGS LD_CXX LD_STATIC_FLAG LFLAGS LIBDIR LIBOCTAVE LIBOCTINTERP OCTAVE_LINK_OPTS OCTINCLUDEDIR OCTAVE_LIBS OCTAVE_LINK_DEPS OCTLIBDIR OCT_LINK_DEPS OCT_LINK_OPTS RDYNAMIC_FLAG SPECIAL_MATH_LIB XTRA_CFLAGS XTRA_CXXFLAGS ; do echo $i=$(mkoctfile -p $i); done
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CPPFLAGS
         OUTPUT_VARIABLE OCT_CPPFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -35,18 +36,32 @@ execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CXXPICFLAG
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p ALL_CXXFLAGS
         OUTPUT_VARIABLE OCT_CXXFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (WIN32)
+	# Provided options from mkoctfile could be better if they are split into target_include_directories and set_target_properties(... COMPILE_FLAGS ...)
+	# Work around misunderstanding of compiler with backslashs include paths
+	if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+		string(REPLACE "\\" "/" OCT_CXXFLAGS ${OCT_CXXFLAGS})
+	else()
+		logFatalError("Unexpected configuration : WIN32 + ${CMAKE_CXX_COMPILER_ID}")
+	endif()
+endif()
+		
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p DL_LDFLAGS
         OUTPUT_VARIABLE OCT_DLLDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+separate_arguments(OCT_DLLDFLAGS) # transform in list
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LDFLAGS
         OUTPUT_VARIABLE OCT_LDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+separate_arguments(OCT_LDFLAGS) # transform in list
 #execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LFLAGS
 #        OUTPUT_VARIABLE OCT_LFLAGS
 #        OUTPUT_STRIP_TRAILING_WHITESPACE)
+#separate_arguments(OCT_LFLAGS) # transform in list
 #execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p OCTAVE_LIBS
 #        OUTPUT_VARIABLE OCT_LIBS
 #        OUTPUT_STRIP_TRAILING_WHITESPACE)
+#separate_arguments(OCT_LIBS) # transform in list
 
 #foreach (VAR OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS OCT_DLLDFLAGS OCT_LDFLAGS OCT_LFLAGS OCT_LIBS)
 #    message(STATUS "${VAR} = ${${VAR}}")
@@ -98,7 +113,7 @@ macro(add_mex_function)
     endif ()
 
     add_library(${ARGS_NAME} MODULE ${ARGS_SOURCES})
-    target_link_libraries(${ARGS_NAME} ${OCTAVE_LIBRARIES} ${ARGS_LINK_LIBRARIES})
+    target_link_libraries(${ARGS_NAME} ${ARGS_LINK_LIBRARIES} ${OCTAVE_LIBRARIES})
     # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#properties-on-targets
     set_target_properties(${ARGS_NAME} PROPERTIES
             PREFIX ""
@@ -109,7 +124,7 @@ macro(add_mex_function)
     # https://stackoverflow.com/questions/48176641/linking-to-an-executable-under-osx-with-cmake si pb avec bundle_loader
     #mkoctfile link = CXX OCT_CXXFLAGS OCT_DLLDFLAGS OCT_LDFLAGS OCT_LFLAGS OCT_LIBS
     target_link_options(${ARGS_NAME}
-            PRIVATE ${${OCT_DLLDFLAGS}} ${${OCT_LDFLAGS}}
+            PRIVATE ${OCT_DLLDFLAGS} ${OCT_LDFLAGS}
             )
 endmacro()
 
