@@ -330,6 +330,13 @@ add_subdirectory(src)
 
 #------------------------------------------------------
 
+if(${CMAKE_VERSION} VERSION_EQUAL "3.18.0")
+    # cf 
+    # - issue https://github.com/libKriging/libKriging/issues/51
+    # - comment https://gitlab.kitware.com/cmake/cmake/-/issues/21017#note_804926
+    # - doc https://cmake.org/cmake/help/v3.18/release/3.18.html#id1
+    logFatalError("CMake 3.18.0 contains an abnormal behavior; consider another version of CMake")
+endif()
 set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
 include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
 add_subdirectory("${CATCH_MODULE_PATH}")
