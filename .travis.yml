@@ -76,8 +76,28 @@ jobs:
             - liblapack-dev
             - lcov
             - python3-pip
+              
+    - name: "Linux Memcheck"
+      os: linux
+      dist: bionic
+      env:
+        - BUILD_NAME="linux-macos"
+        - MODE=Debug
+        - ENABLE_MEMCHECK=on
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=on
+      addons:
+        apt:
+          update: true
+          packages:
+            - octave
+            - octave-pkg-dev
+            - liblapack-dev
+            - valgrind
+            - python3-setuptools
+            - python3-pip
 
-    #    # Disabled because too long
+#    # Disabled because too long
 #    - name: "MacOS Coverage"
 #      os: osx
 #      osx_image: xcode9.4
