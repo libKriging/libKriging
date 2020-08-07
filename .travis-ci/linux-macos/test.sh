@@ -10,8 +10,8 @@ fi
 
 cd build
 
-if [[ "$MODE" == "Coverage" ]]; then
-    cmake --build . --target coverage --config Coverage
+if [[ "$ENABLE_COVERAGE" == "on" ]]; then
+    cmake --build . --target coverage --config "${MODE}"
 else
     ctest -C "${MODE}" ${CTEST_FLAGS}
 

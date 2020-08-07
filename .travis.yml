@@ -63,7 +63,8 @@ jobs:
       dist: bionic
       env:
         - BUILD_NAME="linux-macos"
-        - MODE=Coverage
+        - MODE=Debug
+        - ENABLE_COVERAGE=on
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=on
       addons:

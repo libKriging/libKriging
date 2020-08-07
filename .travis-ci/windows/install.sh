@@ -8,7 +8,7 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
-if [[ "$MODE" == "Coverage" ]]; then
+if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
     travis_terminate 1
 fi
