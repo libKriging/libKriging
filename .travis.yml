@@ -8,7 +8,6 @@ jobs:
     - name: "Guideline checks"
       os: linux
       dist: bionic
-      compiler: clang
       env:
         - BUILD_NAME="checks"
 
@@ -62,14 +61,17 @@ jobs:
     - name: "Linux Coverage"
       os: linux
       dist: bionic
-      compiler: clang
       env:
         - BUILD_NAME="linux-macos"
         - MODE=Coverage
+        - ENABLE_OCTAVE_BINDING=on
+        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           update: true
           packages:
+            - octave
+            - octave-pkg-dev
             - liblapack-dev
             - lcov
             - python3-pip
