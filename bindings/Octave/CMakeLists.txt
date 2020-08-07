@@ -27,5 +27,5 @@ install(FILES
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Octave
         )
 
-enable_testing()
+include(CTest)
 add_subdirectory(tests)

@@ -37,6 +37,7 @@ include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
 #option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
 option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 option(ENABLE_COVERAGE "Enable coverage target" OFF)
+option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 
 #------------------------------------------------------
 # Check options
@@ -214,6 +215,23 @@ endif ()
 
 #------------------------------------------------------
 
+# valgrind must be checked before adding new subdirectories
+# before include(CTest)
+if (ENABLE_MEMCHECK)
+    find_program(VALGRIND_EXECUTABLE valgrind)
+    if (NOT VALGRIND_EXECUTABLE)
+        MESSAGE(FATAL_ERROR "ENABLE_MEMCHECK is requested but valgrind executable cannot be found")
+    endif()
+    set(MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=50 --error-exitcode=1 --errors-for-leak-kinds=definite")
+    set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -v") # verbose run with details
+    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -q") # for quiet runs
+    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --gen-suppressions=all") # for setting up suppressions
+    set(MEMORYCHECK_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/.valgrind-suppressions")
+    MESSAGE(STATUS "Memcheck on tests enabled")
+endif()
+
+#------------------------------------------------------
+
 # search for octave-config (for building Octave's mex library)
 find_program(OCTAVE_CONFIG_EXECUTABLE
         NAMES octave-config
@@ -329,7 +347,7 @@ set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
 include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
 add_subdirectory("${CATCH_MODULE_PATH}")
 
-enable_testing()
+include(CTest)
 add_subdirectory(tests)
 
 add_custom_target(run_unit_tests

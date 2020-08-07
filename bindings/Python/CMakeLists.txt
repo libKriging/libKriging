@@ -39,7 +39,7 @@ else()
 endif()
 target_compile_definitions(pylibkriging PUBLIC VERSION_INFO=\"${KRIGING_VERSION}\")
 
-enable_testing()
+include(CTest)
 add_subdirectory(tests)
 
 install(TARGETS pylibkriging
