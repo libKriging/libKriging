@@ -1,0 +1,48 @@
+# Armadillo suppressions
+{
+   armadillo print #1
+   Memcheck:Value8
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+{
+   armadillo print #2
+   Memcheck:Cond
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+{
+   armadillo print #3
+   Memcheck:Param
+   write(buf)
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+
+# Octave suppressions
+# Generic syntax: https://stackoverflow.com/questions/3174468/is-it-possible-to-make-valgrind-ignore-certain-libraries
+{
+   Octave leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   ...
+   obj:*octave-cli*
+}
+{
+   Octave leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   ...
+   obj:*/liboctinterp.so*
+}
+{
+   Octave leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znam
+   fun:_ZN5ArrayI12octave_valueE8ArrayRepC1Ei
+   ...
+   obj:*/liboctinterp.so*
+}
+

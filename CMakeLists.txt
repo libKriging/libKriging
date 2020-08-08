@@ -36,6 +36,8 @@ include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
 #option(BUILD_SHARED_LIBS "Build the shared library" ON) # BUILD_SHARED_LIBS config should be after armadillo config
 #option(BUILD_STATIC_LIBS "Build the static library" ON) # TODO not yet implemented; today, equivalent to BUILD_SHARED_LIBS=off 
 option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
+option(ENABLE_COVERAGE "Enable coverage target" OFF)
+option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 
 #------------------------------------------------------
 # Check options
@@ -43,10 +45,10 @@ option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 # Default build type is RelWIthDebInfo
 if (NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
-            "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel Coverage"
+            "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel"
             FORCE)
 else ()
-    string(REGEX MATCH "^(Debug|Release|RelWithDebInfo|MinSizeRel|Coverage)$" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+    string(REGEX MATCH "^(Debug|Release|RelWithDebInfo|MinSizeRel)$" VALID_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
     if (VALID_BUILD_TYPE STREQUAL "")
         logFatalError("Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
     endif ()
@@ -143,30 +145,14 @@ SET("CMAKE_C_FLAGS_RELWITHDEBINFO"
         CACHE STRING "Flags used by the compiler during release builds with debug info and assertions"
         FORCE)
 
-# Add new build types
+if (ENABLE_COVERAGE)
 # --coverage option is used to compile and link code instrumented for coverage analysis.
 # The option is a synonym for -fprofile-arcs -ftest-coverage (when compiling) and -lgcov (when linking).
-set(CMAKE_CXX_FLAGS_COVERAGE
-        "-g -O0 --coverage"
-        CACHE STRING "Flags used by the C++ compiler during coverage builds."
-        FORCE)
-set(CMAKE_C_FLAGS_COVERAGE
-        "-g -O0 --coverage"
-        CACHE STRING "Flags used by the C compiler during coverage builds."
-        FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_COVERAGE
-        "--coverage"
-        CACHE STRING "Flags used for linking binaries during coverage builds."
-        FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE
-        "--coverage"
-        CACHE STRING "Flags used by the shared libraries linker during coverage builds."
-        FORCE)
-mark_as_advanced(
-        CMAKE_CXX_FLAGS_COVERAGE
-        CMAKE_C_FLAGS_COVERAGE
-        CMAKE_EXE_LINKER_FLAGS_COVERAGE
-        CMAKE_SHARED_LINKER_FLAGS_COVERAGE)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g --coverage")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g --coverage")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+endif()
 
 #------------------------------------------------------
 
@@ -189,6 +175,9 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # workaround like https://github.com/nlohmann/json/issues/1408
     # to avoid error like: carma\third_party\armadillo-code\include\armadillo_bits/arma_str.hpp(194): error C2039: '_snprintf': is not a member of 'std' (compiling source file carma\tests\src\bindings.cpp) 
     ADD_DEFINITIONS(-DHAVE_SNPRINTF)
+    if (ENABLE_COVERAGE)
+        logFatalError("Coverage is not supported with MSVC")
+    endif()
 endif ()
 
 # Compiler flags
@@ -223,6 +212,23 @@ else ()
         logFatalError("INTERNAL ERROR: value '${ENABLE_STATIC_ANALYSIS}' not managed")
     endif ()
 endif ()
+
+#------------------------------------------------------
+
+# valgrind must be checked before adding new subdirectories
+# before include(CTest)
+if (ENABLE_MEMCHECK)
+    find_program(VALGRIND_EXECUTABLE valgrind)
+    if (NOT VALGRIND_EXECUTABLE)
+        MESSAGE(FATAL_ERROR "ENABLE_MEMCHECK is requested but valgrind executable cannot be found")
+    endif()
+    set(MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=50 --error-exitcode=1 --errors-for-leak-kinds=definite")
+    set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -v") # verbose run with details
+    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -q") # for quiet runs
+    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --gen-suppressions=all") # for setting up suppressions
+    set(MEMORYCHECK_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/.valgrind-suppressions")
+    MESSAGE(STATUS "Memcheck on tests enabled")
+endif()
 
 #------------------------------------------------------
 
@@ -341,7 +347,7 @@ set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
 include("${CATCH_MODULE_PATH}/contrib/ParseAndAddCatchTests.cmake")
 add_subdirectory("${CATCH_MODULE_PATH}")
 
-enable_testing()
+include(CTest)
 add_subdirectory(tests)
 
 add_custom_target(run_unit_tests
@@ -354,7 +360,7 @@ add_custom_target(run_unit_tests
 
 # unit tests coverage
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
+if (ENABLE_COVERAGE)
     find_program(LCOV lcov)
     if (NOT LCOV)
         logFatalError("lcov not found, cannot perform coverage.")

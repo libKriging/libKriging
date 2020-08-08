@@ -5,7 +5,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-if [[ "$MODE" == "Coverage" ]]; then
+if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     gem install coveralls-lcov
 fi
 
@@ -15,6 +15,15 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
     # python3 -m pip install pip # --upgrade # --progress-bar off
     python3 -m pip install pytest numpy # --upgrade # --progress-bar off
   fi
+  
+  if [[ "$ENABLE_MEMCHECK" == "on" ]]; then 
+    python3 -m pip install pytest-valgrind
+  fi
+fi
+
+if [[ "$ENABLE_COVERAGE" == "on" ]] && [[ "$ENABLE_MEMCHECK" == "on" ]]; then
+  echo "Mixing coverage mode and memcheck is not supported"
+  exit 1
 fi
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then

@@ -1,4 +1,4 @@
-enable_testing()
+include(CTest)
 
 # target_link_libraries links the executable to the library.
 # Since the library has public include directories we will use those link directories when building
