@@ -38,7 +38,6 @@ PYBIND11_MODULE(pylibkriging, m) {
     )pbdoc");
 
   m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
-  m.def("add_arrays2", &add_arrays2, "Add two NumPy arrays");
 
   m.attr("__version__") = VERSION_INFO;
 
