@@ -21,8 +21,6 @@ macro(add_python_test)
 
     set(TEST_NAME "Python/${ARGS_NAME}")
 
-    set(MEMORYCHECK_COMMAND "")
-    set(CTEST_MEMORYCHECK_COMMAND_OPTIONS "--toto")
     if (ENABLE_MEMCHECK)
         SET(VALGRIND_LOG_FILE "${CMAKE_BINARY_DIR}/Testing/Temporary/PythonMemoryChecker.${ARGS_NAME}.log")
         add_test(NAME ${TEST_NAME}
