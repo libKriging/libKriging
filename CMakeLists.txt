@@ -99,7 +99,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 #------------------------------------------------------
 
-# Generate position independant (aka -fPIC) code even for static libs
+# Can be locally overridden using set_target_properties + https://cmake.org/cmake/help/latest/prop_tgt/LANG_VISIBILITY_PRESET.html
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor the visibility properties for all target types
+
+#------------------------------------------------------
+
+# Generate position independent (aka -fPIC) code even for static libs
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 #------------------------------------------------------
