@@ -47,7 +47,7 @@ set_target_properties(Kriging PROPERTIES SOVERSION ${KRIGING_VERSION_MAJOR})
 ## target_include_directories (Kriging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(Kriging
         PUBLIC
-            # path of the headers afterinstallation
+            # path of the headers after installation
             $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
             # path of the headers before installation
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
