@@ -10,6 +10,9 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 
 include(cmake/version.cmake)
+include(cmake/configuration.cmake)
+
+#------------------------------------------------------
 
 project(libKriging
         VERSION ${KRIGING_VERSION}
@@ -29,7 +32,6 @@ endif ()
 
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-include(${LIBKRIGING_SOURCE_DIR}/cmake/configuration.cmake)
 
 #------------------------------------------------------
 
@@ -90,6 +92,19 @@ else ()
     string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_PYTHON_BINDING "${ENABLE_PYTHON_BINDING}")
     if (VALID_PYTHON_BINDING STREQUAL "") # /!\ IF(VALID_PYTHON_BINDING) is false when ENABLE_PYTHON_BINDING is OFF
         logFatalError("Invalid ENABLE_PYTHON_BINDING option '${ENABLE_PYTHON_BINDING}'; choose between ON, OFF and AUTO.")
+    endif ()
+endif ()
+
+#------------------------------------------------------
+
+if (USE_COMPILER_CACHE)
+    # search for requested compiler cache (could be: ccache, sccache...)
+    find_program(COMPILER_CACHE_EXECUTABLE ${USE_COMPILER_CACHE})
+    if (COMPILER_CACHE_EXECUTABLE)
+        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${COMPILER_CACHE_EXECUTABLE}")
+        message(STATUS "Using ${COMPILER_CACHE_EXECUTABLE} as compiler cache for accelerated compilation")
+    else ()
+        logFatalError("Requested compiler cache '${USE_COMPILER_CACHE}' is not available")
     endif ()
 endif ()
 
@@ -277,7 +292,6 @@ endif ()
 #------------------------------------------------------
 
 # search for python-config (for building Python module)
-
 
 # force pybind11 to use the right python interpreter, it could be useful 
 # to define CMAKE_PREFIX_PATH with PYTHON_PREFIX_PATH (cf carma CMake config)
