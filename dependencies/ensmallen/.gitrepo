@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/mlpack/ensmallen.git
+	branch = 2.12.0
+	commit = 12a2522df7cf0620ba014f735a7268b03c01f30e
+	parent = 28fd23643e400dadd126311f3b562b17157821a2
+	method = merge
+	cmdver = 0.4.1
