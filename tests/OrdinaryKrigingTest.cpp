@@ -68,7 +68,7 @@ TEST_CASE("logLikelihood benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("OrdinaryKriging::logLikelihood#" + std::to_string(i)) {
-      return ok.logLikelihood(theta_vec);  //
+      return ok.logLikelihoodFun(theta_vec);  //
     };
   });
 }
