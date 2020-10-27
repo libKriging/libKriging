@@ -75,8 +75,8 @@ class OrdinaryKriging {
     arma::colvec beta;
   };
 
-  double fit_ofn(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
-  double fit_ofn2(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
+  double logLikelihood(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
+  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT OrdinaryKriging(const std::string& covType);
@@ -97,10 +97,10 @@ class OrdinaryKriging {
   // const std::string& optim_method,
   // const std::string& optim_objective);
 
-  LIBKRIGING_EXPORT double logLikelihood(const arma::vec& theta);
+  LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
-  LIBKRIGING_EXPORT double loofun(const arma::vec& theta);
-  LIBKRIGING_EXPORT arma::vec loofungrad(const arma::vec& theta);
+  LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output

@@ -58,3 +58,24 @@ arma::vec bench_loglikgrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   Rcpp::XPtr<Bench> impl_ptr(b);
   return impl_ptr->LogLikGrad(*ok, std::move(theta));
 }
+
+// [[Rcpp::export]]
+arma::mat bench_optim(arma::vec x0) {
+  Bench* b = new Bench(1);
+  Rcpp::XPtr<Bench> impl_ptr(b);
+  return impl_ptr->OptimRosenbrock(x0);
+}
+
+// [[Rcpp::export]]
+double f_optim(arma::vec x) {
+  Bench* b = new Bench(1);
+  Rcpp::XPtr<Bench> impl_ptr(b);
+  return impl_ptr->Rosenbrock(x);
+}
+
+// [[Rcpp::export]]
+arma::vec grad_optim(arma::vec x0) {
+  Bench* b = new Bench(1);
+  Rcpp::XPtr<Bench> impl_ptr(b);
+  return impl_ptr->RosenbrockGrad(x0);
+}

@@ -27,6 +27,10 @@ class Bench {
   LIBKRIGING_EXPORT double LogLik(OrdinaryKriging& ok, const arma::vec& theta);
 
   LIBKRIGING_EXPORT arma::vec LogLikGrad(OrdinaryKriging& ok, const arma::vec& theta);
+  
+  LIBKRIGING_EXPORT double Rosenbrock(arma::vec& x) ;
+  LIBKRIGING_EXPORT arma::vec RosenbrockGrad(arma::vec& x) ;
+  LIBKRIGING_EXPORT arma::mat OptimRosenbrock(arma::vec& x0) ;
 };
 
 #endif  // LIBKRIGING_BENCH_HPP

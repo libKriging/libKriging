@@ -3,13 +3,13 @@ registerDoSEQ()
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 
-logn <- seq(1.1, 2.5, by=.1)
+logn <- 2.5 #seq(1, 2.5, by=.1)
 times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
-times.n = 1
+times.n = 10
 
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
-  d <- 1+floor(log(n)) #floor(2+i/3)
+  d <- 1+floor(log(n))
   
   print(n)
   set.seed(123)
@@ -17,11 +17,17 @@ for (i in 1:length(logn)) {
   y <- f(X)
   
   times$R[i] = system.time(
-    try(for (j in 1:times.n) k <- DiceKriging::km(design=X,response=y,covtype = "gauss", multistart = 1,control = list(trace=F,maxit=10), lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
+    # try(
+      # for (j in 1:times.n) 
+        k <- DiceKriging::km(design=X,response=y,covtype = "gauss", multistart = 1,control = list(trace=F,maxit=10))
+      # ) #, lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
   )[1]
   
   times$cpp[i] = system.time(
-    try(for (j in 1:times.n) r <- ordinary_kriging(y, X,"gauss"))
+    # try(
+      # for (j in 1:times.n) 
+        r <- ordinary_kriging(y, X,"gauss")
+      # )
   )[1]
   
   ll_cpp <- ordinary_kriging_logLikelihood(r, ordinary_kriging_model(r)$theta)

@@ -7,7 +7,7 @@
 #include "libKriging/OrdinaryKriging.hpp"
 
 #include <armadillo>
-#include <optim.hpp>
+#include <ensmallen.hpp>
 #include <tuple>
 #include <cassert>
 
@@ -147,7 +147,7 @@ LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string& covType) {
 }
 
 // Objective function for fit : -logLikelihood
-double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
+double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
                                 arma::vec* grad_out,
                                 OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
@@ -261,6 +261,30 @@ double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
   return minus_ll;
 }
 
+LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihoodFun(const arma::vec& _theta) {
+  arma::mat T;
+  arma::mat M;
+  arma::mat z;
+  arma::colvec beta;
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  
+  return -logLikelihood(_theta, nullptr, &okm_data);
+}
+
+LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
+  arma::mat T;
+  arma::mat M;
+  arma::mat z;
+  arma::colvec beta;
+  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  
+  arma::vec grad(_theta.n_elem);
+  
+  double ll = logLikelihood(_theta, &grad, &okm_data);
+  
+  return -grad;
+}
+
 // Utility function for LOO
 arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
   arma::mat D = trimatu(2 * B);
@@ -272,7 +296,7 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 }
 
 // Objective function for fit : -LOO
-double OrdinaryKriging::fit_ofn2(const arma::vec& _theta,
+double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
                                  arma::vec* grad_out,
                                  OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
@@ -316,13 +340,13 @@ double OrdinaryKriging::fit_ofn2(const arma::vec& _theta,
 
   if (grad_out != nullptr) {
     //' @ref hhttps://github.com/cran/DiceKriging/blob/master/R/leaveOneOutGrad.R
-    // LOOfunDer <- matrix(0, nparam, 1)
+    // leaveOneOutDer <- matrix(0, nparam, 1)
     // for (k in 1:nparam) {
     //	gradR.k <- covMatrixDerivative(model@covariance, X=model@X, C0=R, k=k)
     //	diagdQ <- - diagABA(A=Q, B=gradR.k)
     //	dsigma2LOO <- - (sigma2LOO^2) * diagdQ
     //	derrorsLOO <- dsigma2LOO * Q.y - sigma2LOO * (Q%*%(gradR.k%*%Q.y))
-    //	LOOfunDer[k] <- 2*crossprod(errorsLOO, derrorsLOO)/model@n
+    //	leaveOneOutDer[k] <- 2*crossprod(errorsLOO, derrorsLOO)/model@n
     //}
 
     for (arma::uword k = 0; k < m_X.n_cols; k++) {
@@ -348,41 +372,17 @@ double OrdinaryKriging::fit_ofn2(const arma::vec& _theta,
   return minus_loo;
 }
 
-LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihood(const arma::vec& _theta) {
+LIBKRIGING_EXPORT double OrdinaryKriging::leaveOneOutFun(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::mat z;
   arma::colvec beta;
   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
 
-  return -fit_ofn(_theta, nullptr, &okm_data);
+  return -leaveOneOut(_theta, nullptr, &okm_data);
 }
 
-LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
-  arma::mat T;
-  arma::mat M;
-  arma::mat z;
-  arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-
-  arma::vec grad(_theta.n_elem);
-
-  double ll = fit_ofn(_theta, &grad, &okm_data);
-
-  return -grad;
-}
-
-LIBKRIGING_EXPORT double OrdinaryKriging::loofun(const arma::vec& _theta) {
-  arma::mat T;
-  arma::mat M;
-  arma::mat z;
-  arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-
-  return -fit_ofn2(_theta, nullptr, &okm_data);
-}
-
-LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta) {
+LIBKRIGING_EXPORT arma::vec OrdinaryKriging::leaveOneOutGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::mat z;
@@ -391,10 +391,61 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::loofungrad(const arma::vec& _theta)
 
   arma::vec grad(_theta.n_elem);
 
-  double ll = fit_ofn2(_theta, &grad, &okm_data);
+  double ll = leaveOneOut(_theta, &grad, &okm_data);
 
   return -grad;
 }
+
+class Fit_DifferentiableFunction {
+
+public:
+  OrdinaryKriging& m_ok;
+  
+  Fit_DifferentiableFunction(OrdinaryKriging& ok) : m_ok(ok) {}
+  
+  // Given parameters x, return the value of f(x).
+  double Evaluate(const arma::mat& x) {
+    arma::cout << "x "<< x << arma::endl;
+    arma::mat T;
+    arma::mat M;
+    arma::mat z;
+    arma::colvec beta;
+    OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+    
+    return -m_ok.logLikelihood(arma::vec(x), nullptr, &okm_data);
+  }
+  
+  // Given parameters x and a matrix g, store f'(x) in the provided matrix g.
+  // g should have the same size (rows, columns) as x.
+  void Gradient(const arma::mat& x, arma::mat& grad) {
+    arma::cout << "g "<< x << arma::endl;
+    arma::mat T;
+    arma::mat M;
+    arma::mat z;
+    arma::colvec beta;
+    OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+    
+    arma::vec g(x.n_elem);
+    double ll = m_ok.logLikelihood(arma::vec(x), &g, &okm_data);
+    grad = arma::mat(g);
+    return;
+  }
+  
+  double EvaluateWithGradient(const arma::mat& x, arma::mat& grad) {
+   arma::cout << "xg " << x << arma::endl;
+   arma::mat T;
+   arma::mat M;
+   arma::mat z;
+   arma::colvec beta;
+   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+
+   arma::vec g(x.n_elem);
+   double ll = m_ok.logLikelihood(arma::vec(x), &g, &okm_data);
+   grad = arma::mat(g);
+   return -ll;
+  }
+};
+
 
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
@@ -460,52 +511,37 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 10;            // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      int multistart = 1;            // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
       theta0 = arma::randu(multistart, X.n_cols);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
 
-    // arma::cout << "theta0:" << theta0 << arma::endl;
-
-    optim::algo_settings_t algo_settings;
-    algo_settings.iter_max = 10;  // TODO change by default?
-    algo_settings.err_tol = 1e-5;
-    algo_settings.vals_bound = true;
-    algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
-    algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);
-    double minus_ll = std::numeric_limits<double>::infinity();
+    double f_min = std::numeric_limits<double>::infinity();
     for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
       arma::vec theta_tmp = trans(theta0.row(i));
-      arma::mat T;
-      arma::mat M;
-      arma::mat z;
-      arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-      bool bfgs_ok = optim::lbfgs(
-          theta_tmp,
-          [&okm_data, this](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-            return fit_ofn(vals_inp, grad_out, &okm_data);
-          },
-          nullptr,
-          algo_settings);
+      ens::L_BFGS lbfgs;
+      lbfgs.MaxIterations() = 10;
+      arma::mat coords = arma::mat(theta_tmp);
+      Fit_DifferentiableFunction f(*this);
+      lbfgs.Optimize(f, coords);
+      double f_tmp = f.Evaluate(coords);
+      arma::cout << "     LL:" << f_tmp << arma::endl;
+      
+      if (f_tmp < f_min) {
+        m_theta = arma::vec(std::move(theta_tmp));
+        f_min = f_tmp;
 
-      // if (bfgs_ok) { // FIXME always succeeds ?
-      double minus_ll_tmp
-          = fit_ofn(theta_tmp,
-                    nullptr,
-                    &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
-      if (minus_ll_tmp < minus_ll) {
-        m_theta = std::move(theta_tmp);
-        minus_ll = minus_ll_tmp;
-        m_T = std::move(okm_data.T);
-        m_M = std::move(okm_data.M);
-        m_z = std::move(okm_data.z);
-        m_beta = std::move(okm_data.beta);
+        // Update T,M,z,beta
+        OrdinaryKriging::OKModel okm_data{m_T, m_M, m_z, m_beta};
+        logLikelihood(coords, nullptr, &okm_data);
       }
       // }
     }
+    
+    arma::cout << "best LL:" << f_min << arma::endl;
+    
   } else
     throw std::runtime_error("Not a suitable optim_method: " + optim_method);
 
