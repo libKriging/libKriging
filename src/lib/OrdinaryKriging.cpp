@@ -405,7 +405,7 @@ public:
   
   // Given parameters x, return the value of f(x).
   double Evaluate(const arma::mat& x) {
-    arma::cout << "x "<< x << arma::endl;
+    // arma::cout << "x "<< x << arma::endl;
     arma::mat T;
     arma::mat M;
     arma::mat z;
@@ -418,7 +418,7 @@ public:
   // Given parameters x and a matrix g, store f'(x) in the provided matrix g.
   // g should have the same size (rows, columns) as x.
   void Gradient(const arma::mat& x, arma::mat& grad) {
-    arma::cout << "g "<< x << arma::endl;
+    // arma::cout << "g "<< x << arma::endl;
     arma::mat T;
     arma::mat M;
     arma::mat z;
@@ -432,7 +432,7 @@ public:
   }
   
   double EvaluateWithGradient(const arma::mat& x, arma::mat& grad) {
-   arma::cout << "xg " << x << arma::endl;
+   // arma::cout << "xg " << x << arma::endl;
    arma::mat T;
    arma::mat M;
    arma::mat z;
