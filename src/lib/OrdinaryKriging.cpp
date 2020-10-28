@@ -407,7 +407,7 @@ public:
   double Evaluate(const arma::mat& x) {
     // arma::cout << "x "<< x << arma::endl;
     OrdinaryKriging::OKModel okm_data{};
-    return -m_ok.logLikelihood(arma::vec(x), nullptr, &okm_data);
+    return -m_ok.logLikelihood(x, nullptr, &okm_data);
   }
   
   // Given parameters x and a matrix g, store f'(x) in the provided matrix g.
@@ -416,9 +416,7 @@ public:
     // arma::cout << "g "<< x << arma::endl;
     OrdinaryKriging::OKModel okm_data{};
     // TODO same as EvaluateWithGradient
-//    arma::vec g(x.n_elem);
-    double ll = m_ok.logLikelihood(arma::vec(x), &grad, &okm_data);
-//    grad = arma::mat(g);
+    double ll = m_ok.logLikelihood(x, &grad, &okm_data);
   }
   
   double EvaluateWithGradient(const arma::mat& x, arma::mat& grad) {
@@ -427,10 +425,7 @@ public:
 
    assert(grad.n_cols == 1);
    assert(grad.n_rows == x.n_elem);
-//    arma::vec g(x.n_elem);
-    double ll = m_ok.logLikelihood(arma::vec(x), &grad, &okm_data);
-//    grad = arma::mat(g);
-//    grad = g;
+    double ll = m_ok.logLikelihood(x, &grad, &okm_data);
     return -ll;
   }
 };
@@ -509,7 +504,7 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
     double f_min = std::numeric_limits<double>::infinity();
     for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
       arma::vec theta_tmp = trans(theta0.row(i));
-      arma::vec coords = arma::mat(theta_tmp);
+      arma::vec coords = theta_tmp;
       auto start = std::chrono::system_clock::now();
       ens::L_BFGS lbfgs;
       lbfgs.MaxIterations() = 10;
@@ -520,16 +515,16 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
 //      arma::cout << "     LL:" << f_tmp << arma::endl;
       
       if (f_tmp < f_min) {
-        m_theta = arma::vec(std::move(theta_tmp));
+        m_theta = std::move(theta_tmp);
         f_min = f_tmp;
 
         // Update T,M,z,beta
         auto start = std::chrono::system_clock::now();
-        OrdinaryKriging::OKModel okm_data{m_T, m_M, m_z, m_beta};
+        // OrdinaryKriging::OKModel okm_data{m_T, m_M, m_z, m_beta}; // copied but never used
+        OrdinaryKriging::OKModel okm_data{}; // copied but never used
         logLikelihood(coords, nullptr, &okm_data);
         update_time += static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6;
       }
-      // }
     }
     double completion_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6; 
     
@@ -540,9 +535,9 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
 
 //    arma::cout << "best LL:" << f_min << arma::endl;
     
-  } else
+  } else {
     throw std::runtime_error("Not a suitable optim_method: " + optim_method);
-
+  }
   // arma::cout << "theta:" << m_theta << arma::endl;
 
   if (!parameters.has_sigma2) {
