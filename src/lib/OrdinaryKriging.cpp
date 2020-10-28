@@ -407,6 +407,8 @@ public:
   double Evaluate(const arma::mat& x) {
     // arma::cout << "x "<< x << arma::endl;
     OrdinaryKriging::OKModel okm_data{};
+    assert(x.n_cols == 1);
+    assert(x.n_rows == x.n_elem);
     return -m_ok.logLikelihood(x, nullptr, &okm_data);
   }
   
@@ -415,6 +417,10 @@ public:
   void Gradient(const arma::mat& x, arma::mat& grad) {
     // arma::cout << "g "<< x << arma::endl;
     OrdinaryKriging::OKModel okm_data{};
+    assert(x.n_cols == 1);
+    assert(grad.n_cols == 1);
+    assert(x.n_rows == x.n_elem);
+    assert(grad.n_rows == x.n_elem);
     // TODO same as EvaluateWithGradient
     double ll = m_ok.logLikelihood(x, &grad, &okm_data);
   }
@@ -422,9 +428,10 @@ public:
   double EvaluateWithGradient(const arma::mat& x, arma::mat& grad) {
    // arma::cout << "xg " << x << arma::endl;
    OrdinaryKriging::OKModel okm_data{}; // FIXME never used ?
-
-   assert(grad.n_cols == 1);
-   assert(grad.n_rows == x.n_elem);
+    assert(x.n_cols == 1);
+    assert(grad.n_cols == 1);
+    assert(x.n_rows == x.n_elem);
+    assert(grad.n_rows == x.n_elem);
     double ll = m_ok.logLikelihood(x, &grad, &okm_data);
     return -ll;
   }
