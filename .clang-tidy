@@ -14,7 +14,8 @@ Checks:  "\
   -modernize-use-emplace,\
   -cert-err60-cpp,\
   -modernize-use-trailing-return-type,\
-  -fuchsia-default-arguments-calls"
+  -fuchsia-default-arguments-calls,\
+  -llvmlibc-*"
 
 # All checkers turned on, minus:
 #  * Proper header guards used (the check is very brittle and incorrectly assesses my guards)
@@ -29,6 +30,7 @@ Checks:  "\
 #  * Throwing exception objects which aren't nothrow copy constructible (Dinkumware STL does this, not my fault)
 #  * modernize function style to C++11 trailing return type
 #  * disallow usage of implicit optional arguments in calls
+#  * remove "method must resolve to a function within the __llvm_libc namespace" warnings
 
 # Like in https://github.com/Kitware/CMake/blob/master/.clang-tidy
 #   pattern should be filtered as `find | grep -E PATTERN` do
