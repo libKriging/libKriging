@@ -6,24 +6,33 @@
 #include "libKriging/OrdinaryKriging.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List ordinary_kriging(arma::vec y,
-                            arma::mat X,
+Rcpp::List ordinary_kriging(const arma::vec &y,
+                            const arma::mat &X,
                             std::string kernel,
                             std::string regmodel = "constant",
                             bool normalize = false) {
+  auto start = std::chrono::system_clock::now();
   OrdinaryKriging* ok = new OrdinaryKriging(kernel);
-  ok->fit(std::move(y), std::move(X));  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+//  ok->fit(y, X);  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
 
-  ok->fit(std::move(y),
-          std::move(X),
+  std::vector<double> times = 
+  ok->fit(y,
+          X,
           OrdinaryKriging::RegressionModelUtils::fromString(regmodel),
           normalize);  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
+  auto end = std::chrono::system_clock::now();
+  double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  elapsed /= 1e6;
 
+  times.push_back(elapsed); // 5
+  //Rcpp::NumericVector e = { elapsed };
+  
   Rcpp::List obj;
   obj.attr("object") = impl_ptr;
   obj.attr("class") = "OrdinaryKriging";
+  obj.attr("time") = times;
   return obj;
 }
 

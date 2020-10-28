@@ -5,6 +5,7 @@
 
 #include "libKriging/Bench.hpp"
 #include "libKriging/OrdinaryKriging.hpp"
+#include <chrono>
 
 // [[Rcpp::export]]
 arma::mat bench_solvetri(int n, arma::mat X, arma::vec y) {
@@ -48,7 +49,8 @@ double bench_loglik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
 }
 
 // [[Rcpp::export]]
-arma::vec bench_loglikgrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
+Rcpp::List bench_loglikgrad(int n, Rcpp::List ordinaryKriging, arma::vec &theta) {
+  auto start = std::chrono::system_clock::now();
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl_ok = ordinaryKriging.attr("object");
@@ -56,7 +58,11 @@ arma::vec bench_loglikgrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
 
   Bench* b = new Bench(n);
   Rcpp::XPtr<Bench> impl_ptr(b);
-  return impl_ptr->LogLikGrad(*ok, std::move(theta));
+  auto result = impl_ptr->LogLikGrad(*ok, theta);
+  auto end = std::chrono::system_clock::now();
+  double elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  elapsed /= 1e6;
+  return Rcpp::List::create(Rcpp::Named("result") = std::move(result), Rcpp::Named("time") = elapsed);
 }
 
 // [[Rcpp::export]]

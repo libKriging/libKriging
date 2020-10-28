@@ -1,10 +1,16 @@
 library(foreach)
+library(rlibkriging)
 registerDoSEQ()
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 
 logn <- seq(1.1, 2.5, by=.1)
-times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)), 
+              icpp1=rep(NA, length(logn)),
+              icpp2=rep(NA, length(logn)),
+              icpp3=rep(NA, length(logn)),
+              icpp4=rep(NA, length(logn)),
+              icpp5=rep(NA, length(logn)))
 times.n = 1
 
 for (i in 1:length(logn)) {
@@ -23,6 +29,11 @@ for (i in 1:length(logn)) {
   times$cpp[i] = system.time(
     try(for (j in 1:times.n) r <- ordinary_kriging(y, X,"gauss"))
   )[1]
+  times$icpp1[i] = attr(r,'time')[1]
+  times$icpp2[i] = attr(r,'time')[2]
+  times$icpp3[i] = attr(r,'time')[3]
+  times$icpp4[i] = attr(r,'time')[4]
+  times$icpp5[i] = attr(r,'time')[5]
   
   ll_cpp <- ordinary_kriging_logLikelihood(r, ordinary_kriging_model(r)$theta)
   e <- new.env()
@@ -39,7 +50,11 @@ for (i in 1:length(logn)) {
   
 }
 
-plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R,na.rm = T),min(times$cpp,na.rm = T))),log(max(max(times$R,na.rm = T),max(times$cpp,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
+plot(floor(10^logn),log(times$R),ylim=c(max(-7, log(min(min(times$R,na.rm = T),min(times$cpp,na.rm = T)))),
+                                        log(max(max(times$R,na.rm = T),max(times$cpp,na.rm = T)))),
+                                  xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
 text(20,-1,"DiceKriging")
 points(floor(10^logn),log(times$cpp),col='red')
+points(floor(10^logn),log(times$icpp3),col='green')
+points(floor(10^logn),log(times$icpp5),col='green')
 text(80,-1,"libKriging",col = 'red')

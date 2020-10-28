@@ -7,23 +7,29 @@
 #include <libKriging/OrdinaryKriging.hpp>
 
 auto f = [](const arma::rowvec& row) {
-  double sum = 0;
+//  double sum = 0;
+//  for (auto&& x : row) {
+//    // sum += ((x - .5) * (x - .5));  // cas 1
+//    // sum += (x * x);  // cas 2
+//  }
+//  return sum;
+
+  double prod = 1;
   for (auto&& x : row) {
-    // sum += ((x - .5) * (x - .5));  // cas 1
-    sum += (x * x);  // cas 2
+    prod *= sin( (x-0.5) * (x-0.5));
   }
-  return sum;
+  return prod;
 };
 
 auto prepare_and_run_bench = [](auto&& bench) {
-  const int count = 11;
+  const int count = 14;
   const auto i = GENERATE_COPY(range(0, count));
 
   arma::arma_rng::seed_type seed_val = 123;  // populate somehow (fixed value => reproducible)
 
   const double logn = 1 + 0.1 * i;
   const arma::uword n = floor(std::pow(10., logn));
-  const arma::uword d = floor(2 + i / 3);
+  const arma::uword d = 1+floor(log(n)); // floor(2 + i / 3);
 
   INFO("dimensions are n=" << n << " x d=" << d);
 
@@ -52,6 +58,8 @@ TEST_CASE("workflow") {
 TEST_CASE("fit benchmark", "[.benchmark]") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
     OrdinaryKriging ok = OrdinaryKriging("gauss");
+    arma::cout << "y = " << y << std::endl;
+    arma::cout << "X = " << X << std::endl;
     BENCHMARK("OrdinaryKriging::fit#" + std::to_string(i)) {
       return ok.fit(y, X);  // FIXME no move
     };

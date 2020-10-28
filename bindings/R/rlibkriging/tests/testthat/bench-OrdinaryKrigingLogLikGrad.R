@@ -3,7 +3,7 @@ library(testthat)
 f <- function(X) apply(X, 1, function(x) sum(x^2))
 
 logn <- seq(1, 2.5, by=.1)
-times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)), icpp=rep(NA, length(logn)))
 N <- 1000
 
 theta <- 0.5
@@ -29,12 +29,14 @@ for (i in 1:length(logn)) {
     try({gll2x <- bench_loglikgrad(N,r,rep(theta,ncol(X)))})
     # try({for (t in 1:N) ll2x <- ordinary_kriging_loglikelihoodgrad(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
+  times$icpp[i] = gll2x$time
   
-  if (max(abs((gllx-gll2x)/gllx))>1E-3) stop("gradLL is not identical betw C++/R")
+  if (max(abs((gllx-gll2x$result)/gllx))>1E-3) stop("gradLL is not identical betw C++/R")
 }
 
 
 plot(main = "1000 logLikGrad",floor(10^logn),log(times$R),ylim=c(log(min(min(times$R),min(times$cpp))),log(max(max(times$R),max(times$cpp)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
 text(20,0,"DiceKriging")
 points(floor(10^logn),log(times$cpp),col='red')
+points(floor(10^logn),log(times$icpp),col='green')
 text(80,0,"C++",col = 'red')
