@@ -181,14 +181,16 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
   arma::mat R0(n,n); // = arma::zeros(n, n); // initialization not required
-  for (arma::uword i = 0; i < n; i++) {
-    for (arma::uword j = 0; j < i; j++) {
+  // arma::col are column-major (inverse loops)
+  for (arma::uword j = 0; j < n; j++) {
+    for (arma::uword i = 0; i < j; i++) {
+      R0.at(i,j) = 0; // FIXME On n'aura pas besoin des 0 si on fait un symmatl special matrice triangulaire (arma::trimatl())
+    }
+    for (arma::uword i = j; i < n; i++) {
       R0.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
-    for (arma::uword j = i; j < n; j++) {
-      R0.at(i,j) = 0;
-    }
   }
+  
   arma::mat R = arma::symmatl(R0);  // R + trans(R);
   R.diag().ones();
   // arma::cout << "R:" << R << arma::endl;
@@ -235,10 +237,12 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
     //  }
 
     arma::mat Linv = solve(trimatl(fd->T), arma::eye(n, n), arma::solve_opts::fast);
-    arma::mat Rinv = trans(Linv) * Linv;  // inv_sympd(R);
+    Linv = trans(Linv) * Linv;  // inv_sympd(R);
+    const arma::mat &Rinv = Linv; 
 
     arma::mat x = solve(trimatu(trans(fd->T)), fd->z, arma::solve_opts::fast);
-    arma::mat xx = x * trans(x); // seule la partie correspondant à gradR_k_upper serait utile (sinon 0)
+    x = x * trans(x); // seule la partie correspondant à gradR_k_upper serait utile (sinon 0)
+    const arma::mat & xx = x;
     // arma::mat xx_upper = trimatu(xx);
     
     for (arma::uword k = 0; k < m_X.n_cols; k++) {
@@ -251,15 +255,16 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
       auto adhoc2 = [](double xki, double xkj) {
         return (xki - xkj) * (xki - xkj);
       };
-      
-      for (arma::uword i = 0; i < n; i++) {
-        for (arma::uword j = 0; j < i; j++) {
+
+      // arma::col are column-major (inverse loops)
+      for (arma::uword j = 0; j < n; j++) {
+        for(arma::uword i = 0; i < j; i++) {
+          gradR_k_upper.at(i, j) = 0;
+        }
+        for (arma::uword i = j; i < n; i++) {
 //          gradR_k_upper.at(j, i) = CovNorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
 //          gradR_k_upper.at(i, j) = R0(i,j) * adhoc(Xtnorm.col(i), Xtnorm.col(j), k) / tk;
           gradR_k_upper.at(i, j) = R0(i,j) * adhoc2(Xtnorm.at(k,i), Xtnorm.at(k,j)) / tk;
-        }
-        for(arma::uword j = i; j < n; j++) {
-          gradR_k_upper.at(i, j) = 0;
         }
       }
       
