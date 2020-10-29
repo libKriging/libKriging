@@ -89,7 +89,7 @@ class OrdinaryKriging {
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT std::vector<double> fit(const arma::colvec& y,
+  LIBKRIGING_EXPORT void fit(const arma::colvec& y,
                              const arma::mat& X,
                              const RegressionModel& regmodel = RegressionModel::Constant,
                              bool normalize = false);  //,

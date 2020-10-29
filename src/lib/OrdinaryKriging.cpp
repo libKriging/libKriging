@@ -452,16 +452,13 @@ public:
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y,
+LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const RegressionModel& regmodel,
                                             bool normalize) {  //,
                                                                // const Parameters& parameters,
   // const std::string& optim_objective, // will support "logLik" or "leaveOneOut"
   // const std::string& optim_method) {
-  std::vector<double> times;
-  auto start = std::chrono::system_clock::now();
-
   std::string optim_objective = "ll";
   std::string optim_method = "bfgs";
   Parameters parameters{0, false, arma::vec(1), false};
@@ -508,21 +505,15 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
-    times.push_back( static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6); // 1
-    double opt_time = 0;
-    double update_time = 0;
-    
-    
+
     double f_min = std::numeric_limits<double>::infinity();
     for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
       arma::vec theta_tmp = trans(theta0.row(i));
       arma::vec coords = theta_tmp;
-      auto start = std::chrono::system_clock::now();
       ens::L_BFGS lbfgs;
       lbfgs.MaxIterations() = 10;
       Fit_DifferentiableFunction f(*this);
       lbfgs.Optimize(f, coords);
-      opt_time += static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6;
       double f_tmp = f.Evaluate(coords);
 //      arma::cout << "     LL:" << f_tmp << arma::endl;
       
@@ -531,20 +522,12 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
         f_min = f_tmp;
 
         // Update T,M,z,beta
-        auto start = std::chrono::system_clock::now();
         // OrdinaryKriging::OKModel okm_data{m_T, m_M, m_z, m_beta}; // copied but never used
         OrdinaryKriging::OKModel okm_data{}; // copied but never used
         logLikelihood(coords, nullptr, &okm_data);
-        update_time += static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6;
       }
     }
-    double completion_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start).count()) / 1e6; 
     
-    
-    times.push_back( completion_time - opt_time - update_time); // 2
-    times.push_back( completion_time - opt_time); // 3
-    times.push_back( completion_time); // 4
-
 //    arma::cout << "best LL:" << f_min << arma::endl;
     
   } else {
@@ -562,7 +545,6 @@ LIBKRIGING_EXPORT std::vector<double> OrdinaryKriging::fit(const arma::colvec& y
   }
 
   // arma::cout << "sigma2:" << m_sigma2 << arma::endl;
-  return times;
 }
 
 /** Compute the prediction for given points X'
