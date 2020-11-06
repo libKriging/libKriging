@@ -33,20 +33,24 @@
   #error "need Armadillo version 8.400 or later"
 #endif
 
-#include <cmath>
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
 #include <cctype>
-#include <climits>
 #include <cfloat>
+#include <climits>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <map>
+#include <set>
+#include <limits>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <utility>
-#include <iostream>
-#include <string>
-#include <sstream>
+#include <vector>
 
 // On Visual Studio, disable C4519 (default arguments for function templates)
 // since it's by default an error, which doesn't even make any sense because
@@ -62,11 +66,15 @@
 #include "ensmallen_bits/utility/any.hpp"
 #include "ensmallen_bits/utility/arma_traits.hpp"
 
+// Contains traits, must be placed before report callback.
+#include "ensmallen_bits/function.hpp" // TODO: should move to function/
+
 // Callbacks.
 #include "ensmallen_bits/callbacks/callbacks.hpp"
 #include "ensmallen_bits/callbacks/early_stop_at_min_loss.hpp"
 #include "ensmallen_bits/callbacks/print_loss.hpp"
 #include "ensmallen_bits/callbacks/progress_bar.hpp"
+#include "ensmallen_bits/callbacks/report.hpp"
 #include "ensmallen_bits/callbacks/store_best_coordinates.hpp"
 #include "ensmallen_bits/callbacks/timer_stop.hpp"
 
@@ -85,8 +93,6 @@
 #include "ensmallen_bits/eve/eve.hpp"
 #include "ensmallen_bits/ftml/ftml.hpp"
 
-#include "ensmallen_bits/function.hpp" // TODO: should move to function/
-
 #include "ensmallen_bits/fw/frank_wolfe.hpp"
 #include "ensmallen_bits/gradient_descent/gradient_descent.hpp"
 #include "ensmallen_bits/grid_search/grid_search.hpp"
@@ -94,6 +100,7 @@
 #include "ensmallen_bits/katyusha/katyusha.hpp"
 #include "ensmallen_bits/lbfgs/lbfgs.hpp"
 #include "ensmallen_bits/lookahead/lookahead.hpp"
+#include "ensmallen_bits/nsga2/nsga2.hpp"
 #include "ensmallen_bits/padam/padam.hpp"
 #include "ensmallen_bits/parallel_sgd/parallel_sgd.hpp"
 #include "ensmallen_bits/pso/pso.hpp"

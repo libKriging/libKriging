@@ -5,8 +5,8 @@
 ;
 [subrepo]
 	remote = https://github.com/mlpack/ensmallen.git
-	branch = 2.12.0
-	commit = 12a2522df7cf0620ba014f735a7268b03c01f30e
-	parent = 28fd23643e400dadd126311f3b562b17157821a2
+	branch = 2.15.1
+	commit = 59288c607e8ced9fac14254894460c779f509f0e
+	parent = fa18ed49bcc964fccf07edcc99cc5a6bf0921892
 	method = merge
 	cmdver = 0.4.1
