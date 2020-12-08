@@ -24,7 +24,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
     # Python3 is named python in Windows
     if ( command -v python >/dev/null 2>&1 ); then
       echo "Python3 config: $(command -v python)"
-      python --version | sed 's/^/  /'
+      python --version 2>&1 | sed 's/^/  /'
     fi
 
     echo "EXTRA_CMAKE_OPTIONS = ${EXTRA_CMAKE_OPTIONS}"
