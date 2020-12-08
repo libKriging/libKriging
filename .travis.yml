@@ -199,15 +199,34 @@ before_deploy:
   - echo "Before deploy"
 
 deploy:
-  provider: releases
-  api_key: $API_DEPLOY_TOKEN
-  file: $DEPLOY_FILE
-  overwrite: true
-  skip_cleanup: true
-  on:
-    tags: true
-    repo: libKriging/libKriging
-    condition: $MODE = "Release" && -e $DEPLOY_FILE
+  - provider: releases
+    api_key: $API_DEPLOY_TOKEN
+    file: $DEPLOY_FILE
+    overwrite: true
+    skip_cleanup: true
+    on:
+      tags: true
+      repo: libKriging/libKriging
+      condition: $MODE = "Release" && -e $DEPLOY_FILE
+  - provider: script
+    services:
+      - docker
+    skip_cleanup: true
+    script:
+      - "/bin/bash ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh"
+    on:
+      tags: true
+      repo: haveneer/libKriging
+      condition: $MODE = "Release" && $ENABLE_PYTHON_BINDING == "on" && $TRAVIS_OS_NAME == "linux" 
+  - provider: script
+    skip_cleanup: true
+    script:
+      - "/bin/bash ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh"
+    on:
+      tags: true
+      repo: haveneer/libKriging
+      condition: $MODE = "Release" && $ENABLE_PYTHON_BINDING == "on" && $TRAVIS_OS_NAME != "linux"
+
 
 # Cache update/upload is too slow and slow down the whole process
 #cache:
@@ -219,3 +238,4 @@ deploy:
 env:
   global: 
     - DEBUG_CI=true
+    - TWINE_USERNAME=__token__
