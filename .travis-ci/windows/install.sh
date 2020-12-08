@@ -30,7 +30,7 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # ** Install python tools **
   
   ## Using Chocolatey (by default only includes Python2)
-  choco install --no-progress -y python --version 3.7
+  # should be installed using choco in main .travis.yml
   
   # ** Install PIP ** 
   
@@ -46,9 +46,9 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   
   ## By 'hand'
   curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py # curl already available with Chocolatey
-  python get-pip.py
+  python3 get-pip.py
   
   # ** Install required Python libs ** 
-  python -m pip install --progress-bar off pip --upgrade
-  python -m pip install --progress-bar off pytest numpy scipy --upgrade
+  python3 -m pip install --progress-bar off pip --upgrade
+  python3 -m pip install --progress-bar off pytest numpy scipy --upgrade
 fi

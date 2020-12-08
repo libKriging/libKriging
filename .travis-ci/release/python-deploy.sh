@@ -6,9 +6,17 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 fi
 set -x
 
+PYTHON=python3
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}" || exit 1
+    # windows environment requires to load special tools
+    loadenv_sh="${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/loadenv.sh"
+    if [ -e "$loadenv_sh" ]; then
+      . "$loadenv_sh"
+      PYTHON=python
+    fi
 fi
+$PYTHON --version
 
 echo "Ready to deploy from $TRAVIS_OS_NAME"
 ARCH=$(uname -s)
@@ -22,7 +30,7 @@ fi
 echo "Release tag '$TAG' in branch '$TRAVIS_BRANCH'"
 
 if [ "$ENABLE_PYTHON_BINDING" == "on" ]; then
-  python3 -m pip install twine  
+  $PYTHON -m pip install twine
   case $ARCH in
     Linux)
       docker run --rm \
@@ -33,15 +41,15 @@ if [ "$ENABLE_PYTHON_BINDING" == "on" ]; then
         quay.io/pypa/manylinux2014_x86_64 /data/bindings/Python/tools/build_wheels.sh
       # TWINE_USERNAME is set from travis global environment
       # TWINE_PASSWORD is set to an API token in Travis settings
-      python3 -m twine upload \
+      $PYTHON -m twine upload \
         --repository-url https://upload.pypi.org/legacy/ \
         ./dist/*-manylinux2014_x86_64.whl        
       ;;
     Darwin|MSYS_NT*)
-      python3 ./bindings/Python/setup.py bdist_wheel
+      $PYTHON ./bindings/Python/setup.py bdist_wheel
       # TWINE_USERNAME is set from travis global environment
       # TWINE_PASSWORD is set to an API token in Travis settings
-      python3 -m twine upload \
+      $PYTHON -m twine upload \
         --repository-url https://upload.pypi.org/legacy/ \
         ./dist/*.whl
       ;;
