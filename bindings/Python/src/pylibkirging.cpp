@@ -3,9 +3,7 @@
 
 #include "AddDemo.hpp"
 #include "NumPyDemo.hpp"
-#ifndef DISABLE_KRIGING
 #include "LinearRegression_binding.hpp"
-#endif
 
 #include <carma/carma.h>
 
@@ -41,7 +39,6 @@ PYBIND11_MODULE(pylibkriging, m) {
 
   m.attr("__version__") = VERSION_INFO;
 
-#ifndef DISABLE_KRIGING
   py::class_<PyLinearRegression>(m, "PyLinearRegression")
       .def(py::init<>())
       .def("fit", &PyLinearRegression::fit)
@@ -51,5 +48,4 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def(py::init<>())
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
-#endif
 }

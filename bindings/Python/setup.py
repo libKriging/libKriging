@@ -40,9 +40,10 @@ class CMakeBuild(build_ext):
         print('Python executable', sys.executable)
 
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                      '-DENABLE_PYTHON_BINDING=on',
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
-                      '-DDISABLE_KRIGING=TRUE',
-                      f'-DKRIGING_VERSION={self.distribution.get_version()}']
+                      f'-DKRIGING_VERSION={self.distribution.get_version()}'
+                      ]
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
@@ -68,24 +69,30 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
-file = open("../../cmake/version.cmake", "r")
-data = file.read()
-file.close()
+with open("cmake/version.cmake", "r") as file:
+    data = file.read()
 
-import re
 version_major = re.search(r"^set\(KRIGING_VERSION_MAJOR (\d+)\)$", data, re.M)
 version_minor = re.search(r"^set\(KRIGING_VERSION_MINOR (\d+)\)$", data, re.M)
 version_patch = re.search(r"^set\(KRIGING_VERSION_PATCH (\d+)\)$", data, re.M)
 version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
+
+# with open("README.md", "r", encoding="utf-8") as fh:
+#     long_description = fh.read()
 
 setup(
     name='pylibkriging',
     version=version,
     author='Pascal Havé',
     author_email='hpwxf@haveneer.com',
+    url="https://github.com/libKriging/libKriging",
     description='Python binding for LibKriging',
-    long_description='',
-    ext_modules=[CMakeExtension('pylibkriging')],
+    long_description='Python support for libKriging, the kriging library for performance and wide language support',
+    #long_description_content_type="text/markdown",
+    ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
     cmdclass=dict(build_ext=CMakeBuild),
+    script_name='./bindings/Python/setup.py',
+    data_files=['./bindings/Python/setup.py'],
+    python_requires='>=3.6',
     zip_safe=False,
 )
