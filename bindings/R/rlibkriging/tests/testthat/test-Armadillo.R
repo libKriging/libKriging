@@ -1,3 +1,5 @@
+library(rlibkriging)
+
 demo_binding1()
 demo_binding2()
 
