@@ -31,7 +31,7 @@ struct strip_diagmat
     arma_extra_debug_sigprint();
     }
   
-  static const bool do_diagmat = false;
+  static constexpr bool do_diagmat = false;
   
   const T1& M;
   };
@@ -50,7 +50,7 @@ struct strip_diagmat< Op<T1, op_diagmat> >
     arma_extra_debug_sigprint();
     }
   
-  static const bool do_diagmat = true;
+  static constexpr bool do_diagmat = true;
   
   const T1& M;
   };
@@ -71,8 +71,8 @@ struct strip_inv
   
   const T1& M;
   
-  static const bool do_inv       = false;
-  static const bool do_inv_sympd = false;
+  static constexpr bool do_inv       = false;
+  static constexpr bool do_inv_sympd = false;
   };
 
 
@@ -91,8 +91,8 @@ struct strip_inv< Op<T1, op_inv> >
   
   const T1& M;
   
-  static const bool do_inv       = true;
-  static const bool do_inv_sympd = false;
+  static constexpr bool do_inv       = true;
+  static constexpr bool do_inv_sympd = false;
   };
 
 
@@ -111,8 +111,52 @@ struct strip_inv< Op<T1, op_inv_sympd> >
   
   const T1& M;
   
-  static const bool do_inv       = true;
-  static const bool do_inv_sympd = true;
+  static constexpr bool do_inv       = true;
+  static constexpr bool do_inv_sympd = true;
+  };
+
+
+
+template<typename T1>
+struct strip_trimat
+  {
+  typedef T1 stored_type;
+  
+  const T1& M;
+  
+  static constexpr bool do_trimat = false;
+  static constexpr bool do_triu   = false;
+  static constexpr bool do_tril   = false;
+  
+  inline
+  strip_trimat(const T1& X)
+    : M(X)
+    {
+    arma_extra_debug_sigprint();
+    }
+  };
+
+
+
+template<typename T1>
+struct strip_trimat< Op<T1, op_trimat> >
+  {
+  typedef T1 stored_type;
+  
+  const T1& M;
+  
+  static constexpr bool do_trimat = true;
+         const bool do_triu;
+         const bool do_tril;
+  
+  inline
+  strip_trimat(const Op<T1, op_trimat>& X)
+    : M(X.m)
+    , do_triu(X.aux_uword_a == 0)
+    , do_tril(X.aux_uword_a == 1)
+    {
+    arma_extra_debug_sigprint();
+    }
   };
 
 

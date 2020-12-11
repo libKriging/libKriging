@@ -57,6 +57,8 @@ op_index_max::apply_noalias(Mat<uword>& out, const Mat<eT>& X, const uword dim)
   {
   arma_extra_debug_sigprint();
   
+  typedef typename get_pod_type<eT>::result T;
+  
   const uword X_n_rows = X.n_rows;
   const uword X_n_cols = X.n_cols;
   
@@ -80,15 +82,46 @@ op_index_max::apply_noalias(Mat<uword>& out, const Mat<eT>& X, const uword dim)
     {
     arma_extra_debug_print("op_index_max::apply(): dim = 1");
     
-    out.set_size(X_n_rows, (X_n_cols > 0) ? 1 : 0);
+    out.zeros(X_n_rows, (X_n_cols > 0) ? 1 : 0);
     
     if(X_n_cols == 0)  { return; }
     
     uword* out_mem = out.memptr();
     
-    for(uword row=0; row<X_n_rows; ++row)
+    Col<T> tmp(X_n_rows);
+    
+    T* tmp_mem = tmp.memptr();
+    
+    if(is_cx<eT>::yes)
       {
-      out_mem[row] = X.row(row).index_max();
+      const eT* col_mem = X.colptr(0);
+      
+      for(uword row=0; row < X_n_rows; ++row)
+        {
+        tmp_mem[row] = eop_aux::arma_abs(col_mem[row]);
+        }
+      }
+    else
+      {
+      arrayops::copy(tmp_mem, (T*)(X.colptr(0)), X_n_rows);
+      }
+    
+    for(uword col=1; col < X_n_cols; ++col)
+      {
+      const eT* col_mem = X.colptr(col);
+      
+      for(uword row=0; row < X_n_rows; ++row)
+        {
+        T& max_val = tmp_mem[row];
+        T  col_val = (is_cx<eT>::yes) ? T(eop_aux::arma_abs(col_mem[row])) : T(access::tmp_real(col_mem[row]));
+        
+        if(max_val < col_val)
+          {
+          max_val = col_val;
+          
+          out_mem[row] = col;
+          }
+        }
       }
     }
   }

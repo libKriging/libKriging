@@ -1,5 +1,5 @@
 Name:           armadillo
-Version:        9.100.0
+Version:        10.1.x
 Release:        1%{?dist}
 Summary:        Fast C++ matrix library with syntax similar to MATLAB and Octave
 
@@ -93,9 +93,9 @@ rm -rf examples/lib_win64
 %doc README.md index.html docs.html
 %doc examples armadillo_icon.png
 %doc armadillo_joss_2016.pdf
-%doc arma_spmat_icms_2018.pdf
-%doc arma_gmm_joss_2017.pdf
-%doc arma_gmm_spcs_2017.pdf
-%doc rcpp_armadillo_csda_2014.pdf
+%doc armadillo_lncs_2018.pdf
 %doc armadillo_nicta_2010.pdf
+%doc armadillo_solver_2020.pdf
+%doc armadillo_spcs_2017.pdf
+%doc rcpp_armadillo_csda_2014.pdf
 %doc mex_interface

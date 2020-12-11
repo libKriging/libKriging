@@ -60,28 +60,18 @@
 #endif
 
 
-#if defined(ARMA_USE_U64S64)
-  #if   ULLONG_MAX >= 0xffffffffffffffff
-    typedef unsigned long long u64;
-    typedef          long long s64;
-  #elif ULONG_MAX  >= 0xffffffffffffffff
-    typedef unsigned long      u64;
-    typedef          long      s64;
-    #define ARMA_U64_IS_LONG
-  #elif defined(UINT64_MAX)
-    typedef          uint64_t  u64;
-    typedef           int64_t  s64;
-  #else
-      #error "don't know how to typedef 'u64' on this system; please disable ARMA_64BIT_WORD"
-  #endif
+#if   ULLONG_MAX >= 0xffffffffffffffff
+  typedef unsigned long long u64;
+  typedef          long long s64;
+#elif defined(UINT64_MAX)
+  typedef          uint64_t  u64;
+  typedef           int64_t  s64;
+#else
+    #error "don't know how to typedef 'u64' on this system"
 #endif
 
 
-#if !defined(ARMA_USE_U64S64) || (defined(ARMA_USE_U64S64) && !defined(ARMA_U64_IS_LONG))
-  #define ARMA_ALLOW_LONG
-#endif
-
-
+// for compatibility with earlier versions of Armadillo
 typedef unsigned long ulng_t;
 typedef          long slng_t;
 
@@ -126,6 +116,23 @@ typedef void* void_ptr;
   typedef int       blas_int;
   #define ARMA_MAX_BLAS_INT 0x7fffffffU
 #endif
+
+
+//
+
+
+#ifdef ARMA_USE_MKL_TYPES
+  // for compatibility with MKL
+  typedef MKL_Complex8  blas_cxf;
+  typedef MKL_Complex16 blas_cxd;
+#else
+  // standard BLAS and LAPACK prototypes use "void*" pointers for complex arrays
+  typedef void blas_cxf;
+  typedef void blas_cxd;
+#endif
+
+
+//
 
 
 // NOTE: blas_len is the fortran type for "hidden" arguments that specify the length of character arguments;

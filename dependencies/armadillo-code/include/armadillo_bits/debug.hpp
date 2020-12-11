@@ -26,7 +26,7 @@ arma_cout_stream(std::ostream* user_stream)
   {
   static std::ostream* cout_stream = &(ARMA_COUT_STREAM);
   
-  if(user_stream != NULL)  { cout_stream = user_stream; }
+  if(user_stream != nullptr)  { cout_stream = user_stream; }
   
   return (*cout_stream);
   }
@@ -40,7 +40,7 @@ arma_cerr_stream(std::ostream* user_stream)
   {
   static std::ostream* cerr_stream = &(ARMA_CERR_STREAM);
   
-  if(user_stream != NULL)  { cerr_stream = user_stream; }
+  if(user_stream != nullptr)  { cerr_stream = user_stream; }
   
   return (*cerr_stream);
   }
@@ -69,7 +69,7 @@ inline
 std::ostream&
 get_cout_stream()
   {
-  return arma_cout_stream<char>(NULL);
+  return arma_cout_stream<char>(nullptr);
   }
 
 
@@ -78,7 +78,7 @@ inline
 std::ostream&
 get_cerr_stream()
   {
-  return arma_cerr_stream<char>(NULL);
+  return arma_cerr_stream<char>(nullptr);
   }
 
 
@@ -413,7 +413,7 @@ arma_inline
 void
 arma_set_error(bool& err_state, char*& err_msg, const bool expression, const char* message)
   {
-  if(expression == true)
+  if(expression)
     {
     err_state = true;
     err_msg   = const_cast<char*>(message);
@@ -934,7 +934,7 @@ arma_assert_cube_as_mat(const Mat<eT>& M, const T1& Q, const char* x, const bool
     }
   
   
-  if(check_compat_size == true)
+  if(check_compat_size)
     {
     const uword M_n_rows = M.n_rows;
     const uword M_n_cols = M.n_cols;
@@ -1317,7 +1317,9 @@ arma_assert_atlas_size(const T1& A, const T2& B)
             << " (" << nickname << ")\n";
         
         out << "@ arma_config::wrapper      = " << arma_config::wrapper      << '\n';
-        out << "@ arma_config::cxx11        = " << arma_config::cxx11        << '\n';
+        out << "@ arma_config::cxx14        = " << arma_config::cxx14        << '\n';
+        out << "@ arma_config::cxx17        = " << arma_config::cxx17        << '\n';
+        out << "@ arma_config::std_mutex    = " << arma_config::std_mutex    << '\n';
         out << "@ arma_config::posix        = " << arma_config::posix        << '\n';
         out << "@ arma_config::openmp       = " << arma_config::openmp       << '\n';
         out << "@ arma_config::lapack       = " << arma_config::lapack       << '\n';

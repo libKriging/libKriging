@@ -20,15 +20,14 @@
 
 
 template<typename eT, typename T1>
-class subview_cube_slices : public BaseCube<eT, subview_cube_slices<eT,T1> >
+class subview_cube_slices : public BaseCube< eT, subview_cube_slices<eT,T1> >
   {
   public:
   
   typedef eT                                       elem_type;
   typedef typename get_pod_type<elem_type>::result pod_type;
   
-  arma_aligned const Cube<eT>& m;
-  
+  arma_aligned const Cube<eT>&       m;
   arma_aligned const Base<uword,T1>& base_si;
   
   
@@ -40,6 +39,9 @@ class subview_cube_slices : public BaseCube<eT, subview_cube_slices<eT,T1> >
   public:
   
   inline ~subview_cube_slices();
+  inline  subview_cube_slices() = delete;
+  
+  inline void inplace_rand(const uword rand_mode);
   
   template<typename op_type>                inline void inplace_op(const eT val);
   template<typename op_type, typename expr> inline void inplace_op(const BaseCube<eT,expr>& x);
@@ -47,8 +49,8 @@ class subview_cube_slices : public BaseCube<eT, subview_cube_slices<eT,T1> >
   inline void fill(const eT val);
   inline void zeros();
   inline void ones();
-  // inline void randu();  // TODO
-  // inline void randn();  // TODO
+  inline void randu();
+  inline void randn();
   
   inline void operator+= (const eT val);
   inline void operator-= (const eT val);
@@ -80,11 +82,7 @@ class subview_cube_slices : public BaseCube<eT, subview_cube_slices<eT,T1> >
   inline static void   div_inplace(Cube<eT>& out, const subview_cube_slices& in);
   
   
-  
-  private:
-  
   friend class Cube<eT>;
-  subview_cube_slices();
   };
 
 

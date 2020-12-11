@@ -32,14 +32,14 @@ namespace sympd_helper
 // http://mathworld.wolfram.com/PositiveDefiniteMatrix.html
 // http://mathworld.wolfram.com/DiagonallyDominantMatrix.html
   
-template<typename eT>
+template<uword threshold, typename eT>
 inline
 typename enable_if2<is_cx<eT>::no, bool>::result
-guess_sympd(const Mat<eT>& A)
+guess_sympd_worker(const Mat<eT>& A)
   {
   arma_extra_debug_sigprint();
   
-  if((A.n_rows != A.n_cols) || (A.n_rows < 16))  { return false; }
+  if((A.n_rows != A.n_cols) || (A.n_rows < threshold))  { return false; }
   
   const eT tol = eT(100) * std::numeric_limits<eT>::epsilon();  // allow some leeway
   
@@ -106,16 +106,16 @@ guess_sympd(const Mat<eT>& A)
 
 
 
-template<typename eT>
+template<uword threshold, typename eT>
 inline
 typename enable_if2<is_cx<eT>::yes, bool>::result
-guess_sympd(const Mat<eT>& A)
+guess_sympd_worker(const Mat<eT>& A)
   {
   arma_extra_debug_sigprint();
   
   typedef typename get_pod_type<eT>::result T;
   
-  if((A.n_rows != A.n_cols) || (A.n_rows < 16))  { return false; }
+  if((A.n_rows != A.n_cols) || (A.n_rows < threshold))  { return false; }
   
   const T tol = T(100) * std::numeric_limits<T>::epsilon();  // allow some leeway
   
@@ -141,7 +141,7 @@ guess_sympd(const Mat<eT>& A)
   
   const T square_max_diag = max_diag * max_diag;
   
-  if(std::isfinite(square_max_diag) == false)  { return false; }
+  if(arma_isfinite(square_max_diag) == false)  { return false; }
   
   A_col = A_mem;
   
@@ -165,7 +165,7 @@ guess_sympd(const Mat<eT>& A)
       // avoid using std::abs(), as that is time consuming due to division and std::sqrt()
       const T square_A_ij_abs = (A_ij_real * A_ij_real) + (A_ij_imag * A_ij_imag);
       
-      if(std::isfinite(square_A_ij_abs) == false)  { return false; }
+      if(arma_isfinite(square_A_ij_abs) == false)  { return false; }
       
       if(square_A_ij_abs >= square_max_diag)  { return false; }
       
@@ -204,6 +204,29 @@ guess_sympd(const Mat<eT>& A)
     }
   
   return true;
+  }
+
+
+
+template<typename eT>
+inline
+bool
+guess_sympd(const Mat<eT>& A)
+  {
+  // analyse matrices with size >= 16x16
+  return guess_sympd_worker<16u>(A);
+  }
+
+
+
+template<typename eT>
+inline
+bool
+guess_sympd_anysize(const Mat<eT>& A)
+  {
+  // analyse matrices with size >= 2x2
+  
+  return guess_sympd_worker<2u>(A);
   }
 
 

@@ -21,7 +21,7 @@
 //! Class for storing data required to construct or apply operations to a subcube
 //! (i.e. where the subcube starts and ends as well as a reference/pointer to the original cube),
 template<typename eT>
-class subview_cube : public BaseCube<eT, subview_cube<eT> >
+class subview_cube : public BaseCube< eT, subview_cube<eT> >
   {
   public:    
   
@@ -49,6 +49,7 @@ class subview_cube : public BaseCube<eT, subview_cube<eT> >
   public:
   
   inline ~subview_cube();
+  inline  subview_cube() = delete;
   
   inline void operator=  (const eT val);
   inline void operator+= (const eT val);
@@ -95,10 +96,8 @@ class subview_cube : public BaseCube<eT, subview_cube<eT> >
   template<typename functor> inline void transform(functor F);
   template<typename functor> inline void     imbue(functor F);
   
-  #if defined(ARMA_USE_CXX11)
   inline void each_slice(const std::function< void(      Mat<eT>&) >& F);
   inline void each_slice(const std::function< void(const Mat<eT>&) >& F) const;
-  #endif
   
   inline void replace(const eT old_val, const eT new_val);
   
@@ -111,6 +110,7 @@ class subview_cube : public BaseCube<eT, subview_cube<eT> >
   inline void randn();
   
   inline arma_warn_unused bool is_finite() const;
+  inline arma_warn_unused bool is_zero(const pod_type tol = 0) const;
   
   inline arma_warn_unused bool has_inf() const;
   inline arma_warn_unused bool has_nan() const;
@@ -225,12 +225,8 @@ class subview_cube : public BaseCube<eT, subview_cube<eT> >
   inline const_iterator cend() const;
   
   
-  private:
-  
   friend class  Mat<eT>;
   friend class Cube<eT>;
-  
-  subview_cube();
   };
 
 

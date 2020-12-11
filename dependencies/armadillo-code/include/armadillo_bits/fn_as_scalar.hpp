@@ -311,7 +311,7 @@ template<typename T1, typename T2>
 arma_warn_unused
 arma_inline
 typename T1::elem_type
-as_scalar(const Glue<T1, T2, glue_times>& X, const typename arma_not_cx<typename T1::elem_type>::result* junk = 0)
+as_scalar(const Glue<T1, T2, glue_times>& X, const typename arma_not_cx<typename T1::elem_type>::result* junk = nullptr)
   {
   arma_extra_debug_sigprint();
   arma_ignore(junk);
@@ -353,52 +353,6 @@ as_scalar(const Base<typename T1::elem_type,T1>& X)
   
   return (Proxy<T1>::use_at) ? P.at(0,0) : P[0];
   }
-
-
-// ensure the following two functions are aware of each other
-template<typename T1,              typename   eop_type> inline arma_warn_unused typename T1::elem_type as_scalar(const   eOp<T1,       eop_type>& X);
-template<typename T1, typename T2, typename eglue_type> inline arma_warn_unused typename T1::elem_type as_scalar(const eGlue<T1, T2, eglue_type>& X);
-
-
-
-template<typename T1, typename eop_type>
-arma_warn_unused
-inline
-typename T1::elem_type
-as_scalar(const eOp<T1, eop_type>& X)
-  {
-  arma_extra_debug_sigprint();
-  
-  typedef typename T1::elem_type eT;
-  
-  const eT val = as_scalar(X.P.Q);
-  
-  return eop_core<eop_type>::process(val, X.aux);
-  }
-
-
-
-template<typename T1, typename T2, typename eglue_type>
-inline
-arma_warn_unused
-typename T1::elem_type
-as_scalar(const eGlue<T1, T2, eglue_type>& X)
-  {
-  arma_extra_debug_sigprint();
-  
-  typedef typename T1::elem_type eT;
-  
-  const eT a = as_scalar(X.P1.Q);
-  const eT b = as_scalar(X.P2.Q);
-  
-  // the optimiser will keep only one return statement
-  
-       if(is_same_type<eglue_type, eglue_plus >::yes) { return a + b; }
-  else if(is_same_type<eglue_type, eglue_minus>::yes) { return a - b; }
-  else if(is_same_type<eglue_type, eglue_div  >::yes) { return a / b; }
-  else if(is_same_type<eglue_type, eglue_schur>::yes) { return a * b; }
-  }
-
 
 
 template<typename T1>

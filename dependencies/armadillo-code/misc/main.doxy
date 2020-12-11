@@ -4,16 +4,8 @@
 \htmlonly
 
 <br>
-See the associated technical report for an overview of the internal architecture:
+Main page: <a href=http://arma.sourceforge.net>http://arma.sourceforge.net</a>
 <br>
-<ul>
-Conrad Sanderson.
-<br>Armadillo: An Open Source C++ Linear Algebra Library for Fast Prototyping and Computationally Intensive Experiments.
-<br>Technical Report, NICTA, 2010. 
-<br>
-<br><a href="http://arma.sourceforge.net/armadillo_nicta_2010.pdf">online PDF</a>
-
-</ul>
 
 \endhtmlonly
 */

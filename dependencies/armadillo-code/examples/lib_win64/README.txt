@@ -1,19 +1,25 @@
-The lib and dll files in this folder are for 64 bit Windows 7.
-They are compiled versions of standard BLAS and LAPACK libraries,
-which are distributed under a BSD license (see below).
+The lib and dll files in this folder are for MSVC running on Windows 10 (64 bit).
+
+The files were obtained from a pre-compiled release of OpenBLAS 0.3.10:
+https://github.com/xianyi/OpenBLAS/releases/download/v0.3.10/OpenBLAS-0.3.10-x64.zip
 
 The compilation was done by a third party.  USE AT YOUR OWN RISK.
-The compiled versions of LAPACK and BLAS were obtained from:
-  http://ylzhao.blogspot.com.au/2013/10/blas-lapack-precompiled-binaries-for.html
 
-You can find the original sources for standard BLAS and LAPACK at:
+libopenblas.dll is a copy of OpenBLAS-0.3.10-x64/bin/libopenblas.dll
+libopenblas.lib is a copy of OpenBLAS-0.3.10-x64/lib/libopenblas.dll.a
+
+The original sources for OpenBLAS are at:
+  https://github.com/xianyi/OpenBLAS/
+
+OpenBLAS is a fast implementation of BLAS and LAPACK.
+The original sources for standard BLAS and LAPACK are at:
   http://www.netlib.org/blas/
   http://www.netlib.org/lapack/
-  
-Faster and/or alternative implementations of BLAS and LAPACK are available:
-  http://xianyi.github.com/OpenBLAS/
+
+Alternative implementations and/or distributions of BLAS and LAPACK are available at:
   http://software.intel.com/en-us/intel-mkl/
   http://icl.cs.utk.edu/lapack-for-windows/lapack/
+  http://ylzhao.blogspot.com.au/2013/10/blas-lapack-precompiled-binaries-for.html
 
 --------------------------------------------------------------------------
 

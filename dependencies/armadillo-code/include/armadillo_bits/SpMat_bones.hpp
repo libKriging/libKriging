@@ -27,9 +27,9 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   typedef eT                                elem_type;  //!< the type of elements stored in the matrix
   typedef typename get_pod_type<eT>::result  pod_type;  //!< if eT is std::complex<T>, pod_type is T; otherwise pod_type is eT
   
-  static const bool is_row  = false;
-  static const bool is_col  = false;
-  static const bool is_xvec = false;
+  static constexpr bool is_row  = false;
+  static constexpr bool is_col  = false;
+  static constexpr bool is_xvec = false;
   
   const uword n_rows;    //!< number of rows             (read-only)
   const uword n_cols;    //!< number of columns          (read-only)
@@ -92,13 +92,11 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline SpMat& operator=(const std::string& text);
   inline            SpMat(const SpMat<eT>&   x);
   
-  #if defined(ARMA_USE_CXX11)
   inline            SpMat(SpMat&& m);
   inline SpMat& operator=(SpMat&& m);
-  #endif
   
   inline explicit    SpMat(const MapMat<eT>& x);
-  inline SpMat&  operator=(const MapMat<eT>& x);
+  inline SpMat& operator= (const MapMat<eT>& x);
   
   template<typename T1, typename T2, typename T3>
   inline SpMat(const Base<uword,T1>& rowind, const Base<uword,T2>& colptr, const Base<eT,T3>& values, const uword n_rows, const uword n_cols);
@@ -112,12 +110,12 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   template<typename T1, typename T2>
   inline SpMat(const bool add_values, const Base<uword,T1>& locations, const Base<eT,T2>& values, const uword n_rows, const uword n_cols, const bool sort_locations = true, const bool check_for_zeros = true);
   
-  inline SpMat&  operator=(const eT val); //! sets size to 1x1
+  inline SpMat& operator= (const eT val); //! sets size to 1x1
   inline SpMat& operator*=(const eT val);
   inline SpMat& operator/=(const eT val);
   // operator+=(val) and operator-=(val) are not defined as they don't make sense for sparse matrices
   
-  inline SpMat&  operator=(const SpMat& m);
+  inline SpMat& operator= (const SpMat& m);
   inline SpMat& operator+=(const SpMat& m);
   inline SpMat& operator-=(const SpMat& m);
   inline SpMat& operator*=(const SpMat& m);
@@ -125,7 +123,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline SpMat& operator/=(const SpMat& m);
   
   template<typename T1> inline explicit    SpMat(const Base<eT, T1>& m);
-  template<typename T1> inline SpMat&  operator=(const Base<eT, T1>& m);
+  template<typename T1> inline SpMat& operator= (const Base<eT, T1>& m);
   template<typename T1> inline SpMat& operator+=(const Base<eT, T1>& m);
   template<typename T1> inline SpMat& operator-=(const Base<eT, T1>& m);
   template<typename T1> inline SpMat& operator*=(const Base<eT, T1>& m);
@@ -133,7 +131,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   template<typename T1> inline SpMat& operator%=(const Base<eT, T1>& m);
   
   template<typename T1> inline explicit    SpMat(const Op<T1, op_diagmat>& expr);
-  template<typename T1> inline SpMat&  operator=(const Op<T1, op_diagmat>& expr);
+  template<typename T1> inline SpMat& operator= (const Op<T1, op_diagmat>& expr);
   template<typename T1> inline SpMat& operator+=(const Op<T1, op_diagmat>& expr);
   template<typename T1> inline SpMat& operator-=(const Op<T1, op_diagmat>& expr);
   template<typename T1> inline SpMat& operator*=(const Op<T1, op_diagmat>& expr);
@@ -148,15 +146,23 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline explicit SpMat(const SpBase<pod_type, T1>& A, const SpBase<pod_type, T2>& B);
   
   inline             SpMat(const SpSubview<eT>& X);
-  inline SpMat&  operator=(const SpSubview<eT>& X);
+  inline SpMat& operator= (const SpSubview<eT>& X);
   inline SpMat& operator+=(const SpSubview<eT>& X);
   inline SpMat& operator-=(const SpSubview<eT>& X);
   inline SpMat& operator*=(const SpSubview<eT>& X);
   inline SpMat& operator%=(const SpSubview<eT>& X);
   inline SpMat& operator/=(const SpSubview<eT>& X);
   
+  template<typename T1> inline             SpMat(const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator= (const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator+=(const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator-=(const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator*=(const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator%=(const SpSubview_col_list<eT,T1>& X);
+  template<typename T1> inline SpMat& operator/=(const SpSubview_col_list<eT,T1>& X);
+  
   inline             SpMat(const spdiagview<eT>& X);
-  inline SpMat&  operator=(const spdiagview<eT>& X);
+  inline SpMat& operator= (const spdiagview<eT>& X);
   inline SpMat& operator+=(const spdiagview<eT>& X);
   inline SpMat& operator-=(const spdiagview<eT>& X);
   inline SpMat& operator*=(const spdiagview<eT>& X);
@@ -165,7 +171,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   // delayed unary ops
   template<typename T1, typename spop_type> inline             SpMat(const SpOp<T1, spop_type>& X);
-  template<typename T1, typename spop_type> inline SpMat&  operator=(const SpOp<T1, spop_type>& X);
+  template<typename T1, typename spop_type> inline SpMat& operator= (const SpOp<T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator+=(const SpOp<T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator-=(const SpOp<T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator*=(const SpOp<T1, spop_type>& X);
@@ -174,7 +180,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   // delayed binary ops
   template<typename T1, typename T2, typename spglue_type> inline             SpMat(const SpGlue<T1, T2, spglue_type>& X);
-  template<typename T1, typename T2, typename spglue_type> inline SpMat&  operator=(const SpGlue<T1, T2, spglue_type>& X);
+  template<typename T1, typename T2, typename spglue_type> inline SpMat& operator= (const SpGlue<T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator+=(const SpGlue<T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator-=(const SpGlue<T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator*=(const SpGlue<T1, T2, spglue_type>& X);
@@ -183,7 +189,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   // delayed mixed-type unary ops
   template<typename T1, typename spop_type> inline             SpMat(const mtSpOp<eT, T1, spop_type>& X);
-  template<typename T1, typename spop_type> inline SpMat&  operator=(const mtSpOp<eT, T1, spop_type>& X);
+  template<typename T1, typename spop_type> inline SpMat& operator= (const mtSpOp<eT, T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator+=(const mtSpOp<eT, T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator-=(const mtSpOp<eT, T1, spop_type>& X);
   template<typename T1, typename spop_type> inline SpMat& operator*=(const mtSpOp<eT, T1, spop_type>& X);
@@ -192,7 +198,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   // delayed mixed-type binary ops
   template<typename T1, typename T2, typename spglue_type> inline             SpMat(const mtSpGlue<eT, T1, T2, spglue_type>& X);
-  template<typename T1, typename T2, typename spglue_type> inline SpMat&  operator=(const mtSpGlue<eT, T1, T2, spglue_type>& X);
+  template<typename T1, typename T2, typename spglue_type> inline SpMat& operator= (const mtSpGlue<eT, T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator+=(const mtSpGlue<eT, T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator-=(const mtSpGlue<eT, T1, T2, spglue_type>& X);
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator*=(const mtSpGlue<eT, T1, T2, spglue_type>& X);
@@ -200,17 +206,17 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   template<typename T1, typename T2, typename spglue_type> inline SpMat& operator/=(const mtSpGlue<eT, T1, T2, spglue_type>& X);
   
   
-  arma_inline       SpSubview<eT> row(const uword row_num);
-  arma_inline const SpSubview<eT> row(const uword row_num) const;
+  arma_inline       SpSubview_row<eT> row(const uword row_num);
+  arma_inline const SpSubview_row<eT> row(const uword row_num) const;
   
-  inline            SpSubview<eT> operator()(const uword row_num, const span& col_span);
-  inline      const SpSubview<eT> operator()(const uword row_num, const span& col_span) const;
+  inline            SpSubview_row<eT> operator()(const uword row_num, const span& col_span);
+  inline      const SpSubview_row<eT> operator()(const uword row_num, const span& col_span) const;
   
-  arma_inline       SpSubview<eT> col(const uword col_num);
-  arma_inline const SpSubview<eT> col(const uword col_num) const;
+  arma_inline       SpSubview_col<eT> col(const uword col_num);
+  arma_inline const SpSubview_col<eT> col(const uword col_num) const;
   
-  inline            SpSubview<eT> operator()(const span& row_span, const uword col_num);
-  inline      const SpSubview<eT> operator()(const span& row_span, const uword col_num) const;
+  inline            SpSubview_col<eT> operator()(const span& row_span, const uword col_num);
+  inline      const SpSubview_col<eT> operator()(const span& row_span, const uword col_num) const;
   
   arma_inline       SpSubview<eT> rows(const uword in_row1, const uword in_row2);
   arma_inline const SpSubview<eT> rows(const uword in_row1, const uword in_row2) const;
@@ -245,6 +251,10 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   
   inline       SpSubview<eT> tail_cols(const uword N);
   inline const SpSubview<eT> tail_cols(const uword N) const;
+  
+  
+  template<typename T1> arma_inline       SpSubview_col_list<eT,T1> cols(const Base<uword,T1>& ci);
+  template<typename T1> arma_inline const SpSubview_col_list<eT,T1> cols(const Base<uword,T1>& ci) const;
   
   
   inline       spdiagview<eT> diag(const sword in_id = 0);
@@ -332,8 +342,6 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline void  reshape_helper_generic(const uword in_rows, const uword in_cols);  //! internal use only
   inline void  reshape_helper_intovec();                                          //! internal use only
   
-  arma_deprecated inline void reshape(const uword in_rows, const uword in_cols, const uword dim);  //!< NOTE: don't use this form: it will be removed
-  
   template<typename functor> inline const SpMat&  for_each(functor F);
   template<typename functor> inline const SpMat&  for_each(functor F) const;
   
@@ -382,15 +390,19 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   // TODO: implement auto_detect for sparse matrices
   
   inline arma_cold bool save(const std::string   name, const file_type type = arma_binary, const bool print_status = true) const;
+  inline arma_cold bool save(const csv_name&     spec, const file_type type =   csv_ascii, const bool print_status = true) const;
   inline arma_cold bool save(      std::ostream& os,   const file_type type = arma_binary, const bool print_status = true) const;
   
   inline arma_cold bool load(const std::string   name, const file_type type = arma_binary, const bool print_status = true);
+  inline arma_cold bool load(const csv_name&     spec, const file_type type =   csv_ascii, const bool print_status = true);
   inline arma_cold bool load(      std::istream& is,   const file_type type = arma_binary, const bool print_status = true);
   
   inline arma_cold bool quiet_save(const std::string   name, const file_type type = arma_binary) const;
+  inline arma_cold bool quiet_save(const csv_name&     spec, const file_type type =   csv_ascii) const;
   inline arma_cold bool quiet_save(      std::ostream& os,   const file_type type = arma_binary) const;
   
   inline arma_cold bool quiet_load(const std::string   name, const file_type type = arma_binary);
+  inline arma_cold bool quiet_load(const csv_name&     spec, const file_type type =   csv_ascii);
   inline arma_cold bool quiet_load(      std::istream& is,   const file_type type = arma_binary);
   
   
@@ -475,7 +487,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
     inline iterator(SpMat& in_M, uword in_row, uword in_col, uword in_pos) : const_iterator(in_M, in_row, in_col, in_pos) { }
     inline iterator(const iterator& other) : const_iterator(other) { }
     
-    inline arma_hot SpValProxy<SpMat<eT> > operator*();
+    inline arma_hot SpValProxy< SpMat<eT> > operator*();
     
     // overloads needed for return type correctness
     inline arma_hot         iterator& operator++();
@@ -485,9 +497,9 @@ class SpMat : public SpBase< eT, SpMat<eT> >
     inline arma_warn_unused iterator  operator--(int);
     
     // this has a different value_type than iterator_base
-    typedef SpValProxy<SpMat<eT> >         value_type;
-    typedef const SpValProxy<SpMat<eT> >*  pointer;
-    typedef const SpValProxy<SpMat<eT> >&  reference;
+    typedef       SpValProxy< SpMat<eT> >   value_type;
+    typedef const SpValProxy< SpMat<eT> >*  pointer;
+    typedef const SpValProxy< SpMat<eT> >&  reference;
     };
   
   class const_row_iterator : public iterator_base
@@ -536,7 +548,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
     inline row_iterator(SpMat& in_M, uword in_row, uword in_col) : const_row_iterator(in_M, in_row, in_col) { }
     inline row_iterator(const row_iterator& other) : const_row_iterator(other) { }
     
-    inline arma_hot SpValProxy<SpMat<eT> > operator*();
+    inline arma_hot SpValProxy< SpMat<eT> > operator*();
     
     // overloads required for return type correctness
     inline arma_hot         row_iterator& operator++();
@@ -546,9 +558,9 @@ class SpMat : public SpBase< eT, SpMat<eT> >
     inline arma_warn_unused row_iterator  operator--(int);
     
     // this has a different value_type than iterator_base
-    typedef SpValProxy<SpMat<eT> >         value_type;
-    typedef const SpValProxy<SpMat<eT> >*  pointer;
-    typedef const SpValProxy<SpMat<eT> >&  reference;
+    typedef       SpValProxy< SpMat<eT> >  value_type;
+    typedef const SpValProxy< SpMat<eT> >* pointer;
+    typedef const SpValProxy< SpMat<eT> >& reference;
     };
   
   
@@ -599,6 +611,12 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline bool  empty() const;
   inline uword size()  const;
   
+  arma_inline arma_warn_unused SpMat_MapMat_val<eT> front();
+  arma_inline arma_warn_unused eT                   front() const;
+  
+  arma_inline arma_warn_unused SpMat_MapMat_val<eT> back();
+  arma_inline arma_warn_unused eT                   back() const;
+  
   // Resize memory.
   // If the new size is larger, the column pointers and new memory still need to be correctly set.
   // If the new size is smaller, the first new_n_nonzero elements will be copied.
@@ -618,8 +636,8 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   inline void steal_mem_simple(SpMat& X);
   
   //! don't use this unless you're writing internal Armadillo code
-  template<              typename T1, typename Functor> arma_hot inline void init_xform   (const SpBase<eT, T1>& x, const Functor& func);
-  template<typename eT2, typename T1, typename Functor> arma_hot inline void init_xform_mt(const SpBase<eT2,T1>& x, const Functor& func);
+  template<              typename T1, typename Functor> inline void init_xform   (const SpBase<eT, T1>& x, const Functor& func);
+  template<typename eT2, typename T1, typename Functor> inline void init_xform_mt(const SpBase<eT2,T1>& x, const Functor& func);
   
   //! don't use this unless you're writing internal Armadillo code
   arma_inline bool is_alias(const SpMat<eT>& X) const;
@@ -671,7 +689,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   // 1: CSC needs to be updated from cache (ie. cache has more recent data)
   // 2: no update required                 (ie. CSC and cache contain the same data)
   
-  #if defined(ARMA_USE_CXX11)
+  #if (!defined(ARMA_DONT_USE_STD_MUTEX))
   arma_aligned mutable std::mutex cache_mutex;
   #endif
   
@@ -692,6 +710,7 @@ class SpMat : public SpBase< eT, SpMat<eT> >
   friend class SpSubview_MapMat_val<eT>;
   friend class spdiagview<eT>;
   
+  template<typename xT1, typename xT2> friend class SpSubview_col_list;
   
   public:
   

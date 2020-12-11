@@ -30,13 +30,12 @@ main(int argc, char** argv)
   A.fill(5.0);     // set all elements to a particular value
   A.print("A:");
   
-  // endr indicates "end of row"
-  A << 0.165300 << 0.454037 << 0.995795 << 0.124098 << 0.047084 << endr
-    << 0.688782 << 0.036549 << 0.552848 << 0.937664 << 0.866401 << endr
-    << 0.348740 << 0.479388 << 0.506228 << 0.145673 << 0.491547 << endr
-    << 0.148678 << 0.682258 << 0.571154 << 0.874724 << 0.444632 << endr
-    << 0.245726 << 0.595218 << 0.409327 << 0.367827 << 0.385736 << endr;
-  
+  A = { { 0.165300, 0.454037, 0.995795, 0.124098, 0.047084 },
+        { 0.688782, 0.036549, 0.552848, 0.937664, 0.866401 },
+        { 0.348740, 0.479388, 0.506228, 0.145673, 0.491547 },
+        { 0.148678, 0.682258, 0.571154, 0.874724, 0.444632 },
+        { 0.245726, 0.595218, 0.409327, 0.367827, 0.385736 } };
+        
   A.print("A:");
   
   // determinant
@@ -93,13 +92,11 @@ main(int argc, char** argv)
   D.print("D:");
   
   // row vectors are treated like a matrix with one row
-  rowvec r;
-  r << 0.59119 << 0.77321 << 0.60275 << 0.35887 << 0.51683;
+  rowvec r = { 0.59119, 0.77321, 0.60275, 0.35887, 0.51683 };
   r.print("r:");
   
   // column vectors are treated like a matrix with one column
-  vec q;
-  q << 0.14333 << 0.59478 << 0.14481 << 0.58558 << 0.60809;
+  vec q = { 0.14333, 0.59478, 0.14481, 0.58558, 0.60809 };
   q.print("q:");
   
   // convert matrix to vector; data in matrices is stored column-by-column
@@ -120,11 +117,13 @@ main(int argc, char** argv)
   B.print("B:");
   
   // imat specifies an integer matrix
-  imat AA;
-  imat BB;
+  imat AA = { { 1, 2, 3 },
+              { 4, 5, 6 },
+              { 7, 8, 9 } };
   
-  AA << 1 << 2 << 3 << endr << 4 << 5 << 6 << endr << 7 << 8 << 9;
-  BB << 3 << 2 << 1 << endr << 6 << 5 << 4 << endr << 9 << 8 << 7;
+  imat BB = { { 3, 2, 1 }, 
+              { 6, 5, 4 },
+              { 9, 8, 7 } };
   
   // comparison of matrices (element-wise); output of a relational operator is a umat
   umat ZZ = (AA >= BB);

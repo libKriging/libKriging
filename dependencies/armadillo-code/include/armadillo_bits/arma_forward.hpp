@@ -46,6 +46,8 @@ template<typename eT> class SpMat;
 template<typename eT> class SpCol;
 template<typename eT> class SpRow;
 template<typename eT> class SpSubview;
+template<typename eT> class SpSubview_col;
+template<typename eT> class SpSubview_row;
 
 template<typename eT> class diagview;
 template<typename eT> class spdiagview;
@@ -64,6 +66,8 @@ template<typename parent, unsigned int mode, typename TB> class subview_each2;
 template<typename eT>              class subview_cube_each1;
 template<typename eT, typename TB> class subview_cube_each2;
 template<typename eT, typename T1> class subview_cube_slices;
+
+template<typename eT, typename T1> class SpSubview_col_list;
 
 
 class SizeMat;
@@ -113,6 +117,22 @@ class gen_randn;
 
 
 
+class spop_strans;
+class spop_htrans;
+class spop_vectorise_row;
+class spop_vectorise_col;
+
+class spglue_plus;
+class spglue_minus;
+class spglue_schur;
+class spglue_times;
+class spglue_max;
+class spglue_min;
+class spglue_rel_lt;
+class spglue_rel_gt;
+
+
+
 class op_internal_equ;
 class op_internal_plus;
 class op_internal_minus;
@@ -126,9 +146,9 @@ struct traits_op_default
   template<typename T1>
   struct traits
     {
-    static const bool is_row  = false;
-    static const bool is_col  = false;
-    static const bool is_xvec = false;
+    static constexpr bool is_row  = false;
+    static constexpr bool is_col  = false;
+    static constexpr bool is_xvec = false;
     };
   };
 
@@ -138,9 +158,9 @@ struct traits_op_xvec
   template<typename T1>
   struct traits
     {
-    static const bool is_row  = false;
-    static const bool is_col  = false;
-    static const bool is_xvec = true;
+    static constexpr bool is_row  = false;
+    static constexpr bool is_col  = false;
+    static constexpr bool is_xvec = true;
     };
   };
 
@@ -150,9 +170,9 @@ struct traits_op_col
   template<typename T1>
   struct traits
     {
-    static const bool is_row  = false;
-    static const bool is_col  = true;
-    static const bool is_xvec = false;
+    static constexpr bool is_row  = false;
+    static constexpr bool is_col  = true;
+    static constexpr bool is_xvec = false;
     };
   };
 
@@ -162,9 +182,9 @@ struct traits_op_row
   template<typename T1>
   struct traits
     {
-    static const bool is_row  = true;
-    static const bool is_col  = false;
-    static const bool is_xvec = false;
+    static constexpr bool is_row  = true;
+    static constexpr bool is_col  = false;
+    static constexpr bool is_xvec = false;
     };
   };
 
@@ -174,9 +194,9 @@ struct traits_op_passthru
   template<typename T1>
   struct traits
     {
-    static const bool is_row  = T1::is_row;
-    static const bool is_col  = T1::is_col;
-    static const bool is_xvec = T1::is_xvec;
+    static constexpr bool is_row  = T1::is_row;
+    static constexpr bool is_col  = T1::is_col;
+    static constexpr bool is_xvec = T1::is_xvec;
     };
   };
 
@@ -186,9 +206,9 @@ struct traits_glue_default
   template<typename T1, typename T2>
   struct traits
     {
-    static const bool is_row  = false;
-    static const bool is_col  = false;
-    static const bool is_xvec = false;
+    static constexpr bool is_row  = false;
+    static constexpr bool is_col  = false;
+    static constexpr bool is_xvec = false;
     };
   };
 
@@ -198,9 +218,9 @@ struct traits_glue_or
   template<typename T1, typename T2>
   struct traits
     {
-    static const bool is_row  = (T1::is_row  || T2::is_row );
-    static const bool is_col  = (T1::is_col  || T2::is_col );
-    static const bool is_xvec = (T1::is_xvec || T2::is_xvec);
+    static constexpr bool is_row  = (T1::is_row  || T2::is_row );
+    static constexpr bool is_col  = (T1::is_col  || T2::is_col );
+    static constexpr bool is_xvec = (T1::is_xvec || T2::is_xvec);
     };
   };
 
@@ -212,10 +232,11 @@ template<const bool, const bool, const bool>             class gemv;
 
 template<                 typename eT, typename gen_type> class  Gen; 
 
-template<                 typename T1, typename  op_type> class      Op; 
-template<                 typename T1, typename eop_type> class     eOp;
-template<                 typename T1, typename  op_type> class SpToDOp; 
-template<typename out_eT, typename T1, typename  op_type> class    mtOp;
+template<                 typename T1, typename  op_type> class          Op; 
+template<                 typename T1, typename eop_type> class         eOp;
+template<                 typename T1, typename  op_type> class     SpToDOp; 
+template<                 typename T1, typename  op_type> class CubeToMatOp;
+template<typename out_eT, typename T1, typename  op_type> class        mtOp;
 
 template<                 typename T1, typename T2, typename  glue_type> class   Glue;
 template<                 typename T1, typename T2, typename eglue_type> class  eGlue;
@@ -239,23 +260,19 @@ template<typename T1> class ProxyCube;
 
 template<typename T1> class diagmat_proxy;
 
-class spop_strans;
-class spop_htrans;
-class spop_vectorise_row;
-class spop_vectorise_col;
+template<typename T1> struct unwrap;
+template<typename T1> struct quasi_unwrap;
+template<typename T1> struct unwrap_cube;
+template<typename T1> struct unwrap_spmat;
 
-class spglue_plus;
-class spglue_minus;
-class spglue_schur;
-class spglue_times;
-class spglue_max;
-class spglue_min;
+
+
 
 struct state_type
   {
   #if   defined(ARMA_USE_OPENMP)
                 int  state;
-  #elif defined(ARMA_USE_CXX11)
+  #elif (!defined(ARMA_DONT_USE_STD_MUTEX))
     std::atomic<int> state;
   #else
                 int  state;
@@ -274,7 +291,7 @@ struct state_type
     #if   defined(ARMA_USE_OPENMP)
       #pragma omp atomic read
       out = state;
-    #elif defined(ARMA_USE_CXX11)
+    #elif (!defined(ARMA_DONT_USE_STD_MUTEX))
       out = state.load();
     #else
       out = state;
@@ -290,7 +307,7 @@ struct state_type
     #if   defined(ARMA_USE_OPENMP)
       #pragma omp atomic write
       state = in_state;
-    #elif defined(ARMA_USE_CXX11)
+    #elif (!defined(ARMA_DONT_USE_STD_MUTEX))
       state.store(in_state);
     #else
       state = in_state;
@@ -333,90 +350,39 @@ static const injector_end_of_row<> endr = injector_end_of_row<>();
 //! @{
 
 
-enum file_type
+enum struct file_type : unsigned int
   {
   file_type_unknown,
-  auto_detect,        //!< Automatically detect the file type
-  raw_ascii,          //!< ASCII format (text), without any other information.
-  arma_ascii,         //!< Armadillo ASCII format (text), with information about matrix type and size
-  csv_ascii,          //!< comma separated values (CSV), without any other information
-  raw_binary,         //!< raw binary format, without any other information.
-  arma_binary,        //!< Armadillo binary format, with information about matrix type and size
+  auto_detect,        //!< attempt to automatically detect the file type
+  raw_ascii,          //!< raw text (ASCII), without a header
+  arma_ascii,         //!< Armadillo text format, with a header specifying matrix type and size
+  csv_ascii,          //!< comma separated values (CSV), without a header
+  raw_binary,         //!< raw binary format (machine dependent), without a header
+  arma_binary,        //!< Armadillo binary format (machine dependent), with a header specifying matrix type and size
   pgm_binary,         //!< Portable Grey Map (greyscale image)
   ppm_binary,         //!< Portable Pixel Map (colour image), used by the field and cube classes
-  hdf5_binary,        //!< Open binary format, not specific to Armadillo, which can store arbitrary data
-  hdf5_binary_trans,  //!< as per hdf5_binary, but save/load the data with columns transposed to rows
-  coord_ascii         //!< simple co-ordinate format for sparse matrices
+  hdf5_binary,        //!< HDF5: open binary format, not specific to Armadillo, which can store arbitrary data
+  hdf5_binary_trans,  //!< [DO NOT USE - deprecated] as per hdf5_binary, but save/load the data with columns transposed to rows
+  coord_ascii         //!< simple co-ordinate format for sparse matrices (indices start at zero)
   };
 
 
-namespace hdf5_opts
-  {
-  typedef unsigned int flag_type;
-  
-  struct opts
-    {
-    const flag_type flags;
-    
-    inline explicit opts(const flag_type in_flags);
-    
-    inline const opts operator+(const opts& rhs) const;
-    };
-  
-  inline
-  opts::opts(const flag_type in_flags)
-    : flags(in_flags)
-    {}
-  
-  inline
-  const opts
-  opts::operator+(const opts& rhs) const
-    {
-    const opts result( flags | rhs.flags );
-    
-    return result;
-    }
-  
-  // The values below (eg. 1u << 0) are for internal Armadillo use only.
-  // The values can change without notice.
-  
-  static const flag_type flag_none    = flag_type(0      );
-  static const flag_type flag_trans   = flag_type(1u << 0);
-  static const flag_type flag_append  = flag_type(1u << 1);
-  static const flag_type flag_replace = flag_type(1u << 2);
-  
-  struct opts_none    : public opts { inline opts_none()    : opts(flag_none   ) {} };
-  struct opts_trans   : public opts { inline opts_trans()   : opts(flag_trans  ) {} };
-  struct opts_append  : public opts { inline opts_append()  : opts(flag_append ) {} };
-  struct opts_replace : public opts { inline opts_replace() : opts(flag_replace) {} };
-  
-  static const opts_none    none;
-  static const opts_trans   trans;
-  static const opts_append  append;
-  static const opts_replace replace;
-  }
+static constexpr file_type file_type_unknown  = file_type::file_type_unknown;
+static constexpr file_type auto_detect        = file_type::auto_detect;
+static constexpr file_type raw_ascii          = file_type::raw_ascii;
+static constexpr file_type arma_ascii         = file_type::arma_ascii;
+static constexpr file_type csv_ascii          = file_type::csv_ascii;
+static constexpr file_type raw_binary         = file_type::raw_binary;
+static constexpr file_type arma_binary        = file_type::arma_binary;
+static constexpr file_type pgm_binary         = file_type::pgm_binary;
+static constexpr file_type ppm_binary         = file_type::ppm_binary;
+static constexpr file_type hdf5_binary        = file_type::hdf5_binary;
+static constexpr file_type hdf5_binary_trans  = file_type::hdf5_binary_trans;
+static constexpr file_type coord_ascii        = file_type::coord_ascii;
 
 
-struct hdf5_name
-  {
-  const std::string     filename;
-  const std::string     dsname;
-  const hdf5_opts::opts opts;
-  
-  inline
-  hdf5_name(const std::string& in_filename)
-    : filename(in_filename    )
-    , dsname  (std::string()  )
-    , opts    (hdf5_opts::none)
-    {}
-  
-  inline
-  hdf5_name(const std::string& in_filename, const std::string& in_dsname, const hdf5_opts::opts& in_opts = hdf5_opts::none)
-    : filename(in_filename)
-    , dsname  (in_dsname  )
-    , opts    (in_opts    )
-    {}
-  };
+struct hdf5_name;
+struct  csv_name;
 
 
 //! @}
@@ -489,7 +455,30 @@ struct superlu_opts : public spsolve_opts_base
     symmetric    = false;
     pivot_thresh = 1.0;
     permutation  = COLAMD;
-    refine       = REF_DOUBLE;
+    refine       = REF_NONE;
+    }
+  };
+
+
+//! @}
+
+
+
+//! \ingroup fn_eigs_sym fs_eigs_gen
+//! @{
+
+
+struct eigs_opts
+  {
+  double       tol;     // tolerance
+  unsigned int maxiter; // max iterations
+  unsigned int subdim;  // subspace dimension
+  
+  inline eigs_opts()
+    {
+    tol     = 0.0;
+    maxiter = 1000;
+    subdim  = 0;
     }
   };
 

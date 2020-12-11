@@ -28,8 +28,8 @@ eigs_gen
   const SpBase<typename T1::elem_type, T1>& X,
   const uword                               n_eigvals,
   const char*                               form = "lm",
-  const typename T1::pod_type               tol  = 0.0,
-  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = 0
+  const eigs_opts                           opts = eigs_opts(),
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
   )
   {
   arma_extra_debug_sigprint();
@@ -40,7 +40,9 @@ eigs_gen
   Mat< std::complex<T> > eigvec;
   Col< std::complex<T> > eigval;
   
-  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form, tol);
+  sp_auxlib::form_type form_val = sp_auxlib::interpret_form_str(form);
+  
+  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form_val, opts);
   
   if(status == false)
     {
@@ -49,6 +51,31 @@ eigs_gen
     }
   
   return eigval;
+  }
+
+
+
+//! this form is deprecated; use eigs_gen(X, n_eigvals, form, opts) instead
+template<typename T1>
+arma_deprecated
+inline
+Col< std::complex<typename T1::pod_type> >
+eigs_gen
+  (
+  const SpBase<typename T1::elem_type, T1>& X,
+  const uword                               n_eigvals,
+  const char*                               form,
+  const typename T1::pod_type               tol,
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
+  )
+  {
+  arma_extra_debug_sigprint();
+  arma_ignore(junk);
+  
+  eigs_opts opts;
+  opts.tol = tol;
+  
+  return eigs_gen(X, n_eigvals, form, opts);
   }
 
 
@@ -63,8 +90,8 @@ eigs_gen
   const SpBase<typename T1::elem_type, T1>&            X,
   const uword                                          n_eigvals,
   const char*                                          form = "lm",
-  const typename T1::pod_type                          tol  = 0.0,
-  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = 0
+  const eigs_opts                                      opts = eigs_opts(),
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
   )
   {
   arma_extra_debug_sigprint();
@@ -74,7 +101,9 @@ eigs_gen
   
   Mat< std::complex<T> > eigvec;
   
-  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form, tol);
+  sp_auxlib::form_type form_val = sp_auxlib::interpret_form_str(form);
+  
+  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form_val, opts);
   
   if(status == false)
     {
@@ -87,7 +116,33 @@ eigs_gen
 
 
 
-//! eigenvalues and eigenvectors of general real sparse matrix X
+//! this form is deprecated; use eigs_gen(eigval, X, n_eigvals, form, opts) instead
+template<typename T1>
+arma_deprecated
+inline
+bool
+eigs_gen
+  (
+           Col< std::complex<typename T1::pod_type> >& eigval,
+  const SpBase<typename T1::elem_type, T1>&            X,
+  const uword                                          n_eigvals,
+  const char*                                          form,
+  const typename T1::pod_type                          tol,
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
+  )
+  {
+  arma_extra_debug_sigprint();
+  arma_ignore(junk);
+  
+  eigs_opts opts;
+  opts.tol = tol;
+  
+  return eigs_gen(eigval, X, n_eigvals, form, opts);
+  }
+
+
+
+//! eigenvalues and eigenvectors of general sparse matrix X
 template<typename T1>
 inline
 bool
@@ -98,8 +153,8 @@ eigs_gen
   const SpBase<typename T1::elem_type, T1>&          X,
   const uword                                        n_eigvals,
   const char*                                        form = "lm",
-  const typename T1::pod_type                        tol  = 0.0,
-  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = 0
+  const eigs_opts                                    opts = eigs_opts(),
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
   )
   {
   arma_extra_debug_sigprint();
@@ -107,7 +162,9 @@ eigs_gen
   
   arma_debug_check( void_ptr(&eigval) == void_ptr(&eigvec), "eigs_gen(): parameter 'eigval' is an alias of parameter 'eigvec'" );
   
-  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form, tol);
+  sp_auxlib::form_type form_val = sp_auxlib::interpret_form_str(form);
+  
+  const bool status = sp_auxlib::eigs_gen(eigval, eigvec, X, n_eigvals, form_val, opts);
   
   if(status == false)
     {
@@ -117,6 +174,33 @@ eigs_gen
     }
   
   return status;
+  }
+
+
+
+//! this form is deprecated; use eigs_gen(eigval, eigvec, X, n_eigvals, form, opts) instead
+template<typename T1>
+arma_deprecated
+inline
+bool
+eigs_gen
+  (
+         Col< std::complex<typename T1::pod_type> >& eigval,
+         Mat< std::complex<typename T1::pod_type> >& eigvec,
+  const SpBase<typename T1::elem_type, T1>&          X,
+  const uword                                        n_eigvals,
+  const char*                                        form,
+  const typename T1::pod_type                        tol,
+  const typename arma_blas_type_only<typename T1::elem_type>::result* junk = nullptr
+  )
+  {
+  arma_extra_debug_sigprint();
+  arma_ignore(junk);
+  
+  eigs_opts opts;
+  opts.tol = tol;
+  
+  return eigs_gen(eigval, eigvec, X, n_eigvals, form, opts);
   }
 
 

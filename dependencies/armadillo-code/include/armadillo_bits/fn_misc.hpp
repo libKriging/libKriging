@@ -167,7 +167,7 @@ log_add_exp(eT log_a, eT log_b)
     }
   else
     {
-    return (log_a + arma_log1p(std::exp(negdelta)));
+    return (log_a + std::log1p(std::exp(negdelta)));
     }
   }
 
@@ -190,7 +190,7 @@ template<typename eT>
 arma_warn_unused
 arma_inline
 bool
-is_finite(const eT x, const typename arma_scalar_only<eT>::result* junk = 0)
+is_finite(const eT x, const typename arma_scalar_only<eT>::result* junk = nullptr)
   {
   arma_ignore(junk);
   
@@ -237,22 +237,6 @@ is_finite(const BaseCube<typename T1::elem_type,T1>& X)
   arma_extra_debug_sigprint();
   
   return X.is_finite();
-  }
-
-
-
-//! NOTE: don't use this function: it will be removed
-template<typename T1>
-arma_deprecated
-inline
-const T1&
-sympd(const Base<typename T1::elem_type,T1>& X)
-  {
-  arma_extra_debug_sigprint();
-  
-  arma_debug_warn("sympd() is deprecated and will be removed; change inv(sympd(X)) to inv_sympd(X)");
-  
-  return X.get_ref();
   }
 
 
@@ -495,7 +479,7 @@ sub2ind(const SizeMat& s, const Base<uword,T1>& subscripts)
   const uword s_n_rows = s.n_rows;
   const uword s_n_cols = s.n_cols;
   
-  const unwrap<T1> U(subscripts.get_ref());
+  const quasi_unwrap<T1> U(subscripts.get_ref());
   
   arma_debug_check( (U.M.n_rows != 2), "sub2ind(): matrix of subscripts must have 2 rows" );
   
@@ -552,7 +536,7 @@ sub2ind(const SizeCube& s, const Base<uword,T1>& subscripts)
   const uword s_n_cols   = s.n_cols;
   const uword s_n_slices = s.n_slices;
   
-  const unwrap<T1> U(subscripts.get_ref());
+  const quasi_unwrap<T1> U(subscripts.get_ref());
   
   arma_debug_check( (U.M.n_rows != 3), "sub2ind(): matrix of subscripts must have 3 rows" );
   

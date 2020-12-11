@@ -20,10 +20,8 @@
 
 
 template<typename T1>
-class unwrap_cube
+struct unwrap_cube
   {
-  public:
-  
   typedef typename T1::elem_type eT;
   
   inline
@@ -36,16 +34,14 @@ class unwrap_cube
   const Cube<eT> M;
   
   template<typename eT2>
-  arma_inline bool is_alias(const Cube<eT2>&) const { return false; }
+  constexpr bool is_alias(const Cube<eT2>&) const { return false; }
   };
 
 
 
 template<typename eT>
-class unwrap_cube< Cube<eT> >
+struct unwrap_cube< Cube<eT> >
   {
-  public:
-  
   inline
   unwrap_cube(const Cube<eT>& A)
     : M(A)
@@ -68,10 +64,8 @@ class unwrap_cube< Cube<eT> >
 
 
 template<typename T1>
-class unwrap_cube_check
+struct unwrap_cube_check
   {
-  public:
-  
   typedef typename T1::elem_type eT;
   
   inline
@@ -89,14 +83,12 @@ class unwrap_cube_check
 
 
 template<typename eT>
-class unwrap_cube_check< Cube<eT> >
+struct unwrap_cube_check< Cube<eT> >
   {
-  public:
-
   inline
   unwrap_cube_check(const Cube<eT>& A, const Cube<eT>& B)
-    : M_local( (&A == &B) ? new Cube<eT>(A) : 0 )
-    , M      ( (&A == &B) ? (*M_local)      : A )
+    : M_local( (&A == &B) ? new Cube<eT>(A) : nullptr )
+    , M      ( (&A == &B) ? (*M_local)      : A       )
     {
     arma_extra_debug_sigprint();
     }
@@ -117,7 +109,6 @@ class unwrap_cube_check< Cube<eT> >
   // the order below is important
   const Cube<eT>* M_local;
   const Cube<eT>& M;
-  
   };
 
 
