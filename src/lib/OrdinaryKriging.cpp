@@ -33,19 +33,16 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
         return exp(-0.5 * temp);
       };
 
-std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_gauss
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor_gauss
     = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
-        //    double temp = 0;
-        //    for (arma::uword k = 0; k < xi.n_elem; k++) {
-        //      double d = (xi(k) - xj(k));
-        //      temp += d*d;
-        //    }
-
-        auto&& diff = (xi - xj);
-        const double temp = arma::dot(diff, diff);
-
-        return exp(-.5 * temp) * (xi(dim) - xj(dim)) * (xi(dim) - xj(dim));
+        double d = (xi(dim) - xj(dim));
+        return d*d;
       };
+
+//std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_gauss
+//    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+//        return CovNorm_fun_gauss(xi,xj) * CovNorm_derivFactor_gauss(xi,xj,dim);
+//      };
 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_exp
     = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
@@ -53,11 +50,15 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
         return exp(-arma::sum(arma::abs(diff)));
       };
 
-std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_exp
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor_exp
     = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
-        auto&& diff = (xi - xj);
-        return exp(-arma::sum(arma::abs(diff))) * fabs(xi(dim) - xj(dim));
+        return fabs(xi(dim) - xj(dim));
       };
+
+//std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_exp
+//    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+//        return CovNorm_fun_exp(xi,xj) * CovNorm_derivFactor_exp(xi,xj,dim);
+//      };
 
 /************************************************/
 /** implementation details forward declaration **/
@@ -131,10 +132,12 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   if (covType.compare("gauss") == 0) {
     CovNorm_fun = CovNorm_fun_gauss;
-    CovNorm_deriv = CovNorm_deriv_gauss;
+    //CovNorm_deriv = CovNorm_deriv_gauss;
+    CovNorm_derivFactor = CovNorm_derivFactor_gauss;
   } else if (covType.compare("exp") == 0) {
     CovNorm_fun = CovNorm_fun_exp;
-    CovNorm_deriv = CovNorm_deriv_exp;
+    //CovNorm_deriv = CovNorm_deriv_exp;
+    CovNorm_derivFactor = CovNorm_derivFactor_exp;
   } else
     throw std::invalid_argument("Unsupported covariance: " + covType);
 
@@ -241,7 +244,7 @@ double OrdinaryKriging::fit_ofn(const arma::vec& _theta,
       arma::mat gradR_k_upper = arma::zeros(n, n);
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k_upper.at(j, i) = CovNorm_deriv(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j, i) = R.at(i,j) * CovNorm_derivFactor(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);

@@ -57,6 +57,7 @@ class OrdinaryKriging {
   double m_sigma2;
   std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun;
   std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv;
+  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor;
 
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
