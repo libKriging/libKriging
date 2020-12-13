@@ -22,10 +22,10 @@ for (x in xx){
 r <- ordinary_kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
-  times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- ordinary_kriging_loglikelihood(r,rep(x,3)))
-  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- ordinary_kriging_loglikelihoodgrad(r,rep(x,3)))
+  times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- ordinary_kriging_logLikelihood(r,rep(x,3)))
+  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- ordinary_kriging_logLikelihoodGrad(r,rep(x,3)))
   i <- i+1
 }
 
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,3),k))(xx))
-points(xx,Vectorize(function(x)ordinary_kriging_loglikelihood(r,rep(x,3)))(xx),col='red')
+points(xx,Vectorize(function(x)ordinary_kriging_logLikelihood(r,rep(x,3)))(xx),col='red')

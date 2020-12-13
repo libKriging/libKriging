@@ -36,7 +36,7 @@ Rcpp::List bench_qr(int n, arma::mat X) {
 }
 
 // [[Rcpp::export]]
-double bench_loglik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
+double bench_LogLik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl_ok = ordinaryKriging.attr("object");
@@ -48,7 +48,7 @@ double bench_loglik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
 }
 
 // [[Rcpp::export]]
-arma::vec bench_loglikgrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
+arma::vec bench_LogLikGrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl_ok = ordinaryKriging.attr("object");

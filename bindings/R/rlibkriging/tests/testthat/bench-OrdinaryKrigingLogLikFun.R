@@ -26,7 +26,7 @@ for (i in 1:length(logn)) {
 
   r <- ordinary_kriging(y, X,"gauss")
   times$cpp[i] = system.time(
-    try({ll2x <- bench_loglik(N,r,rep(theta,ncol(X)))})
+    try({ll2x <- bench_LogLik(N,r,rep(theta,ncol(X)))})
     # try({for (t in 1:N) ll2x <- ordinary_kriging_loglikelihood(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
 

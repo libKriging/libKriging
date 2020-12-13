@@ -24,15 +24,15 @@ for (i in 1:length(logn)) {
     try(for (j in 1:times.n) r <- ordinary_kriging(y, X,"gauss"))
   )[1]
   
-  ll_cpp <- ordinary_kriging_loglikelihood(r, ordinary_kriging_model(r)$theta)
+  ll_cpp <- ordinary_kriging_logLikelihood(r, ordinary_kriging_model(r)$theta)
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- ordinary_kriging_loglikelihoodgrad(r, ordinary_kriging_model(r)$theta)
+  gll_cpp <- ordinary_kriging_logLikelihoodGrad(r, ordinary_kriging_model(r)$theta)
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(ordinary_kriging_model(r)$theta),model=k))/ll_cpp>.1)
-    stop("LL function is not the same bw DiceKriging/libKriging: ",ordinary_kriging_loglikelihood(r,ordinary_kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(ordinary_kriging_model(r)$theta),model=k))  
+    stop("LL function is not the same bw DiceKriging/libKriging: ",ordinary_kriging_logLikelihood(r,ordinary_kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(ordinary_kriging_model(r)$theta),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)

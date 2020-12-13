@@ -96,7 +96,7 @@ double Bench::LogLik(OrdinaryKriging& ok, const arma::vec& theta) {
   // arma::vec theta = 0.5*ones(ok->X().n_cols)
   double s = 0;
   for (int i = 0; i < n; i++) {
-    s += ok.logLikelihood(theta);
+    s += ok.logLikelihoodFun(theta);
   }
   return s / n;
 }

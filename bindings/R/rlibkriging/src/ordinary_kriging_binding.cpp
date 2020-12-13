@@ -53,40 +53,40 @@ Rcpp::List ordinary_kriging_model(Rcpp::List ordinaryKriging) {
 }
 
 // [[Rcpp::export]]
-double ordinary_kriging_loglikelihood(Rcpp::List ordinaryKriging, arma::vec theta) {
+double ordinary_kriging_logLikelihood(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
 
-  return impl_ptr->logLikelihood(theta);
+  return impl_ptr->logLikelihoodFun(theta);
 }
 
 // [[Rcpp::export]]
-double ordinary_kriging_loofun(Rcpp::List ordinaryKriging, arma::vec theta) {
+double ordinary_kriging_leaveOneOut(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
 
-  return impl_ptr->loofun(theta);
+  return impl_ptr->leaveOneOutFun(theta);
 }
 
 // [[Rcpp::export]]
-arma::vec ordinary_kriging_loofungrad(Rcpp::List ordinaryKriging, arma::vec theta) {
+arma::vec ordinary_kriging_leaveOneOutGrad(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
 
-  return impl_ptr->loofungrad(theta);
+  return impl_ptr->leaveOneOutGrad(theta);
 }
 
 // [[Rcpp::export]]
-arma::vec ordinary_kriging_loglikelihoodgrad(Rcpp::List ordinaryKriging, arma::vec theta) {
+arma::vec ordinary_kriging_logLikelihoodGrad(Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("OrdinaryKriging"))
     Rcpp::stop("Input must be a OrdinaryKriging object.");
   SEXP impl = ordinaryKriging.attr("object");

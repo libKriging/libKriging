@@ -25,8 +25,8 @@ ll2 = function(theta) ordinary_kriging_loglikelihood(r,theta)
 # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
 for (x in seq(0.01,1,,11)){
   envx = new.env()
-  ll2x = ordinary_kriging_loglikelihood(r,x)
-  gll2x = ordinary_kriging_loglikelihoodgrad(r,x)
+  ll2x = ordinary_kriging_logLikelihood(r,x)
+  gll2x = ordinary_kriging_logLikelihoodGrad(r,x)
   arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 }
 
@@ -34,9 +34,9 @@ precision <- 1e-8  # the following tests should work with it, since the computat
 x=.5
 xenv=new.env()
 test_that(desc="logLik is the same that DiceKriging one", 
-         expect_true(relative_error(ordinary_kriging_loglikelihood(r,x),DiceKriging::logLikFun(x,k,xenv)) < precision))
+         expect_true(relative_error(ordinary_kriging_logLikelihood(r,x),DiceKriging::logLikFun(x,k,xenv)) < precision))
 
 test_that(desc="logLik Grad is the same that DiceKriging one", 
-         expect_true(relative_error(ordinary_kriging_loglikelihoodgrad(r,x),DiceKriging::logLikGrad(x,k,xenv)) < precision))
+         expect_true(relative_error(ordinary_kriging_logLikelihoodGrad(r,x),DiceKriging::logLikGrad(x,k,xenv)) < precision))
 }
          
