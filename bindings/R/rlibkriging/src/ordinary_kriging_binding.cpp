@@ -10,14 +10,29 @@ Rcpp::List ordinary_kriging(arma::vec y,
                             arma::mat X,
                             std::string kernel,
                             std::string regmodel = "constant",
-                            bool normalize = false) {
+                            bool normalize = false,
+                            std::string optim = "BFGS",
+                            std::string objective = "LL",
+                            Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   OrdinaryKriging* ok = new OrdinaryKriging(kernel);
-  ok->fit(std::move(y), std::move(X));  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
 
+  Rcpp::List _parameters;
+  if (parameters.isNotNull()) {
+    _parameters = parameters;       
+  } else {
+    _parameters = Rcpp::List::create(
+                              Rcpp::Named("sigma2")=0,
+                              Rcpp::Named("has_sigma2")=false,
+                              Rcpp::Named("theta")=0,
+                              Rcpp::Named("has_theta")=false);
+  }
+                              
   ok->fit(std::move(y),
           std::move(X),
           OrdinaryKriging::RegressionModelUtils::fromString(regmodel),
-          normalize);  //, OrdinaryKriging::Parameters{0,false,nullptr,false},"ll","bfgs");
+          normalize,
+          optim,objective,
+          OrdinaryKriging::Parameters{_parameters["sigma2"],_parameters["has_sigma2"],_parameters["theta"],_parameters["has_theta"]});
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
 

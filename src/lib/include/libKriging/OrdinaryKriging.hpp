@@ -48,6 +48,8 @@ class OrdinaryKriging {
   double m_centerY;
   double m_scaleY;
   RegressionModel m_regmodel;
+  std::string m_optim;
+  std::string m_objective;
   arma::mat m_F;
   arma::mat m_T;
   arma::mat m_M;
@@ -86,19 +88,17 @@ class OrdinaryKriging {
    * @param y is n length column vector of output
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
-   * @param parameters is starting value for hyper-parameters
-   * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
-   * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
+   * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
+   * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+   * @param parameters starting paramteters for optim, or final values if optim=='none'.
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec& y,
                              const arma::mat& X,
                              const RegressionModel& regmodel = RegressionModel::Constant,
                              bool normalize = false,
                              const std::string& optim = "BFGS",
-                             const std::string& objective = "MLE");  //,
-  // const Parameters& parameters,
-  // const std::string& optim_method,
-  // const std::string& optim_objective);
+                             const std::string& objective = "LL",
+                             const Parameters& parameters = Parameters{0, false, nullptr, false});
 
   LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
@@ -130,8 +130,7 @@ class OrdinaryKriging {
    */
   LIBKRIGING_EXPORT void update(const arma::vec& newy,
                                 const arma::mat& newX,
-                                const std::string& optim_method,
-                                const std::string& optim_objective);
+                                bool normalize);
 };
 
 #endif  // LIBKRIGING_ORDINARYKRIGING_HPP

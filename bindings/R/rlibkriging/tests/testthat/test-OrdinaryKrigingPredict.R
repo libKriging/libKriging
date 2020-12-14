@@ -8,7 +8,8 @@ X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
-r <- ordinary_kriging(y,X,"gauss")
+r <- ordinary_kriging(y,X,"gauss","constant",FALSE,"BFGS","LL",
+                      parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,theta=k@covariance@range.val,has_theta=TRUE))
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
 ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE)

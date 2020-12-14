@@ -403,27 +403,27 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::leaveOneOutGrad(const arma::vec& _t
  * @param X is n*d matrix of input
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param normalize is a boolean to enforce inputs/output normalization
- * @param parameters is starting value for hyper-parameters
- * @param optim_method is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
- * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
+ * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
+ * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+ * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const RegressionModel& regmodel,
                                             bool normalize, 
                                             const std::string& optim,
-                                            const std::string& objective) {  //,
-                                            // const Parameters& parameters,
+                                            const std::string& objective,
+                                            const Parameters& parameters) {
 
   std::function<double(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data)> fit_ofn;
-  if (objective.compare("MLE") == 0) {
+  m_optim = optim;
+  m_objective = objective;
+  if (objective.compare("LL") == 0) {
     fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {return - this->logLikelihood(_theta, grad_out, okm_data);};
   } else if (objective.compare("LOO") == 0) {
     fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {return - this->leaveOneOut(_theta, grad_out, okm_data);};
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
-
-  Parameters parameters{0, false, arma::vec(1), false};
 
   arma::uword n = X.n_rows;
   arma::uword d = X.n_cols;
@@ -699,8 +699,7 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
  */
 LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
                                                const arma::mat& newX,
-                                               const std::string& optim_objective,
-                                               const std::string& optim_method) {
+                                               bool normalize = false) {
   // rebuild data
   m_X = join_rows(m_X, newX);
   m_y = join_rows(m_y, newy);
@@ -708,7 +707,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   // rebuild starting parameters
   Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
-  this->fit(m_y, m_X);  //, parameters, optim_objective, optim_method);
+  this->fit(m_y, m_X, m_regmodel, normalize, m_optim, m_objective, parameters);  //, parameters, optim_objective, optim_method);
 }
 
 /************************************************/

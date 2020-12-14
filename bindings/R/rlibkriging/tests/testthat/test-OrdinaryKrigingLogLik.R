@@ -20,7 +20,7 @@ for (x in seq(0.01,1,,11)){
   arrows(x,llx,x+.1,llx+.1*gllx)
 }
 
-r <- ordinary_kriging(y, X,kernel)
+r <- ordinary_kriging(y, X, kernel)
 ll2 = function(theta) ordinary_kriging_loglikelihood(r,theta)
 # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
 for (x in seq(0.01,1,,11)){
