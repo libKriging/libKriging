@@ -1,30 +1,33 @@
-# OptimLib &nbsp; [![Build Status](https://travis-ci.org/kthohr/optim.svg?branch=master)](https://travis-ci.org/kthohr/optim) [![Coverage Status](https://codecov.io/github/kthohr/optim/coverage.svg?branch=master)](https://codecov.io/github/kthohr/optim?branch=master) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9fea40836c4c4d5fa3a29b5675b58f6e)](https://www.codacy.com/app/kthohr/optim?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=kthohr/optim&amp;utm_campaign=Badge_Grade) [![License](https://img.shields.io/badge/Licence-Apache%202.0-blue.svg)](./LICENSE)
+# OptimLib &nbsp; [![Build Status](https://travis-ci.org/kthohr/optim.svg?branch=master)](https://travis-ci.org/kthohr/optim) [![Coverage Status](https://codecov.io/github/kthohr/optim/coverage.svg?branch=master)](https://codecov.io/github/kthohr/optim?branch=master) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9fea40836c4c4d5fa3a29b5675b58f6e)](https://www.codacy.com/app/kthohr/optim?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=kthohr/optim&amp;utm_campaign=Badge_Grade) [![License](https://img.shields.io/badge/Licence-Apache%202.0-blue.svg)](./LICENSE) [![Documentation Status](https://readthedocs.org/projects/optimlib/badge/?version=latest)](https://optimlib.readthedocs.io/en/latest/?badge=latest)
 
 OptimLib is a lightweight C++ library of numerical optimization methods for nonlinear functions.
 
 Features:
 
 * A C++11 library of local and global optimization algorithms, as well as root finding techniques.
-* Derivative-free optimization using advanced, parallelized metaheuristics.
+* Derivative-free optimization using advanced, parallelized metaheuristic methods.
 * Constrained optimization routines to handle simple box constraints, as well as systems of nonlinear constraints.
-* Built on the [Armadillo C++ linear algebra library](http://arma.sourceforge.net/) for fast and efficient matrix-based computation.
-* OpenMP-accelerated accelerated algorithms for parallel computation. 
+* For fast and efficient matrix-based computation, OptimLib supports the following templated linear algebra libraries:
+  * [Armadillo](http://arma.sourceforge.net/)
+  * [Eigen](http://eigen.tuxfamily.org/index.php)
+* OpenMP-accelerated algorithms for parallel computation. 
 * Straightforward linking with parallelized BLAS libraries, such as [OpenBLAS](https://github.com/xianyi/OpenBLAS).
-* Available as a header-only library, or in shared library format.
+* Available as a header-only library, or as a compiled shared library.
 * Released under a permissive, non-GPL license.
 
 ### Contents:
-* [Status](#status)
-* [General Syntax](#general-syntax)
+* [Algorithms](#algorithms)
+* [Documentation](#documentation)
+* [General API](#api)
 * [Installation Method 1: Shared Library](#installation-method-1-shared-library)
 * [Installation Method 2: Header-only Library](#installation-method-2-header-only-library)
 * [R Compatibility](#r-compatibility)
 * [Examples](#examples)
 * [Author and License](#author)
 
-## Status
+## Algorithms
 
-The library is actively maintained, and is still being extended. A list of algorithms includes:
+A list of currently available algorithms includes:
 
 * Broyden's Method (for root finding)
 * Newton's method, BFGS, and L-BFGS
@@ -34,11 +37,19 @@ The library is actively maintained, and is still being extended. A list of algor
 * Differential Evolution (DE)
 * Particle Swarm Optimization (PSO)
 
-## General Syntax
+## Documentation
 
-OptimLib functions have the following generic form:
+Full documentation is available online:
+
+[![Documentation Status](https://readthedocs.org/projects/optimlib/badge/?version=latest)](https://optimlib.readthedocs.io/en/latest/?badge=latest)
+
+A PDF version of the documentation is available [here](https://buildmedia.readthedocs.org/media/pdf/optimlib/latest/optimlib.pdf).
+
+## API
+
+The OptimLib API follows a relatively simple convention, with most algorithms called in the following manner:
 ```
-algorithm_name(<initial and final values>, <objective function>, <objective function data>);
+algorithm_id(<initial/final values>, <objective function>, <objective function data>);
 ```
 The inputs, in order, are:
 * A writable vector of initial values to define the starting point of the algorithm. In the event of successful completion, the initial values will be overwritten by the solution vector.
@@ -46,9 +57,11 @@ The inputs, in order, are:
 * The final input is optional: it is any object that contains additional parameters necessary to evaluate the objective function.
 
 For example, the BFGS algorithm is called using
-``` cpp
-bool bfgs(arma::vec& init_out_vals, std::function<double (const arma::vec& vals_inp, arma::vec* grad_out, void* opt_data)> opt_objfn, void* opt_data);
+```cpp
+bfgs(Vec_t& init_out_vals, std::function<double (const Vec_t& vals_inp, Vec_t* grad_out, void* opt_data)> opt_objfn, void* opt_data);
 ```
+
+where ``Vec_t`` is used to represent either ``arma::vec`` or ``Eigen::VectorXd`` types.
 
 ## Installation Method 1: Shared Library
 
@@ -57,9 +70,10 @@ The library can be installed on Unix-alike systems via the standard `./configure
 ```bash
 # clone optim into the current directory
 git clone https://github.com/kthohr/optim ./optim
+
 # build and install
 cd ./optim
-./configure -i "/usr/local" -p
+./configure -i "/usr/local" -l arma -p
 make
 make install
 ```
@@ -71,6 +85,7 @@ Configuration options (see `./configure -h`):
 &nbsp; &nbsp; &nbsp; **Primary**
 * `-h` print help
 * `-i` installation path; default: the build directory
+* `-l` specify the choice of linear algebra library; `arma` or `eigen`
 * `-m` specify the BLAS and Lapack libraries to link against; for example, `-m "-lopenblas"` or `-m "-framework Accelerate"`
 * `-o` compiler optimization options; defaults to `-O3 -march=native -ffp-contract=fast -flto -DARMA_NO_DEBUG`
 * `-p` enable OpenMP parallelization features (*recommended*)
@@ -84,13 +99,15 @@ Configuration options (see `./configure -h`):
 * `--header-only-version` generate a header-only version of OptimLib (see [below](#installation-method-2-header-only-library))
 <!-- * `-R` RcppArmadillo compatible build by setting the appropriate R library directories (R, Rcpp, and RcppArmadillo) -->
 
-### Armadillo
+### Linear Algebra Library
 
-OptimLib is built on the Armadillo C++ linear algebra library. The `configure` script will search for Armadillo in the usual places: `/usr/include`, `/usr/local/include`, `/opt/include`, `/opt/local/include`. If the Armadillo header files are installed elsewhere, set the following environment variable *before* running `configure`:
+OptimLib requires either the Armadillo or Eigen C++ linear algebra libraries. 
+
+Set (one) of the following environment variables *before* running `configure`:
 ``` bash
 export ARMA_INCLUDE_PATH=/path/to/armadillo
+export EIGEN_INCLUDE_PATH=/path/to/eigen
 ```
-Otherwise the build script will proceed to download any required files from the Armadillo GitLab repository.
 
 ## Installation Method 2: Header-only Library
 
@@ -122,6 +139,7 @@ This is a well-known test function with many local minima. Newton-type methods (
 Code:
 
 ``` cpp
+#define OPTIM_ENABLE_ARMA_WRAPPERS
 #include "optim.hpp"
 
 //
@@ -192,6 +210,7 @@ Check the `/tests` directory for additional examples, and http://www.kthohr.com/
 For a data-based example, consider maximum likelihood estimation of a logit model, common in statistics and machine learning. In this case we have closed-form expressions for the gradient and hessian. We will employ a popular gradient descent method, Adam (Adaptive Moment Estimation), and compare to a pure Newton-based algorithm.
 
 ``` cpp
+#define OPTIM_ENABLE_ARMA_WRAPPERS
 #include "optim.hpp"
 
 // sigmoid function
