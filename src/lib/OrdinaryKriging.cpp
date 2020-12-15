@@ -36,10 +36,10 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor_gauss
     = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
         double d = (xi(dim) - xj(dim));
-        return d*d;
+        return d * d;
       };
 
-//std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_gauss
+// std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_gauss
 //    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
 //        return CovNorm_fun_gauss(xi,xj) * CovNorm_derivFactor_gauss(xi,xj,dim);
 //      };
@@ -51,11 +51,9 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
       };
 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor_exp
-    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
-        return fabs(xi(dim) - xj(dim));
-      };
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) { return fabs(xi(dim) - xj(dim)); };
 
-//std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_exp
+// std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv_exp
 //    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
 //        return CovNorm_fun_exp(xi,xj) * CovNorm_derivFactor_exp(xi,xj,dim);
 //      };
@@ -132,11 +130,11 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
 void OrdinaryKriging::make_Cov(const std::string& covType) {
   if (covType.compare("gauss") == 0) {
     CovNorm_fun = CovNorm_fun_gauss;
-    //CovNorm_deriv = CovNorm_deriv_gauss;
+    // CovNorm_deriv = CovNorm_deriv_gauss;
     CovNorm_derivFactor = CovNorm_derivFactor_gauss;
   } else if (covType.compare("exp") == 0) {
     CovNorm_fun = CovNorm_fun_exp;
-    //CovNorm_deriv = CovNorm_deriv_exp;
+    // CovNorm_deriv = CovNorm_deriv_exp;
     CovNorm_derivFactor = CovNorm_derivFactor_exp;
   } else
     throw std::invalid_argument("Unsupported covariance: " + covType);
@@ -210,7 +208,7 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   // arma::cout << "sigma2_hat:" << sigma2_hat << arma::endl;
 
   double ll = -0.5 * (n * log(2 * M_PI * sigma2_hat) + 2 * sum(log(fd->T.diag())) + n);
-  //arma::cout << "ll:" << ll << arma::endl;
+  // arma::cout << "ll:" << ll << arma::endl;
 
   if (grad_out != nullptr) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikGrad.R
@@ -244,7 +242,7 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
       arma::mat gradR_k_upper = arma::zeros(n, n);
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k_upper.at(j, i) = R.at(i,j) * CovNorm_derivFactor(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j, i) = R.at(i, j) * CovNorm_derivFactor(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);
@@ -269,7 +267,7 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihoodFun(const arma::vec& _the
   arma::colvec z;
   arma::colvec beta;
   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-  
+
   return logLikelihood(_theta, nullptr, &okm_data);
 }
 
@@ -279,11 +277,11 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   arma::colvec z;
   arma::colvec beta;
   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-  
+
   arma::vec grad(_theta.n_elem);
-  
+
   double ll = logLikelihood(_theta, &grad, &okm_data);
-  
+
   return grad;
 }
 
@@ -299,8 +297,8 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 
 // Objective function for fit : -LOO
 double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
-                                 arma::vec* grad_out,
-                                 OrdinaryKriging::OKModel* okm_data) const {
+                                    arma::vec* grad_out,
+                                    OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
 
   arma::mat Xtnorm = trans(m_X);
@@ -410,18 +408,21 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::leaveOneOutGrad(const arma::vec& _t
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const RegressionModel& regmodel,
-                                            bool normalize, 
+                                            bool normalize,
                                             const std::string& optim,
                                             const std::string& objective,
                                             const Parameters& parameters) {
-
   std::function<double(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
-    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {return - this->logLikelihood(_theta, grad_out, okm_data);};
+    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+      return -this->logLikelihood(_theta, grad_out, okm_data);
+    };
   } else if (objective.compare("LOO") == 0) {
-    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {return - this->leaveOneOut(_theta, grad_out, okm_data);};
+    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) {
+      return -this->leaveOneOut(_theta, grad_out, okm_data);
+    };
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
 
@@ -478,8 +479,8 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
     optim::algo_settings_t algo_settings;
-    algo_settings.iter_max = 10;  // TODO change by default?
-    algo_settings.grad_err_tol = 1e-5; // FIXME err_tol was an option for optimlib v1 not v2, updated with grad_err_tol
+    algo_settings.iter_max = 10;        // TODO change by default?
+    algo_settings.grad_err_tol = 1e-5;  // FIXME err_tol was an option for optimlib v1 not v2, updated with grad_err_tol
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);
@@ -697,9 +698,7 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
-                                               const arma::mat& newX,
-                                               bool normalize = false) {
+LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild data
   m_X = join_rows(m_X, newX);
   m_y = join_rows(m_y, newy);
@@ -707,7 +706,13 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   // rebuild starting parameters
   Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
-  this->fit(m_y, m_X, m_regmodel, normalize, m_optim, m_objective, parameters);  //, parameters, optim_objective, optim_method);
+  this->fit(m_y,
+            m_X,
+            m_regmodel,
+            normalize,
+            m_optim,
+            m_objective,
+            parameters);  //, parameters, optim_objective, optim_method);
 }
 
 /************************************************/
