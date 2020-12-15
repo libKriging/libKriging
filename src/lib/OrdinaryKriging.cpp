@@ -479,7 +479,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
 
     optim::algo_settings_t algo_settings;
     algo_settings.iter_max = 10;  // TODO change by default?
-    algo_settings.err_tol = 1e-5;
+    algo_settings.grad_err_tol = 1e-5; // FIXME err_tol was an option for optimlib v1 not v2, updated with grad_err_tol
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);

@@ -133,6 +133,7 @@ set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo"
 set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
+add_definitions(-DOPTIM_ENABLE_ARMA_WRAPPERS)
 include_directories(SYSTEM dependencies/optim/header_only_version)
 
 #------------------------------------------------------
