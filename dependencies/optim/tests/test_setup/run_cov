@@ -1,0 +1,31 @@
+#!/bin/bash
+
+WDIR=${PWD}
+
+cd ..
+
+export CXXCOV=gcov
+export LD_LIBRARY_PATH="$PWD":$LD_LIBRARY_PATH
+
+cd tests
+
+#
+
+declare -a DIRS=("constrained" "misc" "unconstrained" "zeros")
+
+for i in "${DIRS[@]}"; do
+    cd "$WDIR"/"$i"
+
+    if [[ "${OPTIM_TEST_USE_ARMA}" == "y" ]]; then 
+        ./configure -c -l arma
+    elif [[ "${OPTIM_TEST_USE_EIGEN}" == "y" ]]; then 
+        ./configure -c -l eigen
+    else
+      echo -e "  \x1B[31m- tests error: unrecognized linear algebra library.\033[0m" >&2 ;
+      echo ""
+      exit 1
+    fi
+
+    make
+    sh ./../test_setup/cov_check
+done

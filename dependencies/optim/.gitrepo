@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/kthohr/optim.git
+	branch = master
+	commit = a997b044695071fc1ab3e9f539656167fa22be29
+	parent = 785643207bd79d0588d1f04ded5b4ca467494367
+	method = merge
+	cmdver = 0.4.1
