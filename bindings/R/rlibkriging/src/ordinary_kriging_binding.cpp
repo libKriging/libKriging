@@ -23,7 +23,7 @@ Rcpp::List ordinary_kriging(arma::vec y,
     _parameters = Rcpp::List::create(
                               Rcpp::Named("sigma2")=0,
                               Rcpp::Named("has_sigma2")=false,
-                              Rcpp::Named("theta")=0,
+                              Rcpp::Named("theta")=Rcpp::NumericMatrix(0),
                               Rcpp::Named("has_theta")=false);
   }
                               
@@ -109,6 +109,17 @@ arma::vec ordinary_kriging_logLikelihoodGrad(Rcpp::List ordinaryKriging, arma::v
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
 
   return impl_ptr->logLikelihoodGrad(theta);
+}
+
+// [[Rcpp::export]]
+arma::mat ordinary_kriging_logLikelihoodHess(Rcpp::List ordinaryKriging, arma::vec theta) {
+  if (!ordinaryKriging.inherits("OrdinaryKriging"))
+    Rcpp::stop("Input must be a OrdinaryKriging object.");
+  SEXP impl = ordinaryKriging.attr("object");
+
+  Rcpp::XPtr<OrdinaryKriging> impl_ptr(impl);
+
+  return impl_ptr->logLikelihoodHess(theta);
 }
 
 // [[Rcpp::export]]

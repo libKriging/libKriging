@@ -14,7 +14,7 @@ class OrdinaryKriging {
   struct Parameters {
     double sigma2;
     bool has_sigma2;
-    arma::vec theta;
+    arma::mat theta;
     bool has_theta;
   };
 
@@ -40,7 +40,7 @@ class OrdinaryKriging {
   const arma::vec& theta() const { return m_theta; };
   const double& sigma2() const { return m_sigma2; };
 
- private:
+private:
   arma::mat m_X;
   arma::rowvec m_centerX;
   arma::rowvec m_scaleX;
@@ -58,8 +58,7 @@ class OrdinaryKriging {
   arma::vec m_theta;
   double m_sigma2;
   std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun;
-  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_deriv;
-  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> CovNorm_derivFactor;
+  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm;
 
   // returns distance matrix form Xp to X
   LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
@@ -78,7 +77,7 @@ class OrdinaryKriging {
     arma::colvec beta;
   };
 
-  double logLikelihood(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
+  double logLikelihood(const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, OrdinaryKriging::OKModel* okm_data) const;
   double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
@@ -102,6 +101,7 @@ class OrdinaryKriging {
 
   LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::mat logLikelihoodHess(const arma::vec& theta);
   LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
 

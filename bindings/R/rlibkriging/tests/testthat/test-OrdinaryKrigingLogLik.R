@@ -1,6 +1,6 @@
 library(testthat)
 
-for (kernel in c("gauss","exp")) {
+for (kernel in c("gauss")){ #"exp")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)

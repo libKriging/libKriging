@@ -16,12 +16,16 @@ for (i in 1:length(logn)) {
   X <- matrix(runif(n*d),ncol=d)
   y <- f(X)
   
+  k <- NULL
   times$R[i] = system.time(
     try(for (j in 1:times.n) k <- DiceKriging::km(design=X,response=y,covtype = "gauss", multistart = 1,control = list(trace=F,maxit=10), lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
   )[1]
   
+  r <- NULL
   times$cpp[i] = system.time(
-    try(for (j in 1:times.n) r <- ordinary_kriging(y, X,"gauss"))
+    try(for (j in 1:times.n) r <- ordinary_kriging(y, X,"gauss","constant",FALSE,"Newton","LL",
+                      # to let start optim at same initial point
+                      parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE)))
   )[1]
   
   ll_cpp <- ordinary_kriging_logLikelihood(r, ordinary_kriging_model(r)$theta)
@@ -30,13 +34,15 @@ for (i in 1:length(logn)) {
   
   gll_cpp <- ordinary_kriging_logLikelihoodGrad(r, ordinary_kriging_model(r)$theta)
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
-  
+    
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(ordinary_kriging_model(r)$theta),model=k))/ll_cpp>.1)
     stop("LL function is not the same bw DiceKriging/libKriging: ",ordinary_kriging_logLikelihood(r,ordinary_kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(ordinary_kriging_model(r)$theta),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)
-  
+
+  if ((ll_R - ll_cpp)/ll_R < -.01 )
+    warning("DiceKriging LL ",ll_R," << libKriging LL ",ll_cpp)
 }
 
 plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R,na.rm = T),min(times$cpp,na.rm = T))),log(max(max(times$R,na.rm = T),max(times$cpp,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
