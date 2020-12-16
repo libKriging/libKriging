@@ -24,19 +24,12 @@ list(APPEND pylibkriging_SRCS
         src/AddDemo.cpp src/AddDemo.hpp
         src/NumPyDemo.cpp src/NumPyDemo.hpp
         )
-if (NOT DISABLE_KRIGING)
-    list(APPEND pylibkriging_SRCS 
-            src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
-            )
-endif()
+list(APPEND pylibkriging_SRCS 
+        src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
+    )
 
 pybind11_add_module(pylibkriging ${pylibkriging_SRCS})
-if (NOT DISABLE_KRIGING)
-    target_link_libraries(pylibkriging PRIVATE Kriging carma)
-else()
-    target_link_libraries(pylibkriging PRIVATE carma)
-    target_compile_definitions(pylibkriging PUBLIC DISABLE_KRIGING)    
-endif()
+target_link_libraries(pylibkriging PRIVATE Kriging carma)
 target_compile_definitions(pylibkriging PUBLIC VERSION_INFO=\"${KRIGING_VERSION}\")
 
 include(CTest)

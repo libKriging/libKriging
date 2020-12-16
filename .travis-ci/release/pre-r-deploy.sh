@@ -60,12 +60,6 @@ r-*)
       ;;
   esac
   ;;
-Octave-*)
-  echo "Octave binding not yet packaged"
-  ;;
-Python-*)
-  echo "Python binding not yet packaged"
-  ;;
 *)
   echo "Build [${BUILD_NAME}] not packaged"
   ;;

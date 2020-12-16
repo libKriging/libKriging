@@ -24,18 +24,18 @@ jobs:
             - liblapack-dev
             - python3-pip
 
-    - name: "Linux Release"
-      os: linux
-      dist: bionic
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Release
-        - ENABLE_PYTHON_BINDING=on
-      addons:
-        apt:
-          packages:
-            - liblapack-dev
-            - python3-pip
+#    - name: "Linux Release"
+#      os: linux
+#      dist: bionic
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Release
+#        - ENABLE_PYTHON_BINDING=on
+#      addons:
+#        apt:
+#          packages:
+#            - liblapack-dev
+#            - python3-pip
 
     - name: "MacOS Debug"
       os: osx
@@ -51,12 +51,29 @@ jobs:
         - BUILD_NAME="windows"
         - MODE=Debug
         - ENABLE_PYTHON_BINDING=on
+        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
+      before_install:
+        - choco install --no-progress -y python --version 3.7
+        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
 
 #    - name: "Windows Release"
 #      os: windows
 #      env:
 #        - BUILD_NAME="windows"
 #        - MODE=Release
+#        - ENABLE_PYTHON_BINDING=on
+#        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
+#      before_install:
+#        - choco install --no-progress -y python --version 3.7
+#        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
+
+#    - name: "MacOS Release"
+#      os: osx
+#      osx_image: xcode12.2
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Release
+#        - ENABLE_PYTHON_BINDING=on
 
     - name: "Linux Coverage"
       os: linux
@@ -76,7 +93,9 @@ jobs:
             - liblapack-dev
             - lcov
             - python3-pip
-              
+      after_success:
+        - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
+
     - name: "Linux Memcheck"
       os: linux
       dist: bionic
@@ -145,14 +164,26 @@ jobs:
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
-        - ENABLE_PYTHON_BINDING=on
       addons:
         apt:
           packages:
             - r-base
             - liblapack-dev
             - gfortran
-            - python3-pip
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
 
     - name: "R MacOS"
       os: osx
@@ -160,16 +191,174 @@ jobs:
       env:
         - BUILD_NAME="r-linux-macos"
         - MODE=Release
-        - ENABLE_PYTHON_BINDING=on
       language: r
       r: release
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
 
     - name: "R Windows"
       os: windows
       env:
         - BUILD_NAME="r-windows"
         - MODE=Release
-        - ENABLE_PYTHON_BINDING=auto
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
+
+    - name: "Linux deploy all python"
+      stage: deploy
+      os: linux
+      dist: bionic
+      env:
+        - BUILD_NAME="linux-macos"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+      addons:
+        apt:
+          packages:
+            - liblapack-dev
+            - python3-pip
+      services:
+        - docker
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "Windows deploy python 3.7"
+      stage: deploy
+      os: windows
+      env:
+        - BUILD_NAME="windows"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
+      before_install:
+        - choco install python --version 3.7.0
+        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: bash ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "Windows deploy python 3.8"
+      stage: deploy
+      os: windows
+      env:
+        - BUILD_NAME="windows"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+        - PATH=/c/Python38:/c/Python38/Scripts:$PATH
+      before_install: 
+        - choco install python --version 3.8.0
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: bash ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "Windows deploy python 3.9"
+      stage: deploy
+      os: windows
+      env:
+        - BUILD_NAME="windows"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+        - PATH=/c/Python39:/c/Python39/Scripts:$PATH
+      before_install:
+        - choco install python --version 3.9.0
+        - ln -s /c/Python39/python.exe /c/Python39/python3.exe
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: bash ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "MacOS deploy python 3.7"
+      stage: deploy
+      os: osx
+      osx_image:
+        - xcode11.3 # python 3.7
+      env:
+        - BUILD_NAME="linux-macos"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "MacOS deploy python 3.8"
+      stage: deploy
+      os: osx
+      osx_image:
+        - xcode11.7 # python 3.8
+      env:
+        - BUILD_NAME="linux-macos"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
+    - name: "MacOS deploy python 3.9"
+      stage: deploy
+      os: osx
+      osx_image:
+        - xcode12.2 # python 3.9
+      env:
+        - BUILD_NAME="linux-macos"
+        - MODE=Release
+        - ENABLE_PYTHON_BINDING=on
+      script: skip
+      deploy:
+        provider: script
+        skip_cleanup: true
+        on:
+          tags: true
+        script: ${TRAVIS_BUILD_DIR}/.travis-ci/release/python-deploy.sh
+
 
 install:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/install.sh
@@ -187,28 +376,6 @@ script:
 #    paths:
 #      - ${HOME}/build
 
-after_success:
-  - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
-  # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
-  # nor in before_deploy since the condition is checked before *deploy scripts    
-  - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-deploy.sh"
-  - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
-  - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
-
-before_deploy: 
-  - echo "Before deploy"
-
-deploy:
-  provider: releases
-  api_key: $API_DEPLOY_TOKEN
-  file: $DEPLOY_FILE
-  overwrite: true
-  skip_cleanup: true
-  on:
-    tags: true
-    repo: libKriging/libKriging
-    condition: $MODE = "Release" && -e $DEPLOY_FILE
-
 # Cache update/upload is too slow and slow down the whole process
 #cache:
 #  directories:
@@ -219,3 +386,4 @@ deploy:
 env:
   global: 
     - DEBUG_CI=true
+    - TWINE_USERNAME=__token__
