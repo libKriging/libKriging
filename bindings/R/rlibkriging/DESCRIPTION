@@ -1,7 +1,7 @@
 Package: rlibkriging
 Type: Package
 Title: Test wrapper
-Version: 0.1-5
+Version: 0.1-6
 Date: 2020-12-17
 Author: Pascal Havé <hpwxf@haveneer.com>
 Maintainer: Pascal Havé <hpwxf@haveneer.com>
