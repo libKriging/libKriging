@@ -134,6 +134,7 @@ jobs:
       dist: bionic # bionic does not support Octave 5
       env:
         - BUILD_NAME="linux-macos"
+        - MODE=Release
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=on
       addons:
@@ -142,14 +143,43 @@ jobs:
             - octave
             - octave-pkg-dev
             - python3-pip
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
 
     - name: "Octave MacOS"
       os: osx
       osx_image: xcode11.3
       env:
         - BUILD_NAME="linux-macos"
+        - MODE=Release
         - ENABLE_OCTAVE_BINDING=on
         - ENABLE_PYTHON_BINDING=off
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
 
     - name: "Octave Windows"
       os: windows
@@ -157,6 +187,20 @@ jobs:
         - BUILD_NAME="octave-windows"
         - MODE=Release
         - ENABLE_OCTAVE_BINDING=on
+      after_success:
+        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+        # nor in before_deploy since the condition is checked before *deploy scripts    
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+      deploy:
+        - provider: releases
+          api_key: $API_DEPLOY_TOKEN
+          file: $DEPLOY_FILE
+          overwrite: true
+          skip_cleanup: true
+          on:
+            tags: true
 
     - name: "R Linux"
       os: linux
@@ -173,7 +217,7 @@ jobs:
       after_success:
         # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
         # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/r-pre-deploy.sh"
         - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
         - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
       deploy:
@@ -196,7 +240,7 @@ jobs:
       after_success:
         # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
         # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/r-pre-deploy.sh"
         - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
         - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
       deploy:
@@ -216,7 +260,7 @@ jobs:
       after_success:
         # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
         # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/pre-r-deploy.sh"
+        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/r-pre-deploy.sh"
         - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
         - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
       deploy:
