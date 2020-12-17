@@ -22,7 +22,6 @@ void PyOrdinaryKriging::fit(const py::array_t<double>& y, const py::array_t<doub
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyOrdinaryKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov) {
-  std::cout << "IN" << std::endl;
   arma::mat mat_X = carma::arr_to_mat<double>(X, true);
   auto [y_predict, y_stderr, y_cov] = m_internal->predict(mat_X, withStd, withCov);
   return std::make_tuple(
