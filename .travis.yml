@@ -368,7 +368,7 @@ before_script:
 
 script:
   - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/build.sh
-  - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/test.sh
+#  - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/test.sh
 
 #addons:
 #  artifacts:
