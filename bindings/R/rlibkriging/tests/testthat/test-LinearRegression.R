@@ -1,5 +1,5 @@
 library(testthat)
-install.packages(pkgs="rlibkriging_0.1-3.tgz", type="source", repos=NULL)
+install.packages(pkgs="rlibkriging_0.1-5.tgz", type="source", repos=NULL)
 library(rlibkriging)
 n <- 10
 X <- as.matrix(runif(n))

@@ -1,8 +1,8 @@
 Package: rlibkriging
 Type: Package
 Title: Test wrapper
-Version: 0.1-3
-Date: 2020-12-16
+Version: 0.1-5
+Date: 2020-12-17
 Author: Pascal Havé <hpwxf@haveneer.com>
 Maintainer: Pascal Havé <hpwxf@haveneer.com>
 Description: A package that demonstrates how to wrap
