@@ -1,13 +1,19 @@
 #include <pybind11/pybind11.h>
 #include <iostream>
 
+#include <libKriging/LinearRegression.hpp>
+#include <libKriging/OrdinaryKriging.hpp>
 #include "AddDemo.hpp"
-#include "NumPyDemo.hpp"
-#ifndef DISABLE_KRIGING
 #include "LinearRegression_binding.hpp"
-#endif
+#include "OrdinaryKriging_binding.hpp"
+#include "NumPyDemo.hpp"
 
 #include <carma/carma.h>
+
+// To compare string at compile time (before latest C++)
+constexpr bool strings_equal(char const* a, char const* b) {
+  return *a == *b && (*a == '\0' || strings_equal(a + 1, b + 1));
+}
 
 namespace py = pybind11;
 
@@ -25,31 +31,42 @@ PYBIND11_MODULE(pylibkriging, m) {
            subtract
     )pbdoc";
 
-  m.def("add", &add, R"pbdoc(
+  if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
+    m.def("add", &add, R"pbdoc(
         Add two numbers
 
         Some other explanation about the add function.
     )pbdoc");
 
-  m.def("subtract", [](int i, int j) { return i - j; }, R"pbdoc(
+    m.def(
+        "subtract", [](int i, int j) { return i - j; }, R"pbdoc(
         Subtract two numbers
 
         Some other explanation about the subtract function.
     )pbdoc");
 
-  m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
+    m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
+  }
 
   m.attr("__version__") = VERSION_INFO;
+  m.attr("__build_type__") = BUILD_TYPE;
 
-#ifndef DISABLE_KRIGING
+  // Custom manual wrapper (for testing)
   py::class_<PyLinearRegression>(m, "PyLinearRegression")
       .def(py::init<>())
       .def("fit", &PyLinearRegression::fit)
       .def("predict", &PyLinearRegression::predict);
 
+  // Automated wrappers
   py::class_<LinearRegression>(m, "LinearRegression")
       .def(py::init<>())
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
-#endif
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  py::class_<PyOrdinaryKriging>(m, "OrdinaryKriging")
+      .def(py::init<const std::string&>())
+      .def("fit", &PyOrdinaryKriging::fit)
+      .def("predict", &PyOrdinaryKriging::predict);
+
 }

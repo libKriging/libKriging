@@ -36,7 +36,7 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm_gauss
     = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
         double d = (xi(dim) - xj(dim));
-        return d*d;
+        return d * d;
       };
 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_exp
@@ -385,7 +385,6 @@ LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihoodFun(const arma::vec& _the
   arma::colvec z;
   arma::colvec beta;
   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-
   return logLikelihood(_theta, nullptr, nullptr, &okm_data);
 }
 
@@ -395,10 +394,9 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& 
   arma::colvec z;
   arma::colvec beta;
   OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-  
+
   arma::vec grad(_theta.n_elem);
   double ll = logLikelihood(_theta, &grad, nullptr, &okm_data);
-  
   return grad;
 }
 
@@ -428,8 +426,8 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 
 // Objective function for fit : -LOO
 double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
-                                 arma::vec* grad_out,
-                                 OrdinaryKriging::OKModel* okm_data) const {
+                                    arma::vec* grad_out,
+                                    OrdinaryKriging::OKModel* okm_data) const {
   OrdinaryKriging::OKModel* fd = okm_data;
 
   arma::mat Xtnorm = trans(m_X);
@@ -629,7 +627,7 @@ double optim_newton(
 LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const RegressionModel& regmodel,
-                                            bool normalize, 
+                                            bool normalize,
                                             const std::string& optim,
                                             const std::string& objective,
                                             const Parameters& parameters) {
@@ -643,7 +641,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       if (grad_out!=nullptr) *grad_out = - *grad_out;
       if (hess_out!=nullptr) *hess_out = - *hess_out;
       return -ll;};
-    } else if (objective.compare("LOO") == 0) {
+  } else if (objective.compare("LOO") == 0) {
     fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, OrdinaryKriging::OKModel* okm_data) {
       double loo = this->leaveOneOut(_theta, grad_out, okm_data);
       if (grad_out!=nullptr) *grad_out = - *grad_out;
@@ -702,8 +700,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
     optim::algo_settings_t algo_settings;
-    algo_settings.iter_max = 5;  // TODO change by default?
-    algo_settings.err_tol = 10;
+    algo_settings.iter_max = 10;        // TODO change by default?  
+    algo_settings.rel_sol_change_tol = 0.1;
+    algo_settings.grad_err_tol = 0.01;  
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);
@@ -957,9 +956,7 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
-                                               const arma::mat& newX,
-                                               bool normalize = false) {
+LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild data
   m_X = join_rows(m_X, newX);
   m_y = join_rows(m_y, newy);
@@ -967,7 +964,13 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy,
   // rebuild starting parameters
   Parameters parameters{this->m_sigma2, true, this->m_theta, true};
   // re-fit
-  this->fit(m_y, m_X, m_regmodel, normalize, m_optim, m_objective, parameters);  //, parameters, optim_objective, optim_method);
+  this->fit(m_y,
+            m_X,
+            m_regmodel,
+            normalize,
+            m_optim,
+            m_objective,
+            parameters);  //, parameters, optim_objective, optim_method);
 }
 
 /************************************************/

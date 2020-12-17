@@ -1,6 +1,6 @@
 /*################################################################################
   ##
-  ##   Copyright (C) 2016-2018 Keith O'Hara
+  ##   Copyright (C) 2016-2020 Keith O'Hara
   ##
   ##   This file is part of the OptimLib C++ library.
   ##
@@ -24,22 +24,25 @@
 
 #include "optim.hpp"
 
-double optim_simple_fn_1(const arma::vec& vals_inp, arma::vec* grad_out, void* opt_data)
+double 
+optim_simple_fn_1(const optim::Vec_t& vals_inp, optim::Vec_t* grad_out, void* opt_data)
 {
     return 1.0;
 }
 
-arma::vec optim_simple_fn_2(const arma::vec& vals_inp, void* opt_data)
+optim::Vec_t 
+optim_simple_fn_2(const optim::Vec_t& vals_inp, void* opt_data)
 {
-    int n = vals_inp.n_elem;
-    return arma::zeros(n,1);
+    int n = OPTIM_MATOPS_SIZE(vals_inp);
+    optim::Vec_t ret_vec = OPTIM_MATOPS_ZERO_VEC(n);
+    return ret_vec;
 }
 
 int main()
 {
     
-    arma::vec out_vals = arma::ones(2,1);
-    arma::vec x_p = arma::ones(2,1);
+    optim::Vec_t out_vals = OPTIM_MATOPS_ONE_VEC(2);
+    optim::Vec_t x_p = OPTIM_MATOPS_ONE_VEC(2);
 
     bool success = false;
 
@@ -47,9 +50,9 @@ int main()
     double err_2 = 1.5;
     double err_tol = 1.0;
 
-    int iter_1 = 1;
-    int iter_2 = 3;
-    int iter_max = 2;
+    size_t iter_1 = 1;
+    size_t iter_2 = 3;
+    size_t iter_max = 2;
 
     optim::algo_settings_t settings;
 

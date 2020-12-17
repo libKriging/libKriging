@@ -1,5 +1,6 @@
 #!/bin/bash
-if [ "$TRAVIS_PULL_REQUEST" == "false" ] ; then
+set -x
+if [ "${TRAVIS_PULL_REQUEST:=false}" == "false" ] ; then
   # Not in a pull request, so compare against parent commit
   base_commit="HEAD^"
   echo "Running clang-format against parent commit $(git rev-parse $base_commit)"

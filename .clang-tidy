@@ -35,3 +35,5 @@ Checks:  "\
 # Unfortunately, I did'nt succeed to enable it and filter out armadillo headers
 HeaderFilterRegex: 'src/lib/.*\.(hpp|cpp)$'
 #CheckOptions:
+
+WarningsAsErrors: bugprone-use-after-move, hicpp-invalid-access-moved, hicpp-move-const-arg, performance-move-const-arg
