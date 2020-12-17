@@ -5,202 +5,202 @@ language: shell
 
 jobs:
   include:
-    - name: "Guideline checks"
-      os: linux
-      dist: bionic
-      env:
-        - BUILD_NAME="checks"
-
-    - name: "Linux Debug"
-      os: linux
-      dist: bionic
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Debug
-        - ENABLE_PYTHON_BINDING=on
-      addons:
-        apt:
-          packages:
-            - liblapack-dev
-            - python3-pip
-
-#    - name: "Linux Release"
+#    - name: "Guideline checks"
+#      os: linux
+#      dist: bionic
+#      env:
+#        - BUILD_NAME="checks"
+#
+#    - name: "Linux Debug"
 #      os: linux
 #      dist: bionic
 #      env:
 #        - BUILD_NAME="linux-macos"
-#        - MODE=Release
+#        - MODE=Debug
 #        - ENABLE_PYTHON_BINDING=on
 #      addons:
 #        apt:
 #          packages:
 #            - liblapack-dev
 #            - python3-pip
-
-    - name: "MacOS Debug"
-      os: osx
-      osx_image: xcode11.3
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Debug
-        - ENABLE_PYTHON_BINDING=on
-
-    - name: "Windows Debug"
-      os: windows
-      env:
-        - BUILD_NAME="windows"
-        - MODE=Debug
-        - ENABLE_PYTHON_BINDING=on
-        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
-      before_install:
-        - choco install --no-progress -y python --version 3.7
-        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
-
-#    - name: "Windows Release"
+#
+##    - name: "Linux Release"
+##      os: linux
+##      dist: bionic
+##      env:
+##        - BUILD_NAME="linux-macos"
+##        - MODE=Release
+##        - ENABLE_PYTHON_BINDING=on
+##      addons:
+##        apt:
+##          packages:
+##            - liblapack-dev
+##            - python3-pip
+#
+#    - name: "MacOS Debug"
+#      os: osx
+#      osx_image: xcode11.3
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Debug
+#        - ENABLE_PYTHON_BINDING=on
+#
+#    - name: "Windows Debug"
 #      os: windows
 #      env:
 #        - BUILD_NAME="windows"
-#        - MODE=Release
+#        - MODE=Debug
 #        - ENABLE_PYTHON_BINDING=on
 #        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
 #      before_install:
 #        - choco install --no-progress -y python --version 3.7
 #        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
-
-#    - name: "MacOS Release"
-#      os: osx
-#      osx_image: xcode12.2
+#
+##    - name: "Windows Release"
+##      os: windows
+##      env:
+##        - BUILD_NAME="windows"
+##        - MODE=Release
+##        - ENABLE_PYTHON_BINDING=on
+##        - PATH=/c/Python37:/c/Python37/Scripts:$PATH
+##      before_install:
+##        - choco install --no-progress -y python --version 3.7
+##        - ln -s /c/Python37/python.exe /c/Python37/python3.exe
+#
+##    - name: "MacOS Release"
+##      os: osx
+##      osx_image: xcode12.2
+##      env:
+##        - BUILD_NAME="linux-macos"
+##        - MODE=Release
+##        - ENABLE_PYTHON_BINDING=on
+#
+#    - name: "Linux Coverage"
+#      os: linux
+#      dist: bionic
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Debug
+#        - ENABLE_COVERAGE=on
+#        - ENABLE_OCTAVE_BINDING=on
+#        - ENABLE_PYTHON_BINDING=on
+#      addons:
+#        apt:
+#          update: true
+#          packages:
+#            - octave
+#            - octave-pkg-dev
+#            - liblapack-dev
+#            - lcov
+#            - python3-pip
+#      after_success:
+#        - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
+#
+#    - name: "Linux Memcheck"
+#      os: linux
+#      dist: bionic
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Debug
+#        - ENABLE_MEMCHECK=on
+#        - ENABLE_OCTAVE_BINDING=on
+#        - ENABLE_PYTHON_BINDING=on
+#      addons:
+#        apt:
+#          update: true
+#          packages:
+#            - octave
+#            - octave-pkg-dev
+#            - liblapack-dev
+#            - valgrind
+#            - python3-setuptools
+#            - python3-pip
+#
+##    # Disabled because too long
+##    - name: "MacOS Coverage"
+##      os: osx
+##      osx_image: xcode9.4
+##      env:
+##        - BUILD_NAME="linux-macos-coverage"
+##        - MODE=Coverage
+##      addons:
+##        homebrew:
+##          update: true
+##          packages:
+##            - lcov
+#
+#    - name: "Octave Linux"
+#      os: linux
+#      dist: bionic # bionic does not support Octave 5
 #      env:
 #        - BUILD_NAME="linux-macos"
 #        - MODE=Release
+#        - ENABLE_OCTAVE_BINDING=on
 #        - ENABLE_PYTHON_BINDING=on
-
-    - name: "Linux Coverage"
-      os: linux
-      dist: bionic
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Debug
-        - ENABLE_COVERAGE=on
-        - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=on
-      addons:
-        apt:
-          update: true
-          packages:
-            - octave
-            - octave-pkg-dev
-            - liblapack-dev
-            - lcov
-            - python3-pip
-      after_success:
-        - ${TRAVIS_BUILD_DIR}/.travis-ci/${BUILD_NAME}/after_success.sh
-
-    - name: "Linux Memcheck"
-      os: linux
-      dist: bionic
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Debug
-        - ENABLE_MEMCHECK=on
-        - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=on
-      addons:
-        apt:
-          update: true
-          packages:
-            - octave
-            - octave-pkg-dev
-            - liblapack-dev
-            - valgrind
-            - python3-setuptools
-            - python3-pip
-
-#    # Disabled because too long
-#    - name: "MacOS Coverage"
-#      os: osx
-#      osx_image: xcode9.4
-#      env:
-#        - BUILD_NAME="linux-macos-coverage"
-#        - MODE=Coverage
 #      addons:
-#        homebrew:
-#          update: true
+#        apt:
 #          packages:
-#            - lcov
-
-    - name: "Octave Linux"
-      os: linux
-      dist: bionic # bionic does not support Octave 5
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Release
-        - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=on
-      addons:
-        apt:
-          packages:
-            - octave
-            - octave-pkg-dev
-            - python3-pip
-      after_success:
-        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
-        # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
-        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
-        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
-      deploy:
-        - provider: releases
-          api_key: $API_DEPLOY_TOKEN
-          file: $DEPLOY_FILE
-          overwrite: true
-          skip_cleanup: true
-          on:
-            tags: true
-
-    - name: "Octave MacOS"
-      os: osx
-      osx_image: xcode11.3
-      env:
-        - BUILD_NAME="linux-macos"
-        - MODE=Release
-        - ENABLE_OCTAVE_BINDING=on
-        - ENABLE_PYTHON_BINDING=off
-      after_success:
-        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
-        # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
-        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
-        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
-      deploy:
-        - provider: releases
-          api_key: $API_DEPLOY_TOKEN
-          file: $DEPLOY_FILE
-          overwrite: true
-          skip_cleanup: true
-          on:
-            tags: true
-
-    - name: "Octave Windows"
-      os: windows
-      env:
-        - BUILD_NAME="octave-windows"
-        - MODE=Release
-        - ENABLE_OCTAVE_BINDING=on
-      after_success:
-        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
-        # nor in before_deploy since the condition is checked before *deploy scripts    
-        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
-        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
-        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
-      deploy:
-        - provider: releases
-          api_key: $API_DEPLOY_TOKEN
-          file: $DEPLOY_FILE
-          overwrite: true
-          skip_cleanup: true
-          on:
-            tags: true
+#            - octave
+#            - octave-pkg-dev
+#            - python3-pip
+#      after_success:
+#        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+#        # nor in before_deploy since the condition is checked before *deploy scripts    
+#        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+#        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+#        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+#      deploy:
+#        - provider: releases
+#          api_key: $API_DEPLOY_TOKEN
+#          file: $DEPLOY_FILE
+#          overwrite: true
+#          skip_cleanup: true
+#          on:
+#            tags: true
+#
+#    - name: "Octave MacOS"
+#      os: osx
+#      osx_image: xcode11.3
+#      env:
+#        - BUILD_NAME="linux-macos"
+#        - MODE=Release
+#        - ENABLE_OCTAVE_BINDING=on
+#        - ENABLE_PYTHON_BINDING=off
+#      after_success:
+#        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+#        # nor in before_deploy since the condition is checked before *deploy scripts    
+#        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+#        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+#        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+#      deploy:
+#        - provider: releases
+#          api_key: $API_DEPLOY_TOKEN
+#          file: $DEPLOY_FILE
+#          overwrite: true
+#          skip_cleanup: true
+#          on:
+#            tags: true
+#
+#    - name: "Octave Windows"
+#      os: windows
+#      env:
+#        - BUILD_NAME="octave-windows"
+#        - MODE=Release
+#        - ENABLE_OCTAVE_BINDING=on
+#      after_success:
+#        # pre-deploy cannot neither be in after_script which is the last script (after deploy), 
+#        # nor in before_deploy since the condition is checked before *deploy scripts    
+#        - "${TRAVIS_BUILD_DIR}/.travis-ci/release/octave-pre-deploy.sh"
+#        - "[ -e ${TRAVIS_BUILD_DIR}/DEPLOY_FILE ] && export DEPLOY_FILE=$(cat ${TRAVIS_BUILD_DIR}/DEPLOY_FILE)"
+#        - "[ $DEBUG_CI = true ] && echo DEPLOY_FILE=$DEPLOY_FILE"
+#      deploy:
+#        - provider: releases
+#          api_key: $API_DEPLOY_TOKEN
+#          file: $DEPLOY_FILE
+#          overwrite: true
+#          skip_cleanup: true
+#          on:
+#            tags: true
 
     - name: "R Linux"
       os: linux
