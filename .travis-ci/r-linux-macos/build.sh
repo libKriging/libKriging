@@ -22,9 +22,10 @@ if [[ -e /usr/local/opt/coreutils/libexec/gnubin/readlink ]]; then
 fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
+MODE=${MODE:-Release}
 
 BUILD_TEST=false \
-    MODE=Release \
+    MODE=${MODE} \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} ${EXTRA_CMAKE_OPTIONS}" \
