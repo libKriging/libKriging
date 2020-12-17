@@ -6,6 +6,7 @@ import pytest
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_exact(n, m):
+    np.random.seed(0)
     sol = np.asarray(np.random.normal(size=(m, 1)), dtype=np.float64, order='F')
     X = np.asarray(np.random.normal(size=(n, m)), dtype=np.float64, order='F')
     X[:, 0] = 1
@@ -23,6 +24,7 @@ def test_linear_regression_exact(n, m):
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_noisy(n, m):
+    np.random.seed(0)
     sol = np.asarray(np.random.normal(size=(m, 1)), dtype=np.float64, order='F')
     X = np.asarray(np.random.normal(size=(n, m)), dtype=np.float64, order='F')
     X[:, 0] = 1
