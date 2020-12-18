@@ -7,32 +7,33 @@
 
 // [[Rcpp::export]]
 Rcpp::List kriging(arma::vec y,
-                            arma::mat X,
-                            std::string kernel,
-                            std::string regmodel = "constant",
-                            bool normalize = false,
-                            std::string optim = "BFGS",
-                            std::string objective = "LL",
-                            Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                   arma::mat X,
+                   std::string kernel,
+                   std::string regmodel = "constant",
+                   bool normalize = false,
+                   std::string optim = "BFGS",
+                   std::string objective = "LL",
+                   Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   Kriging* ok = new Kriging(kernel);
 
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
-    _parameters = parameters;       
+    _parameters = parameters;
   } else {
-    _parameters = Rcpp::List::create(
-                              Rcpp::Named("sigma2")=0,
-                              Rcpp::Named("has_sigma2")=false,
-                              Rcpp::Named("theta")=Rcpp::NumericMatrix(0),
-                              Rcpp::Named("has_theta")=false);
+    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = 0,
+                                     Rcpp::Named("has_sigma2") = false,
+                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(0),
+                                     Rcpp::Named("has_theta") = false);
   }
-                              
+
   ok->fit(std::move(y),
           std::move(X),
           Kriging::RegressionModelUtils::fromString(regmodel),
           normalize,
-          optim,objective,
-          Kriging::Parameters{_parameters["sigma2"],_parameters["has_sigma2"],_parameters["theta"],_parameters["has_theta"]});
+          optim,
+          objective,
+          Kriging::Parameters{
+              _parameters["sigma2"], _parameters["has_sigma2"], _parameters["theta"], _parameters["has_theta"]});
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
 
@@ -50,21 +51,20 @@ Rcpp::List kriging_model(Rcpp::List ordinaryKriging) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return Rcpp::List::create(
-      Rcpp::Named("theta") = impl_ptr->theta(),
-      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
-      Rcpp::Named("X") = impl_ptr->X(),
-      Rcpp::Named("centerX") = impl_ptr->centerX(),
-      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
-      Rcpp::Named("y") = impl_ptr->y(),
-      Rcpp::Named("centerY") = impl_ptr->centerY(),
-      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-      Rcpp::Named("regmodel") = Kriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
-      Rcpp::Named("F") = impl_ptr->F(),
-      Rcpp::Named("T") = impl_ptr->T(),
-      Rcpp::Named("M") = impl_ptr->M(),
-      Rcpp::Named("z") = impl_ptr->z(),
-      Rcpp::Named("beta") = impl_ptr->beta());
+  return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta(),
+                            Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+                            Rcpp::Named("X") = impl_ptr->X(),
+                            Rcpp::Named("centerX") = impl_ptr->centerX(),
+                            Rcpp::Named("scaleX") = impl_ptr->scaleX(),
+                            Rcpp::Named("y") = impl_ptr->y(),
+                            Rcpp::Named("centerY") = impl_ptr->centerY(),
+                            Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+                            Rcpp::Named("regmodel") = Kriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
+                            Rcpp::Named("F") = impl_ptr->F(),
+                            Rcpp::Named("T") = impl_ptr->T(),
+                            Rcpp::Named("M") = impl_ptr->M(),
+                            Rcpp::Named("z") = impl_ptr->z(),
+                            Rcpp::Named("beta") = impl_ptr->beta());
 }
 
 // [[Rcpp::export]]

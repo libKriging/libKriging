@@ -55,8 +55,7 @@ TEST_CASE("fit benchmark", "[.benchmark]") {
     Kriging ok = Kriging("gauss");
     BENCHMARK("Kriging::fit#" + std::to_string(i)) {
       Kriging::Parameters parameters{0, false, arma::vec(), false};
-      return ok.fit(
-          y, X, Kriging::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
+      return ok.fit(y, X, Kriging::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
     };
   });
 }

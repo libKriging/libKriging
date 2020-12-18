@@ -1,11 +1,11 @@
 #include <pybind11/pybind11.h>
 #include <iostream>
 
-#include <libKriging/LinearRegression.hpp>
 #include <libKriging/Kriging.hpp>
+#include <libKriging/LinearRegression.hpp>
 #include "AddDemo.hpp"
-#include "LinearRegression_binding.hpp"
 #include "Kriging_binding.hpp"
+#include "LinearRegression_binding.hpp"
 #include "NumPyDemo.hpp"
 
 #include <carma/carma.h>
@@ -68,5 +68,4 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def(py::init<const std::string&>())
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict);
-
 }
