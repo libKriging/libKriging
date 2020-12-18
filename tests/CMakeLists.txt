@@ -26,9 +26,9 @@ add_executable(regression_unit_test regression_unit_test.cpp)
 target_link_libraries(regression_unit_test LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries regression_unit_test)
 
-add_executable(OrdinaryKrigingTest OrdinaryKrigingTest.cpp)
-target_link_libraries(OrdinaryKrigingTest LINK_PUBLIC Kriging Catch2)
-add_dependencies(all_test_binaries OrdinaryKrigingTest)
+add_executable(KrigingTest KrigingTest.cpp)
+target_link_libraries(KrigingTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingTest)
 
 # Can be enabled if necessary
 #if (CXX_CLANG_TIDY)
@@ -58,10 +58,10 @@ ParseAndAddCatchTests(catch2_unit_test)
 ParseAndAddCatchTests(regression_unit_test)
 
 set(AdditionalCatchParameters --benchmark-samples 10)
-ParseAndAddCatchTests(OrdinaryKrigingTest)
+ParseAndAddCatchTests(KrigingTest)
 unset(AdditionalCatchParameters)
 # example of callgrind command line
-# valgrind --tool=callgrind --dump-instr=yes --trace-jump=yes -v ./tests/OrdinaryKrigingTest "logLikelihood benchmark" --benchmark-samples 10
+# valgrind --tool=callgrind --dump-instr=yes --trace-jump=yes -v ./tests/KrigingTest "logLikelihood benchmark" --benchmark-samples 10
 # catch2 commande line options: https://github.com/catchorg/Catch2/blob/master/docs/command-line.md#specifying-which-tests-to-run
 
 # list of all tests

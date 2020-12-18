@@ -1,7 +1,7 @@
-#include "OrdinaryKriging_binding.hpp"
+#include "Kriging_binding.hpp"
 
 #include <armadillo>
-#include <libKriging/OrdinaryKriging.hpp>
+#include <libKriging/Kriging.hpp>
 #include <random>
 
 #include <pybind11/numpy.h>
@@ -10,18 +10,18 @@
 
 #include <carma/carma.h>
 
-PyOrdinaryKriging::PyOrdinaryKriging(const std::string& kernel) : m_internal{new OrdinaryKriging{kernel}} {}
+PyKriging::PyKriging(const std::string& kernel) : m_internal{new Kriging{kernel}} {}
 
-PyOrdinaryKriging::~PyOrdinaryKriging() {}
+PyKriging::~PyKriging() {}
 
-void PyOrdinaryKriging::fit(const py::array_t<double>& y, const py::array_t<double>& X) {
+void PyKriging::fit(const py::array_t<double>& y, const py::array_t<double>& X) {
   arma::mat mat_y = carma::arr_to_col<double>(y, true);
   arma::mat mat_X = carma::arr_to_mat<double>(X, true);
   m_internal->fit(mat_y, mat_X);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyOrdinaryKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov) {
+PyKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov) {
   arma::mat mat_X = carma::arr_to_mat<double>(X, true);
   auto [y_predict, y_stderr, y_cov] = m_internal->predict(mat_X, withStd, withCov);
   return std::make_tuple(

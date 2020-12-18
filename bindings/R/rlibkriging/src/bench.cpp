@@ -4,7 +4,7 @@
 // clang-format on
 
 #include "libKriging/Bench.hpp"
-#include "libKriging/OrdinaryKriging.hpp"
+#include "libKriging/Kriging.hpp"
 
 // [[Rcpp::export]]
 arma::mat bench_solvetri(int n, arma::mat X, arma::vec y) {
@@ -37,10 +37,10 @@ Rcpp::List bench_qr(int n, arma::mat X) {
 
 // [[Rcpp::export]]
 double bench_LogLik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("OrdinaryKriging"))
-    Rcpp::stop("Input must be a OrdinaryKriging object.");
+  if (!ordinaryKriging.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
   SEXP impl_ok = ordinaryKriging.attr("object");
-  Rcpp::XPtr<OrdinaryKriging> ok(impl_ok);
+  Rcpp::XPtr<Kriging> ok(impl_ok);
 
   Bench* b = new Bench(n);
   Rcpp::XPtr<Bench> impl_ptr(b);
@@ -49,10 +49,10 @@ double bench_LogLik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
 
 // [[Rcpp::export]]
 arma::vec bench_LogLikGrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("OrdinaryKriging"))
-    Rcpp::stop("Input must be a OrdinaryKriging object.");
+  if (!ordinaryKriging.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
   SEXP impl_ok = ordinaryKriging.attr("object");
-  Rcpp::XPtr<OrdinaryKriging> ok(impl_ok);
+  Rcpp::XPtr<Kriging> ok(impl_ok);
 
   Bench* b = new Bench(n);
   Rcpp::XPtr<Bench> impl_ptr(b);

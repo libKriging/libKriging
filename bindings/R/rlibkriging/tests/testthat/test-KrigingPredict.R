@@ -9,13 +9,13 @@ y = f(X)
 points(X,y)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
 
-r <- ordinary_kriging(y,X,"gauss","constant",FALSE,"Newton","LL")
+r <- kriging(y,X,"gauss","constant",FALSE,"Newton","LL")
 
-m = ordinary_kriging_model(r)
+m = kriging_model(r)
 
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",coef.cov=m$theta,coef.var = m$sigma2)
 
-r <- ordinary_kriging(y,X,"gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,theta=k@covariance@range.val,has_theta=TRUE))
+r <- kriging(y,X,"gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,theta=k@covariance@range.val,has_theta=TRUE))
 
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
@@ -23,7 +23,7 @@ ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE)
 Yktest <- ptest$mean
 sktest <- ptest$sd
 cktest <- c(ptest$cov)
-Ytest <- ordinary_kriging_predict(r,Xtest,TRUE,TRUE)
+Ytest <- kriging_predict(r,Xtest,TRUE,TRUE)
 
 precision <- 1e-5
 test_that(desc=paste0("pred mean is the same that DiceKriging one: ",paste0(collapse=",",Yktest)," ",paste0(collapse=",",Ytest$mean)),

@@ -9,7 +9,7 @@
 /** Ordinary kriging regression
  * @ingroup Regression
  */
-class OrdinaryKriging {
+class Kriging {
  public:
   struct Parameters {
     double sigma2;
@@ -40,7 +40,7 @@ class OrdinaryKriging {
   const arma::vec& theta() const { return m_theta; };
   const double& sigma2() const { return m_sigma2; };
 
- private:
+private:
   arma::mat m_X;
   arma::rowvec m_centerX;
   arma::rowvec m_scaleX;
@@ -77,14 +77,11 @@ class OrdinaryKriging {
     arma::colvec beta;
   };
 
-  double logLikelihood(const arma::vec& _theta,
-                       arma::vec* grad_out,
-                       arma::mat* hess_out,
-                       OrdinaryKriging::OKModel* okm_data) const;
-  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
+  double logLikelihood(const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) const;
+  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging(const std::string& covType);
+  LIBKRIGING_EXPORT Kriging(const std::string& covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -131,7 +128,9 @@ class OrdinaryKriging {
    * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
+  LIBKRIGING_EXPORT void update(const arma::vec& newy,
+                                const arma::mat& newX,
+                                bool normalize);
 };
 
 #endif  // LIBKRIGING_ORDINARYKRIGING_HPP

@@ -24,10 +24,10 @@ for (i in 1:length(logn)) {
   )[1]
   llx <- llx/N
 
-  r <- ordinary_kriging(y, X,"gauss")
+  r <- kriging(y, X,"gauss")
   times$cpp[i] = system.time(
-    try({ll2x <- bench_LogLik(N,r,rep(theta,ncol(X)))})
-    # try({for (t in 1:N) ll2x <- ordinary_kriging_loglikelihood(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
+    # try({ll2x <- bench_LogLik(N,r,rep(theta,ncol(X)))})
+    try({for (t in 1:N) ll2x <- kriging_logLikelihood(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
 
   if (abs((llx-ll2x)/llx)>1E-3) stop("LL is not identical betw C++/R")

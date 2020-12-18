@@ -9,12 +9,12 @@ def f(X):
 
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
-def test_ordinary_kriging_f_order(n, m):
+def test_kriging_f_order(n, m):
     np.random.seed(0)
     X = np.asarray(np.random.uniform(size=(n, m)), dtype=np.float64, order='F')
     y = f(X)
 
-    rl = lk.OrdinaryKriging("gauss")
+    rl = lk.Kriging("gauss")
     rl.fit(y, X)
 
     y_pred, _stderr, _cov = rl.predict(X, True, True)
@@ -22,13 +22,13 @@ def test_ordinary_kriging_f_order(n, m):
 
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
-def test_ordinary_kriging_c_order(n, m):
+def test_kriging_c_order(n, m):
     np.random.seed(0)
     # X = np.asarray(np.random.uniform(size=(n, m)), dtype=np.float64, order='C')
     X = np.random.uniform(size=(n, m))  # this is the default
     y = f(X)
 
-    rl = lk.OrdinaryKriging("gauss")
+    rl = lk.Kriging("gauss")
     rl.fit(y, X)
 
     y_pred, _stderr, _cov = rl.predict(X, True, True)

@@ -8,11 +8,11 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
-r <- ordinary_kriging(y, X, "gauss")
+r <- kriging(y, X, "gauss")
 
 precision <- 1e-3
 test_that(desc="fit of theta is the same that DiceKriging one", 
-          expect_true(abs(ordinary_kriging_model(r)$theta - k@covariance@range.val) < precision))
+          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))
          
 #############################################################
 
@@ -24,14 +24,14 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- ordinary_kriging(y, X, "gauss","constant",FALSE,"Newton","LL")
+r <- kriging(y, X, "gauss","constant",FALSE,"Newton","LL")
 
-ordinary_kriging_model(r)$theta
+kriging_model(r)$theta
 k@covariance@range.val
 
 precision <- 1e-3
 test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_true(abs(ordinary_kriging_model(r)$theta - k@covariance@range.val) < precision))
+          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))
 
 #############################################################
 
@@ -58,11 +58,11 @@ mll_fun <- function(x) -apply(x,1,
 )
 contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
  
-r <- ordinary_kriging(y, X, "gauss","constant",FALSE,"Newton","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
+r <- kriging(y, X, "gauss","constant",FALSE,"Newton","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
 
-ordinary_kriging_model(r)$theta
+kriging_model(r)$theta
 k@covariance@range.val
 
 precision <- 1e-3
 test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_true(abs(ordinary_kriging_model(r)$theta - k@covariance@range.val) < precision))
+          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))

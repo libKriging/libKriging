@@ -10,14 +10,14 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-#include <libKriging/OrdinaryKriging.hpp>
+#include <libKriging/Kriging.hpp>
 
 namespace py = pybind11;
 
-class PyOrdinaryKriging {
+class PyKriging {
  public:
-  PyOrdinaryKriging(const std::string& kernel);
-  ~PyOrdinaryKriging();
+  PyKriging(const std::string& kernel);
+  ~PyKriging();
 
   void fit(const py::array_t<double>& y, const py::array_t<double>& X);
 
@@ -30,7 +30,7 @@ class PyOrdinaryKriging {
                                                                                     bool withCov);
 
  private:
-  std::unique_ptr<OrdinaryKriging> m_internal;
+  std::unique_ptr<Kriging> m_internal;
 };
 
 #endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP

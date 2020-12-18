@@ -4,7 +4,7 @@
 #include <cmath>
 // clang-format on
 
-#include "libKriging/OrdinaryKriging.hpp"
+#include "libKriging/Kriging.hpp"
 
 #include <armadillo>
 #include <optim.hpp>
@@ -45,27 +45,29 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
         return exp(-arma::sum(arma::abs(diff)));
       };
 
-std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm_exp
-    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) { return fabs(xi(dim) - xj(dim)); };
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&,  int)> Dln_CovNorm_exp
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+        return fabs(xi(dim) - xj(dim));
+      };
 
 /************************************************/
 /** implementation details forward declaration **/
 /************************************************/
 
 namespace {  // anonymous namespace for local implementation details
-auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
+auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
                            const arma::mat& newX,
                            arma::uword n,
                            arma::uword d) -> arma::mat;
 }  // namespace
 
 /************************************************/
-/**      OrdinaryKriging implementation        **/
+/**      Kriging implementation        **/
 /************************************************/
 
 // returns distance matrix form Xp to X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
+arma::mat Kriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   arma::mat Xtnorm = trans(X);
   Xtnorm.each_col() /= m_theta;
   arma::mat Xptnorm = trans(Xp);
@@ -79,7 +81,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < np; j++) {
-      R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
+      R.at(i, j) = Kriging::CovNorm_fun(Xtnorm.col(i), Xptnorm.col(j));
     }
   }
   return R;
@@ -87,7 +89,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X, const arma::mat& Xp) {
 
 // Optimized version when Xp=X
 LIBKRIGING_EXPORT
-arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
+arma::mat Kriging::Cov(const arma::mat& X) {
   // Should be tyaken from covariance.h from nestedKriging ?
   // return getCrossCorrMatrix(X,Xp,parameters,covType);
 
@@ -100,7 +102,7 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
   R.zeros();
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = OrdinaryKriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      R.at(i, j) = Kriging::CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
 
@@ -109,15 +111,15 @@ arma::mat OrdinaryKriging::Cov(const arma::mat& X) {
   return R;
 }
 //// same for one point
-// LIBKRIGING_EXPORT arma::colvec OrdinaryKriging::Cov(const arma::mat& X,
+// LIBKRIGING_EXPORT arma::colvec Kriging::Cov(const arma::mat& X,
 //                                                    const arma::rowvec& x,
 //                                                    const arma::colvec& theta) {
 //  // FIXME mat(x) : an arma::mat from a arma::rowvec ?
-//  return OrdinaryKriging::Cov(&X, arma::mat(&x), &theta).col(1);  // TODO to be optimized...
+//  return Kriging::Cov(&X, arma::mat(&x), &theta).col(1);  // TODO to be optimized...
 //}
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
-void OrdinaryKriging::make_Cov(const std::string& covType) {
+void Kriging::make_Cov(const std::string& covType) {
   if (covType.compare("gauss") == 0) {
     CovNorm_fun = CovNorm_fun_gauss;
     Dln_CovNorm = Dln_CovNorm_gauss;
@@ -131,19 +133,18 @@ void OrdinaryKriging::make_Cov(const std::string& covType) {
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT OrdinaryKriging::OrdinaryKriging(const std::string& covType) {
+LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType) {
   make_Cov(covType);
 }
 
-auto solve_opts
-    = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
+auto solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
 
 // Objective function for fit : -logLikelihood
-double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
+double Kriging::logLikelihood(const arma::vec& _theta,
                                       arma::vec* grad_out,
                                       arma::mat* hess_out,
-                                      OrdinaryKriging::OKModel* okm_data) const {
-  // arma::cout << " theta: " << _theta << arma::endl;
+                                      Kriging::OKModel* okm_data) const {
+  //arma::cout << " theta: " << _theta << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param)
   //  model@covariance@sd2 <- 1		# to get the correlation matrix
@@ -159,7 +160,7 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   //  sigma2.hat <- compute.sigma2.hat(z)
   //  logLik <- -0.5*(model@n * log(2*pi*sigma2.hat) + 2*sum(log(diag(T))) + model@n)
 
-  OrdinaryKriging::OKModel* fd = okm_data;
+  Kriging::OKModel* fd = okm_data;
 
   arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= _theta;
@@ -178,15 +179,15 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   R.diag().ones();
 
   // Cholesky decompostion of covariance matrix
-  fd->T = trimatl(chol(R, "lower"));
+  fd->T = trimatl(chol(R,"lower"));
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, solve_opts);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
-
-  arma::mat H = Q * Q.t();  // if (hess_out != nullptr)
+  
+  arma::mat H = Q * Q.t(); // if (hess_out != nullptr) 
   arma::colvec Yt = solve(fd->T, m_y, solve_opts);
   fd->beta = solve(trimatu(G), Q.t() * Yt, solve_opts);
   fd->z = Yt - fd->M * fd->beta;
@@ -217,9 +218,9 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
     //    logLik.derivative[k] <- terme1 + terme2
     //  }
 
-    arma::cube gradsR = arma::cube(n, n, n);  // if (hess_out != nullptr)
-    arma::vec terme1 = arma::vec(n);          // if (hess_out != nullptr)
-
+    arma::cube gradsR = arma::cube(n,n,n); // if (hess_out != nullptr) 
+    arma::vec terme1 = arma::vec(n); // if (hess_out != nullptr) 
+    
     arma::mat Linv = solve(fd->T, arma::eye(n, n), solve_opts);
     arma::mat Rinv = trans(Linv) * Linv;  // inv_sympd(R);
 
@@ -228,108 +229,105 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
     arma::mat xx = x * x.t();
 
     for (arma::uword k = 0; k < m_X.n_cols; k++) {
-      arma::mat gradR_k_upper = arma::zeros(n, n);  // should be trimatu ?
+      arma::mat gradR_k_upper = arma::zeros(n, n); // should be trimatu ?
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k_upper.at(j, i) = R.at(i, j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j, i) = R.at(i,j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k_upper /= _theta(k);
       arma::mat gradR_k = symmatu(gradR_k_upper);
-      // gradR_k.diag().zeros();
+      //gradR_k.diag().zeros();
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
-      terme1.at(k)
-          = as_scalar((trans(x) * gradR_k) * x) / sigma2_hat;  //; //as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
-      double terme2 = -arma::trace(Rinv * gradR_k);            //-arma::accu(Rinv % gradR_k_upper)
-      (*grad_out).at(k) = (terme1.at(k) + terme2) / 2;
-      // arma::cout << " grad_out:" << *grad_out << arma::endl;
+      terme1.at(k) = as_scalar((trans(x) * gradR_k) * x) / sigma2_hat; //; //as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
+      double terme2 = -arma::trace(Rinv * gradR_k); //-arma::accu(Rinv % gradR_k_upper)
+      (*grad_out).at(k) = (terme1.at(k) + terme2)/2;
+      //arma::cout << " grad_out:" << *grad_out << arma::endl;
 
       if (hess_out != nullptr) {
         //' @ref O. Roustant
         // for (k in 1:d) {
         //   for (l in 1:k) {
         //     aux <- grad_R[[k]] %*% Rinv %*% grad_R[[l]]
-        //     Dkl <- d2_matcor(X, modele_proba$covariance, R, grad_logR, k,l)
-        //     xk <- backsolve(t(T),grad_R[[k]]%*%x, upper.tri=FALSE)
+        //     Dkl <- d2_matcor(X, modele_proba$covariance, R, grad_logR, k,l)		
+        //     xk <- backsolve(t(T),grad_R[[k]]%*%x, upper.tri=FALSE)      
         //     xl <- backsolve(t(T),grad_R[[l]]%*%x, upper.tri=FALSE)
-        //
+        //     
         //     hess_A <- - (t(xk) %*% H %*% xl) / sigma2_hat
         //     hess_B <- (t(x) %*% ( -Dkl+2*aux ) %*% x) / sigma2_hat
         //     hess_C <- - grad_A[k] * grad_A[l] / n
         //     hess_D <- - sum(diag( Rinv %*% aux ))
         //     hess_E <- sum(diag( Rinv %*% Dkl ))
-        //
+        //     
         //     hess_log_vrais[k,l] <- 2*hess_A + hess_B + hess_C + hess_D + hess_E
         //     hess_log_vrais[l,k] <- hess_log_vrais[k,l]
         //   }
         // }
-
+        
         gradsR.slice(k) = arma::symmatu(gradR_k_upper);
-
+        
         for (arma::uword l = 0; l <= k; l++) {
+          
           arma::mat aux = gradsR.slice(k) * Rinv * gradsR.slice(l);
-
+          
           arma::mat hessR_k_l = arma::zeros(n, n);
-          if (k == l) {
+          if (k==l) {
             for (arma::uword i = 0; i < n; i++) {
-              for (arma::uword j = 0; j < i; j++) {
+            for (arma::uword j = 0; j < i; j++) {
                 double dln_k = Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k) / _theta(k);
-                hessR_k_l.at(j, i) = R.at(i, j) * dln_k * (dln_k - 3 / _theta(k));
-              }
-            }
+                hessR_k_l.at(j, i) = R.at(i,j) * dln_k * (dln_k - 3/_theta(k));
+            }}
           } else {
             for (arma::uword i = 0; i < n; i++) {
-              for (arma::uword j = 0; j < i; j++) {
-                hessR_k_l.at(j, i) = R.at(i, j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k) / _theta(k)
-                                     * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), l) / _theta(l);
-              }
-            }
-          }
+            for (arma::uword j = 0; j < i; j++) {
+                hessR_k_l.at(j, i) = R.at(i,j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k)/_theta(k) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), l)/ _theta(l);
+            }}
+          }   
           hessR_k_l = arma::symmatu(hessR_k_l);
 
           arma::mat xk = solve(fd->T, gradsR.slice(k) * x, solve_opts);
           arma::mat xl;
-          if (k == l)
+          if (k==l) 
             xl = xk;
-          else
+          else 
             xl = solve(fd->T, gradsR.slice(l) * x, solve_opts);
 
-          // arma::cout << " hess_A:" << -xk.t() * H * xl / sigma2_hat << arma::endl;
-          // arma::cout << " hess_B:" << -x.t() * (hessR_k_l - 2*aux) * x / sigma2_hat << arma::endl;
-          // arma::cout << " hess_C:" << -terme1.at(k) * terme1.at(l) / n << arma::endl;
-          // arma::cout << " hess_D:" << -arma::trace(Rinv * aux)  << arma::endl;
-          // arma::cout << " hess_E:" << arma::trace(Rinv * hessR_k_l) << arma::endl;
+          //arma::cout << " hess_A:" << -xk.t() * H * xl / sigma2_hat << arma::endl;
+          //arma::cout << " hess_B:" << -x.t() * (hessR_k_l - 2*aux) * x / sigma2_hat << arma::endl;
+          //arma::cout << " hess_C:" << -terme1.at(k) * terme1.at(l) / n << arma::endl;
+          //arma::cout << " hess_D:" << -arma::trace(Rinv * aux)  << arma::endl;
+          //arma::cout << " hess_E:" << arma::trace(Rinv * hessR_k_l) << arma::endl;
 
-          (*hess_out).at(k, l)
-              = (2.0 * xk.t() * H * xl / sigma2_hat + x.t() * (hessR_k_l - 2 * aux) * x / sigma2_hat
-                 + terme1.at(k) * terme1.at(l) / n + arma::trace(Rinv * aux) - arma::trace(Rinv * hessR_k_l))[0]
-                / 2;  // should optim there using accu & %
-
-          // arma::cout << " xk:" << xk << arma::endl;
-          // arma::cout << " xl:" << xl << arma::endl;
-          // arma::cout << " aux:" << aux << arma::endl;
-          // arma::cout << " hessR_k_l:" << hessR_k_l << arma::endl;
-        }  // for (arma::uword l = 0; l <= k; l++)
-      }    // if (hess_out != nullptr)
-    }      // for (arma::uword k = 0; k < m_X.n_cols; k++)
-    // arma::cout << " grad_out:" << *grad_out << arma::endl;
+          (*hess_out).at(k,l) = (2.0 * xk.t() * H * xl / sigma2_hat  +  
+                                x.t() * (hessR_k_l - 2*aux) * x / sigma2_hat  +  
+                                terme1.at(k) * terme1.at(l) / n  +  
+                                arma::trace(Rinv * aux)  -  arma::trace(Rinv * hessR_k_l))[0]/2; //should optim there using accu & %
+        
+          //arma::cout << " xk:" << xk << arma::endl;
+          //arma::cout << " xl:" << xl << arma::endl;
+          //arma::cout << " aux:" << aux << arma::endl;
+          //arma::cout << " hessR_k_l:" << hessR_k_l << arma::endl;
+        }//for (arma::uword l = 0; l <= k; l++)
+      }//if (hess_out != nullptr)
+    }//for (arma::uword k = 0; k < m_X.n_cols; k++)
+    //arma::cout << " grad_out:" << *grad_out << arma::endl;
     if (hess_out != nullptr) {
-      *hess_out = arma::symmatl(*hess_out);
-      // arma::cout << " hess_out:" << *hess_out << arma::endl;
+      *hess_out = arma::symmatl(*hess_out);  
+      //arma::cout << " hess_out:" << *hess_out << arma::endl;
     }
-  }  // if (grad_out != nullptr)
+  }//if (grad_out != nullptr)
 
-  // Trace & check calcs
-  // arma::cout << " theta:" << _theta << arma::endl;
-  // arma::cout << " ll:" << ll << arma::endl;
-  // arma::cout << " sigma2:" << sigma2_hat << arma::endl;
-  // arma::cout << " T:" << fd->T << arma::endl;
-  // arma::cout << " z:" << fd->z << arma::endl;
-  // arma::cout << " H:" << H << arma::endl;
+  // Trace & check calcs        
+  //arma::cout << " theta:" << _theta << arma::endl;
+  //arma::cout << " ll:" << ll << arma::endl;
+  //arma::cout << " sigma2:" << sigma2_hat << arma::endl;
+  //arma::cout << " T:" << fd->T << arma::endl;
+  //arma::cout << " z:" << fd->z << arma::endl;
+  //arma::cout << " H:" << H << arma::endl;
 
-  //  if (grad_out != nullptr) {
-  //  arma::cout << "[DEBUG]    logLikelihood: " << _theta << arma::endl;
+  //  if (grad_out != nullptr) { 
+  //  arma::cout << "[DEBUG]    logLikelihood: " << _theta << arma::endl;  
   //  arma::cout << "[DEBUG]      sigma2_hat: " << sigma2_hat << arma::endl;
   //  arma::cout << "[DEBUG]      ll: " << ll << arma::endl;
   //
@@ -344,7 +342,7 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   //  arma::mat M;
   //  arma::colvec z;
   //  arma::colvec beta;
-  //  OrdinaryKriging::OKModel okm_data_eps{T, M, z, beta};
+  //  Kriging::OKModel okm_data_eps{T, M, z, beta};
   //  arma::cout << "[DEBUG]    <<<<<<<<<<<<<<<<<<<<<<<<<<<" << arma::endl;
   //  double ll_eps = logLikelihood(_theta+eps_i, nullptr, nullptr, &okm_data_eps);
   //        g.at(i) =  (ll_eps - ll)/eps;
@@ -366,53 +364,53 @@ double OrdinaryKriging::logLikelihood(const arma::vec& _theta,
   //  arma::mat M;
   //  arma::colvec z;
   //  arma::colvec beta;
-  //  OrdinaryKriging::OKModel okm_data_eps2{T, M, z, beta};
+  //  Kriging::OKModel okm_data_eps2{T, M, z, beta};
   //  arma::vec grad_eps(_theta.n_elem);
   //  arma::cout << "[DEBUG]    <<<<<<<<<<<<<<<<<<<<<<<<<<<" << arma::endl;
   //  double ll_eps = logLikelihood(_theta+eps_i, &grad_eps, nullptr, &okm_data_eps2);
   //        h.col(i) =  (grad_eps - *grad_out)/eps;
   //  arma::cout << "[DEBUG]    >>>>>>>>>>>>>>>>>>>>>>>>>>>" << arma::endl;
   //      }
-  //      arma::cout << "[DEBUG]      Hess (num.): " << ((h+h.t())/2) <<  arma::endl;
+  //      arma::cout << "[DEBUG]      Hess (num.): " << ((h+h.t())/2) <<  arma::endl; 
   //      arma::cout << "[DEBUG]      Hess: " << *hess_out <<  arma::endl;
-  //    }
-  //    arma::cout << arma::endl;
+  //    }  
+  //    arma::cout << arma::endl;  
   //  }
   return ll;
 }
 
-LIBKRIGING_EXPORT double OrdinaryKriging::logLikelihoodFun(const arma::vec& _theta) {
+LIBKRIGING_EXPORT double Kriging::logLikelihoodFun(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  Kriging::OKModel okm_data{T, M, z, beta};
   return logLikelihood(_theta, nullptr, nullptr, &okm_data);
 }
 
-LIBKRIGING_EXPORT arma::vec OrdinaryKriging::logLikelihoodGrad(const arma::vec& _theta) {
+LIBKRIGING_EXPORT arma::vec Kriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  Kriging::OKModel okm_data{T, M, z, beta};
 
   arma::vec grad(_theta.n_elem);
   double ll = logLikelihood(_theta, &grad, nullptr, &okm_data);
   return grad;
 }
 
-LIBKRIGING_EXPORT arma::mat OrdinaryKriging::logLikelihoodHess(const arma::vec& _theta) {
+LIBKRIGING_EXPORT arma::mat Kriging::logLikelihoodHess(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
-
+  Kriging::OKModel okm_data{T, M, z, beta};
+  
   arma::vec grad(_theta.n_elem);
   arma::mat hess(_theta.n_elem, _theta.n_elem);
   double ll = logLikelihood(_theta, &grad, &hess, &okm_data);
-
+  
   return hess;
 }
 
@@ -427,10 +425,10 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 }
 
 // Objective function for fit : -LOO
-double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
+double Kriging::leaveOneOut(const arma::vec& _theta,
                                     arma::vec* grad_out,
-                                    OrdinaryKriging::OKModel* okm_data) const {
-  OrdinaryKriging::OKModel* fd = okm_data;
+                                    Kriging::OKModel* okm_data) const {
+  Kriging::OKModel* fd = okm_data;
 
   arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= _theta;
@@ -484,7 +482,7 @@ double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
       arma::mat gradR_k = arma::zeros(n, n);
       for (arma::uword i = 0; i < n; i++) {
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k.at(j, i) = R.at(i, j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k.at(j, i) = R.at(i,j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
       gradR_k /= _theta(k);
@@ -502,22 +500,22 @@ double OrdinaryKriging::leaveOneOut(const arma::vec& _theta,
   return loo;
 }
 
-LIBKRIGING_EXPORT double OrdinaryKriging::leaveOneOutFun(const arma::vec& _theta) {
+LIBKRIGING_EXPORT double Kriging::leaveOneOutFun(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  Kriging::OKModel okm_data{T, M, z, beta};
 
   return leaveOneOut(_theta, nullptr, &okm_data);
 }
 
-LIBKRIGING_EXPORT arma::vec OrdinaryKriging::leaveOneOutGrad(const arma::vec& _theta) {
+LIBKRIGING_EXPORT arma::vec Kriging::leaveOneOutGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+  Kriging::OKModel okm_data{T, M, z, beta};
 
   arma::vec grad(_theta.n_elem);
 
@@ -526,94 +524,93 @@ LIBKRIGING_EXPORT arma::vec OrdinaryKriging::leaveOneOutGrad(const arma::vec& _t
   return grad;
 }
 
-double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma::mat* hess_out)> f,
-                    arma::vec& x_0,
-                    const arma::vec& x_lower,
-                    const arma::vec& x_upper) {
-  // arma::cout << "x_0: " << x_0 << " ";
+double optim_newton(
+  std::function<double(arma::vec& x, arma::vec* grad_out, arma::mat* hess_out)> f,
+  arma::vec& x_0, const arma::vec& x_lower, const arma::vec& x_upper) {
+  //arma::cout << "x_0: " << x_0 << " ";
 
   double delta = 0.1;
   double x_tol = 0.001;
   double y_tol = 1;
   double g_tol = 0.01;
   int max_iteration = 10;
-
+  
   arma::vec x_previous(x_0.n_elem);
   arma::vec x_best(x_0.n_elem);
   double f_previous = std::numeric_limits<double>::infinity();
   double f_new = std::numeric_limits<double>::infinity();
   double f_best = std::numeric_limits<double>::infinity();
-
+  
   arma::vec x = x_0;
   arma::vec grad(x.n_elem);
-  arma::mat hess(x.n_elem, x.n_elem);
+  arma::mat hess(x.n_elem,x.n_elem);
   int i = 0;
   while (i < max_iteration) {
-    // arma::cout << "." ;
-    // arma::cout << "iteration: " << i << arma::endl;
-    // arma::cout << "  x: " << x << arma::endl;
-
+    //arma::cout << "." ;
+    //arma::cout << "iteration: " << i << arma::endl;
+    //arma::cout << "  x: " << x << arma::endl;
+    
     f_previous = f_new;
-    f_new = f(x, &grad, &hess);
-    // arma::cout << "    f_new: " << f_new << arma::endl;
+    f_new = f(x,&grad,&hess);
+    //arma::cout << "    f_new: " << f_new << arma::endl;
     if (f_best > f_new) {
       f_best = f_new;
       x_best = x;
     }
 
     if (std::abs(f_new - f_previous) < y_tol) {
-      // arma::cout << "  X f_new ~ f_previous" << arma::endl;
+      //arma::cout << "  X f_new ~ f_previous" << arma::endl;
       break;
     }
     if (arma::abs(grad).max() < g_tol) {
-      // arma::cout << "  X grad ~ 0" << arma::endl;
+      //arma::cout << "  X grad ~ 0" << arma::endl;
       break;
     }
-
+    
     arma::vec delta_x(x.n_elem);
-    // arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
-    if (arma::all(arma::eig_sym(hess) > 0)) {
+    //arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
+    if (arma::all(arma::eig_sym(hess)>0)) {
       // try to fit a second order polynom to use its minimizer. Otherwise, just iterate with conjugate gradient
-      // arma::cout << "!";
-      delta_x = arma::solve(hess, grad, arma::solve_opts::likely_sympd);
+      //arma::cout << "!";
+      delta_x = arma::solve(hess,grad,arma::solve_opts::likely_sympd);
     } else {
-      delta_x = delta * grad / std::sqrt(arma::sum(arma::cdot(grad, grad)));
+      delta_x = delta * grad/std::sqrt(arma::sum(arma::cdot(grad,grad)));
     }
-    // arma::cout << "  delta_x: " << delta_x << arma::endl;
-
+    //arma::cout << "  delta_x: " << delta_x << arma::endl;
+      
     arma::vec x_next = x - delta_x;
-    // arma::cout << "  x_next: " << x_next << arma::endl;
+    //arma::cout << "  x_next: " << x_next << arma::endl;
 
     for (int j = 0; j < x_next.n_elem; j++) {
       if (x_next[j] < x_lower[j]) {
-        // arma::cout << "    <" << x_lower[j] << arma::endl;
-        delta_x = delta_x * (x[j] - x_lower[j]) / (x[j] - x_next[j]) / 2;
+        //arma::cout << "    <" << x_lower[j] << arma::endl;
+        delta_x = delta_x * (x[j] - x_lower[j]) / (x[j] - x_next[j]) /2;
         x_next = x - delta_x;
-      }
-      if (x_next[j] > x_upper[j]) {
-        // arma::cout << "    >" << x_upper[j] << arma::endl;
-        delta_x = delta_x * (x_upper[j] - x[j]) / (x_next[j] - x[j]) / 2;
+      } 
+      if (x_next[j] > x_upper[j]) { 
+        //arma::cout << "    >" << x_upper[j] << arma::endl;
+        delta_x = delta_x * (x_upper[j] - x[j]) / (x_next[j] - x[j]) /2;
         x_next = x - delta_x;
       }
     }
-    // arma::cout << "    delta_x: " << delta << arma::endl;
-    // arma::cout << "    x_next: " << x_next << arma::endl;
+    //arma::cout << "    delta_x: " << delta << arma::endl;
+    //arma::cout << "    x_next: " << x_next << arma::endl;
 
     if (arma::abs(x - x_next).max() < x_tol) {
-      // arma::cout << "  X x_0 ~ x_next" << arma::endl;
+      //arma::cout << "  X x_0 ~ x_next" << arma::endl;
       break;
     }
-
+    
     x_previous = x;
     x = x_next;
-
+    
     // TODO : keep best result instead of last one
     ++i;
-    // arma::cout << "  f_best: " << f_best << arma::endl;
+    //arma::cout << "  f_best: " << f_best << arma::endl;
   }
-
+  
   x_0 = x_best;
-  // arma::cout << " " << x_0 << " " << f_best << arma::endl;
+  //arma::cout << " " << x_0 << " " << f_best << arma::endl;
 
   return f_best;
 }
@@ -627,36 +624,28 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
  * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
-LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
+LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                                             const arma::mat& X,
                                             const RegressionModel& regmodel,
                                             bool normalize,
                                             const std::string& optim,
                                             const std::string& objective,
                                             const Parameters& parameters) {
-  std::function<double(
-      const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, OrdinaryKriging::OKModel* okm_data)>
-      fit_ofn;
+
+  std::function<double(const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
-    fit_ofn =
-        [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, OrdinaryKriging::OKModel* okm_data) {
-          double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
-          if (grad_out != nullptr)
-            *grad_out = -*grad_out;
-          if (hess_out != nullptr)
-            *hess_out = -*hess_out;
-          return -ll;
-        };
+    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+      double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
+      if (grad_out!=nullptr) *grad_out = - *grad_out;
+      if (hess_out!=nullptr) *hess_out = - *hess_out;
+      return -ll;};
   } else if (objective.compare("LOO") == 0) {
-    fit_ofn =
-        [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, OrdinaryKriging::OKModel* okm_data) {
-          double loo = this->leaveOneOut(_theta, grad_out, okm_data);
-          if (grad_out != nullptr)
-            *grad_out = -*grad_out;
-          return -loo;
-        };
+    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+      double loo = this->leaveOneOut(_theta, grad_out, okm_data);
+      if (grad_out!=nullptr) *grad_out = - *grad_out;
+      return -loo;};
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
 
@@ -701,7 +690,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      int multistart = 1;            // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
       theta0 = arma::randu(multistart, X.n_cols);
     } else {  // just use given theta(s) as starting values for multi-bfgs
@@ -711,9 +700,9 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
     optim::algo_settings_t algo_settings;
-    algo_settings.iter_max = 10;  // TODO change by default?
+    algo_settings.iter_max = 10;        // TODO change by default?  
     algo_settings.rel_sol_change_tol = 0.1;
-    algo_settings.grad_err_tol = 0.01;
+    algo_settings.grad_err_tol = 0.01;  
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = 0.001 * arma::ones<arma::vec>(X.n_cols);
     algo_settings.upper_bounds = 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols);
@@ -724,7 +713,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+      Kriging::OKModel okm_data{T, M, z, beta};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -736,8 +725,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       // if (bfgs_ok) { // FIXME always succeeds ?
       double minus_ll_tmp
           = fit_ofn(theta_tmp,
-                    nullptr,
-                    nullptr,
+                    nullptr,nullptr,
                     &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
       if (minus_ll_tmp < minus_ll) {
         m_theta = std::move(theta_tmp);
@@ -753,7 +741,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
     arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      int multistart = 1;            // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
       theta0 = arma::randu(multistart, X.n_cols);
     } else {  // just use given theta(s) as starting values for multi-bfgs
@@ -769,14 +757,12 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::mat z;
       arma::colvec beta;
-      OrdinaryKriging::OKModel okm_data{T, M, z, beta};
+      Kriging::OKModel okm_data{T, M, z, beta};
       double minus_ll_tmp = optim_newton(
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
+        [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
             return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
           },
-          theta_tmp,
-          0.001 * arma::ones<arma::vec>(X.n_cols),
-          2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols));
+          theta_tmp, 0.001 * arma::ones<arma::vec>(X.n_cols), 2 * sqrt(X.n_cols) * arma::ones<arma::vec>(X.n_cols));
 
       if (minus_ll_tmp < minus_ll) {
         m_theta = std::move(theta_tmp);
@@ -810,7 +796,7 @@ LIBKRIGING_EXPORT void OrdinaryKriging::fit(const arma::colvec& y,
  * @param cov is true if return also cov matrix between Xp
  * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
  */
-LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKriging::predict(const arma::mat& Xp,
+LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::predict(const arma::mat& Xp,
                                                                                              bool withStd,
                                                                                              bool withCov) {
   arma::uword m = Xp.n_rows;
@@ -903,7 +889,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> OrdinaryKrig
  * @param nsim is number of simulations to draw
  * @return output is m*nsim matrix of simulations at Xp
  */
-LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma::mat& Xp) {
+LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const arma::mat& Xp) {
   // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
   double nugget_sim = 1e-10;
   arma::uword m = Xp.n_rows;
@@ -970,7 +956,7 @@ LIBKRIGING_EXPORT arma::mat OrdinaryKriging::simulate(const int nsim, const arma
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
+LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild data
   m_X = join_rows(m_X, newX);
   m_y = join_rows(m_y, newy);
@@ -993,19 +979,19 @@ LIBKRIGING_EXPORT void OrdinaryKriging::update(const arma::vec& newy, const arma
 
 namespace {  // anonymous namespace for local implementation details
 
-auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
+auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
                            const arma::mat& newX,
                            arma::uword n,
                            arma::uword d) -> arma::mat {
   arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
-    case OrdinaryKriging::RegressionModel::Constant: {
+    case Kriging::RegressionModel::Constant: {
       F.set_size(n, 1);
       F = arma::ones(n, 1);
       return F;
     } break;
 
-    case OrdinaryKriging::RegressionModel::Linear: {
+    case Kriging::RegressionModel::Linear: {
       F.set_size(n, 1 + d);
       F.col(0) = arma::ones(n, 1);
       for (arma::uword i = 0; i < d; i++) {
@@ -1014,7 +1000,7 @@ auto regressionModelMatrix(const OrdinaryKriging::RegressionModel& regmodel,
       return F;
     } break;
 
-    case OrdinaryKriging::RegressionModel::Quadratic: {
+    case Kriging::RegressionModel::Quadratic: {
       F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
       F.col(0) = arma::ones(n, 1);
       arma::uword count = 1;
@@ -1035,7 +1021,7 @@ static char const* enum_RegressionModel_strings[] = {"constant", "linear", "quad
 
 }  // namespace
 
-OrdinaryKriging::RegressionModel OrdinaryKriging::RegressionModelUtils::fromString(const std::string& value) {
+Kriging::RegressionModel Kriging::RegressionModelUtils::fromString(const std::string& value) {
   static auto begin = std::begin(enum_RegressionModel_strings);
   static auto end = std::end(enum_RegressionModel_strings);
 
@@ -1048,7 +1034,7 @@ OrdinaryKriging::RegressionModel OrdinaryKriging::RegressionModelUtils::fromStri
   }
 }
 
-std::string OrdinaryKriging::RegressionModelUtils::toString(const OrdinaryKriging::RegressionModel& e) {
+std::string Kriging::RegressionModelUtils::toString(const Kriging::RegressionModel& e) {
   assert(static_cast<std::size_t>(e) < sizeof(enum_RegressionModel_strings));
   return enum_RegressionModel_strings[static_cast<int>(e)];
 }

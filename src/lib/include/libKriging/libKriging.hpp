@@ -4,6 +4,6 @@
 /** @defgroup Regression Regression */
 #include "LinearRegression.hpp"
 #include "LinearRegressionOptim.hpp"
-#include "OrdinaryKriging.hpp"
+#include "Kriging.hpp"
 
 #endif  // LIBKRIGING_LIBKRIGING_H

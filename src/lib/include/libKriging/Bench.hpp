@@ -3,7 +3,7 @@
 
 #include <armadillo>
 
-#include "libKriging/OrdinaryKriging.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/libKriging_exports.h"
 // #include "covariance.h"
 
@@ -24,9 +24,9 @@ class Bench {
 
   LIBKRIGING_EXPORT arma::mat InvSymPD(const arma::mat& Rsympd);
 
-  LIBKRIGING_EXPORT double LogLik(OrdinaryKriging& ok, const arma::vec& theta);
+  LIBKRIGING_EXPORT double LogLik(Kriging& ok, const arma::vec& theta);
 
-  LIBKRIGING_EXPORT arma::vec LogLikGrad(OrdinaryKriging& ok, const arma::vec& theta);
+  LIBKRIGING_EXPORT arma::vec LogLikGrad(Kriging& ok, const arma::vec& theta);
 };
 
 #endif  // LIBKRIGING_BENCH_HPP
