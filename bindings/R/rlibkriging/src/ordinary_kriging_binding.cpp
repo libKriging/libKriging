@@ -18,21 +18,22 @@ Rcpp::List ordinary_kriging(arma::vec y,
 
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
-    _parameters = parameters;       
+    _parameters = parameters;
   } else {
-    _parameters = Rcpp::List::create(
-                              Rcpp::Named("sigma2")=0,
-                              Rcpp::Named("has_sigma2")=false,
-                              Rcpp::Named("theta")=Rcpp::NumericMatrix(0),
-                              Rcpp::Named("has_theta")=false);
+    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = 0,
+                                     Rcpp::Named("has_sigma2") = false,
+                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(0),
+                                     Rcpp::Named("has_theta") = false);
   }
-                              
+
   ok->fit(std::move(y),
           std::move(X),
           OrdinaryKriging::RegressionModelUtils::fromString(regmodel),
           normalize,
-          optim,objective,
-          OrdinaryKriging::Parameters{_parameters["sigma2"],_parameters["has_sigma2"],_parameters["theta"],_parameters["has_theta"]});
+          optim,
+          objective,
+          OrdinaryKriging::Parameters{
+              _parameters["sigma2"], _parameters["has_sigma2"], _parameters["theta"], _parameters["has_theta"]});
 
   Rcpp::XPtr<OrdinaryKriging> impl_ptr(ok);
 
