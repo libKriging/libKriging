@@ -24,10 +24,10 @@ for (i in 1:length(logn)) {
   )[1]
   gllx <- gllx/N
   
-  r <- ordinary_kriging(y, X,"gauss")
+  r <- kriging(y, X,"gauss")
   times$cpp[i] = system.time(
-    try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
-    # try({for (t in 1:N) ll2x <- ordinary_kriging_loglikelihoodgrad(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
+    # try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
+    try({for (t in 1:N) gll2x <- kriging_logLikelihoodGrad(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (max(abs((gllx-gll2x)/gllx))>1E-3) stop("gradLL is not identical betw C++/R")

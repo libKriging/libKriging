@@ -9,7 +9,7 @@
 /** Ordinary kriging regression
  * @ingroup Regression
  */
-class OrdinaryKriging {
+class Kriging {
  public:
   struct Parameters {
     double sigma2;
@@ -80,11 +80,11 @@ class OrdinaryKriging {
   double logLikelihood(const arma::vec& _theta,
                        arma::vec* grad_out,
                        arma::mat* hess_out,
-                       OrdinaryKriging::OKModel* okm_data) const;
-  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, OrdinaryKriging::OKModel* okm_data) const;
+                       Kriging::OKModel* okm_data) const;
+  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
-  LIBKRIGING_EXPORT OrdinaryKriging(const std::string& covType);
+  LIBKRIGING_EXPORT Kriging(const std::string& covType);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

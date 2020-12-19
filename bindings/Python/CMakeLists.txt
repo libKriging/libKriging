@@ -28,7 +28,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 list(APPEND pylibkriging_SRCS 
         src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
-        src/OrdinaryKriging_binding.cpp src/OrdinaryKriging_binding.hpp
+        src/Kriging_binding.cpp src/Kriging_binding.hpp
     )
 
 pybind11_add_module(pylibkriging ${pylibkriging_SRCS})

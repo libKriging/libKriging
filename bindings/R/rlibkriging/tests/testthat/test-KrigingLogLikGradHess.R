@@ -34,10 +34,10 @@ hll = function(theta,eps=0.001) {
 }
 
 
-r <- ordinary_kriging(y, X, kernel)
-ll_C = function(theta) ordinary_kriging_logLikelihood(r,theta)
-gll_C = function(theta) ordinary_kriging_logLikelihoodGrad(r,theta)
-hll_C = function(theta) ordinary_kriging_logLikelihoodHess(r,theta)
+r <- kriging(y, X, kernel)
+ll_C = function(theta) kriging_logLikelihood(r,theta)
+gll_C = function(theta) kriging_logLikelihoodGrad(r,theta)
+hll_C = function(theta) kriging_logLikelihoodHess(r,theta)
 
 
 x=runif(d)
