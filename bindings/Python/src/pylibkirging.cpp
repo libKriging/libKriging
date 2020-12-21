@@ -7,6 +7,7 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NumPyDemo.hpp"
+#include "random_generator.hpp"
 
 #include <carma/carma.h>
 
@@ -47,6 +48,10 @@ PYBIND11_MODULE(pylibkriging, m) {
 
     m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
   }
+
+  // Basic tools
+  m.def("set_random_seed", &set_random_seed, "Set seed for random generation");
+  m.def("random_uniform", &generate_uniform_random_array, "Generate a random sequence");
 
   m.attr("__version__") = VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
