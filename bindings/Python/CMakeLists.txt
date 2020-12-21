@@ -29,6 +29,7 @@ endif()
 list(APPEND pylibkriging_SRCS 
         src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
         src/Kriging_binding.cpp src/Kriging_binding.hpp
+        src/RandomGenerator.cpp src/RandomGenerator.hpp
     )
 
 pybind11_add_module(pylibkriging ${pylibkriging_SRCS})
