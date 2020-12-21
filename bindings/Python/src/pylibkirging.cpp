@@ -1,15 +1,12 @@
 #include <pybind11/pybind11.h>
 #include <iostream>
 
-#include <libKriging/Kriging.hpp>
 #include <libKriging/LinearRegression.hpp>
 #include "AddDemo.hpp"
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NumPyDemo.hpp"
-#include "random_generator.hpp"
-
-#include <carma/carma.h>
+#include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)
 constexpr bool strings_equal(char const* a, char const* b) {
@@ -49,12 +46,13 @@ PYBIND11_MODULE(pylibkriging, m) {
     m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
   }
 
-  // Basic tools
-  m.def("set_random_seed", &set_random_seed, "Set seed for random generation");
-  m.def("random_uniform", &generate_uniform_random_array, "Generate a random sequence");
-
   m.attr("__version__") = VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
+
+  // Basic tools
+  py::class_<RandomGenerator>(m, "RandomGenerator")
+      .def(py::init<unsigned int>())
+      .def("uniform", &RandomGenerator::uniform);
 
   // Custom manual wrapper (for testing)
   py::class_<PyLinearRegression>(m, "PyLinearRegression")

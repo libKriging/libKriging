@@ -10,8 +10,8 @@ def f(X):
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_f_order(n, m):
-    lk.set_random_seed(123)
-    X = np.asarray(lk.random_uniform(n, m), dtype=np.float64, order='F')
+    g = lk.RandomGenerator(123)
+    X = np.asarray(g.uniform(n, m), dtype=np.float64, order='F')
     y = f(X)
 
     rl = lk.Kriging("gauss")
@@ -23,9 +23,9 @@ def test_kriging_f_order(n, m):
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_c_order(n, m):
-    lk.set_random_seed(123)
-    # X = np.asarray(lk.random_uniform(n, m), dtype=np.float64, order='C')
-    X = lk.random_uniform(n, m)  # this is the default
+    g = lk.RandomGenerator(123)
+    # X = np.asarray(g.uniform(n, m), dtype=np.float64, order='C')
+    X = g.uniform(n, m)  # this is the default
     y = f(X)
 
     rl = lk.Kriging("gauss")

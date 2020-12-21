@@ -6,9 +6,9 @@ import pytest
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_exact(n, m):
-    lk.set_random_seed(123)
-    sol = np.asarray(lk.random_uniform(m, 1), dtype=np.float64, order='F')
-    X = np.asarray(lk.random_uniform(n, m), dtype=np.float64, order='F')
+    g = lk.RandomGenerator(123)
+    sol = np.asarray(g.uniform(m, 1), dtype=np.float64, order='F')
+    X = np.asarray(g.uniform(n, m), dtype=np.float64, order='F')
     X[:, 0] = 1
     y = X.dot(sol)  # or X @ sol
 
@@ -24,9 +24,9 @@ def test_linear_regression_exact(n, m):
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_noisy(n, m):
-    lk.set_random_seed(123)
-    sol = np.asarray(lk.random_uniform(m, 1), dtype=np.float64, order='F')
-    X = np.asarray(lk.random_uniform(n, m), dtype=np.float64, order='F')
+    g = lk.RandomGenerator(123)
+    sol = np.asarray(g.uniform(m, 1), dtype=np.float64, order='F')
+    X = np.asarray(g.uniform(n, m), dtype=np.float64, order='F')
     X[:, 0] = 1
     y = X.dot(sol)  # or X @ sol
 

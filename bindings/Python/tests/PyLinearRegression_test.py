@@ -7,9 +7,9 @@ def test_basic():
     n = 40
     m = 3
 
-    lk.set_random_seed(123)
-    sol = np.asarray(lk.random_uniform(m, 1), dtype=np.float64, order='F')
-    X = np.asarray(lk.random_uniform(n, m), dtype=np.float64, order='F')
+    g = lk.RandomGenerator(123)
+    sol = np.asarray(g.uniform(m, 1), dtype=np.float64, order='F')
+    X = np.asarray(g.uniform(n, m), dtype=np.float64, order='F')
     X[:, 0] = 1
     y = X.dot(sol)  # or X @ sol
 
