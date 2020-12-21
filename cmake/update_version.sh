@@ -34,3 +34,10 @@ sed -i.bak -e "s/m.__version__ == .*$/m.__version__ == '${KRIGING_VERSION_MAJOR}
 sed -i.bak -e "s/pkgs=\"rlibkriging_.*\.tgz\"/pkgs=\"rlibkriging_${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}-${KRIGING_VERSION_PATCH}.tgz\"/" \
   ../bindings/R/rlibkriging/tests/testthat/test-LinearRegression.R
 
+git commit -m "build: update version to ${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}" \
+  ./version.cmake \
+  ../bindings/R/rlibkriging/DESCRIPTION \
+  ../bindings/Python/tests/loading_test.py \
+  ../bindings/R/rlibkriging/tests/testthat/test-LinearRegression.R
+  
+git tag "v${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}"
