@@ -3,13 +3,13 @@ registerDoSEQ()
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 
-logn <- seq(1.1, 2, by=.1)
+logn <- seq(1.1, 3, by=.1)
 times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
 N = 10
 
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
-  d <- 4 #1+floor(log(n)) #floor(2+i/3)
+  d <- 1+floor(log(n)) #floor(2+i/3)
   
   print(n)
   set.seed(123)
@@ -24,7 +24,7 @@ for (i in 1:length(logn)) {
   
   r <- NULL
   times$cpp[i] = system.time(
-    try(for (j in 1:N) r <- kriging(y, X,"gauss","constant",FALSE,"Newton","LL",
+    try(for (j in 1:N) r <- kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
                       # to let start optim at same initial point
                       parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE)))
   )[1]

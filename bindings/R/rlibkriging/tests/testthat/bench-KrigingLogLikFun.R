@@ -2,9 +2,9 @@ library(testthat)
 
 f <- function(X) apply(X, 1, function(x) sum(x^2))
 
-logn <- seq(1, 2.5, by=.1)
+logn <- seq(1, 3, by=.1)
 times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
-N <- 1000
+N <- 100
 
 theta <- 0.5
 
@@ -30,7 +30,7 @@ for (i in 1:length(logn)) {
     try({for (t in 1:N) ll2x <- kriging_logLikelihood(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
 
-  if (abs((llx-ll2x)/llx)>1E-3) stop("LL is not identical betw C++/R")
+  if (abs((llx-ll2x)/llx)>1E-3) stop("LL is not identical bw C++/R")
 }
 
 plot(main = "1000 logLik",floor(10^logn),log(times$R),col='black',ylim=c(log(min(min(times$R),min(times$cpp))),log(max(max(times$R),max(times$cpp)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())

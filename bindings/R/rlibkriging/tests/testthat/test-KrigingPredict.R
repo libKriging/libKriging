@@ -1,21 +1,17 @@
 library(testthat)
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
-plot(f)
+#plot(f)
 n <- 5
 set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
-points(X,y)
+#points(X,y)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
-
-r <- kriging(y,X,"gauss","constant",FALSE,"Newton","LL")
-
-m = kriging_model(r)
-
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",coef.cov=m$theta,coef.var = m$sigma2)
-
-r <- kriging(y,X,"gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,theta=k@covariance@range.val,has_theta=TRUE))
+r <- kriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
+             theta=matrix(k@covariance@range.val),has_theta=TRUE))
+# m = kriging_model(r)
 
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
@@ -26,11 +22,11 @@ cktest <- c(ptest$cov)
 Ytest <- kriging_predict(r,Xtest,TRUE,TRUE)
 
 precision <- 1e-5
-test_that(desc=paste0("pred mean is the same that DiceKriging one: ",paste0(collapse=",",Yktest)," ",paste0(collapse=",",Ytest$mean)),
-          expect_true(max(abs(Yktest-Ytest$mean)) < precision))
+test_that(desc=paste0("pred mean is the same that DiceKriging one:\n ",paste0(collapse=",",Yktest),"\n ",paste0(collapse=",",Ytest$mean)),
+          expect_equal(array(Yktest),array(Ytest$mean),tol = precision))
 
 test_that(desc="pred sd is the same that DiceKriging one", 
-          expect_true(max(abs(sktest-Ytest$stdev)) < precision))
+          expect_equal(array(sktest),array(Ytest$stdev) ,tol = precision))
 
 test_that(desc="pred cov is the same that DiceKriging one", 
-          expect_true(max(abs(cktest-c(Ytest$cov))) < precision))
+          expect_equal(cktest,c(Ytest$cov) ,tol = precision))

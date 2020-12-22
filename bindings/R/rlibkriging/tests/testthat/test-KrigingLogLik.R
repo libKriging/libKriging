@@ -1,6 +1,6 @@
 library(testthat)
 
-for (kernel in c("gauss")){ #"exp")) {
+for (kernel in c("gauss","exp")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
@@ -34,9 +34,10 @@ precision <- 1e-8  # the following tests should work with it, since the computat
 x=.5
 xenv=new.env()
 test_that(desc="logLik is the same that DiceKriging one", 
-         expect_true(relative_error(kriging_logLikelihood(r,x),DiceKriging::logLikFun(x,k,xenv)) < precision))
+         expect_equal(kriging_logLikelihood(r,x),DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
 
 test_that(desc="logLik Grad is the same that DiceKriging one", 
-         expect_true(relative_error(kriging_logLikelihoodGrad(r,x),DiceKriging::logLikGrad(x,k,xenv)) < precision))
+          expect_equal(kriging_logLikelihoodGrad(r,x),DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
 }
          
+

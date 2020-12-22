@@ -1,6 +1,6 @@
-logn = seq(1,2.5,by=.1)
+logn = seq(1,3,by=.1)
 times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
-N = 10000
+N = 1000
 
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])

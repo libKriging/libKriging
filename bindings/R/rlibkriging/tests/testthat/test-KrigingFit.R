@@ -2,7 +2,7 @@ library(testthat)
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 n <- 5
-set.seed(123)
+set.seed(1234)
 X <- as.matrix(runif(n))
 y = f(X)
 k = NULL
@@ -10,28 +10,52 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss")
 r <- kriging(y, X, "gauss")
 
+ll = Vectorize(function(x) kriging_logLikelihood(r,x))
+# plot(ll,xlim=c(0.001,1))
+theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
+abline(v=theta_ref,col='black')
+abline(v=kriging_model(r)$theta,col='red')
+abline(v=k@covariance@range.val,col='blue')
+
 precision <- 1e-3
-test_that(desc="fit of theta is the same that DiceKriging one", 
-          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))
+test_that(desc="fit of theta by DiceKriging is right", 
+          expect_equal(theta_ref, k@covariance@range.val, tol= precision))
+
+test_that(desc="fit of theta by libKriging is right", 
+          expect_equal(array(theta_ref), array(kriging_model(r)$theta), tol= precision))
          
 #############################################################
 
 f = function(X) apply(X,1,DiceKriging::branin)
 n <- 15
-set.seed(123)
+set.seed(1234)
 X <- cbind(runif(n),runif(n))
 y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- kriging(y, X, "gauss","constant",FALSE,"Newton","LL")
+r <- kriging(y, X, "gauss")
 
-kriging_model(r)$theta
-k@covariance@range.val
+ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
+                  #print(X);
+                  apply(X,1,
+                    function(x) {#print(matrix(unlist(x),ncol=2));
+                      y=-kriging_logLikelihood(r,matrix(unlist(x),ncol=2))
+                      #print(y);
+                      y})}
+#DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
+x=seq(0.01,2,,51)
+contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
 
-precision <- 1e-3
-test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))
+theta_ref = optim(par=matrix(c(.2,.5),ncol=2),ll,lower=c(0.01,0.01),upper=c(2,2),method="L-BFGS-B")$par
+points(theta_ref,col='black')
+points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
+points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
+
+
+precision <- 1e-1
+test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
+          expect_equal(ll(array(kriging_model(r)$theta)), ll(k@covariance@range.val), tol=precision))
 
 #############################################################
 
@@ -58,11 +82,14 @@ mll_fun <- function(x) -apply(x,1,
 )
 contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
  
-r <- kriging(y, X, "gauss","constant",FALSE,"Newton","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
+# use same startup point for convergence
+r <- kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
 
-kriging_model(r)$theta
-k@covariance@range.val
+points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
+points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-precision <- 1e-3
+precision <- 5e-2
 test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_true(abs(kriging_model(r)$theta - k@covariance@range.val) < precision))
+          expect_equal(array(kriging_model(r)$theta),array(k@covariance@range.val),tol= precision))
+
+
