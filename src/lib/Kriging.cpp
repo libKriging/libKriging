@@ -726,8 +726,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_regmodel = regmodel;
   m_F = regressionModelMatrix(regmodel, m_X, n, d);
 
-  if (optim == "none") {  // just keep given theta, no optimisation of ll
-    m_theta = parameters.theta.row(0);
+  arma::mat theta0 = parameters.theta;
+  if (parameters.theta.n_cols != m_X.n_cols && parameters.theta.n_rows == m_X.n_cols)
+    theta0 = parameters.theta.t();
+  if (theta0.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of theta should be nx" + std::to_string(m_X.n_cols) + " instead of " + std::to_string(theta0.n_rows)+"x"+std::to_string(theta0.n_cols));
+
+  if (optim == "none") {  // just keep given theta, no optimisation of ll  
+    m_theta = trans(theta0.row(0));
     arma::mat T;
     arma::mat M;
     arma::mat z;
@@ -739,7 +745,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
   } else if (optim.rfind("BFGS", 0) == 0) {
-    arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
@@ -791,7 +796,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       // }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
-    arma::mat theta0;
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
