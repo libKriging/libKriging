@@ -481,7 +481,6 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
     }
   }
   R = arma::symmatl(R);  // (R + trans(R))/2;
-  arma::cout << "R:" << R << arma::endl;
 
   // Cholesky decompostion of covariance matrix
   fd->T = trans(chol(R));
@@ -521,7 +520,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
       }
       gradR_k_upper /= _theta(k);
       // t0 = toc(" gradR_k_upper", t0);
-      
+
       arma::mat gradR_k = symmatu(gradR_k_upper);
       arma::colvec diagdQ = -DiagABA(Q, gradR_k);
       arma::colvec dsigma2LOO = -sigma2LOO % sigma2LOO % diagdQ;
