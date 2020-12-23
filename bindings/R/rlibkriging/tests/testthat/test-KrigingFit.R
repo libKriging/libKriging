@@ -45,7 +45,7 @@ ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                       y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
 x=seq(0.01,2,,51)
-contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
+contour(x,x,matrix(ll(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
 
 theta_ref = optim(par=matrix(c(.2,.5),ncol=2),ll,lower=c(0.01,0.01),upper=c(2,2),method="L-BFGS-B")$par
 points(theta_ref,col='black')
