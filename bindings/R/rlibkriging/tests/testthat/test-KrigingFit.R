@@ -11,7 +11,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss")
 r <- kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) kriging_logLikelihood(r,x))
-# plot(ll,xlim=c(0.001,1))
+plot(ll,xlim=c(0.001,1))
 theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=kriging_model(r)$theta,col='red')
