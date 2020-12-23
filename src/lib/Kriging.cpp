@@ -263,7 +263,6 @@ double Kriging::logLikelihood(const arma::vec& _theta,
       gradR_k_upper /= _theta(k);
       // t0 = toc(" gradR_k_upper", t0);
       arma::mat gradR_k = symmatu(gradR_k_upper);
-      // gradR_k.diag().zeros();
       // t0 = toc(" gradR_k      ", t0);
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
@@ -466,33 +465,31 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const {
   Kriging::OKModel* fd = okm_data;
 
+  // auto t0 = tic();
   arma::mat Xtnorm = trans(m_X);
   Xtnorm.each_col() /= _theta;
+  // t0 = toc("Xtnorm        ", t0);
 
   arma::uword n = m_X.n_rows;
 
   // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
   // Should be replaced by for_each
-  arma::mat R(n, n);
-  R.zeros();
+  arma::mat R = arma::ones(n, n);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      R(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
     }
   }
-  R = arma::symmatl(R);  // R + trans(R);
-  R.diag().ones();
-  // arma::cout << "R:" << R << arma::endl;
+  R = arma::symmatl(R);  // (R + trans(R))/2;
+  arma::cout << "R:" << R << arma::endl;
 
   // Cholesky decompostion of covariance matrix
   fd->T = trans(chol(R));
-
   // Compute intermediate useful matrices
   // arma::mat M = solve(fd->T, F);
   fd->M = solve(trimatl(fd->T), m_F, arma::solve_opts::fast);
   // arma::mat Rinv = inv_sympd(R); // didn't find chol2inv equivalent in armadillo
-  arma::mat Rinv = inv(trimatl(fd->T));
-  Rinv = trimatl(Rinv) * trimatl(Rinv);
+  arma::mat Rinv = inv_sympd(R);
   arma::mat RinvF = Rinv * m_F;
   arma::mat TM = chol(trans(fd->M) * fd->M);  // Can be optimized with a crossprod equivalent in armadillo ?
   // arma::mat aux = solve(trans(TM), trans(RinvF));
@@ -500,7 +497,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat Q = Rinv - trans(aux) * aux;  // Can be optimized with a crossprod equivalent in armadillo ?
   arma::mat Qy = Q * m_y;
   arma::colvec sigma2LOO = 1 / Q.diag();
-  arma::colvec errorsLOO = sigma2LOO % Qy;
+  arma::colvec errorsLOO = sigma2LOO % Qy;  
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
 
   if (grad_out != nullptr) {
@@ -515,16 +512,17 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
     //}
 
     for (arma::uword k = 0; k < m_X.n_cols; k++) {
-      arma::mat gradR_k = arma::zeros(n, n);
+      arma::mat gradR_k_upper = R;
       for (arma::uword i = 0; i < n; i++) {
+        gradR_k_upper.at(i, i) = 0;
         for (arma::uword j = 0; j < i; j++) {
-          gradR_k.at(j, i) = R.at(i, j) * Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
+          gradR_k_upper.at(j, i) *= Dln_CovNorm(Xtnorm.col(i), Xtnorm.col(j), k);
         }
       }
-      gradR_k /= _theta(k);
-      gradR_k = arma::symmatl(gradR_k);  // gradR_k + trans(gradR_k);
-      gradR_k.diag().zeros();
-
+      gradR_k_upper /= _theta(k);
+      // t0 = toc(" gradR_k_upper", t0);
+      
+      arma::mat gradR_k = symmatu(gradR_k_upper);
       arma::colvec diagdQ = -DiagABA(Q, gradR_k);
       arma::colvec dsigma2LOO = -sigma2LOO % sigma2LOO % diagdQ;
       arma::colvec derrorsLOO = dsigma2LOO % Qy - sigma2LOO % (Q * (gradR_k * Qy));
@@ -727,12 +725,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_F = regressionModelMatrix(regmodel, m_X, n, d);
 
   arma::mat theta0 = parameters.theta;
-  if (parameters.theta.n_cols != m_X.n_cols && parameters.theta.n_rows == m_X.n_cols)
-    theta0 = parameters.theta.t();
-  if (theta0.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of theta should be nx" + std::to_string(m_X.n_cols) + " instead of " + std::to_string(theta0.n_rows)+"x"+std::to_string(theta0.n_cols));
+  if (parameters.has_theta) {
+    if (parameters.theta.n_cols != m_X.n_cols && parameters.theta.n_rows == m_X.n_cols)
+      theta0 = parameters.theta.t();
+    if (theta0.n_cols != m_X.n_cols)
+      throw std::runtime_error("Dimension of theta should be nx" + std::to_string(m_X.n_cols) + " instead of " + std::to_string(theta0.n_rows)+"x"+std::to_string(theta0.n_cols));
+  }
 
   if (optim == "none") {  // just keep given theta, no optimisation of ll  
+    if (!parameters.has_theta) throw std::runtime_error("Theta should be given (1x" + std::to_string(m_X.n_cols) + ") matrix, when optim=none");
     m_theta = trans(theta0.row(0));
     arma::mat T;
     arma::mat M;
