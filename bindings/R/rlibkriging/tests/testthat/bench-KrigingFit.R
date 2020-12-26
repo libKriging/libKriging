@@ -1,34 +1,28 @@
-library(foreach)
-registerDoSEQ()
+library(testthat)
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
+n <- 500
+set.seed(123)
+X <- DiceDesign::lhsDesign(n,dimension=6)$design #cbind(runif(n),runif(n))
+y <- f(X)
+d = ncol(X)
 
-logn <- seq(1.1, 2, by=.1)
-times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
-N = 10
+N = 1
+times <- list(R=rep(NA, N), cpp=rep(NA, N))
 
-for (i in 1:length(logn)) {
-  n <- floor(10^logn[i])
-  d <- 4 #1+floor(log(n)) #floor(2+i/3)
-  
-  print(n)
-  set.seed(123)
-  X <- DiceDesign::lhsDesign(n,dimension=d)$design #matrix(runif(n*d),ncol=d)
-  y <- f(X)
-  
-  k <- NULL
-  times$R[i] = system.time(
-    try(for (j in 1:N) k <- DiceKriging::km(design=X,response=y,covtype = "gauss", multistart = 1,control = list(trace=F,maxit=10), 
-                                                  lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
-  )[1]
-  
-  r <- NULL
-  times$cpp[i] = system.time(
-    try(for (j in 1:N) r <- kriging(y, X,"gauss","constant",FALSE,"Newton","LL",
-                      # to let start optim at same initial point
-                      parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE)))
-  )[1]
-  
+for (i in 1:N) {
+    set.seed(i)
+    times$R[i]   = system.time(
+                        k <- DiceKriging::km(design=X,response=y,covtype = "gauss",
+                         multistart = 1,control = list(trace=T,maxit=10)) #,lower=rep(0.001,d),upper=rep(2*sqrt(d),d))
+                    )
+    times$cpp[i] = system.time(
+                        r <- kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
+                            # to let start optim at same initial point
+                            parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE))
+                    )
+
+
   ll_cpp <- kriging_logLikelihood(r, kriging_model(r)$theta)
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
@@ -46,7 +40,9 @@ for (i in 1:length(logn)) {
     warning("DiceKriging LL ",ll_R," << libKriging LL ",ll_cpp)
 }
 
-plot(floor(10^logn),log(times$R),ylim=c(log(min(min(times$R,na.rm = T),min(times$cpp,na.rm = T))),log(max(max(times$R,na.rm = T),max(times$cpp,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
-text(20,-1,"DiceKriging")
-points(floor(10^logn),log(times$cpp),col='red')
-text(80,-1,"libKriging",col = 'red')
+plot(times$R,times$cpp)
+abline(a=0,b=1,col='red')
+abline(a=0,b=2,col='red')
+abline(a=0,b=0.5,col='red')
+
+

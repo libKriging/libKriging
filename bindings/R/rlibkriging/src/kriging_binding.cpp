@@ -18,14 +18,29 @@ Rcpp::List kriging(arma::vec y,
 
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
-    _parameters = parameters;
+    Rcpp::List params(parameters);
+    _parameters = Rcpp::List::create();
+    if (params.containsElementNamed("sigma2")) {
+      _parameters.push_back(params["sigma2"], "sigma2");
+      _parameters.push_back(true,"has_sigma2");
+    } else {
+      _parameters.push_back(-1, "sigma2");
+      _parameters.push_back(false,"has_sigma2");
+    }
+    if (params.containsElementNamed("theta")) {
+      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
+      _parameters.push_back(true,"has_theta");
+    } else { 
+      _parameters.push_back(Rcpp::NumericMatrix(0), "theta");
+      _parameters.push_back(false,"has_theta");
+    }
   } else {
-    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = 0,
+    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = -1,
                                      Rcpp::Named("has_sigma2") = false,
                                      Rcpp::Named("theta") = Rcpp::NumericMatrix(0),
-                                     Rcpp::Named("has_theta") = false);
+                                     Rcpp::Named("has_theta") = false);        
   }
-
+  
   ok->fit(std::move(y),
           std::move(X),
           Kriging::RegressionModelUtils::fromString(regmodel),

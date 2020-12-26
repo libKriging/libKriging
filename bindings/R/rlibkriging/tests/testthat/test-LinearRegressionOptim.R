@@ -13,4 +13,4 @@ lines(x,px$y+2*px$stderr,col='red')
 
 precision <- 1e-1  # the following tests should work with it, since the computations are analytical
 test_that(desc="Predict linear reg. is exact on the design points", 
-          expect_true(relative_error(predict.LinearRegression(r,X)$y,y) < precision))
+          expect_equal(predict.LinearRegression(r,X)$y,y,tol= precision))
