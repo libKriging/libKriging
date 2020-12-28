@@ -22,7 +22,7 @@ fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
-$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge openblas liblapack
+$HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge openblas liblapack
 
 . ${BASEDIR}/loadenv.sh
 
@@ -32,21 +32,21 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   ## Using Chocolatey (by default only includes Python2)
   # should be installed using choco in main .travis.yml
   
-  # ** Install PIP ** 
-  
-  ## Using miniconda3
-  # https://anaconda.org/search?q=pip
-  #$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge pip openssl
-  # error like: https://stackoverflow.com/questions/45954528/pip-is-configured-with-locations-that-require-tls-ssl-however-the-ssl-module-in
-  # python -m pip install --progress-bar off pytest numpy scipy --upgrade
-  
-  ## Using Chocolatey
-  #choco install --no-progress -y pip
-  #python3 -m pip install --progress-bar off pip --upgrade
-  
-  ## By 'hand'
-  curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py # curl already available with Chocolatey
-  python3 get-pip.py
+  # ** Install PIP if not yet available **   
+  if ( ! python3 -m pip --version 2>/dev/null ); then
+    ## Using miniconda3
+    # https://anaconda.org/search?q=pip
+    #$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge pip openssl
+    # error like: https://stackoverflow.com/questions/45954528/pip-is-configured-with-locations-that-require-tls-ssl-however-the-ssl-module-in
+
+    ## Using Chocolatey
+    #choco install --no-progress -y pip
+    #python3 -m pip install --progress-bar off pip --upgrade
+
+    ## By 'hand'
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py # curl already available with Chocolatey
+    python3 get-pip.py
+  fi
   
   # ** Install required Python libs ** 
   python3 -m pip install --progress-bar off pip --upgrade

@@ -1,0 +1,14 @@
+name: libKriging trigger workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          event-type: make-release
+          #client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
