@@ -382,18 +382,13 @@ jobs:
         #if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -eo pipefail
-          set -x
 
           cat <<EOF > RELEASE_NOTE.md
           Release $GIT_TAG
 
-          This is a release note
-          * this many features
-          * and \`system\`
-
-          Nota:
-          * GITHUB_REF=${GITHUB_REF}
-          EOF
+          This is an automated release note.
+          
+          Customize me once published.
 
           # using https://github.com/github/hub
           if [ -z "${{ github.event.release.tag_name }}" ]; then
