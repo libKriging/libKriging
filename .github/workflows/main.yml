@@ -3,6 +3,8 @@ name: libKriging push workflow
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
 on:
   push:
+    branches:
+      - '*'
     tags-ignore:
       - 'v*' # done in release
 
