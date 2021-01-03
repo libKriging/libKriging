@@ -6,7 +6,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 fi
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
-    gem install coveralls-lcov
+    sudo gem install coveralls-lcov
 fi
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
@@ -17,6 +17,7 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   fi
   
   if [[ "$ENABLE_MEMCHECK" == "on" ]]; then 
+    python3 -m pip install wheel # required ton compile pytest-valgrind
     python3 -m pip install pytest-valgrind
   fi
 fi
@@ -34,12 +35,14 @@ if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
      ;;
 
    Linux)
-     sudo apt-get install -y software-properties-common
-     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 291F9FF6FD385783
-     sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
-     sudo apt-get install -y cmake # requires cmake ≥3.13 for target_link_options
-     test -d /usr/local/cmake-3.12.4 && sudo mv /usr/local/cmake-3.12.4 /usr/local/cmake-3.12.4.old # Overrides Travis installation
-     # octave 4 is installed using travis
+     if [ "${TRAVIS}" == "true" ]; then
+       sudo apt-get install -y software-properties-common
+       sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 291F9FF6FD385783
+       sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+       sudo apt-get install -y cmake # requires cmake ≥3.13 for target_link_options
+       test -d /usr/local/cmake-3.12.4 && sudo mv /usr/local/cmake-3.12.4 /usr/local/cmake-3.12.4.old # Overrides Travis installation
+       # octave 4 is installed using packager
+     fi
      ;;
 
    *)

@@ -12,7 +12,7 @@ BASEDIR=$(readlink -f "${BASEDIR}")
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make
-choco install -y make --version 4.3
+choco install -y --no-progress make --version 4.3
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   choco install -y --no-progress octave.portable

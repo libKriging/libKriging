@@ -7,6 +7,10 @@ else
 	LIB_SUFFIX=a
 endif
 
+# using CXX_STD should be better but, while using `R CMD INSTALL`, we get an error like
+#     make[1]: *** No rule to make target '$(CXX11STD)''.  Stop.
+# CXX_STD = CXX11
+
 PKG_CFLAGS=
 PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 PKG_CXXFLAGS=-std=c++11

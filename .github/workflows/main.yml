@@ -1,0 +1,224 @@
+name: libKriging main workflow
+
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
+on:
+  push:
+    tags-ignore:
+      - 'v*' # done in release
+
+# About image content:
+# https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images/linux/Ubuntu1804-README.md
+
+# Global GHA doc:
+# https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions
+
+# To define local environment variable inside build steps
+# https://github.community/t/support-saving-environment-variables-between-steps/16230
+
+# Support for YAML anchors:
+# https://github.community/t/support-for-yaml-anchors/16128
+
+
+# Default working directory is equivalent to
+#   working-directory: ${{github.workspace}}
+# always set shell (could be powershell in windows environment)
+#   shell: bash
+
+
+env:
+  DEBUG_CI: true
+
+jobs:
+  guideline-checks:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false # submodules not required here
+          fetch-depth: 2 # git rev-parse HEAD^ will fail without this
+
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v3.x
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: check
+        shell: bash
+        run: .travis-ci/checks/test.sh
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Linux Debug"
+            os: ubuntu-18.04
+            mode: Debug
+            enable_python: on
+          - name: "macOS Debug"
+            os: macOS-10.15
+            mode: Debug
+            enable_python: on
+          - name: "Windows Debug"
+            os: windows-2019
+            mode: Debug
+            enable_python: on
+          - name: "Coverage mode"
+            os: ubuntu-18.04
+            mode: Debug
+            enable_python: on
+            enable_octave: on
+            enable_coverage: on
+            force_update: on
+            # /!\ need after_success
+          - name: "Memcheck mode"
+            os: ubuntu-18.04
+            mode: Debug
+            enable_python: on
+            enable_octave: on
+            enable_memcheck: on
+            force_update: on
+          - name: "Octave Linux"
+            os: ubuntu-18.04
+            mode: Release
+            enable_python: on
+            enable_octave: on
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-10.15
+            mode: Release
+            enable_python: off
+            enable_octave: on
+          - name: "Octave Windows"
+            os: windows-2019
+            mode: Release
+            # using python and octave in windows leads to the following error:
+            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+            #   491 | # define snprintf _snprintf
+            enable_python: off
+            enable_octave: on
+          - name: "R Linux"
+            os: ubuntu-18.04
+            mode: Release
+            enable_R: on
+          - name: "R macOS"
+            os: macOS-10.15
+            mode: Release
+            enable_R: on
+          - name: "R Windows"
+            os: windows-2019
+            mode: Release
+            enable_R: on
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=${{matrix.mode}}"                           >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=${{matrix.enable_python}}" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=${{matrix.enable_octave}}" >> $GITHUB_ENV
+          echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
+          echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
+          echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=r-linux-macos"  >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+          fi
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=octave-windows" >> $GITHUB_ENV
+          elif [ "${ENABLE_R_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=r-windows"      >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=windows"        >> $GITHUB_ENV
+          fi
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install liblapack-dev python3-pip
+          if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
+            sudo apt install -qy octave octave-pkg-dev
+          fi
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            sudo apt install -qy r-base liblapack-dev gfortran
+          fi
+          if [ "${ENABLE_COVERAGE}" == "on" ]; then
+            sudo apt install -qy lcov
+          fi
+          if [ "${ENABLE_MEMCHECK}" == "on" ]; then
+            sudo apt install -qy valgrind python3-setuptools
+          fi
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: pre-install-macos
+        shell: bash
+        run: |
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            brew install coreutils # for readlink -f : FIXME usefull ?
+          fi
+        if: runner.os == 'macOS'
+
+      - name: pre-install-windows
+        shell: bash
+        run: |
+          # add alternative name python3 (default is python)
+          PYTHON_CMD_PATH=$(which python)
+          PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
+          PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
+          ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
+
+          # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
+          # Rscript -e 'print(R.home(component="etc"))'
+          # Rscript -e 'Sys.getenv("R_HOME")'
+          # Rscript -e 'Sys.getenv("R_ARCH")'
+          mkdir -p ~/.R
+          echo "# Custom configuration" > ~/.R/Makevars
+          echo "BINPREF=C:/rtools40/mingw64/bin/" >> ~/.R/Makevars
+          echo 'SHLIB_CXXLD=$(BINPREF)g++' >> ~/.R/Makevars
+          # R CMD config SHLIB_CXXLD # updated config
+        if: runner.os == 'Windows'
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: publish_report
+        shell: bash
+        run: |
+          cd build
+          lcov --list coverage.info
+          coveralls-lcov coverage.info
+        if: matrix.enable_coverage == 'on'

@@ -12,21 +12,38 @@ BASEDIR=$(readlink -f "${BASEDIR}")
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make
-choco install -y make --version 4.3
+choco install -y --no-progress make --version 4.3
 
-# Using chocolatey and manual command
-# https://chocolatey.org/packages/R.Project
-choco install -y r.project --version 3.6.0
-if [ ! -f "C:/Rtools/VERSION.txt" ]; then
-    # https://cran.r-project.org/bin/windows/Rtools
-    curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
-    "${BASEDIR}"/install_rtools.bat
+if [ "${TRAVIS}" == "true" ]; then
+  # Using chocolatey and manual command
+  # https://chocolatey.org/packages/R.Project
+  choco install -y --no-progress r.project --version 3.6.0
+  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
+      # https://cran.r-project.org/bin/windows/Rtools
+      curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
+      "${BASEDIR}"/install_rtools.bat
+  else
+    echo "Rtools installation detected: nothing to do"
+  fi
+elif [ "${GITHUB_ACTIONS}" == "true" ]; then
+  # déjà installé
+#  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
+#      # https://cran.r-project.org/bin/windows/Rtools
+#      curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe
+#      "${BASEDIR}"/install_rtools.bat
+#  else
+#    echo "Rtools installation detected: nothing to do"
+#  fi
+  : # do nothing
 else
-	echo "Rtools installation detected: nothing to do"
+  echo "Unknown CI environment"
+  exit 1
 fi
 
+
+
 # For R packaging
-choco install -y zip
+choco install -y --no-progress zip
 
 . ${BASEDIR}/loadenv.sh
 
@@ -42,3 +59,4 @@ choco install -y zip
 # /usr/bin/sh: line 8: g++ : command not found
 #       with a space here ^
 ln -sf "$(command -v g++).exe" "$(command -v g++) .exe"
+# should be replaced using ~/.R/Makevars config
