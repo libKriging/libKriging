@@ -9,7 +9,7 @@ on:
       - 'v*' # done in release
 
 # About image content:
-# https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images/linux/Ubuntu1804-README.md
+# https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images
 
 # Global GHA doc:
 # https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions
