@@ -15,7 +15,7 @@ Rcpp::List kriging(arma::vec y,
                    std::string objective = "LL",
                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   Kriging* ok = new Kriging(kernel);
-
+  
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
     Rcpp::List params(parameters);
@@ -48,10 +48,10 @@ Rcpp::List kriging(arma::vec y,
           optim,
           objective,
           Kriging::Parameters{
-              _parameters["sigma2"], _parameters["has_sigma2"], _parameters["theta"], _parameters["has_theta"]});
-
+            _parameters["sigma2"], _parameters["has_sigma2"], _parameters["theta"], _parameters["has_theta"]});
+  
   Rcpp::XPtr<Kriging> impl_ptr(ok);
-
+  
   Rcpp::List obj;
   obj.attr("object") = impl_ptr;
   obj.attr("class") = "Kriging";
@@ -59,14 +59,17 @@ Rcpp::List kriging(arma::vec y,
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_model(Rcpp::List ordinaryKriging) {
-  if (!ordinaryKriging.inherits("Kriging"))
+Rcpp::List kriging_model(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
-  return Rcpp::List::create(Rcpp::Named("theta") = impl_ptr->theta(),
+  
+  return Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
+                            Rcpp::Named("optim") = impl_ptr->optim(),
+                            Rcpp::Named("objective") = impl_ptr->objective(),
+                            Rcpp::Named("theta") = impl_ptr->theta(),
                             Rcpp::Named("sigma2") = impl_ptr->sigma2(),
                             Rcpp::Named("X") = impl_ptr->X(),
                             Rcpp::Named("centerX") = impl_ptr->centerX(),
@@ -83,94 +86,147 @@ Rcpp::List kriging_model(Rcpp::List ordinaryKriging) {
 }
 
 // [[Rcpp::export]]
-double kriging_logLikelihood(Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("Kriging"))
+double kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->logLikelihoodFun(theta);
 }
 
 // [[Rcpp::export]]
-double kriging_leaveOneOut(Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("Kriging"))
+double kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->leaveOneOutFun(theta);
 }
 
 // [[Rcpp::export]]
-arma::vec kriging_leaveOneOutGrad(Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("Kriging"))
+arma::vec kriging_leaveOneOutGrad(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->leaveOneOutGrad(theta);
 }
 
 // [[Rcpp::export]]
-arma::vec kriging_logLikelihoodGrad(Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("Kriging"))
+arma::vec kriging_logLikelihoodGrad(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->logLikelihoodGrad(theta);
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_logLikelihoodHess(Rcpp::List ordinaryKriging, arma::vec theta) {
-  if (!ordinaryKriging.inherits("Kriging"))
+arma::mat kriging_logLikelihoodHess(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->logLikelihoodHess(theta);
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predict(Rcpp::List ordinaryKriging, arma::mat X, bool stdev, bool cov) {
-  if (!ordinaryKriging.inherits("Kriging"))
+Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev=true, bool cov=false) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
+  auto pred = impl_ptr->predict(X, stdev, cov);
   if (stdev & cov) {
-    auto pred = impl_ptr->predict(X, true, true);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred),
                               Rcpp::Named("stdev") = std::get<1>(pred),
                               Rcpp::Named("cov") = std::get<2>(pred));
   } else if (stdev & !cov) {
-    auto pred = impl_ptr->predict(X, true, false);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred), Rcpp::Named("stdev") = std::get<1>(pred));
   } else if (!stdev & cov) {
-    auto pred = impl_ptr->predict(X, false, true);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred), Rcpp::Named("cov") = std::get<2>(pred));
   } else if (!stdev & !cov) {
-    auto pred = impl_ptr->predict(X, false, false);
     return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   }
-
+  
   // FIXME no default return
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_simulate(Rcpp::List ordinaryKriging, int nsim, arma::mat X) {
-  if (!ordinaryKriging.inherits("Kriging"))
+arma::mat kriging_simulate(Rcpp::List k, int nsim, arma::mat X) {
+  if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = ordinaryKriging.attr("object");
-
+  SEXP impl = k.attr("object");
+  
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-
+  
   return impl_ptr->simulate(nsim, X);
+}
+
+
+// [[Rcpp::export]]
+void kriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool normalize=false) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  
+  impl_ptr->update(y, X, normalize);
+
+  // Rcpp::List obj;
+  // obj.attr("object") = impl_ptr;
+  // obj.attr("class") = "Kriging";
+  // return obj;
+}
+
+
+// [[Rcpp::export]]
+Rcpp::List kriging_logLikelihood(Rcpp::List k, arma::vec theta, bool grad=false, bool hess=false) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  
+  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodEval(theta, grad, hess);
+  if (grad & hess) {
+    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll),
+                              Rcpp::Named("logLikelihoodGrad") = std::get<1>(ll),
+                              Rcpp::Named("logLikelihoodHess") = std::get<2>(ll));
+  } else if (grad & !hess) {
+    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll),
+                              Rcpp::Named("logLikelihoodGrad") = std::get<1>(ll));
+  } else if (!grad & !hess) {
+    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+  }
+}
+
+// [[Rcpp::export]]
+Rcpp::List kriging_leaveOneOut(Rcpp::List k, arma::vec theta, bool grad=false) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  
+  std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutEval(theta, grad);
+  if (grad) {
+    return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo),
+                              Rcpp::Named("leaveOneOutGrad") = std::get<1>(loo));
+  } else if (!grad) {
+    return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
+  }
 }

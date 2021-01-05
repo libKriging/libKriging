@@ -35,7 +35,7 @@ hll = function(theta,eps=0.001) {
 
 
 r <- kriging(y, X, kernel)
-ll_C = function(theta) kriging_logLikelihood(r,theta)
+ll_C = function(theta) kriging_logLikelihood(r,theta)$logLikelihood
 gll_C = function(theta) kriging_logLikelihoodGrad(r,theta)
 hll_C = function(theta) kriging_logLikelihoodHess(r,theta)
 

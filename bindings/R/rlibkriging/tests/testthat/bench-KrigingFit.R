@@ -23,7 +23,7 @@ for (i in 1:N) {
                     )
 
 
-  ll_cpp <- kriging_logLikelihood(r, kriging_model(r)$theta)
+  ll_cpp <- kriging_logLikelihood(r, kriging_model(r)$theta)$logLikelihood
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   

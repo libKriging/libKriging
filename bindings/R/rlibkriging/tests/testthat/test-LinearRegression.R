@@ -1,5 +1,6 @@
 library(testthat)
-install.packages(pkgs="rlibkriging_0.1-10.tgz", type="source", repos=NULL)
+pack=list.files(".",pattern = "rlibkriging_",full.names = T)
+install.packages(pack[1],repos=NULL)
 library(rlibkriging)
 n <- 10
 X <- as.matrix(runif(n))

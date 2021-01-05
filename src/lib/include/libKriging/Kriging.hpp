@@ -18,13 +18,16 @@ class Kriging {
     bool has_theta;
   };
 
-  enum class RegressionModel { Constant, Linear, Quadratic };
+  enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
 
   struct RegressionModelUtils {
     LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
     LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
   };
 
+  const std::string& kernel() const { return m_covType; };
+  const std::string& optim() const { return m_optim; };
+  const std::string& objective() const { return m_objective; };
   const arma::mat& X() const { return m_X; };
   const arma::rowvec& centerX() const { return m_centerX; };
   const arma::rowvec& scaleX() const { return m_scaleX; };
@@ -41,6 +44,7 @@ class Kriging {
   const double& sigma2() const { return m_sigma2; };
 
  private:
+  std::string m_covType;
   arma::mat m_X;
   arma::rowvec m_centerX;
   arma::rowvec m_scaleX;
@@ -105,8 +109,10 @@ class Kriging {
   LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::mat logLikelihoodHess(const arma::vec& theta);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta, const bool grad, const bool hess);
   LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output

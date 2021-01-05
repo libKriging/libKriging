@@ -25,8 +25,8 @@ ll2 = function(theta) kriging_loglikelihood(r,theta)
 # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
 for (x in seq(0.01,1,,11)){
   envx = new.env()
-  ll2x = kriging_logLikelihood(r,x)
-  gll2x = kriging_logLikelihoodGrad(r,x)
+  ll2x = kriging_logLikelihood(r,x)$logLikelihood
+  gll2x = kriging_logLikelihood(r,x,grad = T)$logLikelihoodGrad
   arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 }
 
