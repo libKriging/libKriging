@@ -6,7 +6,7 @@
 #include "libKriging/Kriging.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List kriging(arma::vec y,
+Rcpp::List new_Kriging(arma::vec y,
                    arma::mat X,
                    std::string kernel,
                    std::string regmodel = "constant",
@@ -165,14 +165,14 @@ Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev=true, bool cov=
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_simulate(Rcpp::List k, int nsim, arma::mat X) {
+arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
   
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   
-  return impl_ptr->simulate(nsim, X);
+  return impl_ptr->simulate(nsim, seed, X);
 }
 
 

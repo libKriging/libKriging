@@ -17,7 +17,7 @@ for (i in 1:N) {
                          multistart = 1,control = list(trace=T,maxit=10)) #,lower=rep(0.001,d),upper=rep(2*sqrt(d),d))
                     )
     times$cpp[i] = system.time(
-                        r <- kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
+                        r <- Kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
                             # to let start optim at same initial point
                             parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE))
                     )

@@ -1,7 +1,7 @@
+library(testthat)
+
 # install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
 # library(rlibkriging)
-
-library(testthat)
 
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
@@ -17,7 +17,7 @@ x=seq(0,1,,51)
 contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 
-r <- kriging(y, X,"gauss",parameters = list(theta=matrix(.5,ncol=2)))
+r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(.5,ncol=2)))
 
 
 context("print")
@@ -82,7 +82,7 @@ contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 points(X2,col='red')
 
-r2 <- kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(kriging_model(r)$theta,ncol=2)))
+r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(kriging_model(r)$theta,ncol=2)))
 ll2 = function(Theta){apply(Theta,1,function(theta) kriging_logLikelihood(r2,theta)$logLikelihood)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)

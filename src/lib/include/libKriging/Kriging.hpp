@@ -127,9 +127,10 @@ class Kriging {
   /** Draw sample trajectories of kriging at given points X'
    * @param Xp is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
+   * @param seed random seed setup for sample simulations
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const int seed, const arma::mat& Xp);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output

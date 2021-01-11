@@ -9,8 +9,8 @@ X <- as.matrix(runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss")
-r <- kriging(y, X, "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+r <- Kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) kriging_logLikelihood(r,x)$logLikelihood)
 plot(ll,xlim=c(0.001,1))
@@ -37,7 +37,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- kriging(y, X, "gauss")
+r <- Kriging(y, X, "gauss")
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
                   # print(dim(X));
@@ -75,8 +75,24 @@ k = NULL
 r = NULL
 
 parinit = matrix(runif(10*ncol(X)),ncol=ncol(X))
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),multistart = 10, parinit=parinit)
-r <- kriging(y, X, "gauss", parameters=list(theta=parinit))
+k <- tryCatch( # needed to catch warning due to %dopar% usage when using multistart
+    withCallingHandlers(
+      {
+        error_text <- "No error."
+        DiceKriging::km(design=X,response=y,covtype = "gauss",multistart = 10, parinit=parinit,control = list(trace=F))
+      }, 
+      warning = function(e) {
+        error_text <<- trimws(paste0("WARNING: ", e))
+        invokeRestart("muffleWarning")
+      }
+    ), 
+    error = function(e) {
+      return(list(value = NA, error_text = trimws(paste0("ERROR: ", e))))
+    }, 
+    finally = {
+    }
+  )
+r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 # print(dim(X));
@@ -129,7 +145,7 @@ mll_fun <- function(x) -apply(x,1,
 contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
  
 # use same startup point for convergence
-r <- kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
+r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=2),has_theta=TRUE))
 
 points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
@@ -156,7 +172,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),parinit = c(0.25,10))
-r <- kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
+r <- Kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
 
 ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 # print(dim(X));

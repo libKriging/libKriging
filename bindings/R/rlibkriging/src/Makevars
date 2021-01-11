@@ -29,7 +29,7 @@ endif
 
 CXX_STD = CXX11
 
-PKG_CFLAGS=
+#PKG_CFLAGS=
 PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
 PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo $(EXTRA_PKG_LIBS)

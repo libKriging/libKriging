@@ -7,7 +7,7 @@ else
 	LIB_SUFFIX=a
 endif
 
-PKG_CFLAGS=
+#PKG_CFLAGS=
 PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 PKG_CXXFLAGS=-std=c++11
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package

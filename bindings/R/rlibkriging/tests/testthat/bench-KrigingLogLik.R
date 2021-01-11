@@ -18,7 +18,7 @@ for (x in xx){
   i <- i+1
 }
 
-r <- kriging(y, X, "gauss")
+r <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
   times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- kriging_logLikelihood(r,rep(x,3)))

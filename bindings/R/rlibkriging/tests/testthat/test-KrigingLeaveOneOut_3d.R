@@ -11,10 +11,10 @@ for (kernel in c("gauss","exp")) {
   y <- f(X)
   d = ncol(X)
   
-k = DiceKriging::km(design=X,response=y,covtype = kernel)
+k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
 ll = function(theta) DiceKriging::leaveOneOutFun(theta,k)
 
-r <- kriging(y, X, kernel)
+r <- Kriging(y, X, kernel)
 ll2 = function(theta) kriging_leaveOneOut(r,theta)
 
 precision <- 1e-8  # the following tests should work with it, since the computations are analytical

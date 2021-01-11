@@ -6,11 +6,12 @@ Date: 2020-12-21
 Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>
 Maintainer: Pascal Havé <hpwxf@haveneer.com>
 Description: Binding libKriging to R, and provide DiceKriging features with improved performance.
-License: Apache (>= 2)
+License: Apache License (>= 2)
 Encoding: UTF-8
-Imports: Rcpp (>= 0.12.11)
 LinkingTo: Rcpp, RcppArmadillo
-Depends: R (>= 2.14), methods
-#Collate: rlibkrigingWrapper.R RcppExports.R
-Suggests: testthat, DiceKriging
-Enhances: DiceKriging
+Depends: R (>= 2.14)
+Imports: Rcpp (>= 0.12.11), methods
+Suggests: testthat, DiceKriging, utils
+SystemRequirements: GNU make
+URL: https://github.com/libKriging
+RoxygenNote: 7.1.1

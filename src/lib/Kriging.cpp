@@ -1042,7 +1042,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
  * @param nsim is number of simulations to draw
  * @return output is m*nsim matrix of simulations at Xp
  */
-LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const arma::mat& Xp) {
+LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& Xp) {
   // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
   double nugget_sim = 1e-10;
   arma::uword m = Xp.n_rows;
@@ -1119,6 +1119,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const arma::mat& X
   // y <- matrix(y.trend.cond, m, nsim) + y.rand.cond
   arma::mat yp(m, nsim);
   yp.each_col() = y_trend;
+  
+  arma::arma_rng::set_seed(seed);  
   yp += tT_cond * arma::randn(m, nsim);
   //t0 = toc("yp             ", t0);
 
