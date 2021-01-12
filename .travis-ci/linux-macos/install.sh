@@ -37,7 +37,11 @@ if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
    Linux)
      if [ "${TRAVIS}" == "true" ]; then
        sudo apt-get install -y software-properties-common
-       sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 291F9FF6FD385783
+       
+       # add kitware server signature cf https://apt.kitware.com       
+       apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget
+       wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - > /etc/apt/trusted.gpg.d/kitware.gpg
+       
        sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
        sudo apt-get install -y cmake # requires cmake ≥3.13 for target_link_options
        test -d /usr/local/cmake-3.12.4 && sudo mv /usr/local/cmake-3.12.4 /usr/local/cmake-3.12.4.old # Overrides Travis installation
