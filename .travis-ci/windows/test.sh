@@ -11,6 +11,8 @@ else
   CTEST_FLAGS=--output-on-failure
 fi
 
+MODE=${MODE:-Release}
+
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     echo "Coverage not supported for Windows"
     travis_terminate 1
