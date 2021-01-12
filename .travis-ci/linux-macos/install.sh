@@ -36,11 +36,9 @@ if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
 
    Linux)
      if [ "${TRAVIS}" == "true" ]; then
-       sudo apt-get install -y software-properties-common
-       
        # add kitware server signature cf https://apt.kitware.com       
-       apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget
-       wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - > /etc/apt/trusted.gpg.d/kitware.gpg
+       sudo apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common
+       curl -s https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
        
        sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
        sudo apt-get install -y cmake # requires cmake ≥3.13 for target_link_options
