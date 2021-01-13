@@ -16,6 +16,8 @@ class Kriging {
     bool has_sigma2;
     arma::mat theta;
     bool has_theta;
+    arma::colvec beta;
+    bool has_beta;
   };
 
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
@@ -40,9 +42,12 @@ class Kriging {
   const arma::mat& M() const { return m_M; };
   const arma::colvec& z() const { return m_z; };
   const arma::colvec& beta() const { return m_beta; };
+  const bool& estim_beta() const { return m_est_beta; };
   const arma::vec& theta() const { return m_theta; };
+  const bool& estim_theta() const { return m_est_theta; };
   const double& sigma2() const { return m_sigma2; };
-
+  const bool& estim_sigma2() const { return m_est_sigma2; };
+  
  private:
   std::string m_covType;
   arma::mat m_X;
@@ -59,8 +64,11 @@ class Kriging {
   arma::mat m_M;
   arma::colvec m_z;
   arma::colvec m_beta;
+  bool m_est_beta;
   arma::vec m_theta;
+  bool m_est_theta;
   double m_sigma2;
+  bool m_est_sigma2;
   std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun;
   std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm;
 
@@ -79,6 +87,9 @@ class Kriging {
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool estim_beta;
+    double sigma2;
+    bool estim_sigma2;
   };
 
   double logLikelihood(const arma::vec& _theta,

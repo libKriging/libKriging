@@ -9,21 +9,9 @@ if (!isClass("as_km"))
 # }
 
 
-#' Build a "as_km" object, which extends DiceKriging::km S4 class.
-#'
-#' @author Yann Richet <yann.richet@irsn.fr>
-#' 
-#' @param ... args
-#'
-#' @return as_km/km object
-#' @export
-as_km <- function (...) {
-  UseMethod("as_km")
-}
-
 #' Convert a "Kriging" object to a DiceKriging::km one.
 #'
-#' @author Yann Richet <yann.richet@irsn.fr>
+#' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param k "Kriging" object 
 #' @param .call Force the "call" filed in km object 
@@ -38,7 +26,7 @@ as_km <- function (...) {
 #' @aliases as_km,Kriging,Kriging-method
 #' @examples
 #' f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
-#' set.seed(1234)
+#' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X)
 #' r <- Kriging(y, X, "gauss")
@@ -103,12 +91,9 @@ as_km.Kriging <- function(k,.call=NULL) {
   return(model)
 }
 
-setMethod("as_km", "Kriging", as_km.Kriging)
-
-
 #' Build a DiceKriging "km" like object.
 #'
-#' @author Yann Richet <yann.richet@irsn.fr>
+#' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param formula R formula object to setup the linear trend (aka Universal Kriging). Supports ~1, ~. and ~.^2
 #' @param design data.frame of design of experiments
@@ -116,6 +101,7 @@ setMethod("as_km", "Kriging", as_km.Kriging)
 #' @param covtype covariance structure. Supports "gauss", "exp", ...
 #' @param coef.cov fixed covariance range value (so will not optimize if given)
 #' @param coef.var fixed variance value (so will not estimate if given)
+#' @param coef.trend fixed trend value (so will not estimate if given)
 #' @param estim.method estimation criterion. Supports "MLE" or "LOO"
 #' @param optim.method optimization algorithm used on estim.method objective. Supports "BFGS"
 #' @param parinit initial values of covariance range which will be optimzed using optim.method
@@ -136,7 +122,7 @@ setMethod("as_km", "Kriging", as_km.Kriging)
 #' #m1 <- km(design=design.fact, response=y,covtype = "gauss",parinit = c(.5,1),control = list(trace=F))
 #' as_m1 <- as_km(design=design.fact, response=y,covtype = "gauss",parinit = c(.5,1))
 as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
-                  coef.cov = NULL, coef.var = NULL,
+                  coef.cov = NULL, coef.var = NULL, coef.trend = NULL,
                   estim.method="MLE", optim.method = "BFGS", parinit = NULL, ...) {
   formula = formula2regmodel(formula)
   
@@ -161,6 +147,9 @@ as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
   if (!is.null(coef.cov)) {
     parameters = c(parameters,list(theta=matrix(coef.cov,ncol=ncol(design))))
     optim.method = "none"
+  }  
+  if (!is.null(coef.trend)) {
+    parameters = c(parameters,list(beta=matrix(coef.trend)))
   }
   if (!is.null(parinit)) {
     parameters = c(parameters,list(theta=matrix(parinit,ncol=ncol(design))))
@@ -169,15 +158,28 @@ as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
     parameters=NULL
   
   r = rlibkriging::Kriging(y=response, X=design, kernel = covtype, regmodel = formula,
-                           normalize = F, objective = estim.method,optim = "BFGS",parameters = parameters)
+                           normalize = F, 
+                           objective = estim.method, optim = optim.method, parameters = parameters)
   
   return(as_km.Kriging(r,.call=match.call()))
 }
 
+#' Build a "as_km" object, which extends DiceKriging::km S4 class.
+#'
+#' @author Yann Richet (yann.richet@irsn.fr)
+#' 
+#' @param ... args
+#'
+#' @return as_km/km object
+#' @export
+as_km <- function(...) UseMethod("as_km")
+setMethod("as_km", "Kriging", as_km.Kriging)
+setGeneric(name = "as_km", def = function(...) standardGeneric("as_km"))
+
 
 #' Overload DiceKriging::predict.km for as_km objects (expected faster).
 #'
-#' @author Yann Richet <yann.richet@irsn.fr>
+#' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param object as_km object
 #' @param newdata matrix of points where to perform prediction
@@ -187,6 +189,7 @@ as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
 #' @param light.return return no other intermediate objects (like T matrix) (default is TRUE)
 #' @param bias.correct fix UK variance and covaariance (defualt is FALSE)
 #' @param checkNames check consistency between object design data: X and newdata (default is FALSE) 
+#' @param ... Ignored
 #'
 #' @return list of predict data: mean, sd, trend, cov, upper95 and lower95 quantiles.
 #' 
@@ -203,12 +206,13 @@ as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
 #' 
 #' #library(DiceKriging)
 #' # kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
-#' #m1 <- km(design=design.fact, response=y,covtype = "gauss",parinit = c(.5,1),control = list(trace=F))
+#' #m1 <-      km(design=design.fact, response=y,covtype = "gauss",parinit = c(.5,1),control = list(trace=F))
 #' as_m1 <- as_km(design=design.fact, response=y,covtype = "gauss",parinit = c(.5,1))
 #' as_p = predict(as_m1,newdata=matrix(.5,ncol=2),type="UK",checkNames=FALSE,light.return=TRUE)
 predict.as_km <- function(object, newdata, type="UK",
                           se.compute = TRUE, cov.compute = FALSE, light.return = TRUE,
-                          bias.correct = FALSE, checkNames = FALSE) {
+                          bias.correct = FALSE, checkNames = FALSE,...) {
+  if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
   if (isTRUE(checkNames)) stop("checkNames=TRUE unsupported.")
   if (isTRUE(bias.correct)) stop("bias.correct=TRUE unsupported.")
   if (!isTRUE(light.return)) stop("light.return=FALSE unsupported.")
@@ -242,27 +246,12 @@ predict.as_km <- function(object, newdata, type="UK",
   return(output.list)
 }
 
-if(!isGeneric("predict")) {
-  setGeneric(name = "predict",
-             def = function(...) standardGeneric("predict")
-  )
-}
-
-setMethod("predict", "as_km", 
-          function(object, newdata, type="UK", se.compute = TRUE,
-                   cov.compute = FALSE, light.return = TRUE, bias.correct = FALSE,
-                   checkNames = FALSE) {
-            predict.as_km(object = object, newdata = newdata, type = type,
-                          se.compute = se.compute, cov.compute = cov.compute,
-                          light.return = light.return,
-                          bias.correct = bias.correct, checkNames = checkNames)
-          }
-)
+setMethod("predict", "as_km", predict.as_km)
 
 
 #' Overload DiceKriging::simulate.km for as_km objects (expected faster).
 #'
-#' @author Yann Richet <yann.richet@irsn.fr>
+#' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param object as_km object
 #' @param nsim number of response vector to simulate
@@ -282,12 +271,12 @@ setMethod("predict", "as_km",
 #' @examples
 #' f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 #'   plot(f)
-#' set.seed(1234)
+#' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X)
 #'   points(X,y,col='blue')
-#' k <- as_km(design=X, response=y,covtype = "gauss",parinit = .5)
-#' x = seq(0,1,,21)
+#' k <- as_km(design=X, response=y,covtype = "gauss")
+#' x = seq(0,1,,101)
 #' s_x = simulate(k, nsim=3, newdata=x)
 #'   lines(x,s_x[,1],col='blue')
 #'   lines(x,s_x[,2],col='blue')
@@ -299,27 +288,15 @@ simulate.as_km <- function(object, nsim = 1, seed = NULL, newdata,
   if (!isTRUE(cond)) stop("cond=FALSE unsupported.")
   if (nugget.sim!=0) stop("nugget.sim!=0 unsupported.")
   
-  return(simulate.Kriging(object = object@Kriging,x = newdata,nsim = nsim))
+  return(simulate.Kriging(object = object@Kriging,x = newdata,nsim = nsim, seed=seed))
 }
 
+setMethod("simulate", "as_km", simulate.as_km)
 
-if(!isGeneric("simulate")) {
-  setGeneric(name = "simulate",
-             def = function(object, nsim = 1, seed = NULL, ...) standardGeneric("simulate")
-  )
-}
-
-setMethod("simulate", "as_km", 
-          function(object, nsim = 1, seed = NULL, newdata,
-                   cond = TRUE, nugget.sim = 0, checkNames = FALSE) {
-            simulate.as_km(object = object, nsim = nsim, newdata = newdata,
-                           cond = cond, nugget.sim = nugget.sim, checkNames = checkNames)
-          }
-)
 
 #' Overload DiceKriging::update.km methd for as_km objects (expected faster).
 #'
-#' @author Yann Richet <yann.richet@irsn.fr>
+#' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param object as_km object
 #' @param newX new design points: matrix of object@d columns
@@ -339,21 +316,21 @@ setMethod("simulate", "as_km",
 #' @examples
 #' f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 #'   plot(f)
-#' set.seed(1234)
+#' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X)
 #'   points(X,y,col='blue')
-#' k <- as_km(design=X, response=y,covtype = "gauss",parinit = .5)
-#' x = seq(0,1,,21)
+#' k <- as_km(design=X, response=y,covtype = "gauss")
+#' x = seq(0,1,,101)
 #' p_x = predict(k, x)
 #'   lines(x,p_x$mean,col='blue')
 #'   lines(x,p_x$lower95,col='blue')
 #'   lines(x,p_x$upper95,col='blue')
-#' newX <- as.matrix(runif(5))
-#' newy <- f(X)
+#' newX <- as.matrix(runif(3))
+#' newy <- f(newX)
 #'   points(newX,newy,col='red')
 #' update(k,newy,newX)
-#' x = seq(0,1,,21)
+#' x = seq(0,1,,101)
 #' p2_x = predict(k, x)
 #'   lines(x,p2_x$mean,col='red')
 #'   lines(x,p2_x$lower95,col='red')
@@ -375,22 +352,7 @@ update.as_km <- function(object,
   return(object)
 }
 
-if(!isGeneric("update")) {
-  setGeneric(name = "update",
-             def = function(...) standardGeneric("update")
-  )
-}
-
-setMethod("update", "as_km", 
-          function(object, newX, newy, newX.alreadyExist =  FALSE, 
-                   cov.reestim = TRUE, trend.reestim = TRUE, nugget.reestim = FALSE,
-                   newnoise.var = NULL, kmcontrol = NULL, newF = NULL) {
-            update.as_km(object=object, newX = newX, newy = newy, 
-                         newX.alreadyExist = newX.alreadyExist, 
-                         cov.reestim = cov.reestim, trend.reestim = trend.reestim, nugget.reestim = nugget.reestim,
-                         newnoise.var = newnoise.var, kmcontrol = kmcontrol, newF = newF) 
-          }
-)
+setMethod("update", "as_km", update.as_km)
 
 
 formula2regmodel = function(form) {

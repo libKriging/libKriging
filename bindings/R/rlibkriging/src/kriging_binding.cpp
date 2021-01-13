@@ -34,11 +34,20 @@ Rcpp::List new_Kriging(arma::vec y,
       _parameters.push_back(Rcpp::NumericMatrix(0), "theta");
       _parameters.push_back(false,"has_theta");
     }
+    if (params.containsElementNamed("beta")) {
+      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["beta"]), "beta");
+      _parameters.push_back(true,"has_beta");
+    } else { 
+      _parameters.push_back(Rcpp::NumericVector(0), "beta");
+      _parameters.push_back(false,"has_beta");
+    }
   } else {
     _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = -1,
                                      Rcpp::Named("has_sigma2") = false,
                                      Rcpp::Named("theta") = Rcpp::NumericMatrix(0),
-                                     Rcpp::Named("has_theta") = false);        
+                                     Rcpp::Named("has_theta") = false,
+                                     Rcpp::Named("beta") = Rcpp::NumericVector(0),
+                                     Rcpp::Named("has_beta") = false);        
   }
   
   ok->fit(std::move(y),
@@ -47,8 +56,9 @@ Rcpp::List new_Kriging(arma::vec y,
           normalize,
           optim,
           objective,
-          Kriging::Parameters{
-            _parameters["sigma2"], _parameters["has_sigma2"], _parameters["theta"], _parameters["has_theta"]});
+          Kriging::Parameters{_parameters["sigma2"], _parameters["has_sigma2"],
+                              _parameters["theta"], _parameters["has_theta"],
+                              _parameters["beta"], _parameters["has_beta"]});
   
   Rcpp::XPtr<Kriging> impl_ptr(ok);
   
@@ -70,7 +80,9 @@ Rcpp::List kriging_model(Rcpp::List k) {
                             Rcpp::Named("optim") = impl_ptr->optim(),
                             Rcpp::Named("objective") = impl_ptr->objective(),
                             Rcpp::Named("theta") = impl_ptr->theta(),
+                            Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
                             Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+                            Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
                             Rcpp::Named("X") = impl_ptr->X(),
                             Rcpp::Named("centerX") = impl_ptr->centerX(),
                             Rcpp::Named("scaleX") = impl_ptr->scaleX(),
@@ -82,7 +94,8 @@ Rcpp::List kriging_model(Rcpp::List k) {
                             Rcpp::Named("T") = impl_ptr->T(),
                             Rcpp::Named("M") = impl_ptr->M(),
                             Rcpp::Named("z") = impl_ptr->z(),
-                            Rcpp::Named("beta") = impl_ptr->beta());
+                            Rcpp::Named("beta") = impl_ptr->beta(),
+                            Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 }
 
 // [[Rcpp::export]]
