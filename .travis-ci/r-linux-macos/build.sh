@@ -36,4 +36,5 @@ export LIBKRIGING_PATH=${PWD}/build/installed
 cd bindings/R
 make uninstall || true
 make clean
+MAKEFLAGS=-j$(nproc)
 MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make
