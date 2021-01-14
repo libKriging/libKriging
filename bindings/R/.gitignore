@@ -12,3 +12,4 @@ RcppExports.R
 /rlibkriging/tests/testthat/Rplots.pdf
 /*.gz
 /*.tgz
+/rlibkriging.Rcheck/
