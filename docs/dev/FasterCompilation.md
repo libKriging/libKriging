@@ -17,5 +17,20 @@ There are two ways to enable a compiler cache:
 * `CXX="<your-compiler-cache> <your-cxx-compiler>" CC="<your-compiler-cache> <your-c-compiler>" cmake <CMAKE_OPTIONS>`
 
     Example with `ccache` and GCC: `CXX="ccache g++" CC="ccache gcc" cmake ..`    
-    * Yo have to specify it as a new compiler
+    * You have to specify it as a new compiler
     * You can set additional options in command line  
+
+
+To speed-up R compilation, you can override R default compiler.
+
+The following script generates a config using `ccache`
+```
+#!/usr/bin/env bash
+set -eo pipefail
+
+echo "# Custom ~/.R/Makevars configuration"
+CCACHE=ccache
+for comp in CC CXX CXX11 CXX14 CXX17 FC; do
+  echo "$comp=${CCACHE} $(R CMD config $comp)"
+done
+```

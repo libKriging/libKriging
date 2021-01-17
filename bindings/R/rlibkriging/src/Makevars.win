@@ -7,7 +7,11 @@ else
 	LIB_SUFFIX=a
 endif
 
-#PKG_CFLAGS=
+# using CXX_STD should be better but, while using `R CMD INSTALL`, we get an error like
+#     make[1]: *** No rule to make target '$(CXX11STD)''.  Stop.
+# CXX_STD = CXX11
+
+PKG_CFLAGS=
 PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include
 PKG_CXXFLAGS=-std=c++11
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package

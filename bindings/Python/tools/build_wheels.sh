@@ -44,3 +44,5 @@ for PYBIN in /opt/python/*/bin; do
     "${PYBIN}/pip" install pylibkriging --no-index -f "${ROOT_DIR}"/dist
     (cd "$HOME"; "${PYBIN}/pytest" "${ROOT_DIR}"/bindings/Python/tests)
 done
+
+find "${ROOT_DIR}"/dist/ -name "*-linux_*" -exec rm {} \;

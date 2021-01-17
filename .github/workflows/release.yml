@@ -1,0 +1,479 @@
+name: libKriging release workflow
+
+on:
+  push:
+    tags:
+       - 'v*' # release tag trigger 
+#  workflow_dispatch:
+#    inputs:
+#      release-tag:
+#        description: 'Release tag'
+#        required: true
+#        default: ''
+#  release:
+#    types:
+#      - created
+#  repository_dispatch:
+#    types: [ make-release ]
+#    # sent data in ${{ github.event.client_payload }}
+
+env:
+  DEBUG_CI: true
+
+jobs:
+  check-release-consistency:
+    name: Check Release Consistency
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Verify version name 
+        run: |
+          echo "Checking release tag: ${GIT_TAG}" 
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Valid version name"
+          else
+            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+\$"
+            exit 1
+          fi
+          
+      - name: Verify source code consistency
+        run: |
+          CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
+          if [[ "${GIT_TAG}" != "v${CODE_VERSION}" ]]; then
+            echo "Non consistent code and requested tag versions"
+            exit 1
+          fi
+          
+      - name: Check available version in pypi.org 
+        run: |
+          if ( python3 .travis-ci/release/check_python_release.py pylibkriging ${GIT_TAG##v} ); then
+            echo "Cannot re-upload already available version ${GIT_TAG} in pypi.org"  
+            exit 1
+          else
+            echo "Ok to build this new version ${GIT_TAG}"
+          fi
+
+  build-wheel-python:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-2019, macOS-10.15 ]
+        python-version: [ 3.6, 3.7, 3.8, 3.9 ]
+        include:
+          - os: ubuntu-18.04
+            # all versions done in one script wrapper
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+          
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+          
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+        if: runner.os != 'Linux'
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "ENABLE_PYTHON_BINDING=on"  >> $GITHUB_ENV          
+          if [ "$RUNNER_OS" != "Windows" ]; then          
+            echo "BUILD_NAME=linux-macos"  >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=windows"      >> $GITHUB_ENV
+          fi
+
+      - name: Common pre-install
+        shell: bash
+        run: |
+          pip3 install wheel
+
+      - name: Windows pre-install
+        shell: bash
+        run: |
+          # add alternative name python3 (default is python)
+          echo "PATH=$PATH"
+          PYTHON_CMD_PATH=$(which python)
+          PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
+          PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
+          ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
+        if: runner.os == 'Windows'
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: build
+        shell: bash
+        run: |
+          .travis-ci/release/python-release.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: python-artifact
+          path: |
+            dist 
+            
+  build-octave-package:
+    needs: check-release-consistency    
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Octave Linux"
+            os: ubuntu-18.04
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-10.15
+          - name: "Octave Windows"
+            os: windows-2019
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+          
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=on"  >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=octave-windows" >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install liblapack-dev python3-pip
+          sudo apt install -qy octave octave-pkg-dev
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+          
+      - name: make package
+        shell: bash
+        run: |
+          .travis-ci/release/octave-release.sh
+                     
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: octave-package
+          path: |
+            octave-package
+
+  build-R-package:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "R Linux"
+            os: ubuntu-18.04
+          - name: "R macOS"
+            os: macOS-10.15
+          - name: "R Windows"
+            os: windows-2019
+            
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=r-linux-macos"  >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=r-windows"      >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install -qy r-base liblapack-dev gfortran
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: pre-install-macos
+        shell: bash
+        run: |
+          brew install coreutils # for readlink -f : FIXME usefull ?
+        if: runner.os == 'macOS'
+
+      - name: pre-install-windows
+        shell: bash
+        run: |
+          # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
+          # Rscript -e 'print(R.home(component="etc"))'
+          # Rscript -e 'Sys.getenv("R_HOME")'
+          # Rscript -e 'Sys.getenv("R_ARCH")'
+          mkdir -p ~/.R
+          echo "# Custom configuration" > ~/.R/Makevars
+          echo "BINPREF=C:/rtools40/mingw64/bin/" >> ~/.R/Makevars
+          echo 'SHLIB_CXXLD=$(BINPREF)g++' >> ~/.R/Makevars
+          # R CMD config SHLIB_CXXLD # updated config
+        if: runner.os == 'Windows'
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: make package
+        shell: bash
+        run: |
+          .travis-ci/release/r-release.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: R-package
+          path: |
+            R-package
+
+  all-package-build-checkpoint:
+    name: Build package checkpoint
+    needs:
+      - build-wheel-python
+      - build-R-package
+      - build-octave-package
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+        
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        #if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -eo pipefail
+
+          cat <<EOF > RELEASE_NOTE.md
+          Release $GIT_TAG
+
+          This is an automated release note.
+          
+          Customize me once published.
+
+          # using https://github.com/github/hub
+          if [ -z "${{ github.event.release.tag_name }}" ]; then
+            hub release create -F RELEASE_NOTE.md "$GIT_TAG"
+          fi
+
+  release-python-wheel:
+    name: Release Python Wheel to Pypi.org
+    needs: all-package-build-checkpoint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: python-artifact
+          path: dist
+
+      - name: upload
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+        run: |
+          # Debug secrets
+          # cf https://stackoverflow.com/a/44606194/12430075
+          if [ -n "${TWINE_PASSWORD}" ]; then echo TWINE_PASSWORD is set; fi
+          if [ -z "${TWINE_PASSWORD+set}" ]; then echo TWINE_PASSWORD is not set at all; fi
+          if [ -z "${TWINE_PASSWORD-unset}" ]; then echo TWINE_PASSWORD is set but empty; fi
+
+          pip3 install twine
+          find .
+          # TWINE_USERNAME is set from travis global environment
+          # TWINE_PASSWORD is set to an API token in Travis settings
+          python3 -m twine upload \
+                  --repository-url https://upload.pypi.org/legacy/ \
+                  ./dist/*.whl
+
+  release-artifacts:
+    name: Upload Release Asset
+    needs: all-package-build-checkpoint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: python-artifact
+          path: dist
+        if: ${{ false }}  # disable for now
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: octave-package
+          path: dist
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: R-package
+          path: dist
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+              GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG="${GITHUB_REF##*/}"
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: upload assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          set -x
+
+          # using https://github.com/github/hub
+          mkdir -p dist
+          assets=()
+          for asset in ./dist/*; do
+            assets+=("-a" "$asset")
+          done
+          hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"

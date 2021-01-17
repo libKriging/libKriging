@@ -1,7 +1,11 @@
 library(testthat)
+
+# loading package using wildcard
 # pack=list.files(".",pattern = "rlibkriging_",full.names = T)
 # install.packages(pack[1],repos=NULL)
-# library(rlibkriging)
+
+install.packages(pkgs="rlibkriging_0.2-0.tgz", type="source", repos=NULL)
+library(rlibkriging)
 n <- 10
 X <- as.matrix(runif(n))
 y = 4*X+rnorm(n,0,.1)
