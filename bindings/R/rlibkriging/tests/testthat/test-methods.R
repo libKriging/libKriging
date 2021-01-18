@@ -93,6 +93,7 @@ test_that("simulate nsim dim",
 
 test_that("simulate mean X",
           expect_equal(mean(simulate(r,nsim = 100, x=X[1,]+0.00005)),y[1],tolerance = 0.01))
+set.seed(12345)
 x = runif(d)
 test_that("simulate mean",
           expect_equal(mean(simulate(r,nsim = 100, x=x)),predict(r,x)$mean[1],tolerance = 0.01))
@@ -102,6 +103,7 @@ test_that("simulate sd",
 
 context("update")
 
+set.seed(1234)
 X2 = matrix(runif(d*10),ncol=d)
 y2 = f(X2)
 x=seq(0,1,,51)
