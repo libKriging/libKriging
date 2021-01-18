@@ -57,7 +57,8 @@ endif ()
 ParseAndAddCatchTests(catch2_unit_test)
 ParseAndAddCatchTests(regression_unit_test)
 
-set(AdditionalCatchParameters --benchmark-samples 10)
+#set(AdditionalCatchParameters --benchmark-samples 10 -s -a)
+set(AdditionalCatchParameters -s -a)
 ParseAndAddCatchTests(KrigingTest)
 unset(AdditionalCatchParameters)
 # example of callgrind command line
