@@ -189,17 +189,19 @@ double Kriging::logLikelihood(const arma::vec& _theta,
 
   arma::uword n = m_X.n_rows;
 
-  // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
-  // Should be replaced by for_each ?
-  arma::mat R = arma::ones(n, n);
-  for (arma::uword i = 0; i < n; i++) {
-    for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
-    }
-  }
-  R = arma::symmatl(R);  // (R + trans(R))/2;
-  // t0 = toc("R             ", t0);
+//  // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
+//  // Should be replaced by for_each ?
+//  arma::mat R = arma::ones(n, n);
+//  for (arma::uword i = 0; i < n; i++) {
+//    for (arma::uword j = 0; j < i; j++) {
+//      R.at(i, j) = CovNorm_fun(Xtnorm.col(i), Xtnorm.col(j));
+//    }
+//  }
+//  R = arma::symmatl(R);  // (R + trans(R))/2;
+//  // t0 = toc("R             ", t0);
 
+  // TIMEOUT 
+  
 //  // Cholesky decompostion of covariance matrix
 //  fd->T = trimatl(chol(R, "lower"));
 //  // t0 = toc("T             ", t0);
