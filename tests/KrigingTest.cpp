@@ -46,7 +46,7 @@ TEST_CASE("workflow") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-//    return ok.logLikelihoodGrad(theta_vec);
+    return ok.logLikelihoodGrad(theta_vec);
   });
 }
 
