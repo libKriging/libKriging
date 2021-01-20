@@ -182,12 +182,12 @@ double Kriging::logLikelihood(const arma::vec& _theta,
 
   Kriging::OKModel* fd = okm_data;
 
-  // auto t0 = tic();
-  arma::mat Xtnorm = trans(m_X);
-  Xtnorm.each_col() /= _theta;
-  // t0 = toc("Xtnorm        ", t0);
-
-  arma::uword n = m_X.n_rows;
+//  // auto t0 = tic();
+//  arma::mat Xtnorm = trans(m_X);
+//  Xtnorm.each_col() /= _theta;
+//  // t0 = toc("Xtnorm        ", t0);
+//
+//  arma::uword n = m_X.n_rows;
 
 //  // Allocate the matrix // arma::mat R = Cov(fd->X, _theta);
 //  // Should be replaced by for_each ?
