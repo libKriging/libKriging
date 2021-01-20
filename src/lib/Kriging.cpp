@@ -455,7 +455,7 @@ LIBKRIGING_EXPORT arma::vec Kriging::logLikelihoodGrad(const arma::vec& _theta) 
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   arma::vec grad(_theta.n_elem);
-  double ll = logLikelihood(_theta, &grad, nullptr, &okm_data);
+//  double ll = logLikelihood(_theta, &grad, nullptr, &okm_data);
   return grad;
 }
 
