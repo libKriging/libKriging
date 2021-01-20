@@ -16,7 +16,7 @@ auto f = [](const arma::rowvec& row) {
 };
 
 auto prepare_and_run_bench = [](auto&& bench) {
-  const int count = 11;
+  const int count = 1;
   const auto i = GENERATE_COPY(range(0, count));
 
   arma::arma_rng::seed_type seed_val = 123;  // populate somehow (fixed value => reproducible)
