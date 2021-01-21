@@ -5,12 +5,12 @@
 #ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP
 #define LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP
 
-#include <string>
-#include <tuple>
-
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+
 #include <libKriging/Kriging.hpp>
+#include <string>
+#include <tuple>
 
 namespace py = pybind11;
 

@@ -1,7 +1,8 @@
 #include <pybind11/pybind11.h>
-#include <iostream>
 
+#include <iostream>
 #include <libKriging/LinearRegression.hpp>
+
 #include "AddDemo.hpp"
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"

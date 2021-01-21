@@ -1,14 +1,12 @@
 #include "LinearRegression_binding.hpp"
 
+#include <carma/carma.h>
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+
 #include <armadillo>
 #include <libKriging/LinearRegression.hpp>
 #include <random>
-
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#include <armadillo>
-
-#include <carma/carma.h>
 
 PyLinearRegression::PyLinearRegression() : m_internal{new LinearRegression{}} {}
 

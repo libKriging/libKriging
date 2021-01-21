@@ -5,12 +5,12 @@
 #ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_LINEARREGRESSION_BINDING_HPP
 #define LIBKRIGING_BINDINGS_PYTHON_SRC_LINEARREGRESSION_BINDING_HPP
 
-#include <string>
-#include <tuple>
-
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+
 #include <libKriging/LinearRegression.hpp>
+#include <string>
+#include <tuple>
 
 namespace py = pybind11;
 
