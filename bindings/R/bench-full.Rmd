@@ -183,7 +183,7 @@ for (i in 1:length(logn)) {
              theta=matrix(k@covariance@range.val,ncol=d)))
   times$cpp[i] = system.time(
     # try({ll2x <- bench_LogLik(N,r,rep(theta,ncol(X)))})
-    try({for (t in 1:N) ll2x <- kriging_logLikelihood(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) ll2x <- kriging_logLikelihoodFun(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (abs((llx-ll2x)/llx)>1E-3) warning("LL is not identical bw C++/R")
@@ -257,7 +257,7 @@ for (i in 1:length(logn)) {
              parameters=list(sigma2=k@covariance@sd2,
              theta=matrix(k@covariance@range.val,ncol=d)))
   times$cpp[i] = system.time(
-    try({for (t in 1:N) loo2x <- kriging_leaveOneOut(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) loo2x <- kriging_leaveOneOutFun(r,rep(theta,ncol(X)))}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (abs((loox-loo2x)/loox)>1E-3) warning("LOO is not identical bw C++/R")
@@ -335,7 +335,7 @@ for (i in 1:length(logn)) {
                                     parameters=list(theta=matrix(k@parinit,ncol=d))))
   )[1]
   
-  ll_cpp <- kriging_logLikelihood(r, kriging_model(r)$theta)
+  ll_cpp <- kriging_logLikelihoodFun(r, kriging_model(r)$theta)
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
@@ -343,7 +343,7 @@ for (i in 1:length(logn)) {
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))/ll_cpp>.1)
-    warning("LL function is not the same bw DiceKriging/libKriging: ",kriging_logLikelihood(r,kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))  
+    warning("LL function is not the same bw DiceKriging/libKriging: ",kriging_logLikelihoodFun(r,kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)
@@ -386,7 +386,7 @@ for (i in 1:length(logn)) {
                                     parameters=list(theta=matrix(k@parinit,ncol=d))))
   )[1]
   
-  ll_cpp <- kriging_leaveOneOut(r, kriging_model(r)$theta)
+  ll_cpp <- kriging_leaveOneOutFun(r, kriging_model(r)$theta)
   e <- new.env()
   ll_R <- DiceKriging::leaveOneOutFun(k@covariance@range.val, k, e)
   
@@ -394,7 +394,7 @@ for (i in 1:length(logn)) {
   gll_R <- DiceKriging::leaveOneOutGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::leaveOneOutFun(param=as.numeric(kriging_model(r)$theta),model=k))/ll_cpp>.1)
-    warning("LOO function is not the same bw DiceKriging/libKriging: ",kriging_leaveOneOut(r,kriging_model(r)$theta)," vs. ",DiceKriging::leaveOneOutFun(param=as.numeric(kriging_model(r)$theta),model=k))  
+    warning("LOO function is not the same bw DiceKriging/libKriging: ",kriging_leaveOneOutFun(r,kriging_model(r)$theta)," vs. ",DiceKriging::leaveOneOutFun(param=as.numeric(kriging_model(r)$theta),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LOO ",ll_cpp," << DiceKriging LOO ",ll_R)
@@ -436,7 +436,7 @@ for (i in 1:length(logn)) {
                                     parameters=list(theta=matrix(k@parinit,ncol=d))))
   )[1]
   
-  ll_cpp <- kriging_logLikelihood(r, kriging_model(r)$theta)
+  ll_cpp <- kriging_logLikelihoodFun(r, kriging_model(r)$theta)
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
@@ -444,7 +444,7 @@ for (i in 1:length(logn)) {
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))/ll_cpp>.1)
-    warning("LL function is not the same bw DiceKriging/libKriging: ",kriging_logLikelihood(r,kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))  
+    warning("LL function is not the same bw DiceKriging/libKriging: ",kriging_logLikelihoodFun(r,kriging_model(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(kriging_model(r)$theta),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)

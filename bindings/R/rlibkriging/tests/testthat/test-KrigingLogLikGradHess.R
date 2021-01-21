@@ -11,14 +11,14 @@ for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
   d <- 1+floor(log(n)) #floor(2+i/3)
   
-  print(n)
+  # print(n)
 
   set.seed(123)
   X <- matrix(runif(n*d),ncol=d)
   y <- f(X)
   
 
-k = DiceKriging::km(design=X,response=y,covtype = kernel)
+k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
 ll = function(theta) DiceKriging::logLikFun(theta,k)
 gll = function(theta) {e = new.env(); ll=DiceKriging::logLikFun(theta,k,e); DiceKriging::logLikGrad(theta,k,e)}
 hll = function(theta,eps=0.001) {
@@ -34,8 +34,8 @@ hll = function(theta,eps=0.001) {
 }
 
 
-r <- kriging(y, X, kernel)
-ll_C = function(theta) kriging_logLikelihood(r,theta)
+r <- Kriging(y, X, kernel)
+ll_C = function(theta) kriging_logLikelihood(r,theta)$logLikelihood
 gll_C = function(theta) kriging_logLikelihoodGrad(r,theta)
 hll_C = function(theta) kriging_logLikelihoodHess(r,theta)
 

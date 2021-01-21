@@ -7,15 +7,15 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 #points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss")
-r <- kriging(y,X,"gauss","constant",FALSE,"none","LL",
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
              parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
              theta=matrix(k@covariance@range.val),has_theta=TRUE))
 # m = kriging_model(r)
 
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
-ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE)
+ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE,checkNames=F)
 Yktest <- ptest$mean
 sktest <- ptest$sd
 cktest <- c(ptest$cov)

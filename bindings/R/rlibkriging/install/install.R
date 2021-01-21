@@ -19,4 +19,5 @@ install.packages("RcppArmadillo", repos=repos, type=type)
 install.packages("RhpcBLASctl", repos=repos, type=type)
 install.packages("testthat", repos=repos, type=type)
 install.packages("DiceKriging", repos=repos, type=type)
+install.packages("roxygen2", repos=repos, type=type)
 

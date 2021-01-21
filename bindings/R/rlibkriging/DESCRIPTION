@@ -1,17 +1,17 @@
 Package: rlibkriging
 Type: Package
-Title: Test wrapper
+Title: Kriging model through libKriging binding
 Version: 0.2-0
 Date: 2021-01-03
-Author: Pascal Havé <hpwxf@haveneer.com>
+Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>
 Maintainer: Pascal Havé <hpwxf@haveneer.com>
-Description: A package that demonstrates how to wrap
-             a library using local library.
-License: Apache (>= 2)
+Description: Binding libKriging to R, and provide DiceKriging features with improved performance.
+License: Apache License (>= 2)
 Encoding: UTF-8
-Imports: Rcpp (>= 0.12.11)
 LinkingTo: Rcpp, RcppArmadillo
-Depends: RhpcBLASctl, R (>= 2.14)
-#Collate: rlibkrigingWrapper.R RcppExports.R
-Depends: methods
-Suggests: testthat
+Depends: R (>= 2.14)
+Imports: Rcpp (>= 0.12.11), methods
+Suggests: testthat, DiceKriging, utils
+SystemRequirements: GNU make
+URL: https://github.com/libKriging
+RoxygenNote: 7.1.1

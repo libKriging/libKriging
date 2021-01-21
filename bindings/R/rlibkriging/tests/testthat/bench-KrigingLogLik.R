@@ -13,13 +13,12 @@ times.n = 100
 k <- DiceKriging::km(design=X, response=y, covtype = "gauss")
 i <- 1
 for (x in xx){
-  envx <- new.env()
-  times$R_ll[i]=system.time(for (j in 1:times.n) llx <- DiceKriging::logLikFun(rep(x,3),k,envx))
-  times$R_gll[i]=system.time(for (j in 1:times.n) gllx <- DiceKriging::logLikGrad(rep(x,3),k,envx))
+  times$R_ll[i]=system.time(for (j in 1:times.n) llx <- DiceKriging::logLikFun(rep(x,3),k))
+  times$R_gll[i]=system.time(for (j in 1:times.n) { envx <- new.env(); llx <- DiceKriging::logLikFun(rep(x,3),k,envx); gllx <- DiceKriging::logLikGrad(rep(x,3),k,envx)})
   i <- i+1
 }
 
-r <- kriging(y, X, "gauss")
+r <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
   times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- kriging_logLikelihood(r,rep(x,3)))
@@ -28,11 +27,11 @@ for (x in xx){
 }
 
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,3),k))(xx))
-points(xx,Vectorize(function(x)kriging_logLikelihood(r,rep(x,3)))(xx),col='red')
+points(xx,Vectorize(function(x)kriging_logLikelihood(r,rep(x,3))$logLikelihood)(xx),col='red')
 
-plot(floor(10^logn),log(times$R_ll),ylim=c(log(min(min(times$R_ll,na.rm = T),min(times$cpp_ll,na.rm = T))),log(max(max(times$R_ll,na.rm = T),max(times$cpp_ll,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
+plot(xx,log(times$R_ll),ylim=c(log(min(min(times$R_ll,na.rm = T),min(times$cpp_ll,na.rm = T))),log(max(max(times$R_ll,na.rm = T),max(times$cpp_ll,na.rm = T)))),xlab="nb points",ylab="log(user_time (s))", panel.first=grid())
 text(20,-1,"DiceKriging")
-points(floor(10^logn),log(times$cpp_ll),col='red')
+points(xx,log(times$cpp_ll),col='red')
 text(80,-1,"libKriging",col = 'red')
 
 hist(times$R_ll/times$cpp_ll,main="times R/cpp")
