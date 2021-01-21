@@ -441,7 +441,7 @@ LIBKRIGING_EXPORT double Kriging::logLikelihoodFun(const arma::vec& _theta) {
   arma::mat z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   return logLikelihood(_theta, nullptr, nullptr, &okm_data);
 }
@@ -464,7 +464,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::logLikelihoodHess(const arma::vec& _theta) 
   arma::mat z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   arma::vec grad(_theta.n_elem);
   arma::mat hess(_theta.n_elem, _theta.n_elem);
@@ -479,7 +479,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoo
   arma::mat z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   double ll = -1;
   arma::vec grad;
@@ -586,8 +586,6 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
 
-  if (fd->estim_sigma2) // means no sigma2 provided
-    fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
   
   if (grad_out != nullptr) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/leaveOneOutGrad.R
@@ -633,7 +631,7 @@ LIBKRIGING_EXPORT double Kriging::leaveOneOutFun(const arma::vec& _theta) {
   arma::colvec z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   return leaveOneOut(_theta, nullptr, &okm_data);
 }
@@ -644,7 +642,7 @@ LIBKRIGING_EXPORT arma::vec Kriging::leaveOneOutGrad(const arma::vec& _theta) {
   arma::colvec z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   arma::vec grad(_theta.n_elem);
 
@@ -659,7 +657,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutEval(const a
   arma::colvec z;
   arma::colvec beta;
   double sigma2;
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, beta};
   
   double loo = -1;
   arma::vec grad;
@@ -856,14 +854,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     if (parameters.has_beta) beta = parameters.beta;
     double sigma2 = -1;
     if (parameters.has_sigma2) sigma2 = parameters.sigma2;
-    Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+    Kriging::OKModel okm_data{T, M, z, beta};
     double minus_ll_tmp = fit_ofn(m_theta, nullptr, nullptr, &okm_data);
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
     m_est_beta = !parameters.has_beta;
-    m_sigma2 = std::move(okm_data.sigma2);
     m_est_sigma2 = !parameters.has_sigma2;
   } else if (optim.rfind("BFGS", 0) == 0) {
     // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -895,7 +892,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (parameters.has_beta) beta = parameters.beta;
       double sigma2 = -1;
       if (parameters.has_sigma2) sigma2 = parameters.sigma2;
-      Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+      Kriging::OKModel okm_data{T, M, z, beta};
       bool bfgs_ok = optim::lbfgs(
           theta_tmp,
           [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
@@ -919,7 +916,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
         m_est_beta = !parameters.has_beta;
-        m_sigma2 = std::move(okm_data.sigma2);
         m_est_sigma2 = !parameters.has_sigma2;
       }
       // }
@@ -946,7 +942,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (parameters.has_beta) beta = parameters.beta;
       double sigma2 = -1;
       if (parameters.has_sigma2) sigma2 = parameters.sigma2;
-      Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+      Kriging::OKModel okm_data{T, M, z, beta};
       double minus_ll_tmp = optim_newton(
           [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
             return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
@@ -964,7 +960,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
         m_est_beta = !parameters.has_beta;
-        m_sigma2 = std::move(okm_data.sigma2);
         m_est_sigma2 = !parameters.has_sigma2;
       }
     }
