@@ -1,14 +1,12 @@
 #include "Kriging_binding.hpp"
 
+#include <carma/carma.h>
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+
 #include <armadillo>
 #include <libKriging/Kriging.hpp>
 #include <random>
-
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#include <armadillo>
-
-#include <carma/carma.h>
 
 PyKriging::PyKriging(const std::string& kernel) : m_internal{new Kriging{kernel}} {}
 

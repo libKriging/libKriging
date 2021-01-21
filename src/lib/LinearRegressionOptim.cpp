@@ -16,11 +16,11 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) 
 
   arma::vec y_est = d->X * coef;
 
-  std::cout<<"****************"<<std::endl;
-  arma::cout<<"coef: "<<coef<<arma::endl;
+  std::cout << "****************" << std::endl;
+  arma::cout << "coef: " << coef << arma::endl;
 
   double err = arma::sum(arma::square(y_est - d->y));
-  std::cout<<"Err: "<<err<<std::endl;
+  std::cout << "Err: " << err << std::endl;
 
   if (grad_out != nullptr) {
     int k = coef.n_elem;
@@ -35,7 +35,7 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) 
     }
     arma::cout << "Grad: " << *grad_out << arma::endl;
   }
-  //arma::cout<<"Y = X * s :\n"<<y_est<<arma::endl;
+  // arma::cout<<"Y = X * s :\n"<<y_est<<arma::endl;
 
   return err;
 }
@@ -63,7 +63,7 @@ void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
       },
       nullptr,
       algo_settings);
-  if (!bfgs_ok){
+  if (!bfgs_ok) {
     std::cout.flush();
     throw std::runtime_error("BFGS failed");
   }

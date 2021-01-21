@@ -47,7 +47,7 @@ class Kriging {
   const bool& estim_theta() const { return m_est_theta; };
   const double& sigma2() const { return m_sigma2; };
   const bool& estim_sigma2() const { return m_est_sigma2; };
-  
+
  private:
   std::string m_covType;
   arma::mat m_X;
@@ -120,7 +120,9 @@ class Kriging {
   LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::mat logLikelihoodHess(const arma::vec& theta);
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta, const bool grad, const bool hess);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
+                                                                               const bool grad,
+                                                                               const bool hess);
   LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);

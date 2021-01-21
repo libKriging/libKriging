@@ -1,4 +1,5 @@
 #include "RandomGenerator.hpp"
+
 #include <random>
 
 RandomGenerator::RandomGenerator(unsigned int seed) : m_engine(seed) {}

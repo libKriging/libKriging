@@ -5,14 +5,13 @@
 namespace RequiresArg {
 
 bool validate(const Requirement& v, const unsigned n) {
-  return std::visit(
-      overload{
-          [n](const RequiresArg::AtLeast& x) { return (x.n <= n); },
-          [n](const RequiresArg::Exactly& x) { return (x.n == n); },
-          [n](const RequiresArg::Range& x) { return (x.min <= n && n <= x.max); },
-          [](const RequiresArg::Autodetect& /*unused*/) { return true; }  // default
-      },
-      v);
+  return std::visit(overload{
+                        [n](const RequiresArg::AtLeast& x) { return (x.n <= n); },
+                        [n](const RequiresArg::Exactly& x) { return (x.n == n); },
+                        [n](const RequiresArg::Range& x) { return (x.min <= n && n <= x.max); },
+                        [](const RequiresArg::Autodetect& /*unused*/) { return true; }  // default
+                    },
+                    v);
 }
 
 std::string describe(const Requirement& v) {
