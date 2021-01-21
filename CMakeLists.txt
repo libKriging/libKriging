@@ -462,7 +462,7 @@ if (CLANG_FORMAT)
             OUTPUT_VARIABLE CLANG_FORMAT_RAW_VERSION)
     string(REGEX MATCH "[1-9][0-9]*\\.[0-9]+\\.[0-9]+"
             CLANG_FORMAT_VERSION ${CLANG_FORMAT_RAW_VERSION})
-    if (CLANG_FORMAT_VERSION VERSION_GREATER_EQUAL "6.0.0")
+    if (CLANG_FORMAT_VERSION VERSION_GREATER_EQUAL "9.0.0")
         add_custom_target(clang-format
                 COMMAND echo "running ${CLANG_FORMAT} ..."
                 COMMAND ${CMAKE_COMMAND}
