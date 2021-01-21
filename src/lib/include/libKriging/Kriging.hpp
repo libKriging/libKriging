@@ -87,6 +87,9 @@ class Kriging {
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool estim_beta;
+    double sigma2;
+    bool estim_sigma2;
   };
 
   double logLikelihood(const arma::vec& _theta,
