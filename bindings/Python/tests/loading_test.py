@@ -3,7 +3,7 @@ import pytest
 
 
 def test_version():
-    assert m.__version__ == '0.3.0'
+    assert m.__version__ == '0.3.1'
 
 
 @pytest.mark.skipif(m.__build_type__ != 'Debug',

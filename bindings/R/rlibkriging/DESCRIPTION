@@ -1,7 +1,7 @@
 Package: rlibkriging
 Type: Package
 Title: Kriging model through libKriging binding
-Version: 0.3-0
+Version: 0.3-1
 Date: 2021-01-21
 Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>
 Maintainer: Pascal Havé <hpwxf@haveneer.com>
