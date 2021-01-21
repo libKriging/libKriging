@@ -14,7 +14,7 @@ if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
 fi
 
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
-	curl -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
 	cd ${HOME}/Downloads
 	${BASEDIR}/install_conda.bat
 	cd ${BASEDIR}
@@ -44,7 +44,7 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
     #python3 -m pip install --progress-bar off pip --upgrade
 
     ## By 'hand'
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py # curl already available with Chocolatey
+    curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py # curl already available with Chocolatey
     python3 get-pip.py
   fi
   

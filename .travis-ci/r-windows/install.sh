@@ -20,7 +20,7 @@ if [ "${TRAVIS}" == "true" ]; then
   choco install -y --no-progress r.project --version 3.6.0
   if [ ! -f "C:/Rtools/VERSION.txt" ]; then
       # https://cran.r-project.org/bin/windows/Rtools
-      curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
+      curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
       "${BASEDIR}"/install_rtools.bat
   else
     echo "Rtools installation detected: nothing to do"
@@ -29,7 +29,7 @@ elif [ "${GITHUB_ACTIONS}" == "true" ]; then
   # déjà installé
 #  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
 #      # https://cran.r-project.org/bin/windows/Rtools
-#      curl -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe
+#      curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe
 #      "${BASEDIR}"/install_rtools.bat
 #  else
 #    echo "Rtools installation detected: nothing to do"
