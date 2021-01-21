@@ -435,9 +435,9 @@ double Kriging::logLikelihood(const arma::vec& _theta,
 LIBKRIGING_EXPORT double Kriging::logLikelihoodFun(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
-  arma::mat z;
+  arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   return logLikelihood(_theta, nullptr, nullptr, &okm_data);
@@ -446,9 +446,9 @@ LIBKRIGING_EXPORT double Kriging::logLikelihoodFun(const arma::vec& _theta) {
 LIBKRIGING_EXPORT arma::vec Kriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
-  arma::mat z;
+  arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   arma::vec grad(_theta.n_elem);
@@ -459,9 +459,9 @@ LIBKRIGING_EXPORT arma::vec Kriging::logLikelihoodGrad(const arma::vec& _theta) 
 LIBKRIGING_EXPORT arma::mat Kriging::logLikelihoodHess(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
-  arma::mat z;
+  arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   arma::vec grad(_theta.n_elem);
@@ -474,9 +474,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::logLikelihoodHess(const arma::vec& _theta) 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodEval(const arma::vec& _theta, const bool _grad, const bool _hess) {
   arma::mat T;
   arma::mat M;
-  arma::mat z;
+  arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   double ll = -1;
@@ -630,7 +630,7 @@ LIBKRIGING_EXPORT double Kriging::leaveOneOutFun(const arma::vec& _theta) {
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   return leaveOneOut(_theta, nullptr, &okm_data);
@@ -641,7 +641,7 @@ LIBKRIGING_EXPORT arma::vec Kriging::leaveOneOutGrad(const arma::vec& _theta) {
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   arma::vec grad(_theta.n_elem);
@@ -656,7 +656,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutEval(const a
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  double sigma2;
+  double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
   
   double loo = -1;
@@ -849,7 +849,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_theta = false;
     arma::mat T;
     arma::mat M;
-    arma::mat z;
+    arma::colvec z;
     arma::colvec beta;
     if (parameters.has_beta) beta = parameters.beta;
     double sigma2 = -1;
@@ -888,7 +888,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       arma::colvec theta_tmp = trans(theta0.row(i));
       arma::mat T;
       arma::mat M;
-      arma::mat z;
+      arma::colvec z;
       arma::colvec beta;
       if (parameters.has_beta) beta = parameters.beta;
       double sigma2 = -1;
@@ -939,7 +939,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       arma::colvec theta_tmp = trans(theta0.row(i));
       arma::mat T;
       arma::mat M;
-      arma::mat z;
+      arma::colvec z;
       arma::colvec beta;
       if (parameters.has_beta) beta = parameters.beta;
       double sigma2 = -1;
