@@ -449,7 +449,7 @@ LIBKRIGING_EXPORT double Kriging::logLikelihoodFun(const arma::vec& _theta) {
 LIBKRIGING_EXPORT arma::vec Kriging::logLikelihoodGrad(const arma::vec& _theta) {
   arma::mat T;
   arma::mat M;
-  arma::mat z;
+  arma::colvec z;
   arma::colvec beta;
   double sigma2;
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
