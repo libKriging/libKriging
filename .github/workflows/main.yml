@@ -7,6 +7,8 @@ on:
       - '*'
     tags-ignore:
       - 'v*' # done in release
+  schedule:
+    - cron: '0 2 * * SAT'
 
 # About image content:
 # https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images
