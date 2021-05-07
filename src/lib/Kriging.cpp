@@ -54,7 +54,37 @@ std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> 
       };
 
 std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm_exp
-    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) { return fabs(xi[dim] - xj[dim]); };
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) { 
+        return fabs(xi[dim] - xj[dim]); 
+      };
+
+const double SQRT_3 = std::sqrt(3.0);
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_matern32
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+        arma::vec diff = SQRT_3 * arma::abs(xi - xj);
+        return exp(-arma::sum(diff - arma::log1p(diff)));
+      };
+
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm_matern32
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+        double d = SQRT_3 * fabs(xi[dim] - xj[dim]);
+        return d * d / (1+d);
+      };
+
+const double SQRT_5 = std::sqrt(5.0);
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun_matern52
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj) {
+        arma::vec diff = SQRT_5 * arma::abs(xi - xj);
+        return exp(-arma::sum(diff - arma::log1p(diff + (diff % diff)/3)));
+      };
+
+std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm_matern52
+    = [](arma::subview_col<double>&& xi, arma::subview_col<double>&& xj, int dim) {
+        double d = SQRT_5 * fabs(xi[dim] - xj[dim]);
+        double a = 1+d;
+        double b = d*d/3;
+        return a*b / (a+b);
+      };
 
 /************************************************/
 /** implementation details forward declaration **/
@@ -133,6 +163,12 @@ void Kriging::make_Cov(const std::string& covType) {
   } else if (covType.compare("exp") == 0) {
     CovNorm_fun = CovNorm_fun_exp;
     Dln_CovNorm = Dln_CovNorm_exp;
+  } else if (covType.compare("matern3_2") == 0) {
+    CovNorm_fun = CovNorm_fun_matern32;
+    Dln_CovNorm = Dln_CovNorm_matern32;
+  } else if (covType.compare("matern5_2") == 0) {
+    CovNorm_fun = CovNorm_fun_matern52;
+    Dln_CovNorm = Dln_CovNorm_matern52;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
