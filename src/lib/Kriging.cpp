@@ -1034,6 +1034,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
       return this->leaveOneOut(_theta, grad_out, okm_data);
     };
+  } else if (objective.compare("LMP") == 0) { 
+    // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
+    //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
+    fit_ofn = [this](const arma::vec& _theta, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+      double lmp = this->logMargPost(_theta, grad_out, okm_data);
+      if (grad_out != nullptr)
+        *grad_out = -*grad_out;
+      return -lmp;
+    };
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
 
