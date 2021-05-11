@@ -15,7 +15,9 @@ BASEDIR=$(readlink -f "${BASEDIR}")
 choco install -y --no-progress make --version 4.3
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
-  choco install -y --no-progress octave.portable
+  # select your version from https://community.chocolatey.org/packages/octave.portable#versionhistory
+  # Don't forget to update loadenv.sh with the related path
+  choco install -y --no-progress octave.portable --version 5.2.0.1
   if [[ ! -e  /c/windows/system32/GLU32.DLL ]]; then
     # add missing GLU32.dll in travis-ci windows image
     # 64bit 10.0.14393.0	161.5 KB	U.S. English	OpenGL Utility Library DLL

@@ -7,6 +7,8 @@ on:
       - '*'
     tags-ignore:
       - 'v*' # done in release
+  schedule:
+    - cron: '0 2 * * SAT'
 
 # About image content:
 # https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images
@@ -185,12 +187,6 @@ jobs:
       - name: pre-install-windows
         shell: bash
         run: |
-          # add alternative name python3 (default is python)
-          PYTHON_CMD_PATH=$(which python)
-          PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
-          PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
-          ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
-
           # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
           # Rscript -e 'print(R.home(component="etc"))'
           # Rscript -e 'Sys.getenv("R_HOME")'
