@@ -1,0 +1,140 @@
+name: Performance benchmark
+
+on:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - 'v*' # done in release
+
+env:
+  DEBUG_CI: false
+
+jobs:
+  guideline-checks:       
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Linux BLAS"
+            os: ubuntu-20.04
+            mode: Release
+            enable_R: on
+            install_blas: sudo apt install -qy libblas3 libblas-dev
+
+          - name: "Linux OpenBLAS"
+            os: ubuntu-20.04
+            mode: Release
+            enable_R: on
+            install_blas: sudo apt install -qy libopenblas-base libopenblas-dev
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=${{matrix.mode}}"     >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_R_BINDING=on"       >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=r-linux-macos"  >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+          fi
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=octave-windows" >> $GITHUB_ENV
+          elif [ "${ENABLE_R_BINDING}" == "on" ]; then
+            echo "BUILD_NAME=r-windows"      >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=windows"        >> $GITHUB_ENV
+          fi
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install liblapack-dev python3-pip
+          if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
+            sudo apt install -qy octave octave-pkg-dev
+          fi
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            sudo apt install -qy r-base liblapack-dev gfortran
+          fi
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: pre-install-macos
+        shell: bash
+        run: |
+          if [ "${ENABLE_R_BINDING}" == "on" ]; then
+            brew install coreutils # for readlink -f : FIXME usefull ?
+          fi
+        if: runner.os == 'macOS'
+
+      - name: pre-install-windows
+        shell: bash
+        run: |
+          # add alternative name python3 (default is python)
+          PYTHON_CMD_PATH=$(which python)
+          PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
+          PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
+          ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
+
+          # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
+          # Rscript -e 'print(R.home(component="etc"))'
+          # Rscript -e 'Sys.getenv("R_HOME")'
+          # Rscript -e 'Sys.getenv("R_ARCH")'
+          mkdir -p ~/.R
+          echo "# Custom configuration" > ~/.R/Makevars
+          echo "BINPREF=C:/rtools40/mingw64/bin/" >> ~/.R/Makevars
+          echo 'SHLIB_CXXLD=$(BINPREF)g++' >> ~/.R/Makevars
+          # R CMD config SHLIB_CXXLD # updated config
+        if: runner.os == 'Windows'
+
+      - name: install BLAS
+        shell: bash
+        run: ${{matrix.install_blas}}
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: bench
+        shell: bash
+        run: cd bindings/R && bench_perf-full.sh
+      
+      - name: report 
+		uses: actions/upload-artifact@v2
+      	with:
+          name: artifacts-${{ matrix.name }}
+          path: |
+          	bindings/R/*.log
+          	bindings/R/*.out
+          	bindings/R/*.Rout
+          	bindings/R/*.pdf

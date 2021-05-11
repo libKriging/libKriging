@@ -1,0 +1,525 @@
+---
+title: "libKriging performance report"
+author: "Y. Richet"
+date: "22/12/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, error = TRUE)
+rlibkriging_path = "./rlibkriging"
+rlibkriging_benchs_path = file.path(rlibkriging_path,"tests","testthat")
+```
+
+This report is intended to display a (quite) full benchmark of armadillo/libKriging implementation and methods versus R/DiceKriging ones.
+
+```{r install}
+pack=list.files(file.path(rlibkriging_path,".."),pattern = ".tar.gz",full.names = T)
+install.packages(pack,repos=NULL)
+library(rlibkriging)
+#tinytex::install_tinytex()
+```
+
+```{r system, echo = TRUE}
+Sys.info()
+sessionInfo()
+```
+
+```{r in-out, echo=F}
+logn = seq(1,2.5,by=.1)
+
+plot_times = function(times,N,name,eps=0.001) {
+  y = c(times$cpp,times$R)
+  plot(main = paste(N,name),floor(10^logn),log(eps+times$R),
+       ylim=c(log(eps+min(y)),log(eps+max(y))),
+       xlab="nb points",ylab="log(+user_time (s))")
+  text((min(floor(10^logn))+max(floor(10^logn)))/2,(log(eps+min(y))+log(eps+max(y)))/2,"R   ")
+  points(floor(10^logn),log(eps+times$cpp),col='red')
+  text((min(floor(10^logn))+max(floor(10^logn)))/2,(log(eps+min(y))+log(eps+max(y)))/2,"   C++",col = 'red')
+}
+```
+
+
+## Linear Algebra
+
+```{r setup-linalg, echo=F}
+N = 1000
+```
+
+```{r bench-qr}
+times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  X <- X %*% t(X)
+  diag(X) <- 10
+  
+  times$R[i] = system.time(
+    try({for (t in 1:N) k <- qr.Q(qr(X))})
+  )[1]
+  
+  times$cpp[i] = system.time(
+    try(r <- bench_qr(N,X))
+  )[1]
+}
+
+plot_times(times,N,"QR")
+```
+
+```{r bench-cholsym}
+times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  X <- X %*% t(X)
+  diag(X) <- 10
+  
+  times$R[i] = system.time(
+    try({for (t in 1:N) k <- chol(X)})
+  )[1]
+  
+  times$cpp[i] = system.time(
+    try(r <- bench_cholsym(N,X))
+  )[1]
+}
+
+plot_times(times,N,"CholSym")
+```
+
+```{r inv-sympd}
+times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  X <- X %*% t(X)
+  diag(X) <- 10
+  
+  times$R[i] = system.time(
+    try({for (t in 1:N) {T = chol(X);k <- chol2inv(T)}})
+  )[1]
+  
+  times$cpp[i] = system.time(
+    try(r <- bench_invsympd(N,X))
+  )[1]
+}
+
+plot_times(times,N,"inv SymPD")
+```
+
+
+```{r solve-tri}
+times = list(R=rep(NA,length(logn)),cpp=rep(NA,length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  X <- upper.tri(X %*% t(X),diag = T)
+  y = matrix(runif(n))
+  
+  times$R[i] = system.time(
+    try({for (t in 1:N) k <- backsolve(X, y, upper.tri = T)})
+  )[1]
+  
+  times$cpp[i] = system.time(
+    try(r <- bench_solvetri(N,X,y))
+  )[1]
+}
+
+plot_times(times,N,"Solve TriMat")
+```
+
+
+## Kriging
+
+```{r setup-kriging, echo=F}
+f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
+N <- 100
+```
+
+
+### logLikelihood (& deriv.)
+
+```{r logLikelihood}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+theta <- 0.5
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
+  llx <- 0
+  times$R[i] = system.time(
+    try({for (t in 1:N) llx <- DiceKriging::logLikFun(rep(theta,ncol(X)),k)})
+  )[1]
+
+  r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,
+             theta=matrix(k@covariance@range.val,ncol=d)))
+  times$cpp[i] = system.time(
+    # try({ll2x <- bench_LogLik(N,r,rep(theta,ncol(X)))})
+    try({for (t in 1:N) ll2x <- rlibkriging::logLikelihood(r,rep(theta,ncol(X)))$logLikelihood[1]}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  if (abs((llx-ll2x)/llx)>1E-3) warning("LL is not identical bw C++/R")
+}
+
+plot_times(times,N,"logLikelihood")
+```
+
+
+```{r logLikelihood-grad}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+theta <- 0.5
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
+  gllx <- rep(0, ncol(X))
+  times$R[i] = system.time(
+    try({for (t in 1:N) {envx <- new.env();DiceKriging::logLikFun(rep(theta, ncol(X)), k, envx); 
+    gllx <- DiceKriging::logLikGrad(rep(theta, ncol(X)), k, envx)}})
+  )[1]
+
+  r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,
+             theta=matrix(k@covariance@range.val,ncol=d)))
+  times$cpp[i] = system.time(
+    # try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
+    try({for (t in 1:N) gll2x <- logLikelihood(r,rep(theta,ncol(X)),grad=T)$logLikelihoodGrad}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  if (max(abs((gllx-gll2x)/gllx))>1E-3) warning("grad LL is not identical bw C++/R")
+}
+
+plot_times(times,N,"logLikelihood Grad")
+```
+
+
+### leaveOneOut (& deriv.)
+
+```{r leaveOneOut}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+theta <- 0.5
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss",
+                       estim.method="LOO",
+                       control=list(trace=F))
+  loox <- 0
+  times$R[i] = system.time(
+    try({for (t in 1:N) loox <- DiceKriging::leaveOneOutFun(rep(theta,ncol(X)),k)})
+  )[1]
+
+  r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,
+             theta=matrix(k@covariance@range.val,ncol=d)))
+  times$cpp[i] = system.time(
+    try({for (t in 1:N) loo2x <- leaveOneOut(r,rep(theta,ncol(X)))$leaveOneOut[1]}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  if (abs((loox-loo2x)/loox)>1E-3) warning("LOO is not identical bw C++/R")
+}
+
+plot_times(times,N,"leaveOneOut")
+```
+
+```{r leaveOneOut-grad}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+theta <- 0.5
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss",
+                       estim.method="LOO",
+                       control=list(trace=F))
+  gllx <- rep(0, ncol(X))
+  times$R[i] = system.time(
+    try({for (t in 1:N) {envx <- new.env();DiceKriging::leaveOneOutFun(rep(theta, ncol(X)), k, envx);
+    gllx <-  DiceKriging::leaveOneOutGrad(rep(theta, ncol(X)), k, envx)}})
+  )[1]
+
+  r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,
+             theta=matrix(k@covariance@range.val,ncol=d)))
+  times$cpp[i] = system.time(
+    # try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
+    try({for (t in 1:N) gll2x <- leaveOneOut(r,rep(theta,ncol(X)),grad=T)$leaveOneOutGrad}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  if (max(abs((gllx-gll2x)/gllx))>1E-3) warning("grad LOO is not identical bw C++/R")
+}
+
+plot_times(times,N,"leaveOneOut Grad")
+```
+
+
+### fit
+
+#### logLikelihood / BFGS
+
+```{r logLikelihood-BFGS}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- 1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- DiceDesign::lhsDesign(n,dimension=d)$design #matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- NULL
+  times$R[i] = system.time(
+    try(for (j in 1:N) k <- DiceKriging::km(design=X,response=y,
+                                            covtype = "gauss", 
+                                            multistart = 1,control = list(trace=F,maxit=10),
+                                            lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
+  )[1]
+  
+  r <- NULL
+  times$cpp[i] = system.time(
+    try(for (j in 1:N) r <- Kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
+                                    # to let start optim at same initial point
+                                    parameters=list(theta=matrix(k@parinit,ncol=d))))
+  )[1]
+  
+  ll_cpp <- logLikelihood(r, as.list(r)$theta)$logLikelihood[1]
+  e <- new.env()
+  ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
+  
+  gll_cpp <- logLikelihood(r, as.list(r)$theta,grad=T)$logLikelihoodGrad
+  gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
+  
+  if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
+    warning("LL function is not the same bw DiceKriging/libKriging: ",logLikelihood(r,as.list(r)$theta)$logLikelihood[1]," vs. ",DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))  
+  
+  if ((ll_cpp - ll_R)/ll_R < -.01 )
+    warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)
+  
+  if ((ll_R - ll_cpp)/ll_R < -.01 )
+    warning("DiceKriging LL ",ll_R," << libKriging LL ",ll_cpp)
+}
+
+plot_times(times,N,"fit logLikelihood / BFGS")
+```
+
+
+#### leaveOneOut / BFGS
+
+```{r leaveOneOut-BFGS}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- 1+floor(log(n)) #floor(2+i/3)
+  
+ # print(n)
+  set.seed(123)
+  X <- DiceDesign::lhsDesign(n,dimension=d)$design #matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- NULL
+  times$R[i] = system.time(
+    try(for (j in 1:N) k <- DiceKriging::km(design=X,response=y,
+                                            covtype = "gauss", 
+                                            estim.method="LOO",
+                                            multistart = 1,control = list(trace=F,maxit=10),
+                                            lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
+  )[1]
+  
+  r <- NULL
+  times$cpp[i] = system.time(
+    try(for (j in 1:N) r <- Kriging(y, X,"gauss","constant",FALSE,"BFGS","LOO",
+                                    # to let start optim at same initial point
+                                    parameters=list(theta=matrix(k@parinit,ncol=d))))
+  )[1]
+  
+  ll_cpp <- leaveOneOut(r, as.list(r)$theta)$leaveOneOut[1]
+  e <- new.env()
+  ll_R <- DiceKriging::leaveOneOutFun(k@covariance@range.val, k, e)
+  
+  gll_cpp <- leaveOneOut(r, as.list(r)$theta,grad=T)$leaveOneOutGrad
+  gll_R <- DiceKriging::leaveOneOutGrad(k@covariance@range.val, k, e)
+  
+  if (abs(ll_cpp - DiceKriging::leaveOneOutFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
+    warning("LOO function is not the same bw DiceKriging/libKriging: ",leaveOneOut(r,as.list(r)$theta)$leaveOneOut[1]," vs. ",DiceKriging::leaveOneOutFun(param=as.numeric(as.list(r)$theta),model=k))  
+  
+  if ((ll_cpp - ll_R)/ll_R < -.01 )
+    warning("libKriging LOO ",ll_cpp," << DiceKriging LOO ",ll_R)
+  
+  if ((ll_R - ll_cpp)/ll_R < -.01 )
+    warning("DiceKriging LOO ",ll_R," << libKriging LOO ",ll_cpp)
+}
+
+plot_times(times,N,"fit leaveOneOut / BFGS")
+```
+
+
+#### logLikelihood / Newton
+
+```{r logLikelihood-Newton}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <- 1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- DiceDesign::lhsDesign(n,dimension=d)$design #matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  k <- NULL
+  times$R[i] = system.time(
+    try(for (j in 1:N) k <- DiceKriging::km(design=X,response=y,
+                                            covtype = "gauss", 
+                                            multistart = 1,control = list(trace=F,maxit=10),
+                                            lower=rep(0.001,d),upper=rep(2*sqrt(d),d)))
+  )[1]
+  
+  r <- NULL
+  times$cpp[i] = system.time(
+    try(for (j in 1:N) r <- Kriging(y, X,"gauss","constant",FALSE,"Newton","LL",
+                                    # to let start optim at same initial point
+                                    parameters=list(theta=matrix(k@parinit,ncol=d))))
+  )[1]
+  
+  ll_cpp <- logLikelihoodFun(r, as.list(r)$theta)
+  e <- new.env()
+  ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
+  
+  gll_cpp <- logLikelihoodGrad(r, as.list(r)$theta)
+  gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
+  
+  if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
+    warning("LL function is not the same bw DiceKriging/libKriging: ",logLikelihoodFun(r,as.list(r)$theta)," vs. ",DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))  
+  
+  if ((ll_cpp - ll_R)/ll_R < -.01 )
+    warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)
+  
+  if ((ll_R - ll_cpp)/ll_R < -.01 )
+    warning("DiceKriging LL ",ll_R," << libKriging LL ",ll_cpp)
+}
+
+plot_times(times,N,"fit logLikelihood / Newton")
+```
+
+
+### predict
+
+```{r predict}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  newX = matrix(runif(100*d),ncol=d)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
+  times$R[i] = system.time(
+    try({for (t in 1:N) p <- DiceKriging::predict(k,newdata = newX, type="UK",cov.compute = FALSE,checkNames=FALSE)})
+  )[1]
+
+  r <- Kriging(y, X,"gauss", "constant", FALSE,"none", "LL",
+               parameters=list(sigma2=k@covariance@sd2,theta=matrix(k@parinit,ncol=d)))
+  times$cpp[i] = system.time(
+    try({for (t in 1:N) p2 <- predict(r,newX,TRUE,FALSE)}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  if (max(abs(p$mean-p2$mean))>1E-3) warning("predict is not identical bw C++/R")
+}
+
+plot_times(times,N,"predict")
+```
+
+
+### simulate
+
+```{r simulate}
+times <- list(R=rep(NA, length(logn)), cpp=rep(NA, length(logn)))
+
+for (i in 1:length(logn)) {
+  n <- floor(10^logn[i])
+  d <-  1+floor(log(n)) #floor(2+i/3)
+  
+#  print(n)
+  set.seed(123)
+  X <- matrix(runif(n*d),ncol=d)
+  y <- f(X)
+  
+  newX = matrix(runif(100*d),ncol=d)
+  
+  k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
+  times$R[i] = system.time(
+    try({for (t in 1:N) s <- DiceKriging::simulate(k,newdata = newX, nsim=10,checkNames=FALSE,cond=TRUE)})
+  )[1]
+
+  r <- Kriging(y, X,"gauss", "constant", FALSE,"none", "LL",
+               parameters=list(sigma2=k@covariance@sd2,theta=matrix(k@parinit,ncol=d)))
+  times$cpp[i] = system.time(
+    try({for (t in 1:N) s2 <- simulate(r,10,seed=123,newX)}) # Loop should be done inside c++, not from R...
+  )[1]
+  
+  # Cannot check, because random generator are not the same. if (abs(p$mean-p2$mean)>1E-3) warning("predict is not identical bw C++/R")
+}
+
+plot_times(times,N,"simulate")
+```
