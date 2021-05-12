@@ -10,9 +10,8 @@ on:
 env:
   DEBUG_CI: false
 
-jobs:
-  guideline-checks:       
-  build:
+jobs:    
+  bench:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -30,6 +29,12 @@ jobs:
             mode: Release
             enable_R: on
             install_blas: sudo apt install -qy libopenblas-base libopenblas-dev
+
+          - name: "Linux Intel MKL"
+            os: ubuntu-20.04
+            mode: Release
+            enable_R: on
+            install_blas: sudo apt install -qy intel-mkl-full
 
     steps:
       - uses: actions/checkout@v2
@@ -72,7 +77,7 @@ jobs:
           if [ "${{matrix.force_update}}" == "on" ]; then
             sudo apt update
           fi
-          sudo apt install liblapack-dev python3-pip
+          sudo apt install liblapack-dev python3-pip clang-tidy
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave octave-pkg-dev
           fi
@@ -127,14 +132,16 @@ jobs:
 
       - name: bench
         shell: bash
-        run: cd bindings/R && bench_perf-full.sh
+        run: |
+          sudo apt install -qy pandoc texlive-full && sudo Rscript -e "if (!('rmarkdown' %in% installed.packages())) install.packages('rmarkdown')"
+          cd bindings/R && chmod a+x bench_perf-full.sh && sudo ./bench_perf-full.sh
       
       - name: report 
-		uses: actions/upload-artifact@v2
-      	with:
-          name: artifacts-${{ matrix.name }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: report-${{matrix.name}}
           path: |
-          	bindings/R/*.log
-          	bindings/R/*.out
-          	bindings/R/*.Rout
-          	bindings/R/*.pdf
+            bindings/R/*.log
+            bindings/R/*.out
+            bindings/R/*.Rout
+            bindings/R/*.pdf

@@ -14,6 +14,7 @@ rlibkriging_benchs_path = file.path(rlibkriging_path,"tests","testthat")
 This report is intended to display a (quite) full benchmark of armadillo/libKriging implementation and methods versus R/DiceKriging ones.
 
 ```{r install}
+install.packages(c("Rcpp", "RcppArmadillo", "testthat","DiceKriging", "DiceDesign"))
 pack=list.files(file.path(rlibkriging_path,".."),pattern = ".tar.gz",full.names = T)
 install.packages(pack,repos=NULL)
 library(rlibkriging)

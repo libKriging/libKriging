@@ -6,6 +6,7 @@
 #include "libKriging/Bench.hpp"
 #include "libKriging/Kriging.hpp"
 
+//' @export
 // [[Rcpp::export]]
 arma::mat bench_solvetri(int n, arma::mat X, arma::vec y) {
   Bench* b = new Bench(n);
@@ -13,6 +14,7 @@ arma::mat bench_solvetri(int n, arma::mat X, arma::vec y) {
   return impl_ptr->SolveTri(std::move(X), std::move(y));
 }
 
+//' @export
 // [[Rcpp::export]]
 arma::mat bench_cholsym(int n, arma::mat X) {
   Bench* b = new Bench(n);
@@ -20,6 +22,8 @@ arma::mat bench_cholsym(int n, arma::mat X) {
   return impl_ptr->CholSym(std::move(X));
 }
 
+//' @export
+//' @export
 // [[Rcpp::export]]
 arma::mat bench_invsympd(int n, arma::mat X) {
   Bench* b = new Bench(n);
@@ -27,6 +31,7 @@ arma::mat bench_invsympd(int n, arma::mat X) {
   return impl_ptr->InvSymPD(std::move(X));
 }
 
+//' @export
 // [[Rcpp::export]]
 Rcpp::List bench_qr(int n, arma::mat X) {
   Bench* b = new Bench(n);
@@ -35,6 +40,7 @@ Rcpp::List bench_qr(int n, arma::mat X) {
   return Rcpp::List::create(Rcpp::Named("Q") = std::get<0>(ans), Rcpp::Named("R") = std::get<1>(ans));
 }
 
+//' @export
 // [[Rcpp::export]]
 double bench_LogLik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("Kriging"))
@@ -47,6 +53,7 @@ double bench_LogLik(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   return impl_ptr->LogLik(*ok, std::move(theta));
 }
 
+//' @export
 // [[Rcpp::export]]
 arma::vec bench_LogLikGrad(int n, Rcpp::List ordinaryKriging, arma::vec theta) {
   if (!ordinaryKriging.inherits("Kriging"))
