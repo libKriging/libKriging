@@ -391,7 +391,7 @@ for (i in 1:length(logn)) {
   e <- new.env()
   ll_R <- DiceKriging::leaveOneOutFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- leaveOneOut(r, t(as.list(r)$theta,grad=T))$leaveOneOutGrad
+  gll_cpp <- leaveOneOut(r, t(as.list(r)$theta),grad=T)$leaveOneOutGrad
   gll_R <- DiceKriging::leaveOneOutGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::leaveOneOutFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
