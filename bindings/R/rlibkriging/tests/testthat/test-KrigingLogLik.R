@@ -10,9 +10,10 @@ for (kernel in c("gauss","exp")) {
   X <- as.matrix(runif(n))
   y = f(X)
   points(X,y)
+
   k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
   ll = function(theta) DiceKriging::logLikFun(theta,k)
-  plot(Vectorize(ll),ylab="LL",xlab="theta")
+  plot(Vectorize(ll),ylab="LL",xlab="theta",xlim=c(0.01,1))
   for (x in seq(0.01,1,,11)){
     envx = new.env()
     llx = DiceKriging::logLikFun(x,k,envx)
@@ -21,12 +22,12 @@ for (kernel in c("gauss","exp")) {
   }
   
   r <- Kriging(y, X, kernel)
-  ll2 = function(theta) kriging_loglikelihood(r,theta)
+  ll2 = function(theta) logLikelihood(r,theta)$logLikelihood
   # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
   for (x in seq(0.01,1,,11)){
     envx = new.env()
-    ll2x = kriging_logLikelihood(r,x)$logLikelihood
-    gll2x = kriging_logLikelihood(r,x,grad = T)$logLikelihoodGrad
+    ll2x = logLikelihood(r,x)$logLikelihood
+    gll2x = logLikelihood(r,x,grad = T)$logLikelihoodGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
   
@@ -34,10 +35,39 @@ for (kernel in c("gauss","exp")) {
   x=.5
   xenv=new.env()
   test_that(desc="logLik is the same that DiceKriging one", 
-            expect_equal(kriging_logLikelihood(r,x)$logLikelihood,DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
+            expect_equal(logLikelihood(r,x)$logLikelihood,DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
   
   test_that(desc="logLik Grad is the same that DiceKriging one", 
-            expect_equal(kriging_logLikelihood(r,x,grad=T)$logLikelihoodGrad,DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
+            expect_equal(logLikelihood(r,x,grad=T)$logLikelihoodGrad,DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
+}
+
+
+########################## 2D
+
+
+
+for (kernel in c("gauss")){#"matern3_2","matern5_2","gauss","exp")) {
+  context(paste0("Check LogLikelihood for kernel ",kernel))
+  
+  f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
+  n <- 100
+  set.seed(123)
+  X <- cbind(runif(n),runif(n),runif(n))
+  y <- f(X)
+
+  k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
+  
+  #library(rlibkriging)
+  r <- Kriging(y, X, kernel)
+  
+  precision <- 1e-8  # the following tests should work with it, since the computations are analytical
+  x=c(.2,.5,.7)
+  xenv=new.env()
+  test_that(desc="logLik is the same that DiceKriging one", 
+            expect_equal(logLikelihood(r,x)$logLikelihood[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
+  
+  test_that(desc="logLik Grad is the same that DiceKriging one", 
+            expect_equal(logLikelihood(r,x,grad=T)$logLikelihoodGrad[1,],t(DiceKriging::logLikGrad(x,k,xenv))[1,],tolerance= precision))
 }
 
 

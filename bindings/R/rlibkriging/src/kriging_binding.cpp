@@ -240,7 +240,24 @@ Rcpp::List kriging_leaveOneOut(Rcpp::List k, arma::vec theta, bool grad = false)
   if (grad) {
     return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo),
                               Rcpp::Named("leaveOneOutGrad") = std::get<1>(loo));
-  } else if (!grad) {
+  } else {
     return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
+  }
+}
+
+// [[Rcpp::export]]
+Rcpp::List kriging_logMargPost(Rcpp::List k, arma::vec theta, bool grad = false) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostEval(theta, grad);
+  if (grad) {
+    return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp),
+                              Rcpp::Named("logMargPostGrad") = std::get<1>(lmp));
+  } else {
+    return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   }
 }
