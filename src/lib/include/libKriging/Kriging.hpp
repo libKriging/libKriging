@@ -59,6 +59,7 @@ class Kriging {
   RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
+  arma::cube m_dX;
   arma::mat m_F;
   arma::mat m_T;
   arma::mat m_M;
@@ -69,14 +70,8 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
-  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&)> CovNorm_fun;
-  std::function<double(arma::subview_col<double>&&, arma::subview_col<double>&&, int)> Dln_CovNorm;
-
-  // returns distance matrix form Xp to X
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X, const arma::mat& Xp);
-  LIBKRIGING_EXPORT arma::mat Cov(const arma::mat& X);
-  //  // same for one point
-  //  LIBKRIGING_EXPORT arma::colvec Cov(const arma::mat& X, const arma::rowvec& x, const arma::colvec& theta);
+  std::function<double(const arma::vec&)> CovNorm_fun; // dist_norm is L1 distance between to points of X, divided by theta
+  std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -97,6 +92,7 @@ class Kriging {
                        arma::mat* hess_out,
                        Kriging::OKModel* okm_data) const;
   double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
+  double logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
@@ -126,6 +122,8 @@ class Kriging {
   LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
   LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
+  
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
