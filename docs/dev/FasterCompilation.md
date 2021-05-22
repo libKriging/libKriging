@@ -21,16 +21,10 @@ There are two ways to enable a compiler cache:
     * You can set additional options in command line  
 
 
-To speed-up R compilation, you can override R default compiler.
+To speed-up R compilation, you can override the R default compilers.
 
-The following script generates a config using `ccache`
+To do so, use `tools/Makevars.py` script
 ```
-#!/usr/bin/env bash
-set -eo pipefail
-
-echo "# Custom ~/.R/Makevars configuration"
-CCACHE=ccache
-for comp in CC CXX CXX11 CXX14 CXX17 FC; do
-  echo "$comp=${CCACHE} $(R CMD config $comp)"
-done
+$ tools/Makevars.py --cache=ccache -w
+Config written in '/Users/pascal/.R/Makevars'
 ```
