@@ -4,7 +4,7 @@
 # Created on: 23/05/2021
 
 do_write = FALSE # set to TRUE to regenerate a set of values
-tolerance <- 1e-14
+tolerance <- 1e-12
 
 relative_error = function(x, y) {
   x_norm <- norm(x)
@@ -43,14 +43,14 @@ prefix = "data1-scal"
 # @formatter:off
 f = function(x) { 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7) }
 # @formatter:on
-n <- 5
-set.seed(123)
-X <- as.matrix(runif(n))
-y = f(X)
 
 filex <- file.path(refpath, sprintf("%s-X.csv", prefix))
 filey <- file.path(refpath, sprintf("%s-y.csv", prefix))
 if (do_write) {
+  n <- 5
+  set.seed(123)
+  X <- as.matrix(runif(n))
+  y = f(X)
   write.table(X, file = filex, row.names = FALSE, col.names = FALSE, sep = ',')
   write.table(y, file = filey, row.names = FALSE, col.names = FALSE, sep = ',')
 }
@@ -69,8 +69,9 @@ for (n in names(llo)) {
     write.table(llo[[n]], file = filer, row.names = FALSE, col.names = FALSE, sep = ',')
   }
   testme <- as.matrix(read.table(file = filer, header = FALSE, sep = ','))
-  expect_equal(dim(llo[[n]]), dim(testme))
-  expect_lt(relative_error(llo[[n]], testme), tolerance)
+  test_that(desc = paste0("Computed result should be  close to reference value on ", prefix, " llo$", n), {
+    expect_equal(dim(llo[[n]]), dim(testme))
+    expect_lt(relative_error(llo[[n]], testme), tolerance) })
 }
 for (n in names(loglik)) {
   filer <- file.path(refpath, sprintf("%s-result-%s.csv", prefix, n))
@@ -78,8 +79,9 @@ for (n in names(loglik)) {
     write.table(loglik[[n]], file = filer, row.names = FALSE, col.names = FALSE, sep = ',')
   }
   testme <- as.matrix(read.table(file = filer, header = FALSE, sep = ','))
-  expect_equal(dim(loglik[[n]]), dim(testme))
-  expect_lt(relative_error(loglik[[n]], testme), tolerance)
+  test_that(desc = paste0("Computed result should be close to reference value on ", prefix, " loglik$", n), {
+    expect_equal(dim(loglik[[n]]), dim(testme))
+    expect_lt(relative_error(loglik[[n]], testme), tolerance) })
 }
 
 
@@ -89,13 +91,12 @@ logn <- seq(1.1, 2, by = .1)
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
   d <- 1 + floor(log(n))
-  set.seed(123)
-  X <- matrix(runif(n * d), ncol = d)
-  y <- f(X)
-
   filex <- file.path(refpath, sprintf("%s-%i-X.csv", prefix, i))
   filey <- file.path(refpath, sprintf("%s-%i-y.csv", prefix, i))
   if (do_write) {
+    set.seed(123)
+    X <- matrix(runif(n * d), ncol = d)
+    y <- f(X)
     write.table(X, file = filex, row.names = FALSE, col.names = FALSE, sep = ',')
     write.table(y, file = filey, row.names = FALSE, col.names = FALSE, sep = ',')
   }
@@ -111,7 +112,8 @@ for (i in 1:length(logn)) {
       write.table(loglik[[n]], file = filer, row.names = FALSE, col.names = FALSE, sep = ',')
     }
     testme <- as.matrix(read.table(file = filer, header = FALSE, sep = ','))
-    expect_equal(dim(loglik[[n]]), dim(testme))
-    expect_lt(relative_error(loglik[[n]], testme), tolerance)
+    test_that(desc = paste0("Computed result should be close to reference value on ", prefix, " loglik$", n), {
+      expect_equal(dim(loglik[[n]]), dim(testme))
+      expect_lt(relative_error(loglik[[n]], testme), tolerance) })
   }
 }
