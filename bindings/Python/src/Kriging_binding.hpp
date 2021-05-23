@@ -1,9 +1,5 @@
-//
-// Created by Pascal Havé on 27/06/2020.
-//
-
-#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP
-#define LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP
+#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_KRIGING_BINDING_HPP
+#define LIBKRIGING_BINDINGS_PYTHON_SRC_KRIGING_BINDING_HPP
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -19,7 +15,13 @@ class PyKriging {
   PyKriging(const std::string& kernel);
   ~PyKriging();
 
-  void fit(const py::array_t<double>& y, const py::array_t<double>& X);
+  void fit(const py::array_t<double>& y,
+           const py::array_t<double>& X,
+           const Kriging::RegressionModel& regmodel = Kriging::RegressionModel::Constant,
+           bool normalize = false,
+           const std::string& optim = "BFGS",
+           const std::string& objective = "LL",
+           const Kriging::Parameters& parameters = Kriging::Parameters{});
 
   // TODO The result should be a namedtuple
   // see
@@ -29,8 +31,14 @@ class PyKriging {
                                                                                     bool withStd,
                                                                                     bool withCov);
 
+  std::tuple<double, py::array_t<double>> leaveOneOutEval(const py::array_t<double>& theta, const bool want_grad);
+
+  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodEval(const py::array_t<double>& theta,
+                                                                                 const bool want_grad,
+                                                                                 const bool want_hess);
+
  private:
   std::unique_ptr<Kriging> m_internal;
 };
 
-#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_ORDINARYKRIGING_BINDING_HPP
+#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_KRIGING_BINDING_HPP
