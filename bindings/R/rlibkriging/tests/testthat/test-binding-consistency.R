@@ -21,7 +21,7 @@ find_dir = function() {
   path = getwd()
   found <- FALSE
   while (!is.null(path) && !found) {
-    testpath <- file.path(path, "tests", "references")
+    testpath <- file.path(path, ".git", "..", "tests", "references")
     if (dir.exists(testpath)) {
       return(testpath)
     } else {
