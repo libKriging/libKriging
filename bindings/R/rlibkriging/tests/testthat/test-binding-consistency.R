@@ -40,13 +40,13 @@ find_dir = function() {
 refpath = find_dir()
 print(paste0("Reference directory=", refpath))
 prefix = "data1-scal"
-# @formatter:off
-f = function(x) { 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7) }
-# @formatter:on
 
 filex <- file.path(refpath, sprintf("%s-X.csv", prefix))
 filey <- file.path(refpath, sprintf("%s-y.csv", prefix))
 if (do_write) {
+  # @formatter:off
+  f = function(x) { 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7) }
+  # @formatter:on
   n <- 5
   set.seed(123)
   X <- as.matrix(runif(n))
@@ -86,14 +86,14 @@ for (n in names(loglik)) {
 
 
 prefix = "data2-grad"
-f <- function(X) apply(X, 1, function(x) prod(sin((x - .5)^2)))
 logn <- seq(1.1, 2, by = .1)
 for (i in 1:length(logn)) {
-  n <- floor(10^logn[i])
-  d <- 1 + floor(log(n))
   filex <- file.path(refpath, sprintf("%s-%i-X.csv", prefix, i))
   filey <- file.path(refpath, sprintf("%s-%i-y.csv", prefix, i))
   if (do_write) {
+    f <- function(X) apply(X, 1, function(x) prod(sin((x - .5)^2)))
+    n <- floor(10^logn[i])
+    d <- 1 + floor(log(n))
     set.seed(123)
     X <- matrix(runif(n * d), ncol = d)
     y <- f(X)
