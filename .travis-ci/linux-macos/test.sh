@@ -2,7 +2,7 @@
 set -eo pipefail
 
 if [[ "$DEBUG_CI" == "true" ]]; then
-  CTEST_FLAGS=--verbose
+  CTEST_FLAGS="--verbose --output-on-failure"
   set -x
 else
   CTEST_FLAGS=--output-on-failure
