@@ -8,10 +8,11 @@ X <- as.matrix(runif(n))
 y = f(X)
 #points(X,y)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+library(rlibkriging)
 r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
              parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
              theta=matrix(k@covariance@range.val),has_theta=TRUE))
-# m = kriging_model(r)
+# m = as.list(r)
 
 ntest <- 100
 Xtest <- as.matrix(runif(ntest))
@@ -19,7 +20,7 @@ ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE,checkNames=F)
 Yktest <- ptest$mean
 sktest <- ptest$sd
 cktest <- c(ptest$cov)
-Ytest <- kriging_predict(r,Xtest,TRUE,TRUE)
+Ytest <- predict(r,Xtest,TRUE,TRUE)
 
 precision <- 1e-5
 test_that(desc=paste0("pred mean is the same that DiceKriging one:\n ",paste0(collapse=",",Yktest),"\n ",paste0(collapse=",",Ytest$mean)),

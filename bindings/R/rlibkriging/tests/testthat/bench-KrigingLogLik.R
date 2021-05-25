@@ -18,6 +18,9 @@ for (x in xx){
   i <- i+1
 }
 
+ pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
+ install.packages(pack,repos=NULL)
+ library(rlibkriging)
 r <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){

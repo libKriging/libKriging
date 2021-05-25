@@ -1,12 +1,14 @@
 library(testthat)
 
-for (kernel in c("gauss")){ #"exp")) {
+#kernel="matern3_2" #
+for (kernel in c("gauss","exp")){ # NOT YET WORKING: ,"matern3_2","matern5_2")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 
 logn <- seq(1.1, 2, by=.1)
 
+#i=1 #
 for (i in 1:length(logn)) {
   n <- floor(10^logn[i])
   d <- 1+floor(log(n)) #floor(2+i/3)
@@ -21,7 +23,7 @@ for (i in 1:length(logn)) {
 k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
 ll = function(theta) DiceKriging::logLikFun(theta,k)
 gll = function(theta) {e = new.env(); ll=DiceKriging::logLikFun(theta,k,e); DiceKriging::logLikGrad(theta,k,e)}
-hll = function(theta,eps=0.001) {
+hll = function(theta,eps=0.0001) {
   d = length(theta)
   h = matrix(NA,d,d)
   g = gll(theta)
@@ -33,11 +35,11 @@ hll = function(theta,eps=0.001) {
   (h+t(h))/2
 }
 
-
+library(rlibkriging)
 r <- Kriging(y, X, kernel)
-ll_C = function(theta) kriging_logLikelihood(r,theta)$logLikelihood
-gll_C = function(theta) kriging_logLikelihoodGrad(r,theta)
-hll_C = function(theta) kriging_logLikelihoodHess(r,theta)
+ll_C = function(theta) logLikelihood(r,theta)$logLikelihood[1]
+gll_C = function(theta) t(logLikelihood(r,theta,grad=T)$logLikelihoodGrad)
+hll_C = function(theta) logLikelihood(r,theta,hess=T)$logLikelihoodHess[,,]
 
 
 x=runif(d)

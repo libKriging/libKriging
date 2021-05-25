@@ -59,7 +59,7 @@ class Kriging {
   RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
-  arma::cube m_dX;
+  arma::mat m_dX;
   arma::mat m_F;
   arma::mat m_T;
   arma::mat m_M;
@@ -72,6 +72,7 @@ class Kriging {
   bool m_est_sigma2;
   std::function<double(const arma::vec&)> CovNorm_fun; // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
+  double CovNorm_pow; // power factor used in hessian
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);

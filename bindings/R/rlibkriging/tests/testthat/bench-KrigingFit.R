@@ -1,7 +1,11 @@
+ pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
+ install.packages(pack,repos=NULL)
+ library(rlibkriging)
+
 library(testthat)
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
-n <- 500
+n <- 1000
 set.seed(123)
 X <- DiceDesign::lhsDesign(n,dimension=6)$design #cbind(runif(n),runif(n))
 y <- f(X)
@@ -19,7 +23,7 @@ for (i in 1:N) {
     times$cpp[i] = system.time(
                         r <- Kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
                             # to let start optim at same initial point
-                            parameters=list(sigma2=0,has_sigma2=FALSE,theta=matrix(k@parinit,ncol=d),has_theta=TRUE))
+                            parameters=list(theta=matrix(k@parinit,ncol=d)))
                     )
 
 

@@ -1,6 +1,8 @@
+#install.packages("bindings/R/rlibkriging_0.3-2_R_x86_64-pc-linux-gnu.tar.gz")
+
 library(testthat)
 
-for (kernel in c("gauss","exp")) {
+for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
   f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
@@ -21,6 +23,7 @@ for (kernel in c("gauss","exp")) {
     arrows(x,llx,x+.1,llx+.1*gllx)
   }
   
+  library(rlibkriging)
   r <- Kriging(y, X, kernel)
   ll2 = function(theta) logLikelihood(r,theta)$logLikelihood
   # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
@@ -35,7 +38,7 @@ for (kernel in c("gauss","exp")) {
   x=.5
   xenv=new.env()
   test_that(desc="logLik is the same that DiceKriging one", 
-            expect_equal(logLikelihood(r,x)$logLikelihood,DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
+            expect_equal(logLikelihood(r,x)$logLikelihood[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
   
   test_that(desc="logLik Grad is the same that DiceKriging one", 
             expect_equal(logLikelihood(r,x,grad=T)$logLikelihoodGrad,DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
@@ -46,7 +49,7 @@ for (kernel in c("gauss","exp")) {
 
 
 
-for (kernel in c("gauss")){#"matern3_2","matern5_2","gauss","exp")) {
+for (kernel in c("matern3_2","matern5_2","gauss","exp")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
   f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))

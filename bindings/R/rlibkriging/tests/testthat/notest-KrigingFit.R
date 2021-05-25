@@ -1,4 +1,5 @@
 library(testthat)
+library(rlibkriging)
 
 context("Fit: 1D")
 
