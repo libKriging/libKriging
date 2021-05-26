@@ -25,13 +25,12 @@ struct MxException : public std::exception {
   //  template <typename... Args>
   //  MxException(const char* id_, const char* msg, Args... args) : id(id_), msg(formatString(msg, args...)) {}
 
-  template <typename... Args>
-  MxException(Location&& location, const char* id_, const char* msg, Args... args)
+  template <typename Arg, typename... Args>
+  MxException(Location&& location, const char* id_, Arg msg, Args... args)
       : id(id_), msg(formatString(msg, args..., " at ", location.file, ':', location.line)) {}
 
-  template <typename... Args>
-  MxException(NoLocation&&, const char* id_, const char* msg, Args... args)
-      : id(id_), msg(formatString(msg, args...)) {}
+  template <typename Arg, typename... Args>
+  MxException(NoLocation&&, const char* id_, Arg msg, Args... args) : id(id_), msg(formatString(msg, args...)) {}
 
   const char* id;
   const std::string msg;

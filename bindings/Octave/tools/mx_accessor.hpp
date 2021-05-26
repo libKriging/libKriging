@@ -18,7 +18,7 @@ struct converter_trait<ObjectRef> {
 };
 
 template <typename T>
-auto converter(mxArray*);
+auto converter(mxArray*, const std::string & parameter);
 
 template <typename T>
 void setter(const T&, mxArray*&);
@@ -26,42 +26,42 @@ void setter(const T&, mxArray*&);
 /* Specialization */
 
 template <>
-inline auto converter<mxArray*>(mxArray* x) {
+inline auto converter<mxArray*>(mxArray* x, const std::string & parameter) {
   return x;
 }
 
 template <>
-inline auto converter<std::string>(mxArray* x) {
+inline auto converter<std::string>(mxArray* x, const std::string & parameter) {
   if (!mxIsChar(x) || mxGetNumberOfDimensions(x) != 2 || mxGetM(x) != 1 || mxGetM(x) != 1) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not a string");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a string");
   }
 
   char buffer[256];
   if (mxGetString(x, buffer, 256) != 0) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not a string");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, "is not a string");
   }
 
   return std::string{buffer};
 }
 
 template <>
-inline auto converter<arma::vec>(mxArray* x) {
+inline auto converter<arma::vec>(mxArray* x, const std::string & parameter) {
   if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not a vector of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a vector of double");
   }
   const arma::uword nrow = mxGetM(x);
   const arma::uword ncol = mxGetN(x);
   if (ncol > 1) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not a vector of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, "is not a vector of double");
   }
   double* data = mxGetPr(x);
   return arma::vec{data, nrow, false, true};
 }
 
 template <>
-inline auto converter<arma::mat>(mxArray* x) {
+inline auto converter<arma::mat>(mxArray* x, const std::string & parameter) {
   if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not a matrix of double");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, "is not a matrix of double");
   }
   const arma::uword nrow = mxGetM(x);
   const arma::uword ncol = mxGetN(x);
@@ -70,14 +70,14 @@ inline auto converter<arma::mat>(mxArray* x) {
 }
 
 template <>
-inline auto converter<ObjectRef>(mxArray* x) {
+inline auto converter<ObjectRef>(mxArray* x, const std::string & parameter) {
   return getObject(x);
 }
 
 template <>
-inline auto converter<uint64_t>(mxArray* x) {
+inline auto converter<uint64_t>(mxArray* x, const std::string & parameter) {
   if (!mxIsUint64(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
-    throw MxException(LOCATION(), "mLibKriging:badType", "not an unsigned 64bits int");
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, "is not an unsigned 64bits int");
   }
   return *static_cast<uint64_t*>(mxGetData(x));
 }
