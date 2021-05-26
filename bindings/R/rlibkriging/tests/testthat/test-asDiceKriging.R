@@ -25,7 +25,7 @@ test_that("m1.logLikFun == as_m1.logLikFun",
           expect_true(logLikFun(m1@covariance@range.val,m1) == logLikFun(m1@covariance@range.val,as_m1)))
 
 test_that("m1.argmax(logLig) == as_m1.argmax(logLig)", 
-          expect_equal(m1@covariance@range.val,as_m1@covariance@range.val,tol=0.01))
+          expect_equal(m1@covariance@range.val,as_m1@covariance@range.val,tol=0.1))
 
 ll = function(Theta){apply(Theta,1,function(theta) logLikFun(theta,m1))}
 as_ll = function(Theta){apply(Theta,1,function(theta) kriging_logLikelihood(as_m1@Kriging,theta)$logLikelihood)}

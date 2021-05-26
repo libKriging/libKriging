@@ -24,13 +24,13 @@ for (kernel in c("matern5_2","matern3_2")) {
   k = RobustGaSP::rgasp(design=X,response=y,kernel_type=kernel_type(kernel))
 
   lmp = function(theta) {
-    cat("theta: ",theta,"\n")
+    #cat("theta: ",theta,"\n")
     lml = RobustGaSP::log_marginal_lik(param=log(1/theta),nugget=k@nugget,nugget_est=k@nugget.est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
-    cat("  lml: ",lml,"\n")
+    #cat("  lml: ",lml,"\n")
     larp = RobustGaSP::log_approx_ref_prior(param=log(1/theta),nugget=k@nugget,nugget_est=k@nugget.est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
-    cat("  larp: ",larp,"\n")
+    #cat("  larp: ",larp,"\n")
     return(lml+larp)
   }
 
@@ -38,13 +38,13 @@ for (kernel in c("matern5_2","matern3_2")) {
   abline(v=1/k@beta_hat)
 
   lmp_deriv = function(theta) {
-    cat("theta: ",theta,"\n")
+    #cat("theta: ",theta,"\n")
     lml_d = RobustGaSP::log_marginal_lik_deriv(param=log(1/theta),nugget=k@nugget,nugget_est=k@nugget.est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
-    cat("  lml_d: ",lml_d,"\n")
+    #cat("  lml_d: ",lml_d,"\n")
     larp_d = RobustGaSP::log_approx_ref_prior_deriv(param=log(1/theta),nugget=k@nugget,nugget_est=k@nugget.est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
-      cat("  larp_d: ",larp_d,"\n")
+    #cat("  larp_d: ",larp_d,"\n")
     return((lml_d + larp_d)* 1/theta * (-1/theta))
   }
 
