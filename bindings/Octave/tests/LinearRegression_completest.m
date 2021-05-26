@@ -9,14 +9,14 @@ try
     a=LinearRegression(1); % no argument required
 catch exception
     if (~strcmp(exception.identifier,'mLibKriging:badArgs'))
-        printf("Unexception test exception %s\n\n",exception.identifier)
+        printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
     else
-        printf("Exception well catched %s\n",exception.identifier)
+        printf("Exception well caught %s\n",exception.identifier)
      end
 end
 
-% right has been catched, follows with good args
+% right has been caught, follows with good args
 printf("\nNow try right usage\n")
 a=LinearRegression(); 
 
@@ -33,14 +33,14 @@ try
     a.fit(y,badX); % incompatibles X y sizes
 catch exception
     if (~strcmp(exception.identifier,'mLibKriging:exception'))
-        printf("Unexception test exception %s\n\n",exception.identifier)
+        printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
     else
-        printf("Exception well catched %s\n",exception.identifier)
+        printf("Exception well caught %s\n",exception.identifier)
      end
 end
 
-% right has been catched, follows with good args
+% right has been caught, follows with good args
 printf("\nNow try right usage\n")
 a.fit(y,X);
 
@@ -50,10 +50,10 @@ try
     [y_pred,stderr] = a.predict(badX);
 catch exception
     if (~strcmp(exception.identifier,'mLibKriging:exception'))
-        printf("Unexception test exception %s\n\n",exception.identifier)
+        printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
     else
-        printf("Exception well catched %s\n",exception.identifier)
+        printf("Exception well caught %s\n",exception.identifier)
      end
 end
 
@@ -62,10 +62,10 @@ try
     [y_pred,stderr, dummy] = a.predict(X2)
 catch exception
     if (~strcmp(exception.identifier,'mLibKriging:badArgs'))
-        printf("Unexception test exception %s\n\n",exception.identifier)
+        printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
      else
-        printf("Exception well catched %s\n",exception.identifier)
+        printf("Exception well caught %s\n",exception.identifier)
     end
 end
 
