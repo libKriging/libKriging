@@ -5,6 +5,7 @@
 // clang-format on
 
 #include "libKriging/Kriging.hpp"
+#include "libKriging/KrigingException.hpp"
 
 #include <armadillo>
 #include <cassert>
@@ -1386,7 +1387,7 @@ Kriging::RegressionModel Kriging::RegressionModelUtils::fromString(const std::st
     return static_cast<RegressionModel>(std::distance(begin, find));
   } else {
     // FIXME use std::optional as returned type
-    throw std::exception();
+    throw KrigingException("Cannot convert '" + value + "' as a regression model");
   }
 }
 

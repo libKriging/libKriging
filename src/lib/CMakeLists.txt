@@ -8,6 +8,7 @@ add_library(Kriging
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
+        include/libKriging/KrigingException.hpp
         Bench.cpp include/libKriging/Bench.hpp)
 
 if (CXX_CLANG_TIDY)
