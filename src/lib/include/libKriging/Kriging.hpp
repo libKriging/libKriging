@@ -1,5 +1,5 @@
-#ifndef LIBKRIGING_ORDINARYKRIGING_HPP
-#define LIBKRIGING_ORDINARYKRIGING_HPP
+#ifndef LIBKRIGING_KRIGING_HPP
+#define LIBKRIGING_KRIGING_HPP
 
 #include <armadillo>
 
@@ -149,4 +149,4 @@ class Kriging {
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
 };
 
-#endif  // LIBKRIGING_ORDINARYKRIGING_HPP
+#endif  // LIBKRIGING_KRIGING_HPP
