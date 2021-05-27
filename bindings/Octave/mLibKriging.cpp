@@ -81,7 +81,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
 } catch (MxException& e) {
   mexErrMsgIdAndTxt(e.id, e.msg.c_str());
 } catch (std::exception& e) {
-  mexErrMsgIdAndTxt("mLibKriging::kernelException", e.what());
+  mexErrMsgIdAndTxt("mLibKriging:kernelException", e.what());
 } catch (...) {  // catch everything even end-of-scope event
   mexErrMsgIdAndTxt("mLibKriging:exception", "unexpected exception");
 }

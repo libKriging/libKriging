@@ -32,7 +32,7 @@ try
     badX = randn (nrow+2,ncol);
     a.fit(y,badX); % incompatibles X y sizes
 catch exception
-    if (~strcmp(exception.identifier,'mLibKriging:exception'))
+    if (~strcmp(exception.identifier,'mLibKriging:kernelException'))
         printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
     else
@@ -49,7 +49,7 @@ try
     badX = randn (nrow,ncol+1);
     [y_pred,stderr] = a.predict(badX);
 catch exception
-    if (~strcmp(exception.identifier,'mLibKriging:exception'))
+    if (~strcmp(exception.identifier,'mLibKriging:kernelException'))
         printf("Unexpected test exception %s\n\n",exception.identifier)
         rethrow(exception)
     else
