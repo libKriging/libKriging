@@ -2,8 +2,8 @@ name: Performance benchmark
 
 on:
   push:
-    branches:
-      - '*'
+#    branches:
+#      - '*'
     tags:
       - 'bench*'
 
