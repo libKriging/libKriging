@@ -54,6 +54,20 @@ llvm 8.0.0_1 -> 9.0.0_1
 ==> Pouring llvm-9.0.0_1.catalina.bottle.tar.gz
 ```
 
+## `CMake 3.13 or higher is required.`
+
+Octave binding requires a more recent version of CMake than the other sections.
+
+Specially for Ubuntu 18, the default CMake version is 3.10.2 and you need to upgrade it:
+```
+apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common # common package and security tools
+curl -s https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null # get security keys
+apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' # add kitware repo
+apt-get install -y cmake # install latest version of CMake
+```
+
+(this procedure is also done in `linux-macos/install.sh` script)
+
 # Before changing compiler check ABI compatibility
 
 * GCC:
