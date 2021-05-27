@@ -10,6 +10,7 @@
 #include <optim.hpp>
 #include <tuple>
 #include <cassert>
+#include <vector>
 
 std::chrono::high_resolution_clock::time_point tic() {
   return std::chrono::high_resolution_clock::now();
@@ -229,7 +230,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
     //  }
 
     //t0 = tic();
-    arma::mat gradsR[d];  // if (hess_out != nullptr)
+    std::vector<arma::mat> gradsR(d);  // if (hess_out != nullptr)
     arma::vec terme1 = arma::vec(d);          // if (hess_out != nullptr)
     //t0 = toc(" +gradsR         ", t0);
 
