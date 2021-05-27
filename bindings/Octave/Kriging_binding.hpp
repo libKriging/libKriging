@@ -10,6 +10,6 @@ void fit(int nlhs, void** plhs, int nrhs, const void** prhs);
 void predict(int nlhs, void** plhs, int nrhs, const void** prhs);
 void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs);
 void logLikelihood(int nlhs, void** plhs, int nrhs, const void** prhs);
-}  // namespace LinearRegressionBinding
+}  // namespace KrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_KRIGING_BINDING_HPP
