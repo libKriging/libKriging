@@ -3,7 +3,8 @@ function refdir = find_dir()
     found = false;
     while ~found
         testpath = [ path  filesep ".git" filesep ".." filesep "tests" filesep "references" ];
-        if isfolder(testpath)
+        % if isfolder(testpath) % requires R2017b 
+        if exist(testpath, 'dir') % compatible with Octave 4.2
             refdir = testpath;
             return
         else
