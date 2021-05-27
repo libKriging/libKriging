@@ -114,14 +114,9 @@ class Kriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT double logLikelihoodFun(const arma::vec& theta);
-  LIBKRIGING_EXPORT arma::vec logLikelihoodGrad(const arma::vec& theta);
-  LIBKRIGING_EXPORT arma::mat logLikelihoodHess(const arma::vec& theta);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
                                                                                const bool grad,
                                                                                const bool hess);
-  LIBKRIGING_EXPORT double leaveOneOutFun(const arma::vec& theta);
-  LIBKRIGING_EXPORT arma::vec leaveOneOutGrad(const arma::vec& theta);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
   
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
