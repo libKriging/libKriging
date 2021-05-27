@@ -28,6 +28,7 @@ def find_dir():
 
 
 def relative_error(x, y):
+    # FIXME check compatible vector sizes
     x_norm = np.linalg.norm(x)
     y_norm = np.linalg.norm(y)
     if x_norm > 0 or y_norm > 0:
@@ -49,27 +50,27 @@ def test_data1():
     filey = refpath / f"{prefix}-y.csv"
     X = np.genfromtxt(filex, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
     y = np.genfromtxt(filey, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
-    file_llo = refpath / f"{prefix}-result-leaveOneOut.csv"
-    file_llograd = refpath / f"{prefix}-result-leaveOneOutGrad.csv"
-    llo_ref = np.genfromtxt(file_llo, delimiter=',')
-    llograd_ref = np.genfromtxt(file_llograd, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
-    file_lll = refpath / f"{prefix}-result-logLikelihood.csv"
-    file_lllgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
-    lll_ref = np.genfromtxt(file_lll, delimiter=',')
-    lllgrad_ref = np.genfromtxt(file_lllgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    file_loo = refpath / f"{prefix}-result-leaveOneOut.csv"
+    file_loograd = refpath / f"{prefix}-result-leaveOneOutGrad.csv"
+    loo_ref = np.genfromtxt(file_loo, delimiter=',')
+    loograd_ref = np.genfromtxt(file_loograd, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    file_ll = refpath / f"{prefix}-result-logLikelihood.csv"
+    file_llgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
+    ll_ref = np.genfromtxt(file_ll, delimiter=',')
+    llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
 
     kernel = "gauss"
-    r = lk.Kriging2(kernel)  # FIXME prefer Kriging (not Kriging2 is possible)
+    r = lk.Kriging(kernel)  # FIXME prefer Kriging (not Kriging2 is possible)
     r.fit(y, X, lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    llo, llograd = r.leaveOneOut(x, True)
-    assert relative_error(llo, llo_ref) < tolerance
-    assert relative_error(llograd, llograd_ref) < tolerance
+    loo, loograd = r.leaveOneOut(x, True)
+    assert relative_error(loo, loo_ref) < tolerance
+    assert relative_error(loograd, loograd_ref) < tolerance
 
-    lll, lllgrad, lllhess = r.logLikelihood(x, True, False)
-    assert relative_error(lll, lll_ref) < tolerance
-    assert relative_error(lllgrad, lllgrad_ref) < tolerance
+    ll, llgrad, llhess = r.logLikelihood(x, True, False)
+    assert relative_error(ll, ll_ref) < tolerance
+    assert relative_error(llgrad, llgrad_ref) < tolerance
 
 
 @pytest.mark.parametrize("i", np.arange(1, 11))
@@ -80,10 +81,10 @@ def test_data2(i):
     filey = refpath / f"{prefix}-y.csv"
     X = np.genfromtxt(filex, delimiter=',')
     y = np.genfromtxt(filey, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
-    file_lll = refpath / f"{prefix}-result-logLikelihood.csv"
-    file_lllgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
-    lll_ref = np.genfromtxt(file_lll, delimiter=',')
-    lllgrad_ref = np.genfromtxt(file_lllgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    file_ll = refpath / f"{prefix}-result-logLikelihood.csv"
+    file_llgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
+    ll_ref = np.genfromtxt(file_ll, delimiter=',')
+    llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
 
     kernel = "gauss"
     r = lk.Kriging(kernel)  # FIXME prefer Kriging (not Kriging2 is possible)
@@ -91,6 +92,6 @@ def test_data2(i):
 
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    lll, lllgrad, lllhess = r.logLikelihood(x, True, False)
-    assert relative_error(lll, lll_ref) < tolerance
-    assert relative_error(lllgrad, lllgrad_ref) < tolerance
+    ll, llgrad, llhess = r.logLikelihood(x, True, False)
+    assert relative_error(ll, ll_ref) < tolerance
+    assert relative_error(llgrad, llgrad_ref) < tolerance
