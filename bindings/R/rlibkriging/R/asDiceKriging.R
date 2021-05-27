@@ -132,10 +132,10 @@ as_km.default <- function(formula=~1, design, response, covtype="matern5_2",
   if (estim.method=="MLE")
     estim.method = "LL"
   else if (estim.method=="LOO")
-    estim.method = "LL"
+    estim.method = "LOO"
   else stop("Unsupported estim.method ",estim.method)
   
-  if (!(covtype=="gauss" | covtype=="exp"))
+  if (!(covtype=="gauss" | covtype=="exp" | covtype=="matern3_2" | covtype=="matern5_2"))
     stop("Unsupported covtype ",covtype)
   
   if (optim.method!="BFGS")
