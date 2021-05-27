@@ -2,9 +2,9 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-#include <carma>
 
 #include <armadillo>
+#include <carma>
 #include <libKriging/LinearRegression.hpp>
 #include <random>
 
