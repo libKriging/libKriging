@@ -1,9 +1,9 @@
 #ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_RANDOMGENERATOR_HPP
 #define LIBKRIGING_BINDINGS_PYTHON_SRC_RANDOMGENERATOR_HPP
 
-#include <carma/carma.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <carma>
 
 #include <armadillo>
 #include <random>

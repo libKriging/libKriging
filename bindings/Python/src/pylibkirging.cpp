@@ -37,7 +37,7 @@ PYBIND11_MODULE(pylibkriging, m) {
     )pbdoc");
   }
 
-  m.attr("__version__") = VERSION_INFO;
+  m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
 
   // Basic tools
