@@ -8,7 +8,7 @@
 #' @param regmodel Universal Kriging linear trend: "constant", "linear", "interactive" ("constant" by default)
 #' @param normalize Normalize X and y in [0,1] (FALSE by default)
 #' @param optim Optimization method to fit hyper-parameters: "BFGS", "Newton" (uses objective Hessian), "none" (keep initial "parameters" values)
-#' @param objective Objective function to optimize: "LL" (log-Likelihood, by default), "LOO" (leave one out)
+#' @param objective Objective function to optimize: "LL" (log-Likelihood, by default), "LOO" (leave one out), "LMP" (log Marginal Posterior)
 #' @param parameters Initial hyper parameters: list(sigma2=..., theta=...). If theta has many rows, each is used as a starting point for optim.
 #' 
 #' @return S3 Kriging object. Should be used with its predict, simulate, update methods.
@@ -143,7 +143,6 @@ setMethod("predict", "Kriging", predict.Kriging)
 #'
 #' @return length(x) x nsim matrix containing simulated path at x points
 #' 
-#' @importFrom stats runif
 #' @method simulate Kriging
 #' @export simulate
 #' @aliases simulate,Kriging,Kriging-method
@@ -225,7 +224,7 @@ update.Kriging <- function(object, newy, newX, normalize=FALSE, ...) {
 
 update <- function(...) UseMethod("update")
 setMethod("update", "Kriging", update.Kriging)
-setGeneric(name = "update", def = function(...) standardGeneric("update"))
+#setGeneric(name = "update", def = function(...) standardGeneric("update"))
 
 
 #' Compute log-Likelihood of Kriging model
@@ -233,7 +232,7 @@ setGeneric(name = "update", def = function(...) standardGeneric("update"))
 #' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param object S3 Kriging object
-#' @param theta new points in model output space
+#' @param theta range parameters to evaluate
 #' @param grad return Gradient ? (default is TRUE)
 #' @param hess return Hessian ? (default is FALSe)
 #'
@@ -287,7 +286,7 @@ setGeneric(name = "logLikelihood", def = function(...) standardGeneric("logLikel
 #' @author Yann Richet (yann.richet@irsn.fr)
 #' 
 #' @param object S3 Kriging object
-#' @param theta new points in model output space
+#' @param theta range parameters to evaluate
 #' @param grad return Gradient ? (default is TRUE)
 #'
 #' @return leave-One-Out computed for given theta
@@ -332,3 +331,54 @@ leaveOneOut.Kriging <- function(object, theta, grad=FALSE) {
 leaveOneOut <- function (...) UseMethod("leaveOneOut")
 setMethod("leaveOneOut", "Kriging", leaveOneOut.Kriging)
 setGeneric(name = "leaveOneOut", def = function(...) standardGeneric("leaveOneOut"))
+
+
+#' Compute log-Marginal-Posterior of Kriging model
+#' 
+#' @author Yann Richet (yann.richet@irsn.fr)
+#' 
+#' @param object S3 Kriging object
+#' @param theta range parameters to evaluate
+#' @param grad return Gradient ? (default is TRUE)
+#'
+#' @return log-MargPost computed for given theta
+#' 
+#' @method logMargPost Kriging
+#' @export logMargPost
+#' @aliases logMargPost,Kriging,Kriging-method
+#' 
+#' @examples
+#' f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, "gauss")
+#' print(r)
+#' lmp = function(theta) logMargPost(r,theta)$logMargPost
+#' t = seq(0.0001,2,,101)
+#'   plot(t,lmp(t),type='l')
+#'   abline(v=as.list(r)$theta,col='blue')
+logMargPost.Kriging <- function(object, theta, grad=FALSE) {
+  k=kriging_model(object) 
+  if (!is.matrix(theta)) theta=matrix(theta,ncol=ncol(k$X))
+  if (ncol(theta)!=ncol(k$X))
+    stop("Input theta must have ",ncol(k$X), " columns (instead of ",ncol(theta),")")
+  out=list(logMargPost=matrix(NA,nrow=nrow(theta)),logMargPostGrad=matrix(NA,nrow=nrow(theta),ncol=ncol(theta)))
+  for (i in 1:nrow(theta)) {
+    lmp = kriging_logMargPost(object,theta[i,],isTRUE(grad))
+    out$logMargPost[i] = lmp$logMargPost
+    if (isTRUE(grad)) out$logMargPostGrad[i,] = lmp$logMargPostGrad
+  }
+  if (!isTRUE(grad)) out$logMargPostGrad <- NULL
+  return(out)
+}
+
+#' Compute model log-Marginal-Posterior at given args
+#'
+#' @param ... args
+#'
+#' @return log-Marginal-Posterior
+#' @export
+logMargPost <- function (...) UseMethod("logMargPost")
+setMethod("logMargPost", "Kriging", logMargPost.Kriging)
+setGeneric(name = "logMargPost", def = function(...) standardGeneric("logMargPost"))

@@ -1,7 +1,7 @@
 library(testthat)
 
-# install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
-# library(rlibkriging)
+# install.packages("../rlib0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
+library(rlibkriging)
 
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
@@ -19,6 +19,20 @@ points(X)
 
 r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(.5,ncol=2)))
 
+# ll = function(X) {
+#   logLikelihood(r,X,grad=F)$logLikelihood
+# }
+# contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
+# gll = function(X) {
+#   logLikelihood(r,X,grad=T)$logLikelihoodGrad
+# }
+# for (ix in 1:21) {
+# for (iy in 1:21) {
+#   xx = c(ix/21,iy/21)
+#   g = gll(xx)
+#   arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
+# }
+# }
 
 context("print")
 
@@ -27,17 +41,17 @@ p = capture.output(print(r))
 
 context("logLikelihood")
 
-ll = function(Theta){apply(Theta,1,function(theta) kriging_logLikelihood(r,theta)$logLikelihood)}
+ll = function(Theta){apply(Theta,1,function(theta) logLikelihood(r,theta)$logLikelihood)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2])
-# logLikelihood(r,t(kriging_model(r)$theta))
+points(as.list(r)$theta[1],as.list(r)$theta[2])
+# logLikelihood(r,t(as.list(r)$theta))
 
 test_that("logLikelihood returned",
           expect_equal(names(logLikelihood(r,runif(d))),c("logLikelihood")))
 test_that("logLikelihood logLikelihoodGrad returned",
           expect_equal(names(logLikelihood(r,runif(d),grad=T)),c("logLikelihood","logLikelihoodGrad")))
-test_that("logLikelihood logLikelihoodGrad logLikelihoodHessreturned",
+test_that("logLikelihood logLikelihoodGrad logLikelihoodHess returned",
           expect_equal(names(logLikelihood(r,runif(d),grad=T,hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
 
 test_that("logLikelihood dim",
@@ -50,11 +64,11 @@ test_that("logLikelihoodHess dim",
 
 context("leaveOneOut")
 
-loo = function(Theta){apply(Theta,1,function(theta) kriging_leaveOneOut(r,theta)$leaveOneOut)}
+loo = function(Theta){apply(Theta,1,function(theta) leaveOneOut(r,theta)$leaveOneOut)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(loo(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2])
-# leaveOneOut(r,t(kriging_model(r)$theta))
+points(as.list(r)$theta[1],as.list(r)$theta[2])
+# leaveOneOut(r,t(as.list(r)$theta))
 
 test_that("leaveOneOut returned",
           expect_equal(names(leaveOneOut(r,runif(d))),c("leaveOneOut")))
@@ -111,13 +125,31 @@ contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 points(X2,col='red')
 
-r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(kriging_model(r)$theta,ncol=2)))
-ll2 = function(Theta){apply(Theta,1,function(theta) kriging_logLikelihood(r2,theta)$logLikelihood)}
+#r20 <- Kriging(c(y,y2), rbind(X,X2),"gauss")
+#ll = function(X) {
+#  logLikelihood(r20,X,grad=F)$logLikelihood
+#}
+#contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
+#gll = function(X) {
+#  logLikelihood(r20,X,grad=T)$logLikelihoodGrad
+#}
+#for (ix in 1:21) {
+#for (iy in 1:21) {
+#  xx = c(ix/21,iy/21)
+#  g = gll(xx)
+#  arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
+#}
+#}
+
+
+
+r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2)))
+ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihood(r2,theta)$logLikelihood)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2])
+points(as.list(r)$theta[1],as.list(r)$theta[2])
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
-points(kriging_model(r2)$theta[1],kriging_model(r2)$theta[2],col='red')
+points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red')
 
 p2 = capture.output(print(r2))
 

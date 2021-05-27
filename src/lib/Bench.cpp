@@ -94,9 +94,16 @@ arma::mat Bench::InvSymPD(const arma::mat& Rsympd) {
 LIBKRIGING_EXPORT
 double Bench::LogLik(Kriging& ok, const arma::vec& theta) {
   // arma::vec theta = 0.5*ones(ok->X().n_cols)
+  arma::mat T;
+  arma::mat M;
+  arma::colvec z;
+  arma::colvec beta;
+  double sigma2{};
+  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+
   double s = 0;
   for (int i = 0; i < n; i++) {
-    s += ok.logLikelihoodFun(theta);
+    s += ok.logLikelihood(theta, nullptr, nullptr, &okm_data);
   }
   return s / n;
 }
@@ -104,9 +111,18 @@ double Bench::LogLik(Kriging& ok, const arma::vec& theta) {
 LIBKRIGING_EXPORT
 arma::vec Bench::LogLikGrad(Kriging& ok, const arma::vec& theta) {
   // arma::vec theta = 0.5*ones(ok->X().n_cols)
+  arma::mat T;
+  arma::mat M;
+  arma::colvec z;
+  arma::colvec beta;
+  double sigma2{};
+  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+
+  arma::vec grad(theta.n_elem);
+
   arma::vec s = arma::zeros(theta.n_elem);
   for (int i = 0; i < n; i++) {
-    s += ok.logLikelihoodGrad(theta);
+    s += ok.logLikelihood(theta, &grad, nullptr, &okm_data);
   }
   return s / n;
 }

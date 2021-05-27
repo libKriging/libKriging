@@ -1,4 +1,5 @@
 library(testthat)
+library(rlibkriging)
 
 context("Fit: 1D")
 
@@ -12,18 +13,18 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
 r <- Kriging(y, X, "gauss")
 
-ll = Vectorize(function(x) kriging_logLikelihood(r,x)$logLikelihood)
+ll = Vectorize(function(x) logLikelihood(r,x)$logLikelihood)
 plot(ll,xlim=c(0.001,1))
 theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
 abline(v=theta_ref,col='black')
-abline(v=kriging_model(r)$theta,col='red')
+abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
 
 test_that(desc="fit of theta by DiceKriging is right", 
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
 
 test_that(desc="fit of theta by libKriging is right", 
-          expect_equal(array(theta_ref), array(kriging_model(r)$theta), tol= 0.01))
+          expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
          
 #############################################################
 
@@ -45,7 +46,7 @@ ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                     function(x) {
                       # print(dim(x))
                       #print(matrix(unlist(x),ncol=2));
-                      y=-kriging_logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+                      y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
                       #print(y);
                       y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -54,11 +55,11 @@ contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 
 theta_ref = optim(par=matrix(c(.2,.5),ncol=2),ll,lower=c(0.01,0.01),upper=c(2,2),method="L-BFGS-B")$par
 points(theta_ref,col='black')
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
+points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
 test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
-          expect_equal(ll(array(kriging_model(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
+          expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
 
 
 
@@ -100,7 +101,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        y=-kriging_logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
         #print(y);
         y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -109,11 +110,11 @@ contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 
 theta_ref = optim(par=matrix(c(.2,.5),ncol=2),ll,lower=c(0.01,0.01),upper=c(2,2),method="L-BFGS-B")$par
 points(theta_ref,col='black')
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
+points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
 test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
-          expect_equal(ll(array(kriging_model(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
+          expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
 
 
 
@@ -152,7 +153,7 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
 test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_equal(array(kriging_model(r)$theta),array(k@covariance@range.val),tol=  5e-2))
+          expect_equal(array(as.list(r)$theta),array(k@covariance@range.val),tol=  5e-2))
 
 ################################################################################
 
@@ -181,15 +182,15 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        -kriging_logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        -logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
         #print(y);
         })}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
 x1=seq(0.001,2,,51)
 x2=seq(0.001,30,,51)
 contour(x1,x2,matrix(ll_r(as.matrix(expand.grid(x1,x2))),nrow=length(x1)),nlevels = 30,col='red')
-points(kriging_model(r)$theta[1],kriging_model(r)$theta[2],col='red')
-ll_r(t(kriging_model(r)$theta))
+points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
+ll_r(t(as.list(r)$theta))
 
 ll_k = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 apply(X,1,function(x) {-DiceKriging::logLikFun(x,k)})}
@@ -201,5 +202,5 @@ theta_ref = optim(par=matrix(c(.25,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c
 points(theta_ref,col='black')
 
 test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
-          expect_equal(ll_r(array(kriging_model(r)$theta)), ll_k(k@covariance@range.val), tol=1e-1))
+          expect_equal(ll_r(array(as.list(r)$theta)), ll_k(k@covariance@range.val), tol=1e-1))
 

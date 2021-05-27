@@ -2,10 +2,10 @@ name: Performance benchmark
 
 on:
   push:
-    branches:
-      - '*'
-    tags-ignore:
-      - 'v*' # done in release
+#    branches:
+#      - '*'
+    tags:
+      - 'bench*'
 
 env:
   DEBUG_CI: false
