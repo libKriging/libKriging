@@ -82,6 +82,8 @@ class MxMapper : public NonCopyable {
     return ptr;
   }
 
+  int count() const { return m_n; }
+
   template <int I>
   static std::string parameterStr(const char* msg) {
     if (msg) {
