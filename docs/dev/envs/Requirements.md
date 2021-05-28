@@ -29,3 +29,9 @@
 ## [Linux setup](Readme_Linux.md)
 ## [macOS setup](Readme_macOS.md)
 ## [Windows setup](Readme_Windows.md)
+
+## Optional useful tools
+* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting)
+* clang-format for automated code formatting
+* clang-tidy for static analysis
+* Doxygen for doc generation

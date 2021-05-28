@@ -10,10 +10,3 @@ The legacy dependencies have been integrated using [subrepo](https://github.com/
 If you want to manage then, you need to install [subrepo](https://github.com/ingydotnet/git-subrepo) (for normal usage, this is not required).
 
 Today, we include new dependencies using submodule technique.
-
-## Optional tools
-* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting)
-* clang-format for automated code formatting
-* clang-tidy for static analysis
-* Doxygen for doc generation
-
