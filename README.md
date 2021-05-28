@@ -9,68 +9,40 @@ Table of contents
     1. [Requirements](#requirements)
     1. [Compilation and unit tests](#compilation-and-unit-tests)
     1. [Deployment](#deployment)
+1. [More info](docs/dev/MoreInfo.md)
 
 # Get the code
 
 Just clone it:
 ```
-git clone https://github.com/libKriging/libKriging.git
+git clone --recurse-submodules https://github.com/libKriging/libKriging.git
 ```
-
-Dependencies are plugged in as [subrepo](https://github.com/ingydotnet/git-subrepo) components.
-If you want to manage then, you need to install [subrepo](https://github.com/ingydotnet/git-subrepo) (for normal usage, this is not required).
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation
 
-## Requirements
-* CMake ≥ 3.11
+## Requirements ([more details](docs/dev/envs/Requirements.md))
 
-  You can install it by hand (cf [cmake](https://cmake.org/download/)) or using automated method from `.travis-ci/<your-environment>/install.sh` script.
+* CMake ≥ 3.13
 
-  NB: On Windows, `choco` package manager requires admin rights, so that it could be simpler to do it by hand.
-  
-* C++ Compiler with C++11 support;
-  
-  Tested with:
-     
-  |   Compiler/OS    | Linux        | macOS                    | Windows       |
-  |:----------------:|:-------------|:-------------------------|:--------------|
-  |       GCC        | **5.4**, 8.3 |                          | **4.9.3** (R) |
-  |      Clang       | 7.1          | AppleClang **9.1**<br>AppleClang 10.0 (Mojave)<br>AppleClang 11.0 (Catalina)<br>Clang 9.0|               |
-  | MS Visual Studio |              |                          | **15 (2017)** |
-  
-  (bold values represent configurations used in Travis CI pipelines)
-  
-  NB: Ensure C++ compiler is available. On macOS systems you will need to install Xcode
-     with additional Command Line Tools using:  
-     ```
-     xcode-select --install
-     sudo xcodebuild -license accept
-     ```
-     (should be done after macOS upgrade) 
-     
-  NB: On Windows with R environment (R + Rtools), you can use R's recommanded compiler. See compilation woth R toolchain below.
+* C++ Compiler with C++17 support
   
 * Linear algebra packages providing blas and lapack functions.
   
   You can use standard blas and lapack, OpenBlas, MKL.
-  
-  On Windows, the simplest method is to use Anaconda (cf `install.sh` scripts in `.travis-ci` or [Readme_Windows.md](.travis-ci/Readme_Windows.md)).
-  
-### Optional tools
-     
-* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting)
-* clang-format for automated code formatting
-* clang-tidy for static analysis
-* Doxygen for doc generation
 
+* Python ≥ 3.6 (optional)
+
+* Octave ≥ 4.2 (optional)
+
+* R ≥ 3.6 (optional)
+  
 ## Integrated scripts for CI
 
-Note: calling these scripts "by hand" should produce the same results than following "Compilation and unit tests" instructions (and it should be also easier).
+Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
 
-### Integration for Linux and MacOS
+### Integration for Linux and macOS
 
 With standard cmake & system libs:
 ```shell
@@ -206,7 +178,7 @@ Following commands are made for Unix shell. To use them with Windows use [Mingw]
 To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
 first `cmake` configuration command.
 
-If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directoty is `${BUILD}/installed`.
+If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directory is `${BUILD}/installed`.
 
 ### For Linux and MacOS
 
