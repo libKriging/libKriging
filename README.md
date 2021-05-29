@@ -5,18 +5,22 @@
 
 Table of contents
 
-1. [Installation](#installation)
+1. [Installation](#installation-from-pre-built-packages)
 1. [Compilation](#compilation)   
     1. [Requirements](#requirements-more-details)
-    1. [Compilation and unit tests](#compilation-and-unit-tests)
+    1. [Get the code](#get-the-code)
+    1. [Helper scripts](#helper-scripts-for-ci)   
+    1. [Compilation and tests](#compilation-and-tests)
     1. [Deployment](#deployment)
 1. [More info](docs/dev/MoreInfo.md)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
-# Installation
+# Installation from pre-built packages
 
 For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use released binaries.
+
+**TODO**
 
 # Compilation
 
@@ -43,7 +47,7 @@ Just clone it with its submodules:
 git clone --recurse-submodules https://github.com/libKriging/libKriging.git
 ```
   
-## Integrated scripts for CI
+## Helper scripts for CI
 
 Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
 They use the preset of options also used in CI workflow.
@@ -83,7 +87,7 @@ Then:
   ```
   NB: It will create a `build` directory.
   
-## Compilation and unit tests
+## Compilation and tests
 
 ### Preamble
 
@@ -94,14 +98,14 @@ We assume that:
     (should be an absolute path)
   * following commands are executed in *`${BUILD}`* directory 
   
-PS: *`${NAME}`* represents a word or an absolute path of your choice
+PS: *`${NAME}`* syntax represents a word or an absolute path of your choice
 
 Select your compilation *`${MODE}`* between: 
   * `Release` : produce an optimized code
   * `Debug` (default) : produce a debug code
   * `Coverage` : for code coverage analysis (not yet tested with Windows)
 
-Following commands are made for Unix shell. To use them with Windows use [Mingw](http://www.mingw.org) or [git-bash](https://gitforwindows.org) environment.
+Following commands are made for Unix shell. To use them with Windows use [git-bash](https://gitforwindows.org) or [Mingw](http://www.mingw.org) environments.
 
 ### Compilation for Linux and macOS
   
