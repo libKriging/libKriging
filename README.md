@@ -20,7 +20,61 @@ If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use released binaries.
 
-**TODO**
+## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
+
+```shell
+python3 -m pip install --upgrade pip
+pip3 install pylibkriging numpy
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/Kriging_test.py)
+
+## rlibkriging for R
+
+Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+(CRAN repo will come soon...)
+```
+# example
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/rlibkriging_macOS10.15.7-x86_64_v0.3.2.tgz
+```
+Then
+```R
+# in R
+install.packages("Rcpp")
+install.packages(pkgs="rlibkriging_OS_version.tgz", repos=NULL)
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/R/rlibkriging/tests/testthat/test-KrigingLeaveOneOut.R)
+
+NB: this example requires to also install DiceKriging
+```R
+# in R
+install.packages("DiceKriging")
+```
+
+## mlibkriging for Octave
+
+Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+```
+# example
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/mLibKrging_MINGW64_NT10.0-x86_64_v0.3.2.tgz
+```
+Then
+```shell
+octave --path /path/to/mLibKriging/installation
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_test.m)
+
+## Tested installation
+
+with libKriging 0.3.2
+
+|        | Linux Ubuntu                             | macOS 11                                | Windows                                 |
+|:-------|:-----------------------------------------|:----------------------------------------|:----------------------------------------|
+| Python | <span style="color:green">✔</span> 3.8   | <span style="color:green">✔</span> 3.9  | <span style="color:red">✘</span> 3.9    |
+| R      | <span style="color:green">✔</span> ≥3.6  | <span style="color:green">✔</span> 4.0  | <span style="color:red">✘</span> 4.1    | 
+| Octave | <span style="color:green">✔</span> =4.2  | <span style="color:green">✔</span> =6.1 | <span style="color:green">✔</span> =5.2 | 
 
 # Compilation
 
