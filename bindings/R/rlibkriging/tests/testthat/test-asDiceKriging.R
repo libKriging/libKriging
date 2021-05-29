@@ -3,6 +3,40 @@ library(testthat)
 # install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
 # library(rlibkriging)
 
+f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+# f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
+n <- 5
+set.seed(123)
+X <- cbind(runif(n))
+y <- f(X)
+d = ncol(X)
+
+library(DiceKriging)
+# kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
+m1 <- km(design=X, response=y,covtype = "gauss",estim.method="LOO",parinit = c(.25),control = list(trace=F))
+library(rlibkriging)
+as_m1 <- as_km(design=X, response=y,covtype = "gauss",estim.method="LOO",parinit = c(.25))
+
+test_that("m1.leaveOneOutFun == as_m1.leaveOneOutFun",
+          expect_true(leaveOneOutFun(m1@covariance@range.val,m1) == leaveOneOutFun(m1@covariance@range.val,as_m1)))
+
+test_that("m1.argmax(loo) == as_m1.argmax(loo)", 
+          expect_equal(m1@covariance@range.val,as_m1@covariance@range.val,tol=0.1))
+
+plot(Vectorize(function(.t) leaveOneOutFun(param=as.numeric(.t),model=m1)))
+abline(v=m1@covariance@range.val)
+plot(Vectorize(function(.t) leaveOneOut(as_m1@Kriging,as.numeric(.t))),add=T,col='red')
+abline(v=as_m1@covariance@range.val,col='red')
+
+
+
+##########################################################################
+
+library(testthat)
+
+# install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
+# library(rlibkriging)
+
 context("# A 2D example - Branin-Hoo function")
 
 branin <- function (x) {
@@ -127,12 +161,14 @@ test_that("DiceKriging::simulate ~= rlibkriging::simulate",
 ################################################################################
 
 
-f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
+f <- function(X) apply(X, 1, function(x) prod(sin((x*pi-.5)^2)))
 n <- 5#100
 set.seed(123)
 X <- cbind(runif(n))#,runif(n),runif(n))
 y <- f(X)
 d = ncol(X)
+#plot(function(x)f(as.matrix(x)))
+#points(X,y)
 
 test_args = function(formula ,design ,response ,covtype, estim.method ) {
   context(paste0("asDiceKriging: ",paste0(sep=", ",formula,
@@ -145,14 +181,29 @@ test_args = function(formula ,design ,response ,covtype, estim.method ) {
   parinit = runif(ncol(design))
   k <<-       DiceKriging::km(formula = formula,design = design, response = response, covtype = covtype, estim.method = estim.method, parinit = parinit, control = list(trace=F))
   as_k <<- rlibkriging::as_km(formula = formula,design = design, response = response, covtype = covtype, estim.method = estim.method, parinit = parinit)
-    
-  x = runif(ncol(X))
-  test_that("DiceKriging::logLikFun == rlibkriging::logLikelihood",
-            expect_equal(DiceKriging::logLikFun(x,k)[1],rlibkriging::logLikelihood(as_k@Kriging,x)$logLikelihood[1]))
-  test_that("DiceKriging::leaveOneOutFun == rlibkriging::leaveOneOut",
-            expect_equal(DiceKriging::leaveOneOutFun(x,k)[1],rlibkriging::leaveOneOut(as_k@Kriging,x)$leaveOneOut[1]))
   
-  x = matrix(x,ncol=d)
+  #print(k)
+  #print(as_k)
+  #if (e=="MLE") {
+  #  plot(Vectorize(function(t)DiceKriging::logLikFun(t,k)[1]),xlim=c(0.0001,2))
+  #} else {
+  #  plot(Vectorize(function(t)DiceKriging::leaveOneOutFun(t,k)[1]),xlim=c(0.0001,2))
+  #}
+  #abline(v=k@covariance@range.val)
+  #if (e=="MLE") {
+  #  plot(Vectorize(function(t)rlibkriging::logLikelihood(as_k@Kriging,t)$logLikelihood[1]),xlim=c(0.0001,2),add=T,col='red')
+  #} else {
+  #  plot(Vectorize(function(t)rlibkriging::leaveOneOut(as_k@Kriging,t)$leaveOneOut[1]),xlim=c(0.0001,2),add=T,col='red')
+  #}
+  #abline(v=as_k@covariance@range.val,col='red')
+
+  t = runif(ncol(X))
+  test_that("DiceKriging::logLikFun == rlibkriging::logLikelihood",
+            expect_equal(DiceKriging::logLikFun(t,k)[1],rlibkriging::logLikelihood(as_k@Kriging,t)$logLikelihood[1]))
+  test_that("DiceKriging::leaveOneOutFun == rlibkriging::leaveOneOut",
+            expect_equal(DiceKriging::leaveOneOutFun(t,k)[1],rlibkriging::leaveOneOut(as_k@Kriging,t)$leaveOneOut[1]))
+  
+  x = matrix(runif(d),ncol=d)
   test_that("DiceKriging::predict == rlibkriging::predict",
             expect_equal(DiceKriging::predict(k,newdata=x,type = "UK",checkNames=F)$mean[1],rlibkriging::predict(as_k,newdata = x,type = "UK")$mean[1],tol=0.01))
   
@@ -167,6 +218,8 @@ test_args = function(formula ,design ,response ,covtype, estim.method ) {
 
 #### Test the whole matrix of km features already available
 for (f in c( ~1 , ~. , ~.^2 ))
-  for (co in c("gauss","exp"))
-    for (e in c("MLE","LOO"))
+  for (co in c("gauss","exp","matern3_2","matern5_2"))
+    for (e in c("MLE","LOO")) {
+      print(paste0("kernel:",co," objective:",e," trend:",paste0(f,collapse="")))
       test_args(formula = f,design = X,response = y,covtype = co, estim.method = e)
+    }

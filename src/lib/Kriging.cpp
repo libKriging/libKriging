@@ -442,7 +442,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
-  fd->M = solve(trimatl(fd->T), m_F, arma::solve_opts::fast);
+  fd->M = solve(fd->T, m_F, arma::solve_opts::fast);
   // t0 = toc("M             ", t0);
   arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
   // t0 = toc("Rinv          ", t0);
@@ -464,12 +464,16 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::colvec errorsLOO = sigma2LOO % Qy;
   // t0 = toc("errorsLOO     ", t0);
 
-  // TODO:
-  // if (fd->beta == nullptr)
-  //  fd->beta = ???
-
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
 
+    arma::colvec Yt = solve(fd->T,m_y, solve_opts);
+    if (fd->estim_beta) {
+      arma::mat Q;
+      arma::mat G;
+      qr_econ(Q, G, fd->M);
+      fd->beta = solve(G, Q.t() * Yt, solve_opts);
+      fd->z = Yt - fd->M * fd->beta;
+    }
   if (fd->estim_sigma2)  // means no sigma2 provided
     fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
 

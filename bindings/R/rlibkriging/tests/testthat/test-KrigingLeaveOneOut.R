@@ -35,10 +35,10 @@ for (x in seq(0.01,1,,11)){
 precision <- 1e-8  # the following tests should work with it, since the computations are analytical
 x=.5
 xenv=new.env()
-test_that(desc="logLik is the same that DiceKriging one",
+test_that(desc="leaveOneOut is the same that DiceKriging one",
          expect_equal(leaveOneOut(r,x)$leaveOneOut[1],DiceKriging::leaveOneOutFun(x,k,xenv),tolerance = precision))
 
-test_that(desc="logLik Grad is the same that DiceKriging one",
+test_that(desc="leaveOneOut Grad is the same that DiceKriging one",
           expect_equal(leaveOneOut(r,x,grad=T)$leaveOneOutGrad,DiceKriging::leaveOneOutGrad(x,k,xenv),tolerance= precision))
 }
 
