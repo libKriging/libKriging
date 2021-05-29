@@ -6,21 +6,19 @@
 Table of contents
 
 1. [Installation](#installation)
-    1. [Requirements](#requirements)
+1. [Compilation](#compilation)   
+    1. [Requirements](#requirements-more-details)
     1. [Compilation and unit tests](#compilation-and-unit-tests)
     1. [Deployment](#deployment)
 1. [More info](docs/dev/MoreInfo.md)
 
-# Get the code
-
-Just clone it:
-```
-git clone --recurse-submodules https://github.com/libKriging/libKriging.git
-```
-
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation
+
+For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use released binaries.
+
+# Compilation
 
 ## Requirements ([more details](docs/dev/envs/Requirements.md))
 
@@ -37,39 +35,54 @@ If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 * Octave ≥ 4.2 (optional)
 
 * R ≥ 3.6 (optional)
+
+## Get the code
+
+Just clone it with its submodules:
+```
+git clone --recurse-submodules https://github.com/libKriging/libKriging.git
+```
   
 ## Integrated scripts for CI
 
 Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
+They use the preset of options also used in CI workflow.
 
-### Integration for Linux and macOS
+To configure it, you can define following environment variables:
 
-With standard cmake & system libs:
-```shell
-cd libKriging
-.travis-ci/linux-macos/build.sh
-```
+| Variable name          | Default value | Useful values                      | Comment                                         |
+|:-----------------------|:--------------|:-----------------------------------|:------------------------------------------------|
+|`MODE`                  | `Debug`       | `Debug`, `Release`                 |                                                 |
+|`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`ENABLE_PYTHON_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`USE_COMPILER_CACHE`    | &lt;empty&gt; | &lt;string&gt;                     | name of a compiler cache program                |
+|`EXTRA_CMAKE_OPTIONS`   | &lt;empty&gt; | &lt;string&gt;                     | pass extra CMake option for CMaKe configuration |
 
-With R specific cmake & system libs (needed for rlibkriging):
-```shell
-cd libKriging
-.travis-ci/r-linux-macos/build.sh
-```
+Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
 
-### Integration for Windows
+| `BUILD_NAME`     | when you want to build         | available bindings             |
+|:-----------------|:-------------------------------|:-------------------------------|
+| `r-windows`      | a R binding for windows        | C++, rlibkriging               | 
+| `r-linux-macos`  | a R binding for Linux or macOS | C++, rlibkriging               |  
+| `octave-windows` | an Octave for windows          | C++, mlibkriging               | 
+| `windows`        | for windows                    | C++, mlibkriging, pylibkriging |
+| `linux-macos`    | for Linux or macOS             | C++, mlibkriging, pylibkriging |
 
-With standard cmake & system libs:
-```shell
-cd libKriging
-.travis-ci/windows/build.sh
-```
-
-With R specific cmake & system libs (needed for rlibkriging):
-```shell
-cd libKriging
-.travis-ci/r-windows/build.sh
-```
-
+Then:
+* Go into `libKriging` root directory  
+    ```shell
+    cd libKriging
+    ```
+* Prepare your environment (Once, for your first compilation)
+    ```shell
+    .travis-ci/${BUILD_NAME}/install.sh
+    ```
+* Build
+  ```shell
+  .travis-ci/${BUILD_NAME}/build.sh
+  ```
+  NB: It will create a `build` directory.
+  
 ## Compilation and unit tests
 
 ### Preamble
@@ -90,7 +103,7 @@ Select your compilation *`${MODE}`* between:
 
 Following commands are made for Unix shell. To use them with Windows use [Mingw](http://www.mingw.org) or [git-bash](https://gitforwindows.org) environment.
 
-### Compilation for Linux and MacOS
+### Compilation for Linux and macOS
   
   * Configure
       ```shell
@@ -100,43 +113,23 @@ Following commands are made for Unix shell. To use them with Windows use [Mingw]
       ```shell
       cmake --build .
       ```
-      aka with classical makefiles
-      ```shell
-      make  
-      ```
   * Run tests
       ```shell
       ctest
       ```
-      aka with classical makefiles
-      ```shell
-      make test  
-      ```
-  * Buidl documentation (requires doxygen)
+  * Build documentation (requires doxygen)
       ```shell
       cmake --build . --target doc
-      ```
-      aka with classical makefiles
-      ```shell
-      make doc
       ```
   * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
       ```shell
       cmake --build . --target coverage --config Coverage
       ```
-      aka with classical makefiles
-      ```shell
-      make coverage
-      ```
       or 
       ```shell
       cmake --build . --target coverage-report --config Coverage
       ```
-      aka with classical makefiles
-      ```shell
-      make coverage-report
-      ```
-      to produce an html report located in `${BUILD}/coverage/index.html`
+      to produce a html report located in `${BUILD}/coverage/index.html`
    
 ### Compilation for Windows 64bits with Visual Studio
   * Configure
@@ -180,7 +173,7 @@ first `cmake` configuration command.
 
 If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directory is `${BUILD}/installed`.
 
-### For Linux and MacOS
+### For Linux and macOS
 
 e.g.:
 ```shell
