@@ -9,9 +9,10 @@ echo 'tzdata tzdata/Areas select Europe' | debconf-set-selections
 echo 'tzdata tzdata/Zones/Europe select Paris' | debconf-set-selections
 DEBIAN_FRONTEND="noninteractive" apt install -y tzdata
 
+# for ubuntu:20 octave-pkg-dev should be replaced by liboctave-dev
 apt install -y build-essential g++ cmake git python3 python3-pip octave octave-pkg-dev r-base liblapack-dev gfortran
 apt install -y lcov valgrind # advanced tools
-apt install -y ccache vim # convenient tools
+apt install -y ccache vim curl # convenient tools
 
 # commands from linux-macos/install.sh
 # add kitware server signature cf https://apt.kitware.com       
