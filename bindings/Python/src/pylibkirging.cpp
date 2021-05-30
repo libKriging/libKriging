@@ -3,7 +3,6 @@
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
 
-#include "AddDemo.hpp"
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NumPyDemo.hpp"
@@ -31,23 +30,14 @@ PYBIND11_MODULE(pylibkriging, m) {
     )pbdoc";
 
   if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
-    m.def("add", &add, R"pbdoc(
-        Add two numbers
+    m.def("add_arrays", &add_arrays, R"pbdoc(
+        Add two NumPy arrays
 
-        Some other explanation about the add function.
+        This is a demo for debugging numpy stuff with carma mapper
     )pbdoc");
-
-    m.def(
-        "subtract", [](int i, int j) { return i - j; }, R"pbdoc(
-        Subtract two numbers
-
-        Some other explanation about the subtract function.
-    )pbdoc");
-
-    m.def("add_arrays", &add_arrays, "Add two NumPy arrays");
   }
 
-  m.attr("__version__") = VERSION_INFO;
+  m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
 
   // Basic tools
@@ -67,9 +57,31 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
 
+  py::enum_<Kriging::RegressionModel>(m, "RegressionModel")
+      .value("Constant", Kriging::RegressionModel::Constant)
+      .value("Linear", Kriging::RegressionModel::Linear)
+      .value("Interactive", Kriging::RegressionModel::Interactive)
+      .value("Quadratic", Kriging::RegressionModel::Quadratic)
+      .export_values();
+
   // Quick and dirty manual wrapper (cf optional argument mapping)
-  py::class_<PyKriging>(m, "Kriging")
+  py::class_<PyKriging>(m, "Kriging2")
       .def(py::init<const std::string&>())
       .def("fit", &PyKriging::fit)
-      .def("predict", &PyKriging::predict);
+      .def("predict", &PyKriging::predict)
+      .def("leaveOneOut", &PyKriging::leaveOneOutEval)
+      .def("logLikelihood", &PyKriging::logLikelihoodEval)
+      .def("logMargPost", &PyKriging::logMargPostEval);
+
+  // Automated mapper
+  py::class_<Kriging>(m, "Kriging")
+      .def(py::init<const std::string&>())
+      .def("fit", &Kriging::fit)  // TODO mettre des arguments nommé optionnels: py::arg("name") =
+      .def("predict", &Kriging::predict)
+      .def("leaveOneOut", &Kriging::leaveOneOutEval)
+      .def("logLikelihood", &Kriging::logLikelihoodEval)
+      .def("logMargPost", &Kriging::logMargPostEval);
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
 }

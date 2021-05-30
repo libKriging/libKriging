@@ -32,10 +32,10 @@ class MxMapper : public NonCopyable {
   typename converter_trait<T>::type get(const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter ", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
     }
     m_accesses.set(I);
-    return converter<T>(m_p[I]);
+    return converter<T>(m_p[I], parameterStr<I>(msg));
   }
 
   template <int I, typename T>
@@ -44,14 +44,14 @@ class MxMapper : public NonCopyable {
     if (I >= m_n)
       return std::nullopt;
     m_accesses.set(I);
-    return converter<T>(m_p[I]);
+    return converter<T>(m_p[I], parameterStr<I>(msg));
   }
 
   template <int I, typename T>
   void set(const T& t, const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter %s", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
     }
     m_accesses.set(I);
     setter<T>(t, m_p[I]);
@@ -71,7 +71,7 @@ class MxMapper : public NonCopyable {
   T* getObject(const char* msg = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable parameter ", (msg) ? msg : "");
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
     }
     m_accesses.set(I);
     auto ref = get<I, ObjectRef>(msg);
@@ -80,6 +80,17 @@ class MxMapper : public NonCopyable {
       throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
     }
     return ptr;
+  }
+
+  int count() const { return m_n; }
+
+  template <int I>
+  static std::string parameterStr(const char* msg) {
+    if (msg) {
+      return "parameter " + std::to_string(I) + " '" + msg + "'";
+    } else {
+      return "parameter " + std::to_string(I);
+    }
   }
 };
 

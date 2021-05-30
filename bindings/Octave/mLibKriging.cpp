@@ -1,3 +1,4 @@
+#include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "mlibKriging_exports.h"
@@ -61,11 +62,28 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
     case "LinearRegression::predict"_hash:
       return LinearRegressionBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
 
+    case "Kriging::new"_hash:
+      return KrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::delete"_hash:
+      return KrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::fit"_hash:
+      return KrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::predict"_hash:
+      return KrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::leaveOneOut"_hash:
+      return KrigingBinding::leaveOneOut(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::logLikelihood"_hash:
+      return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::logMargPost"_hash:
+      return KrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
+
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");
   }
 } catch (MxException& e) {
   mexErrMsgIdAndTxt(e.id, e.msg.c_str());
+} catch (std::exception& e) {
+  mexErrMsgIdAndTxt("mLibKriging:kernelException", e.what());
 } catch (...) {  // catch everything even end-of-scope event
-  mexErrMsgIdAndTxt("mLibKriging:exception", "unexcepted exception");
+  mexErrMsgIdAndTxt("mLibKriging:exception", "unexpected exception");
 }

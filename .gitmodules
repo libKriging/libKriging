@@ -4,5 +4,5 @@
 	branch = v2.4
 [submodule "dependencies/carma"]
 	path = dependencies/carma
-	url = https://github.com/RUrlus/carma.git
+	url = https://github.com/libKriging/carma.git
 	branch = master

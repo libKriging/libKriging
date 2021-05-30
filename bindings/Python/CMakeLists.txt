@@ -22,7 +22,6 @@ add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 set(pylibkriging_SRCS src/pylibkirging.cpp)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND pylibkriging_SRCS 
-            src/AddDemo.cpp src/AddDemo.hpp
             src/NumPyDemo.cpp src/NumPyDemo.hpp
             )
 endif()
@@ -34,7 +33,7 @@ list(APPEND pylibkriging_SRCS
 
 pybind11_add_module(pylibkriging ${pylibkriging_SRCS})
 target_link_libraries(pylibkriging PRIVATE Kriging carma)
-target_compile_definitions(pylibkriging PUBLIC VERSION_INFO=\"${KRIGING_VERSION}\")
+target_compile_definitions(pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING_VERSION}\") # renamed to avoid collision with VERSION_INFO from carma
 target_compile_definitions(pylibkriging PUBLIC BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\")
 
 include(CTest)

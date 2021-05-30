@@ -5,7 +5,7 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(readlink -f "${BASEDIR}")
 
 if [[ "$DEBUG_CI" == "true" ]]; then
-  CTEST_FLAGS=--verbose
+  CTEST_FLAGS="--verbose --output-on-failure"
   set -x
 else
   CTEST_FLAGS=--output-on-failure

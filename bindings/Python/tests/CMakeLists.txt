@@ -46,6 +46,7 @@ endmacro()
 
 add_python_test(NAME canary FILENAME canary_test.py)
 add_python_test(NAME loading FILENAME loading_test.py)
+add_python_test(NAME binding_consistency FILENAME binding_consistency_test.py)
 add_python_test(NAME numpy FILENAME NumPy_test.py)
 add_python_test(NAME random FILENAME random_generator_test.py)
 add_python_test(NAME LinearRegression FILENAME LinearRegression_test.py)
