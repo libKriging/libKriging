@@ -5,100 +5,143 @@
 
 Table of contents
 
-1. [Installation](#installation)
-    1. [Requirements](#requirements)
-    1. [Compilation and unit tests](#compilation-and-unit-tests)
+1. [Installation](#installation-from-pre-built-packages)
+1. [Compilation](#compilation)   
+    1. [Requirements](#requirements-more-details)
+    1. [Get the code](#get-the-code)
+    1. [Helper scripts](#helper-scripts-for-ci)   
+    1. [Compilation and tests](#compilation-and-tests)
     1. [Deployment](#deployment)
-
-# Get the code
-
-Just clone it:
-```
-git clone https://github.com/libKriging/libKriging.git
-```
-
-Dependencies are plugged in as [subrepo](https://github.com/ingydotnet/git-subrepo) components.
-If you want to manage then, you need to install [subrepo](https://github.com/ingydotnet/git-subrepo) (for normal usage, this is not required).
+1. [More info](docs/dev/MoreInfo.md)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
-# Installation
+# Installation from pre-built packages
 
-## Requirements
-* CMake ≥ 3.11
+For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use released binaries.
 
-  You can install it by hand (cf [cmake](https://cmake.org/download/)) or using automated method from `.travis-ci/<your-environment>/install.sh` script.
+## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
-  NB: On Windows, `choco` package manager requires admin rights, so that it could be simpler to do it by hand.
-  
-* C++ Compiler with C++11 support;
-  
-  Tested with:
-     
-  |   Compiler/OS    | Linux        | macOS                    | Windows       |
-  |:----------------:|:-------------|:-------------------------|:--------------|
-  |       GCC        | **5.4**, 8.3 |                          | **4.9.3** (R) |
-  |      Clang       | 7.1          | AppleClang **9.1**<br>AppleClang 10.0 (Mojave)<br>AppleClang 11.0 (Catalina)<br>Clang 9.0|               |
-  | MS Visual Studio |              |                          | **15 (2017)** |
-  
-  (bold values represent configurations used in Travis CI pipelines)
-  
-  NB: Ensure C++ compiler is available. On macOS systems you will need to install Xcode
-     with additional Command Line Tools using:  
-     ```
-     xcode-select --install
-     sudo xcodebuild -license accept
-     ```
-     (should be done after macOS upgrade) 
-     
-  NB: On Windows with R environment (R + Rtools), you can use R's recommanded compiler. See compilation woth R toolchain below.
+```shell
+python3 -m pip install --upgrade pip
+pip3 install pylibkriging numpy
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/Kriging_test.py)
+
+## rlibkriging for R
+
+Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+(CRAN repo will come soon...)
+```
+# example
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/rlibkriging_macOS10.15.7-x86_64_v0.3.2.tgz
+```
+Then
+```R
+# in R
+install.packages("Rcpp")
+install.packages(pkgs="rlibkriging_OS_version.tgz", repos=NULL)
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/R/rlibkriging/tests/testthat/test-KrigingLeaveOneOut.R)
+
+NB: this example requires to also install DiceKriging
+```R
+# in R
+install.packages("DiceKriging")
+```
+
+## mlibkriging for Octave
+
+Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+```
+# example
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/mLibKrging_MINGW64_NT10.0-x86_64_v0.3.2.tgz
+```
+Then
+```shell
+octave --path /path/to/mLibKriging/installation
+```
+
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_test.m)
+
+## Tested installation
+
+with libKriging 0.3.2
+
+|        | Linux Ubuntu                             | macOS 11                                | Windows                                 |
+|:-------|:-----------------------------------------|:----------------------------------------|:----------------------------------------|
+| Python | <span style="color:green">✔</span> 3.8   | <span style="color:green">✔</span> 3.9  | <span style="color:red">✘</span> 3.9    |
+| R      | <span style="color:green">✔</span> ≥3.6  | <span style="color:green">✔</span> 4.0  | <span style="color:red">✘</span> 4.1    | 
+| Octave | <span style="color:green">✔</span> =4.2  | <span style="color:green">✔</span> =6.1 | <span style="color:green">✔</span> =5.2 | 
+
+# Compilation
+
+## Requirements ([more details](docs/dev/envs/Requirements.md))
+
+* CMake ≥ 3.13
+
+* C++ Compiler with C++17 support
   
 * Linear algebra packages providing blas and lapack functions.
   
   You can use standard blas and lapack, OpenBlas, MKL.
+
+* Python ≥ 3.6 (optional)
+
+* Octave ≥ 4.2 (optional)
+
+* R ≥ 3.6 (optional)
+
+## Get the code
+
+Just clone it with its submodules:
+```
+git clone --recurse-submodules https://github.com/libKriging/libKriging.git
+```
   
-  On Windows, the simplest method is to use Anaconda (cf `install.sh` scripts in `.travis-ci` or [Readme_Windows.md](.travis-ci/Readme_Windows.md)).
+## Helper scripts for CI
+
+Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
+They use the preset of options also used in CI workflow.
+
+To configure it, you can define following environment variables:
+
+| Variable name          | Default value | Useful values                      | Comment                                         |
+|:-----------------------|:--------------|:-----------------------------------|:------------------------------------------------|
+|`MODE`                  | `Debug`       | `Debug`, `Release`                 |                                                 |
+|`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`ENABLE_PYTHON_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`USE_COMPILER_CACHE`    | &lt;empty&gt; | &lt;string&gt;                     | name of a compiler cache program                |
+|`EXTRA_CMAKE_OPTIONS`   | &lt;empty&gt; | &lt;string&gt;                     | pass extra CMake option for CMaKe configuration |
+
+Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
+
+| `BUILD_NAME`     | when you want to build         | available bindings             |
+|:-----------------|:-------------------------------|:-------------------------------|
+| `r-windows`      | a R binding for windows        | C++, rlibkriging               | 
+| `r-linux-macos`  | a R binding for Linux or macOS | C++, rlibkriging               |  
+| `octave-windows` | an Octave for windows          | C++, mlibkriging               | 
+| `windows`        | for windows                    | C++, mlibkriging, pylibkriging |
+| `linux-macos`    | for Linux or macOS             | C++, mlibkriging, pylibkriging |
+
+Then:
+* Go into `libKriging` root directory  
+    ```shell
+    cd libKriging
+    ```
+* Prepare your environment (Once, for your first compilation)
+    ```shell
+    .travis-ci/${BUILD_NAME}/install.sh
+    ```
+* Build
+  ```shell
+  .travis-ci/${BUILD_NAME}/build.sh
+  ```
+  NB: It will create a `build` directory.
   
-### Optional tools
-     
-* [lcov](http://ltp.sourceforge.net/coverage/lcov.php) is required for test coverage (with `genhtml` for pretty test coverage html reporting)
-* clang-format for automated code formatting
-* clang-tidy for static analysis
-* Doxygen for doc generation
-
-## Integrated scripts for CI
-
-Note: calling these scripts "by hand" should produce the same results than following "Compilation and unit tests" instructions (and it should be also easier).
-
-### Integration for Linux and MacOS
-
-With standard cmake & system libs:
-```shell
-cd libKriging
-.travis-ci/linux-macos/build.sh
-```
-
-With R specific cmake & system libs (needed for rlibkriging):
-```shell
-cd libKriging
-.travis-ci/r-linux-macos/build.sh
-```
-
-### Integration for Windows
-
-With standard cmake & system libs:
-```shell
-cd libKriging
-.travis-ci/windows/build.sh
-```
-
-With R specific cmake & system libs (needed for rlibkriging):
-```shell
-cd libKriging
-.travis-ci/r-windows/build.sh
-```
-
-## Compilation and unit tests
+## Compilation and tests
 
 ### Preamble
 
@@ -109,16 +152,16 @@ We assume that:
     (should be an absolute path)
   * following commands are executed in *`${BUILD}`* directory 
   
-PS: *`${NAME}`* represents a word or an absolute path of your choice
+PS: *`${NAME}`* syntax represents a word or an absolute path of your choice
 
 Select your compilation *`${MODE}`* between: 
   * `Release` : produce an optimized code
   * `Debug` (default) : produce a debug code
   * `Coverage` : for code coverage analysis (not yet tested with Windows)
 
-Following commands are made for Unix shell. To use them with Windows use [Mingw](http://www.mingw.org) or [git-bash](https://gitforwindows.org) environment.
+Following commands are made for Unix shell. To use them with Windows use [git-bash](https://gitforwindows.org) or [Mingw](http://www.mingw.org) environments.
 
-### Compilation for Linux and MacOS
+### Compilation for Linux and macOS
   
   * Configure
       ```shell
@@ -128,43 +171,23 @@ Following commands are made for Unix shell. To use them with Windows use [Mingw]
       ```shell
       cmake --build .
       ```
-      aka with classical makefiles
-      ```shell
-      make  
-      ```
   * Run tests
       ```shell
       ctest
       ```
-      aka with classical makefiles
-      ```shell
-      make test  
-      ```
-  * Buidl documentation (requires doxygen)
+  * Build documentation (requires doxygen)
       ```shell
       cmake --build . --target doc
-      ```
-      aka with classical makefiles
-      ```shell
-      make doc
       ```
   * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
       ```shell
       cmake --build . --target coverage --config Coverage
       ```
-      aka with classical makefiles
-      ```shell
-      make coverage
-      ```
       or 
       ```shell
       cmake --build . --target coverage-report --config Coverage
       ```
-      aka with classical makefiles
-      ```shell
-      make coverage-report
-      ```
-      to produce an html report located in `${BUILD}/coverage/index.html`
+      to produce a html report located in `${BUILD}/coverage/index.html`
    
 ### Compilation for Windows 64bits with Visual Studio
   * Configure
@@ -206,9 +229,9 @@ Following commands are made for Unix shell. To use them with Windows use [Mingw]
 To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
 first `cmake` configuration command.
 
-If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directoty is `${BUILD}/installed`.
+If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directory is `${BUILD}/installed`.
 
-### For Linux and MacOS
+### For Linux and macOS
 
 e.g.:
 ```shell
