@@ -13,9 +13,9 @@ d = ncol(X)
 
 library(DiceKriging)
 # kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
-m1 <- km(design=X, response=y,covtype = "gauss",estim.method="LOO",parinit = c(.25),control = list(trace=F))
+m1 <- km(design=X, response=y,covtype = "gauss",formula=~1,estim.method="LOO",parinit = c(.15),control = list(trace=F))
 library(rlibkriging)
-as_m1 <- as_km(design=X, response=y,covtype = "gauss",estim.method="LOO",parinit = c(.25))
+as_m1 <- as_km(design=X, response=y,covtype = "gauss",formula=~1,estim.method="LOO",parinit = c(.15))
 
 test_that("m1.leaveOneOutFun == as_m1.leaveOneOutFun",
           expect_true(leaveOneOutFun(m1@covariance@range.val,m1) == leaveOneOutFun(m1@covariance@range.val,as_m1)))
@@ -62,7 +62,7 @@ test_that("m1.argmax(logLig) == as_m1.argmax(logLig)",
           expect_equal(m1@covariance@range.val,as_m1@covariance@range.val,tol=0.1))
 
 ll = function(Theta){apply(Theta,1,function(theta) logLikFun(theta,m1))}
-as_ll = function(Theta){apply(Theta,1,function(theta) kriging_logLikelihood(as_m1@Kriging,theta)$logLikelihood)}
+as_ll = function(Theta){apply(Theta,1,function(theta) logLikelihood(as_m1@Kriging,theta)$logLikelihood[1])}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 contour(t,t,matrix(as_ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
@@ -156,6 +156,7 @@ if (t$p.value<0.05) {
     lines(xx,rlibkriging::simulate(as_k,nsim = 1,newdata = xx,checkNames=F,cond=TRUE, nugget.sim=0),col=rgb(1,0,0,0.02))
   }
 }
+print(t)
 test_that("DiceKriging::simulate ~= rlibkriging::simulate",
           expect_true(t$p.value>0.05))
 ################################################################################
@@ -212,6 +213,7 @@ test_args = function(formula ,design ,response ,covtype, estim.method ) {
   sims_k <<-       DiceKriging::simulate(k,nsim = n,newdata = x,checkNames=F,cond=TRUE, nugget.sim=1e-10)
   sims_as_k <<- rlibkriging::simulate(as_k,nsim = n,newdata = x,checkNames=F,cond=TRUE)
   t = t.test(t(sims_k),sims_as_k,var.equal=F,paired=F)
+  print(t)
   test_that("DiceKriging::simulate ~= rlibkriging::simulate",
             expect_true(t$p.value>0.05))
 }

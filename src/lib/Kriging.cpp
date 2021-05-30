@@ -438,11 +438,11 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = trans(chol(R));
+  fd->T = chol(R, "lower");
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
-  fd->M = solve(fd->T, m_F, arma::solve_opts::fast);
+  fd->M = solve(fd->T, m_F, solve_opts);
   // t0 = toc("M             ", t0);
   arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
   // t0 = toc("Rinv          ", t0);
@@ -451,7 +451,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat TM = chol(trans(fd->M) * fd->M);  // Can be optimized with a crossprod equivalent in armadillo ?
   // arma::mat aux = solve(trans(TM), trans(RinvF));
   // t0 = toc("TM            ", t0);
-  arma::mat aux = solve(trans(TM), trans(RinvF), arma::solve_opts::fast);
+  arma::mat aux = solve(trans(TM), trans(RinvF), solve_opts);
   // t0 = toc("aux           ", t0);
   arma::mat Q = Rinv - trans(aux) * aux;  // Can be optimized with a crossprod equivalent in armadillo ?
   // t0 = toc("Q             ", t0);
@@ -468,12 +468,14 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
 
     arma::colvec Yt = solve(fd->T,m_y, solve_opts);
     if (fd->estim_beta) {
+      //fd->beta = solve(fd->M, Yt, solve_opts);
       arma::mat Q;
       arma::mat G;
       qr_econ(Q, G, fd->M);
       fd->beta = solve(G, Q.t() * Yt, solve_opts);
-      fd->z = Yt - fd->M * fd->beta;
     }
+    fd->z = Yt - fd->M * fd->beta;
+
   if (fd->estim_sigma2)  // means no sigma2 provided
     fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
 
