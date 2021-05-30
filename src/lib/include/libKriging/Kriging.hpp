@@ -70,9 +70,10 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
-  std::function<double(const arma::vec&)> CovNorm_fun; // dist_norm is L1 distance between to points of X, divided by theta
+  std::function<double(const arma::vec&)>
+      CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
-  double CovNorm_pow; // power factor used in hessian
+  double CovNorm_pow;  // power factor used in hessian
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -118,7 +119,7 @@ class Kriging {
                                                                                const bool grad,
                                                                                const bool hess);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
-  
+
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
 
   /** Compute the prediction for given points X'
