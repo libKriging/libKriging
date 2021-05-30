@@ -48,5 +48,5 @@ case $ARCH in
     ;;
 esac
 
-RELEASE_FILE="${PACKAGE_DIR}"/mLibKrging_${ARCHZ}_${GIT_TAG}.tgz
+RELEASE_FILE="${PACKAGE_DIR}"/mLibKriging_${ARCHZ}_${GIT_TAG}.tgz
 tar czvf "${RELEASE_FILE}" -C build/installed/bindings/Octave .
