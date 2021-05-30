@@ -111,4 +111,17 @@ void logLikelihood(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.setOptional<2>(llhess, "llhess");  // FIXME better name
 }
 
+void logMargPost(int nlhs, void** plhs, int nrhs, const void** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Range{2, 3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
+  auto [lmp, lmpgrad] = km->logMargPostEval(input.get<1, arma::vec>("theta"), want_grad);
+  output.set<0>(lmp, "lmp");                  // FIXME better name
+  output.setOptional<1>(lmpgrad, "lmpgrad");  // FIXME better name
+}
+
 }  // namespace KrigingBinding

@@ -37,6 +37,8 @@ class PyKriging {
                                                                                  const bool want_grad,
                                                                                  const bool want_hess);
 
+  std::tuple<double, py::array_t<double>> logMargPostEval(const py::array_t<double>& theta, const bool want_grad);
+
  private:
   std::unique_ptr<Kriging> m_internal;
 };

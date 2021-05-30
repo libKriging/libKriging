@@ -34,6 +34,10 @@ classdef Kriging < handle
         function varargout = logLikelihood(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::logLikelihood", obj.ref, varargin{:});
         end
-        
+
+        function varargout = logMargPost(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::logMargPost", obj.ref, varargin{:});
+        end
+
     end
 end

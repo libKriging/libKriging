@@ -50,3 +50,10 @@ PyKriging::logLikelihoodEval(const py::array_t<double>& theta, const bool want_g
       {}  //
   };
 }
+
+std::tuple<double, py::array_t<double>> PyKriging::logMargPostEval(const py::array_t<double>& theta,
+                                                                   const bool want_grad) {
+  arma::vec vec_theta = carma::arr_to_col<double>(theta);
+  auto [lmp, grad] = m_internal->logMargPostEval(vec_theta, want_grad);
+  return {lmp, carma::col_to_arr(grad)};
+}

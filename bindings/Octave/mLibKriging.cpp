@@ -74,6 +74,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::leaveOneOut(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::logLikelihood"_hash:
       return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::logMargPost"_hash:
+      return KrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

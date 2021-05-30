@@ -69,16 +69,18 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def(py::init<const std::string&>())
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
-      .def("leaveOneOut", &PyKriging::leaveOneOutEval)  // TODO rename as leaveOneOutEval ??
-      .def("logLikelihood", &PyKriging::logLikelihoodEval);
+      .def("leaveOneOut", &PyKriging::leaveOneOutEval)
+      .def("logLikelihood", &PyKriging::logLikelihoodEval)
+      .def("logMargPost", &PyKriging::logMargPostEval);
 
   // Automated mapper
   py::class_<Kriging>(m, "Kriging")
       .def(py::init<const std::string&>())
       .def("fit", &Kriging::fit)  // TODO mettre des arguments nommé optionnels: py::arg("name") =
       .def("predict", &Kriging::predict)
-      .def("leaveOneOut", &Kriging::leaveOneOutEval)  // TODO rename as leaveOneOutEval ??
-      .def("logLikelihood", &Kriging::logLikelihoodEval);
+      .def("leaveOneOut", &Kriging::leaveOneOutEval)
+      .def("logLikelihood", &Kriging::logLikelihoodEval)
+      .def("logMargPost", &Kriging::logMargPostEval);
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
