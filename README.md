@@ -1,5 +1,5 @@
-<!-- [![Build Status](https://travis-ci.com/libKriging/libKriging.svg?branch=master)](https://travis-ci.com/libKriging/libKriging) -->
-[![Github CI](https://github.com/libKriging/libKriging/workflows/Github%20CI/badge.svg)](https://github.com/libKriging/libKriging/actions?query=workflow%3A%22Github+CI%22)
+[![Build and tests](https://github.com/libKriging/libKriging/actions/workflows/main.yml/badge.svg)](https://github.com/libKriging/libKriging/actions/workflows/main.yml)
+[![Code Analysis](https://github.com/libKriging/libKriging/actions/workflows/analysis.yml/badge.svg)](https://github.com/libKriging/libKriging/actions/workflows/analysis.yml)
 [![Coverage Status](https://coveralls.io/repos/github/libKriging/libKriging/badge.svg?branch=master)](https://coveralls.io/github/libKriging/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
