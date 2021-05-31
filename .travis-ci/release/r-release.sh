@@ -35,7 +35,7 @@ RVER=$(awk -F": " '/^Version:/ { print $2 }' "${PREFIX}"/DESCRIPTION)
 
 case $ARCH in
   Linux)
-    ARCHZ="$(ARCH)-$(uname -m)"
+    ARCHZ="${ARCH}-$(uname -m)"
     tar xzvf "${PREFIX}_${RVER}_R_$(uname -m)-pc-linux-gnu.tar.gz" -C "${TMP_DIR}"
     cp -a build/installed/lib/libarmadillo.so.* "${TMP_DIR}"/rlibkriging/libs/
     cp -a build/installed/lib/libKriging.so.* "${TMP_DIR}"/rlibkriging/libs/
