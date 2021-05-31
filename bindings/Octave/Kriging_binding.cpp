@@ -6,13 +6,38 @@
 
 namespace KrigingBinding {
 
+// Old short constructor only
+// void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
+//  MxMapper input{"Input",
+//                 nrhs,
+//                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+//                 RequiresArg::Exactly{1}};
+//  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+//  output.set<0>(buildObject<Kriging>(input.get<0, std::string>("kernel")), "new object reference");
+//}
+
 void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{3, 8}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  output.set<0>(buildObject<Kriging>(input.get<0, std::string>("kernel")), "new object reference");
+  const auto regmodel = Kriging::RegressionModelUtils::fromString(
+      input.getOptional<3, std::string>("regression model").value_or("constant"));
+  const auto normalize = input.getOptional<4, bool>("normalize").value_or(false);
+  const auto optim = input.getOptional<5, std::string>("optim").value_or("BFGS");
+  const auto objective = input.getOptional<6, std::string>("objective").value_or("LL");
+  const auto parameters = Kriging::Parameters{};  // input.getOptional<7, std::string>("parameters").value_or(); //
+  // FIXME Parameters not done
+  auto km = buildObject<Kriging>(input.get<0, arma::vec>("vector"),
+                                 input.get<1, arma::mat>("matrix"),
+                                 input.get<2, std::string>("kernel"),
+                                 regmodel,
+                                 normalize,
+                                 optim,
+                                 objective,
+                                 parameters);
+  output.set<0>(km, "new object reference");
 }
 
 void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
@@ -81,6 +106,27 @@ void predict(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(y_pred, "predicted response");
   output.setOptional<1>(stderr_v, "stderr vector");
   output.setOptional<2>(cov_m, "cov matrix");
+}
+
+void simulate(int nlhs, void** plhs, int nrhs, const void** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{4}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  auto result = km->simulate(input.get<1, int>("nsim"), input.get<2, int>("seed"), input.get<3, arma::mat>("Xp"));
+  output.set<0>(result, "simulated response");
+}
+
+void update(int nlhs, void** plhs, int nrhs, const void** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{4}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  km->update(input.get<1, arma::vec>("new y"), input.get<2, arma::mat>("new X"), input.get<3, bool>("normalize"));
 }
 
 void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs) {

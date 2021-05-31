@@ -83,6 +83,14 @@ inline auto converter<uint64_t>(mxArray* x, const std::string& parameter) {
 }
 
 template <>
+inline auto converter<int32_t>(mxArray* x, const std::string& parameter) {
+  if (!mxIsInt32(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not an unsigned 64bits int");
+  }
+  return *static_cast<int32_t*>(mxGetData(x));
+}
+
+template <>
 inline auto converter<bool>(mxArray* x, const std::string& parameter) {
   if (!mxIsLogicalScalar(x) || mxIsComplex(x) || mxGetNumberOfElements(x) != 1) {
     throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not an logical");
@@ -126,6 +134,12 @@ template <>
 inline void setter<uint64_t>(const uint64_t& v, mxArray*& x) {
   x = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
   *static_cast<uint64_t*>(mxGetData(x)) = v;
+}
+
+template <>
+inline void setter<int32_t>(const int32_t& v, mxArray*& x) {
+  x = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
+  *static_cast<int32_t*>(mxGetData(x)) = v;
 }
 
 template <>

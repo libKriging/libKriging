@@ -27,6 +27,14 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::predict", obj.ref, varargin{:});
         end
 
+        function varargout = simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::simulate", obj.ref, varargin{:});
+        end
+
+        function varargout = update(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::update", obj.ref, varargin{:});
+        end
+
         function varargout = leaveOneOut(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOut", obj.ref, varargin{:});
         end

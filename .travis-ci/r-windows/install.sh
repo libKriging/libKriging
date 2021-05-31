@@ -17,7 +17,7 @@ choco install -y --no-progress make --version 4.3
 if [ "${TRAVIS}" == "true" ]; then
   # Using chocolatey and manual command
   # https://chocolatey.org/packages/R.Project
-  choco install -y --no-progress r.project --version 3.6.0
+  choco install -y --no-progress r.project --version 4.0.0
   if [ ! -f "C:/Rtools/VERSION.txt" ]; then
       # https://cran.r-project.org/bin/windows/Rtools
       curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
@@ -26,7 +26,7 @@ if [ "${TRAVIS}" == "true" ]; then
     echo "Rtools installation detected: nothing to do"
   fi
 elif [ "${GITHUB_ACTIONS}" == "true" ]; then
-  # déjà installé
+  # Already installed
 #  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
 #      # https://cran.r-project.org/bin/windows/Rtools
 #      curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe

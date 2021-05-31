@@ -32,6 +32,18 @@ PyKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov) {
       carma::col_to_arr(y_predict, true), carma::col_to_arr(y_stderr, true), carma::mat_to_arr(y_cov, true));
 }
 
+py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp) {
+  arma::mat mat_X = carma::arr_to_mat<double>(Xp);
+  auto result = m_internal->simulate(nsim, seed, mat_X);
+  return carma::mat_to_arr(result, true);
+}
+
+void PyKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX, bool normalize) {
+  arma::mat mat_y = carma::arr_to_col<double>(newy);
+  arma::mat mat_X = carma::arr_to_mat<double>(newX);
+  m_internal->update(mat_y, mat_X, normalize);
+}
+
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutEval(const py::array_t<double>& theta,
                                                                    const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);

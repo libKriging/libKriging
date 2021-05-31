@@ -60,8 +60,7 @@ def test_data1():
     llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
 
     kernel = "gauss"
-    r = lk.Kriging(kernel)  # FIXME prefer Kriging (not Kriging2 is possible)
-    r.fit(y, X, lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
+    r = lk.Kriging(y, X, kernel, lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
     x = 0.3 * np.ones(np.shape(X)[1])
 
     loo, loograd = r.leaveOneOut(x, True)
@@ -87,8 +86,7 @@ def test_data2(i):
     llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
 
     kernel = "gauss"
-    r = lk.Kriging(kernel)  # FIXME prefer Kriging (not Kriging2 is possible)
-    r.fit(y, X, lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
+    r = lk.Kriging(y, X, kernel)  # use defaults: lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
 
     x = 0.3 * np.ones(np.shape(X)[1])
 

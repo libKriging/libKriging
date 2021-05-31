@@ -31,6 +31,10 @@ class PyKriging {
                                                                                     bool withStd,
                                                                                     bool withCov);
 
+  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
+
+  void update(const py::array_t<double>& newy, const py::array_t<double>& newX, bool normalize);
+
   std::tuple<double, py::array_t<double>> leaveOneOutEval(const py::array_t<double>& theta, const bool want_grad);
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodEval(const py::array_t<double>& theta,
