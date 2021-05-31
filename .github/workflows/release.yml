@@ -262,6 +262,10 @@ jobs:
         with:
           submodules: true
 
+      - uses: r-lib/actions/setup-r@v1
+        with:
+          r-version: 4.0
+
       - name: Check tag
         shell: bash
         run: |

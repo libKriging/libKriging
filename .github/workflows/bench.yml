@@ -41,6 +41,11 @@ jobs:
         with:
           submodules: true
 
+      - uses: r-lib/actions/setup-r@v1
+        with:
+          r-version: 4.0
+        if: matrix.enable_R == 'on'
+
       - name: Define local variables
         shell: bash
         run: |
@@ -82,7 +87,7 @@ jobs:
             sudo apt install -qy octave liboctave-dev
           fi
           if [ "${ENABLE_R_BINDING}" == "on" ]; then
-            sudo apt install -qy r-base liblapack-dev gfortran
+            sudo apt install -qy liblapack-dev gfortran # r-base
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
