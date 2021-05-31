@@ -129,7 +129,8 @@ jobs:
           PYTHON_CMD_PATH=$(which python)
           PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
           PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
-          ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
+          # do not create symlink if python3 already exists
+          [ -e "${PYTHON_ALT_CMD_PATH}" ] || ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
         if: runner.os == 'Windows'
 
       - name: install
@@ -390,7 +391,7 @@ jobs:
           
           Customize me once published.
 
-          # using https://github.com/github/hub
+          (using https://github.com/github/hub)
           
           EOF
           if [ -z "${{ github.event.release.tag_name }}" ]; then
@@ -400,7 +401,7 @@ jobs:
   release-python-wheel:
     name: Release Python Wheel to Pypi.org
     needs: all-package-build-checkpoint
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/download-artifact@v2
         with:
