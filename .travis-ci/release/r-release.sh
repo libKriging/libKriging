@@ -57,7 +57,7 @@ case $ARCH in
     cp -a build/installed/lib/libarmadillo.dll "${TMP_DIR}"/rlibkriging/libs/x64/
     cp -a build/installed/lib/libKriging.dll "${TMP_DIR}"/rlibkriging/libs/x64/
     # RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG#v}.zip
-    RELEASE_FILE="${PREFIX}_${RVER}.zip" # cannot rename for Windows
+    RELEASE_FILE="${PREFIX}_${GIT_TAG#v}.zip" # cannot rename for Windows
     (cd "${TMP_DIR}" && zip -FS -r "${RELEASE_FILE}" rlibkriging)
     ;;
   *)
