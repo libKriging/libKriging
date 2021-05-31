@@ -44,6 +44,10 @@ void PyKriging::update(const py::array_t<double>& newy, const py::array_t<double
   m_internal->update(mat_y, mat_X, normalize);
 }
 
+std::string PyKriging::describeModel() const {
+  return m_internal->describeModel();
+}
+
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutEval(const py::array_t<double>& theta,
                                                                    const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
