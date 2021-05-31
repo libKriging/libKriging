@@ -161,7 +161,7 @@ jobs:
       matrix:
         include:
           - name: "Octave Linux"
-            os: ubuntu-18.04
+            os: ubuntu-20.04
             force_update: on
           - name: "Octave macOS"
             os: macOS-10.15
@@ -251,7 +251,7 @@ jobs:
       matrix:
         include:
           - name: "R Linux"
-            os: ubuntu-18.04
+            os: ubuntu-20.04
           - name: "R macOS"
             os: macOS-10.15
           - name: "R Windows"
@@ -357,7 +357,7 @@ jobs:
       - build-wheel-python
       - build-R-package
       - build-octave-package
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -430,7 +430,7 @@ jobs:
   release-artifacts:
     name: Upload Release Asset
     needs: all-package-build-checkpoint
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
         with:
