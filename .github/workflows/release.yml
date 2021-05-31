@@ -212,7 +212,7 @@ jobs:
             sudo apt update
           fi
           sudo apt install liblapack-dev python3-pip
-          sudo apt install -qy octave octave-pkg-dev
+          sudo apt install -qy octave liboctave-dev
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
       - name: install

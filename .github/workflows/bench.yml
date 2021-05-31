@@ -79,7 +79,7 @@ jobs:
           fi
           sudo apt install liblapack-dev python3-pip clang-tidy
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
-            sudo apt install -qy octave octave-pkg-dev
+            sudo apt install -qy octave liboctave-dev
           fi
           if [ "${ENABLE_R_BINDING}" == "on" ]; then
             sudo apt install -qy r-base liblapack-dev gfortran
