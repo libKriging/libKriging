@@ -23,11 +23,10 @@ For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
 ```shell
-python3 -m pip install --upgrade pip
 pip3 install pylibkriging numpy
 ```
 
-Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/Kriging_test.py)
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/pylibkriging_trivial_demo.py)
 
 ## rlibkriging for R
 
@@ -35,13 +34,13 @@ Download the archive from [libKriging releases](https://github.com/libKriging/li
 (CRAN repo will come soon...)
 ```
 # example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/rlibkriging_macOS10.15.7-x86_64_v0.3.2.tgz
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/rlibkriging_0.4.1_macOS10.15.7-x86_64.tgz
 ```
 Then
 ```R
 # in R
 install.packages("Rcpp")
-install.packages(pkgs="rlibkriging_OS_version.tgz", repos=NULL)
+install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 ```
 
 Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/R/rlibkriging/tests/testthat/test-KrigingLeaveOneOut.R)
@@ -54,27 +53,28 @@ install.packages("DiceKriging")
 
 ## mlibkriging for Octave
 
-Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+Download and uncompress the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 ```
 # example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.3.2/mLibKrging_MINGW64_NT10.0-x86_64_v0.3.2.tgz
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/mLibKriging_0.4.1_Linux-x86_64.tgz
 ```
 Then
 ```shell
 octave --path /path/to/mLibKriging/installation
 ```
 
-Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_test.m)
+Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_trivial_demo.m)
 
 ## Tested installation
 
-with libKriging 0.3.2
+with libKriging 0.4.1
 
-|        | Linux Ubuntu                             | macOS 11                                | Windows                                 |
-|:-------|:-----------------------------------------|:----------------------------------------|:----------------------------------------|
-| Python | <span style="color:green">✔</span> 3.8   | <span style="color:green">✔</span> 3.9  | <span style="color:red">✘</span> 3.9    |
-| R      | <span style="color:green">✔</span> ≥3.6  | <span style="color:green">✔</span> 4.0  | <span style="color:red">✘</span> 4.1    | 
-| Octave | <span style="color:green">✔</span> =4.2  | <span style="color:green">✔</span> =6.1 | <span style="color:green">✔</span> =5.2 | 
+<!-- ✔ ✘ -->
+|        | Linux Ubuntu:20                          | macOS 11                                 | Windows                                |
+|:-------|:-----------------------------------------|:-----------------------------------------|:---------------------------------------|
+| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:red">✘</span> 3.9.5 |
+| R      | <span style="color:green">✔</span> 4.1   | <span style="color:green">✔</span> 4.1   | <span style="color:gray">?</span> 4.1  | 
+| Octave | <span style="color:green">✔</span> 5.2.0 | <span style="color:green">✔</span> 6.2   | <span style="color:green">✔</span> 5.2 | 
 
 # Compilation
 
