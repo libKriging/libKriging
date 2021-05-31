@@ -22,9 +22,7 @@ try
     llgrad_ref = dlmread(file_llgrad, delimiter=',');
     
     kernel = "gauss";
-    k_m = Kriging(kernel);
-    
-    k_m.fit(y, X, "constant", false, "BFGS", "LL") % lk.Parameters() % FIXME parameters arg not mapped
+    k_m = Kriging(y, X, kernel, "constant", false, "BFGS", "LL") % lk.Parameters() % FIXME parameters arg not mapped
     x = 0.3 * ones(size(X)(2), 1);
     [loo, loograd] = k_m.leaveOneOut(x, true);
     assert(relative_error(loo, loo_ref) < tolerance)
@@ -56,8 +54,7 @@ for i = 1:10
         llgrad_ref = transpose(llgrad_ref); % has been read as a row vector
         
         kernel = "gauss";
-        k_m = Kriging(kernel);
-        k_m.fit(y, X) % use all default formal parameters
+        k_m = k_m = Kriging(y, X, kernel) % use all default formal parameters
         x = 0.3 * ones(size(X)(2), 1);
         
         [ll, llgrad] = k_m.logLikelihood(x, true, false);

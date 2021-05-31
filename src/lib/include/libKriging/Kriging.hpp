@@ -99,6 +99,15 @@ class Kriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
 
+  LIBKRIGING_EXPORT Kriging(const arma::colvec& y,
+                            const arma::mat& X,
+                            const std::string& covType,
+                            const RegressionModel& regmodel = RegressionModel::Constant,
+                            bool normalize = false,
+                            const std::string& optim = "BFGS",
+                            const std::string& objective = "LL",
+                            const Parameters& parameters = Parameters{});
+
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param X is n*d matrix of input

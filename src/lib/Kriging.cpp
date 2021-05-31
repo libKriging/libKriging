@@ -112,6 +112,18 @@ LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType) {
   make_Cov(covType);
 }
 
+LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
+                                   const arma::mat& X,
+                                   const std::string& covType,
+                                   const RegressionModel& regmodel,
+                                   bool normalize,
+                                   const std::string& optim,
+                                   const std::string& objective,
+                                   const Parameters& parameters) {
+  make_Cov(covType);
+  fit(y, X, regmodel, normalize, optim, objective, parameters);
+}
+
 auto solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
 
