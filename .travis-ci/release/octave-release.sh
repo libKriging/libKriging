@@ -33,7 +33,7 @@ mkdir -p "${PACKAGE_DIR}"
 
 case $ARCH in
   Linux)
-    ARCHZ="$(ARCH)-$(uname -m)"
+    ARCHZ="${ARCH}-$(uname -m)"
     ;;
   Darwin)
     MACOS_VERSION=$(/usr/libexec/PlistBuddy -c "Print:ProductVersion" /System/Library/CoreServices/SystemVersion.plist)
@@ -48,5 +48,5 @@ case $ARCH in
     ;;
 esac
 
-RELEASE_FILE="${PACKAGE_DIR}"/mLibKriging_${ARCHZ}_${GIT_TAG}.tgz
+RELEASE_FILE="${PACKAGE_DIR}"/mLibKriging_${GIT_TAG#v}_${ARCHZ}.tgz
 tar czvf "${RELEASE_FILE}" -C build/installed/bindings/Octave .

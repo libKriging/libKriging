@@ -39,7 +39,7 @@ case $ARCH in
     tar xzvf "${PREFIX}_${RVER}_R_$(uname -m)-pc-linux-gnu.tar.gz" -C "${TMP_DIR}"
     cp -a build/installed/lib/libarmadillo.so.* "${TMP_DIR}"/rlibkriging/libs/
     cp -a build/installed/lib/libKriging.so.* "${TMP_DIR}"/rlibkriging/libs/
-    RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG}.tgz
+    RELEASE_FILE=${PREFIX}_${GIT_TAG#v}_${ARCHZ}.tgz
     tar czvf "${RELEASE_FILE}" -C "${TMP_DIR}" .
     ;;
   Darwin)
@@ -48,7 +48,7 @@ case $ARCH in
     tar xzvf "${PREFIX}_${RVER}.tgz" -C "${TMP_DIR}"
     cp -a build/installed/lib/libarmadillo.*.dylib "${TMP_DIR}"/rlibkriging/libs/
     cp -a build/installed/lib/libKriging.*.dylib "${TMP_DIR}"/rlibkriging/libs/
-    RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG}.tgz
+    RELEASE_FILE=${PREFIX}_${GIT_TAG#v}_${ARCHZ}.tgz
     tar czvf "${RELEASE_FILE}" -C "${TMP_DIR}" .
     ;;
   MSYS_NT*|MINGW64_NT*) # Windows
@@ -56,7 +56,8 @@ case $ARCH in
     unzip "${PREFIX}_${RVER}.zip" -d "${TMP_DIR}"
     cp -a build/installed/lib/libarmadillo.dll "${TMP_DIR}"/rlibkriging/libs/x64/
     cp -a build/installed/lib/libKriging.dll "${TMP_DIR}"/rlibkriging/libs/x64/
-    RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG}.zip
+    # RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG#v}.zip
+    RELEASE_FILE="${PREFIX}_${RVER}.zip" # cannot rename for Windows
     (cd "${TMP_DIR}" && zip -FS -r "${RELEASE_FILE}" rlibkriging)
     ;;
   *)
