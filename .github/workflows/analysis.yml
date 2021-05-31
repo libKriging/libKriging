@@ -1,4 +1,4 @@
-name: Github CI
+name: Code Analysis
 
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#on
 on:
@@ -60,49 +60,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Linux Debug"
+          - name: "Coverage mode"
             os: ubuntu-20.04
             mode: Debug
-            enable_python: on
-          - name: "macOS Debug"
-            os: macOS-10.15
-            mode: Debug
-            enable_python: on
-          - name: "Windows Debug"
-            os: windows-2019
-            mode: Debug
-            enable_python: on
-          - name: "Octave Linux"
-            os: ubuntu-20.04
-            mode: Release
             enable_python: on
             enable_octave: on
+            enable_coverage: on
             force_update: on
-          - name: "Octave macOS"
-            os: macOS-10.15
-            mode: Release
-            enable_python: off
-            enable_octave: on
-          - name: "Octave Windows"
-            os: windows-2019
-            mode: Release
-            # using python and octave in windows leads to the following error:
-            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-            #   491 | # define snprintf _snprintf
-            enable_python: off
-            enable_octave: on
-          - name: "R Linux"
+            # /!\ need after_success
+          - name: "Memcheck mode"
             os: ubuntu-20.04
-            mode: Release
-            enable_R: on
-          - name: "R macOS"
-            os: macOS-10.15
-            mode: Release
-            enable_R: on
-          - name: "R Windows"
-            os: windows-2019
-            mode: Release
-            enable_R: on
+            mode: Debug
+            enable_python: on
+            enable_octave: on
+            enable_memcheck: on
+            force_update: on
 
     steps:
       - uses: actions/checkout@v2
