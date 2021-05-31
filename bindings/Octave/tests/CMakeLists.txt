@@ -42,7 +42,7 @@ endmacro()
 
 add_octave_test(NAME success FILENAME dummy_succeededtest.m)
 add_octave_test(NAME failure FILENAME dummy_failingtest.m WILL_FAIL)
-add_octave_test(NAME mLibKriging FILENAME mLibKriging_test.m)
+add_octave_test(NAME mLibKriging-Demo FILENAME mLibKriging_trivial_demo.m)
 add_octave_test(NAME mLibKriging-BadUsage FILENAME mLibKriging_failingtest.m WILL_FAIL)
 add_octave_test(NAME LinearRegression-Simple FILENAME LinearRegression_simpletest.m)
 add_octave_test(NAME LinearRegression-Complete FILENAME LinearRegression_completest.m)

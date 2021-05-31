@@ -35,6 +35,8 @@ class PyKriging {
 
   void update(const py::array_t<double>& newy, const py::array_t<double>& newX, bool normalize);
 
+  std::string describeModel() const;
+
   std::tuple<double, py::array_t<double>> leaveOneOutEval(const py::array_t<double>& theta, const bool want_grad);
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodEval(const py::array_t<double>& theta,

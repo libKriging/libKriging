@@ -107,6 +107,11 @@ inline auto converter<double>(mxArray* x, const std::string& parameter) {
 }
 
 template <>
+inline void setter<std::string>(const std::string& v, mxArray*& x) {
+  x = mxCreateString(v.c_str());
+}
+
+template <>
 inline void setter<arma::vec>(const arma::vec& v, mxArray*& x) {
   x = mxCreateNumericMatrix(v.n_rows, v.n_cols, mxDOUBLE_CLASS, mxREAL);
   if (false && v.mem_state == 0 && v.n_elem > arma::arma_config::mat_prealloc) {

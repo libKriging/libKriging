@@ -10,6 +10,7 @@ void fit(int nlhs, void** plhs, int nrhs, const void** prhs);
 void predict(int nlhs, void** plhs, int nrhs, const void** prhs);
 void simulate(int nlhs, void** plhs, int nrhs, const void** prhs);
 void update(int nlhs, void** plhs, int nrhs, const void** prhs);
+void describeModel(int nlhs, void** plhs, int nrhs, const void** prhs);
 void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs);
 void logLikelihood(int nlhs, void** plhs, int nrhs, const void** prhs);
 void logMargPost(int nlhs, void** plhs, int nrhs, const void** prhs);

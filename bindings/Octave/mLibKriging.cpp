@@ -74,6 +74,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::update"_hash:
       return KrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::describeModel"_hash:
+      return KrigingBinding::describeModel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::leaveOneOut"_hash:
       return KrigingBinding::leaveOneOut(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::logLikelihood"_hash:

@@ -72,6 +72,7 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
       .def("update", &PyKriging::update)
+      .def("describeModel", &PyKriging::describeModel)
       .def("leaveOneOut", &PyKriging::leaveOneOutEval)
       .def("logLikelihood", &PyKriging::logLikelihoodEval)
       .def("logMargPost", &PyKriging::logMargPostEval);
@@ -110,6 +111,7 @@ PYBIND11_MODULE(pylibkriging, m) {
       .def("predict", &Kriging::predict)
       .def("simulate", &Kriging::simulate)
       .def("update", &Kriging::update)
+      .def("describeModel", &Kriging::describeModel)
       .def("leaveOneOut", &Kriging::leaveOneOutEval)
       .def("logLikelihood", &Kriging::logLikelihoodEval)
       .def("logMargPost", &Kriging::logMargPostEval);

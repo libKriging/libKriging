@@ -156,6 +156,8 @@ class Kriging {
    * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
+
+  LIBKRIGING_EXPORT std::string describeModel() const;
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP
