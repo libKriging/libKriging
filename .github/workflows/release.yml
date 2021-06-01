@@ -393,10 +393,6 @@ jobs:
 
           This is an automated release note.
           
-          Customize me once published.
-
-          (using https://github.com/github/hub)
-          
           EOF
           if [ -z "${{ github.event.release.tag_name }}" ]; then
             hub release create -F RELEASE_NOTE.md "$GIT_TAG"
