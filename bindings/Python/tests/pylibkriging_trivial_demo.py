@@ -15,3 +15,7 @@ def test_kriging():
     rl = lk.Kriging(y, X, "gauss")
     y_pred, _stderr, _cov = rl.predict(X, True, True)
     print(rl.describeModel())
+
+
+if __name__ == '__main__':
+    test_kriging()
