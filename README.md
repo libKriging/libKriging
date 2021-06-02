@@ -44,7 +44,7 @@ import pylibkriging as lk
 
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 (CRAN repo will come soon...)
-```
+```shell
 # example
 curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/rlibkriging_0.4.1_macOS10.15.7-x86_64.tgz
 ```
@@ -60,7 +60,7 @@ Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo
 ## mlibkriging for Octave
 
 Download and uncompress the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
-```
+```shell
 # example
 curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/mLibKriging_0.4.1_Linux-x86_64.tgz
 ```
@@ -69,7 +69,7 @@ Then
 octave --path /path/to/mLibKriging/installation
 ```
 or inside Octave
-```octave
+```matlab
 addpath("path/to/mLibKriging")
 ```
 
