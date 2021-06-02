@@ -31,6 +31,9 @@ pip3 install pylibkriging numpy
 ```
 
 Usage example [here](bindings/Python/tests/pylibkriging_demo.py)
+
+NB: Code sample below has been extracted from the reference file linked above.
+
 ```python
 import numpy as np
 X = [0.0, 0.2, 0.5, 0.8, 1.0]
@@ -91,6 +94,8 @@ install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 
 Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)
 
+NB: Code sample below has been extracted from the reference file linked above.   
+
 ```R
 X <- as.matrix(c(0.0, 0.2, 0.5, 0.8, 1.0))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -131,6 +136,8 @@ addpath("path/to/mLibKriging")
 ```
 
 Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)
+
+NB: Code sample below has been extracted from the reference file linked above.
 
 ```matlab
 X = [0.0;0.2;0.5;0.8;1.0];
