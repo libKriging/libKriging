@@ -28,6 +28,14 @@ pip3 install pylibkriging numpy
 
 Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/pylibkriging_trivial_demo.py)
 
+NB: On windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
+To load them into Python's search PATH, use:
+```python
+import os
+os.environ['PATH'] = 'c:\\Users\\User\\Path\\to\\dlls' + os.pathsep + os.environ['PATH']
+import pylibkriging as lk
+```
+
 ## rlibkriging for R
 
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
@@ -62,6 +70,10 @@ Then
 ```shell
 octave --path /path/to/mLibKriging/installation
 ```
+or inside Octave
+```octave
+addpath("path/to/mLibKriging")
+```
 
 Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_trivial_demo.m)
 
@@ -70,11 +82,13 @@ Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindin
 with libKriging 0.4.1
 
 <!-- ✔ ✘ -->
-|        | Linux Ubuntu:20                          | macOS 11                                 | Windows                                |
-|:-------|:-----------------------------------------|:-----------------------------------------|:---------------------------------------|
-| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:red">✘</span> 3.9.5 |
-| R      | <span style="color:green">✔</span> 4.1   | <span style="color:green">✔</span> 4.1   | <span style="color:gray">?</span> 4.1  | 
-| Octave | <span style="color:green">✔</span> 5.2.0 | <span style="color:green">✔</span> 6.2   | <span style="color:green">✔</span> 5.2 | 
+|        | Linux Ubuntu:20                          | macOS 11                                 | Windows 10                               |
+|:-------|:-----------------------------------------|:-----------------------------------------|:-----------------------------------------|
+| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:green">✔</span> 3.6-3.7* <span style="color:red">✘</span> ≥3.8
+| R      | <span style="color:green">✔</span> 4.1   | <span style="color:green">✔</span> 4.1   | <span style="color:gray">?</span> 4.1 
+| Octave | <span style="color:green">✔</span> 5.2.0 | <span style="color:green">✔</span> 6.2   | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2
+
+*requires extra DLLs. See [python installation](#pylibkriging-for-python)
 
 # Compilation
 
