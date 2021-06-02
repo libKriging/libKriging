@@ -5,7 +5,11 @@
 
 Table of contents
 
-1. [Installation](#installation-from-pre-built-packages)
+1. [Installation from binary package](#installation-from-pre-built-packages)
+    1. [pylibkriging for Python](#pylibkriging-for-python)
+    1. [rlibkriging for R](#rlibkriging-for-r)
+    1. [mlibkriging for Octave](#mlibkriging-for-octave)
+    1. [Results examples](#expected-demo-results)
 1. [Compilation](#compilation)   
     1. [Requirements](#requirements-more-details)
     1. [Get the code](#get-the-code)
@@ -18,7 +22,7 @@ If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation from pre-built packages
 
-For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use released binaries.
+For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use [released binaries](https://github.com/libKriging/libKriging/releases).
 
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
