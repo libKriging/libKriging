@@ -26,7 +26,7 @@ For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86
 pip3 install pylibkriging numpy
 ```
 
-Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Python/tests/pylibkriging_demo.py)
+Usage example [here](bindings/Python/tests/pylibkriging_demo.py)
 
 NB: On windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
 To load them into Python's search PATH, use:
@@ -51,7 +51,7 @@ install.packages("Rcpp")
 install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 ```
 
-Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)
+Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)
 
 ## mlibkriging for Octave
 
@@ -69,7 +69,7 @@ or inside Octave
 addpath("path/to/mLibKriging")
 ```
 
-Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_demo.m)
+Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)
 
 ## Expected demo results
 
