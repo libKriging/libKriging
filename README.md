@@ -30,9 +30,9 @@ For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86
 pip3 install pylibkriging numpy
 ```
 
-Usage example [here](bindings/Python/tests/pylibkriging_demo.py)
+**Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
 
-NB: Code sample below has been extracted from the reference file linked above.
+NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.
 
 ```python
 import numpy as np
@@ -69,7 +69,7 @@ for i in range(10):
 pyplot.show()
 ```
 
-NB: On windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
+NB: On Windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
 To load them into Python's search PATH, use:
 ```python
 import os
@@ -92,9 +92,9 @@ install.packages("Rcpp")
 install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 ```
 
-Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)
+**Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
 
-NB: Code sample below has been extracted from the reference file linked above.   
+NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example. 
 
 ```R
 X <- as.matrix(c(0.0, 0.2, 0.5, 0.8, 1.0))
@@ -135,9 +135,9 @@ or inside Octave
 addpath("path/to/mLibKriging")
 ```
 
-Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)
+**Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)**
 
-NB: Code sample below has been extracted from the reference file linked above.
+NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.
 
 ```matlab
 X = [0.0;0.2;0.5;0.8;1.0];
