@@ -14,6 +14,7 @@ def test_kriging():
 
     try:
         import matplotlib.pyplot as pyplot
+        pyplot.figure(1)
         pyplot.plot(x, [f(xi) for xi in x])
         pyplot.scatter(X, [f(xi) for xi in X])
 
@@ -26,9 +27,11 @@ def test_kriging():
     except ModuleNotFoundError:
         print("Cannot load matplotlib")
 
+    s = k_py.simulate(10, 123, x)
+
     try:
         import matplotlib.pyplot as pyplot
-        s = k_py.simulate(10, 123, x)
+        pyplot.figure(2)
         pyplot.plot(x, [f(xi) for xi in x])
         pyplot.scatter(X, [f(xi) for xi in X])
         for i in range(10):
