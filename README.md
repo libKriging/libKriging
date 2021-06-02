@@ -71,6 +71,14 @@ addpath("path/to/mLibKriging")
 
 Usage example [here](https://github.com/libKriging/libKriging/blob/master/bindings/Octave/tests/mLibKriging_demo.m)
 
+## Expected demo results
+
+Using the previous linked examples (in Python, R or Octave), you should obtain the following results
+
+`predict` plot                               |  `simulate` plot
+:-------------------------------------------:|:---------------------------------------------:
+![](docs/images/pylibkriging_demo_plot1.png) | ![](docs/images/pylibkriging_demo_plot2.png)
+
 ## Tested installation
 
 with libKriging 0.4.1
