@@ -39,8 +39,7 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
   ```
 * Restart sshd
   ```
-  Stop-Service sshd
-  Start-Service sshd
+  Restart-Service sshd
   ```
 
 * Edit sshd config to allow Pubkey login
@@ -59,8 +58,7 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
 
 * Restart sshd
   ```
-  Stop-Service sshd
-  Start-Service sshd
+  Restart-Service sshd
   ```
 
 * Change password
