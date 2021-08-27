@@ -7,6 +7,7 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 |`CMAKE_BUILD_TYPE`           | `RelWithDebInfo` | `Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`  |                                                             |
 |`CMAKE_INSTALL_PREFIX`       | `./installed`    |                                                     | path to install libs                                        |
 |`CMAKE_GENERATOR_PLATFORM`   | &lt;empty&gt;    | empty or `x64`                                      | should be set to `x64` on Windows to build 64bits target    |
+|`CMAKE_CXX_COMPILER_LAUNCHER`| &lt;empty&gt;    | a compiler cache like `ccache`                      | to optimize recompilation                                   | 
 
 | libKriging CMake option     | Default value    | Allowed values                                      | Comment                                                     |
 |:----------------------------|:----------------:|:----------------------------------------------------|:------------------------------------------------------------|
