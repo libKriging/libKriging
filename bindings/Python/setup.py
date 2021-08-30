@@ -8,6 +8,12 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+extra_libs = []
+if platform.system() == "Windows":
+    # requires a better detection for non standard environments
+    extra_libs = [os.path.join(os.getenv("HOME"), 'Miniconda3', 'Library', 'bin', f"{f}.dll") for f in
+                  ['flang', 'flangrti', 'libomp', 'openblas']]
+
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -54,6 +60,7 @@ class CMakeBuild(build_ext):
             if sys.maxsize > 2 ** 32:
                 cmake_args += ['-A', 'x64']
             build_args += ['--', '/m']
+
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j2']
@@ -89,11 +96,11 @@ setup(
     url="https://github.com/libKriging/libKriging",
     description='Python binding for LibKriging',
     long_description='Python support for libKriging, the kriging library for performance and wide language support',
-    #long_description_content_type="text/markdown",
+    # long_description_content_type="text/markdown",
     ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
     cmdclass=dict(build_ext=CMakeBuild),
     script_name='./bindings/Python/setup.py',
-    data_files=['./bindings/Python/setup.py'],
+    data_files=[('', extra_libs)],  # '' => copy them in package folder
     python_requires='>=3.6',
     zip_safe=False,
 )
