@@ -20,11 +20,11 @@ set(CARMA_DEV_TARGET false)
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
 set(pylibkriging_SRCS src/pylibkirging.cpp)
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+#if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND pylibkriging_SRCS 
             src/NumPyDemo.cpp src/NumPyDemo.hpp
             )
-endif()
+#endif()
 list(APPEND pylibkriging_SRCS 
         src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
         src/Kriging_binding.cpp src/Kriging_binding.hpp

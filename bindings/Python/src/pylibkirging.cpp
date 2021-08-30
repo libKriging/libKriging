@@ -29,13 +29,13 @@ PYBIND11_MODULE(_pylibkriging, m) {
            subtract
     )pbdoc";
 
-  if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
+//  if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
     m.def("add_arrays", &add_arrays, R"pbdoc(
         Add two NumPy arrays
 
         This is a demo for debugging numpy stuff with carma mapper
     )pbdoc");
-  }
+//  }
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
