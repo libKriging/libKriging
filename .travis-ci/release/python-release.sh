@@ -32,7 +32,6 @@ case $ARCH in
   Darwin|MSYS_NT*|MINGW64_NT*)
     python3 ./bindings/Python/setup.py bdist_wheel
     pip install pylibkriging --no-index -f ./dist
-    # TODO add more tests
     # pytest ./bindings/Python/tests    
     ;;
   *)

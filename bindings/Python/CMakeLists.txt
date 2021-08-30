@@ -31,13 +31,13 @@ list(APPEND pylibkriging_SRCS
         src/RandomGenerator.cpp src/RandomGenerator.hpp
     )
 
-pybind11_add_module(pylibkriging ${pylibkriging_SRCS})
-target_link_libraries(pylibkriging PRIVATE Kriging carma)
-target_compile_definitions(pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING_VERSION}\") # renamed to avoid collision with VERSION_INFO from carma
-target_compile_definitions(pylibkriging PUBLIC BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\")
+pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
+target_link_libraries(_pylibkriging PRIVATE Kriging carma)
+target_compile_definitions(_pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING_VERSION}\") # renamed to avoid collision with VERSION_INFO from carma
+target_compile_definitions(_pylibkriging PUBLIC BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\")
 
 include(CTest)
 add_subdirectory(tests)
 
-install(TARGETS pylibkriging
+install(TARGETS _pylibkriging
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Python)
