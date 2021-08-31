@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 
+#include <carma>
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
 
@@ -74,9 +75,28 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .export_values();
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
+  py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
+  
+  // Quick and dirty manual wrapper (cf optional argument mapping)
   // Backup solution // FIXME remove it if not necessary
-  py::class_<PyKriging>(m, "Kriging2")
+  py::class_<PyKriging>(m, "PyKriging")
       .def(py::init<const std::string&>())
+      .def(py::init<const arma::colvec&,
+                    const arma::mat&,
+                    const std::string&,
+                    const Kriging::RegressionModel&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const Kriging::Parameters&>(),
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("regmodel") = Kriging::RegressionModel::Constant,
+           py::arg("normalize") = false,
+           py::arg("optim") = "BFGS",
+           py::arg("objective") = "LL",
+           py::arg("parameters") = Kriging::Parameters{})
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
@@ -86,12 +106,9 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("logLikelihood", &PyKriging::logLikelihoodEval)
       .def("logMargPost", &PyKriging::logMargPostEval);
 
-  // Quick and dirty manual wrapper (cf optional argument mapping)
-  py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
-
   // Automated mapper
   py::class_<Kriging>(m, "Kriging")
-      // .def(py::init<const std::string&>())
+      .def(py::init<const std::string&>())
       .def(py::init<const arma::colvec&,
                     const arma::mat&,
                     const std::string&,

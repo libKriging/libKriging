@@ -10,6 +10,16 @@
 
 PyKriging::PyKriging(const std::string& kernel) : m_internal{new Kriging{kernel}} {}
 
+PyKriging::PyKriging(const arma::colvec& y,
+                     const arma::mat& X,
+                     const std::string& covType,
+                     const Kriging::RegressionModel& regmodel,
+                     bool normalize,
+                     const std::string& optim,
+                     const std::string& objective,
+                     const Kriging::Parameters& parameters)
+    : m_internal{new Kriging{y, X, covType, regmodel, normalize, optim, objective, parameters}} {}
+
 PyKriging::~PyKriging() {}
 
 void PyKriging::fit(const py::array_t<double>& y,

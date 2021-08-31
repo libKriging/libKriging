@@ -13,6 +13,14 @@ namespace py = pybind11;
 class PyKriging {
  public:
   PyKriging(const std::string& kernel);
+  PyKriging(const arma::colvec& y,
+          const arma::mat& X,
+          const std::string& covType,
+          const Kriging::RegressionModel& regmodel = Kriging::RegressionModel::Constant,
+          bool normalize = false,
+          const std::string& optim = "BFGS",
+          const std::string& objective = "LL",
+          const Kriging::Parameters& parameters = Kriging::Parameters{});
   ~PyKriging();
 
   void fit(const py::array_t<double>& y,
