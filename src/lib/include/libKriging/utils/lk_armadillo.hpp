@@ -1,0 +1,11 @@
+#if defined(ARMA_INCLUDES) && !defined(LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LK_ARMADILLO_HPP)
+#error "<armadillo> should not be included before lkalloc.hpp"
+#endif
+
+#ifndef LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LK_ARMADILLO_HPP
+#define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LK_ARMADILLO_HPP
+
+#include "lkalloc.hpp"
+#include <armadillo>
+
+#endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LK_ARMADILLO_HPP

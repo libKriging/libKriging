@@ -1,5 +1,8 @@
 #include <pybind11/pybind11.h>
 
+// clang-format off
+#include "libKriging/utils/lk_armadillo.hpp"
+// clang-format on
 #include <carma>
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
@@ -17,6 +20,9 @@ constexpr bool strings_equal(char const* a, char const* b) {
 namespace py = pybind11;
 
 PYBIND11_MODULE(_pylibkriging, m) {
+  // to avoid mixing allocators from default libKriging and Python
+  lkalloc::set_allocation_functions(cnalloc::npy_malloc, cnalloc::npy_free);
+
   m.doc() = R"pbdoc(
         pylibkriging example plugin
         -----------------------
@@ -76,13 +82,13 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
-  
+
   // Quick and dirty manual wrapper (cf optional argument mapping)
   // Backup solution // FIXME remove it if not necessary
   py::class_<PyKriging>(m, "PyKriging")
       .def(py::init<const std::string&>())
-      .def(py::init<const arma::colvec&,
-                    const arma::mat&,
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
                     const std::string&,
                     const Kriging::RegressionModel&,
                     bool,

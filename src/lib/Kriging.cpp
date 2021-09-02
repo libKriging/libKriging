@@ -7,7 +7,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingException.hpp"
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 #include <cassert>
 #include <optim.hpp>
 #include <tuple>

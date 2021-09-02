@@ -1,7 +1,7 @@
 #ifndef LIBKRIGING_LINEARREGRESSIONOPTIM_HPP
 #define LIBKRIGING_LINEARREGRESSIONOPTIM_HPP
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
 

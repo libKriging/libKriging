@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include <catch2/catch.hpp>
 #include <cmath>

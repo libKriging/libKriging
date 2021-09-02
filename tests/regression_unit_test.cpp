@@ -4,7 +4,7 @@
 // doc : https://github.com/catchorg/Catch2/blob/master/docs/Readme.mda
 // More example in https://github.com/catchorg/Catch2/tree/master/examples
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 #include <libKriging/LinearRegression.hpp>
 #include <random>
 

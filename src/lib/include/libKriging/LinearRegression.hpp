@@ -5,7 +5,7 @@
 #ifndef LIBKRIGING_LINEARREGRESSION_HPP
 #define LIBKRIGING_LINEARREGRESSION_HPP
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
 

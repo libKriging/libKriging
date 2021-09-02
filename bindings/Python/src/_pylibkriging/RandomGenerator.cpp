@@ -1,5 +1,7 @@
 #include "RandomGenerator.hpp"
 
+#include "libKriging/utils/lk_armadillo.hpp"
+#include <carma>
 #include <random>
 
 RandomGenerator::RandomGenerator(unsigned int seed) : m_engine(seed) {}

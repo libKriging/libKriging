@@ -1,8 +1,8 @@
 
 #include "libKriging/demo/DemoArmadilloClass.hpp"
 
-#include <armadillo>
 #include <iostream>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 using namespace std;
 using namespace arma;

@@ -1,7 +1,7 @@
 #ifndef LIBKRIGING_KRIGING_HPP
 #define LIBKRIGING_KRIGING_HPP
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
 // #include "covariance.h"

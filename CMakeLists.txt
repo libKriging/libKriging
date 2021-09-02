@@ -183,6 +183,10 @@ endif()
 # /D or -D definition headers are updated according to the compiler 'style'
 # Use windows style for easy checking on Unix
 add_definitions(/DARMA_32BIT_WORD)
+add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
+add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
+#add_definitions(-DCARMA_DEBUG)
+#add_definitions(-DCARMA_EXTRA_DEBUG)
 
 #------------------------------------------------------
 

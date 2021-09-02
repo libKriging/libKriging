@@ -1,7 +1,7 @@
 #ifndef LIBKRIGING_BENCH_HPP
 #define LIBKRIGING_BENCH_HPP
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Kriging.hpp"
 #include "libKriging/libKriging_exports.h"
