@@ -35,6 +35,11 @@ case $ARCH in
     pytest ./bindings/Python/tests/canary_test.py
     pytest ./bindings/Python/tests/loading_test.py
     pytest ./bindings/Python/tests/random_generator_test.py
+    pytest ./bindings/Python/tests/direct_binding_test.py
+    pytest ./bindings/Python/tests/one_side_carma_binding_test.py
+    pytest ./bindings/Python/tests/two_side_carma_binding_test.py
+    pytest ./bindings/Python/tests/PyLinearRegression_test.py
+    pytest ./bindings/Python/tests/PyKriging_parametric_test.py
     ;;
   *)
     echo "Unknown OS [$ARCH]"
