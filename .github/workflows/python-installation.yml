@@ -1,0 +1,64 @@
+name: Python installation test  
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'libKriging version to check'
+        required: true
+        default: 'latest'
+
+jobs:
+  installation:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        os: [ubuntu-18.04, ubuntu-20.04, macos-10.15, macos-11, windows-2019]
+        exclude: # not supported
+          - os: ubuntu-20.04
+            python-version: 3.6
+          - os: ubuntu-18.04
+            python-version: 3.6
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Check version
+        shell: bash
+        run: |
+          echo "libKriging v${{ github.event.inputs.version }} will be tested"
+          uname -a
+          python --version
+          python -c "import sys; print(sys.version)"
+      - name: install pylibkriging
+        shell: bash
+        run: |
+          python3 -m venv venv
+          source ./venv/bin/activate
+          LK_VERSION=${{ github.event.inputs.version }}
+          if [[ "${LK_VERSION:-latest}" == "latest" ]]; then            
+            pip3 install pylibkriging
+          else
+            pip3 install pylibkriging==${{ github.event.inputs.version }}
+          fi
+          python3 -c "import pylibkriging as m; print(m.__version__)"
+        if: runner.os != 'Windows'
+      - name: install pylibkriging
+        shell: bash
+        run: |
+          python -m venv venv # /!\ not python3
+          pushd .
+          cd venv/Scripts
+          . activate
+          popd
+          LK_VERSION=${{ github.event.inputs.version }}
+          if [[ "${LK_VERSION:-latest}" == "latest" ]]; then            
+            pip3 install pylibkriging
+          else
+            pip3 install pylibkriging==${{ github.event.inputs.version }}
+          fi
+          python -c "import pylibkriging as m; print(m.__version__)"
+        if: runner.os == 'Windows'
