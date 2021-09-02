@@ -532,7 +532,7 @@ ADD_CUSTOM_TARGET(install.lib
         -P ${CMAKE_BINARY_DIR}/cmake_install.cmake)
 ADD_DEPENDENCIES(install.lib Kriging armadillo)
 if (ENABLED_PYTHON_BINDING)
-    ADD_DEPENDENCIES(install.lib pylibkriging)
+    ADD_DEPENDENCIES(install.lib _pylibkriging)
 endif()
 if (ENABLED_OCTAVE_BINDING)
     ADD_DEPENDENCIES(install.lib mLibKriging)

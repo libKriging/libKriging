@@ -3,6 +3,7 @@ import re
 import sys
 import platform
 import subprocess
+import argparse
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -13,6 +14,11 @@ if platform.system() == "Windows":
     # requires a better detection for non standard environments
     extra_libs = [os.path.join(os.getenv("HOME"), 'Miniconda3', 'Library', 'bin', f"{f}.dll") for f in
                   ['flang', 'flangrti', 'libomp', 'openblas']]
+
+argparser = argparse.ArgumentParser(add_help=False)
+argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
+args, unknown = argparser.parse_known_args()
+sys.argv = [sys.argv[0]] + unknown
 
 
 class CMakeExtension(Extension):
@@ -52,7 +58,8 @@ class CMakeBuild(build_ext):
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'
                       ]
 
-        cfg = 'Debug' if self.debug else 'Release'
+        cfg = 'Debug' if args.debug else 'Release'
+        print('build mode:', cfg)
         build_args = ['--config', cfg]
 
         if platform.system() == "Windows":
@@ -60,7 +67,6 @@ class CMakeBuild(build_ext):
             if sys.maxsize > 2 ** 32:
                 cmake_args += ['-A', 'x64']
             build_args += ['--', '/m']
-
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j2']
@@ -90,6 +96,7 @@ version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.gro
 
 setup(
     name='pylibkriging',
+    packages=['pylibkriging'],
     version=version,
     author='Pascal Havé',
     author_email='hpwxf@haveneer.com',
@@ -100,7 +107,12 @@ setup(
     ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
     cmdclass=dict(build_ext=CMakeBuild),
     script_name='./bindings/Python/setup.py',
-    data_files=[('', extra_libs)],  # '' => copy them in package folder
+    package_dir={'pylibkriging': 'bindings/Python/src'},
+    # https://docs.python.org/3/distutils/setupscript.html#installing-package-data
+    package_data={'pylibkriging': []},
+    # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
+    data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
     python_requires='>=3.6',
+    install_requires=["numpy>=1.17"],
     zip_safe=False,
 )

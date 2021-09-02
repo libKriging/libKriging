@@ -15,7 +15,7 @@ constexpr bool strings_equal(char const* a, char const* b) {
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(pylibkriging, m) {
+PYBIND11_MODULE(_pylibkriging, m) {
   m.doc() = R"pbdoc(
         pylibkriging example plugin
         -----------------------
