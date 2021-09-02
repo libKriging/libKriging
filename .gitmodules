@@ -5,8 +5,8 @@
 [submodule "dependencies/carma"]
 	path = dependencies/carma
 	url = https://github.com/libKriging/carma.git
-	branch = master
+	branch = stable
 [submodule "dependencies/armadillo-code"]
 	path = dependencies/armadillo-code
 	url = https://gitlab.com/conradsnicta/armadillo-code.git
-	branch = 10.5.x
+	branch = 10.6.x
