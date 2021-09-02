@@ -387,7 +387,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoo
   } else
     ll = logLikelihood(_theta, nullptr, nullptr, &okm_data);
 
-  return std::make_tuple(std::move(ll), std::move(grad), std::move(hess));
+  return std::make_tuple(ll, std::move(grad), std::move(hess));
 }
 
 // Objective function for fit : -LOO
@@ -541,7 +541,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutEval(const a
   } else
     loo = leaveOneOut(_theta, nullptr, &okm_data);
 
-  return std::make_tuple(std::move(loo), std::move(grad));
+  return std::make_tuple(loo, std::move(grad));
 }
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
@@ -764,7 +764,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostEval(const a
   } else
     lmp = logMargPost(_theta, nullptr, &okm_data);
 
-  return std::make_tuple(std::move(lmp), std::move(grad));
+  return std::make_tuple(lmp, std::move(grad));
 }
 
 double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma::mat* hess_out)> f,
@@ -999,7 +999,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
     m_est_beta = !parameters.has_beta;
-    m_sigma2 = std::move(okm_data.sigma2);
+    m_sigma2 = okm_data.sigma2;
     m_est_sigma2 = !parameters.has_sigma2;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
@@ -1062,7 +1062,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
         m_est_beta = !parameters.has_beta;
-        m_sigma2 = std::move(okm_data.sigma2);
+        m_sigma2 = okm_data.sigma2;
         m_est_sigma2 = !parameters.has_sigma2;
       }
     }
@@ -1108,7 +1108,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
         m_est_beta = !parameters.has_beta;
-        m_sigma2 = std::move(okm_data.sigma2);
+        m_sigma2 = okm_data.sigma2;
         m_est_sigma2 = !parameters.has_sigma2;
       }
     }

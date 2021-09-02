@@ -1,1 +1,2 @@
-numpy
+numpy>=1.17
+pytest

@@ -36,7 +36,14 @@ macro(add_python_test)
                 PROPERTIES
                 WILL_FAIL TRUE)
     endif ()
-    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}")
+    
+    if (WIN32)
+        set(SEP "\;")
+    else()
+        set(SEP ":")
+    endif()
+    
+    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}${SEP}${CMAKE_CURRENT_SOURCE_DIR}/../src")
     set_tests_properties(${TEST_NAME}
             PROPERTIES
             WORKING_DIRECTORY "${LIBKRIGING_PYTHON_BINARY_DIR}"
