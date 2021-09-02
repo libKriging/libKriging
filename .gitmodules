@@ -8,5 +8,5 @@
 	branch = stable
 [submodule "dependencies/armadillo-code"]
 	path = dependencies/armadillo-code
-	url = https://gitlab.com/conradsnicta/armadillo-code.git
+	url = https://github.com/libKriging/armadillo-code.git
 	branch = 10.6.x
