@@ -9,11 +9,23 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+
+def find_in_path(filename):
+    fpath, fname = os.path.split(filename)
+    if fpath:
+        if os.path.isfile(fpath):
+            return filename
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            test_file = os.path.join(path, filename)
+            if os.path.isfile(test_file):
+                return test_file
+    raise RuntimeError(f"Cannot find required file '{filename}'")
+
+
 extra_libs = []
 if platform.system() == "Windows":
-    # requires a better detection for non standard environments
-    extra_libs = [os.path.join(os.getenv("HOME"), 'Miniconda3', 'Library', 'bin', f"{f}.dll") for f in
-                  ['flang', 'flangrti', 'libomp', 'openblas']]
+    extra_libs = [find_in_path(f) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
 
 argparser = argparse.ArgumentParser(add_help=False)
 argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
@@ -107,7 +119,7 @@ setup(
     ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
     cmdclass=dict(build_ext=CMakeBuild),
     script_name='./bindings/Python/setup.py',
-    package_dir={'pylibkriging': 'bindings/Python/src'},
+    package_dir={'pylibkriging': 'bindings/Python/src/pylibkriging'},
     # https://docs.python.org/3/distutils/setupscript.html#installing-package-data
     package_data={'pylibkriging': []},
     # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
