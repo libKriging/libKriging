@@ -11,7 +11,7 @@ if platform.system() == "Windows":
     # shared_lib_path = os.path.join(distutils.sysconfig.PREFIX, 'pylibkriging', 'shared_libs')
 
     if sys.version_info[:2] < (3, 8):  # < 3.8.0
-        sys.path.append(shared_lib_path)
+        os.environ['PATH'] = shared_lib_path + os.pathsep + os.environ['PATH']
     else:
         os.add_dll_directory(shared_lib_path)
 
