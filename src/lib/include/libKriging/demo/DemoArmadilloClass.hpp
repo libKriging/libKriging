@@ -15,17 +15,16 @@
 class DemoArmadilloClass {
  public:
   /** \deprecated Demo only */
-  LIBKRIGING_EXPORT DemoArmadilloClass(std::string id, arma::Mat<double> M);
+  LIBKRIGING_EXPORT DemoArmadilloClass(arma::rowvec a);
+
   /** \deprecated Demo only */
   LIBKRIGING_EXPORT ~DemoArmadilloClass();
-  /** \deprecated Demo only */
-  LIBKRIGING_EXPORT void test();
-  /** \deprecated Demo only */
-  LIBKRIGING_EXPORT arma::vec getEigenValues();
 
- private:
-  const std::string m_id;
-  const arma::Mat<double> m_m;
+  /** \deprecated Demo only */
+  LIBKRIGING_EXPORT arma::rowvec apply(const arma::rowvec& b) const;
+
+ public:
+  arma::rowvec m_a;
 };
 
 #endif  // LIBKRIGING_DEMOARMADILLOCLASS_HPP

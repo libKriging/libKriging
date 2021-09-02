@@ -3,9 +3,9 @@
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
 
+#include "BindingTest.hpp"
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
-#include "NumPyDemo.hpp"
 #include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)
@@ -30,10 +30,19 @@ PYBIND11_MODULE(_pylibkriging, m) {
     )pbdoc";
 
   if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
-    m.def("add_arrays", &add_arrays, R"pbdoc(
-        Add two NumPy arrays
+    m.def("direct_binding", &direct_binding, R"pbdoc(
+        Pure Numpy debugging demo
 
-        This is a demo for debugging numpy stuff with carma mapper
+    )pbdoc");
+
+    m.def("one_side_carma_binding", &one_side_carma_binding, R"pbdoc(
+        Arma debugging demo
+
+    )pbdoc");
+
+    m.def("two_side_carma_binding", &two_side_carma_binding, R"pbdoc(
+            libkriging link debugging demo
+    
     )pbdoc");
   }
 
