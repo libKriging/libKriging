@@ -10,7 +10,7 @@ if platform.system() == "Windows":
     # import distutils  # https://docs.python.org/3/distutils/apiref.html#module-distutils.sysconfig
     # shared_lib_path = os.path.join(distutils.sysconfig.PREFIX, 'pylibkriging', 'shared_libs')
 
-    if sys.version_info.major < 3 or sys.version_info.major == 3 and sys.version_info.minor < 8:  # < 3.8.0
+    if sys.version_info[:2] < (3, 8):  # < 3.8.0
         sys.path.append(shared_lib_path)
     else:
         os.add_dll_directory(shared_lib_path)

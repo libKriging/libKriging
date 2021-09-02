@@ -19,16 +19,16 @@ set(CARMA_DEV_TARGET false)
 # set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
-set(pylibkriging_SRCS src/pylibkirging.cpp)
+set(pylibkriging_SRCS src/_pylibkriging/pylibkirging.cpp)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND pylibkriging_SRCS 
-            src/NumPyDemo.cpp src/NumPyDemo.hpp
+        src/_pylibkriging/NumPyDemo.cpp src/_pylibkriging/NumPyDemo.hpp
             )
 endif()
 list(APPEND pylibkriging_SRCS 
-        src/LinearRegression_binding.cpp src/LinearRegression_binding.hpp
-        src/Kriging_binding.cpp src/Kriging_binding.hpp
-        src/RandomGenerator.cpp src/RandomGenerator.hpp
+        src/_pylibkriging/LinearRegression_binding.cpp src/_pylibkriging/LinearRegression_binding.hpp
+        src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp
+        src/_pylibkriging/RandomGenerator.cpp src/_pylibkriging/RandomGenerator.hpp
     )
 
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
@@ -41,3 +41,5 @@ add_subdirectory(tests)
 
 install(TARGETS _pylibkriging
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Python)
+install(FILES src/pylibkriging/__init__.py src/pylibkriging/__main__.py
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Python/pylibkriging)

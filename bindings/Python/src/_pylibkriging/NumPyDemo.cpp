@@ -1,7 +1,3 @@
-//
-// Created by Pascal Havé on 27/06/2020.
-//
-
 #include "NumPyDemo.hpp"
 
 py::array_t<double> add_arrays(py::array_t<double> input1, py::array_t<double> input2) {
