@@ -1,6 +1,10 @@
 #ifndef LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LKALLOC_HPP
 #define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LKALLOC_HPP
 
+#if defined(ARMA_INCLUDES)
+#error "<armadillo> should not be included before lkalloc.hpp"
+#endif
+
 #include <cstddef>
 
 #include "libKriging/libKriging_exports.h"
