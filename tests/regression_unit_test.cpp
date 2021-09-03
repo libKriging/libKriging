@@ -5,6 +5,7 @@
 // More example in https://github.com/catchorg/Catch2/tree/master/examples
 
 #include "libKriging/utils/lk_armadillo.hpp"
+
 #include <libKriging/LinearRegression.hpp>
 #include <random>
 

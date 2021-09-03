@@ -11,7 +11,7 @@ add_library(OctaveShared
         MxException.hpp 
         formatString.hpp)
 
-target_link_libraries(OctaveShared armadillo)
+target_link_libraries(OctaveShared PRIVATE armadillo Kriging)
 
 set_target_properties(OctaveShared PROPERTIES
         COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}")

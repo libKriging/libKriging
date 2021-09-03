@@ -1,5 +1,7 @@
 #include "BindingTest.hpp"
+
 #include "libKriging/utils/lk_armadillo.hpp"
+
 #include <carma>
 #include <libKriging/demo/DemoArmadilloClass.hpp>
 

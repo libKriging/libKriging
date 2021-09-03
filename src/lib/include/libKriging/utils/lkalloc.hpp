@@ -2,6 +2,7 @@
 #define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_LKALLOC_HPP
 
 #include <cstddef>
+
 #include "libKriging/libKriging_exports.h"
 
 namespace lkalloc {

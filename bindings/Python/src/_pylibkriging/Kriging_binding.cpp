@@ -1,6 +1,7 @@
 #include "Kriging_binding.hpp"
 
 #include "libKriging/utils/lk_armadillo.hpp"
+
 #include <carma>
 #include <libKriging/Kriging.hpp>
 #include <random>

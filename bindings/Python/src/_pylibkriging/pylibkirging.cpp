@@ -1,8 +1,7 @@
 #include <pybind11/pybind11.h>
 
-// clang-format off
 #include "libKriging/utils/lk_armadillo.hpp"
-// clang-format on
+
 #include <carma>
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>

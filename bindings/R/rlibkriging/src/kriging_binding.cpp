@@ -1,5 +1,7 @@
 // clang-format off
 // Must before any other include
+#include "libKriging/utils/lk_alloc.hpp"
+
 #include <RcppArmadillo.h>
 // clang-format on
 
