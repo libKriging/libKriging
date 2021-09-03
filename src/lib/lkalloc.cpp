@@ -8,6 +8,7 @@
 #endif
 
 #include <cassert>
+#include <cstdlib>
 
 #if WIN32
 #define _AMD64_
