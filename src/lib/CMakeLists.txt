@@ -38,6 +38,8 @@ set_target_properties(Kriging PROPERTIES VERSION ${KRIGING_VERSION})
 # and a symlink with major number of version
 set_target_properties(Kriging PROPERTIES SOVERSION ${KRIGING_VERSION_MAJOR})
 
+# default visibility is hidden for Kriging lib
+set_target_properties(Kriging PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
 # Declare public API of your library.
 # This API will be installed for third-party application.
