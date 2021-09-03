@@ -20,21 +20,18 @@ set(CARMA_DEV_TARGET false)
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
 set(pylibkriging_SRCS src/_pylibkriging/pylibkirging.cpp)
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    list(APPEND pylibkriging_SRCS
-            src/_pylibkriging/BindingTest.cpp src/_pylibkriging/BindingTest.hpp
-            )
-endif()
-list(APPEND pylibkriging_SRCS 
+list(APPEND pylibkriging_SRCS
         src/_pylibkriging/LinearRegression_binding.cpp src/_pylibkriging/LinearRegression_binding.hpp
         src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp
         src/_pylibkriging/RandomGenerator.cpp src/_pylibkriging/RandomGenerator.hpp
-    )
+        src/_pylibkriging/BindingTest.cpp src/_pylibkriging/BindingTest.hpp
+        )
 
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
 target_link_libraries(_pylibkriging PRIVATE Kriging carma)
+
 target_compile_definitions(_pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING_VERSION}\") # renamed to avoid collision with VERSION_INFO from carma
-target_compile_definitions(_pylibkriging PUBLIC BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\")
+target_compile_definitions(_pylibkriging PUBLIC BUILD_TYPE=\"$<CONFIG>\") # do not use CMAKE_BUILD_TYPE specially for Windows
 
 include(CTest)
 add_subdirectory(tests)
