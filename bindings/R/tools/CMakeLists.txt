@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.13)
+project(armadillo_lib_extractor LANGUAGES NONE)
+include(${LIBKRIGING_PATH}/share/Armadillo/CMake/ArmadilloLibraryDepends.cmake)
+get_target_property(arma_libs armadillo INTERFACE_LINK_LIBRARIES)
+list(JOIN arma_libs " " lib_str)
+message(STATUS ARMA_LIBS=${lib_str})

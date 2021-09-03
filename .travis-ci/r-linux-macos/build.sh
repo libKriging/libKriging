@@ -15,6 +15,9 @@ fi
 # Linux + Shared : OK
 # Linux + Static : OK
 MAKE_SHARED_LIBS=on
+if [[ "$(uname -s)" == "Linux" ]]; then
+  MAKE_SHARED_LIBS=off # Quick workaround for not found armadillo lib
+fi
 
 # to get readlink on MacOS (no effect on Linux)
 if [[ -e /usr/local/opt/coreutils/libexec/gnubin/readlink ]]; then
@@ -32,7 +35,7 @@ BUILD_TEST=false \
     "${BASEDIR}"/../linux-macos/build.sh
 
 export LIBKRIGING_PATH=${PWD}/build/installed
-
+ 
 cd bindings/R
 make uninstall || true
 make clean
