@@ -1,7 +1,5 @@
 #include "relative_error.hpp"
 
-#include <armadillo>
-
 double relative_error(const arma::vec& x, const arma::vec& y) {
   double x_norm = arma::norm(x, "inf");
   double y_norm = arma::norm(y, "inf");

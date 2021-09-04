@@ -1,7 +1,8 @@
 #ifndef LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MX_ACCESSOR_HPP
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MX_ACCESSOR_HPP
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
+
 #include <cstring>
 
 #include "ObjectAccessor.hpp"

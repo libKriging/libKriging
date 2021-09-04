@@ -13,15 +13,23 @@ namespace py = pybind11;
 class PyKriging {
  public:
   PyKriging(const std::string& kernel);
+  PyKriging(const py::array_t<double>& y,
+            const py::array_t<double>& X,
+            const std::string& covType,
+            const Kriging::RegressionModel& regmodel,
+            bool normalize,
+            const std::string& optim,
+            const std::string& objective,
+            const Kriging::Parameters& parameters);
   ~PyKriging();
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
-           const Kriging::RegressionModel& regmodel = Kriging::RegressionModel::Constant,
-           bool normalize = false,
-           const std::string& optim = "BFGS",
-           const std::string& objective = "LL",
-           const Kriging::Parameters& parameters = Kriging::Parameters{});
+           const Kriging::RegressionModel& regmodel,
+           bool normalize,
+           const std::string& optim,
+           const std::string& objective,
+           const Kriging::Parameters& parameters);
 
   // TODO The result should be a namedtuple
   // see

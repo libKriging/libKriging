@@ -8,7 +8,6 @@ def f(X):
 
 
 # @pytest.mark.skip(reason="Needs to be stabilized; got runtime error: chol(): decomposition failed")
-@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_f_order(n, m):
@@ -16,13 +15,12 @@ def test_kriging_f_order(n, m):
     X = np.asarray(g.uniform(n, m), dtype=np.float64, order='F')
     y = f(X)
 
-    rl = lk.Kriging(y, X, "gauss")
+    rl = lk.PyKriging(y, X, "gauss")
 
     y_pred, _stderr, _cov = rl.predict(X, True, True)
 
 
 # @pytest.mark.skip(reason="Needs to be stabilized; got runtime error: chol(): decomposition failed")
-@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_c_order(n, m):
@@ -31,6 +29,6 @@ def test_kriging_c_order(n, m):
     X = g.uniform(n, m)  # this is the default
     y = f(X)
 
-    rl = lk.Kriging(y, X, "gauss")
+    rl = lk.PyKriging(y, X, "gauss")
 
     y_pred, _stderr, _cov = rl.predict(X, True, True)

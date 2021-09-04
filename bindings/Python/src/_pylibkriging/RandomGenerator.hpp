@@ -4,14 +4,12 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <armadillo>
-#include <carma>
 #include <random>
 
 class RandomGenerator {
  public:
   RandomGenerator(unsigned int seed);
-  py::array_t<double> uniform(const unsigned int nrows, const unsigned int ncols);
+  pybind11::array_t<double> uniform(const unsigned int nrows, const unsigned int ncols);
 
  private:
   std::mt19937 m_engine;

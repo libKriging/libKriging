@@ -116,7 +116,7 @@ set(CMAKE_CXX_STANDARD 17)
 #------------------------------------------------------
 
 # Can be locally overridden using set_target_properties + https://cmake.org/cmake/help/latest/prop_tgt/LANG_VISIBILITY_PRESET.html
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+# set(CMAKE_CXX_VISIBILITY_PRESET hidden) # global setting is incompatible with armadillo => moved to Kriging target
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor the visibility properties for all target types
 
 #------------------------------------------------------
@@ -179,10 +179,15 @@ endif()
 
 #------------------------------------------------------
 
-# Required since RcppArmadillo uses it by defaut
+# Required since RcppArmadillo uses it by default
 # /D or -D definition headers are updated according to the compiler 'style'
 # Use windows style for easy checking on Unix
 add_definitions(/DARMA_32BIT_WORD)
+add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
+add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
+add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
+#add_definitions(-DCARMA_DEBUG)
+#add_definitions(-DCARMA_EXTRA_DEBUG)
 
 #------------------------------------------------------
 

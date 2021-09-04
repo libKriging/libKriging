@@ -7,7 +7,8 @@
 #include "libKriging/Bench.hpp"
 #include "libKriging/Kriging.hpp"
 
-#include <armadillo>
+#include "libKriging/utils/lk_armadillo.hpp"
+
 // #include <optim.hpp>
 #include <tuple>
 
