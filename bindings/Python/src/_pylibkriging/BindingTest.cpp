@@ -5,6 +5,8 @@
 #include <carma>
 #include <libKriging/demo/DemoArmadilloClass.hpp>
 
+namespace autotest {
+
 py::array_t<double> direct_binding(py::array_t<double>& input1, py::array_t<double>& input2) {
   auto buf1 = input1.request(), buf2 = input2.request();
 
@@ -68,3 +70,14 @@ py::array_t<double> two_side_carma_binding(py::array_t<double>& input1, py::arra
 
   return carma::row_to_arr(result, true);
 }
+
+ArmaClass::ArmaClass(const arma::mat& X) {
+  std::cout << "Receive matrix with " << X.n_elem << " values" << std::endl;
+}
+
+PyArmaClass::PyArmaClass(const py::array_t<double>& input) {
+  arma::mat mat_X = carma::arr_to_mat_view<double>(input);
+  ArmaClass{mat_X};
+}
+
+}  // namespace autotest

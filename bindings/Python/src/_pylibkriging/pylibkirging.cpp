@@ -36,20 +36,23 @@ PYBIND11_MODULE(_pylibkriging, m) {
     )pbdoc";
 
   if constexpr (strings_equal(BUILD_TYPE, "Debug")) {
-    m.def("direct_binding", &direct_binding, R"pbdoc(
+    m.def("direct_binding", &autotest::direct_binding, R"pbdoc(
         Pure Numpy debugging demo
 
     )pbdoc");
 
-    m.def("one_side_carma_binding", &one_side_carma_binding, R"pbdoc(
+    m.def("one_side_carma_binding", &autotest::one_side_carma_binding, R"pbdoc(
         Arma debugging demo
 
     )pbdoc");
 
-    m.def("two_side_carma_binding", &two_side_carma_binding, R"pbdoc(
+    m.def("two_side_carma_binding", &autotest::two_side_carma_binding, R"pbdoc(
             libkriging link debugging demo
     
     )pbdoc");
+
+    py::class_<autotest::ArmaClass>(m, "PyArmaClass").def(py::init<const arma::mat&>());
+    py::class_<autotest::PyArmaClass>(m, "WrappedPyArmaClass").def(py::init<const py::array_t<double>&>());
   }
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
