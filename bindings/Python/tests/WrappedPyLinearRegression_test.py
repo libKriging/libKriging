@@ -3,7 +3,6 @@ import numpy as np
 import pytest
 
 
-@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_exact(n, m):
@@ -13,7 +12,7 @@ def test_linear_regression_exact(n, m):
     X[:, 0] = 1
     y = X.dot(sol)  # or X @ sol
 
-    rl = lk.LinearRegression()
+    rl = lk.WrappedPyLinearRegression()
     rl.fit(y, X)
 
     y2, _stderr = rl.predict(X)
@@ -22,7 +21,6 @@ def test_linear_regression_exact(n, m):
     assert np.linalg.norm(y - y2, ord=np.inf) <= eps
 
 
-@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_noisy(n, m):
@@ -38,7 +36,7 @@ def test_linear_regression_noisy(n, m):
     # y = np.array([noiser(v) for v in y])
     # y = np.array(list(map(noiser, y)))
 
-    rl = lk.LinearRegression()
+    rl = lk.WrappedPyLinearRegression()
     rl.fit(y, X)
 
     y2, _stderr = rl.predict(X)

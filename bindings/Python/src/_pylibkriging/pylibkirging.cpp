@@ -61,13 +61,13 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("uniform", &RandomGenerator::uniform);
 
   // Custom manual wrapper (for testing)
-  py::class_<PyLinearRegression>(m, "PyLinearRegression")
+  py::class_<PyLinearRegression>(m, "WrappedPyLinearRegression")
       .def(py::init<>())
       .def("fit", &PyLinearRegression::fit)
       .def("predict", &PyLinearRegression::predict);
 
   // Automated wrappers
-  py::class_<LinearRegression>(m, "LinearRegression")
+  py::class_<LinearRegression>(m, "PyLinearRegression")
       .def(py::init<>())
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
@@ -84,7 +84,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   // Backup solution // FIXME remove it if not necessary
-  py::class_<PyKriging>(m, "PyKriging")
+  py::class_<PyKriging>(m, "WrappedPyKriging")
       .def(py::init<const std::string&>())
       .def(py::init<const py::array_t<double>&,
                     const py::array_t<double>&,
@@ -112,7 +112,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("logMargPost", &PyKriging::logMargPostEval);
 
   // Automated mapper
-  py::class_<Kriging>(m, "Kriging")
+  py::class_<Kriging>(m, "PyKriging")
       .def(py::init<const std::string&>())
       .def(py::init<const arma::colvec&,
                     const arma::mat&,

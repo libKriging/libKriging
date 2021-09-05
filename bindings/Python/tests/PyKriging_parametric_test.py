@@ -8,6 +8,7 @@ def f(X):
 
 
 # @pytest.mark.skip(reason="Needs to be stabilized; got runtime error: chol(): decomposition failed")
+@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_f_order(n, m):
@@ -21,6 +22,7 @@ def test_kriging_f_order(n, m):
 
 
 # @pytest.mark.skip(reason="Needs to be stabilized; got runtime error: chol(): decomposition failed")
+@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100])
 @pytest.mark.parametrize("m", [3, 6])
 def test_kriging_c_order(n, m):

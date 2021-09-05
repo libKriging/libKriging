@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 
+@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_exact(n, m):
@@ -21,6 +22,7 @@ def test_linear_regression_exact(n, m):
     assert np.linalg.norm(y - y2, ord=np.inf) <= eps
 
 
+@pytest.direct_mapping
 @pytest.mark.parametrize("n", [40, 100, 1000])
 @pytest.mark.parametrize("m", [3, 6])
 def test_linear_regression_noisy(n, m):

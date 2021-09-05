@@ -47,6 +47,7 @@
 cmake-build*/
 build*/
 /dist
+/pylibkriging.egg-info
 CMakeCache.txt
 CMakeFiles
 
