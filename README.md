@@ -180,12 +180,12 @@ Using the previous linked examples (in Python, R or Octave), you should obtain t
 
 ## Tested installation
 
-with libKriging 0.4.1
+with libKriging 0.4.7
 
 <!-- ✔ ✘ -->
 |        | Linux Ubuntu:20                          | macOS 11                                 | Windows 10                               |
 |:-------|:-----------------------------------------|:-----------------------------------------|:-----------------------------------------|
-| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:green">✔</span> 3.6-3.7* <span style="color:red">✘</span> ≥3.8
+| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:green">✔</span> 3.6-3.9
 | R      | <span style="color:green">✔</span> 4.1   | <span style="color:green">✔</span> 4.1   | <span style="color:gray">?</span> 4.1 
 | Octave | <span style="color:green">✔</span> 5.2.0 | <span style="color:green">✔</span> 6.2   | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2
 
