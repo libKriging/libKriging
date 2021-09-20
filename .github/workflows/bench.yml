@@ -138,7 +138,7 @@ jobs:
       - name: bench
         shell: bash
         run: |
-          sudo apt install -qy pandoc texlive-full && sudo Rscript -e "if (!('rmarkdown' %in% installed.packages())) install.packages('rmarkdown')"
+          sudo apt install -qy pandoc texlive-full && sudo Rscript -e "if (!('rmarkdown' %in% installed.packages())) install.packages('rmarkdown',repos='https://cloud.r-project.org/')"
           cd bindings/R && chmod a+x bench_perf-full.sh && sudo ./bench_perf-full.sh
       
       - name: report 
