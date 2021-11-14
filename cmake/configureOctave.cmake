@@ -128,5 +128,48 @@ macro(octave_add_mex)
             )
 endmacro()
 
+macro(octave_add_test)
+    set(options WILL_FAIL)
+    set(oneValueArgs NAME FILENAME)
+    # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#test-properties
+    set(multiValueArgs PROPERTIES)
+
+    cmake_parse_arguments(ARGS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if (ARGS_UNPARSED_ARGUMENTS)
+        logFatalError("unparsed arguments '${ARGS_UNPARSED_ARGUMENTS}'")
+    endif ()
+
+    if (NOT ARGS_NAME)
+        logFatalError("add_mex_function needs NAME")
+    endif ()
+
+    if (NOT ARGS_FILENAME)
+        logFatalError("add_mex_function needs NAME")
+    endif ()
+
+    # to configure command line : http://kirste.userpage.fu-berlin.de/chemnet/use/info/octave/octave_7.html
+    if (NOT ARGS_WILL_FAIL)
+        add_test(NAME Octave/${ARGS_NAME}
+                COMMAND ${OCTAVE_EXECUTABLE} --path ${LIBKRIGING_OCTAVE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/test_wrapper.m)
+    else ()
+        # requires crash management for Octave 4 (where exit command causes 'abort')
+        add_test(NAME Octave/${ARGS_NAME}
+                COMMAND manage_test_crash ${OCTAVE_EXECUTABLE} --path ${LIBKRIGING_OCTAVE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/test_wrapper.m)
+        set_tests_properties(Octave/${ARGS_NAME}
+                PROPERTIES
+                WILL_FAIL TRUE)
+    endif ()
+    set_tests_properties(Octave/${ARGS_NAME}
+            PROPERTIES
+            WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}
+            ENVIRONMENT "TESTFILE=${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME}"
+            LABELS Octave
+            ${ARGS_PROPERTIES})
+endmacro()
+
+
+
+
 # https://cmake.org/cmake/help/latest/command/mark_as_advanced.html
 #mark_as_advanced() # TODO

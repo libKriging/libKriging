@@ -9,9 +9,9 @@ function refdir = find_dir()
         disp(testpath)
         isFolder = false;
         if (isOctave)
-           isFolder = exist(testpath, 'dir'); % compatible with Octave 4.2 
+           isFolder = exist(testpath, 'dir') % compatible with Octave 4.2 
         else
-            isFolder = isfolder(testpath); % requires R2017b
+            isFolder = isfolder(testpath) % requires R2017b
         end
         if (isFolder)
             refdir = testpath;
