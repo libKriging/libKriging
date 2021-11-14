@@ -6,7 +6,7 @@
 
 namespace LinearRegressionBinding {
 
-void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -15,7 +15,7 @@ void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(buildObject<LinearRegression>(), "new object reference");
 }
 
-void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -25,7 +25,7 @@ void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(EmptyObject{}, "deleted object reference");
 }
 
-void fit(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -35,7 +35,7 @@ void fit(int nlhs, void** plhs, int nrhs, const void** prhs) {
   lin_reg->fit(input.get<1, arma::vec>("vector"), input.get<2, arma::mat>("matrix"));
 }
 
-void predict(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
