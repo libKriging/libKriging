@@ -59,13 +59,10 @@ macro(add_mex_test)
         add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 COMMAND ${PRECOMMAND} ${OCTAVE_EXECUTABLE} --path ${LIBKRIGING_OCTAVE_SOURCE_DIR} --eval "${TEST_SCRIPT}")
     elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
-        set(Matlab_UNIT_TESTS_CMD -nosplash -nodesktop -nodisplay)
-        if (WIN32)
-            set(Matlab_UNIT_TESTS_CMD ${Matlab_UNIT_TESTS_CMD} -wait)
-        endif ()
+        # see tools/run_matlab_command.sh and matlab_add_unit_test for startup detail
         string(REPLACE "/" "_" log_file_name "${ARGS_NAME}.log")
         add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
-                COMMAND ${PRECOMMAND} ${Matlab_MAIN_PROGRAM} ${Matlab_UNIT_TESTS_CMD} -logfile "${log_file_name}" -r "${TEST_SCRIPT}")
+                COMMAND ${PRECOMMAND} ${Matlab_MAIN_PROGRAM} -logfile "${log_file_name}" -batch "${TEST_SCRIPT}")
     endif ()
 
     if (ARGS_WILL_FAIL)

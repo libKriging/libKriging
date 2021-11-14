@@ -337,6 +337,7 @@ else()
     message(STATUS "Octave binding not available.")
 endif()
 
+# set(Matlab_ROOT_DIR) # should be defined to help finder
 find_package(Matlab COMPONENTS MAIN_PROGRAM)
 if (Matlab_FOUND)
     if(ENABLE_MATLAB_BINDING STREQUAL "OFF")
