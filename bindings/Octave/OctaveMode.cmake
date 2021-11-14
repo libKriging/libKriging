@@ -44,45 +44,40 @@ macro(add_mex_test)
         logFatalError("unparsed arguments '${ARGS_UNPARSED_ARGUMENTS}'")
     endif ()
 
+    get_filename_component(FUNCTION_NAME "${ARGS_FILENAME}" NAME_WE)
+
+    set(TEST_SCRIPT "addpath('${CMAKE_CURRENT_SOURCE_DIR}'), addpath('${LIBKRIGING_OCTAVE_SOURCE_DIR}'), try, run('${FUNCTION_NAME}'), catch err, disp('An exception has been thrown during the execution'), disp(err), disp(err.stack), exit(1), end, exit(0)")
+
+    if (ARGS_WILL_FAIL)
+        # requires crash management for Octave 4 (where exit command causes 'abort')
+        set(PRECOMMAND manage_test_crash)
+    else()
+        set(PRECOMMAND)
+    endif()
+    
     if (OCTAVE_BINDING_MODE STREQUAL "Octave")
-        if (${ARGS_WILL_FAIL})
-            octave_add_test(NAME ${ARGS_NAME}
-                    FILENAME ${ARGS_FILENAME}
-                    WILL_FAIL
-                    PROPERTIES ${ARGS_PROPERTIES})
-        else ()
-            octave_add_test(NAME ${ARGS_NAME}
-                    FILENAME ${ARGS_FILENAME}
-                    PROPERTIES ${ARGS_PROPERTIES})
-        endif ()
+        add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
+                COMMAND ${PRECOMMAND} ${OCTAVE_EXECUTABLE} --path ${LIBKRIGING_OCTAVE_SOURCE_DIR} --eval "${TEST_SCRIPT}")
     elseif (OCTAVE_BINDING_MODE STREQUAL "Matlab")
         set(Matlab_UNIT_TESTS_CMD -nosplash -nodesktop -nodisplay)
         if (WIN32)
             set(Matlab_UNIT_TESTS_CMD ${Matlab_UNIT_TESTS_CMD} -wait)
         endif ()
-
         string(REPLACE "/" "_" log_file_name "${ARGS_NAME}.log")
+        add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
+                COMMAND ${PRECOMMAND} ${Matlab_MAIN_PROGRAM} ${Matlab_UNIT_TESTS_CMD} -logfile "${log_file_name}" -r "${TEST_SCRIPT}")
+    endif ()
 
-        get_filename_component(FUNCTION_NAME "${ARGS_FILENAME}" NAME_WE)
-        
-        set(TEST_SCRIPT "addpath('${CMAKE_CURRENT_SOURCE_DIR}'), addpath('${LIBKRIGING_OCTAVE_SOURCE_DIR}'), try, run('${FUNCTION_NAME}'), catch err, disp('An exception has been thrown during the execution'), disp(err), disp(err.stack), exit(1), end, exit(0)")
-        
-        if (NOT ARGS_WILL_FAIL)
-            add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
-                    COMMAND ${Matlab_MAIN_PROGRAM} ${Matlab_UNIT_TESTS_CMD} -logfile "${log_file_name}" -r "${TEST_SCRIPT}")
-        else ()
-            # requires crash management for Octave 4 (where exit command causes 'abort')
-            add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
-                    COMMAND manage_test_crash ${Matlab_MAIN_PROGRAM} ${Matlab_UNIT_TESTS_CMD} -logfile "${log_file_name}" -r "${TEST_SCRIPT}")
-            set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
-                    PROPERTIES
-                    WILL_FAIL TRUE)
-        endif ()
-
+    if (ARGS_WILL_FAIL)
         set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 PROPERTIES
-                WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}
-                LABELS ${OCTAVE_BINDING_MODE}
-                ${ARGS_PROPERTIES})
-    endif ()
+                WILL_FAIL TRUE)
+    endif()
+    
+    set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
+            PROPERTIES
+            WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}
+            LABELS ${OCTAVE_BINDING_MODE}
+            ${ARGS_PROPERTIES})
+
 endmacro()
