@@ -337,7 +337,6 @@ else()
     message(STATUS "Octave binding not available.")
 endif()
 
-set(Matlab_ROOT_DIR /Applications/MATLAB_R2021b.app)
 find_package(Matlab COMPONENTS MAIN_PROGRAM)
 if (Matlab_FOUND)
     if(ENABLE_MATLAB_BINDING STREQUAL "OFF")

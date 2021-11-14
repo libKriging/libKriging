@@ -91,6 +91,11 @@ jobs:
             #   491 | # define snprintf _snprintf
             enable_python: off
             enable_octave: on
+          - name: "Matlab Linux"
+            # Using matlab-actions/setup-matlab@v1, only available on Linux
+            os: ubuntu-20.04
+            mode: Release
+            enable_matlab: on            
           - name: "R Linux"
             os: ubuntu-20.04
             mode: Release
@@ -120,6 +125,7 @@ jobs:
           echo "MODE=${{matrix.mode}}"                           >> $GITHUB_ENV
           echo "ENABLE_PYTHON_BINDING=${{matrix.enable_python}}" >> $GITHUB_ENV
           echo "ENABLE_OCTAVE_BINDING=${{matrix.enable_octave}}" >> $GITHUB_ENV
+          echo "ENABLE_MATLAB_BINDING=${{matrix.enable_matlab}}" >> $GITHUB_ENV
           echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
@@ -188,6 +194,10 @@ jobs:
           echo 'SHLIB_CXXLD=$(BINPREF)g++' >> ~/.R/Makevars
           # R CMD config SHLIB_CXXLD # updated config
         if: runner.os == 'Windows'
+
+      - name: pre-install-matlab
+        uses: matlab-actions/setup-matlab@v1
+        if: matrix.enable_matlab == 'on'
 
       - name: install
         shell: bash
