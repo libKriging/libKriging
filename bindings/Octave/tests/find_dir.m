@@ -1,10 +1,19 @@
 function refdir = find_dir()
+    
+    isOctave = exist('OCTAVE_VERSION', 'builtin') ~= 0
+    
     path = pwd();
     found = false;
     while ~found
-        testpath = [ path  filesep ".git" filesep ".." filesep "tests" filesep "references" ];
-        % if isfolder(testpath) % requires R2017b 
-        if exist(testpath, 'dir') % compatible with Octave 4.2
+        testpath = fullfile(path, ".git", "..", "tests", "references");
+        disp(testpath)
+        isFolder = false;
+        if (isOctave)
+           isFolder = exist(testpath, 'dir') % compatible with Octave 4.2 
+        else
+            isFolder = isfolder(testpath) % requires R2017b
+        end
+        if (isFolder)
             refdir = testpath;
             return
         else

@@ -1,6 +1,8 @@
 % clear all
 % addpath("mLibKriging")
-# mLibKriging("help")
+mLibKriging("help")
+
+isOctave = exist('OCTAVE_VERSION', 'builtin') ~= 0
 
 X = [0.0;0.2;0.5;0.8;1.0];
 f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
@@ -11,7 +13,12 @@ disp(k_m.summary());
 % session
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false);
-h = figure(1, 'Visible','off'); % no display
+if (isOctave)
+    h = figure(1, 'Visible','off'); % no display
+else
+    h = figure(1);       
+    h.Visible = 'off'; % no display
+end
 hold on;
 plot(x,f(x));
 scatter(X,f(X));
@@ -22,27 +29,32 @@ set( poly, 'facealpha', 0.2);
 
 hold off;
 try
-    print(h,'-dpng','mplot1.png'); % plot to file
+    saveas(h, 'mplot1.png'); % plot to file
 catch
-    printf("Cannot export plot\n")
-end_try_catch
+    fprintf("Cannot export plot\n")
+end
 % close(h);
 
 s = k_m.simulate(int32(10),int32(123), x);
 
-h = figure(2, 'Visible','off'); % no display
+if (isOctave)
+    h = figure(2, 'Visible','off'); % no display
+else
+    h = figure(1);       
+    h.Visible = 'off'; % no display
+end
 hold on;
 plot(x,f(x));
 scatter(X,f(X));
 for i=1:10
    plot(x,s(:,i),'b');
-endfor
+end
 hold off;
 try
-    print(h,'-dpng','mplot2.png'); % plot to file
+    saveas(h, 'mplot2.png'); % plot to file
 catch
-    printf("Cannot export plot\n")
-end_try_catch    
+    fprintf("Cannot export plot\n")
+end
 % close(h);
 
 Xn = [0.3;0.4];
