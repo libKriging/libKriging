@@ -93,7 +93,7 @@ jobs:
             enable_octave: on
           - name: "Matlab Linux"
             # Using matlab-actions/setup-matlab@v1, only available on Linux
-            os: ubuntu-20.04
+            os: ubuntu-18.04
             mode: Release
             enable_matlab: on            
           - name: "R Linux"
@@ -214,7 +214,6 @@ jobs:
       - name: test
         shell: bash
         run: .travis-ci/${BUILD_NAME}/test.sh
-        if: matrix.enable_matlab != 'on' # skip test for matlab cf https://github.com/libKriging/libKriging/runs/4204949848?check_suite_focus=true
 
       - name: publish_report
         shell: bash
