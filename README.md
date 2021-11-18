@@ -139,9 +139,11 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 
 </details>
 
-## mlibkriging for Octave
+## mlibkriging for Octave and matlab
 
-Download and uncompress the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+⚠️ Matlab binary package is not yet available
+
+Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 ```shell
 # example
 curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/mLibKriging_0.4.1_Linux-x86_64.tgz
@@ -150,7 +152,7 @@ Then
 ```shell
 octave --path /path/to/mLibKriging/installation
 ```
-or inside Octave
+or inside Octave or Matlab
 ```matlab
 addpath("path/to/mLibKriging")
 ```
@@ -188,7 +190,7 @@ plot(x,f(x));
 scatter(X,f(X));
 for i=1:10
    plot(x,s(:,i),'b');
-endfor
+end
 hold off;
 ```
 
@@ -196,7 +198,7 @@ hold off;
 
 ## Expected demo results
 
-Using the previous linked examples (in Python, R or Octave), you should obtain the following results
+Using the previous linked examples (in Python, R, Octave or Matlab), you should obtain the following results
 
 `predict` plot                               |  `simulate` plot
 :-------------------------------------------:|:---------------------------------------------:
@@ -206,13 +208,13 @@ Using the previous linked examples (in Python, R or Octave), you should obtain t
 
 with libKriging 0.4.8 
 
-<!-- ✔ ✘ -->
-|        | Linux Ubuntu:20                              | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)**                       | Windows 10                                                                  |
-|:-------|:---------------------------------------------|:--------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10  | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9 | <span style="color:green">✔</span> 3.6-3.9                                  |
-| R      | <span style="color:green">✔</span> 3.6-4.1   | <span style="color:green">✔</span> 3.6-4.1  |                                        | <span style="color:green">✔</span> 3.6-4.1                                  |
-| Octave | <span style="color:green">✔</span> 5.2.0     | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4 | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
-
+<!-- ✔ ⌛️ ✘ -->
+|        | Linux Ubuntu:20                             | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)**                         | Windows 10                                                                  |
+|:-------|:--------------------------------------------|:--------------------------------------------|:-----------------------------------------|:----------------------------------------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9   | <span style="color:green">✔</span> 3.6-3.9                                  |
+| R      | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:green">✔</span> 3.6-4.1  |                                          | <span style="color:green">✔</span> 3.6-4.1                                  |
+| Octave | <span style="color:green">✔</span> 5.2.0    | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4   | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
+| Matlab | <span style="color:orange">⌛️</span> R2021  | <span style="color:red">✔</span> R2021      | <span style="color:green">✔</span> R2021 | <span style="color:gray">?</span>                                           |
 
 *requires extra DLLs. See [python installation](#pylibkriging-for-python)
 
@@ -234,6 +236,8 @@ with libKriging 0.4.8
 
 * Octave ≥ 4.2 (optional)
 
+* Matlab ≥ R2021 (optional)
+
 * R ≥ 3.6 (optional)
 
 ## Get the code
@@ -253,7 +257,8 @@ To configure it, you can define following environment variables ([more details](
 | Variable name          | Default value | Useful values                      | Comment                                         |
 |:-----------------------|:--------------|:-----------------------------------|:------------------------------------------------|
 |`MODE`                  | `Debug`       | `Debug`, `Release`                 |                                                 |
-|`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) | Exclusive with Matlab binding build             |
+|`ENABLE_MATLAB_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) | Exclusive with Octave binding build             |
 |`ENABLE_PYTHON_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
 
 Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
