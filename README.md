@@ -43,6 +43,9 @@ y = [f(xi) for xi in X]
 import pylibkriging as lk
 k_py = lk.Kriging(y, X, "gauss")
 print(k_py.describeModel())
+# you can also check logLikelhood using:
+#def ll(t): return k_py.logLikelihood(t,False,False)[0]
+#t = np.arange(0,1,1/99); pyplot.figure(1); pyplot.plot(t, [ll(ti) for ti in t]); pyplot.show()
 
 x = np.arange(0, 1, 1 / 99)
 p = k_py.predict(x, True, False)
@@ -104,6 +107,8 @@ y <- f(X)
 library(rlibkriging)
 k_R <- Kriging(y, X, "gauss")
 print(k_R)
+# you can also check logLikelhood using:
+# ll = function(t) logLikelihood(k_R,t)$logLikelihood; plot(ll)
 x <- as.matrix(seq(0, 1, , 100))
 p <- predict(k_R, x, TRUE, FALSE)
 
@@ -145,7 +150,8 @@ f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
 y = f(X);
 k_m = Kriging(y, X, "gauss");
 disp(k_m.describeModel());
-
+% you can also check logLikelhood using:
+% function llt = ll (tt) global k_m; llt=k_m.logLikelihood(tt); endfunction; t=0:(1/99):1; plot(t,arrayfun(@ll,t))
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false);
 
