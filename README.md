@@ -36,7 +36,7 @@ NB: The sample code below should give you a taste. Please refer to the reference
 
 ```python
 import numpy as np
-X = [0.0, 0.2, 0.5, 0.8, 1.0]
+X = [0.0, 0.25, 0.5, 0.75, 1.0]
 f = lambda x: (1 - 1 / 2 * (np.sin(12 * x) / (1 + x) + 2 * np.cos(7 * x) * x ** 5 + 0.7))
 y = [f(xi) for xi in X]
 
@@ -100,7 +100,7 @@ install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example. 
 
 ```R
-X <- as.matrix(c(0.0, 0.2, 0.5, 0.8, 1.0))
+X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 y <- f(X)
 
@@ -145,7 +145,7 @@ addpath("path/to/mLibKriging")
 NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.
 
 ```matlab
-X = [0.0;0.2;0.5;0.8;1.0];
+X = [0.0;0.25;0.5;0.75;1.0];
 f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
 y = f(X);
 k_m = Kriging(y, X, "gauss");
