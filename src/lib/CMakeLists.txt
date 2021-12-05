@@ -61,6 +61,8 @@ target_include_directories(Kriging
             ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
+add_subdirectory(include)
+
 # Create install rule for your library. Use variables CMAKE_INSTALL_*DIR defined in GNUInstallDir
 include(GNUInstallDirs)
 # https://cmake.org/cmake/help/latest/command/install.html
@@ -76,10 +78,6 @@ install(EXPORT libKriging-export
         FILE libKriging.cmake
         NAMESPACE libKriging::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
-        )
-install(DIRECTORY
-        include/libKriging
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
