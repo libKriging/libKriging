@@ -1,0 +1,6 @@
+file(GLOB_RECURSE INSTALLED_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.hpp")
+foreach (ITEM ${INSTALLED_HEADERS})
+    get_filename_component(ITEM_PATH ${ITEM} PATH)
+    install(FILES ${ITEM}
+            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${ITEM_PATH}")
+endforeach ()
