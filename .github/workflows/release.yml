@@ -81,6 +81,9 @@ jobs:
         include:
           - os: ubuntu-18.04
             # all versions done in one script wrapper
+        exclude:
+          - os: windows-2019
+            python-version: "3.10" # see issue #140
 
     steps:
       - uses: actions/checkout@v2
