@@ -5,10 +5,6 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-if [[ "$ENABLE_COVERAGE" == "on" ]]; then
-    sudo gem install coveralls-lcov
-fi
-
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   if ( command -v python3 >/dev/null 2>&1 && 
        python3 -m pip --version >/dev/null 2>&1 ); then

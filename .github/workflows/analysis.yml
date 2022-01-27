@@ -178,10 +178,16 @@ jobs:
         shell: bash
         run: .travis-ci/${BUILD_NAME}/test.sh
 
-      - name: publish_report
+      - name: display Coverage report
         shell: bash
         run: |
           cd build
           lcov --list coverage.info
-          coveralls-lcov coverage.info
+        if: matrix.enable_coverage == 'on'
+
+      - name: publish Coveralls report
+        uses: coverallsapp/github-action@master
+        with:
+          path-to-lcov: ./build/coverage.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         if: matrix.enable_coverage == 'on'
