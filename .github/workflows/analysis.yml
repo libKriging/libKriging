@@ -54,6 +54,7 @@ jobs:
         run: .travis-ci/checks/test.sh
 
   build:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
