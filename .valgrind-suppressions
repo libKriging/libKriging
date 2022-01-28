@@ -1,3 +1,7 @@
+# https://valgrind.org/docs/manual/manual-core.html#manual-core.suppress
+# https://valgrind.org/docs/manual/mc-manual.html#mc-manual.leaks
+# https://valgrind.org/docs/manual/mc-manual.html#mc-manual.suppfiles
+
 # Armadillo suppressions
 {
    armadillo print #1
@@ -20,29 +24,8 @@
 }
 
 # Octave suppressions
-# Generic syntax: https://stackoverflow.com/questions/3174468/is-it-possible-to-make-valgrind-ignore-certain-libraries
-{
-   Octave leak
-   Memcheck:Leak
-   match-leak-kinds: definite
-   ...
-   obj:*octave-cli*
-}
-{
-   Octave leak
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:_Znwm
-   ...
-   obj:*/liboctinterp.so*
-}
-{
-   Octave leak
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:_Znam
-   fun:_ZN5ArrayI12octave_valueE8ArrayRepC1Ei
-   ...
-   obj:*/liboctinterp.so*
-}
-
+# Generated using
+# * --gen-suppressions=all in main CMakeLists.txt to generate targets
+# * `sed -i.bak '/^[-=]\{2\}/d' MemoryChecker.x.log` (e.g. on result of dummy_succeededtest.m)
+# * `csplit MemoryChecker.x.log '/{/' '{*}'` (in build/Testing/Temporary)
+# * `md5sum xx* | sort -k 1 | uniq -w 32 | awk '{ print $2 }' | xargs cat >> .valgrind-suppressions`
