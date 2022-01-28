@@ -250,10 +250,12 @@ if (ENABLE_MEMCHECK)
     if (NOT VALGRIND_EXECUTABLE)
         MESSAGE(FATAL_ERROR "ENABLE_MEMCHECK is requested but valgrind executable cannot be found")
     endif()
-    set(MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=50 --error-exitcode=1 --errors-for-leak-kinds=definite")
+    # https://valgrind.org/docs/manual/mc-manual.html#mc-manual.leaks
+    set(MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --leak-check=yes --num-callers=50 --error-exitcode=1 --errors-for-leak-kinds=definite")
+    set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --show-reachable=yes ") # could be noisy
     set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -v") # verbose run with details
     # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} -q") # for quiet runs
-    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --gen-suppressions=all") # for setting up suppressions
+    # set(MEMORYCHECK_COMMAND_OPTIONS "${MEMORYCHECK_COMMAND_OPTIONS} --gen-suppressions=all --num-callers=8") # for setting up suppressions
     set(MEMORYCHECK_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/.valgrind-suppressions")
     MESSAGE(STATUS "Memcheck on tests enabled")
 endif()

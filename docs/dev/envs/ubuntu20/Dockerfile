@@ -1,6 +1,7 @@
 FROM ubuntu:20.04
 COPY install.sh /
 RUN /install.sh && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y clang-tidy && rm -rf /var/lib/apt/lists/*
 
 # extra python usually installed using linux-macos/install.sh
 RUN python3 -m pip install pytest numpy
