@@ -1,4 +1,5 @@
 include(CTest)
+include(Catch)
 
 # target_link_libraries links the executable to the library.
 # Since the library has public include directories we will use those link directories when building
@@ -54,11 +55,11 @@ endif ()
 #set(PARSE_CATCH_TESTS_VERBOSE ON)
 
 # Test using catch2 (parse catch tests)
-ParseAndAddCatchTests(catch2_unit_test)
-ParseAndAddCatchTests(regression_unit_test)
+catch_discover_tests(catch2_unit_test)
+catch_discover_tests(regression_unit_test)
 
 set(AdditionalCatchParameters --benchmark-samples 10)
-ParseAndAddCatchTests(KrigingTest)
+catch_discover_tests(KrigingTest)
 unset(AdditionalCatchParameters)
 # example of callgrind command line
 # valgrind --tool=callgrind --dump-instr=yes --trace-jump=yes -v ./tests/KrigingTest "logLikelihood benchmark" --benchmark-samples 10
