@@ -76,6 +76,22 @@ jobs:
             enable_octave: on
             enable_memcheck: on
             force_update: on
+          - name: "Memory Sanitizer"
+            os: ubuntu-20.04
+            mode: Debug
+            enable_python: off
+            enable_octave: off
+            enable_memcheck: off
+            force_update: on
+            sanitizer: memory
+          - name: "Thread Sanitizer"
+            os: ubuntu-20.04
+            mode: Debug
+            enable_python: off
+            enable_octave: off
+            enable_memcheck: off
+            force_update: on
+            sanitizer: thread
 
     steps:
       - uses: actions/checkout@v2
@@ -96,6 +112,7 @@ jobs:
           echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
+          echo "SANITIZE=${{matrix.sanitizer}}"                  >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash
