@@ -40,6 +40,7 @@ set(LIBKRIGING_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
+option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 set(PYBIND11_PYTHON_VERSION 3.6)
 
 #------------------------------------------------------
@@ -169,12 +170,12 @@ SET("CMAKE_C_FLAGS_RELWITHDEBINFO"
         FORCE)
 
 if (ENABLE_COVERAGE)
-# --coverage option is used to compile and link code instrumented for coverage analysis.
-# The option is a synonym for -fprofile-arcs -ftest-coverage (when compiling) and -lgcov (when linking).
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g --coverage")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g --coverage")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+    # --coverage option is used to compile and link code instrumented for coverage analysis.
+    # The option is a synonym for -fprofile-arcs -ftest-coverage (when compiling) and -lgcov (when linking).
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g --coverage")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g --coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
 endif()
 
 #------------------------------------------------------
@@ -191,14 +192,50 @@ add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 
 #------------------------------------------------------
 
+string(TOUPPER "${SANITIZE}" SANITIZE)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")
     if (WIN32 AND MINGW) # https://stackoverflow.com/questions/16596876/object-file-has-too-many-sections
         set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wa,-mbig-obj")
     endif()
+    if (SANITIZE STREQUAL "THREAD")
+        add_compile_options(-fsanitize=thread)
+        add_link_options(-fsanitize=thread)
+    elseif (SANITIZE STREQUAL "ADDRESS")
+        add_compile_options(-fsanitize=address)
+        add_compile_options(-fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+    elseif (SANITIZE STREQUAL "LEAK")
+        if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+            message(FATAL_ERROR "Leak Sanitizer is not available on ARM")
+        endif()
+        add_compile_options(-fsanitize=leak)
+        add_compile_options(-fno-omit-frame-pointer)
+        add_link_options(-fsanitize=leak)
+    elseif (NOT SANITIZE STREQUAL "OFF")
+        message(FATAL_ERROR "Bad SANITIZE value; should be THREAD, ADDRESS, LEAK or OFF")
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wall -Wextra")
     set(LIBKRIGING_CXX_FLAGS "${LIBKRIGING_CXX_FLAGS} -Wsign-compare -Wunused -Wunused-member-function -Wunused-private-field")
+    if (SANITIZE STREQUAL "THREAD")
+        add_compile_options(-fsanitize=thread)
+        add_link_options(-fsanitize=thread)
+    elseif (SANITIZE STREQUAL "ADDRESS")
+        add_compile_options(-fsanitize=address)
+        add_compile_options(-fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+    elseif (SANITIZE STREQUAL "LEAK")
+        if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+            message(FATAL_ERROR "Leak Sanitizer is not available on ARM")
+        endif()
+        add_compile_options(-fsanitize=leak)
+        add_compile_options(-fno-omit-frame-pointer)
+        add_link_options(-fsanitize=leak)
+    elseif (NOT SANITIZE STREQUAL "OFF")
+        message(FATAL_ERROR "Bad SANITIZE value; should be THREAD, ADDRESS, LEAK or OFF")
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # workaround like https://github.com/nlohmann/json/issues/1408
     # to avoid error like: carma\third_party\armadillo-code\include\armadillo_bits/arma_str.hpp(194): error C2039: '_snprintf': is not a member of 'std' (compiling source file carma\tests\src\bindings.cpp) 
@@ -206,7 +243,14 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     if (ENABLE_COVERAGE)
         logFatalError("Coverage is not supported with MSVC")
     endif()
-endif ()
+    if (NOT SANITIZE STREQUAL "OFF")
+        message(FATAL_ERROR "SANITIZE feature not support with ${CMAKE_CXX_COMPILER_ID}")
+    endif ()
+else()
+    if (NOT SANITIZE STREQUAL "OFF")
+        message(FATAL_ERROR "SANITIZE feature not support with ${CMAKE_CXX_COMPILER_ID}")
+    endif ()
+endif()
 
 # Compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIBKRIGING_CXX_FLAGS}")
@@ -269,7 +313,7 @@ find_program(OCTAVE_CONFIG_EXECUTABLE
 if (OCTAVE_CONFIG_EXECUTABLE)
     if (ENABLE_OCTAVE_BINDING STREQUAL "ON")
         if (BUILD_SHARED_LIBS)
-            logFatalError("Octave binding requires static library mode")
+            logFatalError("Octave binding requires static library mode (see BUILD_SHARED_LIBS=OFF)")
         else ()
             add_subdirectory(bindings/Octave)
             set(ENABLED_OCTAVE_BINDING ON)
