@@ -21,4 +21,4 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 | `USE_COMPILER_CACHE`           | &lt;empty&gt; | &lt;string&gt;                                      | name of a compiler cache program         |
 | `BUILD_SHARED_LIBS`            |     `ON`      | `ON`, `OFF`                                         |                                          |
 | `PYTHON_PREFIX_PATH`           | &lt;empty&gt; | &lt;string&gt;                                      | overrides default python path detection  |
-| `SANITIZE`                     |     `OFF`      | `OFF`, `THREAD`, `MEMORY`                          | Enable sanitize feature (is available)   |
+| `SANITIZE`                     |     `OFF`      | `OFF`, `THREAD`, `ADDRESS`, `LEAK`                   | Enable sanitize feature (is available)   |

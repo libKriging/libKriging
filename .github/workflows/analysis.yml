@@ -76,14 +76,22 @@ jobs:
             enable_octave: on
             enable_memcheck: on
             force_update: on
-          - name: "Memory Sanitizer"
+          - name: "Address Sanitizer"
             os: ubuntu-20.04
             mode: Debug
             enable_python: off
             enable_octave: off
             enable_memcheck: off
             force_update: on
-            sanitizer: memory
+            sanitizer: address
+          - name: "Leak Sanitizer"
+            os: ubuntu-20.04
+            mode: Debug
+            enable_python: off
+            enable_octave: off
+            enable_memcheck: off
+            force_update: on
+            sanitizer: leak
           - name: "Thread Sanitizer"
             os: ubuntu-20.04
             mode: Debug
