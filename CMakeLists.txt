@@ -313,7 +313,7 @@ find_program(OCTAVE_CONFIG_EXECUTABLE
 if (OCTAVE_CONFIG_EXECUTABLE)
     if (ENABLE_OCTAVE_BINDING STREQUAL "ON")
         if (BUILD_SHARED_LIBS)
-            logFatalError("Octave binding requires static library mode")
+            logFatalError("Octave binding requires static library mode (see BUILD_SHARED_LIBS=OFF)")
         else ()
             add_subdirectory(bindings/Octave)
             set(ENABLED_OCTAVE_BINDING ON)
