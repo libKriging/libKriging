@@ -456,7 +456,7 @@ if (ENABLE_COVERAGE)
     #endif (NOT SED)
 
     # Don't forget '' around each pattern
-    set(LCOV_EXCLUDE_PATTERN "'${LIBKRIGING_SOURCE_DIR}/dependencies/*'")
+    set(LCOV_EXCLUDE_PATTERN "'${LIBKRIGING_SOURCE_DIR}/dependencies/*'" "'${LIBKRIGING_BINARY_DIR}/dependencies/*'")
 
     add_custom_target(coverage
             # Cleanup previously generated profiling data
