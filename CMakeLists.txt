@@ -58,10 +58,10 @@ else ()
     endif ()
 endif ()
 
-# ENABLE_STATIC_ANALYSIS default is AUTO
+# ENABLE_STATIC_ANALYSIS default is OFF
 string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)
 if (NOT DEFINED ENABLE_STATIC_ANALYSIS OR ENABLE_STATIC_ANALYSIS STREQUAL "")
-    set(ENABLE_STATIC_ANALYSIS "AUTO" CACHE STRING
+    set(ENABLE_STATIC_ANALYSIS "OFF" CACHE STRING
             "Enable static analysis; choose between ON, OFF and AUTO (if available and Debug mode)"
             FORCE)
 else ()
