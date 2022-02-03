@@ -50,5 +50,6 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   
   # ** Install required Python libs ** 
   python3 -m pip install --progress-bar off pip --upgrade
-  python3 -m pip install --progress-bar off pytest numpy scipy --upgrade
+  python3 -m pip install --progress-bar off -r bindings/Python/requirements.txt --upgrade
+  python3 -m pip install --progress-bar off -r bindings/Python/dev-requirements.txt --upgrade
 fi

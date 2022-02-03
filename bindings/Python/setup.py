@@ -4,10 +4,11 @@ import sys
 import platform
 import subprocess
 import argparse
+from packaging.version import Version
+from check_requirements import *
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
-from distutils.version import LooseVersion
 
 
 def find_in_path(filename):
@@ -47,8 +48,8 @@ class CMakeBuild(build_ext):
             raise RuntimeError("CMake must be installed to build the following extensions: " +
                                ", ".join(e.name for e in self.extensions))
 
-        cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)', out.decode()).group(1))
-        if cmake_version < '3.1.0':
+        cmake_version = Version(re.search(r'version\s*([\d.]+)', out.decode()).group(1))
+        if cmake_version < Version('3.1.0'):
             raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
         for ext in self.extensions:
@@ -95,21 +96,28 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
+os.chdir("../..")
 with open("cmake/version.cmake", "r") as file:
     data = file.read()
 
 version_major = re.search(r"^set\(KRIGING_VERSION_MAJOR (\d+)\)$", data, re.M)
 version_minor = re.search(r"^set\(KRIGING_VERSION_MINOR (\d+)\)$", data, re.M)
 version_patch = re.search(r"^set\(KRIGING_VERSION_PATCH (\d+)\)$", data, re.M)
-version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
+kriging_version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
 
-# with open("README.md", "r", encoding="utf-8") as fh:
-#     long_description = fh.read()
+# Packages should be installed in global environment (seen by CMake/C++)
+if not has_requirements("requirements.txt"):
+    eprint("Mandatory requirements are not satisfied")
+    exit(1)
+
+if args.debug and not has_requirements("dev-requirements.txt"):
+    eprint("Dev/debug requirements are not satisfied")
+    exit(1)
 
 setup(
     name='pylibkriging',
     packages=['pylibkriging'],
-    version=version,
+    version=kriging_version,
     author='Pascal Havé',
     author_email='hpwxf@haveneer.com',
     url="https://github.com/libKriging/libKriging",
@@ -125,6 +133,6 @@ setup(
     # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
     data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
     python_requires='>=3.6',
-    install_requires=["numpy>=1.17"],
+    # install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment 
     zip_safe=False,
 )

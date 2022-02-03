@@ -29,6 +29,7 @@ yum install -y openblas-devel
 # Compile wheels
 for PYBIN in /opt/python/*/bin; do
     if [ "${PYBIN}" == "/opt/python/cp35-cp35m/bin" ]; then continue; fi
+    "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/requirements.txt # not for Windows
     "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/dev-requirements.txt # not for Windows
     "${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/setup.py bdist_wheel
 done
