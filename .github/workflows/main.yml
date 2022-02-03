@@ -55,22 +55,15 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os }}
-    name: "R ${{ matrix.R }} ${{matrix.os}}"
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         R: [ '3.5.3', '3.6.1', '4.0', '4.1', '4.2' ]
-        include:
-          - os: ubuntu-20.04
-            mode: Release
-            enable_R: on
-          - os: macOS-10.15
-            mode: Release
-            enable_R: on
-          - os: windows-2019
-            mode: Release
-            enable_R: on
+        os: [ubuntu-20.04, macOS-10.15, windows-2019]
+        mode: [Release]
+        enable_R: [on]
+    name: "R ${{matrix.R}} ${{matrix.os}}"
 
     steps:
       - uses: actions/checkout@v2
