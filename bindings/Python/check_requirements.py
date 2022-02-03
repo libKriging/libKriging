@@ -8,7 +8,7 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
     sys.stderr.flush()
-    
+
 
 class InlineClass(object):
     def __init__(self, dict):
@@ -21,6 +21,7 @@ def has_requirements(filename, options=None):
             'pretty': True,
             'verbose': False,
             'soft': False,
+            'indent': ''
         })
 
     try:
@@ -31,15 +32,15 @@ def has_requirements(filename, options=None):
                 requirement = str(requirement)
                 try:
                     if options.verbose:
-                        print(f"Checking requirement package {requirement}")
+                        print(f"{options.indent}Checking requirement package {requirement}")
                     pkg_resources.require(requirement)
                     if options.pretty:
-                        print(f"✔ Module {requirement} is available")
+                        print(f"{options.indent}✔ Module {requirement} is available")
                 except pkg_resources.DistributionNotFound:
                     if options.soft:
-                        print(f"✘ Module {requirement} is NOT available")
+                        print(f"{options.indent}✘ Module {requirement} is NOT available")
                     else:
-                        eprint(f"✘ Module {requirement} is NOT available")
+                        eprint(f"{options.indent}✘ Module {requirement} is NOT available")
                     hasError = True
             return not hasError
     except FileNotFoundError:
@@ -61,12 +62,14 @@ if __name__ == '__main__':
                         help="Pretty display while processing")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Pretty display while processing")
+    parser.add_argument("--indent", type=str, default='',
+                        help="Prefix all output with given string")
     parser.add_argument("--soft", action="store_true",
                         help="Soft error are written in stdout not stderr")
     args = parser.parse_args()
     hasError = False
     for file in args.filenames:
         if args.verbose:
-            print(f"Checking requirements file '{file}'")
+            print(f"{args.indent}Checking requirements file '{file}'")
         hasError |= not has_requirements(file, args)
     exit(hasError)

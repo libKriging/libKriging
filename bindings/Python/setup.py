@@ -96,7 +96,8 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
-os.chdir("../..")
+libKriging_path = Path(__file__).parent.absolute().parent.parent
+os.chdir(libKriging_path)
 with open("cmake/version.cmake", "r") as file:
     data = file.read()
 

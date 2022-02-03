@@ -360,7 +360,8 @@ if (PythonInterp_FOUND)
     message(STATUS "Checking Python requirements")
     set(HAS_PYTHON_REQUIREMENT true)
     set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter found: ${PYTHON_EXECUTABLE}")
-    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty "requirements.txt" "dev-requirements.txt"
+    set(INDENTATION "   ")
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
                     RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
     if (NOT PYTHON_IMPORT_RETCODE EQUAL "0")
         set(HAS_PYTHON_REQUIREMENT false)
