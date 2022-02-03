@@ -15,9 +15,9 @@ fi
 
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
 	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-	cd ${HOME}/Downloads
+	pushd ${HOME}/Downloads 
 	${BASEDIR}/install_conda.bat
-	cd ${BASEDIR}
+	popd
 fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
