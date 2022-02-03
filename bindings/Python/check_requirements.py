@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import pkg_resources
 from pathlib import Path
 import argparse
@@ -32,15 +33,15 @@ def has_requirements(filename, options=None):
                 requirement = str(requirement)
                 try:
                     if options.verbose:
-                        print(f"{options.indent}Checking requirement package {requirement}")
+                        print(f"{options.indent}Checking requirement package {requirement}".encode('utf-8'))
                     pkg_resources.require(requirement)
                     if options.pretty:
-                        print(f"{options.indent}✔ Module {requirement} is available")
+                        print(f"{options.indent}✔ Module {requirement} is available".encode('utf-8'))
                 except pkg_resources.DistributionNotFound:
                     if options.soft:
-                        print(f"{options.indent}✘ Module {requirement} is NOT available")
+                        print(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf-8'))
                     else:
-                        eprint(f"{options.indent}✘ Module {requirement} is NOT available")
+                        eprint(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf-8'))
                     hasError = True
             return not hasError
     except FileNotFoundError:
