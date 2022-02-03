@@ -9,7 +9,8 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   if ( command -v python3 >/dev/null 2>&1 && 
        python3 -m pip --version >/dev/null 2>&1 ); then
     # python3 -m pip install pip # --upgrade # --progress-bar off
-    python3 -m pip install pytest numpy # --upgrade # --progress-bar off
+    python3 -m pip install -r bindings/Python/requirements.txt # --upgrade # --progress-bar off
+    python3 -m pip install -r bindings/Python/dev-requirements.txt # --upgrade # --progress-bar off
   fi
   
   if [[ "$ENABLE_MEMCHECK" == "on" ]]; then 

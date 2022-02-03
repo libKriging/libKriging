@@ -15,9 +15,9 @@ fi
 
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
 	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-	cd ${HOME}/Downloads
+	pushd ${HOME}/Downloads 
 	${BASEDIR}/install_conda.bat
-	cd ${BASEDIR}
+	popd
 fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
@@ -50,5 +50,6 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   
   # ** Install required Python libs ** 
   python3 -m pip install --progress-bar off pip --upgrade
-  python3 -m pip install --progress-bar off pytest numpy scipy --upgrade
+  python3 -m pip install --progress-bar off -r bindings/Python/requirements.txt --upgrade
+  python3 -m pip install --progress-bar off -r bindings/Python/dev-requirements.txt --upgrade
 fi
