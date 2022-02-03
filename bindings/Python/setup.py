@@ -11,6 +11,65 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
 
+def main():
+    """
+    main() is a wrapper to the whole function so that it can be used as imported function by root setup.py
+    """
+
+    extra_libs = []
+    if platform.system() == "Windows":
+        extra_libs = [find_in_path(f) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
+
+    argparser = argparse.ArgumentParser(add_help=False)
+    argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
+    global args  # will available to CMakeBuild functions
+    args, unknown = argparser.parse_known_args()
+    sys.argv = [sys.argv[0]] + unknown
+
+    libKriging_path = Path(__file__).absolute().parents[2]
+    print(f"LibKriging root directory is {libKriging_path}")
+    os.chdir(libKriging_path)
+    with open("cmake/version.cmake", "r") as file:
+        data = file.read()
+
+    version_major = re.search(r"^set\(KRIGING_VERSION_MAJOR (\d+)\)$", data, re.M)
+    version_minor = re.search(r"^set\(KRIGING_VERSION_MINOR (\d+)\)$", data, re.M)
+    version_patch = re.search(r"^set\(KRIGING_VERSION_PATCH (\d+)\)$", data, re.M)
+    kriging_version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
+
+    # Packages should be installed in global environment (seen by CMake/C++)
+    if not has_requirements("requirements.txt"):
+        eprint("Mandatory requirements are not satisfied")
+        exit(1)
+
+    if args.debug and not has_requirements("dev-requirements.txt"):
+        eprint("Dev/debug requirements are not satisfied")
+        exit(1)
+
+    setup(
+        name='pylibkriging',
+        packages=['pylibkriging'],
+        version=kriging_version,
+        author='Pascal Havé',
+        author_email='hpwxf@haveneer.com',
+        url="https://github.com/libKriging/libKriging",
+        description='Python binding for LibKriging',
+        long_description='Python support for libKriging, the kriging library for performance and wide language support',
+        # long_description_content_type="text/markdown",
+        ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
+        cmdclass=dict(build_ext=CMakeBuild),
+        script_name='./bindings/Python/setup.py',
+        package_dir={'pylibkriging': 'bindings/Python/src/pylibkriging'},
+        # https://docs.python.org/3/distutils/setupscript.html#installing-package-data
+        package_data={'pylibkriging': []},
+        # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
+        data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
+        python_requires='>=3.6',
+        # install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment 
+        zip_safe=False,
+    )
+
+
 def find_in_path(filename):
     fpath, fname = os.path.split(filename)
     if fpath:
@@ -22,16 +81,6 @@ def find_in_path(filename):
             if os.path.isfile(test_file):
                 return test_file
     raise RuntimeError(f"Cannot find required file '{filename}'")
-
-
-extra_libs = []
-if platform.system() == "Windows":
-    extra_libs = [find_in_path(f) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
-
-argparser = argparse.ArgumentParser(add_help=False)
-argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
-args, unknown = argparser.parse_known_args()
-sys.argv = [sys.argv[0]] + unknown
 
 
 class CMakeExtension(Extension):
@@ -96,44 +145,5 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 
-libKriging_path = Path(__file__).parent.absolute().parent.parent
-os.chdir(libKriging_path)
-with open("cmake/version.cmake", "r") as file:
-    data = file.read()
-
-version_major = re.search(r"^set\(KRIGING_VERSION_MAJOR (\d+)\)$", data, re.M)
-version_minor = re.search(r"^set\(KRIGING_VERSION_MINOR (\d+)\)$", data, re.M)
-version_patch = re.search(r"^set\(KRIGING_VERSION_PATCH (\d+)\)$", data, re.M)
-kriging_version = f"{version_major.group(1)}.{version_minor.group(1)}.{version_patch.group(1)}"
-
-# Packages should be installed in global environment (seen by CMake/C++)
-if not has_requirements("requirements.txt"):
-    eprint("Mandatory requirements are not satisfied")
-    exit(1)
-
-if args.debug and not has_requirements("dev-requirements.txt"):
-    eprint("Dev/debug requirements are not satisfied")
-    exit(1)
-
-setup(
-    name='pylibkriging',
-    packages=['pylibkriging'],
-    version=kriging_version,
-    author='Pascal Havé',
-    author_email='hpwxf@haveneer.com',
-    url="https://github.com/libKriging/libKriging",
-    description='Python binding for LibKriging',
-    long_description='Python support for libKriging, the kriging library for performance and wide language support',
-    # long_description_content_type="text/markdown",
-    ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
-    cmdclass=dict(build_ext=CMakeBuild),
-    script_name='./bindings/Python/setup.py',
-    package_dir={'pylibkriging': 'bindings/Python/src/pylibkriging'},
-    # https://docs.python.org/3/distutils/setupscript.html#installing-package-data
-    package_data={'pylibkriging': []},
-    # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
-    data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
-    python_requires='>=3.6',
-    # install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment 
-    zip_safe=False,
-)
+if __name__ == '__main__':
+    main()
