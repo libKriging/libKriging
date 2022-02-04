@@ -197,16 +197,19 @@ Using the previous linked examples (in Python, R or Octave), you should obtain t
 
 ## Tested installation
 
-with libKriging 0.4.7
+with libKriging 0.4.8 
 
 <!-- ✔ ✘ -->
-|        | Linux Ubuntu:20                          | macOS 11                                 | Windows 10                               |
-|:-------|:-----------------------------------------|:-----------------------------------------|:-----------------------------------------|
-| Python | <span style="color:green">✔</span> 3.8.5 | <span style="color:green">✔</span> 3.9.5 | <span style="color:green">✔</span> 3.6-3.9
-| R      | <span style="color:green">✔</span> 4.1   | <span style="color:green">✔</span> 4.1   | <span style="color:gray">?</span> 4.1 
-| Octave | <span style="color:green">✔</span> 5.2.0 | <span style="color:green">✔</span> 6.2   | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2
+|        | Linux Ubuntu:20                              | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)**                       | Windows 10                                                                  |
+|:-------|:---------------------------------------------|:--------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.6-3.10  | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9 | <span style="color:green">✔</span> 3.6-3.9                                  |
+| R      | <span style="color:green">✔</span> 3.6-4.1   | <span style="color:green">✔</span> 3.6-4.1  |                                        | <span style="color:green">✔</span> 3.6-4.1                                  |
+| Octave | <span style="color:green">✔</span> 5.2.0     | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4 | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
+
 
 *requires extra DLLs. See [python installation](#pylibkriging-for-python)
+
+**no pre-built package nor CI
 
 # Compilation
 
@@ -449,7 +452,7 @@ Successfully installed pylibkriging-0.4.8
 
 </details>
 
-To get a particular version (branch or tag after v0.4.8), you can use:
+To get a particular version (branch or tag ≥v0.4.9), you can use:
 ```shell
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 ```
