@@ -12,10 +12,11 @@ Table of contents
     1. [Results examples](#expected-demo-results)
 1. [Compilation](#compilation)   
     1. [Requirements](#requirements-more-details)
-    1. [Get the code](#get-the-code)
-    1. [Helper scripts](#helper-scripts-for-ci)   
-    1. [Compilation and tests](#compilation-and-tests)
-    1. [Deployment](#deployment)
+    2. [Get the code](#get-the-code)
+    3. [Helper scripts](#helper-scripts-for-ci)   
+    4. [Compilation and tests](#compilation-and-tests-manually)
+    5. [Deployment](#deployment)
+    6. [Assisted compilation and installation](#assisted-compilation-and-installation)
 1. [More info](docs/dev/MoreInfo.md)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
@@ -32,7 +33,8 @@ pip3 install pylibkriging numpy
 
 **Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
 
-NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.
+<details>
+<summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
 
 ```python
 import numpy as np
@@ -72,6 +74,9 @@ for i in range(10):
 pyplot.show()
 ```
 
+</details>
+
+
 NB: On Windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
 To load them into Python's search PATH, use:
 ```python
@@ -97,7 +102,8 @@ install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
 
-NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example. 
+<details>
+<summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
 
 ```R
 X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
@@ -124,6 +130,8 @@ points(X,y)
 matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 ```
 
+</details>
+
 ## mlibkriging for Octave
 
 Download and uncompress the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
@@ -142,7 +150,8 @@ addpath("path/to/mLibKriging")
 
 **Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)**
 
-NB: The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.
+<details>
+<summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
 
 ```matlab
 X = [0.0;0.25;0.5;0.75;1.0];
@@ -175,6 +184,8 @@ for i=1:10
 endfor
 hold off;
 ```
+
+</details>
 
 ## Expected demo results
 
@@ -227,15 +238,13 @@ git clone --recurse-submodules https://github.com/libKriging/libKriging.git
 Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
 They use the preset of options also used in CI workflow.
 
-To configure it, you can define following environment variables:
+To configure it, you can define following environment variables ([more details](docs/dev/AllCMakeOptions.md)):
 
 | Variable name          | Default value | Useful values                      | Comment                                         |
 |:-----------------------|:--------------|:-----------------------------------|:------------------------------------------------|
 |`MODE`                  | `Debug`       | `Debug`, `Release`                 |                                                 |
 |`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
 |`ENABLE_PYTHON_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
-|`USE_COMPILER_CACHE`    | &lt;empty&gt; | &lt;string&gt;                     | name of a compiler cache program                |
-|`EXTRA_CMAKE_OPTIONS`   | &lt;empty&gt; | &lt;string&gt;                     | pass extra CMake option for CMaKe configuration |
 
 Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
 
@@ -261,8 +270,14 @@ Then:
   .travis-ci/${BUILD_NAME}/build.sh
   ```
   NB: It will create a `build` directory.
+
+* Test
+  ```shell
+  .travis-ci/${BUILD_NAME}/test.sh
+  ```
+
   
-## Compilation and tests
+## Compilation and tests *manually*
 
 ### Preamble
 
@@ -283,6 +298,9 @@ Select your compilation *`${MODE}`* between:
 Following commands are made for Unix shell. To use them with Windows use [git-bash](https://gitforwindows.org) or [Mingw](http://www.mingw.org) environments.
 
 ### Compilation for Linux and macOS
+
+<details>
+<summary>👆 expand the details</summary>
   
   * Configure
       ```shell
@@ -309,8 +327,14 @@ Following commands are made for Unix shell. To use them with Windows use [git-ba
       cmake --build . --target coverage-report --config Coverage
       ```
       to produce a html report located in `${BUILD}/coverage/index.html`
+
+</details>
    
 ### Compilation for Windows 64bits with Visual Studio
+
+<details>
+<summary>👆 expand the details</summary>
+
   * Configure
       ```shell
       cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
@@ -326,7 +350,12 @@ Following commands are made for Unix shell. To use them with Windows use [git-ba
       ctest -C ${MODE}
       ```
     
+</details>
+    
 ### Compilation for Linux/Mac/Windows using R toolchain
+
+<details>
+<summary>👆 expand the details</summary>
 
   With this method, you need [R](https://cran.r-project.org) (and [R-tools](https://cran.r-project.org/bin/windows/Rtools/) if you are on Windows).
   
@@ -344,6 +373,8 @@ Following commands are made for Unix shell. To use them with Windows use [git-ba
       ```shell
       ctest
       ```
+    
+</details>
        
 ## Deployment
 
@@ -354,7 +385,9 @@ If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation d
 
 ### For Linux and macOS
 
-e.g.:
+<details>
+<summary>👆 expand the details</summary>
+
 ```shell
 cmake -DCMAKE_BUILD_TYPE=${MODE} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING}
 ```
@@ -367,9 +400,13 @@ aka with classical makefiles
 make install
 ```
 
+</details>
+
 ### For Windows 64bits with Visual Studio
 
-e.g.:
+<details>
+<summary>👆 expand the details</summary>
+
 ```shell
 cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
 ```
@@ -377,3 +414,43 @@ and then
 ```shell
 cmake --build . --target install --config ${MODE}
 ```
+
+</details>
+
+## Assisted compilation and installation
+
+### Using `pip install` from GitHub
+
+You don't need to download libKriging. `pip install` will do everything. To do that, you need the [Compilation requirements](#requirements-more-details).
+
+```shell
+python3 -m pip install "git+https://github.com/libKriging/libKriging.git"
+```
+will download, compile and install pylibkriging from *master* branch.
+
+<details>
+<summary>Example of build process output (~2mn)</summary>
+
+```
+Collecting git+https://github.com/libKriging/libKriging.git
+  Cloning https://github.com/libKriging/libKriging.git to /private/var/folders/g0/56fnffpn6tjd5kplh140ysrh0000gn/T/pip-req-build-2xhzyw9g
+  Running command git clone --filter=blob:none -q https://github.com/libKriging/libKriging.git /private/var/folders/g0/56fnffpn6tjd5kplh140ysrh0000gn/T/pip-req-build-2xhzyw9g
+  Resolved https://github.com/libKriging/libKriging.git to commit 1a86dd69cf1f60b6dcd2b5e5b876cafc97d616e9
+  Running command git submodule update --init --recursive -q
+  Preparing metadata (setup.py) ... done
+Building wheels for collected packages: pylibkriging
+  Building wheel for pylibkriging (setup.py) ... done
+  Created wheel for pylibkriging: filename=pylibkriging-0.4.8-cp39-cp39-macosx_12_0_x86_64.whl size=712572 sha256=7963a78f16628c5a7d877b368fdd73452e5acf01784cd6931d48dcdc08e62a5b
+  Stored in directory: /private/var/folders/g0/56fnffpn6tjd5kplh140ysrh0000gn/T/pip-ephem-wheel-cache-o7kxij3t/wheels/52/71/b0/e534f2249e9180c596a5b785cf0bfa5471fcfd38d2987318f8
+Successfully built pylibkriging
+Installing collected packages: pylibkriging
+Successfully installed pylibkriging-0.4.8
+```
+
+</details>
+
+To get a particular version (branch or tag after v0.4.8), you can use:
+```shell
+python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
+```
+
