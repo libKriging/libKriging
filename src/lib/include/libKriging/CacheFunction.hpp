@@ -31,9 +31,12 @@ template <typename Callable,
           typename R,
           typename... Args,
           typename... Contexts>  // true type for performance and details
-class CacheFunction<Callable, Signature<std::function<R(Args...)>>, Contexts...> {
+class CacheFunction<Callable, Signature<std::function<R(Args...)>>, Contexts...> : std::function<R(Args...)> {
  private:
   using HashKey = std::size_t;
+
+ public:
+  using type = typename Signature<std::function<R(Args...)>>::type;
 
  public:
   LIBKRIGING_EXPORT explicit CacheFunction(const Callable& callable, const Contexts&... contexts)

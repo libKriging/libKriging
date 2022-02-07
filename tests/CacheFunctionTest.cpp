@@ -163,3 +163,27 @@ TEST_CASE("Cache of 2-args function with global context", "[core]") {
     REQUIRE(stat.cache_size == 2);
   }
 }
+
+TEST_CASE("Cache function behaves like std::function", "[core]") {
+  double context = 1;
+  auto f = [&context](double x, double y) -> double { return (x + y) * context; };
+  CacheFunction f_cached(f, context);
+
+  std::function<decltype(f_cached)::type> f2(f_cached);
+  auto f_cached2 = f2.target<decltype(f_cached)>();
+  REQUIRE(f_cached2 != nullptr);
+
+  double x = 1, y = 2;
+  REQUIRE(f_cached2->inspect(x, y) == 0);
+  REQUIRE(f2(x, y) == f(x, y));
+  REQUIRE(f_cached2->inspect(x, y) == 1);
+  context = 2;
+  REQUIRE(f_cached2->inspect(x, y) == 0);
+  REQUIRE(f2(x, y) == f(x, y));
+  REQUIRE(f_cached2->inspect(x, y) == 1);
+
+  auto stat = f_cached2->stat();
+  REQUIRE(stat.max_hit == 1);
+  REQUIRE(stat.total_hit == 2);
+  REQUIRE(stat.cache_size == 2);
+}
