@@ -2,6 +2,7 @@
 #define LIBKRIGING_SRC_LIB_CACHE_HPP
 
 #include <functional>
+#include <numeric>
 #include <optional>
 #include <tuple>
 #include <unordered_map>
@@ -23,16 +24,20 @@ struct CacheStat {
   size_t cache_size;
 };
 
-template <typename Callable, typename Signature>
+template <typename Callable, typename Signature, typename... Contexts>
 class CacheFunction {};
 
-template <typename Callable, typename R, typename... Args>  // true type for performance and details
-class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
+template <typename Callable,
+          typename R,
+          typename... Args,
+          typename... Contexts>  // true type for performance and details
+class CacheFunction<Callable, Signature<std::function<R(Args...)>>, Contexts...> {
  private:
   using HashKey = std::size_t;
 
  public:
-  LIBKRIGING_EXPORT explicit CacheFunction(const Callable& callable) : m_callable(callable) {}
+  LIBKRIGING_EXPORT explicit CacheFunction(const Callable& callable, const Contexts&... contexts)
+      : m_callable(callable), m_context(contexts...) {}
 
   LIBKRIGING_EXPORT auto operator()(Args... args) const -> R {
     const auto arg_key = hash_args(args...);
@@ -46,13 +51,16 @@ class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
   }
 
  public:
-  static auto hash_args(Args... args) -> HashKey {
-    if constexpr (sizeof...(Args) == 0) {
-      return 1;
-    } else if constexpr (sizeof...(Args) == 1) {
-      return std::hash<Args...>{}(args...);
+  auto hash_args(Args... args) const -> HashKey {
+    const auto args_hash = tupleHash(std::forward_as_tuple(args...), std::make_index_sequence<sizeof...(Args)>{});
+    if constexpr (std::tuple_size<decltype(m_context)>{} == 0) {
+      return args_hash;
     } else {
-      return tupleHash(std::forward_as_tuple(args...), std::make_index_sequence<sizeof...(Args)>{});
+      const auto context_hash
+          = tupleHash(m_context, std::make_index_sequence<std::tuple_size<decltype(m_context)>{}>{});
+      return context_hash
+             ^ args_hash + 0x9e3779b9 + (context_hash << 6)
+                   + (context_hash >> 2);  // should not be symmetric => this hack
     }
   }
 
@@ -87,19 +95,26 @@ class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
 
  private:
   Callable m_callable;
+  std::tuple<const Contexts&...> m_context;
   mutable std::unordered_map<HashKey, R> m_cache;
   mutable std::unordered_map<HashKey, uint32_t> m_cache_hit;
 
   template <typename Tuple, std::size_t... ids>
-  static std::size_t tupleHash(const Tuple&& tuple, const std::index_sequence<ids...>&&) {
-    std::size_t result = 0;
+  static std::size_t tupleHash(Tuple&& tuple, const std::index_sequence<ids...>&&) {
+    if constexpr (sizeof...(ids) == 0) {
+      return 1;
+    } else if constexpr (sizeof...(ids) == 1) {
+      return hashValue(std::get<0>(tuple));
+    } else {
+      std::size_t result = 0;
 #pragma unroll
-    for (auto const& hash : {hashValue(std::get<ids>(tuple))...}) {
-      result ^= hash + 0x9e3779b9 + (result << 6) + (result >> 2);  // should not be symmetric => this hack
-      //                                                            // same magic number as in boost::hash
-      // https://stackoverflow.com/questions/4948780/magic-number-in-boosthash-combine/4948967#4948967
+      for (auto const& hash : {hashValue(std::get<ids>(tuple))...}) {
+        result ^= hash + 0x9e3779b9 + (result << 6) + (result >> 2);  // should not be symmetric => this hack
+        //                                                            // same magic number as in boost::hash
+        // https://stackoverflow.com/questions/4948780/magic-number-in-boosthash-combine/4948967#4948967
+      }
+      return result;
     }
-    return result;
   };
 
   template <typename T>
@@ -108,7 +123,7 @@ class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
   }
 };
 
-template <typename F>
-CacheFunction(const F& f) -> CacheFunction<F, Signature<decltype(std::function{f})>>;
+template <typename F, typename... Contexts>
+CacheFunction(const F& f, const Contexts&...) -> CacheFunction<F, Signature<decltype(std::function{f})>, Contexts...>;
 
 #endif  // LIBKRIGING_SRC_LIB_CACHE_HPP
