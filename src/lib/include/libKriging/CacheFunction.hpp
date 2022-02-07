@@ -15,6 +15,14 @@ struct Signature<std::function<R(Args...)>> {
   using type = R(Args...);
 };
 
+struct CacheStat {
+  uint32_t min_hit;
+  uint32_t max_hit;
+  uint32_t total_hit;
+  float mean_hit;
+  size_t cache_size;
+};
+
 template <typename Callable, typename Signature>
 class CacheFunction {};
 
@@ -48,7 +56,7 @@ class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
     }
   }
 
-  auto inspect(Args... args) -> unsigned {
+  auto inspect(Args... args) -> uint32_t {
     const auto arg_key = hash_args(args...);
     const auto finder = m_cache_hit.find(arg_key);
     if (finder == m_cache_hit.end()) {
@@ -58,10 +66,29 @@ class CacheFunction<Callable, Signature<std::function<R(Args...)>>> {
     }
   }
 
+  auto stat() -> CacheStat {
+    std::vector<uint32_t> hits;
+    const auto cache_size = m_cache_hit.size();
+    hits.reserve(cache_size);
+    for (auto [_, e] : m_cache_hit) {
+      hits.push_back(e);
+    }
+    const auto min_hit = [&] {
+      const auto min_element = std::min_element(hits.begin(), hits.end());
+      return (min_element == hits.end()) ? 0 : *min_element;
+    }();
+    const auto max_hit = [&] {
+      const auto max_element = std::max_element(hits.begin(), hits.end());
+      return (max_element == hits.end()) ? 0 : *max_element;
+    }();
+    const auto total_hit = std::accumulate(hits.begin(), hits.end(), uint32_t{0});
+    return {min_hit, max_hit, total_hit, static_cast<float>(total_hit) / cache_size, cache_size};
+  }
+
  private:
   Callable m_callable;
   mutable std::unordered_map<HashKey, R> m_cache;
-  mutable std::unordered_map<HashKey, unsigned> m_cache_hit;
+  mutable std::unordered_map<HashKey, uint32_t> m_cache_hit;
 
   template <typename Tuple, std::size_t... ids>
   static std::size_t tupleHash(const Tuple&& tuple, const std::index_sequence<ids...>&&) {
