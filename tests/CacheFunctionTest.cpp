@@ -1,5 +1,6 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+#include <tuple>
 #include "libKriging/CacheFunction.hpp"
 
 TEST_CASE("Cache of 0-arg function", "[core]") {

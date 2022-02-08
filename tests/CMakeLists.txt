@@ -62,6 +62,7 @@ endif ()
 # Test using catch2 (parse catch tests)
 catch_discover_tests(catch2_unit_test)
 catch_discover_tests(regression_unit_test)
+catch_discover_tests(CacheTest)
 
 set(AdditionalCatchParameters --benchmark-samples 10)
 catch_discover_tests(KrigingTest)
