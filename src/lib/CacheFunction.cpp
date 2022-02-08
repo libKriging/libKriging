@@ -6,7 +6,8 @@
 /* ----------------------------------------------------------------------------------------------------------------- */
 
 CacheFunctionCommon::~CacheFunctionCommon() {
-  std::cout << stat() << std::endl;
+  if (!m_cache_hit.empty())
+    std::cout << stat() << std::endl;
 }
 
 /* ----------------------------------------------------------------------------------------------------------------- */
@@ -27,13 +28,23 @@ auto CacheFunctionCommon::stat() -> CacheStat {
     return (max_element == hits.end()) ? 0 : *max_element;
   }();
   const auto total_hit = std::accumulate(hits.begin(), hits.end(), uint32_t{0});
-  return {min_hit, max_hit, total_hit, static_cast<float>(total_hit) / cache_size, cache_size};
+  return {min_hit,
+          max_hit,
+          total_hit,
+          static_cast<float>(total_hit) / cache_size,
+          cache_size,
+          m_hash_timer / 1,
+          m_lookup_timer / 1,
+          m_eval_timer / 1};
 }
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
-std::ostream& operator<<(std::ostream& o, const CacheFunctionCommon::CacheStat& cacheStat) {
-  o << cacheStat.total_hit << " hits on cache with " << cacheStat.cache_size << " entries\n";
-  o << "hit average: " << cacheStat.mean_hit << "in [ " << cacheStat.min_hit << " - " << cacheStat.max_hit << " ]";
+std::ostream& operator<<(std::ostream& o, const CacheFunctionCommon::CacheStat& st) {
+  o << st.total_hit << " hits on cache with " << st.cache_size << " entries\n";
+  o << "hit average: " << st.mean_hit << " in range [ " << st.min_hit << " - " << st.max_hit << " ]\n";
+  o << "hash time   (ns): " << st.hash_time << "\n";
+  o << "lookup time (ns): " << st.lookup_time << "\n";
+  o << "call time   (ns): " << st.eval_time << "\n";
   return o;
 }

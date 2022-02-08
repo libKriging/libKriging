@@ -8,8 +8,22 @@
 #include "libKriging/libKriging_exports.h"
 #include "libKriging/utils/cache_details.hpp"
 
-#define LIBKRIGING_CACHE_ANALYSE  // TODO
+#define LIBKRIGING_CACHE_ANALYSE  // Use timers to measure part of the cache processing
 #define LIBKRIGING_CACHE_VERIFY
+
+#ifdef LIBKRIGING_CACHE_ANALYSE
+#include <chrono>
+#define ANALYSE(expr) expr;
+template <typename Timer>
+inline uint64_t diffAndUpdateTimer(Timer& t_init) {
+  const auto t_end = std::chrono::high_resolution_clock::now();
+  const auto diff = (t_end - t_init).count();  // ns count
+  t_init = std::move(t_end);
+  return diff;
+}
+#else
+#define ANALYSE(expr)
+#endif
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
@@ -21,6 +35,9 @@ class CacheFunctionCommon {
     uint32_t total_hit;
     float mean_hit;
     size_t cache_size;
+    uint64_t hash_time;
+    uint64_t lookup_time;
+    uint64_t eval_time;
   };
 
  protected:
@@ -32,6 +49,11 @@ class CacheFunctionCommon {
 
  protected:
   mutable std::unordered_map<HashKey, uint32_t> m_cache_hit;
+#ifdef LIBKRIGING_CACHE_ANALYSE
+  mutable uint64_t m_hash_timer = 0;
+  mutable uint64_t m_lookup_timer = 0;
+  mutable uint64_t m_eval_timer = 0;
+#endif
 };
 
 /* ----------------------------------------------------------------------------------------------------------------- */
@@ -56,18 +78,22 @@ class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Con
       : m_callable(callable), m_context(contexts...) {}
 
   LIBKRIGING_EXPORT auto operator()(Args... args) const -> R {
+    ANALYSE(auto t = std::chrono::high_resolution_clock::now());
     const auto arg_key = hash_args(args...);
+    ANALYSE(m_hash_timer += diffAndUpdateTimer(t));
     auto [finder, is_new] = m_cache.insert({arg_key, R{}});
     ++m_cache_hit[arg_key];
+    ANALYSE(m_lookup_timer += diffAndUpdateTimer(t));
     if (is_new) {
-      return finder->second = m_callable(std::forward<Args>(args)...);
+      finder->second = m_callable(std::forward<Args>(args)...);
+      ANALYSE(m_eval_timer += diffAndUpdateTimer(t));
     } else {
 #ifdef LIBKRIGING_CACHE_VERIFY
       auto expected_result = m_callable(std::forward<Args>(args)...);
       assert(expected_result == finder->second);
 #endif
-      return finder->second;
     }
+    return finder->second;
   }
 
  public:
