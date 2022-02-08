@@ -34,7 +34,6 @@ class CacheFunctionCommon {
     uint32_t min_hit;
     uint32_t max_hit;
     uint32_t total_hit;
-    float mean_hit;
     size_t cache_size;
     uint64_t hash_time;
     uint64_t lookup_time;
