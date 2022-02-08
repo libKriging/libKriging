@@ -1,5 +1,7 @@
 #include "libKriging/CacheFunction.hpp"
 #include <algorithm>
+#include <iomanip>
+#include <iostream>
 #include <numeric>
 #include <vector>
 
@@ -40,11 +42,13 @@ auto CacheFunctionCommon::stat() -> CacheStat {
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
-std::ostream& operator<<(std::ostream& o, const CacheFunctionCommon::CacheStat& st) {
+std::ostream& operator<<(std::ostream& out, const CacheFunctionCommon::CacheStat& st) {
+  std::ostream o(out.rdbuf());  // safe RAII flags restore
+  o.precision(1);
   o << st.total_hit << " hits on cache with " << st.cache_size << " entries\n";
   o << "hit average: " << st.mean_hit << " in range [ " << st.min_hit << " - " << st.max_hit << " ]\n";
-  o << "hash time   (ns): " << st.hash_time << "\n";
-  o << "lookup time (ns): " << st.lookup_time << "\n";
+  o << "hash time   (ns): " << st.hash_time << " (" << (100.0 * st.hash_time / st.eval_time) << "%)\n";
+  o << "lookup time (ns): " << st.lookup_time << " (" << (100.0 * st.lookup_time / st.eval_time) << "%)\n";
   o << "call time   (ns): " << st.eval_time << "\n";
-  return o;
+  return out;
 }

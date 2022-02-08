@@ -6,6 +6,7 @@
 #include <tuple>
 #include <unordered_map>
 #include "libKriging/libKriging_exports.h"
+#include "libKriging/utils/LinearHashStorage.hpp"
 #include "libKriging/utils/cache_details.hpp"
 
 #define LIBKRIGING_CACHE_ANALYSE  // Use timers to measure part of the cache processing
@@ -81,9 +82,10 @@ class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Con
     ANALYSE(auto t = std::chrono::high_resolution_clock::now());
     const auto arg_key = hash_args(args...);
     ANALYSE(m_hash_timer += diffAndUpdateTimer(t));
-    auto [finder, is_new] = m_cache.insert({arg_key, R{}});
-    ++m_cache_hit[arg_key];
+    auto [finder, is_new] = m_cache.emplace(arg_key, R{});
     ANALYSE(m_lookup_timer += diffAndUpdateTimer(t));
+    ++m_cache_hit[arg_key];
+    ANALYSE(diffAndUpdateTimer(t));
     if (is_new) {
       finder->second = m_callable(std::forward<Args>(args)...);
       ANALYSE(m_eval_timer += diffAndUpdateTimer(t));
@@ -120,6 +122,7 @@ class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Con
  private:
   Callable m_callable;
   std::tuple<const Contexts&...> m_context;
+  //  mutable LinearHashStorage<HashKey, R> m_cache; // this struct could be simpler to optimize as circular buffer
   mutable std::unordered_map<HashKey, R> m_cache;
 };
 
