@@ -1041,7 +1041,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
       bool bfgs_ok = optim::lbfgs(
           gamma_tmp,
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
             return fit_ofn(vals_inp, grad_out, nullptr, &okm_data);
           },
           nullptr,
@@ -1094,7 +1094,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
 
       double min_ofn_tmp = optim_newton(
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
+          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
             return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
           },
           gamma_tmp,
