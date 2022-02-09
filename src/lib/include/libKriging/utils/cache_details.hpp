@@ -7,14 +7,6 @@
 
 namespace details {
 
-template <typename T>
-struct Signature;
-
-template <typename R, typename... Args>
-struct Signature<std::function<R(Args...)>> {
-  using type = R(Args...);
-};
-
 inline std::size_t composeHash(std::size_t acc, std::size_t new_hash) {
   return acc ^ (new_hash + 0x9e3779b9 + (acc << 6) + (acc >> 2));  // should not be symmetric => this hack
   //                                                             // same magic number as in boost::hash

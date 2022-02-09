@@ -65,16 +65,17 @@ std::ostream& operator<<(std::ostream& o, const CacheFunctionCommon::CacheStat&)
 template <typename Callable, typename Signature, typename... Contexts>
 class CacheFunction {};
 
-template <typename Callable,
-          typename R,
-          typename... Args,
-          typename... Contexts>  // true type for performance and details
-class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Contexts...> : public CacheFunctionCommon {
+template <typename Callable,    // true function type for performance; could be a lambda
+          typename R,           // return type
+          typename... Args,     // input parameters
+          typename... Contexts  // non-const external context to manage
+          >
+class CacheFunction<Callable, std::function<R(Args...)>, Contexts...> : public CacheFunctionCommon {
  public:
-  using type = typename details::Signature<std::function<R(Args...)>>::type;
+  using type = R(Args...);
 
  public:
-  LIBKRIGING_EXPORT CacheFunction(const Callable& callable, const Contexts&... contexts)
+  LIBKRIGING_EXPORT explicit CacheFunction(const Callable& callable, const Contexts&... contexts)
       : m_callable(callable), m_context(contexts...) {}
 
   LIBKRIGING_EXPORT auto operator()(Args... args) const -> R {
@@ -111,11 +112,7 @@ class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Con
   auto inspect(Args... args) -> uint32_t {
     const auto arg_key = hash_args(args...);
     const auto finder = m_cache_hit.find(arg_key);
-    if (finder == m_cache_hit.end()) {
-      return 0;
-    } else {
-      return finder->second;
-    }
+    return (finder == m_cache_hit.end()) ? 0 : finder->second;
   }
 
  private:
@@ -128,7 +125,6 @@ class CacheFunction<Callable, details::Signature<std::function<R(Args...)>>, Con
 /* ----------------------------------------------------------------------------------------------------------------- */
 
 template <typename F, typename... Contexts>
-CacheFunction(const F& f, const Contexts&...)
-    -> CacheFunction<F, details::Signature<decltype(std::function{f})>, Contexts...>;
+CacheFunction(const F& f, const Contexts&...) -> CacheFunction<F, decltype(std::function{f}), Contexts...>;
 
 #endif  // LIBKRIGING_SRC_LIB_CACHE_HPP
