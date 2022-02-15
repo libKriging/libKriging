@@ -33,15 +33,15 @@ def has_requirements(filename, options=None):
                 requirement = str(requirement)
                 try:
                     if options.verbose:
-                        print(f"{options.indent}Checking requirement package {requirement}".encode('utf-8'))
+                        print(f"{options.indent}Checking requirement package {requirement}".encode('utf8').decode(sys.stdout.encoding))
                     pkg_resources.require(requirement)
                     if options.pretty:
-                        print(f"{options.indent}✔ Module {requirement} is available".encode('utf-8'))
+                        print(f"{options.indent}✔ Module {requirement} is available".encode('utf8').decode(sys.stdout.encoding))
                 except pkg_resources.DistributionNotFound:
                     if options.soft:
-                        print(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf-8'))
+                        print(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf8').decode(sys.stdout.encoding))
                     else:
-                        eprint(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf-8'))
+                        eprint(f"{options.indent}✘ Module {requirement} is NOT available".encode('utf8').decode(sys.stdout.encoding))
                     hasError = True
             return not hasError
     except FileNotFoundError:
