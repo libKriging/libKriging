@@ -27,13 +27,23 @@ $HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge op
 . ${BASEDIR}/loadenv.sh
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
+  # Check if python is available (it could be a python wrapper given by Windows)
+  if ( ! python -V | grep "Python 3." &>/dev/null ); then 
+    echo "#########################################################"
+    echo "Missing Python interpreter"
+    echo "Go to https://www.python.org/downloads and install it"
+    echo 'or `choco install -y --no-progress python3 --version 3.9`'
+    echo "Don't forget to add python executable in PATH"
+    echo "#########################################################"
+    exit 1
+  fi
   # ** Install python tools **
   
   ## Using Chocolatey (by default only includes Python2)
   # should be installed using choco in main .travis.yml
   
   # ** Install PIP if not yet available **   
-  if ( ! python3 -m pip --version 2>/dev/null ); then
+  if ( ! python -m pip --version 2>/dev/null ); then
     ## Using miniconda3
     # https://anaconda.org/search?q=pip
     #$HOME/Miniconda3/condabin/conda.bat install -y -n base -c conda-forge pip openssl
@@ -49,7 +59,7 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   fi
   
   # ** Install required Python libs ** 
-  python3 -m pip install --progress-bar off pip --upgrade
-  python3 -m pip install --progress-bar off -r bindings/Python/requirements.txt --upgrade
-  python3 -m pip install --progress-bar off -r bindings/Python/dev-requirements.txt --upgrade
+  python -m pip install --progress-bar off pip --upgrade
+  python -m pip install --progress-bar off -r bindings/Python/requirements.txt --upgrade
+  python -m pip install --progress-bar off -r bindings/Python/dev-requirements.txt --upgrade
 fi

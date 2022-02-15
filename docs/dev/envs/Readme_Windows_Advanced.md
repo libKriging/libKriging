@@ -70,8 +70,17 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
   ```
   cd ~/.ssh && ssh-copy-id -p 2022 -i id_ed25519 user@localhost
   ```
+  With Parallel Desktop, it could be:
+  ```
+  cd ~/.ssh && ssh-copy-id -p 22 -i id_ed25519 user@ip-given-by-dns_like_10.211.55.4
+  # 22 not 2022: parallels desktop will forward port using dns address
+  ```
 
-* Update Visual Studio Community to support C++/CMake (not by default)
+* Update Visual Studio Community to support C++/CMake
+
+  (not installed by default; see menu "Tools/Get Tools and Features...")
+  
+  If Visual Studio is not yet installed, download it from [here](https://visualstudio.microsoft.com/fr/vs/community/) and install it (select "C++ desktop development" packages).
 
 ## Install common tools
 * To install chocolatey, use following __cmd__ shell command (as Administrator; cf [https://chocolatey.org/docs/installation](https://chocolatey.org/docs/installation))
@@ -81,11 +90,22 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
   ```
 * Reboot (to propagate choco config to the users)
   
-* Install tools 
-  ```
-  # bash script (once per installation)
-  choco install -y cmake
-  ```
+* Install tools
+  * CMake using Choco
+    ```shell
+    # bash script (once per installation)
+    choco install -y cmake
+    ```
+    and load it
+    ```shell
+    # bash script (once per shell, if installed using `choco`)
+    export PATH='C:\Program Files\CMake\bin':$PATH
+    ```
+  * CMake using MSVC installation
+    ```shell
+    export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin":$PATH
+    ```
+
 * Get libKriging repository
   ```
   git clone --recurse-submodules https://github.com/libKriging/libKriging.git
@@ -95,11 +115,6 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
   ```
   # bash script from libKriging repository clone (once per installation)
   .travis-ci/windows/install.sh
-  ```
-* Load tools path
-  ```
-  # bash script (once per shell)
-  export PATH='C:\Program Files\CMake\bin':$PATH
   ```
 * Build libKriging
   ```
