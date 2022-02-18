@@ -1340,22 +1340,18 @@ LIBKRIGING_EXPORT std::string Kriging::describeModel() const {
 
   oss << "* data: " << m_X.n_rows << " x " << m_X.n_cols << " -> " << m_y.n_rows << " x " << m_y.n_cols << "\n";
   oss << "* trend " << RegressionModelUtils::toString(m_regmodel);
-  if (m_est_beta) {
-    oss << " (est.): ";
-    colvec_printer(m_beta);
-  }
+  if (m_est_beta) oss << " (est.): "; else oss << ": ";
+  colvec_printer(m_beta);
   oss << "\n";
   oss << "* variance";
-  if (m_est_sigma2)
-    oss << " (est.): " << m_sigma2;
+  if (m_est_sigma2) oss << " (est.): "; else oss << ": ";
+  oss << m_sigma2;
   oss << "\n";
   oss << "* covariance:\n";
   oss << "  * kernel: " << m_covType << "\n";
   oss << "  * range";
-  if (m_est_theta) {
-    oss << " (est.) ";
-    colvec_printer(m_theta);
-  }
+  if (m_est_theta) oss << " (est.) "; else oss << ": ";
+  colvec_printer(m_theta);
   oss << "\n";
   oss << "  * fit:\n";
   oss << "    * objective: " << m_objective << "\n";
