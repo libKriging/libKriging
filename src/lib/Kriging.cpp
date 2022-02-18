@@ -240,8 +240,6 @@ double Kriging::logLikelihood(const arma::vec& _theta,
     // t0 = toc(" Linv            ",t0);
     arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
     // t0 = toc(" Rinv            ",t0);
-    Rinv = inv_sympd(R);  // Do NOT inv_sympd (slower): inv_sympd(R);
-    // t0 = toc(" Rinv2           ",t0);
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     // t0 = toc(" tT              ", t0);
