@@ -9,6 +9,7 @@ add_library(Kriging
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
         include/libKriging/KrigingException.hpp
+        NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp)
 

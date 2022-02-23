@@ -12,7 +12,9 @@
 class NuggetKriging {
  public:
   struct Parameters {
-    double sigma2;
+    arma::vec nugget;
+    bool has_nugget;
+    arma::vec sigma2;
     bool has_sigma2;
     arma::mat theta;
     bool has_theta;
@@ -47,6 +49,8 @@ class NuggetKriging {
   const bool& estim_theta() const { return m_est_theta; };
   const double& sigma2() const { return m_sigma2; };
   const bool& estim_sigma2() const { return m_est_sigma2; };
+  const double& nugget() const { return m_nugget; };
+  const bool& estim_nugget() const { return m_est_nugget; };
 
  private:
   std::string m_covType;
@@ -70,6 +74,8 @@ class NuggetKriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
+  double m_nugget;
+  bool m_est_nugget;
   std::function<double(const arma::vec&)>
       CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
@@ -87,13 +93,14 @@ class NuggetKriging {
     bool estim_beta;
     double sigma2;
     bool estim_sigma2;
+    double nugget;
+    bool estim_nugget;
+    double var;
   };
 
   double logLikelihood(const arma::vec& _theta,
                        arma::vec* grad_out,
-                       arma::mat* hess_out,
                        NuggetKriging::OKModel* okm_data) const;
-  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
   double logMargPost(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
@@ -124,10 +131,8 @@ class NuggetKriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
-                                                                               const bool grad,
-                                                                               const bool hess);
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodEval(const arma::vec& theta,
+                                                                               const bool grad);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
 
