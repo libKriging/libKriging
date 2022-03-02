@@ -9,5 +9,5 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 LIBKRIGING_EXPORT
-const arma::solve_opts::opts default_solve_opts
+const arma::solve_opts::opts LinearAlgebra::default_solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
