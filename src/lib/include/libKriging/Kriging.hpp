@@ -94,7 +94,7 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
-
+  
   std::function<double(const arma::vec&)>
       CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
