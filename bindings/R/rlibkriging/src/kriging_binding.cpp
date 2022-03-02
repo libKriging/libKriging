@@ -3,8 +3,10 @@
 #include "libKriging/utils/lkalloc.hpp"
 
 #include <RcppArmadillo.h>
+#include "libKriging/LinearAlgebra.hpp"
 // clang-format on
 
+#include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
 
 // [[Rcpp::export]]

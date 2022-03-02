@@ -14,4 +14,4 @@ Imports: Rcpp (>= 0.12.11), methods
 Suggests: testthat, DiceKriging, RobustGaSP, utils
 SystemRequirements: GNU make
 URL: https://github.com/libKriging
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
