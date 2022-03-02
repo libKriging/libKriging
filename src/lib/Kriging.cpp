@@ -4,6 +4,8 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingException.hpp"
 
@@ -24,50 +26,6 @@ std::chrono::high_resolution_clock::time_point toc(std::string what,
   return t;
 }
 
-//' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf
-//'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
-//' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
-
-//' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
-// Covariance function on normalized data
-std::function<double(const arma::vec&)> CovNorm_fun_gauss = [](const arma::vec& _dist_norm) {
-  const double temp = arma::dot(_dist_norm, _dist_norm);
-  return exp(-0.5 * temp);
-};
-
-std::function<arma::vec(const arma::vec&)> Dln_CovNorm_gauss
-    = [](const arma::vec& _dist_norm) { return _dist_norm % _dist_norm; };
-
-std::function<double(const arma::vec&)> CovNorm_fun_exp
-    = [](const arma::vec& _dist_norm) { return exp(-arma::sum(arma::abs(_dist_norm))); };
-
-std::function<arma::vec(const arma::vec&)> Dln_CovNorm_exp
-    = [](const arma::vec& _dist_norm) { return arma::abs(_dist_norm); };
-
-const double SQRT_3 = std::sqrt(3.0);
-std::function<double(const arma::vec&)> CovNorm_fun_matern32 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_3 * arma::abs(_dist_norm);
-  return exp(-arma::sum(d - arma::log1p(d)));
-};
-
-std::function<arma::vec(const arma::vec&)> Dln_CovNorm_matern32 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_3 * arma::abs(_dist_norm);
-  return arma::conv_to<arma::vec>::from((d % d) / (1 + d));
-};
-
-const double SQRT_5 = std::sqrt(5.0);
-std::function<double(const arma::vec&)> CovNorm_fun_matern52 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_5 * arma::abs(_dist_norm);
-  return exp(-arma::sum(d - arma::log1p(d + (d % d) / 3)));
-};
-
-std::function<arma::vec(const arma::vec&)> Dln_CovNorm_matern52 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_5 * arma::abs(_dist_norm);
-  arma::vec a = 1 + d;
-  arma::vec b = (d % d) / 3;
-  return arma::conv_to<arma::vec>::from((a % b) / (a + b));
-};
-
 /************************************************/
 /** implementation details forward declaration **/
 /************************************************/
@@ -87,20 +45,20 @@ auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
 void Kriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
-    CovNorm_fun = CovNorm_fun_gauss;
-    Dln_CovNorm = Dln_CovNorm_gauss;
+    CovNorm_fun = Covariance::CovNorm_fun_gauss;
+    Dln_CovNorm = Covariance::Dln_CovNorm_gauss;
     CovNorm_pow = 2;
   } else if (covType.compare("exp") == 0) {
-    CovNorm_fun = CovNorm_fun_exp;
-    Dln_CovNorm = Dln_CovNorm_exp;
+    CovNorm_fun = Covariance::CovNorm_fun_exp;
+    Dln_CovNorm = Covariance::Dln_CovNorm_exp;
     CovNorm_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
-    CovNorm_fun = CovNorm_fun_matern32;
-    Dln_CovNorm = Dln_CovNorm_matern32;
+    CovNorm_fun = Covariance::CovNorm_fun_matern32;
+    Dln_CovNorm = Covariance::Dln_CovNorm_matern32;
     // CovNorm_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
-    CovNorm_fun = CovNorm_fun_matern52;
-    Dln_CovNorm = Dln_CovNorm_matern52;
+    CovNorm_fun = Covariance::CovNorm_fun_matern52;
+    Dln_CovNorm = Covariance::Dln_CovNorm_matern52;
     // CovNorm_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
@@ -124,9 +82,6 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
   make_Cov(covType);
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
-
-auto solve_opts
-    = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
 
 // arma::mat XtX(arma::mat &X) {
 //   arma::mat XtX = arma::zeros(X.n_cols,X.n_cols);
@@ -181,7 +136,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
-  fd->M = solve(fd->T, m_F, solve_opts);
+  fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   // t0 = toc("M             ", t0);
   arma::mat Q;
   arma::mat G;
@@ -192,10 +147,10 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   if (hess_out != nullptr)  // H is not used otherwise...
     H = Q * Q.t();
   // t0 = toc("H             ", t0);
-  arma::colvec Yt = solve(fd->T, m_y, solve_opts);
+  arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   // t0 = toc("Yt            ", t0);
   if (fd->estim_beta)
-    fd->beta = solve(G, Q.t() * Yt, solve_opts);
+    fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
   // t0 = toc("beta          ", t0);
   fd->z = Yt - fd->M * fd->beta;
   // t0 = toc("z             ", t0);
@@ -236,7 +191,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
     arma::vec terme1 = arma::vec(d);   // if (hess_out != nullptr)
     // t0 = toc(" +gradsR         ", t0);
 
-    arma::mat Linv = solve(fd->T, arma::eye(n, n), solve_opts);
+    arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
     // t0 = toc(" Linv            ",t0);
     arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
     // t0 = toc(" Rinv            ",t0);
@@ -245,7 +200,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     // t0 = toc(" tT              ", t0);
-    arma::mat x = solve(tT, fd->z, solve_opts);
+    arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
     // t0 = toc(" x               ", t0);
     arma::mat xx = x * x.t();
     // t0 = toc(" xx              ", t0);
@@ -328,12 +283,12 @@ double Kriging::logLikelihood(const arma::vec& _theta,
           // hessR_k_l = arma::symmatu(hessR_k_l);
           // t0 = toc("  hessR_k_l   ", t0);
 
-          arma::mat xk = solve(fd->T, gradsR[k] * x, solve_opts);
+          arma::mat xk = solve(fd->T, gradsR[k] * x, LinearAlgebra::default_solve_opts);
           arma::mat xl;
           if (k == l)
             xl = xk;
           else
-            xl = solve(fd->T, gradsR[l] * x, solve_opts);
+            xl = solve(fd->T, gradsR[l] * x, LinearAlgebra::default_solve_opts);
           // t0 = toc("  xk xl       ", t0);
 
           // arma::cout << " hess_A:" << -xk.t() * H * xl / sigma2_hat << arma::endl;
@@ -445,7 +400,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
-  fd->M = solve(fd->T, m_F, solve_opts);
+  fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   // t0 = toc("M             ", t0);
   arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
   // t0 = toc("Rinv          ", t0);
@@ -454,7 +409,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat TM = chol(trans(fd->M) * fd->M);  // Can be optimized with a crossprod equivalent in armadillo ?
   // arma::mat aux = solve(trans(TM), trans(RinvF));
   // t0 = toc("TM            ", t0);
-  arma::mat aux = solve(trans(TM), trans(RinvF), solve_opts);
+  arma::mat aux = solve(trans(TM), trans(RinvF), LinearAlgebra::default_solve_opts);
   // t0 = toc("aux           ", t0);
   arma::mat Q = Rinv - trans(aux) * aux;  // Can be optimized with a crossprod equivalent in armadillo ?
   // t0 = toc("Q             ", t0);
@@ -469,13 +424,13 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
 
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
 
-  arma::colvec Yt = solve(fd->T, m_y, solve_opts);
+  arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   if (fd->estim_beta) {
-    // fd->beta = solve(fd->M, Yt, solve_opts);
+    // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
     arma::mat Q;
     arma::mat G;
     qr_econ(Q, G, fd->M);
-    fd->beta = solve(G, Q.t() * Yt, solve_opts);
+    fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
   }
   fd->z = Yt - fd->M * fd->beta;
 
@@ -615,7 +570,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("T             ", t0);
 
   //  // Compute intermediate useful matrices
-  //  fd->M = solve(fd->T, m_F, solve_opts);
+  //  fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   //  // t0 = toc("M             ", t0);
   //  arma::mat Q;
   //  arma::mat G;
@@ -624,10 +579,10 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   //
   //  arma::mat H = Q * Q.t();  // if (hess_out != nullptr)
   //  // t0 = toc("H             ", t0);
-  //  arma::colvec Yt = solve(fd->T, m_y, solve_opts);
+  //  arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   //  // t0 = toc("Yt            ", t0);
   //  if (fd->estim_beta)
-  // fd->beta = solve(trimatu(G), Q.t() * Yt, solve_opts);
+  // fd->beta = solve(trimatu(G), Q.t() * Yt, LinearAlgebra::default_solve_opts);
   //  // t0 = toc("beta          ", t0);
   //  fd->z = Yt - fd->M * fd->beta;
   //  t0 = toc("z             ", t0);
@@ -636,8 +591,8 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat X = m_F;
   arma::mat L = fd->T;
 
-  fd->M = solve(L, X, solve_opts);
-  arma::mat R_inv_X = solve(trans(L), fd->M, solve_opts);
+  fd->M = solve(L, X, LinearAlgebra::default_solve_opts);
+  arma::mat R_inv_X = solve(trans(L), fd->M, LinearAlgebra::default_solve_opts);
   // t0 = toc("R_inv_X             ", t0);
   arma::mat Xt_R_inv_X = trans(X) * R_inv_X;  // Xt%*%R.inv%*%X
   // t0 = toc("Xt_R_inv_X             ", t0);
@@ -647,22 +602,22 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat R_inv_X_Xt_R_inv_X_inv_Xt_R_inv
       = R_inv_X
         * (solve(trans(LX),
-                 solve(LX, trans(R_inv_X), solve_opts),
-                 solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward and one backward solve
+                 solve(LX, trans(R_inv_X), LinearAlgebra::default_solve_opts),
+                 LinearAlgebra::default_solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward and one backward solve
   // t0 = toc("R_inv_X_Xt_R_inv_X_inv_Xt_R_inv             ", t0);
-  arma::colvec Yt = solve(L, m_y, solve_opts);
+  arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
   if (fd->estim_beta) {
     arma::mat Q;
     arma::mat G;
     qr_econ(Q, G, fd->M);
-    fd->beta = solve(G, Q.t() * Yt, solve_opts);
+    fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     fd->z = Yt - fd->M * fd->beta;
   }
   if (fd->estim_sigma2)  // means no sigma2 provided
     fd->sigma2 = arma::accu(fd->z % fd->z) / n;
   // t0 = toc("sigma2_hat    ", t0);
 
-  arma::mat yt_R_inv = trans(solve(trans(L), Yt, solve_opts));
+  arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
   // t0 = toc("yt_R_inv             ", t0);
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
   // t0 = toc("S_2             ", t0);
@@ -730,7 +685,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
       gradR_k /= _theta.at(k);
       // t0 = toc(" gradR_k", t0);
 
-      Wb_k = trans(solve(trans(L), solve(L, gradR_k, solve_opts), solve_opts))
+      Wb_k = trans(solve(trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
              - gradR_k * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
       // t0 = toc("Wb_ti             ", t0);
       ans[k] = -0.5 * sum(Wb_k.diag())
@@ -1270,7 +1225,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // t0 = toc("Sigma21        ", t0);
 
   // Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE
-  arma::mat Tinv_Sigma21 = solve(m_T, Sigma21, solve_opts);
+  arma::mat Tinv_Sigma21 = solve(m_T, Sigma21, LinearAlgebra::default_solve_opts);
   // t0 = toc("Tinv_Sigma21   ", t0);
 
   // y.trend.cond <- y.trend + t(Tinv.Sigma21) %*% object@z

@@ -4,7 +4,6 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
-// #include "covariance.h"
 
 /** Ordinary kriging regression
  * @ingroup Regression
@@ -22,6 +21,7 @@ class NuggetKriging {
     bool has_beta;
   };
 
+public:
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
 
   struct RegressionModelUtils {
@@ -29,6 +29,7 @@ class NuggetKriging {
     LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
   };
 
+ public:
   const std::string& kernel() const { return m_covType; };
   const std::string& optim() const { return m_optim; };
   const std::string& objective() const { return m_objective; };
