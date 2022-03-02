@@ -6,9 +6,8 @@
 #include "libKriging/libKriging_exports.h"
 
 class LinearAlgebra {
-    public:
-
-    static arma::solve_opts::opts default_solve_opts;
+ public:
+  static const arma::solve_opts::opts default_solve_opts;
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
