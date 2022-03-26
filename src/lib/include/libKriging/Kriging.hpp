@@ -20,6 +20,28 @@ class Kriging {
     arma::colvec beta;
     bool has_beta;
     bool estim_beta;
+
+    Parameters()
+        : sigma2(-1),
+          has_sigma2(false),
+          estim_sigma2(true),
+          theta(arma::mat()),
+          has_theta(false),
+          estim_theta(true),
+          beta(arma::vec()),
+          has_beta(false),
+          estim_beta(true) {}
+
+    Parameters(double s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
+        : sigma2(s2),
+          has_sigma2(h_s2),
+          estim_sigma2(e_s2),
+          theta(t),
+          has_theta(h_t),
+          estim_theta(e_t),
+          beta(b),
+          has_beta(h_b),
+          estim_beta(e_b) {}
   };
 
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
