@@ -25,31 +25,40 @@ Rcpp::List new_Kriging(arma::vec y,
     if (params.containsElementNamed("sigma2")) {
       _parameters.push_back(params["sigma2"], "sigma2");
       _parameters.push_back(true, "has_sigma2");
+      _parameters.push_back(!(params.containsElementNamed("estim_sigma2") && !params["estim_sigma2"]), "estim_sigma2");
     } else {
       _parameters.push_back(-1, "sigma2");
       _parameters.push_back(false, "has_sigma2");
+      _parameters.push_back(true, "estim_sigma2");
     }
     if (params.containsElementNamed("theta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
       _parameters.push_back(true, "has_theta");
+      _parameters.push_back(!(params.containsElementNamed("estim_theta") && !params["estim_theta"]), "estim_theta");
     } else {
       _parameters.push_back(Rcpp::NumericMatrix(0), "theta");
       _parameters.push_back(false, "has_theta");
+      _parameters.push_back(true, "estim_theta");
     }
     if (params.containsElementNamed("beta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["beta"]), "beta");
       _parameters.push_back(true, "has_beta");
+      _parameters.push_back(!(params.containsElementNamed("estim_beta") && !params["estim_beta"]), "estim_beta");
     } else {
       _parameters.push_back(Rcpp::NumericVector(0), "beta");
       _parameters.push_back(false, "has_beta");
+      _parameters.push_back(true, "estim_beta");
     }
   } else {
     _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = -1,
                                      Rcpp::Named("has_sigma2") = false,
+                                     Rcpp::Named("estim_sigma2") = true,
                                      Rcpp::Named("theta") = Rcpp::NumericMatrix(0),
                                      Rcpp::Named("has_theta") = false,
+                                     Rcpp::Named("estim_theta") = true,
                                      Rcpp::Named("beta") = Rcpp::NumericVector(0),
-                                     Rcpp::Named("has_beta") = false);
+                                     Rcpp::Named("has_beta") = false,
+                                     Rcpp::Named("estim_beta") = true);
   }
 
   ok->fit(std::move(y),
@@ -60,10 +69,13 @@ Rcpp::List new_Kriging(arma::vec y,
           objective,
           Kriging::Parameters{_parameters["sigma2"],
                               _parameters["has_sigma2"],
+                              _parameters["estim_sigma2"],
                               _parameters["theta"],
                               _parameters["has_theta"],
+                              _parameters["estim_theta"],
                               _parameters["beta"],
-                              _parameters["has_beta"]});
+                              _parameters["has_beta"],
+                              _parameters["estim_beta"]});
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
 
@@ -81,7 +93,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
                             Rcpp::Named("optim") = impl_ptr->optim(),
                             Rcpp::Named("objective") = impl_ptr->objective(),
                             Rcpp::Named("theta") = impl_ptr->theta(),
@@ -95,12 +107,16 @@ Rcpp::List kriging_model(Rcpp::List k) {
                             Rcpp::Named("centerY") = impl_ptr->centerY(),
                             Rcpp::Named("scaleY") = impl_ptr->scaleY(),
                             Rcpp::Named("regmodel") = Kriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
-                            Rcpp::Named("F") = impl_ptr->F(),
-                            Rcpp::Named("T") = impl_ptr->T(),
-                            Rcpp::Named("M") = impl_ptr->M(),
-                            Rcpp::Named("z") = impl_ptr->z(),
                             Rcpp::Named("beta") = impl_ptr->beta(),
                             Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
+
+  // because Rcpp::List::create accepts no more than 20 args... 
+  ret.push_back(impl_ptr->F(),"F");
+  ret.push_back(impl_ptr->T(),"T");
+  ret.push_back(impl_ptr->M(),"M");
+  ret.push_back(impl_ptr->z(),"z");
+
+  return ret;
 }
 
 // [[Rcpp::export]]

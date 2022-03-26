@@ -11,7 +11,7 @@ Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 2.14)
 Imports: Rcpp (>= 0.12.11), methods
-Suggests: testthat, DiceKriging, RobustGASP, utils
+Suggests: testthat, DiceKriging, RobustGaSP, utils
 SystemRequirements: GNU make
 URL: https://github.com/libKriging
 RoxygenNote: 7.1.1

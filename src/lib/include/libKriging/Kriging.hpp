@@ -4,7 +4,6 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
-// #include "covariance.h"
 
 /** Ordinary kriging regression
  * @ingroup Regression
@@ -14,10 +13,35 @@ class Kriging {
   struct Parameters {
     double sigma2;
     bool has_sigma2;
+    bool estim_sigma2;
     arma::mat theta;
     bool has_theta;
+    bool estim_theta;
     arma::colvec beta;
     bool has_beta;
+    bool estim_beta;
+
+    Parameters()
+        : sigma2(-1),
+          has_sigma2(false),
+          estim_sigma2(true),
+          theta(arma::mat()),
+          has_theta(false),
+          estim_theta(true),
+          beta(arma::vec()),
+          has_beta(false),
+          estim_beta(true) {}
+
+    Parameters(double s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
+        : sigma2(s2),
+          has_sigma2(h_s2),
+          estim_sigma2(e_s2),
+          theta(t),
+          has_theta(h_t),
+          estim_theta(e_t),
+          beta(b),
+          has_beta(h_b),
+          estim_beta(e_b) {}
   };
 
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
@@ -70,6 +94,7 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
+  
   std::function<double(const arma::vec&)>
       CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
@@ -122,7 +147,7 @@ class Kriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = Parameters{});
+                             const Parameters& parameters = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
                                                                                const bool grad,
