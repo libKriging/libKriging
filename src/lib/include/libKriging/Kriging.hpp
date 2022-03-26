@@ -4,7 +4,6 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
-// #include "covariance.h"
 
 /** Ordinary kriging regression
  * @ingroup Regression
@@ -14,10 +13,13 @@ class Kriging {
   struct Parameters {
     double sigma2;
     bool has_sigma2;
+    bool estim_sigma2;
     arma::mat theta;
     bool has_theta;
+    bool estim_theta;
     arma::colvec beta;
     bool has_beta;
+    bool estim_beta;
   };
 
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
@@ -70,6 +72,7 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
+  
   std::function<double(const arma::vec&)>
       CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
