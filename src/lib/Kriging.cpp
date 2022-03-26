@@ -989,7 +989,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     if (parameters.has_sigma2)
       sigma2 = parameters.sigma2;  // otherwise sigma2 will be re-calculated using given theta
 
-    Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+    Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
 
     double min_ofn_tmp = fit_ofn(-arma::log(m_theta), nullptr, nullptr, &okm_data);
 
@@ -997,9 +997,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
-    m_est_beta = !parameters.has_beta;
+    m_est_beta = parameters.estim_beta;
     m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = !parameters.has_sigma2;
+    m_est_sigma2 = parameters.estim_sigma2;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -1036,7 +1036,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (parameters.has_sigma2)
         sigma2 = parameters.sigma2;
 
-      Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+      Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
 
       bool bfgs_ok = optim::lbfgs(
           gamma_tmp,
@@ -1060,9 +1060,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = !parameters.has_beta;
+        m_est_beta = parameters.estim_beta;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = !parameters.has_sigma2;
+        m_est_sigma2 = parameters.estim_sigma2;
       }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
@@ -1089,7 +1089,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       double sigma2 = -1;
       if (parameters.has_sigma2)
         sigma2 = parameters.sigma2;
-      Kriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2};
+
+      Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
+
       double min_ofn_tmp = optim_newton(
           [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
             return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
@@ -1106,9 +1108,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = !parameters.has_beta;
+        m_est_beta = parameters.estim_beta;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = !parameters.has_sigma2;
+        m_est_sigma2 = parameters.estim_sigma2;
       }
     }
   } else
@@ -1319,7 +1321,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild starting parameters
-  Parameters parameters{this->m_sigma2, false, trans(this->m_theta), true};
+  Parameters parameters{this->m_sigma2, true, this->m_est_sigma2, trans(this->m_theta), true, this->m_est_theta, trans(this->m_beta), true, this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(
