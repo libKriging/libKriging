@@ -20,6 +20,11 @@ class Kriging {
     arma::colvec beta;
     bool has_beta;
     bool estim_beta;
+
+    //Parameters() : 
+    //sigma2(-1), has_sigma2(false), estim_sigma2(true), 
+    //theta(arma::mat(0,0)), has_theta(false), estim_theta(true), 
+    //beta(arma::vec(0)), has_beta(false), estim_beta(true) {}
   };
 
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
@@ -125,7 +130,7 @@ class Kriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = Parameters{});
+                             const Parameters& parameters = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
                                                                                const bool grad,
