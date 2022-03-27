@@ -12,7 +12,7 @@ on:
     - cron: '0 2 * * SAT'
 
 # About image content:
-# https://github.com/actions/virtual-environments/blob/ubuntu18/20201210.0/images
+# https://github.com/actions/virtual-environments
 
 # Global GHA doc:
 # https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions
@@ -93,7 +93,7 @@ jobs:
             enable_octave: on
           - name: "Matlab Linux"
             # Using matlab-actions/setup-matlab@v1, only available on Linux
-            os: ubuntu-18.04
+            os: ubuntu-20.04
             mode: Release
             enable_matlab: on            
           - name: "R Linux"
