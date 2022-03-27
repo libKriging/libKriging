@@ -55,8 +55,8 @@ void PyKriging::update(const py::array_t<double>& newy, const py::array_t<double
   m_internal->update(mat_y, mat_X, normalize);
 }
 
-std::string PyKriging::describeModel() const {
-  return m_internal->describeModel();
+std::string PyKriging::summary() const {
+  return m_internal->summary();
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutEval(const py::array_t<double>& theta,

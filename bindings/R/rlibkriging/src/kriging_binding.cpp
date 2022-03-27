@@ -121,6 +121,17 @@ Rcpp::List kriging_model(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
+std::string kriging_summary(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  return impl_ptr->summary();
+}
+
+// [[Rcpp::export]]
 Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

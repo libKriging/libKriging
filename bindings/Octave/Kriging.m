@@ -35,8 +35,8 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::update", obj.ref, varargin{:});
         end
 
-        function varargout = describeModel(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::describeModel", obj.ref, varargin{:});
+        function varargout = summary(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::summary", obj.ref, varargin{:});
         end
 
         function varargout = leaveOneOut(obj, varargin)

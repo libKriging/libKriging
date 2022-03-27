@@ -5,19 +5,26 @@
 
 Table of contents
 
-1. [Installation from binary package](#installation-from-pre-built-packages)
-    1. [pylibkriging for Python](#pylibkriging-for-python)
-    1. [rlibkriging for R](#rlibkriging-for-r)
-    1. [mlibkriging for Octave](#mlibkriging-for-octave)
-    1. [Results examples](#expected-demo-results)
-1. [Compilation](#compilation)   
-    1. [Requirements](#requirements-more-details)
-    2. [Get the code](#get-the-code)
-    3. [Helper scripts](#helper-scripts-for-ci)   
-    4. [Compilation and tests](#compilation-and-tests-manually)
-    5. [Deployment](#deployment)
-    6. [Assisted compilation and installation](#assisted-compilation-and-installation)
-1. [More info](docs/dev/MoreInfo.md)
+- [Installation from pre-built packages](#installation-from-pre-built-packages)
+  - [pylibkriging for Python](#pylibkriging-for-python)
+  - [rlibkriging for R](#rlibkriging-for-r)
+  - [mlibkriging for Octave](#mlibkriging-for-octave)
+  - [Expected demo results](#expected-demo-results)
+  - [Tested installation](#tested-installation)
+- [Compilation](#compilation)
+  - [Requirements (more details)](#requirements-more-details)
+  - [Get the code](#get-the-code)
+  - [Helper scripts for CI](#helper-scripts-for-ci)
+  - [Compilation and tests *manually*](#compilation-and-tests-manually)
+    - [Preamble](#preamble)
+    - [Compilation for Linux and macOS](#compilation-for-linux-and-macos)
+    - [Compilation for Windows 64bits with Visual Studio](#compilation-for-windows-64bits-with-visual-studio)
+    - [Compilation for Linux/Mac/Windows using R toolchain](#compilation-for-linuxmacwindows-using-r-toolchain)
+  - [Deployment](#deployment)
+    - [For Linux and macOS](#for-linux-and-macos)
+    - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
+  - [Assisted compilation and installation](#assisted-compilation-and-installation)
+    - [Using `pip install` from GitHub](#using-pip-install-from-github)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
@@ -44,7 +51,7 @@ y = [f(xi) for xi in X]
 
 import pylibkriging as lk
 k_py = lk.Kriging(y, X, "gauss")
-print(k_py.describeModel())
+print(k_py.summary())
 # you can also check logLikelhood using:
 #def ll(t): return k_py.logLikelihood(t,False,False)[0]
 #t = np.arange(0,1,1/99); pyplot.figure(1); pyplot.plot(t, [ll(ti) for ti in t]); pyplot.show()
@@ -158,7 +165,7 @@ X = [0.0;0.25;0.5;0.75;1.0];
 f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
 y = f(X);
 k_m = Kriging(y, X, "gauss");
-disp(k_m.describeModel());
+disp(k_m.summary());
 % you can also check logLikelhood using:
 % function llt = ll (tt) global k_m; llt=k_m.logLikelihood(tt); endfunction; t=0:(1/99):1; plot(t,arrayfun(@ll,t))
 x = reshape(0:(1/99):1,100,1);

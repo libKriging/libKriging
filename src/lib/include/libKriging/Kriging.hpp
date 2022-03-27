@@ -183,7 +183,7 @@ class Kriging {
    */
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
 
-  LIBKRIGING_EXPORT std::string describeModel() const;
+  LIBKRIGING_EXPORT std::string summary() const;
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP

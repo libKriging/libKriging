@@ -6,7 +6,7 @@ X = [0.0;0.2;0.5;0.8;1.0];
 f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
 y = f(X);
 k_m = Kriging(y, X, "gauss");
-disp(k_m.describeModel());
+disp(k_m.summary());
 
 % session
 x = reshape(0:(1/99):1,100,1);
@@ -47,6 +47,6 @@ end_try_catch
 
 Xn = [0.3;0.4];
 yn = f(Xn);
-disp(k_m.describeModel());
+disp(k_m.summary());
 k_m.update(yn, Xn, false)
-disp(k_m.describeModel());
+disp(k_m.summary());
