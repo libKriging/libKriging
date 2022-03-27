@@ -94,7 +94,7 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
-  
+
   std::function<double(const arma::vec&)>
       CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
   std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
@@ -147,7 +147,8 @@ class Kriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
+                             const Parameters& parameters
+                             = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
                                                                                const bool grad,
