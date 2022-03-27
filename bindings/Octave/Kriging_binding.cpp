@@ -129,14 +129,14 @@ void update(int nlhs, void** plhs, int nrhs, const void** prhs) {
   km->update(input.get<1, arma::vec>("new y"), input.get<2, arma::mat>("new X"), input.get<3, bool>("normalize"));
 }
 
-void describeModel(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void summary(int nlhs, void** plhs, int nrhs, const void** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
-  output.set<0>(km->describeModel(), "Model description");
+  output.set<0>(km->summary(), "Model description");
 }
 
 void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs) {

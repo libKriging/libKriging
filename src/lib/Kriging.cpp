@@ -1336,7 +1336,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
       arma::join_cols(m_y, newy), arma::join_cols(m_X, newX), m_regmodel, normalize, m_optim, m_objective, parameters);
 }
 
-LIBKRIGING_EXPORT std::string Kriging::describeModel() const {
+LIBKRIGING_EXPORT std::string Kriging::summary() const {
   std::ostringstream oss;
   auto colvec_printer = [&oss](const arma::colvec& v) {
     v.for_each([&oss, i = 0](const arma::colvec::elem_type& val) mutable {

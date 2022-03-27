@@ -8,7 +8,7 @@ def test_kriging():
 
     import pylibkriging as lk
     k_py = lk.Kriging(y, X, "gauss")
-    print(k_py.describeModel())
+    print(k_py.summary())
 
     x = np.arange(0, 1, 1 / 99)
     p = k_py.predict(x, True, False)
@@ -45,9 +45,9 @@ def test_kriging():
 
     Xn = np.array([0.3, 0.4])
     yn = [f(xi) for xi in Xn]
-    print(k_py.describeModel())
+    print(k_py.summary())
     k_py.update(yn, Xn, False)
-    print(k_py.describeModel())
+    print(k_py.summary())
 
 
 if __name__ == '__main__':

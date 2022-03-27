@@ -71,17 +71,7 @@ setMethod("as.list", "Kriging", as.list.Kriging)
 print.Kriging <- function(x, ...) {
   if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
   k=kriging_model(x)
-  p = "Kriging model:\n"
-  p = paste0(p,"\n  * data: ",paste0(collapse=" x ",dim(k$X))," -> ",paste0(collapse=" x ",dim(k$y)))
-  p = paste0(p,"\n  * trend ",k$regmodel, ifelse(k$estim_beta," (est.)",""), ": ", paste0(collapse=",",k$beta))#,"(",paste0(collapse=",",k$F),")")
-  p = paste0(p,"\n  * variance",ifelse(k$estim_sigma2," (est.)",""),": ",k$sigma2)
-  p = paste0(p,"\n  * covariance:")
-  p = paste0(p,"\n    * kernel: ",k$kernel)
-  p = paste0(p,"\n    * range",ifelse(k$estim_theta," (est.)",""),": ",paste0(collapse=", ",k$theta))
-  p = paste0(p,"\n    * fit: ")
-  p = paste0(p,"\n      * objective: ",k$objective)
-  p = paste0(p,"\n      * optim: ",k$optim)
-  p = paste0(p,"\n")
+  p = paste0("Kriging model:\n\n",kriging_summary(x),"\n")
   cat(p)
   # return(p)
 }
