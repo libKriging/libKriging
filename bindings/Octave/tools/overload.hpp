@@ -10,7 +10,7 @@ struct overload : Ts... {
 };
 // Custom Template Argument Deduction Rules
 template <typename... Ts>
-overload(Ts...)->overload<Ts...>;
+overload(Ts...) -> overload<Ts...>;
 
 #else  // C++14 version
 

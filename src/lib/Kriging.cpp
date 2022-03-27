@@ -1321,7 +1321,15 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild starting parameters
-  Parameters parameters{this->m_sigma2, true, this->m_est_sigma2, trans(this->m_theta), true, this->m_est_theta, trans(this->m_beta), true, this->m_est_beta};
+  Parameters parameters{this->m_sigma2,
+                        true,
+                        this->m_est_sigma2,
+                        trans(this->m_theta),
+                        true,
+                        this->m_est_theta,
+                        trans(this->m_beta),
+                        true,
+                        this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(
