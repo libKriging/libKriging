@@ -162,6 +162,9 @@ jobs:
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave liboctave-dev
           fi
+          if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
+            sudo apt install -qy intel-mkl
+          fi
           if [ "${ENABLE_R_BINDING}" == "on" ]; then
             sudo apt install -qy liblapack-dev gfortran # r-base
           fi

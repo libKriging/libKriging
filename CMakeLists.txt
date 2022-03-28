@@ -420,6 +420,13 @@ else()
     endif()
 endif()
 
+if (ENABLE_MATLAB_BINDING STREQUAL "ON" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+#    message(FATAL_ERROR "MKL_FOUND=${MKL_FOUND}")
+    #add_definitions(-DARMA_64BIT_WORD)
+    #add_definitions(-DARMA_EXTRA_DEBUG)
+    add_definitions(-DARMA_BLAS_LONG)
+endif()
+
 #------------------------------------------------------
 
 # search for python-config (for building Python module)
