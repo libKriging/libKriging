@@ -71,17 +71,7 @@ setMethod("as.list", "NuggetKriging", as.list.NuggetKriging)
 print.NuggetKriging <- function(x, ...) {
   if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
   k=nuggetkriging_model(x)
-  p = "NuggetKriging model:\n"
-  p = paste0(p,"\n  * data: ",paste0(collapse=" x ",dim(k$X))," -> ",paste0(collapse=" x ",dim(k$y)))
-  p = paste0(p,"\n  * trend ",k$regmodel, ifelse(k$estim_beta," (est.)",""), ": ", paste0(collapse=",",k$beta))#,"(",paste0(collapse=",",k$F),")")
-  p = paste0(p,"\n  * variance",ifelse(k$estim_sigma2," (est.)",""),": ",k$sigma2)
-  p = paste0(p,"\n  * covariance:")
-  p = paste0(p,"\n    * kernel: ",k$kernel)
-  p = paste0(p,"\n    * range",ifelse(k$estim_theta," (est.)",""),": ",paste0(collapse=", ",k$theta))
-  p = paste0(p,"\n    * fit: ")
-  p = paste0(p,"\n      * objective: ",k$objective)
-  p = paste0(p,"\n      * optim: ",k$optim)
-  p = paste0(p,"\n")
+  p = paste0("NuggetKriging model:\n\n",nuggetkriging_summary(x),"\n")
   cat(p)
   # return(p)
 }
@@ -248,18 +238,18 @@ setMethod("update", "NuggetKriging", update.NuggetKriging)
 #' y <- f(X)
 #' r <- NuggetKriging(y, X, "gauss")
 #' print(r)
-#' ll = function(theta) logLikelihood(r,theta)$logLikelihood
+#' ll = function(theta) logLikelihood(r,c(theta,1))$logLikelihood
 #' t = seq(0.0001,2,,101)
 #'   plot(t,ll(t),type='l')
 #'   abline(v=as.list(r)$theta,col='blue')
-logLikelihood.NuggetKriging <- function(object, theta, grad=FALSE) {
+logLikelihood.NuggetKriging <- function(object, theta_alpha, grad=FALSE) {
   k=nuggetkriging_model(object) 
-  if (!is.matrix(theta)) theta=matrix(theta,ncol=ncol(k$X))
-  if (ncol(theta)!=ncol(k$X))
-    stop("Input theta must have ",ncol(k$X), " columns (instead of ",ncol(theta),")")
-  out=list(logLikelihood=matrix(NA,nrow=nrow(theta)),logLikelihoodGrad=matrix(NA,nrow=nrow(theta),ncol=ncol(theta)))
-  for (i in 1:nrow(theta)) {
-    ll = nuggetkriging_logLikelihood(object,theta[i,],isTRUE(grad))
+  if (!is.matrix(theta_alpha)) theta_alpha=matrix(theta_alpha,ncol=ncol(k$X)+1)
+  if (ncol(theta_alpha)!=ncol(k$X)+1)
+    stop("Input theta,alpha must have ",ncol(k$X)+1, " columns (instead of ",ncol(theta_alpha),")")
+  out=list(logLikelihood=matrix(NA,nrow=nrow(theta_alpha)),logLikelihoodGrad=matrix(NA,nrow=nrow(theta_alpha),ncol=ncol(theta_alpha)))
+  for (i in 1:nrow(theta_alpha)) {
+    ll = nuggetkriging_logLikelihood(object,theta_alpha[i,],isTRUE(grad))
     out$logLikelihood[i] = ll$logLikelihood
     if (isTRUE(grad)) out$logLikelihoodGrad[i,] = ll$logLikelihoodGrad
   }

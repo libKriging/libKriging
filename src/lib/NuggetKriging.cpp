@@ -90,7 +90,7 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::colvec& y,
 double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
                               arma::vec* grad_out,
                               NuggetKriging::OKModel* okm_data) const {
-  // arma::cout << " theta: " << _theta << arma::endl;
+  // arma::cout << " theta, alpha: " << _theta_alpha.head(m_X.n_cols) << "," << _theta_alpha.at(m_X.n_cols) << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
   //  model@covariance@sd2 <- 1
@@ -236,16 +236,16 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
     //  term2 <- sum(Cinv * dCdv) # economic computation of trace(Cinv%*%C0)
     //  logLik.derivative[nparam] <- -0.5 * (term1 + term2) # /sigma2
 
-    arma::mat dCdv = R / _alpha; dCdv.diag() -= 1;
+    arma::mat dCdv = R / _alpha; dCdv.diag().zeros();
     double _term1 = - as_scalar((trans(x) * dCdv) * x) / fd->var;
-    double _term2 = arma::trace(Cinv * R ) / _alpha;
+    double _term2 = arma::accu(arma::dot(Cinv, dCdv));
     (*grad_out).at(d) = -0.5 * (_term1 + _term2);
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }  // if (grad_out != nullptr)
   return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodEval(const arma::vec& _theta,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodEval(const arma::vec& _theta_alpha,
                                                                                       const bool _grad) {
   arma::mat T;
   arma::mat M;
@@ -253,15 +253,16 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodEval
   arma::colvec beta;
   double sigma2{};
   double nugget{};
-  NuggetKriging::OKModel okm_data{T, M, z, beta, true, sigma2, true, nugget, true};
+  double var{};
+  NuggetKriging::OKModel okm_data{T, M, z, beta, true, sigma2, true, nugget, true, var};
 
   double ll = -1;
   arma::vec grad;
   if (_grad) {
-    grad = arma::vec(_theta.n_elem);
-    ll = logLikelihood(_theta, &grad, &okm_data);
+    grad = arma::vec(_theta_alpha.n_elem);
+    ll = logLikelihood(_theta_alpha, &grad, &okm_data);
   } else
-    ll = logLikelihood(_theta, nullptr, &okm_data);
+    ll = logLikelihood(_theta_alpha, nullptr, &okm_data);
 
   return std::make_tuple(ll, std::move(grad));
 }
@@ -519,9 +520,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       // Change variable for opt: . -> 1/exp(.)
       arma::vec _theta_alpha = 1 / arma::exp(_gamma);
       _theta_alpha[_theta_alpha.n_elem-1] = _gamma[_theta_alpha.n_elem-1]; // opt!
-      double ll = this->logLikelihood(_theta_alpha, grad_out,  okm_data);
-      if (grad_out != nullptr)
-        *grad_out = *grad_out % _theta_alpha;
+      double ll = this->logLikelihood(_theta_alpha, grad_out, okm_data);
+      if (grad_out != nullptr) {
+        (*grad_out).head(_theta_alpha.n_elem-1) %= _theta_alpha.head(_theta_alpha.n_elem-1);
+        (*grad_out).at(_theta_alpha.n_elem-1) *= -1;
+      }
       return -ll;
     };
   } else if (objective.compare("LMP") == 0) {
@@ -532,8 +535,10 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       arma::vec _theta_alpha = 1 / arma::exp(_gamma);
       _theta_alpha[_theta_alpha.n_elem-1] = _gamma[_theta_alpha.n_elem-1]; // opt!
       double lmp = this->logMargPost(_theta_alpha, grad_out, okm_data);
-      if (grad_out != nullptr)
-        *grad_out = *grad_out % _theta_alpha;
+      if (grad_out != nullptr) {
+        (*grad_out).head(_theta_alpha.n_elem-1) %= _theta_alpha.head(_theta_alpha.n_elem-1);
+        (*grad_out).at(_theta_alpha.n_elem-1) *= -1;
+      }
       return -lmp;
     };
 
@@ -612,7 +617,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     if (parameters.has_nugget)
       nugget = parameters.nugget[0]; 
 
-    NuggetKriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2, nugget, !parameters.has_nugget};
+    NuggetKriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2, nugget, parameters.estim_nugget, nugget + sigma2};
 
     double min_ofn_tmp = fit_ofn(-arma::log(m_theta), nullptr, &okm_data);
 
@@ -620,11 +625,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
-    m_est_beta = !parameters.has_beta;
+    m_est_beta = parameters.estim_beta;
     m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = !parameters.has_sigma2;
+    m_est_sigma2 = parameters.estim_sigma2;
     m_nugget = okm_data.nugget;
-    m_est_nugget = !parameters.has_nugget;
+    m_est_nugget = parameters.estim_nugget;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -643,11 +648,14 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       alpha0 = arma::vec(parameters.sigma2.n_elem * parameters.nugget.n_elem);
       for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
         for (size_t j = 0; j < parameters.nugget.n_elem ; j++) {
-          alpha0[i+j*parameters.sigma2.n_elem] = parameters.sigma2[i] / (parameters.sigma2[i] + parameters.nugget[j]);
+          if (parameters.sigma2[i]<=0 | parameters.nugget[j]<=0)
+            alpha0[i+j*parameters.sigma2.n_elem] = arma::as_scalar(arma::randu(1));
+          else
+            alpha0[i+j*parameters.sigma2.n_elem] = parameters.sigma2[i] / (parameters.sigma2[i] + parameters.nugget[j]);
         }
       }
     } else {
-      alpha0 = arma::randu(parameters.theta.n_rows);
+      alpha0 = arma::randu(theta0.n_rows);
     }
 
     // arma::cout << "alpha0:" << alpha0 << arma::endl;
@@ -658,17 +666,18 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     algo_settings.rel_sol_change_tol = 0.1;
     algo_settings.grad_err_tol = 1e-8;
     algo_settings.vals_bound = true;
-    algo_settings.lower_bounds = -arma::log(theta_upper);
-    algo_settings.lower_bounds.resize(algo_settings.lower_bounds.n_elem+1);
-    algo_settings.lower_bounds[algo_settings.lower_bounds.n_elem] = 0;
-    algo_settings.upper_bounds = -arma::log(theta_lower);
-    algo_settings.upper_bounds.resize(algo_settings.upper_bounds.n_elem+1);
-    algo_settings.upper_bounds[algo_settings.upper_bounds.n_elem] = 1;
+    algo_settings.lower_bounds = arma::vec(d+1);
+    algo_settings.lower_bounds.head(d) = -arma::log(theta_upper);
+    algo_settings.lower_bounds.at(d) = 0;
+    algo_settings.upper_bounds = arma::vec(d+1);
+    algo_settings.upper_bounds.head(d) = -arma::log(theta_lower);
+    algo_settings.upper_bounds.at(d) = 1;
     double min_ofn = std::numeric_limits<double>::infinity();
 
-    for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec gamma_tmp = -arma::log(theta0.row(i)).t();
-      // arma::cout << "gamma_tmp:" << gamma_tmp << arma::endl;
+    for (arma::uword i = 0; i < theta0.n_rows; i++) {
+      arma::vec gamma_tmp = arma::vec(d+1);
+      gamma_tmp.head(d) = -arma::log(theta0.row(i)).t();
+      gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
       arma::mat T;
       arma::mat M;
       arma::colvec z;
@@ -681,8 +690,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       double nugget = -1;
       if (parameters.has_nugget)
         nugget = parameters.nugget[0]; // pass the initial given value (usefull if not to be estimated)
-
-      NuggetKriging::OKModel okm_data{T, M, z, beta, !parameters.has_beta, sigma2, !parameters.has_sigma2, nugget, !parameters.has_nugget};
+ 
+    NuggetKriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2, nugget, parameters.estim_nugget, nugget + sigma2};
 
       bool bfgs_ok = optim::lbfgs(
           gamma_tmp,
@@ -705,9 +714,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = !parameters.has_beta;
+        m_est_beta = parameters.estim_beta;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = !parameters.has_sigma2;
+        m_est_sigma2 = parameters.estim_sigma2;
+        m_nugget = okm_data.nugget;
+        m_est_nugget = parameters.estim_nugget;
       }
     }
   } else
@@ -920,14 +931,14 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
  */
 LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild starting parameters
-  Parameters parameters{arma::vec(this->m_nugget), false, arma::vec(this->m_sigma2), false, trans(this->m_theta), true};
+  NuggetKriging::Parameters parameters{arma::vec(this->m_nugget), true, this->m_est_nugget, arma::vec(this->m_sigma2), true, this->m_est_sigma2, trans(this->m_theta), true, this->m_est_theta, trans(this->m_beta), true, this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(
       arma::join_cols(m_y, newy), arma::join_cols(m_X, newX), m_regmodel, normalize, m_optim, m_objective, parameters);
 }
 
-LIBKRIGING_EXPORT std::string NuggetKriging::describeModel() const {
+LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
   std::ostringstream oss;
   auto colvec_printer = [&oss](const arma::colvec& v) {
     v.for_each([&oss, i = 0](const arma::colvec::elem_type& val) mutable {
@@ -949,10 +960,11 @@ LIBKRIGING_EXPORT std::string NuggetKriging::describeModel() const {
   oss << "* covariance:\n";
   oss << "  * kernel: " << m_covType << "\n";
   oss << "  * range";
-  if (m_est_theta) oss << " (est.) "; else oss << ": ";
+  if (m_est_theta) oss << " (est.): "; else oss << ": ";
   colvec_printer(m_theta);
+  oss << "\n";
   oss << "  * nugget";
-  if (m_est_nugget) oss << " (est.) "; else oss << ": ";
+  if (m_est_nugget) oss << " (est.): "; else oss << ": ";
   oss << m_nugget;
   oss << "\n";
   oss << "  * fit:\n";

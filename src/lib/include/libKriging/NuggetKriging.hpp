@@ -13,12 +13,44 @@ class NuggetKriging {
   struct Parameters {
     arma::vec nugget;
     bool has_nugget;
+    bool estim_nugget;
     arma::vec sigma2;
     bool has_sigma2;
+    bool estim_sigma2;
     arma::mat theta;
     bool has_theta;
+    bool estim_theta;
     arma::colvec beta;
     bool has_beta;
+    bool estim_beta;
+
+    Parameters()
+        : nugget(arma::vec()),
+          has_nugget(false),
+          estim_nugget(true),
+          sigma2(arma::vec()),
+          has_sigma2(false),
+          estim_sigma2(true),
+          theta(arma::mat()),
+          has_theta(false),
+          estim_theta(true),
+          beta(arma::vec()),
+          has_beta(false),
+          estim_beta(true) {}
+
+    Parameters(arma::vec n, bool h_n, bool e_n, arma::vec s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
+        : nugget(n),
+          has_nugget(h_n),
+          estim_nugget(e_n),
+          sigma2(s2),
+          has_sigma2(h_s2),
+          estim_sigma2(e_s2),
+          theta(t),
+          has_theta(h_t),
+          estim_theta(e_t),
+          beta(b),
+          has_beta(h_b),
+          estim_beta(e_b) {}
   };
 
 public:
@@ -163,7 +195,7 @@ public:
    */
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
 
-  LIBKRIGING_EXPORT std::string describeModel() const;
+  LIBKRIGING_EXPORT std::string summary() const;
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP
