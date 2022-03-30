@@ -209,12 +209,12 @@ Using the previous linked examples (in Python, R, Octave or Matlab), you should 
 with libKriging 0.4.8 
 
 <!-- ✔ ⌛️ ✘ -->
-|        | Linux Ubuntu:20                             | macOS 10 & 11 (x86-64)                         | macOS 12 (ARM)**                       | Windows 10                                                                  |
-|:-------|:--------------------------------------------|:-----------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10    | <span style="color:green">✔</span> 3.9 | <span style="color:green">✔</span> 3.6-3.9                                  |
-| R      | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:green">✔</span> 3.6-4.1     |                                        | <span style="color:green">✔</span> 3.6-4.1                                  |
-| Octave | <span style="color:green">✔</span> 5.2.0    | <span style="color:green">✔</span> 6.2         | <span style="color:green">✔</span> 6.4 | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
-| Matlab | <span style="color:orange">⌛️</span> R2021  | <span style="color:green">✔</span> R2021-R2022 | <span style="color:red">✘</span> R2022 | <span style="color:gray">?</span>                                           |
+|        | Linux Ubuntu:20                                 | macOS 10 & 11 (x86-64)                         | macOS 12 (ARM)**                       | Windows 10                                                                  |
+|:-------|:------------------------------------------------|:-----------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.6-3.10     | <span style="color:green">✔</span> 3.6-3.10    | <span style="color:green">✔</span> 3.9 | <span style="color:green">✔</span> 3.6-3.9                                  |
+| R      | <span style="color:green">✔</span> 3.6-4.1      | <span style="color:green">✔</span> 3.6-4.1     |                                        | <span style="color:green">✔</span> 3.6-4.1                                  |
+| Octave | <span style="color:green">✔</span> 5.2.0        | <span style="color:green">✔</span> 6.2         | <span style="color:green">✔</span> 6.4 | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
+| Matlab | <span style="color:green">️✔</span> R2021-R2022 | <span style="color:green">✔</span> R2021-R2022 | <span style="color:red">✘</span> R2022 | <span style="color:gray">?</span>                                           |
 
 *requires extra DLLs. See [python installation](#pylibkriging-for-python)
 

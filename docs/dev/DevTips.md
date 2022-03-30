@@ -115,3 +115,19 @@ end
 ```
 (tested in GDB; will create a `dump.bin` file) 
 
+# Debug armadillo / blas calls
+
+* If you are using Intel MKL, you should set `MKL_VERBOSE` environment variable:
+  ```shell
+  export MKL_VERBOSE=1
+  ```
+
+* To follow armadillo flow, you should set macro,
+  * locally as C++ macro
+    ```cpp
+    #define ARMA_EXTRA_DEBUG
+    ```
+  * as global compilation flag
+    ```shell
+    cmake <options> -DCMAKE_CXX_FLAGS=-DARMA_EXTRA_DEBUG ..
+    ```

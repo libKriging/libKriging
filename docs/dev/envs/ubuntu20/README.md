@@ -42,6 +42,7 @@ docker run --platform linux/amd64 ${DOCKERHUB_USER}/ubuntu20:dev
    ```shell
    apt update
    apt install -y libgtk2.0-0 libnss3 libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libatk-bridge2.0-0
+   apt install -y intel-mkl # you should also install MKL to use Matlab with libKriging
    ```
    
 3. Prepare a ssh server to be able to fill interactive registration
