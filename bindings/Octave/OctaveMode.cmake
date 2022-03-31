@@ -37,7 +37,7 @@ macro(add_mex_test)
     set(oneValueArgs NAME FILENAME)
     # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#test-properties
     set(multiValueArgs PROPERTIES)
-    
+
     cmake_parse_arguments(ARGS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if (ARGS_UNPARSED_ARGUMENTS)
@@ -48,13 +48,13 @@ macro(add_mex_test)
 
     set(TEST_SCRIPT "addpath('${CMAKE_CURRENT_SOURCE_DIR}'), addpath('${LIBKRIGING_OCTAVE_SOURCE_DIR}'), try, run('${FUNCTION_NAME}'), catch err, disp('An exception has been thrown during the execution'), disp(err), disp(err.stack), exit(1), end, exit(0)")
 
-    if (ARGS_WILL_FAIL)
-        # requires crash management for Octave 4 (where exit command causes 'abort')
-        set(PRECOMMAND manage_test_crash)
-    else()
-        set(PRECOMMAND)
-    endif()
-    
+    #    if (ARGS_WILL_FAIL)
+    #        # requires crash management for Octave 4 (where exit command causes 'abort')
+    #        set(PRECOMMAND manage_test_crash)
+    #    else()
+    #        set(PRECOMMAND)
+    #    endif()
+
     if (OCTAVE_BINDING_MODE STREQUAL "Octave")
         add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 COMMAND ${PRECOMMAND} ${OCTAVE_EXECUTABLE} --path ${LIBKRIGING_OCTAVE_SOURCE_DIR} --eval "${TEST_SCRIPT}")
@@ -69,12 +69,20 @@ macro(add_mex_test)
         set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 PROPERTIES
                 WILL_FAIL TRUE)
-    endif()
-    
-    set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
-            PROPERTIES
-            WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}
-            LABELS ${OCTAVE_BINDING_MODE}
-            ${ARGS_PROPERTIES})
+    endif ()
+
+    if (WIN32)
+        set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
+                PROPERTIES
+                WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}/$<CONFIG>
+                LABELS ${OCTAVE_BINDING_MODE}
+                ${ARGS_PROPERTIES})
+    else ()
+        set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
+                PROPERTIES
+                WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}
+                LABELS ${OCTAVE_BINDING_MODE}
+                ${ARGS_PROPERTIES})
+    endif ()
 
 endmacro()

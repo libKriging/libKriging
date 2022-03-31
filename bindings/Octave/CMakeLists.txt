@@ -24,13 +24,6 @@ add_mex_function(NAME mLibKriging
         Kriging_binding.cpp Kriging_binding.hpp
         LINK_LIBRARIES Kriging OctaveShared)
 
-# https://cmake.org/cmake/help/v3.11/module/GenerateExportHeader.html
-include(GenerateExportHeader)
-GENERATE_EXPORT_HEADER(mLibKriging # generates the export header `lib`_EXPORTS.h automatically
-        BASE_NAME MLIBKRIGING
-        EXPORT_FILE_NAME mlibKriging_exports.h)
-target_include_directories(mLibKriging PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-
 install(TARGETS mLibKriging
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/${OCTAVE_BINDING_MODE}
         )
