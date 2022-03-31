@@ -37,10 +37,9 @@ int main(int argc, char** argv) {
 // https://docs.microsoft.com/en-us/windows/win32/procthread/creating-processes
 
 #include <stdio.h>
-#include <tchar.h>
 #include <windows.h>
 
-void _tmain(int argc, TCHAR* argv[]) {
+int main(int argc, char* argv[]) {
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
   DWORD exit_code;
@@ -49,19 +48,19 @@ void _tmain(int argc, TCHAR* argv[]) {
   ZeroMemory(&si, sizeof(si));
   si.cb = sizeof(si);
   ZeroMemory(&pi, sizeof(pi));
-  
-  char * cmdline;
-  int size,i;
-  
-  for(size=0,i=1;i<argc;++i)
+
+  char* cmdline;
+  int size, i;
+
+  for (size = 0, i = 1; i < argc; ++i)
     size += snprintf(NULL, 0, "\"%s\" ", argv[i]);
-  cmdline = (char*)malloc(sizeof(TCHAR)*size);
-  for(size=0,i=1;i<argc;++i)
-    size += sprintf(cmdline+size, "\"%s\" ", argv[i]);
+  cmdline = (char*)malloc(size + 1);
+  for (size = 0, i = 1; i < argc; ++i)
+    size += sprintf(cmdline + size, "\"%s\" ", argv[i]);
   cmdline[size] = 0;
-  
+
   // printf("cmdline=%s\n", cmdline);
-  
+
   // Start the child process.
   if (!CreateProcess(NULL,     // No module name (use command line)
                      cmdline,  // Command line
@@ -79,7 +78,7 @@ void _tmain(int argc, TCHAR* argv[]) {
   }
 
   free(cmdline);
-  
+
   // Wait until child process exits.
   dwWaitResult = WaitForSingleObject(pi.hProcess, INFINITE);
   // printf("WaitForSingleObject() return value is 0X%.8X\n", dwWaitResult);
