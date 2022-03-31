@@ -4,7 +4,7 @@ project(pylibkriging)
 set(CMAKE_CXX_STANDARD 17)
 
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
-if (WIN32)
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     # $<CONFIG> is preferred since CMake 3.0
     set(LIBKRIGING_PYTHON_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
 else()

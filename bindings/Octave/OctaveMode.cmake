@@ -71,7 +71,7 @@ macro(add_mex_test)
                 WILL_FAIL TRUE)
     endif ()
 
-    if (WIN32)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
         set_tests_properties(${OCTAVE_BINDING_MODE}/${ARGS_NAME}
                 PROPERTIES
                 WORKING_DIRECTORY ${LIBKRIGING_OCTAVE_BINARY_DIR}/$<CONFIG>
