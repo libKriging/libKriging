@@ -4,11 +4,13 @@ There are many ways to provide the required tools in Windows environment.
 
 The way explained here is driven by the ability to be scriptable (as it is done in CI pipelines).
 
-First of all, we need [Git Bash](https://gitforwindows.org) to be able to run Shell script on Windows (we do not recommend to use Cygwin).
+First of all, we need [Git Bash](https://gitforwindows.org) to be able to run Shell script on Windows (we do not
+recommend to use Cygwin).
 
 ## Package Managers
 
-We use two different package managers: [Chocolatey](https://chocolatey.org) and [Anaconda](https://docs.conda.io/en/latest/miniconda.html).
+We use two different package managers: [Chocolatey](https://chocolatey.org)
+and [Anaconda](https://docs.conda.io/en/latest/miniconda.html).
 
 ### [Chocolatey](https://chocolatey.org) package manager
 
@@ -36,6 +38,14 @@ This script will also install all the other required dependencies.
 
 We recommend to use [Visual Studio Community](https://visualstudio.microsoft.com/fr/vs/community/)
 
-Nevertheless, if you want to build libKriging for R, we recommend using a complete R environment (R + Rtools) and to use the associated compiler (See R toolchain).
+Nevertheless, if you want to build libKriging for R, we recommend using a complete R environment (R + Rtools) and to use
+the associated compiler (See R toolchain).
+
+## Blas/Lapack for Matlab on Windows
+
+Matlab on Windows provides blas and lapack implementations in `extern` subdirectory. Unfortunately, armadillo does not
+recognise this implementation *out-of-the-box*.
+See [libKriging/armadillo-code/tree/matlab-mkblas-on-windows](https://github.com/libKriging/armadillo-code/tree/matlab-mkblas-on-windows)
+for required changes in armadillo and `.travis-ci/windows/build.sh` for additional config on build.
 
 # [Development for Windows without native Windows](Readme_Windows_Advanced.md)

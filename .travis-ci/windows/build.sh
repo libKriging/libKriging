@@ -27,16 +27,20 @@ fi
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 
+# mwblas and mwlapack are provided by Matlab/extern on Windows
+# export EXTRA_SYSTEM_LIBRARY_PATH="C:/Program Files/MATLAB/R2022a/extern/lib/win64/microsoft"
+# EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBLAS_NAMES=libmwblas -DLAPACK_NAMES=libmwlapack"
+
 mkdir -p build
 cd build
 cmake \
   -DCMAKE_GENERATOR_PLATFORM=x64 \
-  -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} \
+  -DEXTRA_SYSTEM_LIBRARY_PATH="${EXTRA_SYSTEM_LIBRARY_PATH}" \
   -DENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING} \
   -DENABLE_MATLAB_BINDING=${ENABLE_MATLAB_BINDING} \
   -DENABLE_PYTHON_BINDING=${ENABLE_PYTHON_BINDING} \
   -DUSE_COMPILER_CACHE="${USE_COMPILER_CACHE}" \
-  ${EXTRA_CMAKE_OPTIONS} \
+  $(eval echo ${EXTRA_CMAKE_OPTIONS}) \
   ..
 
 if [[ "$BUILD_TEST" == "true" ]]; then
