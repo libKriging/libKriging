@@ -43,20 +43,28 @@ int main(int argc, char** argv) {
 void _tmain(int argc, TCHAR* argv[]) {
   STARTUPINFO si;
   PROCESS_INFORMATION pi;
+  DWORD exit_code;
   DWORD dwWaitResult;
 
   ZeroMemory(&si, sizeof(si));
   si.cb = sizeof(si);
   ZeroMemory(&pi, sizeof(pi));
-
-  if (argc != 2) {
-    printf("Usage: %s [cmdline]\n", argv[0]);
-    return;
-  }
-
+  
+  char * cmdline;
+  int size,i;
+  
+  for(size=0,i=1;i<argc;++i)
+    size += snprintf(NULL, 0, "\"%s\" ", argv[i]);
+  cmdline = (char*)malloc(sizeof(TCHAR)*size);
+  for(size=0,i=1;i<argc;++i)
+    size += sprintf(cmdline+size, "\"%s\" ", argv[i]);
+  cmdline[size] = 0;
+  
+  // printf("cmdline=%s\n", cmdline);
+  
   // Start the child process.
   if (!CreateProcess(NULL,     // No module name (use command line)
-                     argv[1],  // Command line
+                     cmdline,  // Command line
                      NULL,     // Process handle not inheritable
                      NULL,     // Thread handle not inheritable
                      FALSE,    // Set handle inheritance to FALSE
@@ -70,9 +78,13 @@ void _tmain(int argc, TCHAR* argv[]) {
     ExitProcess(2);
   }
 
+  free(cmdline);
+  
   // Wait until child process exits.
   dwWaitResult = WaitForSingleObject(pi.hProcess, INFINITE);
-  printf("WaitForSingleObject() returns value is 0X%.8X\n", dwWaitResult);
+  // printf("WaitForSingleObject() return value is 0X%.8X\n", dwWaitResult);
+  GetExitCodeProcess(pi.hProcess, &exit_code);
+  // printf("GetExitCodeProcess() return value is %d\n", exit_code);
 
   switch (dwWaitResult) {
     case WAIT_ABANDONED:
@@ -94,6 +106,7 @@ void _tmain(int argc, TCHAR* argv[]) {
   // Close process and thread handles.
   CloseHandle(pi.hProcess);
   CloseHandle(pi.hThread);
+  return exit_code;
 }
 
 #endif /* WIN32 */

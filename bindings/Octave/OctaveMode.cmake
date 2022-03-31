@@ -48,12 +48,12 @@ macro(add_mex_test)
 
     set(TEST_SCRIPT "addpath('${CMAKE_CURRENT_SOURCE_DIR}'), addpath('${LIBKRIGING_OCTAVE_SOURCE_DIR}'), try, run('${FUNCTION_NAME}'), catch err, disp('An exception has been thrown during the execution'), disp(err), disp(err.stack), exit(1), end, exit(0)")
 
-    #    if (ARGS_WILL_FAIL)
-    #        # requires crash management for Octave 4 (where exit command causes 'abort')
-    #        set(PRECOMMAND manage_test_crash)
-    #    else()
-    #        set(PRECOMMAND)
-    #    endif()
+    if (ARGS_WILL_FAIL)
+        # requires crash management for Octave 4 (where exit command causes 'abort')
+        set(PRECOMMAND manage_test_crash)
+    else()
+        set(PRECOMMAND)
+    endif()
 
     if (OCTAVE_BINDING_MODE STREQUAL "Octave")
         add_test(NAME ${OCTAVE_BINDING_MODE}/${ARGS_NAME}
