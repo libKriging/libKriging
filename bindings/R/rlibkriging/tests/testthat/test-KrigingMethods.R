@@ -153,8 +153,6 @@ contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red')
 
 p2 = capture.output(print(r2))
-print("=============== p2")
-print(p2)
 
 update(object=r,y2,X2)
 llu = function(Theta){apply(Theta,1,function(theta) logLikelihood(r,theta)$logLikelihood)}
@@ -162,8 +160,6 @@ contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='blue')
 
 pu = capture.output(print(r))
-print("=============== pu")
-print(pu)
 
 test_that("update",
           expect_false(all(p == pu)))

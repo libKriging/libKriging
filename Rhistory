@@ -1,0 +1,80 @@
+library(testthat)
+f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+#plot(f)
+n <- 5
+set.seed(123)
+X <- as.matrix(runif(n))
+y = f(X)
+#points(X,y)
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
+library(rlibkriging)
+r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, estim_sigma2=FALSE,
+             theta=matrix(k@covariance@range.val),has_theta=TRUE, estim_theta=FALSE,
+             nugget=k@covariance@nugget,has_nugget=TRUE, estim_nugget=FALSE))
+# m = as.list(r)
+ntest <- 10
+Xtest <- as.matrix(runif(ntest))
+ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE,checkNames=F)
+Yktest <- ptest$mean
+sktest <- ptest$sd
+cktest <- c(ptest$cov)
+Ytest <- predict(r,Xtest,TRUE,TRUE)
+plot(f)
+points(X,y)
+points(Xtest,Yktest,col='blue')
+points(Xtest,Ytest$mean,col='red')
+
+newdata=Xtest
+checkNames=F
+covMat1Mat2=DiceKriging:::covMat1Mat2.covTensorProduct
+object=k
+
+
+
+
+nugget.flag <- object@covariance@nugget.flag 
+  
+  X <- object@X
+  y <- object@y
+  
+  if (checkNames) {
+    newdata <- checkNames(X1 = X, X2 = newdata, X1.name = "the design", X2.name = "newdata")
+  } else {
+    newdata <- as.matrix(newdata)
+    d.newdata <- ncol(newdata)
+    if (!identical(d.newdata, object@d)) {
+      stop("newdata must have the same numbers of columns than the experimental design")
+    }
+    if (!identical(colnames(newdata), colnames(X))) {
+      ##  warning("column names mismatch between 'newdata' and the experimental design -
+      ## the columns of 'newdata' are interpreted in the same order as the experimental design names")
+      colnames(newdata) <- colnames(X)
+    }
+  }
+  
+  T <- object@T
+  z <- object@z
+  M <- object@M
+  
+  beta <- object@trend.coef
+    
+  F.newdata <- model.matrix(object@trend.formula, data = data.frame(newdata))
+  y.predict.trend <- F.newdata%*%beta
+  
+  c.newdata <- covMat1Mat2(object@covariance, X1 = X, X2 = newdata,
+                           nugget.flag = object@covariance@nugget.flag)
+  ## compute c(x) for x = newdata ; remark that for prediction (or filtering), cov(Yi, Yj)=0
+  ## even if Yi and Yj are the outputs related to the equal points xi and xj.
+
+c.newdata
+
+Tinv.c.newdata <- backsolve(t(T), c.newdata, upper.tri=FALSE)
+  y.predict.complement <- t(Tinv.c.newdata)%*%z
+  y.predict <- y.predict.trend + y.predict.complement
+  y.predict <- as.numeric(y.predict)
+
+Tinv.c.newdata
+
+Ytest <- predict(r,Xtest,TRUE,TRUE)
+

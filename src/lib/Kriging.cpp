@@ -844,7 +844,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       arma::vec _theta = 1 / arma::exp(_gamma);
       double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
       if (grad_out != nullptr)
-        *grad_out = *grad_out % _theta;
+        *grad_out %= _theta;
       if (hess_out != nullptr)
         *hess_out = -*grad_out + *hess_out % _theta;
       return -ll;
@@ -1122,14 +1122,14 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
   if (withStd) {
     double total_sd2 = m_sigma2;
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
-    arma::colvec s2_predict_1 = m_sigma2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
+    arma::colvec s2_predict_1 = total_sd2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
     // Type = "UK"
     // T.M <- chol(t(M)%*%M)
     arma::mat TM = trans(chol(trans(m_M) * m_M));
     // s2.predict.mat <- backsolve(t(T.M), t(F.newdata - t(Tinv.c.newdata)%*%M) , upper.tri = FALSE)
     arma::mat s2_predict_mat = solve(TM, trans(Ftest - trans(Tinv_newdata) * m_M), arma::solve_opts::fast);
     // s2.predict.2 <- apply(s2.predict.mat, 2, crossprod)
-    arma::colvec s2_predict_2 = m_sigma2 * trans(sum(s2_predict_mat % s2_predict_mat, 0));
+    arma::colvec s2_predict_2 = total_sd2 * trans(sum(s2_predict_mat % s2_predict_mat, 0));
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
     arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
     s2_predict.elem(find(pred_stdev < 0)).zeros();
@@ -1145,7 +1145,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
       }
       // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
       // cond.cov <- cond.cov + crossprod(s2.predict.mat)
-      pred_cov = m_sigma2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
+      pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
     }
   } else if (withCov) {
     arma::mat C_newdata = arma::mat(m, m);

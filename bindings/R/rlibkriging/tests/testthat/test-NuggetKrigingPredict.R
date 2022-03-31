@@ -7,11 +7,12 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 #points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
 library(rlibkriging)
-r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
-             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
-             theta=matrix(k@covariance@range.val),has_theta=TRUE))
+r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, estim_sigma2=FALSE,
+             theta=matrix(k@covariance@range.val),has_theta=TRUE, estim_theta=FALSE,
+             nugget=k@covariance@nugget,has_nugget=TRUE, estim_nugget=FALSE))
 # m = as.list(r)
 
 ntest <- 100
