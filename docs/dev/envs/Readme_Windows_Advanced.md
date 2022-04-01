@@ -99,7 +99,7 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
     and load it
     ```shell
     # bash script (once per shell, if installed using `choco`)
-    export PATH='C:\Program Files\CMake\bin':$PATH
+    export PATH='/c/Program Files/CMake/bin':$PATH
     ```
   * CMake using MSVC installation
     ```shell
