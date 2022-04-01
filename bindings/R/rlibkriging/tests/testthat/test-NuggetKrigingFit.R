@@ -10,11 +10,18 @@ X <- as.matrix(runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- Kriging(y, X, "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
+r <- NuggetKriging(y, X, "gauss")
+alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
+test_that(desc="fit of alpha by DiceKriging is same that libKriging", 
+          expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
-ll = Vectorize(function(x) logLikelihood(r,x)$logLikelihood)
+ll = Vectorize(function(x) logLikelihood(r,c(x,alpha_k))$logLikelihood)
 plot(ll,xlim=c(0.001,1))
+#ll = Vectorize(function(x) logLikelihood(r,c(x,alpha_r))$logLikelihood)
+#plot(ll_,xlim=c(0.001,1))
+
 theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
@@ -37,16 +44,18 @@ X <- cbind(runif(n),runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- Kriging(y, X, "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
+r <- NuggetKriging(y, X, "gauss")
+alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
+test_that(desc="fit of alpha by DiceKriging is same that libKriging", 
+          expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      # print(dim(x))
-                      #print(matrix(unlist(x),ncol=2));
-                      y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+                      y=-logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
                       #print(y);
                       y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -80,7 +89,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
     withCallingHandlers(
       {
         error_text <- "No error."
-        DiceKriging::km(design=X,response=y,covtype = "gauss",multistart = 10, parinit=parinit,control = list(trace=F))
+        DiceKriging::km(design=X,response=y,covtype = "gauss", parinit=parinit,control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
       }, 
       warning = function(e) {
         error_text <<- trimws(paste0("WARNING: ", e))
@@ -93,7 +102,11 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
     finally = {
     }
   )
-r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
+r <- NuggetKriging(y, X, "gauss", parameters=list(theta=parinit))
+alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
+test_that(desc="fit of alpha by DiceKriging is same that libKriging", 
+          expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 # print(dim(X));
@@ -101,7 +114,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        y=-logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
         #print(y);
         y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -116,44 +129,6 @@ points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
 
-
-
-#############################################################
-
-context("Fit: 2D")
-
-f <- function(X) apply(X, 1, 
-                       function(x)
-                         prod(
-                           sin(2*pi*
-                                 ( x * (seq(0,1,l=1+length(x))[-1])^2 )
-                           )))
-logn <- 1 #seq(1, 2.5, by=.1)
-n <- floor(10^logn)
-d <- 2
-set.seed(1234)
-X <- matrix(runif(n*d),ncol=d)
-y <- f(X)
-k = NULL
-r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-
-x=seq(0,2,,51)
-mll_fun <- function(x) -apply(x,1,
-                              function(theta) 
-                                DiceKriging::logLikFun(theta,k)
-)
-contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
- 
-# use same startup point for convergence
-r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
-             parameters=list(theta=matrix(k@parinit,ncol=2)))
-
-points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
-points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
-
-test_that(desc="fit of theta 2D is the same that DiceKriging one", 
-          expect_equal(array(as.list(r)$theta),array(k@covariance@range.val),tol=  5e-2))
 
 ################################################################################
 
@@ -173,8 +148,12 @@ X <- cbind(runif(n,0,1),runif(n,0,15))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),parinit = c(0.25,10))
-r <- Kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=TRUE,optim="BFGS",multistart=20,parinit = c(0.5,5))
+r <- NuggetKriging(y, X, "gauss",parameters=list(theta=matrix(c(0.5,5),ncol=2)))
+alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
+test_that(desc="fit of alpha by DiceKriging is same that libKriging", 
+          expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 # print(dim(X));
@@ -182,7 +161,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        -logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        -logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
         #print(y);
         })}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -193,12 +172,12 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 ll_r(t(as.list(r)$theta))
 
 ll_k = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
-apply(X,1,function(x) {-DiceKriging::logLikFun(x,k)})}
+apply(X,1,function(x) {-DiceKriging::logLikFun(c(x,alpha_k),k)})}
 contour(x1,x2,matrix(ll_k(as.matrix(expand.grid(x1,x2))),nrow=length(x1)),nlevels = 30,add=T)
 points(k@covariance@range.val[1],k@covariance@range.val[2])
 ll_k(k@covariance@range.val)
 
-theta_ref = optim(par=matrix(c(.25,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c(2,30),method="L-BFGS-B")$par
+theta_ref = optim(par=matrix(c(.2,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c(2,30),method="L-BFGS-B")$par
 points(theta_ref,col='black')
 
 test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
