@@ -73,7 +73,7 @@ jobs:
             os: ubuntu-20.04
             mode: Debug
             enable_python: on
-            enable_octave: on
+            enable_matlab: on
             enable_memcheck: on
             force_update: on
           - name: "Address Sanitizer"
@@ -153,6 +153,9 @@ jobs:
           sudo apt install liblapack-dev python3-pip
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave liboctave-dev
+          fi
+          if [ "${ENABLE_MATLAB_BINDING}" == "on" ]; then
+            sudo apt install -qy intel-mkl
           fi
           if [ "${ENABLE_R_BINDING}" == "on" ]; then
             sudo apt install -qy liblapack-dev gfortran # r-base

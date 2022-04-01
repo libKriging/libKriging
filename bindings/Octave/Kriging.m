@@ -6,7 +6,7 @@ classdef Kriging < handle
 
     methods
         function obj = Kriging(varargin)
-            printf("New Kriging\n");
+            % fprintf("New Kriging\n");
             obj.ref = mLibKriging("Kriging::new", varargin{:});
         end
         
@@ -14,7 +14,7 @@ classdef Kriging < handle
             % disp(["ObjectRef = ", num2str(obj.ref)])
             % destroy the mex backend
             if ~isempty(obj.ref)
-                printf("Delete Kriging\n")
+                % fprintf("Delete Kriging\n")
                 obj.ref = mLibKriging("Kriging::delete", obj.ref, varargin{:})
             end
         end

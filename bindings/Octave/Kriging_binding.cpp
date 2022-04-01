@@ -7,7 +7,7 @@
 namespace KrigingBinding {
 
 // Old short constructor only
-// void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
+// void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
 //  MxMapper input{"Input",
 //                 nrhs,
 //                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -16,7 +16,7 @@ namespace KrigingBinding {
 //  output.set<0>(buildObject<Kriging>(input.get<0, std::string>("kernel")), "new object reference");
 //}
 
-void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -40,7 +40,7 @@ void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(km, "new object reference");
 }
 
-void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -50,7 +50,7 @@ void destroy(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(EmptyObject{}, "deleted object reference");
 }
 
-void fit(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -93,7 +93,7 @@ bool flag_output_compliance(MxMapper& input, const char* msg, const MxMapper& ou
   }
 }
 
-void predict(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -108,7 +108,7 @@ void predict(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.setOptional<2>(cov_m, "cov matrix");
 }
 
-void simulate(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -119,7 +119,7 @@ void simulate(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(result, "simulated response");
 }
 
-void update(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -129,7 +129,7 @@ void update(int nlhs, void** plhs, int nrhs, const void** prhs) {
   km->update(input.get<1, arma::vec>("new y"), input.get<2, arma::mat>("new X"), input.get<3, bool>("normalize"));
 }
 
-void summary(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -139,7 +139,7 @@ void summary(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.set<0>(km->summary(), "Model description");
 }
 
-void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -152,7 +152,7 @@ void leaveOneOut(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.setOptional<1>(loograd, "loograd");  // FIXME better name
 }
 
-void logLikelihood(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -167,7 +167,7 @@ void logLikelihood(int nlhs, void** plhs, int nrhs, const void** prhs) {
   output.setOptional<2>(llhess, "llhess");  // FIXME better name
 }
 
-void logMargPost(int nlhs, void** plhs, int nrhs, const void** prhs) {
+void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)

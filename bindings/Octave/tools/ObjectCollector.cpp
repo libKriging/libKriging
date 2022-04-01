@@ -3,15 +3,21 @@
 #include <iostream>
 
 void Destroyable::debug(const char* msg, void* t) const {
+#ifndef NDEBUG
   std::cout << msg << " " << type << " " << t << std::endl;
+#endif
 }
 
 ObjectCollector::ObjectCollector() {
+#ifndef NDEBUG
   std::cout << "Ctor ObjectCollector " << this << std::endl;
+#endif
 }
 
 ObjectCollector::~ObjectCollector() {
+#ifndef NDEBUG
   std::cout << "Dtor ObjectCollector " << this << std::endl;
+#endif
 }
 
 ObjectCollector& ObjectCollector::instance() {

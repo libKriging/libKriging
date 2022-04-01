@@ -33,16 +33,19 @@ inline auto converter<mxArray*>(mxArray* x, const std::string& parameter) {
 
 template <>
 inline auto converter<std::string>(mxArray* x, const std::string& parameter) {
-  if (!mxIsChar(x) || mxGetNumberOfDimensions(x) != 2 || mxGetM(x) != 1 || mxGetM(x) != 1) {
+  if (mxIsClass(x, "string")) {
+    // Matlab's String class is encapsulated, use Matlab call to convert it to char array
+    mxArray* char_array[1] = {};
+    mexCallMATLAB(1, char_array, 1, &x, "char");
+    x = char_array[0];
+  }
+
+  auto* chars = mxArrayToString(x);
+  if (chars == nullptr) {
     throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a string");
   }
 
-  char buffer[256];
-  if (mxGetString(x, buffer, 256) != 0) {
-    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a string");
-  }
-
-  return std::string{buffer};
+  return std::string{chars};
 }
 
 template <>

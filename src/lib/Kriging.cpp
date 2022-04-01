@@ -1423,6 +1423,9 @@ auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
       }
       return F;
     } break;
+
+    default:
+      throw std::runtime_error("Unreachable code");
   }
 }
 

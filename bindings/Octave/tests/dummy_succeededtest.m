@@ -1,1 +1,1 @@
-printf("Success\n")
+fprintf("Success\n")

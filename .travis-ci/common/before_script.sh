@@ -61,6 +61,14 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     echo "------------------------------------"
 
+    if ( command -v matlab >/dev/null 2>&1 ); then
+      echo "Matlab config: $(command -v matlab)"
+      matlab -batch "ver; exit" 2>&1 | sed 's/^/  /'
+    else
+      echo "No matlab command found"
+    fi
+
+    echo "------------------------------------"
     if ( command -v R >/dev/null 2>&1 ); then
       echo "R config: $(command -v R)"
       R --version 2>&1 | sed 's/^/  /'
