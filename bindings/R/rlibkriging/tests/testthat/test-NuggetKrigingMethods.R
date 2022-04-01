@@ -125,7 +125,7 @@ contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 
 set.seed(1234)
-r2 <- NuggetKriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2,nrow=20,byrow = T)+matrix(0.1*runif(40),ncol=2)))
+r2 <- NuggetKriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2,nrow=40,byrow = T)+matrix(0.01*runif(80),ncol=2)))
 ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihood(r2,c(theta,as.list(r2)$sigma2/(as.list(r2)$sigma2+as.list(r2)$nugget)))$logLikelihood)}
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red',pch=20)
@@ -142,4 +142,4 @@ pu = capture.output(print(r))
 test_that("update",
           expect_false(all(p == pu)))
 test_that("update almost converge",
-          expect_equal(as.list(r2)$theta, as.list(r)$theta, tolerance = 1E-2))
+          expect_equal(as.list(r2)$theta, as.list(r)$theta, tolerance = 2E-2))
