@@ -17,7 +17,7 @@ x=seq(0,1,,51)
 contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 
-r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(.5,ncol=2)))
+r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 
 # ll = function(X) {
 #   logLikelihood(r,X,grad=F)$logLikelihood
@@ -44,7 +44,7 @@ context("logLikelihood")
 ll = function(Theta){apply(Theta,1,function(theta) logLikelihood(r,theta)$logLikelihood)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
-points(as.list(r)$theta[1],as.list(r)$theta[2])
+points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 # logLikelihood(r,t(as.list(r)$theta))
 
 test_that("logLikelihood returned",
@@ -163,5 +163,5 @@ pu = capture.output(print(r))
 
 test_that("update",
           expect_false(all(p == pu)))
-test_that("update",
+test_that("update almost converge",
           expect_true(all(pu == p2)))
