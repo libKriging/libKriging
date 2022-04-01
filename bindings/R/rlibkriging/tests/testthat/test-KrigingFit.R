@@ -10,7 +10,7 @@ X <- as.matrix(runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim = T)
 r <- Kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) logLikelihood(r,x)$logLikelihood)
