@@ -9,13 +9,13 @@ void Destroyable::debug(const char* msg, void* t) const {
 }
 
 ObjectCollector::ObjectCollector() {
-#ifndef NDEBUG 
+#ifndef NDEBUG
   std::cout << "Ctor ObjectCollector " << this << std::endl;
 #endif
 }
 
 ObjectCollector::~ObjectCollector() {
-#ifndef NDEBUG 
+#ifndef NDEBUG
   std::cout << "Dtor ObjectCollector " << this << std::endl;
 #endif
 }
