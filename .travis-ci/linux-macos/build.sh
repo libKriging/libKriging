@@ -49,7 +49,7 @@ esac
 mkdir -p build
 cd build
 cmake \
-  -G "Ninja" \
+  -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="${MODE}" \
   -DENABLE_COVERAGE="${ENABLE_COVERAGE}" \
   -DENABLE_MEMCHECK="${ENABLE_MEMCHECK}" \
