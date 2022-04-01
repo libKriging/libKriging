@@ -90,7 +90,7 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::colvec& y,
 double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
                               arma::vec* grad_out,
                               NuggetKriging::OKModel* okm_data) const {
-   arma::cout << " theta, alpha: " << _theta_alpha.head(m_X.n_cols) << "," << _theta_alpha.at(m_X.n_cols) << arma::endl;
+  // arma::cout << " theta, alpha: " << _theta_alpha.head(m_X.n_cols) << "," << _theta_alpha.at(m_X.n_cols) << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
   //  model@covariance@sd2 <- 1
@@ -642,7 +642,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
-      theta0 = arma::randu(multistart, d) % (max(m_X, 0) - min(m_X, 0));
+      theta0 = arma::randu(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -668,8 +668,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
 
     optim::algo_settings_t algo_settings;
     algo_settings.print_level = 0;
-    algo_settings.iter_max = 10;
-    algo_settings.rel_sol_change_tol = 0.1;
+    algo_settings.iter_max = 20;
+    algo_settings.rel_sol_change_tol = 0.01;
     algo_settings.grad_err_tol = 1e-8;
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = arma::vec(d+1);
@@ -871,7 +871,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < m; i++) {
     Sigma.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      Sigma.at(i, j) = Sigma.at(j, i) = CovNorm_fun(Xpnorm.col(i) - Xpnorm.col(j));
+      Sigma.at(i, j) = Sigma.at(j, i) = CovNorm_fun(Xpnorm.col(i) - Xpnorm.col(j))* m_sigma2/(m_nugget+m_sigma2);
     }
   }
   // t0 = toc("Sigma          ", t0);
@@ -884,8 +884,12 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat Sigma21(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
-      Sigma21.at(i, j) = CovNorm_fun(Xtnorm.col(i) - Xpnorm.col(j));
-    }
+      arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
+      //if (arma::all(dij==0))
+      //  Sigma21.at(i, j) = 1.0;//m_sigma2 + m_nugget; 
+      //else
+        Sigma21.at(i, j) = CovNorm_fun(dij) * m_sigma2/(m_sigma2 + m_nugget);
+      }
   }
   // t0 = toc("Sigma21        ", t0);
 
@@ -901,6 +905,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   // arma::mat Sigma_cond = Sigma - XtX(Tinv_Sigma21);
   // arma::mat Sigma_cond = Sigma - trans(Tinv_Sigma21) * Tinv_Sigma21;
   arma::mat Sigma_cond = trimatl(Sigma);
+  Sigma_cond.diag() += m_nugget; 
   for (arma::uword i = 0; i < Tinv_Sigma21.n_cols; i++) {
     for (arma::uword j = 0; j <= i; j++) {
       for (arma::uword k = 0; k < Tinv_Sigma21.n_rows; k++) {
@@ -923,7 +928,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   yp.each_col() = y_trend;
 
   arma::arma_rng::set_seed(seed);
-  yp += tT_cond * arma::randn(m, nsim) * std::sqrt(m_sigma2);
+  yp += tT_cond * arma::randn(m, nsim) * std::sqrt(m_sigma2 + m_nugget);
   // t0 = toc("yp             ", t0);
 
   // Un-normalize simulations
@@ -941,7 +946,18 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
  */
 LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
   // rebuild starting parameters
-  NuggetKriging::Parameters parameters{arma::vec(this->m_nugget), true, this->m_est_nugget, arma::vec(this->m_sigma2), true, this->m_est_sigma2, trans(this->m_theta), true, this->m_est_theta, trans(this->m_beta), true, this->m_est_beta};
+  Parameters parameters{arma::vec(1, arma::fill::value(this->m_nugget)),
+                        true,
+                        this->m_est_nugget,
+                        arma::vec(1, arma::fill::value(this->m_sigma2)),
+                        true,
+                        this->m_est_sigma2,
+                        trans(this->m_theta),
+                        true,
+                        this->m_est_theta,
+                        trans(this->m_beta),
+                        true,
+                        this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(

@@ -731,7 +731,7 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
   double x_tol = 0.001;
   double y_tol = 1;
   double g_tol = 0.01;
-  int max_iteration = 10;
+  int max_iteration = 20;
 
   arma::vec x_previous(x_0.n_elem);
   arma::vec x_best(x_0.n_elem);
@@ -961,7 +961,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
-      theta0 = arma::randu(multistart, d) % (max(m_X, 0) - min(m_X, 0));
+      theta0 = arma::randu(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -970,8 +970,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
     optim::algo_settings_t algo_settings;
     algo_settings.print_level = 0;
-    algo_settings.iter_max = 10;
-    algo_settings.rel_sol_change_tol = 0.1;
+    algo_settings.iter_max = 20;
+    algo_settings.rel_sol_change_tol = 0.01;
     algo_settings.grad_err_tol = 1e-8;
     algo_settings.vals_bound = true;
     algo_settings.lower_bounds = -arma::log(theta_upper);
