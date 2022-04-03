@@ -20,12 +20,12 @@ abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
 
-test_that(desc="fit of theta by DiceKriging is right", 
+test_that(desc="fit of theta by DiceKriging is right",
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
 
-test_that(desc="fit of theta by libKriging is right", 
+test_that(desc="fit of theta by libKriging is right",
           expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
-         
+
 #############################################################
 
 context("Fit: 2D (Branin)")
@@ -40,7 +40,7 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
 r <- Kriging(y, X, "gauss")
 
-ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
+ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
@@ -58,7 +58,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
+test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
 
 
@@ -81,23 +81,24 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
       {
         error_text <- "No error."
         DiceKriging::km(design=X,response=y,covtype = "gauss",multistart = 10, parinit=parinit,control = list(trace=F))
-      }, 
+      },
       warning = function(e) {
         error_text <<- trimws(paste0("WARNING: ", e))
         invokeRestart("muffleWarning")
       }
-    ), 
+    ),
     error = function(e) {
       return(list(value = NA, error_text = trimws(paste0("ERROR: ", e))))
-    }, 
+    },
     finally = {
     }
   )
 r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
+l = as.list(r)
 
 save(list=ls(),file="fit-2d-multistart.Rdata")
 
-ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
+ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));
 apply(X,1,
       function(x) {
@@ -115,7 +116,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
+test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
 
 
@@ -124,7 +125,7 @@ test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
 
 context("Fit: 2D")
 
-f <- function(X) apply(X, 1, 
+f <- function(X) apply(X, 1,
                        function(x)
                          prod(
                            sin(2*pi*
@@ -142,19 +143,22 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 
 x=seq(0,2,,51)
 mll_fun <- function(x) -apply(x,1,
-                              function(theta) 
+                              function(theta)
                                 DiceKriging::logLikFun(theta,k)
 )
 contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
- 
+
 # use same startup point for convergence
 r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
              parameters=list(theta=matrix(k@parinit,ncol=2)))
+l = as.list(r)
+
+save(list=ls(),file="fit-2d.Rdata")
 
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is the same that DiceKriging one", 
+test_that(desc="fit of theta 2D is the same that DiceKriging one",
           expect_equal(array(as.list(r)$theta),array(k@covariance@range.val),tol=  5e-2))
 
 ################################################################################
@@ -177,8 +181,11 @@ k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),parinit = c(0.25,10))
 r <- Kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
+l = as.list(r)
 
-ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
+save(list=ls(),file="fit-2d-not01.Rdata")
+
+ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));
 apply(X,1,
       function(x) {
@@ -194,7 +201,7 @@ contour(x1,x2,matrix(ll_r(as.matrix(expand.grid(x1,x2))),nrow=length(x1)),nlevel
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 ll_r(t(as.list(r)$theta))
 
-ll_k = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
+ll_k = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 apply(X,1,function(x) {-DiceKriging::logLikFun(x,k)})}
 contour(x1,x2,matrix(ll_k(as.matrix(expand.grid(x1,x2))),nrow=length(x1)),nlevels = 30,add=T)
 points(k@covariance@range.val[1],k@covariance@range.val[2])
@@ -203,6 +210,6 @@ ll_k(k@covariance@range.val)
 theta_ref = optim(par=matrix(c(.25,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c(2,30),method="L-BFGS-B")$par
 points(theta_ref,col='black')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one", 
+test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll_r(array(as.list(r)$theta)), ll_k(k@covariance@range.val), tol=1e-1))
 
