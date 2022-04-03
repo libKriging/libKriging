@@ -19,7 +19,7 @@ save(list=ls(),file="fit-nugget-1d.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
-test_that(desc="fit of alpha by DiceKriging is same that libKriging",
+test_that(desc="Nugget / Fit: 1D / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll = Vectorize(function(x) logLikelihood(r,c(x,alpha_k))$logLikelihood)
@@ -32,10 +32,10 @@ abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
 
-test_that(desc="fit of theta by DiceKriging is right",
+test_that(desc="Nugget / Fit: 1D / fit of theta by DiceKriging is right",
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
 
-test_that(desc="fit of theta by libKriging is right",
+test_that(desc="Nugget / Fit: 1D / fit of theta by libKriging is right",
           expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
 
 #############################################################
@@ -57,7 +57,7 @@ save(list=ls(),file="fit-nugget-2d.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
-test_that(desc="fit of alpha by DiceKriging is same that libKriging",
+test_that(desc="Nugget / Fit: 2D (Branin) / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
@@ -76,7 +76,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Nugget / Fit: 2D (Branin) / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
 
 
@@ -118,7 +118,7 @@ save(list=ls(),file="fit-nugget-multistart.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
-test_that(desc="fit of alpha by DiceKriging is same that libKriging",
+test_that(desc="Nugget / Fit: 2D (Branin) multistart / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
@@ -139,7 +139,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Nugget / Fit: 2D (Branin) multistart / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
 
 
@@ -169,7 +169,7 @@ save(list=ls(),file="fit-nugget-2d-not01.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
-test_that(desc="fit of alpha by DiceKriging is same that libKriging",
+test_that(desc="Nugget / Fit: 2D _not_ in [0,1]^2 / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
@@ -197,6 +197,6 @@ ll_k(k@covariance@range.val)
 theta_ref = optim(par=matrix(c(.2,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c(2,30),method="L-BFGS-B")$par
 points(theta_ref,col='black')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Nugget / Fit: 2D _not_ in [0,1]^2 / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll_r(array(as.list(r)$theta)), ll_k(k@covariance@range.val), tol=1e-1))
 

@@ -20,10 +20,10 @@ abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
 
-test_that(desc="fit of theta by DiceKriging is right",
+test_that(desc="Fit: 1D / fit of theta by DiceKriging is right",
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
 
-test_that(desc="fit of theta by libKriging is right",
+test_that(desc="Fit: 1D / fit of theta by libKriging is right",
           expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
 
 #############################################################
@@ -58,7 +58,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Fit: 2D (Branin) / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
 
 
@@ -116,7 +116,7 @@ points(theta_ref,col='black')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Fit: 2D (Branin) multistart / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol= 1e-3))
 
 
@@ -158,7 +158,7 @@ save(list=ls(),file="fit-2d.Rdata")
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 
-test_that(desc="fit of theta 2D is the same that DiceKriging one",
+test_that(desc="Fit: 2D / fit of theta 2D is the same that DiceKriging one",
           expect_equal(array(as.list(r)$theta),array(k@covariance@range.val),tol=  5e-2))
 
 ################################################################################
@@ -210,6 +210,6 @@ ll_k(k@covariance@range.val)
 theta_ref = optim(par=matrix(c(.25,10),ncol=2),ll_r,lower=c(0.001,0.001),upper=c(2,30),method="L-BFGS-B")$par
 points(theta_ref,col='black')
 
-test_that(desc="fit of theta 2D is _quite_ the same that DiceKriging one",
+test_that(desc="Fit: 2D _not_ in [0,1]^2 / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll_r(array(as.list(r)$theta)), ll_k(k@covariance@range.val), tol=1e-1))
 
