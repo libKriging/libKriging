@@ -8,13 +8,13 @@
 #include "libKriging/Covariance.hpp"
 #include "libKriging/NuggetKriging.hpp"
 #include "libKriging/KrigingException.hpp"
-
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
 #include <optim.hpp>
 #include <tuple>
 #include <vector>
+#include <random>
 
 /************************************************/
 /** implementation details forward declaration **/
@@ -114,7 +114,7 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
 
   double _alpha = _theta_alpha.at(d);
   arma::vec _theta = _theta_alpha.head(d);
-  // That should never occur: if (!estim_nugget & !estim_sigma2) stop(...) 
+  // That should never occur: if (!estim_nugget & !estim_sigma2) stop(...)
 
   // auto t0 = tic();
   arma::mat R = arma::mat(n, n);
@@ -146,7 +146,7 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
   // t0 = toc("beta          ", t0);
   fd->z = Yt - fd->M * fd->beta;
   // t0 = toc("z             ", t0);
-    
+
   fd->var = arma::accu(fd->z % fd->z) / n;
   if (fd->estim_nugget) {
     fd->nugget = (1 - _alpha) * fd->var;
@@ -170,7 +170,7 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
     //  Cinv.upper <- Cinv[upper.tri(Cinv)]
     //  xx <- x %*% t(x)
     //  xx.upper <- xx[upper.tri(xx)]
-    //            
+    //
     //  # partial derivative with respect to parameters except sigma^2
     //  for (k in 1:(nparam - 1)) {
     //      gradC.k <- covMatrixDerivative(model@covariance, X = model@X, C0 = R0, k = k)
@@ -618,7 +618,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       sigma2 = parameters.sigma2[0];  // otherwise sigma2 will be re-calculated using given theta
     double nugget = -1;
     if (parameters.has_nugget)
-      nugget = parameters.nugget[0]; 
+      nugget = parameters.nugget[0];
 
     NuggetKriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2, nugget, parameters.estim_nugget, nugget + sigma2};
 
@@ -640,9 +640,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   } else if (optim.rfind("BFGS", 0) == 0) {
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 10;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
-      arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
-      theta0 = arma::randu(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
+      int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      std::mt19937 engine;  // Mersenne twister random number engine
+      std::uniform_real_distribution<double> dist{};
+      arma::mat theta0(multistart, d, arma::fill::none);
+      theta0.imbue([&]() { return dist(engine); });
+      theta0 %= arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -696,7 +699,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       double nugget = -1;
       if (parameters.has_nugget)
         nugget = parameters.nugget[0]; // pass the initial given value (usefull if not to be estimated)
- 
+
     NuggetKriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2, nugget, parameters.estim_nugget, nugget + sigma2};
 
       bool bfgs_ok = optim::lbfgs(
@@ -774,7 +777,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
     for (arma::uword j = 0; j < m; j++) {
       arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
       if (arma::all(dij==0))
-        R.at(i, j) = 1.0;//m_sigma2 + m_nugget; 
+        R.at(i, j) = 1.0;//m_sigma2 + m_nugget;
       else
         R.at(i, j) = CovNorm_fun(dij) * m_sigma2/(m_sigma2 + m_nugget);
     }
@@ -785,7 +788,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
   pred_mean = m_centerY + m_scaleY * pred_mean;
 
   if (withStd) {
-    double total_sd2 = m_sigma2 + m_nugget; 
+    double total_sd2 = m_sigma2 + m_nugget;
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
     arma::colvec s2_predict_1 = total_sd2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
     // Type = "UK"
@@ -886,7 +889,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
     for (arma::uword j = 0; j < m; j++) {
       arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
       //if (arma::all(dij==0))
-      //  Sigma21.at(i, j) = 1.0;//m_sigma2 + m_nugget; 
+      //  Sigma21.at(i, j) = 1.0;//m_sigma2 + m_nugget;
       //else
         Sigma21.at(i, j) = CovNorm_fun(dij) * m_sigma2/(m_sigma2 + m_nugget);
       }
@@ -905,7 +908,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   // arma::mat Sigma_cond = Sigma - XtX(Tinv_Sigma21);
   // arma::mat Sigma_cond = Sigma - trans(Tinv_Sigma21) * Tinv_Sigma21;
   arma::mat Sigma_cond = trimatl(Sigma);
-  Sigma_cond.diag() += m_nugget; 
+  Sigma_cond.diag() += m_nugget;
   for (arma::uword i = 0; i < Tinv_Sigma21.n_cols; i++) {
     for (arma::uword j = 0; j <= i; j++) {
       for (arma::uword k = 0; k < Tinv_Sigma21.n_rows; k++) {
