@@ -39,7 +39,7 @@ Rcpp::List new_Kriging(arma::vec y,
       _parameters.push_back(!(params.containsElementNamed("estim_theta") && !params["estim_theta"]), "estim_theta");
     } else {
       Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(r), "theta");
+      _parameters.push_back(Rcpp::NumericMatrix mat(1, X.n_cols, r.begin()), "theta");
       _parameters.push_back(false, "has_theta");
       _parameters.push_back(true, "estim_theta");
     }
@@ -57,7 +57,7 @@ Rcpp::List new_Kriging(arma::vec y,
     _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = Rcpp::runif(1),
                                      Rcpp::Named("has_sigma2") = false,
                                      Rcpp::Named("estim_sigma2") = true,
-                                     Rcpp::Named("theta") = Rcpp::as<Rcpp::NumericMatrix>(r),
+                                     Rcpp::Named("theta") = Rcpp::NumericMatrix mat(1, X.n_cols, r.begin()),
                                      Rcpp::Named("has_theta") = false,
                                      Rcpp::Named("estim_theta") = true,
                                      Rcpp::Named("beta") = Rcpp::NumericVector(0),
