@@ -212,10 +212,11 @@ jobs:
         with:
           name: artifacts-${{ runner.os }}
           path: |
-            *.txt
-            *.log
-            *.Rdata
-            *.rds
+            **/*.txt
+            **/*.log
+            **/*.pdf
+            **/*.Rdata
+            **/*.rds
       
       - if: steps.test.outcome != 'success'
         run: exit 1
