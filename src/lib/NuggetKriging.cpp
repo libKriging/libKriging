@@ -642,6 +642,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
       std::mt19937 engine;  // Mersenne twister random number engine
+      engine.seed(123);
       std::uniform_real_distribution<double> dist{};
       arma::mat theta0(multistart, d, arma::fill::none);
       theta0.imbue([&]() { return dist(engine); });
