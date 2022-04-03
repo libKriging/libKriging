@@ -217,6 +217,9 @@ jobs:
             **/*.pdf
             **/*.Rdata
             **/*.rds
+            **/*.zip
+            **/*.tgz
+            **/*.tar.gz
       
       - if: steps.test.outcome != 'success'
         run: exit 1
