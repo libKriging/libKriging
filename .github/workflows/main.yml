@@ -216,6 +216,9 @@ jobs:
             *.log
             *.Rdata
             *.rds
+      
+      - if: steps.test.outcome != 'success'
+        run: exit 1
 
       - name: publish_report
         shell: bash

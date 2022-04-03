@@ -95,7 +95,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
   )
 r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
 
-save(ls(),file="fit-2d-multistart.Rdata")
+save(list=ls(),file="fit-2d-multistart.Rdata")
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2); 
 # print(dim(X));

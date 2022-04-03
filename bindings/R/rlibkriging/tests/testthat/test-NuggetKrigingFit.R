@@ -13,7 +13,7 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
 r <- NuggetKriging(y, X, "gauss")
 
-save(ls(),file="fit-nugget-1d.Rdata")
+save(list=ls(),file="fit-nugget-1d.Rdata")
 
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
