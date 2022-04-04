@@ -23,6 +23,7 @@ set(pylibkriging_SRCS src/_pylibkriging/pylibkirging.cpp)
 list(APPEND pylibkriging_SRCS
         src/_pylibkriging/LinearRegression_binding.cpp src/_pylibkriging/LinearRegression_binding.hpp
         src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp
+        src/_pylibkriging/NuggetKriging_binding.cpp src/_pylibkriging/NuggetKriging_binding.hpp
         src/_pylibkriging/RandomGenerator.cpp src/_pylibkriging/RandomGenerator.hpp
         src/_pylibkriging/BindingTest.cpp src/_pylibkriging/BindingTest.hpp
         )

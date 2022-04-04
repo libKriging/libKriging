@@ -8,6 +8,7 @@
 
 #include "BindingTest.hpp"
 #include "Kriging_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "RandomGenerator.hpp"
 
@@ -72,7 +73,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
 
-  py::enum_<Kriging::RegressionModel>(m, "RegressionModel")
+  py::enum_<Kriging::RegressionModel>(m, "KrigingRegressionModel")
       .value("Constant", Kriging::RegressionModel::Constant)
       .value("Linear", Kriging::RegressionModel::Linear)
       .value("Interactive", Kriging::RegressionModel::Interactive)
@@ -80,7 +81,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .export_values();
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
-  py::class_<Kriging::Parameters>(m, "Parameters").def(py::init<>());
+  py::class_<Kriging::Parameters>(m, "KrigingParameters").def(py::init<>());
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   // Backup solution // FIXME remove it if not necessary
@@ -146,4 +147,78 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("leaveOneOut", &Kriging::leaveOneOutEval)
       .def("logLikelihood", &Kriging::logLikelihoodEval)
       .def("logMargPost", &Kriging::logMargPostEval);
+
+
+  py::enum_<NuggetKriging::RegressionModel>(m, "NuggetKrigingRegressionModel")
+      .value("Constant", NuggetKriging::RegressionModel::Constant)
+      .value("Linear", NuggetKriging::RegressionModel::Linear)
+      .value("Interactive", NuggetKriging::RegressionModel::Interactive)
+      .value("Quadratic", NuggetKriging::RegressionModel::Quadratic)
+      .export_values();
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  py::class_<NuggetKriging::Parameters>(m, "NuggetKrigingParameters").def(py::init<>());
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  // Backup solution // FIXME remove it if not necessary
+  py::class_<PyNuggetKriging>(m, "WrappedPyNuggetKriging")
+      .def(py::init<const std::string&>())
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const std::string&,
+                    const NuggetKriging::RegressionModel&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const NuggetKriging::Parameters&>(),
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("normalize") = false,
+           py::arg("optim") = "BFGS",
+           py::arg("objective") = "LL",
+           py::arg("parameters") = NuggetKriging::Parameters{})
+      .def("fit", &PyNuggetKriging::fit)
+      .def("predict", &PyNuggetKriging::predict)
+      .def("simulate", &PyNuggetKriging::simulate)
+      .def("update", &PyNuggetKriging::update)
+      .def("summary", &PyNuggetKriging::summary)
+      .def("logLikelihood", &PyNuggetKriging::logLikelihoodEval)
+      .def("logMargPost", &PyNuggetKriging::logMargPostEval);
+
+  // Automated mapper
+  py::class_<NuggetKriging>(m, "PyNuggetKriging")
+      .def(py::init<const std::string&>())
+      .def(py::init<const arma::colvec&,
+                    const arma::mat&,
+                    const std::string&,
+                    const NuggetKriging::RegressionModel&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const NuggetKriging::Parameters&>(),
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("normalize") = false,
+           py::arg("optim") = "BFGS",
+           py::arg("objective") = "LL",
+           py::arg("parameters") = NuggetKriging::Parameters{})
+      .def("fit",
+           &NuggetKriging::fit,
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("normalize") = false,
+           py::arg("optim") = "BFGS",
+           py::arg("objective") = "LL",
+           py::arg("parameters") = NuggetKriging::Parameters{})
+      .def("predict", &NuggetKriging::predict)
+      .def("simulate", &NuggetKriging::simulate)
+      .def("update", &NuggetKriging::update)
+      .def("summary", &NuggetKriging::summary)
+      .def("logLikelihood", &NuggetKriging::logLikelihoodEval)
+      .def("logMargPost", &NuggetKriging::logMargPostEval);
 }

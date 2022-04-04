@@ -1,4 +1,5 @@
 #include "Kriging_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "mlibKriging_exports.h"
@@ -82,6 +83,25 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::logMargPost"_hash:
       return KrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "NuggetKriging::new"_hash:
+      return NuggetKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::delete"_hash:
+      return NuggetKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::fit"_hash:
+      return NuggetKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::predict"_hash:
+      return NuggetKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::simulate"_hash:
+      return NuggetKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::update"_hash:
+      return NuggetKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::summary"_hash:
+      return NuggetKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::logLikelihood"_hash:
+      return NuggetKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::logMargPost"_hash:
+      return NuggetKrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

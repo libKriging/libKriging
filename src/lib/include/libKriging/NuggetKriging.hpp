@@ -1,5 +1,5 @@
-#ifndef LIBKRIGING_KRIGING_HPP
-#define LIBKRIGING_KRIGING_HPP
+#ifndef LIBKRIGING_NUGGETKRIGING_HPP
+#define LIBKRIGING_NUGGETKRIGING_HPP
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -198,4 +198,4 @@ public:
   LIBKRIGING_EXPORT std::string summary() const;
 };
 
-#endif  // LIBKRIGING_KRIGING_HPP
+#endif  // LIBKRIGING_NUGGETKRIGING_HPP
