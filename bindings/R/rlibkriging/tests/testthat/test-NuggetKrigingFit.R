@@ -11,7 +11,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS10")
 l = as.list(r)
 
 save(list=ls(),file="fit-nugget-1d.Rdata")
@@ -50,7 +50,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS10")
 l = as.list(r)
 
 save(list=ls(),file="fit-nugget-2d.Rdata")
@@ -161,8 +161,8 @@ X <- cbind(runif(n,0,1),runif(n,0,15))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=TRUE,optim="BFGS",multistart=20,parinit = c(0.5,5))
-r <- NuggetKriging(y, X, "gauss",parameters=list(theta=matrix(c(0.5,5),ncol=2)))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=TRUE,optim="BFGS",multistart=20)#,parinit = c(0.5,5))
+r <- NuggetKriging(y, X, "gauss",, optim = "BFGS10")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
 l = as.list(r)
 
 save(list=ls(),file="fit-nugget-2d-not01.Rdata")

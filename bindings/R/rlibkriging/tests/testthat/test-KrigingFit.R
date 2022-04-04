@@ -14,7 +14,14 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- Kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) logLikelihood(r,x)$logLikelihood)
-plot(ll,xlim=c(0.001,1))
+plot(ll,xlim=c(0.000001,1))
+  for (x in seq(0.000001,1,,11)){
+    envx = new.env()
+    ll2x = logLikelihood(r,x)$logLikelihood
+    gll2x = logLikelihood(r,x,grad = T)$logLikelihoodGrad
+    arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
+  }
+
 theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
@@ -37,8 +44,8 @@ X <- cbind(runif(n),runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
-r <- Kriging(y, X, "gauss")
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),parinit = c(.2,.5))
+r <- Kriging(y, X, "gauss", parameters=list(theta=matrix(c(.2,.5),ncol=2)))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));

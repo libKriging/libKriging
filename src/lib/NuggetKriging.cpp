@@ -642,7 +642,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
+      int multistart = 1;      
+      try { 
+        multistart = std::stoi(optim.substr(4));
+      } catch(std::invalid_argument){
+        // let multistart = 1
+      }
       theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
