@@ -832,7 +832,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   arma::uword n = X.n_rows;
   arma::uword d = X.n_cols;
 
-  arma::vec theta_lower = 1e-10 * arma::ones<arma::vec>(d);
+  arma::vec theta_lower = 1e-3 * trans(max(X, 0) - min(X, 0));
   arma::vec theta_upper = 2 * trans(max(X, 0) - min(X, 0));
 
   std::function<double(const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data)>

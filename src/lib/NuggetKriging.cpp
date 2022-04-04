@@ -507,7 +507,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   arma::uword n = X.n_rows;
   arma::uword d = X.n_cols;
 
-  arma::vec theta_lower = 1e-10 * arma::ones<arma::vec>(d);
+  arma::vec theta_lower = 1e-3 * trans(max(X, 0) - min(X, 0));
   arma::vec theta_upper = 2 * trans(max(X, 0) - min(X, 0));
 
   std::function<double(const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data)>
