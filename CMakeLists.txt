@@ -189,6 +189,7 @@ add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
 add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 #add_definitions(-DCARMA_DEBUG)
 #add_definitions(-DCARMA_EXTRA_DEBUG)
+add_definitions(-DARMA_USE_EXTERN_RNG)
 
 #------------------------------------------------------
 
