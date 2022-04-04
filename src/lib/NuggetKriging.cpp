@@ -4,10 +4,11 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/Random.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
-#include "libKriging/NuggetKriging.hpp"
 #include "libKriging/KrigingException.hpp"
+#include "libKriging/NuggetKriging.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
@@ -637,12 +638,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_est_nugget = parameters.estim_nugget;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
-    arma::arma_rng::set_seed(123); // that should be setup by user, somewhere...
+    Random::set_seed(123); // that should be setup by user, somewhere...
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
-      theta0 = arma::randu(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
+      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -655,13 +656,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
         for (size_t j = 0; j < parameters.nugget.n_elem ; j++) {
           if (parameters.sigma2[i]<=0 | parameters.nugget[j]<=0)
-            alpha0[i+j*parameters.sigma2.n_elem] = arma::as_scalar(arma::randu(1));
+            alpha0[i+j*parameters.sigma2.n_elem] = Random::randu();
           else
             alpha0[i+j*parameters.sigma2.n_elem] = parameters.sigma2[i] / (parameters.sigma2[i] + parameters.nugget[j]);
         }
       }
     } else {
-      alpha0 = arma::randu(theta0.n_rows);
+      alpha0 = Random::randu_vec(theta0.n_rows);
     }
 
     // arma::cout << "alpha0:" << alpha0 << arma::endl;
@@ -927,8 +928,8 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat yp(m, nsim);
   yp.each_col() = y_trend;
 
-  arma::arma_rng::set_seed(seed);
-  yp += tT_cond * arma::randn(m, nsim) * std::sqrt(m_sigma2 + m_nugget);
+  Random::set_seed(seed);
+  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2 + m_nugget);
   // t0 = toc("yp             ", t0);
 
   // Un-normalize simulations

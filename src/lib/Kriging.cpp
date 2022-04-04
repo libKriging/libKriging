@@ -4,10 +4,11 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/Random.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
-#include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingException.hpp"
+#include "libKriging/Kriging.hpp"
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -957,12 +958,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_sigma2 = parameters.estim_sigma2;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
-    arma::arma_rng::set_seed(123); // that should be setup by user, somewhere...
+    Random::set_seed(123); // that should be setup by user, somewhere...
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
-      theta0 = arma::randu(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
+      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -1022,13 +1023,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
-    arma::arma_rng::set_seed(123); // that should be setup by user, somewhere...
+    Random::set_seed(123); // that should be setup by user, somewhere...
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
       int multistart = 1;             // TODO? stoi(substr(optim_method,)) to hold 'bfgs10' as a 10 multistart bfgs
-      arma::arma_rng::set_seed(123);  // FIXME arbitrary seed for reproducible random sequences
-      theta0 = arma::randu(multistart, d) % (max(m_X, 0) - min(m_X, 0));
+      theta0 = Random::randu_mat(multistart, d) % (max(m_X, 0) - min(m_X, 0));
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -1260,8 +1260,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat yp(m, nsim);
   yp.each_col() = y_trend;
 
-  arma::arma_rng::set_seed(seed);
-  yp += tT_cond * arma::randn(m, nsim) * std::sqrt(m_sigma2);
+  Random::set_seed(seed);
+  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2);
   // t0 = toc("yp             ", t0);
 
   // Un-normalize simulations
