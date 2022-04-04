@@ -6,29 +6,38 @@
 
 #include <random>
 
+#include "libKriging/Random.hpp"
+ 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+std::mt19937 Random::engine(123);
 
-// at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT void Random::set_seed(const int seed) {
-    engine.seed(seed);
+LIBKRIGING_EXPORT void Random::set_seed(unsigned int seed) {
+    engine.seed(seed); 
 };
 
-std::function<double()> Random::runif = []() {
-
+LIBKRIGING_EXPORT std::function<double()> Random::randu = []() {
+    std::uniform_real_distribution<double> dist{};
+    return dist(engine); 
 };
 
-std::function<arma::vec(const int)> Random::runif_vec = [](const int n) {
+LIBKRIGING_EXPORT std::function<arma::vec(const int)> Random::randu_vec = [](const int n) {
     std::uniform_real_distribution<double> dist{};
     arma::vec r(n, arma::fill::none);
     r.imbue([&]() { return dist(engine); });
     return r;
 };
 
-std::function<arma::mat(const int,const int)> Random::runif_mat = [](const int n, const int m) {
+LIBKRIGING_EXPORT std::function<arma::mat(const int,const int)> Random::randu_mat = [](const int n, const int m) {
     std::uniform_real_distribution<double> dist{};
     arma::mat r(n, m, arma::fill::none);
     r.imbue([&]() { return dist(engine); });
     return r;
 };
 
+LIBKRIGING_EXPORT std::function<arma::mat(const int,const int)> Random::randn_mat = [](const int n, const int m) {
+    std::normal_distribution<double> dist{};
+    arma::mat r(n, m, arma::fill::none);
+    r.imbue([&]() { return dist(engine); });
+    return r;
+};

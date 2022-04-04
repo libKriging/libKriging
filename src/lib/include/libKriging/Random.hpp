@@ -9,19 +9,21 @@
 
 class Random {
 
-  private:
+  public:
 
       static std::mt19937 engine;  // Mersenne twister random number engine
 
   public:
 
-      static void set_seed(const int seed) {engine(seed)};
+      LIBKRIGING_EXPORT static void set_seed(unsigned int seed);
 
-      static std::function<double()> runif;
+      LIBKRIGING_EXPORT static std::function<double()> randu;
 
-      static std::function<arma::vec(const int)> runif_vec;
+      LIBKRIGING_EXPORT static std::function<arma::vec(const int)> randu_vec;
 
-      static std::function<arma::mat(const int, const int)> runif_mat;
+      LIBKRIGING_EXPORT static std::function<arma::mat(const int, const int)> randu_mat;
+
+      LIBKRIGING_EXPORT static std::function<arma::mat(const int, const int)> randn_mat;
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_RANDOM_HPP
