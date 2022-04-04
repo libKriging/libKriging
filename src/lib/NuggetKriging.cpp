@@ -14,7 +14,6 @@
 #include <optim.hpp>
 #include <tuple>
 #include <vector>
-#include <random>
 
 /************************************************/
 /** implementation details forward declaration **/
