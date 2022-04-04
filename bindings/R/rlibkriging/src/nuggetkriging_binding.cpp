@@ -29,8 +29,10 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "has_sigma2");
       _parameters.push_back(!(params.containsElementNamed("estim_sigma2") && !params["estim_sigma2"]), "estim_sigma2");
     } else {
-      _parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      _parameters.push_back(true, "has_sigma2");
+      //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
+      //_parameters.push_back(true, "has_sigma2");
+      _parameters.push_back(-1, "sigma2");
+      _parameters.push_back(false, "has_sigma2");
       _parameters.push_back(true, "estim_sigma2");
     }
     if (params.containsElementNamed("nugget")) {
@@ -38,8 +40,10 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "has_nugget");
        _parameters.push_back(!(params.containsElementNamed("estim_nugget") && !params["estim_nugget"]), "estim_nugget");
     } else {
-      _parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      _parameters.push_back(true, "has_nugget");
+      //_parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
+      //_parameters.push_back(true, "has_nugget");
+      _parameters.push_back(-1, "nugget"); 
+      _parameters.push_back(false, "has_nugget");
       _parameters.push_back(true, "estim_nugget");
     }
     if (params.containsElementNamed("theta")) {
@@ -47,9 +51,11 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "has_theta");
       _parameters.push_back(!(params.containsElementNamed("estim_theta") && !params["estim_theta"]), "estim_theta");
     } else {
-      Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      _parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols, r.begin()), "theta");
-      _parameters.push_back(true, "has_theta");
+      //Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
+      //_parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols, r.begin()), "theta");
+      //_parameters.push_back(true, "has_theta");
+      _parameters.push_back(Rcpp::NumericMatrix(0,0), "theta");
+      _parameters.push_back(false, "has_theta");
       _parameters.push_back(true, "estim_theta");
     }
     if (params.containsElementNamed("beta")) {
@@ -62,15 +68,21 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "estim_beta");
     }
   } else {
-    Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = Rcpp::runif(1),
-                                     Rcpp::Named("has_sigma2") = true,
+    //Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
+    _parameters = Rcpp::List::create(//Rcpp::Named("sigma2") = Rcpp::runif(1),
+                                     //Rcpp::Named("has_sigma2") = true,
+                                     Rcpp::Named("sigma2") = -1,
+                                     Rcpp::Named("has_sigma2") = false,
                                      Rcpp::Named("estim_sigma2") = true,
-                                     Rcpp::Named("nugget") = Rcpp::runif(1),
-                                     Rcpp::Named("has_nugget") = true,
+                                     //Rcpp::Named("nugget") = Rcpp::runif(1),
+                                     //Rcpp::Named("has_nugget") = true,
+                                     Rcpp::Named("nugget") = -1,
+                                     Rcpp::Named("has_nugget") = false,
                                      Rcpp::Named("estim_nugget") = true,
-                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
-                                     Rcpp::Named("has_theta") = true,
+                                     //Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
+                                     //Rcpp::Named("has_theta") = true,
+                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(0,0),
+                                     Rcpp::Named("has_theta") = false,
                                      Rcpp::Named("estim_theta") = true,
                                      Rcpp::Named("beta") = Rcpp::NumericVector(0),
                                      Rcpp::Named("has_beta") = false,
