@@ -32,6 +32,9 @@ TMP_DIR=build/tmp
 mkdir -p "${TMP_DIR}"
 
 RVER=$(awk -F": " '/^Version:/ { print $2 }' "${PREFIX}"/DESCRIPTION)
+ 
+# shorten tag to match R requirements.
+GIT_TAG=${GIT_TAG//-*} # remove everything after first -
 
 case $ARCH in
   Linux)
