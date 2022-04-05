@@ -632,12 +632,16 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
 
   // Default prior params
   double a = 0.2;
-  double b = 1 / pow(m_X.n_rows, 1 / m_X.n_cols) * (a + m_X.n_cols);
+  double b = 1.0 / pow(m_X.n_rows, 1.0 / m_X.n_cols) * (a + 1.0);
   // t0 = toc("b             ", t0);
 
-  arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(m_X.n_rows, 1 / m_X.n_cols);
+  arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(m_X.n_rows, 1.0 / m_X.n_cols);
   // t0 = toc("CL             ", t0);
-  double t = arma::accu(CL % pow(_theta, -1));
+  double t = arma::accu(CL % pow(_theta, -1.0));
+  // arma::cout << " a:" << a << arma::endl;
+  // arma::cout << " b:" << b << arma::endl;
+  // arma::cout << " t:" << t << arma::endl;
+
   double log_approx_ref_prior = -b * t + a * log(t);
   // arma::cout << " log_approx_ref_prior:" << log_approx_ref_prior << arma::endl;
 
@@ -696,10 +700,10 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
                + (m_X.n_rows - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
       // t0 = toc("ans             ", t0);
     }
-    // arma::cout << " log_marginal_lik_deriv:" << -ans * pow(_theta,2) << arma::endl;
-    // arma::cout << " log_approx_ref_prior_deriv:" <<  a*CL/t - b*CL << arma::endl;
+    // arma::cout << " log_marginal_lik_deriv:" << ans << arma::endl;
+    // arma::cout << " log_approx_ref_prior_deriv:" <<  - (a * CL / t - b * CL) / pow(_theta, 2.0) << arma::endl;
 
-    *grad_out = ans - (a * CL / t - b * CL) / pow(_theta, 2);
+    *grad_out = ans - (a * CL / t - b * CL) / pow(_theta, 2.0);
     // t0 = toc(" grad_out     ", t0);
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
