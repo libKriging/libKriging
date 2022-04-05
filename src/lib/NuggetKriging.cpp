@@ -4,6 +4,8 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/utils/lk_armadillo.hpp"
+
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/Random.hpp"
@@ -11,8 +13,6 @@
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/NuggetKriging.hpp"
-
-#include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
 #include <optim.hpp>
@@ -539,7 +539,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
       // Change variable for opt: . -> 1/exp(.)
       arma::vec _theta_alpha = 1 / arma::exp(_gamma);
       _theta_alpha[_theta_alpha.n_elem-1] = _gamma[_theta_alpha.n_elem-1]; // opt!
@@ -554,7 +554,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
       // Change variable for opt: . -> 1/exp(.)
       arma::vec _theta_alpha = 1 / arma::exp(_gamma);
       _theta_alpha[_theta_alpha.n_elem-1] = _gamma[_theta_alpha.n_elem-1]; // opt!
