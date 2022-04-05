@@ -237,11 +237,7 @@ precision <- 1e-1
 test_that(desc=paste0("Fit: 2D (Branin) / rgasp/lmp is the same that lk/lmp one"),
           expect_equal(lmp_rgasp(c(1,1)),lmp_lk(c(1,1)),tol = precision))
 test_that(desc=paste0("Fit: 2D (Branin) / fitted theta is the same that RobustGaSP one"),
-          expect_equal(lmp_rgasp(log(k@beta_hat),lmp_rgasp(t(log(1/as.list(r)$theta))),tol = precision))
-
-
-test_that(desc="Fit: 2D (Branin) / fit of theta 2D is _quite_ the same that DiceKriging one",
-          expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
+          expect_equal(lmp_rgasp(log(k@beta_hat)),lmp_rgasp(t(log(1/as.list(r)$theta))),tol = precision))
 
 
 dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=2);
