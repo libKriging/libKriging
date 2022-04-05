@@ -4,12 +4,12 @@ on:
   push:
     tags:
        - 'v*' # release tag trigger 
-#  workflow_dispatch:
-#    inputs:
-#      release-tag:
-#        description: 'Release tag'
-#        required: true
-#        default: ''
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag'
+        required: true
+        default: ''
 #  release:
 #    types:
 #      - created
@@ -37,31 +37,32 @@ jobs:
           if [ -n "${{ github.event.inputs.release-tag }}" ]; then
             GIT_TAG=${{ github.event.inputs.release-tag }}
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
+            GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            echo "Default GITHUB_REF is $GITHUB_REF" 
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
-      - name: Verify version name 
+      - name: Verify version name
         run: |
           echo "Checking release tag: ${GIT_TAG}" 
-          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
             echo "Valid version name"
           else
-            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+\$"
+            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+.*\$"
             exit 1
           fi
           
       - name: Verify source code consistency
         run: |
           CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
-          if [[ "${GIT_TAG}" != "v${CODE_VERSION}" ]]; then
+          if [[ ! "${GIT_TAG}" ~= "v${CODE_VERSION}" ]]; then
             echo "Non consistent code and requested tag versions"
             exit 1
           fi
           
-      - name: Check available version in pypi.org 
+      - name: Check available version in pypi.org
         run: |
           if ( python3 .travis-ci/release/check_python_release.py pylibkriging ${GIT_TAG##v} ); then
             echo "Cannot re-upload already available version ${GIT_TAG} in pypi.org"  
@@ -99,7 +100,7 @@ jobs:
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
               GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
           
@@ -185,7 +186,7 @@ jobs:
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
               GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
           
@@ -278,7 +279,7 @@ jobs:
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
               GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
@@ -379,7 +380,7 @@ jobs:
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
               GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
         
@@ -464,7 +465,7 @@ jobs:
           elif [ -n "${{ github.event.release.tag_name }}" ]; then
               GIT_TAG=${{ github.event.release.tag_name }}
           else
-            GIT_TAG="${GITHUB_REF##*/}"
+            GIT_TAG=$(git describe --tags)
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
