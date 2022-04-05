@@ -1,0 +1,43 @@
+// clang-format off
+// MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
+#define _USE_MATH_DEFINES // required for Visual Studio
+#include <cmath>
+// clang-format on
+
+#include <random>
+
+#include "libKriging/Random.hpp"
+ 
+#include "libKriging/utils/lk_armadillo.hpp"
+
+std::mt19937 Random::engine(123);
+
+LIBKRIGING_EXPORT void Random::set_seed(unsigned int seed) {
+    engine.seed(seed); 
+};
+
+LIBKRIGING_EXPORT std::function<double()> Random::randu = []() {
+    std::uniform_real_distribution<double> dist{};
+    return dist(engine); 
+};
+
+LIBKRIGING_EXPORT std::function<arma::vec(const int)> Random::randu_vec = [](const int n) {
+    std::uniform_real_distribution<double> dist{};
+    arma::vec r(n, arma::fill::none);
+    r.imbue([&]() { return dist(engine); });
+    return r;
+};
+
+LIBKRIGING_EXPORT std::function<arma::mat(const int,const int)> Random::randu_mat = [](const int n, const int m) {
+    std::uniform_real_distribution<double> dist{};
+    arma::mat r(n, m, arma::fill::none);
+    r.imbue([&]() { return dist(engine); });
+    return r;
+};
+
+LIBKRIGING_EXPORT std::function<arma::mat(const int,const int)> Random::randn_mat = [](const int n, const int m) {
+    std::normal_distribution<double> dist{};
+    arma::mat r(n, m, arma::fill::none);
+    r.imbue([&]() { return dist(engine); });
+    return r;
+};

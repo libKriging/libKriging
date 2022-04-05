@@ -217,6 +217,25 @@ jobs:
       - name: test
         shell: bash
         run: .travis-ci/${BUILD_NAME}/test.sh
+        id: test
+        continue-on-error: true
+
+      - if: steps.test.outcome != 'success'
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts-${{ runner.os }}
+          path: |
+            **/*.txt
+            **/*.log
+            **/*.pdf
+            **/*.Rdata
+            **/*.rds
+            **/*.zip
+            **/*.tgz
+            **/*.tar.gz
+      
+      - if: steps.test.outcome != 'success'
+        run: exit 1
 
       - name: publish_report
         shell: bash

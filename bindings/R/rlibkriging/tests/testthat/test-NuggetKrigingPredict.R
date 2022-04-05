@@ -7,11 +7,12 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 #points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
 library(rlibkriging)
-r <- Kriging(y,X,"gauss","constant",FALSE,"none","LL",
-             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
-             theta=matrix(k@covariance@range.val),has_theta=TRUE))
+r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
+             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, estim_sigma2=FALSE,
+             theta=matrix(k@covariance@range.val),has_theta=TRUE, estim_theta=FALSE,
+             nugget=k@covariance@nugget,has_nugget=TRUE, estim_nugget=FALSE))
 # m = as.list(r)
 
 ntest <- 100
@@ -36,16 +37,3 @@ test_that(desc="pred sd is the same that DiceKriging one",
 
 test_that(desc="pred cov is the same that DiceKriging one", 
           expect_equal(cktest,c(Ytest$cov) ,tol = precision))
-
-#plot(f)
-#points(X,y)
-#x=seq(0,1,,101)
-#lines(x,predict(r,x)$mean,lty=2)
-#polygon(
-#    c(x,rev(x)),
-#    c(predict(r,x)$mean-2*predict(r,x)$stdev,
-#      predict(r,rev(x))$mean+2*predict(r,rev(x))$stdev),
-#      col=rgb(0,0,0,.1),border=NA)
-#
-#for (i in 1:10)
-#    lines(x,simulate(r,x=x,seed=i),col='grey')
