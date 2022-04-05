@@ -26,7 +26,8 @@ jobs:
     runs-on: ubuntu-18.04
     outputs:
       git-tag: ${{ steps.expose-variable.outputs.git-tag }}
-
+      draft-release: ${{ steps.expose-variable.outputs.draft-release }}
+      
     steps:
       - uses: actions/checkout@v2
         with:
@@ -53,7 +54,6 @@ jobs:
           if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
             echo "Valid version name"
           else
-            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+.*\$"
             exit 1
           fi
@@ -61,7 +61,8 @@ jobs:
       - name: Verify source code consistency
         run: |
           CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
-          if [[ ! "${GIT_TAG}" =~ "^v${CODE_VERSION}" ]]; then
+          if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
+            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Non consistent code and requested tag versions"
             exit 1
           fi
@@ -74,11 +75,18 @@ jobs:
           else
             echo "Ok to build this new version ${GIT_TAG}"
           fi
-      - name: Define a global variable for next jobs
+          
+      - name: Define a global variables for next jobs
         id: expose-variable
         run: |
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DRAFT_RELEASE=false
+          else
+            DRAFT_RELEASE=true
+          fi
           # GHA hack
           echo "::set-output name=git-tag::${GIT_TAG}"
+          echo "::set-output name=draft-release::${DRAFT_RELEASE}"
 
   build-wheel-python:
     needs: check-release-consistency
@@ -374,8 +382,13 @@ jobs:
         run: |
           set -eo pipefail
 
+          if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+              QUALIFIER="Draft release"            
+          else
+              QUALIFIER="Release"  
+          fi
           cat <<EOF > RELEASE_NOTE.md
-          Release $GIT_TAG
+          ${QUALIFIER} ${GIT_TAG}
 
           This is an automated release note.
           
@@ -386,7 +399,9 @@ jobs:
 
   release-python-wheel:
     name: Release Python Wheel to Pypi.org
-    needs: all-package-build-checkpoint
+    needs:
+      - check-release-consistency
+      - all-package-build-checkpoint
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/download-artifact@v2
@@ -412,6 +427,7 @@ jobs:
           python3 -m twine upload \
                   --repository-url https://upload.pypi.org/legacy/ \
                   ./dist/*.whl
+        if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}  
 
   release-artifacts:
     name: Upload Release Asset
@@ -428,7 +444,7 @@ jobs:
         with:
           name: python-artifact
           path: dist
-        if: ${{ false }}  # disable for now
+        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
 
       - uses: actions/download-artifact@v2
         with:
@@ -460,4 +476,9 @@ jobs:
           for asset in ./dist/*; do
             assets+=("-a" "$asset")
           done
-          hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+          if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+            hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"          
+          else
+            hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+          fi
+          
