@@ -59,6 +59,10 @@ case $ARCH in
     unzip "${PREFIX}_${RVER}.zip" -d "${TMP_DIR}"
     cp -a build/installed/bin/libarmadillo.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no armadillo shared lib to copy"
     cp -a build/installed/bin/libKriging.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no libKriging shared lib to copy"
+    for extralib in openblas.dll libomp.dll flangrti.dll flang.dll
+    do
+      cp "${HOME}"/Miniconda3/Library/bin/$extralib "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no $extralib lib to copy"
+    done
     # RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG#v}.zip
     RELEASE_FILE="${PREFIX}_${GIT_TAG#v}.zip" # cannot rename for Windows
     (cd "${TMP_DIR}" && zip -FS -r "${RELEASE_FILE}" rlibkriging)
