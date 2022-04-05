@@ -8,7 +8,7 @@ on:
     inputs:
       release-tag:
         description: 'Release tag'
-        required: true
+        required: false
         default: ''
 #  release:
 #    types:
