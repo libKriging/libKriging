@@ -114,7 +114,6 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
 
   double _alpha = _theta_alpha.at(d);
   arma::vec _theta = _theta_alpha.head(d);
-  // That should never occur: if (!estim_nugget & !estim_sigma2) stop(...)
 
   // auto t0 = tic();
   arma::mat R = arma::mat(n, n);
@@ -267,7 +266,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodEval
 }
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
 
-double NuggetKriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const {
+double NuggetKriging::logMargPost(const arma::vec& _theta_alpha, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
   // In RobustGaSP:
@@ -320,12 +319,15 @@ double NuggetKriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, 
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;
 
+  double _alpha = _theta_alpha.at(d);
+  arma::vec _theta = _theta_alpha.head(d);
+
   // auto t0 = tic();
   arma::mat R = arma::mat(n, n);
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta);
+      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta) * _alpha;
     }
   }
   // t0 = toc("R             ", t0);
@@ -376,10 +378,19 @@ double NuggetKriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, 
     arma::mat G;
     qr_econ(Q, G, fd->M);
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
-    fd->z = Yt - fd->M * fd->beta;
   }
-  if (fd->estim_sigma2)  // means no sigma2 provided
-    fd->sigma2 = arma::accu(fd->z % fd->z) / n;
+
+  fd->z = Yt - fd->M * fd->beta;
+
+  fd->var = arma::accu(fd->z % fd->z) / n;
+  if (fd->estim_nugget) {
+    fd->nugget = (1 - _alpha) * fd->var;
+    if (fd->estim_sigma2)
+      fd->sigma2 = _alpha * fd->var;
+  } else {
+    if (fd->estim_sigma2)
+      fd->sigma2 = fd->var - fd->nugget;
+  }
   // t0 = toc("sigma2_hat    ", t0);
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
@@ -399,7 +410,7 @@ double NuggetKriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, 
 
   arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(m_X.n_rows, 1 / m_X.n_cols);
   // t0 = toc("CL             ", t0);
-  double t = arma::accu(CL % pow(_theta, -1));
+  double t = arma::accu(CL % pow(_theta, -1)) + fd->nugget;
   double log_approx_ref_prior = -b * t + a * log(t);
   // arma::cout << " log_approx_ref_prior:" << log_approx_ref_prior << arma::endl;
 
@@ -460,7 +471,16 @@ double NuggetKriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, 
     // arma::cout << " log_marginal_lik_deriv:" << -ans * pow(_theta,2) << arma::endl;
     // arma::cout << " log_approx_ref_prior_deriv:" <<  a*CL/t - b*CL << arma::endl;
 
-    *grad_out = ans - (a * CL / t - b * CL) / pow(_theta, 2);
+    (*grad_out).head(d) = ans - (a * CL / t - b * CL) / pow(_theta, 2);
+
+    arma::mat gradR_d = arma::ones(n,n);
+    Wb_k = trans(solve(trans(L), solve(L, gradR_d, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
+             - gradR_d * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
+    double ans_d = -0.5 * sum(Wb_k.diag())
+               + (m_X.n_rows - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
+
+    (*grad_out).at(d) = ans_d - (a * 1.0 / t - b * 1.0);
+ 
     // t0 = toc(" grad_out     ", t0);
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
