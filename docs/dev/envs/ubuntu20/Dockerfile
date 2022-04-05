@@ -3,7 +3,8 @@ ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 RUN echo "Running on $BUILDPLATFORM, building for $TARGETPLATFORM"
 COPY install.sh /
-RUN /install.sh && rm -rf /var/lib/apt/lists/*
+RUN /install-build.sh && rm -rf /var/lib/apt/lists/*
+RUN /install-server.sh && rm -rf /var/lib/apt/lists/*
 RUN apt update && apt install -y clang-tidy && rm -rf /var/lib/apt/lists/*
 
 # extra python usually installed using linux-macos/install.sh
