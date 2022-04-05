@@ -31,7 +31,7 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(!(params.containsElementNamed("estim_sigma2") && !params["estim_sigma2"]), "estim_sigma2");
     } else {
       //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
-      //https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_sigma2");
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_sigma2");
       _parameters.push_back(-1, "sigma2");
       _parameters.push_back(false, "has_sigma2");
       _parameters.push_back(true, "estim_sigma2");
@@ -42,7 +42,7 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(!(params.containsElementNamed("estim_nugget") && !params["estim_nugget"]), "estim_nugget");
     } else {
       //_parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug:
-      //https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_nugget");
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_nugget");
       _parameters.push_back(-1, "nugget");
       _parameters.push_back(false, "has_nugget");
       _parameters.push_back(true, "estim_nugget");
@@ -54,7 +54,7 @@ Rcpp::List new_NuggetKriging(arma::vec y,
     } else {
       // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
       // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols,
-      //r.begin()), "theta"); _parameters.push_back(true, "has_theta");
+      // r.begin()), "theta"); _parameters.push_back(true, "has_theta");
       _parameters.push_back(Rcpp::NumericMatrix(0, 0), "theta");
       _parameters.push_back(false, "has_theta");
       _parameters.push_back(true, "estim_theta");
