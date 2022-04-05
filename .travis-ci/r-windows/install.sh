@@ -14,33 +14,54 @@ BASEDIR=$(readlink -f "${BASEDIR}")
 # https://chocolatey.org/packages/make
 choco install -y --no-progress make --version 4.3
 
-if [ "${TRAVIS}" == "true" ]; then
-  # Using chocolatey and manual command
-  # https://chocolatey.org/packages/R.Project
-  choco install -y --no-progress r.project --version 4.0.0
-  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
-      # https://cran.r-project.org/bin/windows/Rtools
-      curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
-      "${BASEDIR}"/install_rtools.bat
+# Allow to fail
+REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe") || true
+
+if [ -z "$REXE" ]; then
+  if [ "${TRAVIS}" == "true" ]; then
+    # Using chocolatey and manual command
+    # https://chocolatey.org/packages/R.Project
+    choco install -y --no-progress r.project --version 4.0.0
   else
-    echo "Rtools installation detected: nothing to do"
+    echo "Missing R program"
+    echo "Don't know how to install it"
+    exit 1
   fi
-elif [ "${GITHUB_ACTIONS}" == "true" ]; then
-  # Already installed
-#  if [ ! -f "C:/Rtools/VERSION.txt" ]; then
-#      # https://cran.r-project.org/bin/windows/Rtools
-#      curl -s -Lo ${HOME}/Downloads/Rtools.exe https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe
-#      "${BASEDIR}"/install_rtools.bat
-#  else
-#    echo "Rtools installation detected: nothing to do"
-#  fi
-  : # do nothing
-else
-  echo "Unknown CI environment"
-  exit 1
 fi
 
+# Could be updated after install; cannot fail
+REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe")
+RVERSION=$("$REXE" --version 2>&1 | grep -o "R version [[:digit:]]\.[[:digit:]]")
 
+# https://cran.r-project.org/bin/windows/Rtools
+case "$RVERSION" in
+  "R version 3.3"|"R version 3.4"|"R version 3.5"|"R version 3.6")
+    RTOOLSURL=https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe
+    RTOOLSDIR=Rtools
+    ;;
+  "R version 4.0"|"R version 4.1")    
+    RTOOLSURL=https://cran.r-project.org/bin/windows/Rtools/rtools40-x86_64.exe
+    RTOOLSDIR=Rtools40
+    ;;
+  "R version 4.2")    
+    RTOOLSURL=https://cran.r-project.org/bin/windows/Rtools/rtools42/files/rtools42-5111-5107.exe
+    RTOOLSDIR=Rtools42
+    ;;
+  *)
+    echo "Cannot found Rtools related to $RVERSION"
+    exit 1
+    ;;
+esac
+
+if [ ! -d /c/$RTOOLSDIR ]; then
+  if [ -d /c/Rtools ]; then
+    echo "Conflicting existing /c/Rtools directory; aborting"
+    exit 1
+  fi
+  curl -s -Lo "${HOME}"/Downloads/Rtools.exe "$RTOOLSURL" 
+  "${BASEDIR}"/install_rtools.bat
+  mv /c/Rtools /c/$RTOOLSDIR
+fi
 
 # For R packaging
 choco install -y --no-progress zip
