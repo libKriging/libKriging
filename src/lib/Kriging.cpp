@@ -612,14 +612,15 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     fd->z = Yt - fd->M * fd->beta;
   }
-  if (fd->estim_sigma2)  // means no sigma2 provided
-    fd->sigma2 = arma::accu(fd->z % fd->z) / n;
-  // t0 = toc("sigma2_hat    ", t0);
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
   // t0 = toc("yt_R_inv             ", t0);
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
   // t0 = toc("S_2             ", t0);
+  
+  if (fd->estim_sigma2)  // means no sigma2 provided
+    fd->sigma2 = S_2(0, 0)/(n-d);
+
   double log_S_2 = log(S_2(0, 0));
 
   double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (m_X.n_rows - m_F.n_cols) / 2.0 * log_S_2;
@@ -1133,7 +1134,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
   pred_mean = m_centerY + m_scaleY * pred_mean;
 
   if (withStd) {
-    double total_sd2 = m_sigma2;
+    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n-d)/(n-d-2) : 1.0);
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
     arma::colvec s2_predict_1 = total_sd2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
     // Type = "UK"
@@ -1161,6 +1162,8 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
       pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
     }
   } else if (withCov) {
+    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n-d)/(n-d-2) : 1.0);
+
     arma::mat C_newdata = arma::mat(m, m);
     for (arma::uword i = 0; i < m; i++) {
       C_newdata.at(i, i) = 1;
@@ -1171,7 +1174,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     // Need to compute matrices computed in withStd case
     arma::mat TM = trans(chol(trans(m_M) * m_M));
     arma::mat s2_predict_mat = solve(TM, trans(Ftest - trans(Tinv_newdata) * m_M), arma::solve_opts::fast);
-    pred_cov = m_sigma2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
+    pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
   }
 
   return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
@@ -1271,7 +1274,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   yp.each_col() = y_trend;
 
   Random::set_seed(seed);
-  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2);
+  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2) * (m_objective.compare("LMP")  == 0 ? sqrt((n-d)/(n-d-2)) : 1.0);
   // t0 = toc("yp             ", t0);
 
   // Un-normalize simulations
