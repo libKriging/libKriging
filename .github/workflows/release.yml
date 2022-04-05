@@ -53,7 +53,6 @@ jobs:
           if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
             echo "Valid version name"
           else
-            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+.*\$"
             exit 1
           fi
@@ -61,7 +60,8 @@ jobs:
       - name: Verify source code consistency
         run: |
           CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
-          if [[ ! "${GIT_TAG}" =~ "^v${CODE_VERSION}" ]]; then
+          if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
+            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Non consistent code and requested tag versions"
             exit 1
           fi
