@@ -29,6 +29,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: false
+          fetch-depth: 0
 
       - name: Check tag
         shell: bash
@@ -70,6 +71,14 @@ jobs:
           else
             echo "Ok to build this new version ${GIT_TAG}"
           fi
+      - name: Define a global variable for next jobs
+        run: |
+          # GHA hack
+          echo "::set-output name=git-tag::${GIT_TAG}"
+      outputs:
+        git-tag:
+          description: "Reference tag for this release"
+          value: ${{ steps.git-tag.outputs.git-tag }}
 
   build-wheel-python:
     needs: check-release-consistency
@@ -94,14 +103,7 @@ jobs:
       - name: Check tag
         shell: bash
         run: |
-          set -eo pipefail
-          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
-            GIT_TAG=${{ github.event.inputs.release-tag }}
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
-          else
-            GIT_TAG=$(git describe --tags)
-          fi
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
           
       - name: Setup python
@@ -180,14 +182,7 @@ jobs:
       - name: Check tag
         shell: bash
         run: |
-          set -eo pipefail
-          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
-            GIT_TAG=${{ github.event.inputs.release-tag }}
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
-          else
-            GIT_TAG=$(git describe --tags)
-          fi
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
           
       - name: Define local variables
@@ -273,14 +268,7 @@ jobs:
       - name: Check tag
         shell: bash
         run: |
-          set -eo pipefail
-          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
-            GIT_TAG=${{ github.event.inputs.release-tag }}
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
-          else
-            GIT_TAG=$(git describe --tags)
-          fi
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
       - name: Define local variables
@@ -362,6 +350,7 @@ jobs:
   all-package-build-checkpoint:
     name: Build package checkpoint
     needs:
+      - check-release-consistency
       - build-wheel-python
       - build-R-package
       - build-octave-package
@@ -374,14 +363,7 @@ jobs:
       - name: Check tag
         shell: bash
         run: |
-          set -eo pipefail
-          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
-            GIT_TAG=${{ github.event.inputs.release-tag }}
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
-          else
-            GIT_TAG=$(git describe --tags)
-          fi
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
         
       - name: Create release
@@ -433,7 +415,9 @@ jobs:
 
   release-artifacts:
     name: Upload Release Asset
-    needs: all-package-build-checkpoint
+    needs:
+      - check-release-consistency
+      - all-package-build-checkpoint
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -459,14 +443,7 @@ jobs:
       - name: Check tag
         shell: bash
         run: |
-          set -eo pipefail
-          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
-            GIT_TAG=${{ github.event.inputs.release-tag }}
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-              GIT_TAG=${{ github.event.release.tag_name }}
-          else
-            GIT_TAG=$(git describe --tags)
-          fi
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
       - name: upload assets
