@@ -604,7 +604,8 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
       = R_inv_X
         * (solve(trans(LX),
                  solve(LX, trans(R_inv_X), LinearAlgebra::default_solve_opts),
-                 LinearAlgebra::default_solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward and one backward solve
+                 LinearAlgebra::default_solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward
+                                                       // and one backward solve
   // t0 = toc("R_inv_X_Xt_R_inv_X_inv_Xt_R_inv             ", t0);
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
   if (fd->estim_beta) {
@@ -619,9 +620,9 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("yt_R_inv             ", t0);
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
   // t0 = toc("S_2             ", t0);
-  
+
   if (fd->estim_sigma2)  // means no sigma2 provided
-    fd->sigma2 = S_2(0, 0)/(n-d);
+    fd->sigma2 = S_2(0, 0) / (n - d);
 
   double log_S_2 = log(S_2(0, 0));
 
@@ -687,7 +688,8 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
       gradR_k /= _theta.at(k);
       // t0 = toc(" gradR_k", t0);
 
-      Wb_k = trans(solve(trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
+      Wb_k = trans(solve(
+                 trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
              - gradR_k * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
       // t0 = toc("Wb_ti             ", t0);
       ans[k] = -0.5 * sum(Wb_k.diag())
@@ -964,17 +966,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_sigma2 = parameters.estim_sigma2;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
-    Random::set_seed(123); // that should be setup by user, somewhere...
+    Random::set_seed(123);  // that should be setup by user, somewhere...
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;      
-      try { 
+    if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+      int multistart = 1;
+      try {
         multistart = std::stoi(optim.substr(4));
-      } catch(std::invalid_argument){
+      } catch (std::invalid_argument) {
         // let multistart = 1
       }
-      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0),multistart,1);
+      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -1034,14 +1036,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
-    Random::set_seed(123); // that should be setup by user, somewhere...
+    Random::set_seed(123);  // that should be setup by user, somewhere...
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.has_theta) {      // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;      
-      try { 
+    if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+      int multistart = 1;
+      try {
         multistart = std::stoi(optim.substr(4));
-      } catch(std::invalid_argument){
+      } catch (std::invalid_argument) {
         // let multistart = 1
       }
       theta0 = Random::randu_mat(multistart, d) % (max(m_X, 0) - min(m_X, 0));
@@ -1139,7 +1141,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
   pred_mean = m_centerY + m_scaleY * pred_mean;
 
   if (withStd) {
-    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n-d)/(n-d-2) : 1.0);
+    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
     arma::colvec s2_predict_1 = total_sd2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
     // Type = "UK"
@@ -1167,7 +1169,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
       pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
     }
   } else if (withCov) {
-    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n-d)/(n-d-2) : 1.0);
+    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
 
     arma::mat C_newdata = arma::mat(m, m);
     for (arma::uword i = 0; i < m; i++) {
@@ -1279,7 +1281,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   yp.each_col() = y_trend;
 
   Random::set_seed(seed);
-  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2) * (m_objective.compare("LMP")  == 0 ? sqrt((n-d)/(n-d-2)) : 1.0);
+  yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2)
+        * (m_objective.compare("LMP") == 0 ? sqrt((n - d) / (n - d - 2)) : 1.0);
   // t0 = toc("yp             ", t0);
 
   // Un-normalize simulations

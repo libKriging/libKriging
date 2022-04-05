@@ -27,16 +27,17 @@ void build(int nlhs, void** plhs, int nrhs, const void** prhs) {
   const auto normalize = input.getOptional<4, bool>("normalize").value_or(false);
   const auto optim = input.getOptional<5, std::string>("optim").value_or("BFGS");
   const auto objective = input.getOptional<6, std::string>("objective").value_or("LL");
-  const auto parameters = NuggetKriging::Parameters{};  // input.getOptional<7, std::string>("parameters").value_or(); //
+  const auto parameters
+      = NuggetKriging::Parameters{};  // input.getOptional<7, std::string>("parameters").value_or(); //
   // FIXME Parameters not done
   auto km = buildObject<NuggetKriging>(input.get<0, arma::vec>("vector"),
-                                 input.get<1, arma::mat>("matrix"),
-                                 input.get<2, std::string>("kernel"),
-                                 regmodel,
-                                 normalize,
-                                 optim,
-                                 objective,
-                                 parameters);
+                                       input.get<1, arma::mat>("matrix"),
+                                       input.get<2, std::string>("kernel"),
+                                       regmodel,
+                                       normalize,
+                                       optim,
+                                       objective,
+                                       parameters);
   output.set<0>(km, "new object reference");
 }
 
@@ -61,8 +62,9 @@ void fit(int nlhs, void** plhs, int nrhs, const void** prhs) {
   const auto normalize = input.getOptional<4, bool>("normalize").value_or(false);
   const auto optim = input.getOptional<5, std::string>("optim").value_or("BFGS");
   const auto objective = input.getOptional<6, std::string>("objective").value_or("LL");
-  const auto parameters = NuggetKriging::Parameters{};  // input.getOptional<7, std::string>("parameters").value_or(); //
-                                                  // FIXME Parameters not done
+  const auto parameters
+      = NuggetKriging::Parameters{};  // input.getOptional<7, std::string>("parameters").value_or(); //
+                                      // FIXME Parameters not done
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
   km->fit(input.get<1, arma::vec>("vector"),
           input.get<2, arma::mat>("matrix"),

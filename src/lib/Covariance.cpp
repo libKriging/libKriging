@@ -59,15 +59,13 @@ std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_matern52 = []
   return arma::conv_to<arma::vec>::from((a % b) / (a + b));
 };
 
-const double EPSILON=1E-13;
+const double EPSILON = 1E-13;
 
 std::function<double(const arma::vec&)> Covariance::CovNorm_fun_whitenoise = [](const arma::vec& _dist_norm) {
-  if (arma::sum(arma::abs(_dist_norm))<EPSILON) 
+  if (arma::sum(arma::abs(_dist_norm)) < EPSILON)
     return 1.0;
-  return 0.0;                     
+  return 0.0;
 };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_whitenoise = [](const arma::vec& _dist_norm) {
-  return arma::vec(_dist_norm.n_elem);
-};
-
+std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_whitenoise
+    = [](const arma::vec& _dist_norm) { return arma::vec(_dist_norm.n_elem); };

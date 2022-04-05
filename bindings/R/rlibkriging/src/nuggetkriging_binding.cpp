@@ -12,13 +12,13 @@
 
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,
-                       arma::mat X,
-                       std::string kernel,
-                       std::string regmodel = "constant",
-                       bool normalize = false,
-                       std::string optim = "BFGS",
-                       std::string objective = "LL",
-                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                             arma::mat X,
+                             std::string kernel,
+                             std::string regmodel = "constant",
+                             bool normalize = false,
+                             std::string optim = "BFGS",
+                             std::string objective = "LL",
+                             Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   NuggetKriging* ok = new NuggetKriging(kernel);
 
   Rcpp::List _parameters;
@@ -30,8 +30,8 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "has_sigma2");
       _parameters.push_back(!(params.containsElementNamed("estim_sigma2") && !params["estim_sigma2"]), "estim_sigma2");
     } else {
-      //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      //_parameters.push_back(true, "has_sigma2");
+      //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
+      //https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_sigma2");
       _parameters.push_back(-1, "sigma2");
       _parameters.push_back(false, "has_sigma2");
       _parameters.push_back(true, "estim_sigma2");
@@ -39,11 +39,11 @@ Rcpp::List new_NuggetKriging(arma::vec y,
     if (params.containsElementNamed("nugget")) {
       _parameters.push_back(params["nugget"], "nugget");
       _parameters.push_back(true, "has_nugget");
-       _parameters.push_back(!(params.containsElementNamed("estim_nugget") && !params["estim_nugget"]), "estim_nugget");
+      _parameters.push_back(!(params.containsElementNamed("estim_nugget") && !params["estim_nugget"]), "estim_nugget");
     } else {
-      //_parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      //_parameters.push_back(true, "has_nugget");
-      _parameters.push_back(-1, "nugget"); 
+      //_parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug:
+      //https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_nugget");
+      _parameters.push_back(-1, "nugget");
       _parameters.push_back(false, "has_nugget");
       _parameters.push_back(true, "estim_nugget");
     }
@@ -52,10 +52,10 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "has_theta");
       _parameters.push_back(!(params.containsElementNamed("estim_theta") && !params["estim_theta"]), "estim_theta");
     } else {
-      //Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-      //_parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols, r.begin()), "theta");
-      //_parameters.push_back(true, "has_theta");
-      _parameters.push_back(Rcpp::NumericMatrix(0,0), "theta");
+      // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols,
+      //r.begin()), "theta"); _parameters.push_back(true, "has_theta");
+      _parameters.push_back(Rcpp::NumericMatrix(0, 0), "theta");
       _parameters.push_back(false, "has_theta");
       _parameters.push_back(true, "estim_theta");
     }
@@ -69,25 +69,26 @@ Rcpp::List new_NuggetKriging(arma::vec y,
       _parameters.push_back(true, "estim_beta");
     }
   } else {
-    //Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug: https://github.com/msys2/MINGW-packages/issues/5019
-    _parameters = Rcpp::List::create(//Rcpp::Named("sigma2") = Rcpp::runif(1),
-                                     //Rcpp::Named("has_sigma2") = true,
-                                     Rcpp::Named("sigma2") = -1,
-                                     Rcpp::Named("has_sigma2") = false,
-                                     Rcpp::Named("estim_sigma2") = true,
-                                     //Rcpp::Named("nugget") = Rcpp::runif(1),
-                                     //Rcpp::Named("has_nugget") = true,
-                                     Rcpp::Named("nugget") = -1,
-                                     Rcpp::Named("has_nugget") = false,
-                                     Rcpp::Named("estim_nugget") = true,
-                                     //Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
-                                     //Rcpp::Named("has_theta") = true,
-                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(0,0),
-                                     Rcpp::Named("has_theta") = false,
-                                     Rcpp::Named("estim_theta") = true,
-                                     Rcpp::Named("beta") = Rcpp::NumericVector(0),
-                                     Rcpp::Named("has_beta") = false,
-                                     Rcpp::Named("estim_beta") = true);
+    // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
+    // https://github.com/msys2/MINGW-packages/issues/5019
+    _parameters = Rcpp::List::create(  // Rcpp::Named("sigma2") = Rcpp::runif(1),
+                                       // Rcpp::Named("has_sigma2") = true,
+        Rcpp::Named("sigma2") = -1,
+        Rcpp::Named("has_sigma2") = false,
+        Rcpp::Named("estim_sigma2") = true,
+        // Rcpp::Named("nugget") = Rcpp::runif(1),
+        // Rcpp::Named("has_nugget") = true,
+        Rcpp::Named("nugget") = -1,
+        Rcpp::Named("has_nugget") = false,
+        Rcpp::Named("estim_nugget") = true,
+        // Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
+        // Rcpp::Named("has_theta") = true,
+        Rcpp::Named("theta") = Rcpp::NumericMatrix(0, 0),
+        Rcpp::Named("has_theta") = false,
+        Rcpp::Named("estim_theta") = true,
+        Rcpp::Named("beta") = Rcpp::NumericVector(0),
+        Rcpp::Named("has_beta") = false,
+        Rcpp::Named("estim_beta") = true);
   }
 
   ok->fit(std::move(y),
@@ -97,17 +98,17 @@ Rcpp::List new_NuggetKriging(arma::vec y,
           optim,
           objective,
           NuggetKriging::Parameters{_parameters["nugget"],
-                              _parameters["has_nugget"],
-                              _parameters["estim_nugget"],
-                              _parameters["sigma2"],
-                              _parameters["has_sigma2"],
-                              _parameters["estim_sigma2"],
-                              _parameters["theta"],
-                              _parameters["has_theta"],
-                              _parameters["estim_theta"],
-                              _parameters["beta"],
-                              _parameters["has_beta"],
-                              _parameters["estim_beta"]});
+                                    _parameters["has_nugget"],
+                                    _parameters["estim_nugget"],
+                                    _parameters["sigma2"],
+                                    _parameters["has_sigma2"],
+                                    _parameters["estim_sigma2"],
+                                    _parameters["theta"],
+                                    _parameters["has_theta"],
+                                    _parameters["estim_theta"],
+                                    _parameters["beta"],
+                                    _parameters["has_beta"],
+                                    _parameters["estim_beta"]});
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
 
@@ -125,30 +126,31 @@ Rcpp::List nuggetkriging_model(Rcpp::List k) {
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
-                            Rcpp::Named("optim") = impl_ptr->optim(),
-                            Rcpp::Named("objective") = impl_ptr->objective(),
-                            Rcpp::Named("theta") = impl_ptr->theta(),
-                            Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
-                            Rcpp::Named("sigma2") = impl_ptr->sigma2(),
-                            Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
-                            Rcpp::Named("nugget") = impl_ptr->nugget(),
-                            Rcpp::Named("estim_nugget") = impl_ptr->estim_nugget(),
-                            Rcpp::Named("X") = impl_ptr->X(),
-                            Rcpp::Named("centerX") = impl_ptr->centerX(),
-                            Rcpp::Named("scaleX") = impl_ptr->scaleX(),
-                            Rcpp::Named("y") = impl_ptr->y(),
-                            Rcpp::Named("centerY") = impl_ptr->centerY(),
-                            Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-                            Rcpp::Named("regmodel") = NuggetKriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
-                            Rcpp::Named("beta") = impl_ptr->beta(),
-                            Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
+  Rcpp::List ret = Rcpp::List::create(
+      Rcpp::Named("kernel") = impl_ptr->kernel(),
+      Rcpp::Named("optim") = impl_ptr->optim(),
+      Rcpp::Named("objective") = impl_ptr->objective(),
+      Rcpp::Named("theta") = impl_ptr->theta(),
+      Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
+      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+      Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
+      Rcpp::Named("nugget") = impl_ptr->nugget(),
+      Rcpp::Named("estim_nugget") = impl_ptr->estim_nugget(),
+      Rcpp::Named("X") = impl_ptr->X(),
+      Rcpp::Named("centerX") = impl_ptr->centerX(),
+      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
+      Rcpp::Named("y") = impl_ptr->y(),
+      Rcpp::Named("centerY") = impl_ptr->centerY(),
+      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+      Rcpp::Named("regmodel") = NuggetKriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
+      Rcpp::Named("beta") = impl_ptr->beta(),
+      Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 
-  // because Rcpp::List::create accepts no more than 20 args... 
-  ret.push_back(impl_ptr->F(),"F");
-  ret.push_back(impl_ptr->T(),"T");
-  ret.push_back(impl_ptr->M(),"M");
-  ret.push_back(impl_ptr->z(),"z");
+  // because Rcpp::List::create accepts no more than 20 args...
+  ret.push_back(impl_ptr->F(), "F");
+  ret.push_back(impl_ptr->T(), "T");
+  ret.push_back(impl_ptr->M(), "M");
+  ret.push_back(impl_ptr->z(), "z");
 
   return ret;
 }
