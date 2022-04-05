@@ -8,8 +8,8 @@
 
 #include "BindingTest.hpp"
 #include "Kriging_binding.hpp"
-#include "NuggetKriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)
@@ -147,7 +147,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("leaveOneOut", &Kriging::leaveOneOutEval)
       .def("logLikelihood", &Kriging::logLikelihoodEval)
       .def("logMargPost", &Kriging::logMargPostEval);
-
 
   py::enum_<NuggetKriging::RegressionModel>(m, "NuggetKrigingRegressionModel")
       .value("Constant", NuggetKriging::RegressionModel::Constant)

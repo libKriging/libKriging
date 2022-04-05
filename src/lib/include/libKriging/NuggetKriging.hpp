@@ -38,7 +38,18 @@ class NuggetKriging {
           has_beta(false),
           estim_beta(true) {}
 
-    Parameters(arma::vec n, bool h_n, bool e_n, arma::vec s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
+    Parameters(arma::vec n,
+               bool h_n,
+               bool e_n,
+               arma::vec s2,
+               bool h_s2,
+               bool e_s2,
+               arma::mat t,
+               bool h_t,
+               bool e_t,
+               arma::vec b,
+               bool h_b,
+               bool e_b)
         : nugget(n),
           has_nugget(h_n),
           estim_nugget(e_n),
@@ -53,7 +64,7 @@ class NuggetKriging {
           estim_beta(e_b) {}
   };
 
-public:
+ public:
   enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
 
   struct RegressionModelUtils {
@@ -131,22 +142,20 @@ public:
     double var;
   };
 
-  double logLikelihood(const arma::vec& _theta,
-                       arma::vec* grad_out,
-                       NuggetKriging::OKModel* okm_data) const;
+  double logLikelihood(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
   double logMargPost(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NuggetKriging(const std::string& covType);
 
   LIBKRIGING_EXPORT NuggetKriging(const arma::colvec& y,
-                            const arma::mat& X,
-                            const std::string& covType,
-                            const RegressionModel& regmodel = RegressionModel::Constant,
-                            bool normalize = false,
-                            const std::string& optim = "BFGS",
-                            const std::string& objective = "LL",
-                            const Parameters& parameters = Parameters{});
+                                  const arma::mat& X,
+                                  const std::string& covType,
+                                  const RegressionModel& regmodel = RegressionModel::Constant,
+                                  bool normalize = false,
+                                  const std::string& optim = "BFGS",
+                                  const std::string& objective = "LL",
+                                  const Parameters& parameters = Parameters{});
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -164,8 +173,7 @@ public:
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodEval(const arma::vec& theta,
-                                                                               const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodEval(const arma::vec& theta, const bool grad);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
 

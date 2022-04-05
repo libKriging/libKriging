@@ -1,6 +1,6 @@
 #include "Kriging_binding.hpp"
-#include "NuggetKriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "mlibKriging_exports.h"
 #include "tools/MxException.hpp"

@@ -9,27 +9,28 @@
 PyNuggetKriging::PyNuggetKriging(const std::string& kernel) : m_internal{new NuggetKriging{kernel}} {}
 
 PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
-                     const py::array_t<double>& X,
-                     const std::string& covType,
-                     const NuggetKriging::RegressionModel& regmodel,
-                     bool normalize,
-                     const std::string& optim,
-                     const std::string& objective,
-                     const NuggetKriging::Parameters& parameters) {
+                                 const py::array_t<double>& X,
+                                 const std::string& covType,
+                                 const NuggetKriging::RegressionModel& regmodel,
+                                 bool normalize,
+                                 const std::string& optim,
+                                 const std::string& objective,
+                                 const NuggetKriging::Parameters& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+  m_internal
+      = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
 
 PyNuggetKriging::~PyNuggetKriging() {}
 
 void PyNuggetKriging::fit(const py::array_t<double>& y,
-                    const py::array_t<double>& X,
-                    const NuggetKriging::RegressionModel& regmodel,
-                    bool normalize,
-                    const std::string& optim,
-                    const std::string& objective,
-                    const NuggetKriging::Parameters& parameters) {
+                          const py::array_t<double>& X,
+                          const NuggetKriging::RegressionModel& regmodel,
+                          bool normalize,
+                          const std::string& optim,
+                          const std::string& objective,
+                          const NuggetKriging::Parameters& parameters) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
@@ -59,8 +60,9 @@ std::string PyNuggetKriging::summary() const {
   return m_internal->summary();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyNuggetKriging::logLikelihoodEval(const py::array_t<double>& theta, const bool want_grad) {
+std::tuple<double, py::array_t<double>, py::array_t<double>> PyNuggetKriging::logLikelihoodEval(
+    const py::array_t<double>& theta,
+    const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [llo, grad] = m_internal->logLikelihoodEval(vec_theta, want_grad);
   return {
@@ -72,7 +74,7 @@ PyNuggetKriging::logLikelihoodEval(const py::array_t<double>& theta, const bool 
 }
 
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostEval(const py::array_t<double>& theta,
-                                                                   const bool want_grad) {
+                                                                         const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [lmp, grad] = m_internal->logMargPostEval(vec_theta, want_grad);
   return {lmp, carma::col_to_arr(grad)};

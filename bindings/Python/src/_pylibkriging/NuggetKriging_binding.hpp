@@ -14,13 +14,13 @@ class PyNuggetKriging {
  public:
   PyNuggetKriging(const std::string& kernel);
   PyNuggetKriging(const py::array_t<double>& y,
-            const py::array_t<double>& X,
-            const std::string& covType,
-            const NuggetKriging::RegressionModel& regmodel,
-            bool normalize,
-            const std::string& optim,
-            const std::string& objective,
-            const NuggetKriging::Parameters& parameters);
+                  const py::array_t<double>& X,
+                  const std::string& covType,
+                  const NuggetKriging::RegressionModel& regmodel,
+                  bool normalize,
+                  const std::string& optim,
+                  const std::string& objective,
+                  const NuggetKriging::Parameters& parameters);
   ~PyNuggetKriging();
 
   void fit(const py::array_t<double>& y,
