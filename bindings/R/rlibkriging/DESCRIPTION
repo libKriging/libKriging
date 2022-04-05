@@ -1,17 +1,19 @@
 Package: rlibkriging
 Type: Package
-Title: Kriging model through libKriging binding
-Version: 0.4-8
-Date: 2021-12-05
-Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>
-Maintainer: Pascal Havé <hpwxf@haveneer.com>
-Description: Binding libKriging to R, and provide DiceKriging features with improved performance.
+Title: Kriging Models using the libKriging Library
+Version: 0.5-0
+Date: 2022-04-05
+Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>, Yves Deville <deville.yves@alpestat.com>
+Maintainer: Yves Deville <deville.yves@alpestat.com>
+Description: An R interface to the libKriging library that should
+    provide most/some of the features of the DiceKriging package with
+    improved performance.
 License: Apache License (>= 2)
 Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 2.14)
 Imports: Rcpp (>= 0.12.11), methods
-Suggests: testthat, DiceKriging, RobustGaSP, utils, foreach
+Suggests: DiceKriging, testthat, RobustGaSP, utils, DiceDesign, foreach
 SystemRequirements: GNU make
 URL: https://github.com/libKriging
 RoxygenNote: 7.1.2
