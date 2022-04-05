@@ -27,7 +27,7 @@ function repair_wheel {
 yum install -y openblas-devel
 
 # Compile wheels
-for PYBIN in /opt/python/*/bin; do
+for PYBIN in /opt/python/*-cp*/bin; do
     if [ "${PYBIN}" == "/opt/python/cp35-cp35m/bin" ]; then continue; fi
     "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/requirements.txt # not for Windows
     "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/dev-requirements.txt # not for Windows
@@ -40,7 +40,7 @@ for whl in "${ROOT_DIR}"/dist/*.whl; do
 done
 
 # Install packages and test
-for PYBIN in /opt/python/*/bin; do
+for PYBIN in /opt/python/*-cp*/bin; do
     if [ "${PYBIN}" == "/opt/python/cp35-cp35m/bin" ]; then continue; fi
     "${PYBIN}/pip" install pylibkriging --no-index -f "${ROOT_DIR}"/dist
     (cd "${ROOT_DIR}"; "${PYBIN}/pytest" "${ROOT_DIR}"/bindings/Python/tests)
