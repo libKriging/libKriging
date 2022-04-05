@@ -7,7 +7,11 @@ add_library(Kriging
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
+        Random.cpp include/libKriging/Random.hpp
+        LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
+        Covariance.cpp include/libKriging/Covariance.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
+        NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
