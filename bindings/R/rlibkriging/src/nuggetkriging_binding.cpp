@@ -5,10 +5,10 @@
 #include <RcppArmadillo.h>
 // clang-format on
 
-#include "libKriging/Random.hpp"
-#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Random.hpp"
 
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,

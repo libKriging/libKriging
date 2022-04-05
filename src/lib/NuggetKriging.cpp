@@ -7,12 +7,12 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/CacheFunction.hpp"
-#include "libKriging/utils/custom_hash_function.hpp"
-#include "libKriging/Random.hpp"
-#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Random.hpp"
+#include "libKriging/utils/custom_hash_function.hpp"
 
 #include <cassert>
 #include <optim.hpp>
