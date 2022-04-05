@@ -2,7 +2,6 @@
 #include "LinearRegression_binding.hpp"
 #include "NuggetKriging_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
-#include "mlibKriging_exports.h"
 #include "tools/MxException.hpp"
 #include "tools/MxMapper.hpp"
 #include "tools/string_hash.hpp"
@@ -29,7 +28,6 @@ mLibKriging help page
  load "y.mat"
  load "X.mat"
  */
-MLIBKRIGING_EXPORT
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try {
   const char* nm = mexFunctionName();
 #ifdef MEX_DEBUG

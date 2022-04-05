@@ -4,13 +4,15 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/utils/lk_armadillo.hpp"
+
+#include "libKriging/CacheFunction.hpp"
+#include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/Kriging.hpp"
-
-#include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
 #include <optim.hpp>
@@ -843,39 +845,42 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
-    fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-      // Change variable for opt: . -> 1/exp(.)
-      arma::vec _theta = 1 / arma::exp(_gamma);
-      double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
-      if (grad_out != nullptr)
-        *grad_out %= _theta;
-      if (hess_out != nullptr)
-        *hess_out = -*grad_out + *hess_out % _theta;
-      return -ll;
-    };
+    fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          // Change variable for opt: . -> 1/exp(.)
+          arma::vec _theta = 1 / arma::exp(_gamma);
+          double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
+          if (grad_out != nullptr)
+            *grad_out = *grad_out % _theta;
+          if (hess_out != nullptr)
+            *hess_out = -*grad_out + *hess_out % _theta;
+          return -ll;
+        }};
 
   } else if (objective.compare("LOO") == 0) {
-    fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-      // Change variable for opt: . -> 1/exp(.)
-      arma::vec _theta = 1 / arma::exp(_gamma);
-      double loo = this->leaveOneOut(_theta, grad_out, okm_data);
-      if (grad_out != nullptr)
-        *grad_out = -*grad_out % _theta;
-      return loo;
-    };
+    fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          // Change variable for opt: . -> 1/exp(.)
+          arma::vec _theta = 1 / arma::exp(_gamma);
+          double loo = this->leaveOneOut(_theta, grad_out, okm_data);
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out % _theta;
+          return loo;
+        }};
 
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
-    fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-      // Change variable for opt: . -> 1/exp(.)
-      const arma::vec& _theta = 1 / arma::exp(_gamma);
-      double lmp = this->logMargPost(_theta, grad_out, okm_data);
-      if (grad_out != nullptr)
-        *grad_out = *grad_out % _theta;
-      return -lmp;
-    };
- 
+    fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          // Change variable for opt: . -> 1/exp(.)
+          const arma::vec& _theta = 1 / arma::exp(_gamma);
+          double lmp = this->logMargPost(_theta, grad_out, okm_data);
+          if (grad_out != nullptr)
+            *grad_out = *grad_out % _theta;
+          return -lmp;
+        }};
+
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
 
@@ -1005,7 +1010,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
       bool bfgs_ok = optim::lbfgs(
           gamma_tmp,
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
             return fit_ofn(vals_inp, grad_out, nullptr, &okm_data);
           },
           nullptr,
@@ -1064,7 +1069,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
 
       double min_ofn_tmp = optim_newton(
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
+          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
             return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
           },
           gamma_tmp,
@@ -1397,6 +1402,9 @@ auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
       }
       return F;
     } break;
+
+    default:
+      throw std::runtime_error("Unreachable code");
   }
 }
 

@@ -6,7 +6,7 @@ classdef NuggetKriging < handle
 
     methods
         function obj = NuggetKriging(varargin)
-            printf("New NuggetKriging\n");
+            % printf("New NuggetKriging\n");
             obj.ref = mLibKriging("NuggetKriging::new", varargin{:});
         end
         
@@ -14,7 +14,7 @@ classdef NuggetKriging < handle
             % disp(["ObjectRef = ", num2str(obj.ref)])
             % destroy the mex backend
             if ~isempty(obj.ref)
-                printf("Delete NuggetKriging\n")
+                % printf("Delete NuggetKriging\n")
                 obj.ref = mLibKriging("NuggetKriging::delete", obj.ref, varargin{:})
             end
         end

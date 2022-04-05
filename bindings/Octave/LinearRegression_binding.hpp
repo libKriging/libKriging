@@ -4,10 +4,10 @@
 #include <mex.h>
 
 namespace LinearRegressionBinding {
-void build(int nlhs, void** plhs, int nrhs, const void** prhs);
-void destroy(int nlhs, void** plhs, int nrhs, const void** prhs);
-void fit(int nlhs, void** plhs, int nrhs, const void** prhs);
-void predict(int nlhs, void** plhs, int nrhs, const void** prhs);
+void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace LinearRegressionBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_LINEARREGRESSION_BINDING_HPP

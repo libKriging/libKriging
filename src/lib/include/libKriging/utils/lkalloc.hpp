@@ -13,7 +13,7 @@ namespace lkalloc {
 LIBKRIGING_EXPORT void* malloc(size_t n_bytes);
 LIBKRIGING_EXPORT void free(void* mem_ptr);
 LIBKRIGING_EXPORT void set_allocation_functions(void* (*allocator)(size_t), void (*deallocator)(void*));
-LIBKRIGING_EXPORT inline void unset_allocation_functions();
+LIBKRIGING_EXPORT void unset_allocation_functions();
 }  // namespace lkalloc
 
 //#define ARMA_ALIEN_MEM_ALLOC_FUNCTION lkalloc::malloc

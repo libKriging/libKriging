@@ -2,6 +2,7 @@
 #define LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MXMAPPER_HPP
 
 #include <bitset>
+#include <optional>
 
 #include "ObjectCollector.hpp"
 #include "RequiresArg.hpp"

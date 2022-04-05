@@ -14,7 +14,9 @@ add_library(Kriging
         NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
-        Bench.cpp include/libKriging/Bench.hpp)
+        Bench.cpp include/libKriging/Bench.hpp
+        CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
+        include/libKriging/utils/LinearHashStorage.hpp)
 
 if (CXX_CLANG_TIDY)
     set_target_properties(Kriging
@@ -32,7 +34,7 @@ target_link_libraries(Kriging PUBLIC armadillo)
 #   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 # https://cmake.org/cmake/help/v3.11/module/GenerateExportHeader.html
-include (GenerateExportHeader)
+include(GenerateExportHeader)
 GENERATE_EXPORT_HEADER(Kriging # generates the export header `lib`_EXPORTS.h automatically
         BASE_NAME LIBKRIGING
         EXPORT_FILE_NAME libKriging/libKriging_exports.h)
@@ -55,14 +57,14 @@ set_target_properties(Kriging PROPERTIES CXX_VISIBILITY_PRESET hidden)
 ## target_include_directories (Kriging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(Kriging
         PUBLIC
-            # path of the headers after installation
-            $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
-            # path of the headers before installation
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-            # path of the generated headers before installation
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        # path of the headers after installation
+        $<INSTALL_INTERFACE:include> # <prefix>/include/libKriging
+        # path of the headers before installation
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        # path of the generated headers before installation
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}
         )
 
 add_subdirectory(include)

@@ -31,6 +31,11 @@ add_executable(KrigingTest KrigingTest.cpp)
 target_link_libraries(KrigingTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingTest)
 
+add_executable(CacheTest CacheFunctionTest.cpp)
+target_link_libraries(CacheTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries CacheTest)
+
+
 # Can be enabled if necessary
 #if (CXX_CLANG_TIDY)
 #    foreach (bin ${all_test_binaries})
@@ -57,6 +62,7 @@ endif ()
 # Test using catch2 (parse catch tests)
 catch_discover_tests(catch2_unit_test)
 catch_discover_tests(regression_unit_test)
+catch_discover_tests(CacheTest)
 
 set(AdditionalCatchParameters --benchmark-samples 10)
 catch_discover_tests(KrigingTest)

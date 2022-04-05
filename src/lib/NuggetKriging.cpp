@@ -4,12 +4,15 @@
 #include <cmath>
 // clang-format on
 
+#include "libKriging/utils/lk_armadillo.hpp"
+
+#include "libKriging/CacheFunction.hpp"
+#include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/NuggetKriging.hpp"
-#include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
 #include <optim.hpp>
@@ -553,7 +556,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         (*grad_out).at(_theta_alpha.n_elem - 1) *= -1;
       }
       return -ll;
-    };
+    }};
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
@@ -568,7 +571,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         (*grad_out).at(_theta_alpha.n_elem - 1) *= -1;
       }
       return -lmp;
-    };
+    }};
 
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective);
@@ -1123,6 +1126,9 @@ auto regressionModelMatrix(const NuggetKriging::RegressionModel& regmodel,
       }
       return F;
     } break;
+
+    default:
+      throw std::runtime_error("Unreachable code");
   }
 }
 

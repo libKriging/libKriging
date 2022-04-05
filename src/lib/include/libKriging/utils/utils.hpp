@@ -1,6 +1,10 @@
 #ifndef LIBKRIGING_UTILS_HPP
 #define LIBKRIGING_UTILS_HPP
 
+#include <ostringstream>
+#include <string>
+#include <utility>
+
 template <typename... Args>
 std::string asString(Args&&... args) {
   std::ostringstream oss;

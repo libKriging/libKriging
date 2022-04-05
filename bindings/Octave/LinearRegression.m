@@ -6,7 +6,7 @@ classdef LinearRegression < handle
 
     methods
         function obj = LinearRegression(varargin)
-            printf("New LinearRegression\n");
+            % fprintf("New LinearRegression\n");
             obj.ref = mLibKriging("LinearRegression::new", varargin{:});
         end
         
@@ -14,7 +14,7 @@ classdef LinearRegression < handle
             % disp(["ObjectRef = ", num2str(obj.ref)])
             % destroy the mex backend
             if ~isempty(obj.ref)
-                printf("Delete LinearRegression\n")
+                % fprintf("Delete LinearRegression\n")
                 obj.ref = mLibKriging("LinearRegression::delete", obj.ref, varargin{:})
             end
         end
