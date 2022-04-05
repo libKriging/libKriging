@@ -54,8 +54,8 @@ case $ARCH in
   MSYS_NT*|MINGW64_NT*) # Windows
     ARCHZ="$(uname -s | awk -F- '{ print $1$2 }')-$(uname -m)" # remove trailing release
     unzip "${PREFIX}_${RVER}.zip" -d "${TMP_DIR}"
-    cp -a build/installed/lib/libarmadillo.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no armadillo shared lib to copy"
-    cp -a build/installed/lib/libKriging.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no libKriging shared lib to copy"
+    cp -a build/installed/bin/libarmadillo.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no armadillo shared lib to copy"
+    cp -a build/installed/bin/libKriging.dll "${TMP_DIR}"/rlibkriging/libs/x64/ || echo "Warning: no libKriging shared lib to copy"
     # RELEASE_FILE=${PREFIX}_${ARCHZ}_${GIT_TAG#v}.zip
     RELEASE_FILE="${PREFIX}_${GIT_TAG#v}.zip" # cannot rename for Windows
     (cd "${TMP_DIR}" && zip -FS -r "${RELEASE_FILE}" rlibkriging)

@@ -73,11 +73,3 @@ choco install -y --no-progress zip
 ## https://anaconda.org/r/r
 ## https://anaconda.org/r/rtools
 #${HOME}/Miniconda3/condabin/conda.bat install -y -c r r rtools
-
-
-# Crazy hack since R try to call 'g++ ' as compiler
-# Message looks like:
-# /usr/bin/sh: line 8: g++ : command not found
-#       with a space here ^
-ln -sf "$(command -v g++).exe" "$(command -v g++) .exe"
-# should be replaced using ~/.R/Makevars config
