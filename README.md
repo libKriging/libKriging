@@ -96,15 +96,10 @@ import pylibkriging as lk
 
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 (CRAN repo will come soon...)
-```shell
-# example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/rlibkriging_0.4.1_macOS10.15.7-x86_64.tgz
-```
-Then
 ```R
 # in R
 install.packages("Rcpp")
-install.packages(pkgs="rlibkriging_version_OS.tgz", repos=NULL)
+install.packages("https://github.com/libKriging/libKriging/releases/download/v0.4.8-179-g15566e5-8-g2314854/rlibkriging_0.4.8_Linux-x86_64.tgz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
