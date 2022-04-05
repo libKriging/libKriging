@@ -1,4 +1,4 @@
-#include "Kriging_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 
 #include "libKriging/NuggetKriging.hpp"
 #include "tools/MxMapper.hpp"
