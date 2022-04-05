@@ -24,6 +24,8 @@ jobs:
   check-release-consistency:
     name: Check Release Consistency
     runs-on: ubuntu-18.04
+    outputs:
+      git-tag: ${{ steps.expose-variable.outputs.git-tag }}
 
     steps:
       - uses: actions/checkout@v2
@@ -72,13 +74,10 @@ jobs:
             echo "Ok to build this new version ${GIT_TAG}"
           fi
       - name: Define a global variable for next jobs
+        id: expose-variable
         run: |
           # GHA hack
           echo "::set-output name=git-tag::${GIT_TAG}"
-      outputs:
-        git-tag:
-          description: "Reference tag for this release"
-          value: ${{ steps.git-tag.outputs.git-tag }}
 
   build-wheel-python:
     needs: check-release-consistency
