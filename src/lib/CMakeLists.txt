@@ -16,7 +16,8 @@ add_library(Kriging
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
         CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
-        include/libKriging/utils/LinearHashStorage.hpp)
+        include/libKriging/utils/LinearHashStorage.hpp
+        include/libKriging/version.hpp ${VERSION_FILE})
 
 if (CXX_CLANG_TIDY)
     set_target_properties(Kriging

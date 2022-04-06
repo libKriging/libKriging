@@ -1,0 +1,8 @@
+#include <libKriging/version.hpp>
+
+namespace libKriging {
+const std::string _version = "@KRIGING_VERSION@";
+const std::string _buildTag = "@BUILD_TAG@";
+std::string version() { return _version; }
+std::string buildTag() { return _buildTag; }
+}

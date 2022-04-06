@@ -35,6 +35,10 @@ add_executable(CacheTest CacheFunctionTest.cpp)
 target_link_libraries(CacheTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries CacheTest)
 
+add_executable(GetVersion GetVersion.cpp)
+target_link_libraries(GetVersion LINK_PUBLIC Kriging)
+add_dependencies(all_test_binaries GetVersion)
+
 
 # Can be enabled if necessary
 #if (CXX_CLANG_TIDY)

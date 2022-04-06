@@ -176,16 +176,9 @@ function(git_describe _var)
     if(NOT GIT_FOUND)
         find_package(Git QUIET)
     endif()
-    get_git_head_revision(refspec hash)
     if(NOT GIT_FOUND)
         set(${_var}
                 "GIT-NOTFOUND"
-                PARENT_SCOPE)
-        return()
-    endif()
-    if(NOT hash)
-        set(${_var}
-                "HEAD-HASH-NOTFOUND"
                 PARENT_SCOPE)
         return()
     endif()
@@ -201,11 +194,11 @@ function(git_describe _var)
     #message(STATUS "Arguments to execute_process: ${ARGN}")
 
     execute_process(
-            COMMAND "${GIT_EXECUTABLE}" describe --tags --always ${hash} ${ARGN}
+            COMMAND "${GIT_EXECUTABLE}" describe --tags --always ${ARGN}
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             RESULT_VARIABLE res
             OUTPUT_VARIABLE out
-            ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(NOT res EQUAL 0)
         set(out "${out}-${res}-NOTFOUND")
     endif()
