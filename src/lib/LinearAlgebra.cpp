@@ -24,13 +24,17 @@ LIBKRIGING_EXPORT double LinearAlgebra::get_num_nugget() {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   arma::mat R = arma::mat(X.n_rows, X.n_cols);
-  bool ok = arma::chol(R,X,"lower");
+  bool ok = arma::chol(R, X, "lower");
   if (!ok) {
-    arma::cout << "[WARNING]: chol failed, adding numerical nugget (on diagonal)" << arma::endl;
     if (LinearAlgebra::num_nugget <= 0.0)
-      throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: " + std::to_string(LinearAlgebra::num_nugget));
-    else
-      return LinearAlgebra::safe_chol_lower(X + LinearAlgebra::num_nugget * arma::eye(X.n_rows, X.n_cols));
+      throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: "
+                               + std::to_string(LinearAlgebra::num_nugget));
+    else {
+      arma::cout << "[WARNING]: chol failed, adding numerical nugget (on diagonal)" << arma::endl;
+      X /= 1.0 + LinearAlgebra::num_nugget;
+      X.diag().ones();
+      return LinearAlgebra::safe_chol_lower(X);
+    }
   } else
     return R;
 }

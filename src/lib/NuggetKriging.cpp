@@ -678,7 +678,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_est_nugget = parameters.estim_nugget;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
-    Random::set_seed(123);  // that should be setup by user, somewhere...
+    Random::init();
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
@@ -688,7 +688,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       } catch (std::invalid_argument) {
         // let multistart = 1
       }
-      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0) % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -857,6 +857,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
     arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
     s2_predict.elem(find(pred_stdev < 0)).zeros();
+    s2_predict.transform( [](double val) { return (std::isnan(val) ? 0.0 : val); } );
     pred_stdev = sqrt(s2_predict);
     if (withCov) {
       // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
@@ -995,7 +996,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat yp(m, nsim);
   yp.each_col() = y_trend;
 
-  Random::set_seed(seed);
+  Random::reset_seed(seed);
   yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(total_sd2);
   // t0 = toc("yp             ", t0);
 

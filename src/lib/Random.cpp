@@ -10,10 +10,17 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+unsigned int Random::seed = 123;
+
 std::mt19937 Random::engine(123);
 
-LIBKRIGING_EXPORT void Random::set_seed(unsigned int seed) {
-  engine.seed(seed);
+LIBKRIGING_EXPORT void Random::reset_seed(unsigned int seed) {
+  Random::seed = seed;
+  Random::init();
+};
+
+void Random::init() {
+  engine.seed(Random::seed);
 };
 
 LIBKRIGING_EXPORT std::function<double()> Random::randu = []() {
