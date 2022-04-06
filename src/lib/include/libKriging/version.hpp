@@ -6,6 +6,6 @@
 namespace libKriging {
 std::string version();
 std::string buildTag();
-}
+}  // namespace libKriging
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_VERSION_H
