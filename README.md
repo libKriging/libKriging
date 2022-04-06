@@ -8,7 +8,7 @@ Table of contents
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging for R](#rlibkriging-for-r)
-  - [mlibkriging for Octave](#mlibkriging-for-octave)
+  - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
   - [Expected demo results](#expected-demo-results)
   - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
@@ -35,7 +35,11 @@ For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
 ```shell
-pip3 install pylibkriging numpy
+pip3 install pylibkriging
+```
+or for pre-release packages (according to your OS and Python version)
+```shell
+pip3 install https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/pylibkriging-0.5.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
 **Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
@@ -99,7 +103,7 @@ Download the archive from [libKriging releases](https://github.com/libKriging/li
 ```R
 # in R
 install.packages("Rcpp")
-install.packages("https://github.com/libKriging/libKriging/releases/download/v0.4.8-179-g15566e5-8-g2314854/rlibkriging_0.4.8_Linux-x86_64.tgz", repos=NULL)
+install.packages("https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/rlibkriging_0.5.0_Linux-x86_64.tgz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
@@ -134,14 +138,14 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 
 </details>
 
-## mlibkriging for Octave and matlab
+## mlibkriging for Octave and MATLAB
 
-⚠️ Matlab binary package is not yet available
+⚠️ Matlab binary package are done on request (GitHub Action does not support all required Operating Systems)
 
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 ```shell
 # example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.4.1/mLibKriging_0.4.1_Linux-x86_64.tgz
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/mLibKriging_0.5.0-alpha_Linux-x86_64.tgz
 ```
 Then
 ```shell
