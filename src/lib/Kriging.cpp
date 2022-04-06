@@ -135,7 +135,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   // t0 = toc("Rvfast        ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -397,7 +397,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");
+  fd->T = LinearAlgebra::safe_chol_lower(R);
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -567,7 +567,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");
+  fd->T = LinearAlgebra::safe_chol_lower(R);
   // t0 = toc("T             ", t0);
 
   //  // Compute intermediate useful matrices
@@ -970,7 +970,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_sigma2 = parameters.estim_sigma2;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
-    Random::set_seed(123);  // that should be setup by user, somewhere...
+    Random::init();
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
@@ -980,7 +980,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       } catch (std::invalid_argument) {
         // let multistart = 1
       }
-      theta0 = Random::randu_mat(multistart, d) % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+               % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -1040,7 +1041,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
-    Random::set_seed(123);  // that should be setup by user, somewhere...
+    Random::init();
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
@@ -1158,6 +1159,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
     arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
     s2_predict.elem(find(pred_stdev < 0)).zeros();
+    s2_predict.transform([](double val) { return (std::isnan(val) ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
     if (withCov) {
       // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
@@ -1207,7 +1209,6 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
  */
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& Xp) {
   // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
-  double nugget_sim = 1e-10;
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
 
@@ -1274,7 +1275,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // t0 = toc("Sigma_cond     ", t0);
 
   // T.cond <- chol(Sigma.cond + diag(nugget.sim, m, m))
-  Sigma_cond.diag() += nugget_sim;
+  Sigma_cond.diag() += LinearAlgebra::num_nugget;
   arma::mat tT_cond = chol(Sigma_cond, "lower");
   // t0 = toc("T_cond         ", t0);
 
@@ -1284,7 +1285,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat yp(m, nsim);
   yp.each_col() = y_trend;
 
-  Random::set_seed(seed);
+  Random::reset_seed(seed);
   yp += tT_cond * Random::randn_mat(m, nsim) * std::sqrt(m_sigma2)
         * (m_objective.compare("LMP") == 0 ? sqrt((n - d) / (n - d - 2)) : 1.0);
   // t0 = toc("yp             ", t0);

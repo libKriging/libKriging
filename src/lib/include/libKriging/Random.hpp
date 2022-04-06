@@ -11,8 +11,12 @@ class Random {
  public:
   static std::mt19937 engine;  // Mersenne twister random number engine
 
+  static unsigned int seed;
+
  public:
-  LIBKRIGING_EXPORT static void set_seed(unsigned int seed);
+  LIBKRIGING_EXPORT static void reset_seed(unsigned int seed);
+
+  static void init();
 
   LIBKRIGING_EXPORT static std::function<double()> randu;
 
