@@ -88,6 +88,16 @@ jobs:
           echo "::set-output name=git-tag::${GIT_TAG}"
           echo "::set-output name=draft-release::${DRAFT_RELEASE}"
 
+  display_release_tag:
+    name: Release tag ${{ needs.check-release-consistency.outputs.git-tag }}
+    needs: check-release-consistency
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Tag ${{ needs.check-release-consistency.outputs.git-tag }}
+        shell: bash
+        run: |
+          echo "Release is ${{ needs.check-release-consistency.outputs.git-tag }} on $GITHUB_REF"
+    
   build-wheel-python:
     needs: check-release-consistency
     runs-on: ${{ matrix.os }}
