@@ -12,6 +12,12 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 include(cmake/version.cmake)
 include(cmake/configuration.cmake)
 
+include(GetGitRevisionDescription)
+git_describe(BUILD_TAG --tags --dirty=-d)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/lib/version.cpp.in
+        ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+set(VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
+
 #------------------------------------------------------
 
 project(libKriging

@@ -1,0 +1,12 @@
+#include <libKriging/version.hpp>
+
+namespace libKriging {
+const char* const internal_version = "@KRIGING_VERSION@";
+const char* const internal_buildTag = "@BUILD_TAG@";
+LIBKRIGING_EXPORT std::string version() {
+  return internal_version;
+}
+LIBKRIGING_EXPORT std::string buildTag() {
+  return internal_buildTag;
+}
+}  // namespace libKriging
