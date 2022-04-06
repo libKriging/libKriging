@@ -397,7 +397,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R); 
+  fd->T = LinearAlgebra::safe_chol_lower(R);
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -980,7 +980,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       } catch (std::invalid_argument) {
         // let multistart = 1
       }
-      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0) % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+               % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
@@ -1158,7 +1159,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
     arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
     s2_predict.elem(find(pred_stdev < 0)).zeros();
-    s2_predict.transform( [](double val) { return (std::isnan(val) ? 0.0 : val); } );
+    s2_predict.transform([](double val) { return (std::isnan(val) ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
     if (withCov) {
       // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
@@ -1254,7 +1255,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE
   arma::mat Tinv_Sigma21 = solve(m_T, Sigma21, LinearAlgebra::default_solve_opts);
   // t0 = toc("Tinv_Sigma21   ", t0);
- 
+
   // y.trend.cond <- y.trend + t(Tinv.Sigma21) %*% object@z
   y_trend += trans(Tinv_Sigma21) * m_z;
   // t0 = toc("y_trend        ", t0);
