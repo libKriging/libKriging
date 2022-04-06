@@ -135,7 +135,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   // t0 = toc("Rvfast        ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -397,7 +397,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");
+  fd->T = LinearAlgebra::safe_chol_lower(R); 
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -567,7 +567,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");
+  fd->T = LinearAlgebra::safe_chol_lower(R);
   // t0 = toc("T             ", t0);
 
   //  // Compute intermediate useful matrices
@@ -1207,7 +1207,6 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
  */
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& Xp) {
   // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
-  double nugget_sim = 1e-10;
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
 
@@ -1274,7 +1273,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // t0 = toc("Sigma_cond     ", t0);
 
   // T.cond <- chol(Sigma.cond + diag(nugget.sim, m, m))
-  Sigma_cond.diag() += nugget_sim;
+  Sigma_cond.diag() += LinearAlgebra::num_nugget;
   arma::mat tT_cond = chol(Sigma_cond, "lower");
   // t0 = toc("T_cond         ", t0);
 

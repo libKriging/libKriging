@@ -130,7 +130,7 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
   // t0 = toc("Rvfast        ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   // t0 = toc("T             ", t0);
 
   // Compute intermediate useful matrices
@@ -340,7 +340,7 @@ double NuggetKriging::logMargPost(const arma::vec& _theta_alpha,
   // t0 = toc("R             ", t0);
 
   // Cholesky decompostion of covariance matrix
-  fd->T = chol(R, "lower");
+  fd->T = LinearAlgebra::safe_chol_lower(R);
   // t0 = toc("T             ", t0);
 
   //  // Compute intermediate useful matrices
@@ -985,7 +985,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   // t0 = toc("Sigma_cond     ", t0);
 
   // T.cond <- chol(Sigma.cond + diag(nugget.sim, m, m))
-  Sigma_cond.diag() += nugget_sim;
+  Sigma_cond.diag() += LinearAlgebra::num_nugget;
   arma::mat tT_cond = chol(Sigma_cond, "lower");
   // t0 = toc("T_cond         ", t0);
 
