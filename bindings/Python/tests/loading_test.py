@@ -3,4 +3,4 @@ import pytest
 
 
 def test_version():
-    assert m.__version__ == '0.5.0'
+    assert m.__version__ == 'v0.5.0'
