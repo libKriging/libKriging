@@ -53,6 +53,7 @@ add_dependencies(all_test_binaries GetVersion)
 add_test(NAME demo/class_unit_test COMMAND class_unit_test)
 add_test(NAME demo/function_unit_test COMMAND function_unit_test)
 add_test(NAME demo/armadillo_example COMMAND armadillo_example)
+add_test(NAME GetVersion COMMAND GetVersion)
 
 if (LIBKRIGING_BENCHMARK_TESTS)
     message(STATUS "Benchmark tests are enabled")
