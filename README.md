@@ -87,7 +87,8 @@ pyplot.show()
 
 </details>
 
-
+<details>
+  <summary>Note for older versions (&lt; 0.5)</summary>
 NB: On Windows, it should require [extra DLL](https://github.com/libKriging/libKriging/releases/download/v0.4.2/extra_dlls_for_python_on_windows.zip) not (yet) embedded in the python package.
 To load them into Python's search PATH, use:
 ```python
@@ -95,7 +96,8 @@ import os
 os.environ['PATH'] = 'c:\\Users\\User\\Path\\to\\dlls' + os.pathsep + os.environ['PATH']
 import pylibkriging as lk
 ```
-
+</details>
+  
 ## rlibkriging for R
 
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
@@ -103,7 +105,7 @@ Download the archive from [libKriging releases](https://github.com/libKriging/li
 ```R
 # in R
 install.packages("Rcpp")
-install.packages("https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/rlibkriging_0.5.0_Linux-x86_64.tgz", repos=NULL)
+install.packages("https://github.com/libKriging/libKriging/releases/download/v0.5.1/rlibkriging_0.5.1_Linux-x86_64.tgz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
@@ -145,7 +147,7 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 ```shell
 # example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/mLibKriging_0.5.0-alpha_Linux-x86_64.tgz
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.5.1/mLibKriging_0.5.1_Linux-x86_64.tgz
 ```
 Then
 ```shell
@@ -205,14 +207,14 @@ Using the previous linked examples (in Python, R, Octave or Matlab), you should 
 
 ## Tested installation
 
-with libKriging 0.4.8 
+with libKriging 0.5.1
 
 <!-- ✔ ⌛️ ✘ -->
-|        | Linux Ubuntu:20                             | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)**                       | Windows 10                                                                  |
+|        | Linux Ubuntu:20                             | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)                         | Windows 10                                                                  |
 |:-------|:--------------------------------------------|:--------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9 | <span style="color:green">✔</span> 3.6-3.9                                  |
-| R      | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:green">✔</span> 3.6-4.1  |                                        | <span style="color:green">✔</span> 3.6-4.1                                  |
-| Octave | <span style="color:green">✔</span> 5.2.0    | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4 | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
+| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9** | <span style="color:green">✔</span> 3.6-3.9                                  |
+| R      | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:orange"><b>?</b></span> | <span style="color:green">✔</span> 3.6-4.1                                  |
+| Octave | <span style="color:green">✔</span> 5.2.0    | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4** | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
 | Matlab | <span style="color:green">️✔</span> R2022   | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022 | <span style="color:green">✔</span> R2022**                                  |
 
 *requires extra DLLs. See [python installation](#pylibkriging-for-python)
