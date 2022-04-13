@@ -9,6 +9,7 @@
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/NuggetKriging.hpp"
 #include "libKriging/Random.hpp"
+#include "libKriging/Trend.hpp"
 
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,
@@ -93,7 +94,7 @@ Rcpp::List new_NuggetKriging(arma::vec y,
 
   ok->fit(std::move(y),
           std::move(X),
-          NuggetKriging::RegressionModelUtils::fromString(regmodel),
+          Trend::fromString(regmodel),
           normalize,
           optim,
           objective,
@@ -142,7 +143,7 @@ Rcpp::List nuggetkriging_model(Rcpp::List k) {
       Rcpp::Named("y") = impl_ptr->y(),
       Rcpp::Named("centerY") = impl_ptr->centerY(),
       Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-      Rcpp::Named("regmodel") = NuggetKriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
+      Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
       Rcpp::Named("beta") = impl_ptr->beta(),
       Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 

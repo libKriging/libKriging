@@ -9,6 +9,7 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Random.hpp"
+#include "libKriging/Trend.hpp"
 
 // [[Rcpp::export]]
 Rcpp::List new_Kriging(arma::vec y,
@@ -77,7 +78,7 @@ Rcpp::List new_Kriging(arma::vec y,
 
   ok->fit(std::move(y),
           std::move(X),
-          Kriging::RegressionModelUtils::fromString(regmodel),
+          Trend::fromString(regmodel),
           normalize,
           optim,
           objective,
@@ -121,7 +122,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
                            Rcpp::Named("y") = impl_ptr->y(),
                            Rcpp::Named("centerY") = impl_ptr->centerY(),
                            Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-                           Rcpp::Named("regmodel") = Kriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
+                           Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
                            Rcpp::Named("beta") = impl_ptr->beta(),
                            Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 

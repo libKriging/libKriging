@@ -3,7 +3,10 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+
 #include <libKriging/Kriging.hpp>
+#include <libKriging/Trend.hpp>
+
 #include <random>
 
 PyKriging::PyKriging(const std::string& kernel) : m_internal{new Kriging{kernel}} {}
@@ -11,7 +14,7 @@ PyKriging::PyKriging(const std::string& kernel) : m_internal{new Kriging{kernel}
 PyKriging::PyKriging(const py::array_t<double>& y,
                      const py::array_t<double>& X,
                      const std::string& covType,
-                     const Kriging::RegressionModel& regmodel,
+                     const Trend::RegressionModel& regmodel,
                      bool normalize,
                      const std::string& optim,
                      const std::string& objective,
@@ -25,7 +28,7 @@ PyKriging::~PyKriging() {}
 
 void PyKriging::fit(const py::array_t<double>& y,
                     const py::array_t<double>& X,
-                    const Kriging::RegressionModel& regmodel,
+                    const Trend::RegressionModel& regmodel,
                     bool normalize,
                     const std::string& optim,
                     const std::string& objective,
