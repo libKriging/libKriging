@@ -12,6 +12,10 @@
  */
 class Bench {
  public:
+  static std::chrono::high_resolution_clock::time_point tic();
+  static std::chrono::high_resolution_clock::time_point toc(std::string what,
+                                                            std::chrono::high_resolution_clock::time_point t0);
+
   int n;
 
   LIBKRIGING_EXPORT Bench(int _n);  // const std::string & covType);

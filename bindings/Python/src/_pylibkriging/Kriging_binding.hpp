@@ -5,6 +5,8 @@
 #include <pybind11/pybind11.h>
 
 #include <libKriging/Kriging.hpp>
+#include <libKriging/Trend.hpp>
+
 #include <string>
 #include <tuple>
 
@@ -16,7 +18,7 @@ class PyKriging {
   PyKriging(const py::array_t<double>& y,
             const py::array_t<double>& X,
             const std::string& covType,
-            const Kriging::RegressionModel& regmodel,
+            const Trend::RegressionModel& regmodel,
             bool normalize,
             const std::string& optim,
             const std::string& objective,
@@ -25,7 +27,7 @@ class PyKriging {
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
-           const Kriging::RegressionModel& regmodel,
+           const Trend::RegressionModel& regmodel,
            bool normalize,
            const std::string& optim,
            const std::string& objective,

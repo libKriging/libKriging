@@ -9,6 +9,7 @@
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/NuggetKriging.hpp"
 #include "libKriging/Random.hpp"
+#include "libKriging/Trend.hpp"
 
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,
@@ -93,7 +94,7 @@ Rcpp::List new_NuggetKriging(arma::vec y,
 
   ok->fit(std::move(y),
           std::move(X),
-          NuggetKriging::RegressionModelUtils::fromString(regmodel),
+          Trend::fromString(regmodel),
           normalize,
           optim,
           objective,
@@ -126,25 +127,24 @@ Rcpp::List nuggetkriging_model(Rcpp::List k) {
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  Rcpp::List ret = Rcpp::List::create(
-      Rcpp::Named("kernel") = impl_ptr->kernel(),
-      Rcpp::Named("optim") = impl_ptr->optim(),
-      Rcpp::Named("objective") = impl_ptr->objective(),
-      Rcpp::Named("theta") = impl_ptr->theta(),
-      Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
-      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
-      Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
-      Rcpp::Named("nugget") = impl_ptr->nugget(),
-      Rcpp::Named("estim_nugget") = impl_ptr->estim_nugget(),
-      Rcpp::Named("X") = impl_ptr->X(),
-      Rcpp::Named("centerX") = impl_ptr->centerX(),
-      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
-      Rcpp::Named("y") = impl_ptr->y(),
-      Rcpp::Named("centerY") = impl_ptr->centerY(),
-      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-      Rcpp::Named("regmodel") = NuggetKriging::RegressionModelUtils::toString(impl_ptr->regmodel()),
-      Rcpp::Named("beta") = impl_ptr->beta(),
-      Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
+                                      Rcpp::Named("optim") = impl_ptr->optim(),
+                                      Rcpp::Named("objective") = impl_ptr->objective(),
+                                      Rcpp::Named("theta") = impl_ptr->theta(),
+                                      Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
+                                      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+                                      Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
+                                      Rcpp::Named("nugget") = impl_ptr->nugget(),
+                                      Rcpp::Named("estim_nugget") = impl_ptr->estim_nugget(),
+                                      Rcpp::Named("X") = impl_ptr->X(),
+                                      Rcpp::Named("centerX") = impl_ptr->centerX(),
+                                      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
+                                      Rcpp::Named("y") = impl_ptr->y(),
+                                      Rcpp::Named("centerY") = impl_ptr->centerY(),
+                                      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+                                      Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
+                                      Rcpp::Named("beta") = impl_ptr->beta(),
+                                      Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 
   // because Rcpp::List::create accepts no more than 20 args...
   ret.push_back(impl_ptr->F(), "F");

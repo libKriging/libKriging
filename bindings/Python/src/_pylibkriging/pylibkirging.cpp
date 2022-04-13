@@ -73,11 +73,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("fit", &LinearRegression::fit)
       .def("predict", &LinearRegression::predict);
 
-  py::enum_<Kriging::RegressionModel>(m, "KrigingRegressionModel")
-      .value("Constant", Kriging::RegressionModel::Constant)
-      .value("Linear", Kriging::RegressionModel::Linear)
-      .value("Interactive", Kriging::RegressionModel::Interactive)
-      .value("Quadratic", Kriging::RegressionModel::Quadratic)
+  py::enum_<Trend::RegressionModel>(m, "RegressionModel")
+      .value("Constant", Trend::RegressionModel::Constant)
+      .value("Linear", Trend::RegressionModel::Linear)
+      .value("Interactive", Trend::RegressionModel::Interactive)
+      .value("Quadratic", Trend::RegressionModel::Quadratic)
       .export_values();
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
@@ -90,7 +90,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const py::array_t<double>&,
                     const py::array_t<double>&,
                     const std::string&,
-                    const Kriging::RegressionModel&,
+                    const Trend::RegressionModel&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -98,7 +98,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Kriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",
@@ -118,7 +118,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const arma::colvec&,
                     const arma::mat&,
                     const std::string&,
-                    const Kriging::RegressionModel&,
+                    const Trend::RegressionModel&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -126,7 +126,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Kriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",
@@ -135,7 +135,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            &Kriging::fit,
            py::arg("y"),
            py::arg("X"),
-           py::arg("regmodel") = Kriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",
@@ -148,13 +148,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("logLikelihood", &Kriging::logLikelihoodEval)
       .def("logMargPost", &Kriging::logMargPostEval);
 
-  py::enum_<NuggetKriging::RegressionModel>(m, "NuggetKrigingRegressionModel")
-      .value("Constant", NuggetKriging::RegressionModel::Constant)
-      .value("Linear", NuggetKriging::RegressionModel::Linear)
-      .value("Interactive", NuggetKriging::RegressionModel::Interactive)
-      .value("Quadratic", NuggetKriging::RegressionModel::Quadratic)
-      .export_values();
-
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<NuggetKriging::Parameters>(m, "NuggetKrigingParameters").def(py::init<>());
 
@@ -165,7 +158,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const py::array_t<double>&,
                     const py::array_t<double>&,
                     const std::string&,
-                    const NuggetKriging::RegressionModel&,
+                    const Trend::RegressionModel&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -173,7 +166,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",
@@ -192,7 +185,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const arma::colvec&,
                     const arma::mat&,
                     const std::string&,
-                    const NuggetKriging::RegressionModel&,
+                    const Trend::RegressionModel&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -200,7 +193,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",
@@ -209,7 +202,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            &NuggetKriging::fit,
            py::arg("y"),
            py::arg("X"),
-           py::arg("regmodel") = NuggetKriging::RegressionModel::Constant,
+           py::arg("regmodel") = Trend::RegressionModel::Constant,
            py::arg("normalize") = false,
            py::arg("optim") = "BFGS",
            py::arg("objective") = "LL",

@@ -1,6 +1,8 @@
 #include "Kriging_binding.hpp"
 
 #include "libKriging/Kriging.hpp"
+#include "libKriging/Trend.hpp"
+
 #include "tools/MxMapper.hpp"
 #include "tools/ObjectAccessor.hpp"
 
@@ -22,8 +24,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{3, 8}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  const auto regmodel = Kriging::RegressionModelUtils::fromString(
-      input.getOptional<3, std::string>("regression model").value_or("constant"));
+  const auto regmodel = Trend::fromString(input.getOptional<3, std::string>("regression model").value_or("constant"));
   const auto normalize = input.getOptional<4, bool>("normalize").value_or(false);
   const auto optim = input.getOptional<5, std::string>("optim").value_or("BFGS");
   const auto objective = input.getOptional<6, std::string>("objective").value_or("LL");
@@ -56,8 +57,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{3, 8}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  const auto regmodel = Kriging::RegressionModelUtils::fromString(
-      input.getOptional<3, std::string>("regression model").value_or("constant"));
+  const auto regmodel = Trend::fromString(input.getOptional<3, std::string>("regression model").value_or("constant"));
   const auto normalize = input.getOptional<4, bool>("normalize").value_or(false);
   const auto optim = input.getOptional<5, std::string>("optim").value_or("BFGS");
   const auto objective = input.getOptional<6, std::string>("objective").value_or("LL");

@@ -3,7 +3,10 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+
 #include <libKriging/NuggetKriging.hpp>
+#include <libKriging/Trend.hpp>
+
 #include <random>
 
 PyNuggetKriging::PyNuggetKriging(const std::string& kernel) : m_internal{new NuggetKriging{kernel}} {}
@@ -11,7 +14,7 @@ PyNuggetKriging::PyNuggetKriging(const std::string& kernel) : m_internal{new Nug
 PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                  const py::array_t<double>& X,
                                  const std::string& covType,
-                                 const NuggetKriging::RegressionModel& regmodel,
+                                 const Trend::RegressionModel& regmodel,
                                  bool normalize,
                                  const std::string& optim,
                                  const std::string& objective,
@@ -26,7 +29,7 @@ PyNuggetKriging::~PyNuggetKriging() {}
 
 void PyNuggetKriging::fit(const py::array_t<double>& y,
                           const py::array_t<double>& X,
-                          const NuggetKriging::RegressionModel& regmodel,
+                          const Trend::RegressionModel& regmodel,
                           bool normalize,
                           const std::string& optim,
                           const std::string& objective,
