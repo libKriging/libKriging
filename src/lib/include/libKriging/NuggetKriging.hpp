@@ -3,6 +3,8 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/Trend.hpp"
+
 #include "libKriging/libKriging_exports.h"
 
 /** Ordinary kriging regression
@@ -64,15 +66,6 @@ class NuggetKriging {
           estim_beta(e_b) {}
   };
 
- public:
-  enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
-
-  struct RegressionModelUtils {
-    LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
-    LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
-  };
-
- public:
   const std::string& kernel() const { return m_covType; };
   const std::string& optim() const { return m_optim; };
   const std::string& objective() const { return m_objective; };
@@ -82,7 +75,7 @@ class NuggetKriging {
   const arma::colvec& y() const { return m_y; };
   const double& centerY() const { return m_centerY; };
   const double& scaleY() const { return m_scaleY; };
-  const RegressionModel& regmodel() const { return m_regmodel; };
+  const Trend::RegressionModel& regmodel() const { return m_regmodel; };
   const arma::mat& F() const { return m_F; };
   const arma::mat& T() const { return m_T; };
   const arma::mat& M() const { return m_M; };
@@ -104,7 +97,7 @@ class NuggetKriging {
   arma::colvec m_y;
   double m_centerY;
   double m_scaleY;
-  RegressionModel m_regmodel;
+  Trend::RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
   arma::mat m_dX;
@@ -151,7 +144,7 @@ class NuggetKriging {
   LIBKRIGING_EXPORT NuggetKriging(const arma::colvec& y,
                                   const arma::mat& X,
                                   const std::string& covType,
-                                  const RegressionModel& regmodel = RegressionModel::Constant,
+                                  const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                   bool normalize = false,
                                   const std::string& optim = "BFGS",
                                   const std::string& objective = "LL",
@@ -167,7 +160,7 @@ class NuggetKriging {
    */
   LIBKRIGING_EXPORT void fit(const arma::colvec& y,
                              const arma::mat& X,
-                             const RegressionModel& regmodel = RegressionModel::Constant,
+                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",

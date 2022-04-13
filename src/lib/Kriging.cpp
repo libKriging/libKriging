@@ -6,13 +6,14 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/Trend.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
-#include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/utils/custom_hash_function.hpp"
+#include "libKriging/Kriging.hpp"
 
 #include <cassert>
 #include <optim.hpp>
@@ -28,17 +29,6 @@ std::chrono::high_resolution_clock::time_point toc(std::string what,
   arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
   return t;
 }
-
-/************************************************/
-/** implementation details forward declaration **/
-/************************************************/
-
-namespace {  // anonymous namespace for local implementation details
-auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
-                           const arma::mat& newX,
-                           arma::uword n,
-                           arma::uword d) -> arma::mat;
-}  // namespace
 
 /************************************************/
 /**      Kriging implementation        **/
@@ -77,7 +67,7 @@ LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType) {
 LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
                                    const arma::mat& X,
                                    const std::string& covType,
-                                   const RegressionModel& regmodel,
+                                   const Trend::RegressionModel& regmodel,
                                    bool normalize,
                                    const std::string& optim,
                                    const std::string& objective,
@@ -833,7 +823,7 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                                     const arma::mat& X,
-                                    const RegressionModel& regmodel,
+                                    const Trend::RegressionModel& regmodel,
                                     bool normalize,
                                     const std::string& optim,
                                     const std::string& objective,
@@ -930,7 +920,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
   // Define regression matrix
   m_regmodel = regmodel;
-  m_F = regressionModelMatrix(regmodel, m_X, n, d);
+  m_F = Trend::regressionModelMatrix(regmodel, m_X, n, d);
 
   arma::mat theta0 = parameters.theta;
   if (parameters.has_theta) {
@@ -1129,7 +1119,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
 
   // Define regression matrix
   arma::uword d = m_X.n_cols;
-  arma::mat Ftest = regressionModelMatrix(m_regmodel, Xpnorm, m, d);
+  arma::mat Ftest = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
 
   // Compute covariance between training data and new data to predict
   arma::mat R = arma::mat(n, m);
@@ -1219,7 +1209,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
 
   // Define regression matrix
   arma::uword d = m_X.n_cols;
-  arma::mat F_newdata = regressionModelMatrix(m_regmodel, Xpnorm, m, d);
+  arma::mat F_newdata = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
 
   // auto t0 = tic();
   arma::colvec y_trend = F_newdata * m_beta;  // / std::sqrt(m_sigma2);
@@ -1331,7 +1321,7 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
   };
 
   oss << "* data: " << m_X.n_rows << " x " << m_X.n_cols << " -> " << m_y.n_rows << " x " << m_y.n_cols << "\n";
-  oss << "* trend " << RegressionModelUtils::toString(m_regmodel);
+  oss << "* trend " << Trend::toString(m_regmodel);
   oss << ((m_est_beta) ? " (est.): " : ": ");
   colvec_printer(m_beta);
   oss << "\n";
@@ -1349,88 +1339,4 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
   oss << "    * objective: " << m_objective << "\n";
   oss << "    * optim: " << m_optim << "\n";
   return oss.str();
-}
-
-/************************************************/
-/**          implementation details            **/
-/************************************************/
-
-namespace {  // anonymous namespace for local implementation details
-
-auto regressionModelMatrix(const Kriging::RegressionModel& regmodel,
-                           const arma::mat& newX,
-                           arma::uword n,
-                           arma::uword d) -> arma::mat {
-  arma::mat F;  // uses modern RTO to avoid returned object copy
-  switch (regmodel) {
-    case Kriging::RegressionModel::Constant: {
-      F.set_size(n, 1);
-      F = arma::ones(n, 1);
-      return F;
-    } break;
-
-    case Kriging::RegressionModel::Linear: {
-      F.set_size(n, 1 + d);
-      F.col(0) = arma::ones(n, 1);
-      for (arma::uword i = 0; i < d; i++) {
-        F.col(i + 1) = newX.col(i);
-      }
-      return F;
-    } break;
-
-    case Kriging::RegressionModel::Interactive: {
-      F.set_size(n, 1 + d + d * (d - 1) / 2);
-      F.col(0) = arma::ones(n, 1);
-      arma::uword count = 1;
-      for (arma::uword i = 0; i < d; i++) {
-        F.col(count) = newX.col(i);
-        count += 1;
-        for (arma::uword j = 0; j < i; j++) {
-          F.col(count) = newX.col(i) % newX.col(j);
-          count += 1;
-        }
-      }
-      return F;
-    } break;
-
-    case Kriging::RegressionModel::Quadratic: {
-      F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
-      F.col(0) = arma::ones(n, 1);
-      arma::uword count = 1;
-      for (arma::uword i = 0; i < d; i++) {
-        F.col(count) = newX.col(i);
-        count += 1;
-        for (arma::uword j = 0; j <= i; j++) {
-          F.col(count) = newX.col(i) % newX.col(j);
-          count += 1;
-        }
-      }
-      return F;
-    } break;
-
-    default:
-      throw std::runtime_error("Unreachable code");
-  }
-}
-
-static char const* enum_RegressionModel_strings[] = {"constant", "linear", "interactive", "quadratic"};
-
-}  // namespace
-
-Kriging::RegressionModel Kriging::RegressionModelUtils::fromString(const std::string& value) {
-  static auto begin = std::begin(enum_RegressionModel_strings);
-  static auto end = std::end(enum_RegressionModel_strings);
-
-  auto find = std::find(begin, end, value);
-  if (find != end) {
-    return static_cast<RegressionModel>(std::distance(begin, find));
-  } else {
-    // FIXME use std::optional as returned type
-    throw KrigingException("Cannot convert '" + value + "' as a regression model");
-  }
-}
-
-std::string Kriging::RegressionModelUtils::toString(const Kriging::RegressionModel& e) {
-  assert(static_cast<std::size_t>(e) < sizeof(enum_RegressionModel_strings));
-  return enum_RegressionModel_strings[static_cast<int>(e)];
 }
