@@ -976,33 +976,21 @@ LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
 
   oss << "* data: " << m_X.n_rows << " x " << m_X.n_cols << " -> " << m_y.n_rows << " x " << m_y.n_cols << "\n";
   oss << "* trend " << Trend::toString(m_regmodel);
-  if (m_est_beta)
-    oss << " (est.): ";
-  else
-    oss << ": ";
+  oss << ((m_est_beta) ? " (est.): " : ": ");
   colvec_printer(m_beta);
   oss << "\n";
   oss << "* variance";
-  if (m_est_sigma2)
-    oss << " (est.): ";
-  else
-    oss << ": ";
+  oss << ((m_est_sigma2) ? " (est.): " : ": ");
   oss << m_sigma2;
   oss << "\n";
   oss << "* covariance:\n";
   oss << "  * kernel: " << m_covType << "\n";
   oss << "  * range";
-  if (m_est_theta)
-    oss << " (est.): ";
-  else
-    oss << ": ";
+  oss << ((m_est_theta) ? " (est.): " : ": ");
   colvec_printer(m_theta);
   oss << "\n";
   oss << "  * nugget";
-  if (m_est_nugget)
-    oss << " (est.): ";
-  else
-    oss << ": ";
+  oss << ((m_est_nugget) ? " (est.): " : ": ");
   oss << m_nugget;
   oss << "\n";
   oss << "  * fit:\n";

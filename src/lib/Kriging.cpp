@@ -1323,7 +1323,7 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
   oss << "* covariance:\n";
   oss << "  * kernel: " << m_covType << "\n";
   oss << "  * range";
-  oss << ((m_est_theta) ? " (est.) " : ": ");
+  oss << ((m_est_theta) ? " (est.): " : ": ");
   colvec_printer(m_theta);
   oss << "\n";
   oss << "  * fit:\n";
