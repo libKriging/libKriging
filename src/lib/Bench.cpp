@@ -9,10 +9,22 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-// #include <optim.hpp>
 #include <tuple>
 
-// #include "libKriging/covariance.h"
+
+// Usefull functions to evaluate time spent
+
+std::chrono::high_resolution_clock::time_point tic() {
+  return std::chrono::high_resolution_clock::now();
+}
+
+std::chrono::high_resolution_clock::time_point toc(std::string what,
+                                                   std::chrono::high_resolution_clock::time_point t0) {
+  const auto t = std::chrono::high_resolution_clock::now();
+  arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+  return t;
+}
+
 
 LIBKRIGING_EXPORT Bench::Bench(int _n) {
   n = _n;
