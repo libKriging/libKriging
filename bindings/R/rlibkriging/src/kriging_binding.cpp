@@ -108,23 +108,22 @@ Rcpp::List kriging_model(Rcpp::List k) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  Rcpp::List ret
-      = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
-                           Rcpp::Named("optim") = impl_ptr->optim(),
-                           Rcpp::Named("objective") = impl_ptr->objective(),
-                           Rcpp::Named("theta") = impl_ptr->theta(),
-                           Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
-                           Rcpp::Named("sigma2") = impl_ptr->sigma2(),
-                           Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
-                           Rcpp::Named("X") = impl_ptr->X(),
-                           Rcpp::Named("centerX") = impl_ptr->centerX(),
-                           Rcpp::Named("scaleX") = impl_ptr->scaleX(),
-                           Rcpp::Named("y") = impl_ptr->y(),
-                           Rcpp::Named("centerY") = impl_ptr->centerY(),
-                           Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-                           Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
-                           Rcpp::Named("beta") = impl_ptr->beta(),
-                           Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
+                                      Rcpp::Named("optim") = impl_ptr->optim(),
+                                      Rcpp::Named("objective") = impl_ptr->objective(),
+                                      Rcpp::Named("theta") = impl_ptr->theta(),
+                                      Rcpp::Named("estim_theta") = impl_ptr->estim_theta(),
+                                      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
+                                      Rcpp::Named("estim_sigma2") = impl_ptr->estim_sigma2(),
+                                      Rcpp::Named("X") = impl_ptr->X(),
+                                      Rcpp::Named("centerX") = impl_ptr->centerX(),
+                                      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
+                                      Rcpp::Named("y") = impl_ptr->y(),
+                                      Rcpp::Named("centerY") = impl_ptr->centerY(),
+                                      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+                                      Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
+                                      Rcpp::Named("beta") = impl_ptr->beta(),
+                                      Rcpp::Named("estim_beta") = impl_ptr->estim_beta());
 
   // because Rcpp::List::create accepts no more than 20 args...
   ret.push_back(impl_ptr->F(), "F");

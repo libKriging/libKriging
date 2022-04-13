@@ -373,7 +373,6 @@ double NuggetKriging::logMargPost(const arma::vec& _theta_alpha,
   // arma::cout << " log_approx_ref_prior:" << log_approx_ref_prior << arma::endl;
 
   if (grad_out != nullptr) {
-
     // Eigen::VectorXd log_marginal_lik_deriv(const Eigen::VectorXd param,double nugget,  bool nugget_est, const List
     // R0, const Eigen::Map<Eigen::MatrixXd> & X,const String zero_mean,const Eigen::Map<Eigen::MatrixXd> & output,
     // Eigen::VectorXi kernel_type,const Eigen::VectorXd alpha){

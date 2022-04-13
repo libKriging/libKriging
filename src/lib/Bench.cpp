@@ -11,7 +11,6 @@
 
 #include <tuple>
 
-
 // Usefull functions to evaluate time spent
 
 std::chrono::high_resolution_clock::time_point tic() {
@@ -24,7 +23,6 @@ std::chrono::high_resolution_clock::time_point toc(std::string what,
   arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
   return t;
 }
-
 
 LIBKRIGING_EXPORT Bench::Bench(int _n) {
   n = _n;

@@ -32,9 +32,9 @@ std::string Trend::toString(const Trend::RegressionModel& e) {
 }
 
 arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
-                           const arma::mat& newX,
-                           arma::uword n,
-                           arma::uword d) {
+                                       const arma::mat& newX,
+                                       arma::uword n,
+                                       arma::uword d) {
   arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
     case Trend::RegressionModel::Constant: {
