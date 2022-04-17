@@ -14,3 +14,6 @@
 	path = dependencies/Catch2
 	url = https://github.com/catchorg/Catch2.git
 	branch = v2.x
+[submodule "dependencies/optim"]
+	path = dependencies/optim
+	url = https://github.com/libKriging/optim.git
