@@ -92,6 +92,21 @@ NuggetKriging <- function(y, X, kernel,
                       objective = objective,
                       parameters = parameters)
     class(nk) <- "NuggetKriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in methods(class=class(nk))) {
+        if (regexec(paste0(".",class(nk)),f)[[1]]>0) {
+            f_anon = sub(paste0(".",class(nk)),"",fixed=TRUE,f)
+            eval(parse(text=paste0(
+                "nk$", f_anon, " <- function(...) ", f_anon, "(nk,...)"
+                )))
+        }
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','estim_beta','theta','estim_theta','sigma2','estim_sigma2','nugget','estim_nugget')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() nuggetkriging_", d, "(nk)"
+            )))
+    }
     nk
 }
 

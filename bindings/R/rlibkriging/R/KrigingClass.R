@@ -92,6 +92,21 @@ Kriging <- function(y, X, kernel,
                       objective = objective,
                       parameters = parameters)
     class(nk) <- "Kriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in methods(class=class(nk))) {
+        if (regexec(paste0(".",class(nk)),f)[[1]]>0) {
+            f_anon = sub(paste0(".",class(nk)),"",fixed=TRUE,f)
+            eval(parse(text=paste0(
+                "nk$", f_anon, " <- function(...) ", f_anon, "(nk,...)"
+                )))
+        }
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','estim_beta','theta','estim_theta','sigma2','estim_sigma2')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() kriging_", d, "(nk)"
+            )))
+    }
     nk
 }
 
@@ -637,6 +652,36 @@ logMargPost.Kriging <- function(object, theta, grad = FALSE, ...) {
     return(out)
 }
 
-## setMethod("logMargPost", "Kriging", logMargPost.Kriging)
+##############################################################################
 
 
+## ****************************************************************************
+#' Print the content of a \code{Kriging} object.
+#'
+#' @title Print a \code{Kriging} object
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param x A (S3) \code{Kriging} Object.
+#' @param ... Ignored.
+#'
+#' @return NULL
+#'
+#' @export
+#' @method print Kriging
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, "gauss")
+#' print(r)
+#' ## same thing
+#' r
+print.Kriging <- function(x, ...) {
+    if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
+    k=kriging_model(x)
+    p = paste0("Kriging model:\n\n",kriging_summary(x),"\n")
+    cat(p)
+    ## return(p)
+}

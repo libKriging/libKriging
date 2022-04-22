@@ -167,4 +167,224 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.setOptional<1>(lmpgrad, "lmpgrad");  // FIXME better name
 }
 
+void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->kernel(), "kernel");
+}
+
+void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->optim(), "optim");
+}
+
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->objective(), "objective");
+}
+
+void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->X(), "X");
+}
+
+void centerX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->centerX(), "centerX");
+}
+
+void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->scaleX(), "scaleX");
+}
+
+void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->y(), "y");
+}
+
+void centerY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->centerY(), "centerY");
+}
+
+void scaleY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->scaleY(), "scaleY");
+}
+
+void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->regmodel(), "regmodel");
+}
+
+void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->F(), "F");
+}
+
+void T(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->T(), "T");
+}
+
+void M(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->M(), "M");
+}
+
+void z(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->z(), "z");
+}
+
+void beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->beta(), "beta");
+}
+
+void estim_beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->estim_beta(), "estim_beta");
+}
+
+void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->theta(), "theta");
+}
+
+void estim_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->estim_theta(), "estim_theta");
+}
+
+void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->sigma2(), "sigma2");
+}
+
+void estim_sigma2 (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->estim_sigma2 (), "estim_sigma2 ");
+}
+
+void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->nugget(), "nugget");
+}
+
+void estim_nugget (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->estim_nugget (), "estim_nugget ");
+}
+
 }  // namespace NuggetKrigingBinding

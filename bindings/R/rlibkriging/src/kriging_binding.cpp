@@ -248,3 +248,185 @@ Rcpp::List kriging_logMargPost(Rcpp::List k, arma::vec theta, bool grad = false)
     return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////////
+
+// [[Rcpp::export]]
+std::string kriging_kernel(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->kernel();
+}
+
+// [[Rcpp::export]]
+std::string kriging_optim(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->optim();
+}
+
+// [[Rcpp::export]]
+std::string kriging_objective(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->objective();
+}
+
+// [[Rcpp::export]]
+arma::mat kriging_X(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->X();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_centerX(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->centerX();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_scaleX(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->scaleX();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_y(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->y();
+}
+
+// [[Rcpp::export]]
+double kriging_centerY(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->centerY();
+}
+
+// [[Rcpp::export]]
+double kriging_scaleY(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->scaleY();
+}
+
+// [[Rcpp::export]]
+std::string kriging_regmodel(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return Trend::toString(impl_ptr->regmodel());
+}
+
+// [[Rcpp::export]]
+arma::mat kriging_F(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->F();
+}
+
+// [[Rcpp::export]]
+arma::mat kriging_T(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->T();
+}
+
+// [[Rcpp::export]]
+arma::mat kriging_M(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->M();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_z(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->z();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_beta(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->beta();
+}
+
+// [[Rcpp::export]]
+bool kriging_estim_beta(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->estim_beta();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_theta(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->theta();
+}
+
+// [[Rcpp::export]]
+bool kriging_estim_theta(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->estim_theta();
+}
+
+// [[Rcpp::export]]
+double kriging_sigma2(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->sigma2();
+}
+
+// [[Rcpp::export]]
+bool kriging_estim_sigma2 (Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->estim_sigma2();
+}

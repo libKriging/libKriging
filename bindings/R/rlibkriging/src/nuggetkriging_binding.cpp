@@ -248,3 +248,203 @@ Rcpp::List nuggetkriging_logMargPost(Rcpp::List k, arma::vec theta, bool grad = 
     return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////////
+
+// [[Rcpp::export]]
+std::string nuggetkriging_kernel(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->kernel();
+}
+
+// [[Rcpp::export]]
+std::string nuggetkriging_optim(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->optim();
+}
+
+// [[Rcpp::export]]
+std::string nuggetkriging_objective(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->objective();
+}
+
+// [[Rcpp::export]]
+arma::mat nuggetkriging_X(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->X();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_centerX(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->centerX();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_scaleX(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->scaleX();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_y(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->y();
+}
+
+// [[Rcpp::export]]
+double nuggetkriging_centerY(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->centerY();
+}
+
+// [[Rcpp::export]]
+double nuggetkriging_scaleY(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->scaleY();
+}
+
+// [[Rcpp::export]]
+std::string nuggetkriging_regmodel(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return Trend::toString(impl_ptr->regmodel());
+}
+
+// [[Rcpp::export]]
+arma::mat nuggetkriging_F(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->F();
+}
+
+// [[Rcpp::export]]
+arma::mat nuggetkriging_T(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->T();
+}
+
+// [[Rcpp::export]]
+arma::mat nuggetkriging_M(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->M();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_z(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->z();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_beta(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->beta();
+}
+
+// [[Rcpp::export]]
+bool nuggetkriging_estim_beta(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->estim_beta();
+}
+
+// [[Rcpp::export]]
+arma::vec nuggetkriging_theta(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->theta();
+}
+
+// [[Rcpp::export]]
+bool nuggetkriging_estim_theta(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->estim_theta();
+}
+
+// [[Rcpp::export]]
+double nuggetkriging_sigma2(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->sigma2();
+}
+
+// [[Rcpp::export]]
+bool nuggetkriging_estim_sigma2 (Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->estim_sigma2();
+}
+
+// [[Rcpp::export]]
+double nuggetkriging_nugget(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->nugget();
+}
+
+// [[Rcpp::export]]
+bool nuggetkriging_estim_nugget (Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+  return impl_ptr->estim_nugget();
+}

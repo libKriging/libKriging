@@ -14,6 +14,27 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+
+void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void centerX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void centerY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void scaleY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void T(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void M(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void z(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void estim_beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void estim_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void estim_sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace KrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_KRIGING_BINDING_HPP
