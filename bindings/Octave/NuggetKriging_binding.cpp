@@ -264,7 +264,7 @@ void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
-  output.set<0>(km->regmodel(), "regmodel");
+  output.set<0>(Trend::toString(km->regmodel()), "regmodel");
 }
 
 void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
