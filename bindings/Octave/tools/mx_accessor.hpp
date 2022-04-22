@@ -63,6 +63,20 @@ inline auto converter<arma::vec>(mxArray* x, const std::string& parameter) {
 }
 
 template <>
+inline auto converter<arma::rowvec>(mxArray* x, const std::string& parameter) {
+  if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a row vector of double");
+  }
+  const arma::uword nrow = mxGetM(x);
+  const arma::uword ncol = mxGetN(x);
+  if (nrow > 1) {
+    throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a row vector of double");
+  }
+  double* data = mxGetPr(x);
+  return arma::rowvec{data, ncol, false, true};
+}
+
+template <>
 inline auto converter<arma::mat>(mxArray* x, const std::string& parameter) {
   if (!mxIsDouble(x) || mxIsComplex(x) || mxGetNumberOfDimensions(x) > 2) {
     throw MxException(LOCATION(), "mLibKriging:badType", parameter, " is not a matrix of double");
@@ -117,6 +131,18 @@ inline void setter<std::string>(const std::string& v, mxArray*& x) {
 
 template <>
 inline void setter<arma::vec>(const arma::vec& v, mxArray*& x) {
+  x = mxCreateNumericMatrix(v.n_rows, v.n_cols, mxDOUBLE_CLASS, mxREAL);
+  if (false && v.mem_state == 0 && v.n_elem > arma::arma_config::mat_prealloc) {
+    // FIXME hard trick; use internal implementation of arma::~Mat
+    arma::access::rw(v.mem_state) = 2;
+    mxSetPr(x, const_cast<double*>(v.memptr()));
+  } else {
+    std::memcpy(mxGetPr(x), v.memptr(), sizeof(double) * v.n_rows * v.n_cols);
+  }
+}
+
+template <>
+inline void setter<arma::rowvec>(const arma::rowvec& v, mxArray*& x) {
   x = mxCreateNumericMatrix(v.n_rows, v.n_cols, mxDOUBLE_CLASS, mxREAL);
   if (false && v.mem_state == 0 && v.n_elem > arma::arma_config::mat_prealloc) {
     // FIXME hard trick; use internal implementation of arma::~Mat
