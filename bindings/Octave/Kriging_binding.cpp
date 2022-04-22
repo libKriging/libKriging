@@ -330,14 +330,14 @@ void beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->beta(), "beta");
 }
 
-void estim_beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void is_beta_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
-  output.set<0>(km->estim_beta(), "estim_beta");
+  output.set<0>(km->is_beta_estim(), "is_beta_estim");
 }
 
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -350,14 +350,14 @@ void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->theta(), "theta");
 }
 
-void estim_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void is_theta_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
-  output.set<0>(km->estim_theta(), "estim_theta");
+  output.set<0>(km->is_theta_estim(), "is_theta_estim");
 }
 
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -370,14 +370,14 @@ void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->sigma2(), "sigma2");
 }
 
-void estim_sigma2 (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void is_sigma2_estim (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
-  output.set<0>(km->estim_sigma2 (), "estim_sigma2 ");
+  output.set<0>(km->is_sigma2_estim (), "is_sigma2_estim ");
 }
 
 }  // namespace KrigingBinding

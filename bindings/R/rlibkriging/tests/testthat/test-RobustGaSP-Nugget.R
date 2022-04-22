@@ -19,9 +19,9 @@ r <- NuggetKriging(y, X,
   optim = "none",
   objective = "LMP", 
   parameters=list(
-    theta=matrix(1/k@beta_hat),estim_theta=F,
-    nugget=k@nugget*k@sigma2_hat,estim_nugget=F,
-    sigma2=k@sigma2_hat,estim_sigma2=F))
+    theta=matrix(1/k@beta_hat),is_theta_estim=F,
+    nugget=k@nugget*k@sigma2_hat,is_nugget_estim=F,
+    sigma2=k@sigma2_hat,is_sigma2_estim=F))
 # m = as.list(r)
 
 # Check predict
@@ -69,9 +69,9 @@ r <- NuggetKriging(y, X,
   optim = "none",
   objective = "LMP",
   parameters=list(
-    theta=matrix(1/k@beta_hat,nrow=2),estim_theta=F,
-    nugget=k@nugget*k@sigma2_hat,estim_nugget=F,
-    sigma2=k@sigma2_hat,estim_sigma2=F))
+    theta=matrix(1/k@beta_hat,nrow=2),is_theta_estim=F,
+    nugget=k@nugget*k@sigma2_hat,is_nugget_estim=F,
+    sigma2=k@sigma2_hat,is_sigma2_estim=F))
   
 
 # Check predict

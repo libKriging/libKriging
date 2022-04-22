@@ -102,7 +102,7 @@ Kriging <- function(y, X, kernel,
         }
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','estim_beta','theta','estim_theta','sigma2','estim_sigma2')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))

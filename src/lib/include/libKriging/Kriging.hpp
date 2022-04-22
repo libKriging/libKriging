@@ -15,35 +15,35 @@ class Kriging {
   struct Parameters {
     double sigma2;
     bool has_sigma2;
-    bool estim_sigma2;
+    bool is_sigma2_estim;
     arma::mat theta;
     bool has_theta;
-    bool estim_theta;
+    bool is_theta_estim;
     arma::colvec beta;
     bool has_beta;
-    bool estim_beta;
+    bool is_beta_estim;
 
     Parameters()
         : sigma2(-1),
           has_sigma2(false),
-          estim_sigma2(true),
+          is_sigma2_estim(true),
           theta(arma::mat()),
           has_theta(false),
-          estim_theta(true),
+          is_theta_estim(true),
           beta(arma::vec()),
           has_beta(false),
-          estim_beta(true) {}
+          is_beta_estim(true) {}
 
     Parameters(double s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
         : sigma2(s2),
           has_sigma2(h_s2),
-          estim_sigma2(e_s2),
+          is_sigma2_estim(e_s2),
           theta(t),
           has_theta(h_t),
-          estim_theta(e_t),
+          is_theta_estim(e_t),
           beta(b),
           has_beta(h_b),
-          estim_beta(e_b) {}
+          is_beta_estim(e_b) {}
   };
 
   const std::string& kernel() const { return m_covType; };
@@ -61,11 +61,11 @@ class Kriging {
   const arma::mat& M() const { return m_M; };
   const arma::colvec& z() const { return m_z; };
   const arma::colvec& beta() const { return m_beta; };
-  const bool& estim_beta() const { return m_est_beta; };
+  const bool& is_beta_estim() const { return m_est_beta; };
   const arma::vec& theta() const { return m_theta; };
-  const bool& estim_theta() const { return m_est_theta; };
+  const bool& is_theta_estim() const { return m_est_theta; };
   const double& sigma2() const { return m_sigma2; };
-  const bool& estim_sigma2() const { return m_est_sigma2; };
+  const bool& is_sigma2_estim() const { return m_est_sigma2; };
 
  private:
   std::string m_covType;
@@ -104,9 +104,9 @@ class Kriging {
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    bool estim_beta;
+    bool is_beta_estim;
     double sigma2;
-    bool estim_sigma2;
+    bool is_sigma2_estim;
   };
 
   double logLikelihood(const arma::vec& _theta,

@@ -112,16 +112,16 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::beta"_hash:
       return KrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::estim_beta"_hash:
-      return KrigingBinding::estim_beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_beta_estim"_hash:
+      return KrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::theta"_hash:
       return KrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::estim_theta"_hash:
-      return KrigingBinding::estim_theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_theta_estim"_hash:
+      return KrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::sigma2"_hash:
       return KrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::estim_sigma2 "_hash:
-      return KrigingBinding::estim_sigma2 (nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_sigma2_estim "_hash:
+      return KrigingBinding::is_sigma2_estim (nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NuggetKriging::new"_hash:
       return NuggetKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
@@ -172,20 +172,20 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::beta"_hash:
       return NuggetKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "NuggetKriging::estim_beta"_hash:
-      return NuggetKrigingBinding::estim_beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::is_beta_estim"_hash:
+      return NuggetKrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::theta"_hash:
       return NuggetKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "NuggetKriging::estim_theta"_hash:
-      return NuggetKrigingBinding::estim_theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::is_theta_estim"_hash:
+      return NuggetKrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::sigma2"_hash:
       return NuggetKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "NuggetKriging::estim_sigma2 "_hash:
-      return NuggetKrigingBinding::estim_sigma2 (nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::is_sigma2_estim "_hash:
+      return NuggetKrigingBinding::is_sigma2_estim (nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::nugget"_hash:
       return NuggetKrigingBinding::nugget(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "NuggetKriging::estim_nugget "_hash:
-      return NuggetKrigingBinding::estim_nugget (nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::is_nugget_estim "_hash:
+      return NuggetKrigingBinding::is_nugget_estim (nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

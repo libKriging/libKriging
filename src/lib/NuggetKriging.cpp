@@ -127,17 +127,17 @@ double NuggetKriging::logLikelihood(const arma::vec& _theta_alpha,
   qr_econ(Q, G, fd->M);
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->estim_beta)
+  if (fd->is_beta_estim)
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
   fd->z = Yt - fd->M * fd->beta;
 
   fd->var = arma::accu(fd->z % fd->z) / n;
-  if (fd->estim_nugget) {
+  if (fd->is_nugget_estim) {
     fd->nugget = (1 - _alpha) * fd->var;
-    if (fd->estim_sigma2)
+    if (fd->is_sigma2_estim)
       fd->sigma2 = _alpha * fd->var;
   } else {
-    if (fd->estim_sigma2)
+    if (fd->is_sigma2_estim)
       fd->sigma2 = fd->var - fd->nugget;
   }
 
@@ -317,7 +317,7 @@ double NuggetKriging::logMargPost(const arma::vec& _theta_alpha,
   //
   //  arma::mat H = Q * Q.t();  // if (hess_out != nullptr)
   //  arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::solve_opts);
-  //  if (fd->estim_beta)
+  //  if (fd->is_beta_estim)
   // fd->beta = solve(trimatu(G), Q.t() * Yt, LinearAlgebra::solve_opts);
   //  fd->z = Yt - fd->M * fd->beta;
 
@@ -337,7 +337,7 @@ double NuggetKriging::logMargPost(const arma::vec& _theta_alpha,
                  LinearAlgebra::default_solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward
                                                        // and one backward solve
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->estim_beta) {
+  if (fd->is_beta_estim) {
     arma::mat Q;
     arma::mat G;
     qr_econ(Q, G, fd->M);
@@ -349,12 +349,12 @@ double NuggetKriging::logMargPost(const arma::vec& _theta_alpha,
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
 
   fd->var = S_2(0, 0) / (n - d);
-  if (fd->estim_nugget) {
+  if (fd->is_nugget_estim) {
     fd->nugget = (1 - _alpha) * fd->var;
-    if (fd->estim_sigma2)
+    if (fd->is_sigma2_estim)
       fd->sigma2 = _alpha * fd->var;
   } else {
-    if (fd->estim_sigma2)
+    if (fd->is_sigma2_estim)
       fd->sigma2 = fd->var - fd->nugget;
   }
 
@@ -595,11 +595,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                     M,
                                     z,
                                     beta,
-                                    parameters.estim_beta,
+                                    parameters.is_beta_estim,
                                     sigma2,
-                                    parameters.estim_sigma2,
+                                    parameters.is_sigma2_estim,
                                     nugget,
-                                    parameters.estim_nugget,
+                                    parameters.is_nugget_estim,
                                     nugget + sigma2};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
@@ -611,11 +611,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.estim_beta;
+    m_est_beta = parameters.is_beta_estim;
     m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = parameters.estim_sigma2;
+    m_est_sigma2 = parameters.is_sigma2_estim;
     m_nugget = okm_data.nugget;
-    m_est_nugget = parameters.estim_nugget;
+    m_est_nugget = parameters.is_nugget_estim;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
@@ -689,11 +689,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                       M,
                                       z,
                                       beta,
-                                      parameters.estim_beta,
+                                      parameters.is_beta_estim,
                                       sigma2,
-                                      parameters.estim_sigma2,
+                                      parameters.is_sigma2_estim,
                                       nugget,
-                                      parameters.estim_nugget,
+                                      parameters.is_nugget_estim,
                                       nugget + sigma2};
 
       bool bfgs_ok = optim::lbfgs(
@@ -717,11 +717,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.estim_beta;
+        m_est_beta = parameters.is_beta_estim;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.estim_sigma2;
+        m_est_sigma2 = parameters.is_sigma2_estim;
         m_nugget = okm_data.nugget;
-        m_est_nugget = parameters.estim_nugget;
+        m_est_nugget = parameters.is_nugget_estim;
       }
     }
   } else

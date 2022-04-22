@@ -133,14 +133,14 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   // t0 = Bench::toc("H             ", t0);
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   // t0 = Bench::toc("Yt            ", t0);
-  if (fd->estim_beta)
+  if (fd->is_beta_estim)
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
   // t0 = Bench::toc("beta          ", t0);
   fd->z = Yt - fd->M * fd->beta;
   // t0 = Bench::toc("z             ", t0);
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
-  if (fd->estim_sigma2)  // means no sigma2 provided
+  if (fd->is_sigma2_estim)  // means no sigma2 provided
     fd->sigma2 = arma::accu(fd->z % fd->z) / n;
   // t0 = Bench::toc("sigma2_hat    ", t0);
   // arma::cout << " sigma2:" << fd->sigma2 << arma::endl;
@@ -407,7 +407,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->estim_beta) {
+  if (fd->is_beta_estim) {
     // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
     arma::mat Q;
     arma::mat G;
@@ -416,7 +416,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   }
   fd->z = Yt - fd->M * fd->beta;
 
-  if (fd->estim_sigma2)  // means no sigma2 provided
+  if (fd->is_sigma2_estim)  // means no sigma2 provided
     fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
 
   if (grad_out != nullptr) {
@@ -563,7 +563,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   //  // t0 = Bench::toc("H             ", t0);
   //  arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   //  // t0 = Bench::toc("Yt            ", t0);
-  //  if (fd->estim_beta)
+  //  if (fd->is_beta_estim)
   // fd->beta = solve(trimatu(G), Q.t() * Yt, LinearAlgebra::default_solve_opts);
   //  // t0 = Bench::toc("beta          ", t0);
   //  fd->z = Yt - fd->M * fd->beta;
@@ -589,7 +589,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
                                                        // and one backward solve
   // t0 = Bench::toc("R_inv_X_Xt_R_inv_X_inv_Xt_R_inv             ", t0);
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->estim_beta) {
+  if (fd->is_beta_estim) {
     arma::mat Q;
     arma::mat G;
     qr_econ(Q, G, fd->M);
@@ -602,7 +602,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
   // t0 = Bench::toc("S_2             ", t0);
 
-  if (fd->estim_sigma2)  // means no sigma2 provided
+  if (fd->is_sigma2_estim)  // means no sigma2 provided
     fd->sigma2 = S_2(0, 0) / (n - d);
 
   double log_S_2 = log(S_2(0, 0));
@@ -938,7 +938,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     if (parameters.has_sigma2)
       sigma2 = parameters.sigma2;  // otherwise sigma2 will be re-calculated using given theta
 
-    Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
+    Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
     double min_ofn_tmp = fit_ofn(-arma::log(m_theta), nullptr, nullptr, &okm_data);
 
@@ -946,9 +946,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.estim_beta;
+    m_est_beta = parameters.is_beta_estim;
     m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = parameters.estim_sigma2;
+    m_est_sigma2 = parameters.is_sigma2_estim;
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
@@ -992,7 +992,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (parameters.has_sigma2)
         sigma2 = parameters.sigma2;
 
-      Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
+      Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
       bool bfgs_ok = optim::lbfgs(
           gamma_tmp,
@@ -1016,9 +1016,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.estim_beta;
+        m_est_beta = parameters.is_beta_estim;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.estim_sigma2;
+        m_est_sigma2 = parameters.is_sigma2_estim;
       }
     }
   } else if (optim.rfind("Newton", 0) == 0) {
@@ -1052,7 +1052,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (parameters.has_sigma2)
         sigma2 = parameters.sigma2;
 
-      Kriging::OKModel okm_data{T, M, z, beta, parameters.estim_beta, sigma2, parameters.estim_sigma2};
+      Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
       double min_ofn_tmp = optim_newton(
           [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
@@ -1070,9 +1070,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.estim_beta;
+        m_est_beta = parameters.is_beta_estim;
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.estim_sigma2;
+        m_est_sigma2 = parameters.is_sigma2_estim;
       }
     }
   } else

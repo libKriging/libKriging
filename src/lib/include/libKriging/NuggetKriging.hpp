@@ -15,30 +15,30 @@ class NuggetKriging {
   struct Parameters {
     arma::vec nugget;
     bool has_nugget;
-    bool estim_nugget;
+    bool is_nugget_estim;
     arma::vec sigma2;
     bool has_sigma2;
-    bool estim_sigma2;
+    bool is_sigma2_estim;
     arma::mat theta;
     bool has_theta;
-    bool estim_theta;
+    bool is_theta_estim;
     arma::colvec beta;
     bool has_beta;
-    bool estim_beta;
+    bool is_beta_estim;
 
     Parameters()
         : nugget(arma::vec()),
           has_nugget(false),
-          estim_nugget(true),
+          is_nugget_estim(true),
           sigma2(arma::vec()),
           has_sigma2(false),
-          estim_sigma2(true),
+          is_sigma2_estim(true),
           theta(arma::mat()),
           has_theta(false),
-          estim_theta(true),
+          is_theta_estim(true),
           beta(arma::vec()),
           has_beta(false),
-          estim_beta(true) {}
+          is_beta_estim(true) {}
 
     Parameters(arma::vec n,
                bool h_n,
@@ -54,16 +54,16 @@ class NuggetKriging {
                bool e_b)
         : nugget(n),
           has_nugget(h_n),
-          estim_nugget(e_n),
+          is_nugget_estim(e_n),
           sigma2(s2),
           has_sigma2(h_s2),
-          estim_sigma2(e_s2),
+          is_sigma2_estim(e_s2),
           theta(t),
           has_theta(h_t),
-          estim_theta(e_t),
+          is_theta_estim(e_t),
           beta(b),
           has_beta(h_b),
-          estim_beta(e_b) {}
+          is_beta_estim(e_b) {}
   };
 
   const std::string& kernel() const { return m_covType; };
@@ -81,13 +81,13 @@ class NuggetKriging {
   const arma::mat& M() const { return m_M; };
   const arma::colvec& z() const { return m_z; };
   const arma::colvec& beta() const { return m_beta; };
-  const bool& estim_beta() const { return m_est_beta; };
+  const bool& is_beta_estim() const { return m_est_beta; };
   const arma::vec& theta() const { return m_theta; };
-  const bool& estim_theta() const { return m_est_theta; };
+  const bool& is_theta_estim() const { return m_est_theta; };
   const double& sigma2() const { return m_sigma2; };
-  const bool& estim_sigma2() const { return m_est_sigma2; };
+  const bool& is_sigma2_estim() const { return m_est_sigma2; };
   const double& nugget() const { return m_nugget; };
-  const bool& estim_nugget() const { return m_est_nugget; };
+  const bool& is_nugget_estim() const { return m_est_nugget; };
 
  private:
   std::string m_covType;
@@ -127,11 +127,11 @@ class NuggetKriging {
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    bool estim_beta;
+    bool is_beta_estim;
     double sigma2;
-    bool estim_sigma2;
+    bool is_sigma2_estim;
     double nugget;
-    bool estim_nugget;
+    bool is_nugget_estim;
     double var;
   };
 

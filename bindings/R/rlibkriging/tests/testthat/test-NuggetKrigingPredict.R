@@ -10,9 +10,9 @@ y = f(X)
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
 library(rlibkriging)
 r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
-             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, estim_sigma2=FALSE,
-             theta=matrix(k@covariance@range.val),has_theta=TRUE, estim_theta=FALSE,
-             nugget=k@covariance@nugget,has_nugget=TRUE, estim_nugget=FALSE))
+             parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,
+             theta=matrix(k@covariance@range.val),has_theta=TRUE, is_theta_estim=FALSE,
+             nugget=k@covariance@nugget,has_nugget=TRUE, is_nugget_estim=FALSE))
 # m = as.list(r)
 
 ntest <- 100

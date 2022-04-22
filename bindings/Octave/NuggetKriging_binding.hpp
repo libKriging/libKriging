@@ -29,13 +29,13 @@ void T(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void M(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void z(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
-void estim_beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_beta_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
-void estim_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_theta_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
-void estim_sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_sigma2_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
-void estim_nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_nugget_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace NuggetKrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_NUGGETKRIGING_BINDING_HPP

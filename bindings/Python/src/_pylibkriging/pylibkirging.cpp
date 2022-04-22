@@ -163,11 +163,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("M", &Kriging::M)
       .def("z", &Kriging::z)
       .def("beta", &Kriging::beta)
-      .def("estim_beta", &Kriging::estim_beta)
+      .def("is_beta_estim", &Kriging::is_beta_estim)
       .def("theta", &Kriging::theta)
-      .def("estim_theta", &Kriging::estim_theta)
+      .def("is_theta_estim", &Kriging::is_theta_estim)
       .def("sigma2", &Kriging::sigma2)
-      .def("estim_sigma2", &Kriging::estim_sigma2);
+      .def("is_sigma2_estim", &Kriging::is_sigma2_estim);
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<NuggetKriging::Parameters>(m, "NuggetKrigingParameters").def(py::init<>());
@@ -250,11 +250,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("M", &NuggetKriging::M)
       .def("z", &NuggetKriging::z)
       .def("beta", &NuggetKriging::beta)
-      .def("estim_beta", &NuggetKriging::estim_beta)
+      .def("is_beta_estim", &NuggetKriging::is_beta_estim)
       .def("theta", &NuggetKriging::theta)
-      .def("estim_theta", &NuggetKriging::estim_theta)
+      .def("is_theta_estim", &NuggetKriging::is_theta_estim)
       .def("sigma2", &NuggetKriging::sigma2)
-      .def("estim_sigma2", &NuggetKriging::estim_sigma2)
+      .def("is_sigma2_estim", &NuggetKriging::is_sigma2_estim)
       .def("nugget", &NuggetKriging::nugget)
-      .def("estim_nugget", &NuggetKriging::estim_nugget);
+      .def("is_nugget_estim", &NuggetKriging::is_nugget_estim);
 }

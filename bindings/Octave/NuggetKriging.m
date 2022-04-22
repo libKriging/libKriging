@@ -107,32 +107,32 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::beta", obj.ref, varargin{:});
         end
 
-        function varargout = estim_beta(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("NuggetKriging::estim_beta", obj.ref, varargin{:});
+        function varargout = is_beta_estim(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::is_beta_estim", obj.ref, varargin{:});
         end
 
         function varargout = theta(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::theta", obj.ref, varargin{:});
         end
 
-        function varargout = estim_theta(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("NuggetKriging::estim_theta", obj.ref, varargin{:});
+        function varargout = is_theta_estim(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::is_theta_estim", obj.ref, varargin{:});
         end
 
         function varargout = sigma2(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::sigma2", obj.ref, varargin{:});
         end
 
-        function varargout = estim_sigma2 (obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("NuggetKriging::estim_sigma2 ", obj.ref, varargin{:});
+        function varargout = is_sigma2_estim (obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::is_sigma2_estim ", obj.ref, varargin{:});
         end
 
         function varargout = nugget(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::nugget", obj.ref, varargin{:});
         end
 
-        function varargout = estim_nugget (obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("NuggetKriging::estim_nugget ", obj.ref, varargin{:});
+        function varargout = is_nugget_estim (obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::is_nugget_estim ", obj.ref, varargin{:});
         end
 
     end
