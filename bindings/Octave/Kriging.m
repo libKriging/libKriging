@@ -51,5 +51,85 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::logMargPost", obj.ref, varargin{:});
         end
 
+        function varargout = kernel(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::kernel", obj.ref, varargin{:});
+        end
+
+        function varargout = optim(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::optim", obj.ref, varargin{:});
+        end
+
+        function varargout = objective(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::objective", obj.ref, varargin{:});
+        end
+
+        function varargout = X(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::X", obj.ref, varargin{:});
+        end
+
+        function varargout = centerX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::centerX", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::scaleX", obj.ref, varargin{:});
+        end
+
+        function varargout = y(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::y", obj.ref, varargin{:});
+        end
+
+        function varargout = centerY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::centerY", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::scaleY", obj.ref, varargin{:});
+        end
+
+        function varargout = regmodel(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::regmodel", obj.ref, varargin{:});
+        end
+
+        function varargout = F(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::F", obj.ref, varargin{:});
+        end
+
+        function varargout = T(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::T", obj.ref, varargin{:});
+        end
+
+        function varargout = M(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::M", obj.ref, varargin{:});
+        end
+
+        function varargout = z(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::z", obj.ref, varargin{:});
+        end
+
+        function varargout = beta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::beta", obj.ref, varargin{:});
+        end
+
+        function varargout = estim_beta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::estim_beta", obj.ref, varargin{:});
+        end
+
+        function varargout = theta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::theta", obj.ref, varargin{:});
+        end
+
+        function varargout = estim_theta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::estim_theta", obj.ref, varargin{:});
+        end
+
+        function varargout = sigma2(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::sigma2", obj.ref, varargin{:});
+        end
+
+        function varargout = estim_sigma2 (obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::estim_sigma2 ", obj.ref, varargin{:});
+        end
+
     end
 end
