@@ -61,9 +61,9 @@ struct std::hash<Kriging::OKModel*> {
         arma::mat M;
         arma::colvec z;
         arma::colvec beta;
-        bool estim_beta;
+        bool is_beta_estim;
         double sigma2;
-        bool estim_sigma2;
+        bool is_sigma2_estim;
       };
 
       //      return std::hash<arma::mat>{}(*s);

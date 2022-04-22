@@ -26,7 +26,7 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   }
   
   library(rlibkriging)
-  r <- NuggetKriging(y, X, kernel, parameters=list(nugget=0,estim_nugget=TRUE))
+  r <- NuggetKriging(y, X, kernel, parameters=list(nugget=0,is_nugget_estim=TRUE))
   ll2_theta = function(theta) logLikelihood(r,c(theta,alpha0))$logLikelihood
   # second arg is alpha=1 for nugget=0
   # plot(Vectorize(ll2),col='red'), add=T) 
@@ -105,7 +105,7 @@ for (kernel in c("matern3_2","matern5_2","gauss","exp")) {
   k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F),nugget=0, nugget.estim=TRUE)
   
   #library(rlibkriging)
-  r <- NuggetKriging(y, X, kernel, parameters=list(nugget=0,estim_nugget=TRUE))
+  r <- NuggetKriging(y, X, kernel, parameters=list(nugget=0,is_nugget_estim=TRUE))
   
   precision <- 1e-8  # the following tests should work with it, since the computations are analytical
   x=c(.2,.5,.7,0.01)
