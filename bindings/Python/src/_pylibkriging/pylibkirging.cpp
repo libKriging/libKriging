@@ -146,8 +146,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("summary", &Kriging::summary)
       .def("leaveOneOut", &Kriging::leaveOneOutEval)
       .def("logLikelihood", &Kriging::logLikelihoodEval)
-      .def("logMargPost", &Kriging::logMargPostEval)   
-      
+      .def("logMargPost", &Kriging::logMargPostEval)
+
       .def("kernel", &Kriging::kernel)
       .def("optim", &Kriging::optim)
       .def("objective", &Kriging::objective)
@@ -234,7 +234,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("summary", &NuggetKriging::summary)
       .def("logLikelihood", &NuggetKriging::logLikelihoodEval)
       .def("logMargPost", &NuggetKriging::logMargPostEval)
-      
+
       .def("kernel", &NuggetKriging::kernel)
       .def("optim", &NuggetKriging::optim)
       .def("objective", &NuggetKriging::objective)

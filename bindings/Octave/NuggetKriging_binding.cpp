@@ -357,14 +357,14 @@ void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->sigma2(), "sigma2");
 }
 
-void is_sigma2_estim (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void is_sigma2_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
-  output.set<0>(km->is_sigma2_estim (), "is_sigma2_estim ");
+  output.set<0>(km->is_sigma2_estim(), "is_sigma2_estim ");
 }
 
 void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -377,14 +377,14 @@ void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->nugget(), "nugget");
 }
 
-void is_nugget_estim (int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void is_nugget_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
-  output.set<0>(km->is_nugget_estim (), "is_nugget_estim ");
+  output.set<0>(km->is_nugget_estim(), "is_nugget_estim ");
 }
 
 }  // namespace NuggetKrigingBinding
