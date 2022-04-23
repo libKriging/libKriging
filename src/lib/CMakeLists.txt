@@ -26,7 +26,7 @@ if (CXX_CLANG_TIDY)
             CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
 endif ()
 
-target_link_libraries(Kriging PUBLIC armadillo)
+target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp)
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html

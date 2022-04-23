@@ -21,6 +21,8 @@
 #include <tuple>
 #include <vector>
 
+#include <lbfgsb_cpp/lbfgsb.hpp>
+
 /************************************************/
 /**      Kriging implementation        **/
 /************************************************/
