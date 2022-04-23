@@ -5,6 +5,9 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
@@ -19,12 +22,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   MAKE_SHARED_LIBS=off # Quick workaround for not found armadillo lib
 fi
 
-# to get readlink on MacOS (no effect on Linux)
-if [[ -e /usr/local/opt/coreutils/libexec/gnubin/readlink ]]; then
-    export PATH=/usr/local/opt/coreutils/libexec/gnubin:$PATH
-fi
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
 MODE=${MODE:-Release}
 
 BUILD_TEST=false \

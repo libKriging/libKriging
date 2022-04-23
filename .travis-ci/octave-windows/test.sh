@@ -5,9 +5,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
-
-. ${BASEDIR}/loadenv.sh
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
 
 "${BASEDIR}"/../linux-macos/test.sh

@@ -317,12 +317,6 @@ jobs:
           sudo apt install -qy r-base liblapack-dev gfortran
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
-      - name: pre-install-macos
-        shell: bash
-        run: |
-          brew install coreutils # for readlink -f : FIXME usefull ?
-        if: runner.os == 'macOS'
-
       - name: install
         shell: bash
         run: .travis-ci/${BUILD_NAME}/install.sh

@@ -5,8 +5,8 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
@@ -23,8 +23,6 @@ $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
 $HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge openblas liblapack
-
-. ${BASEDIR}/loadenv.sh
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # Check if python is available (it could be a python wrapper given by Windows)

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
 
 if [[ "$DEBUG_CI" == "true" ]]; then
   CTEST_FLAGS="--verbose --output-on-failure"
@@ -17,8 +17,6 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     echo "Coverage not supported for Windows"
     travis_terminate 1
 fi
-
-. ${BASEDIR}/loadenv.sh
 
 cd build
 

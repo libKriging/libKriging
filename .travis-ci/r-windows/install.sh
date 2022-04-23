@@ -5,8 +5,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
 
 "${BASEDIR}"/../windows/install.sh
 
@@ -61,4 +60,5 @@ fi
 # For R packaging
 choco install -y --no-progress zip
 
-. ${BASEDIR}/loadenv.sh
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+

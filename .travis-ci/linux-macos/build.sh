@@ -19,6 +19,9 @@ export ENABLE_MEMCHECK=${ENABLE_MEMCHECK:-off}
 export ENABLE_STATIC_ANALYSIS=${ENABLE_STATIC_ANALYSIS:-off}
 export SANITIZE=${SANITIZE:-off}
 
+BASEDIR=$(cd $(dirname "$0") ; pwd -P)
+test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
