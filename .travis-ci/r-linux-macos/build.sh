@@ -32,9 +32,14 @@ BUILD_TEST=false \
     "${BASEDIR}"/../linux-macos/build.sh
 
 export LIBKRIGING_PATH=${PWD}/build/installed
- 
+
+NPROC=1
+if ( command -v nproc >/dev/null 2>&1 ); then
+  NPROC=$(nproc)
+fi
+
 cd bindings/R
 make uninstall || true
 make clean
-MAKEFLAGS=-j$(nproc)
+MAKEFLAGS=-j${NPROC}
 MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make
