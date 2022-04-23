@@ -25,6 +25,15 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     echo "------------------------------------"
 
+    if ( command -v gfortran >/dev/null 2>&1 ); then
+      echo "Fortran config: $(command -v gfortran)"
+      gfortran --version 2>&1 | sed 's/^/  /'
+    else
+      echo "No Fortran compiler command found"
+    fi
+
+    echo "------------------------------------"
+
     if ( command -v clang-format >/dev/null 2>&1 ); then
       echo "clang-format config: $(command -v clang-format)"
       clang-format --version 2>&1 | sed 's/^/  /'
