@@ -44,7 +44,7 @@ case "$RVERSION" in
     RTOOLSDIR=Rtools40
     ;;
   "R version 4.2")    
-    RTOOLSURL=https://cran.r-project.org/bin/windows/Rtools/rtools42/files/rtools42-5111-5107.exe
+    RTOOLSURL=https://cran.r-project.org/bin/windows/Rtools/rtools42/files/rtools42-5168-5107.exe
     RTOOLSDIR=Rtools42
     ;;
   *)
