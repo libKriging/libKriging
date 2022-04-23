@@ -5,6 +5,21 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+case "$(uname -s)" in
+ Darwin)
+   brew install gfortran
+   ;;
+
+ Linux)
+   sudo apt install gfortran 
+   ;;
+
+ *)
+   echo 'Unknown OS'
+   exit 1 
+   ;;
+esac
+
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   if ( command -v python3 >/dev/null 2>&1 && 
        python3 -m pip --version >/dev/null 2>&1 ); then
