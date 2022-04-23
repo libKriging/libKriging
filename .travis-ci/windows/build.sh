@@ -32,6 +32,7 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 mkdir -p build
 cd build
 cmake \
+  -DCMAKE_Fortran_COMPILER=$(command -v gfortran) \
   -DCMAKE_GENERATOR_PLATFORM=x64 \
   -DEXTRA_SYSTEM_LIBRARY_PATH="${EXTRA_SYSTEM_LIBRARY_PATH}" \
   -DENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING} \
