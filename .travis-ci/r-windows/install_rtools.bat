@@ -6,4 +6,4 @@
 ::    https://cran.r-project.org/bin/windows/Rtools/Rtools35.exe %UserProfile%\Downloads\Rtools.exe
 
 :: http://www.jrsoftware.org/ishelp/index.php?topic=setupcmdline
-%UserProfile%\Downloads\Rtools.exe /VERYSILENT /SP- /NORESTART /DIR="C:\Rtools"
+%UserProfile%\Downloads\Rtools.exe /VERYSILENT /SP- /NORESTART /DIR="C:\%1"

@@ -59,8 +59,7 @@ if [ ! -d /c/$RTOOLSDIR ]; then
     exit 1
   fi
   curl -s -Lo "${HOME}"/Downloads/Rtools.exe "$RTOOLSURL" 
-  "${BASEDIR}"/install_rtools.bat
-  mv /c/Rtools /c/$RTOOLSDIR
+  "${BASEDIR}"/install_rtools.bat $RTOOLSDIR
 fi
 
 # For R packaging
