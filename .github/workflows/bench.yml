@@ -109,11 +109,6 @@ jobs:
           ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
         if: runner.os == 'Windows' && matrix.enable_python == 'on'
 
-      - name: pre-install-windows for R
-        shell: bash
-        run: .travis-ci/${BUILD_NAME}/set_makevars.sh
-        if: runner.os == 'Windows' && matrix.enable_R == 'on'
-
       - name: install BLAS
         shell: bash
         run: ${{matrix.install_blas}}

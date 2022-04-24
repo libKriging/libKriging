@@ -323,11 +323,6 @@ jobs:
           brew install coreutils # for readlink -f : FIXME usefull ?
         if: runner.os == 'macOS'
 
-      - name: pre-install-windows for R
-        shell: bash
-        run: .travis-ci/${BUILD_NAME}/set_makevars.sh
-        if: runner.os == 'Windows' && matrix.enable_R == 'on'
-
       - name: install
         shell: bash
         run: .travis-ci/${BUILD_NAME}/install.sh

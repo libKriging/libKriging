@@ -184,11 +184,6 @@ jobs:
           fi
         if: runner.os == 'macOS'
 
-      - name: pre-install-windows for R
-        shell: bash
-        run: .travis-ci/${BUILD_NAME}/set_makevars.sh
-        if: runner.os == 'Windows' && matrix.enable_R == 'on'
-
       - name: pre-install-matlab
         uses: matlab-actions/setup-matlab@v1
         if: matrix.enable_matlab == 'on'
