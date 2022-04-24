@@ -43,7 +43,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: 4.0
+          r-version: '4.0'
         if: matrix.enable_R == 'on'
 
       - name: Define local variables
@@ -99,7 +99,7 @@ jobs:
           fi
         if: runner.os == 'macOS'
 
-      - name: pre-install-windows
+      - name: pre-install-windows for Python
         shell: bash
         run: |
           # add alternative name python3 (default is python)
@@ -107,17 +107,7 @@ jobs:
           PYTHON_CMD_DIR=$(dirname "${PYTHON_CMD_PATH}")
           PYTHON_ALT_CMD_PATH="${PYTHON_CMD_DIR}/python3.exe"
           ln -s "${PYTHON_CMD_PATH}" "${PYTHON_ALT_CMD_PATH}"
-
-          # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
-          # Rscript -e 'print(R.home(component="etc"))'
-          # Rscript -e 'Sys.getenv("R_HOME")'
-          # Rscript -e 'Sys.getenv("R_ARCH")'
-          mkdir -p ~/.R
-          echo "# Custom configuration" > ~/.R/Makevars
-          echo "BINPREF=C:/rtools40/mingw64/bin/" >> ~/.R/Makevars
-          echo 'SHLIB_CXXLD=$(BINPREF)g++' >> ~/.R/Makevars
-          # R CMD config SHLIB_CXXLD # updated config
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.enable_python == 'on'
 
       - name: install BLAS
         shell: bash
