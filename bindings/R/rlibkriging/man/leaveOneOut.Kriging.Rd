@@ -3,47 +3,32 @@
 \name{leaveOneOut.Kriging}
 \alias{leaveOneOut.Kriging}
 \alias{leaveOneOut,Kriging,Kriging-method}
-\title{Leave-One-Out Method for the S3 class \code{"Kriging"}}
+\title{Get leaveOneOut of Kriging Model}
 \usage{
-\method{leaveOneOut}{Kriging}(object, theta, grad = FALSE, ...)
+\method{leaveOneOut}{Kriging}(object, ...)
 }
 \arguments{
-\item{object}{A \code{Kriging} object.}
-
-\item{theta}{A numeric vector of range parameters at which the LOO
-will be evaluated.}
-
-\item{grad}{Logical. Should the gradient (w.r.t. \code{theta}) be
-returned?}
+\item{object}{An S3 Kriging object.}
 
 \item{...}{Not used.}
 }
 \value{
-The leave-One-Out value computed for the given vector
-    \eqn{\boldsymbol{\theta}}{\theta} of correlation ranges.
+The leaveOneOut computed for fitted
+    \eqn{\boldsymbol{theta}}{\theta}.
 }
 \description{
-Compute Leave-One-Out (LOO) error for an object with S3 class
-\code{"Kriging"} representing a kriging model.
-}
-\details{
-The returned value is the sum of squares \eqn{\sum_{i=1}^n [y_i -
-\hat{y}_{i,(-i)}]^2} where \eqn{\hat{y}_{i,(-i)}} is the
-prediction of \eqn{y_i}{y[i]} based on the the observations \eqn{y_j}{y[j]}
-with \eqn{j \neq i}{j != i}.
+Get leaveOneOut of Kriging Model
 }
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
 X <- as.matrix(runif(5))
 y <- f(X)
-r <- Kriging(y, X, kernel = "gauss", objective = "LOO")
+r <- Kriging(y, X, kernel = "gauss")
 print(r)
-loo <-  function(theta) leaveOneOut(r,theta)$leaveOneOut
-t <-  seq(from = 0.0001, to = 2, length.out = 101)
-plot(t, loo(t), type = "l")
-abline(v = as.list(r)$theta, col = "blue")
+leaveOneOut(r)
+
 }
 \author{
-Yann Richet \email{yann.richet.irsn.fr}
+Yann Richet \email{yann.richet@irsn.fr}
 }

@@ -3,40 +3,30 @@
 \name{logLikelihood.NuggetKriging}
 \alias{logLikelihood.NuggetKriging}
 \alias{logLikelihood,NuggetKriging,NuggetKriging-method}
-\title{Compute Log-Likelihood of NuggetKriging Model}
+\title{Get logLikelihood of NuggetKriging Model}
 \usage{
-\method{logLikelihood}{NuggetKriging}(object, theta, grad = FALSE, ...)
+\method{logLikelihood}{NuggetKriging}(object, ...)
 }
 \arguments{
 \item{object}{An S3 NuggetKriging object.}
 
-\item{theta}{A numeric vector of (positive) range parameters at
-which the log-likelihood will be evaluated.}
-
-\item{grad}{Logical. Should the function return the gradient?}
-
 \item{...}{Not used.}
-
-\item{hess}{Logical. Should the function return Hessian?}
 }
 \value{
-The log-Likelihood computed for given
+The logLikelihood computed for fitted
     \eqn{\boldsymbol{theta}}{\theta}.
 }
 \description{
-Compute Log-Likelihood of NuggetKriging Model
+Get logLikelihood of NuggetKriging Model
 }
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
 X <- as.matrix(runif(5))
-y <- f(X) + 0.01*rnorm(nrow(X))
-r <- NuggetKriging(y, X, kernel = "gauss")
+y <- f(X)
+r <- Kriging(y, X, kernel = "gauss")
 print(r)
-ll <- function(theta) logLikelihood(r, theta)$logLikelihood
-t <- seq(from = 0.0001, to = 2, length.out = 101)
-plot(t, ll(t), type = 'l')
-abline(v = as.list(r)$theta, col = "blue")
+logLikelihood(r)
 
 }
 \author{

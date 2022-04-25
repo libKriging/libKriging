@@ -506,7 +506,7 @@ update.Kriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' y <- f(X)
 #' r <- Kriging(y, X, kernel = "gauss")
 #' print(r)
-#' ll <- function(theta) logLikelihoodFun(r, theta)$logLikelihoodFun
+#' ll <- function(theta) logLikelihoodFun(r, theta)$logLikelihood
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
@@ -518,7 +518,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
   if (ncol(theta) != ncol(k$X))
       stop("Input theta must have ", ncol(k$X), " columns (instead of ",
            ncol(theta),")")
-  out <- list(logLikelihoodFun = matrix(NA, nrow = nrow(theta)),
+  out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
               logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
                                          ncol = ncol(theta)),
               logLikelihoodHess = array(NA, dim = c(nrow(theta), ncol(theta),
@@ -526,7 +526,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
   for (i in 1:nrow(theta)) {
       ll <- kriging_logLikelihoodFun(object, theta[i, ],
                                   grad = isTRUE(grad), hess = isTRUE(hess))
-      out$logLikelihoodFun[i] <- ll$logLikelihoodFun
+      out$logLikelihood[i] <- ll$logLikelihood
       if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
       if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
   }

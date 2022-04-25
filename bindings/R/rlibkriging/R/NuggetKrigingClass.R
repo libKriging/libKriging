@@ -506,7 +506,7 @@ update.NuggetKriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' r <- NuggetKriging(y, X, kernel = "gauss")
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' ll <- function(theta) logLikelihoodFun(r, c(theta,alpha))$logLikelihoodFun
+#' ll <- function(theta) logLikelihoodFun(r, c(theta,alpha))$logLikelihood
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
@@ -518,13 +518,13 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
   if (ncol(theta_alpha) != ncol(k$X)+1)
       stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
            ncol(theta_alpha),")")
-  out <- list(logLikelihoodFun = matrix(NA, nrow = nrow(theta_alpha)),
+  out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_alpha)),
               logLikelihoodGrad = matrix(NA,nrow=nrow(theta_alpha),
                                          ncol = ncol(theta_alpha)))
   for (i in 1:nrow(theta_alpha)) {
       ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
                                   grad = isTRUE(grad))
-      out$logLikelihoodFun[i] <- ll$logLikelihoodFun
+      out$logLikelihood[i] <- ll$logLikelihood
       if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
   }
   if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL

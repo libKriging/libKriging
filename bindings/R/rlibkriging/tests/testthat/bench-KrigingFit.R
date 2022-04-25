@@ -27,7 +27,7 @@ for (i in 1:N) {
                     )
 
 
-  ll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta))$logLikelihoodFun
+  ll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta))$logLikelihood
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   

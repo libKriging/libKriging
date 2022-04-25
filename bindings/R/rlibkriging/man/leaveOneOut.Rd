@@ -9,12 +9,11 @@ leaveOneOut(object, ...)
 \arguments{
 \item{object}{An object representing a fitted model.}
 
-\item{...}{Further arguments for methods.}
+\item{...}{Ignored.}
 }
 \value{
 The Leave-One-Out sum of squares.
 }
 \description{
-Compute the leave-One-Out error of a model given in \code{object},
-possibly at a different value of the parameters.
+Compute the leave-One-Out error of a model given in \code{object}.
 }
