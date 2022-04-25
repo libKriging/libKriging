@@ -39,12 +39,24 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::summary", obj.ref, varargin{:});
         end
 
+        function varargout = leaveOneOutFun(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOutFun", obj.ref, varargin{:});
+        end
+
         function varargout = leaveOneOut(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOut", obj.ref, varargin{:});
         end
 
+        function varargout = logLikelihoodFun(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::logLikelihoodFun", obj.ref, varargin{:});
+        end
+
         function varargout = logLikelihood(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::logLikelihood", obj.ref, varargin{:});
+        end
+
+        function varargout = logMargPostFun(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::logMargPostFun", obj.ref, varargin{:});
         end
 
         function varargout = logMargPost(obj, varargin)

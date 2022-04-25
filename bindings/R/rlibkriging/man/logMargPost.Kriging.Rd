@@ -3,47 +3,32 @@
 \name{logMargPost.Kriging}
 \alias{logMargPost.Kriging}
 \alias{logMargPost,Kriging,Kriging-method}
-\title{Compute Log-Marginal-Posterior of Kriging Model}
+\title{Get logMargPost of Kriging Model}
 \usage{
-\method{logMargPost}{Kriging}(object, theta, grad = FALSE, ...)
+\method{logMargPost}{Kriging}(object, ...)
 }
 \arguments{
-\item{object}{S3 Kriging object.}
-
-\item{theta}{Numeric vector of coorelation range parameters at
-which the function is to be evaluated.}
-
-\item{grad}{Logical. Should the function return the gradient
-(w.r.t theta)?}
+\item{object}{An S3 Kriging object.}
 
 \item{...}{Not used.}
 }
 \value{
-The value of the log-marginal posterior computed for the
-    given vector theta.
+The logMargPost computed for fitted
+    \eqn{\boldsymbol{theta}}{\theta}.
 }
 \description{
-Compute the log-marginal posterior of a kriging model, using the
-prior XXXY.
+Get logMargPost of Kriging Model
 }
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
 X <- as.matrix(runif(5))
 y <- f(X)
-r <- Kriging(y, X, "gauss")
+r <- Kriging(y, X, kernel = "gauss")
 print(r)
-lmp <- function(theta) logMargPost(r, theta)$logMargPost
-t <- seq(from = 0.0001, to = 2, length.out = 101)
-plot(t, lmp(t), type = "l")
-abline(v = as.list(r)$theta, col = "blue")
-}
-\references{
-XXXY A reference describing the model (prior, ...)
-}
-\seealso{
-\code{\link[RobustGaSP]{rgasp}} in the RobustGaSP package.
+logMargPost(r)
+
 }
 \author{
-Yann Richet \email{yann.richet.irsn.fr}
+Yann Richet \email{yann.richet@irsn.fr}
 }

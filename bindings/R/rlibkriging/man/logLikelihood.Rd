@@ -9,12 +9,11 @@ logLikelihood(object, ...)
 \arguments{
 \item{object}{An object representing a fitted model.}
 
-\item{...}{Further arguments for methods.}
+\item{...}{Ignored.}
 }
 \value{
 The log-likelihood.
 }
 \description{
-Compute the log-Likelihood of a model given in \code{object},
-possibly at a different value of the parameters.
+Compute the log-Likelihood of a model given in \code{object}.
 }

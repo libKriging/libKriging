@@ -139,7 +139,7 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->summary(), "Model description");
 }
 
-void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void leaveOneOutFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -147,12 +147,22 @@ void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
-  auto [loo, loograd] = km->leaveOneOutEval(input.get<1, arma::vec>("theta"), want_grad);
+  auto [loo, loograd] = km->leaveOneOutFun(input.get<1, arma::vec>("theta"), want_grad);
   output.set<0>(loo, "loo");                  // FIXME better name
   output.setOptional<1>(loograd, "loograd");  // FIXME better name
 }
 
-void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  output.set<0>(km->leaveOneOut(), "Model leaveOneOut");
+}
+
+void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -161,13 +171,23 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* km = input.getObject<0, Kriging>("Kriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
   const bool want_hess = flag_output_compliance<3>(input, "want_hess", output, 2);
-  auto [ll, llgrad, llhess] = km->logLikelihoodEval(input.get<1, arma::vec>("theta"), want_grad, want_hess);
+  auto [ll, llgrad, llhess] = km->logLikelihoodFun(input.get<1, arma::vec>("theta"), want_grad, want_hess);
   output.set<0>(ll, "ll");                  // FIXME better name
   output.setOptional<1>(llgrad, "llgrad");  // FIXME better name
   output.setOptional<2>(llhess, "llhess");  // FIXME better name
 }
 
-void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  output.set<0>(km->logLikelihood(), "Model logLikelihood");
+}
+
+void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -175,9 +195,19 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObject<0, Kriging>("Kriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
-  auto [lmp, lmpgrad] = km->logMargPostEval(input.get<1, arma::vec>("theta"), want_grad);
+  auto [lmp, lmpgrad] = km->logMargPostFun(input.get<1, arma::vec>("theta"), want_grad);
   output.set<0>(lmp, "lmp");                  // FIXME better name
   output.setOptional<1>(lmpgrad, "lmpgrad");  // FIXME better name
+}
+
+void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, Kriging>("Kriging reference");
+  output.set<0>(km->logMargPost(), "Model logMargPost");
 }
 
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

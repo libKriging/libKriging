@@ -75,6 +75,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::summary"_hash:
       return KrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::leaveOneOutFun"_hash:
+      return KrigingBinding::leaveOneOutFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::logLikelihoodFun"_hash:
+      return KrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::logMargPostFun"_hash:
+      return KrigingBinding::logMargPostFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::leaveOneOut"_hash:
       return KrigingBinding::leaveOneOut(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::logLikelihood"_hash:
@@ -137,6 +143,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::summary"_hash:
       return NuggetKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::logLikelihoodFun"_hash:
+      return NuggetKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::logMargPostFun"_hash:
+      return NuggetKrigingBinding::logMargPostFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logLikelihood"_hash:
       return NuggetKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logMargPost"_hash:

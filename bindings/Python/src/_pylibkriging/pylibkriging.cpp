@@ -108,9 +108,9 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &PyKriging::simulate)
       .def("update", &PyKriging::update)
       .def("summary", &PyKriging::summary)
-      .def("leaveOneOut", &PyKriging::leaveOneOutEval)
-      .def("logLikelihood", &PyKriging::logLikelihoodEval)
-      .def("logMargPost", &PyKriging::logMargPostEval);
+      .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
+      .def("logLikelihoodFun", &PyKriging::logLikelihoodFun)
+      .def("logMargPostFun", &PyKriging::logMargPostFun);
 
   // Automated mapper
   py::class_<Kriging>(m, "PyKriging")
@@ -144,9 +144,12 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &Kriging::simulate)
       .def("update", &Kriging::update)
       .def("summary", &Kriging::summary)
-      .def("leaveOneOut", &Kriging::leaveOneOutEval)
-      .def("logLikelihood", &Kriging::logLikelihoodEval)
-      .def("logMargPost", &Kriging::logMargPostEval)
+      .def("leaveOneOutFun", &Kriging::leaveOneOutFun)
+      .def("logLikelihoodFun", &Kriging::logLikelihoodFun)
+      .def("logMargPostFun", &Kriging::logMargPostFun)
+      .def("leaveOneOut", &Kriging::leaveOneOut)
+      .def("logLikelihood", &Kriging::logLikelihood)
+      .def("logMargPost", &Kriging::logMargPost)
 
       .def("kernel", &Kriging::kernel)
       .def("optim", &Kriging::optim)
@@ -197,8 +200,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &PyNuggetKriging::simulate)
       .def("update", &PyNuggetKriging::update)
       .def("summary", &PyNuggetKriging::summary)
-      .def("logLikelihood", &PyNuggetKriging::logLikelihoodEval)
-      .def("logMargPost", &PyNuggetKriging::logMargPostEval);
+      .def("logLikelihoodFun", &PyNuggetKriging::logLikelihoodFun)
+      .def("logMargPostFun", &PyNuggetKriging::logMargPostFun);
 
   // Automated mapper
   py::class_<NuggetKriging>(m, "PyNuggetKriging")
@@ -232,8 +235,10 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &NuggetKriging::simulate)
       .def("update", &NuggetKriging::update)
       .def("summary", &NuggetKriging::summary)
-      .def("logLikelihood", &NuggetKriging::logLikelihoodEval)
-      .def("logMargPost", &NuggetKriging::logMargPostEval)
+      .def("logLikelihoodFun", &NuggetKriging::logLikelihoodFun)
+      .def("logMargPostFun", &NuggetKriging::logMargPostFun)
+      .def("logLikelihood", &NuggetKriging::logLikelihood)
+      .def("logMargPost", &NuggetKriging::logMargPost)
 
       .def("kernel", &NuggetKriging::kernel)
       .def("optim", &NuggetKriging::optim)

@@ -494,9 +494,9 @@ update.NuggetKriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' @return The log-Likelihood computed for given
 #'     \eqn{\boldsymbol{theta}}{\theta}.
 #' 
-#' @method logLikelihood NuggetKriging
+#' @method logLikelihoodFun NuggetKriging
 #' @export 
-#' @aliases logLikelihood,NuggetKriging,NuggetKriging-method
+#' @aliases logLikelihoodFun,NuggetKriging,NuggetKriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -506,12 +506,12 @@ update.NuggetKriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' r <- NuggetKriging(y, X, kernel = "gauss")
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' ll <- function(theta) logLikelihood(r, c(theta,alpha))$logLikelihood
+#' ll <- function(theta) logLikelihoodFun(r, c(theta,alpha))$logLikelihood
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
 #' 
-logLikelihood.NuggetKriging <- function(object, theta_alpha,
+logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                   grad = FALSE, ...) {
   k <- nuggetkriging_model(object) 
   if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
@@ -522,7 +522,7 @@ logLikelihood.NuggetKriging <- function(object, theta_alpha,
               logLikelihoodGrad = matrix(NA,nrow=nrow(theta_alpha),
                                          ncol = ncol(theta_alpha)))
   for (i in 1:nrow(theta_alpha)) {
-      ll <- nuggetkriging_logLikelihood(object, theta_alpha[i, ],
+      ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
                                   grad = isTRUE(grad))
       out$logLikelihood[i] <- ll$logLikelihood
       if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
@@ -532,7 +532,34 @@ logLikelihood.NuggetKriging <- function(object, theta_alpha,
   return(out)
 }
 
-## setMethod("logLikelihood", "NuggetKriging", logLikelihood.NuggetKriging)
+
+## ****************************************************************************
+#' Get logLikelihood of NuggetKriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 NuggetKriging object.
+#' @param ... Not used.
+#' 
+#' @return The logLikelihood computed for fitted
+#'     \eqn{\boldsymbol{theta}}{\theta}.
+#' 
+#' @method logLikelihood NuggetKriging
+#' @export 
+#' @aliases logLikelihood,NuggetKriging,NuggetKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, kernel = "gauss")
+#' print(r)
+#' logLikelihood(r)
+#' 
+logLikelihood.NuggetKriging <- function(object, ...) {
+  return(nuggetkriging_logLikelihood(object))
+}
 
 ##****************************************************************************
 #' Compute the log-marginal posterior of a kriging model, using the
@@ -552,9 +579,9 @@ logLikelihood.NuggetKriging <- function(object, theta_alpha,
 #' @return The value of the log-marginal posterior computed for the
 #'     given vector theta.
 #' 
-#' @method logMargPost NuggetKriging
+#' @method logMargPostFun NuggetKriging
 #' @export 
-#' @aliases logMargPost,NuggetKriging,NuggetKriging-method
+#' @aliases logMargPostFun,NuggetKriging,NuggetKriging-method
 #'
 #' @references
 #' XXXY A reference describing the model (prior, ...)
@@ -569,11 +596,11 @@ logLikelihood.NuggetKriging <- function(object, theta_alpha,
 #' r <- NuggetKriging(y, X, "gauss")
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' lmp <- function(theta) logMargPost(r, c(theta,alpha))$logMargPost
+#' lmp <- function(theta) logMargPostFun(r, c(theta,alpha))$logMargPost
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
-logMargPost.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
+logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
     k <- nuggetkriging_model(object) 
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha,ncol=ncol(k$X)+1)
     if (ncol(theta_alpha) != ncol(k$X)+1)
@@ -583,7 +610,7 @@ logMargPost.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
                 logMargPostGrad = matrix(NA, nrow = nrow(theta_alpha),
                                          ncol = ncol(theta_alpha)))
     for (i in 1:nrow(theta_alpha)) {
-        lmp <- nuggetkriging_logMargPost(object, theta_alpha[i, ], grad = isTRUE(grad))
+        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], grad = isTRUE(grad))
         out$logMargPost[i] <- lmp$logMargPost
         if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }
@@ -591,6 +618,31 @@ logMargPost.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
     return(out)
 }
 
-## setMethod("logMargPost", "NuggetKriging", logMargPost.NuggetKriging)
-
+## ****************************************************************************
+#' Get logMargPost of NuggetKriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 NuggetKriging object.
+#' @param ... Not used.
+#' 
+#' @return The logMargPost computed for fitted
+#'     \eqn{\boldsymbol{theta}}{\theta}.
+#' 
+#' @method logMargPost NuggetKriging
+#' @export 
+#' @aliases logMargPost,NuggetKriging,NuggetKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, kernel = "gauss")
+#' print(r)
+#' logMargPost(r)
+#' 
+logMargPost.NuggetKriging <- function(object, ...) {
+  return(nuggetkriging_logMargPost(object))
+}
 

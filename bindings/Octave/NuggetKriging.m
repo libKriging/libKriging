@@ -39,8 +39,16 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::summary", obj.ref, varargin{:});
         end
 
+        function varargout = logLikelihoodFun(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::logLikelihoodFun", obj.ref, varargin{:});
+        end
+
         function varargout = logLikelihood(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::logLikelihood", obj.ref, varargin{:});
+        end
+        
+        function varargout = logMargPostFun(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::logMargPostFun", obj.ref, varargin{:});
         end
 
         function varargout = logMargPost(obj, varargin)

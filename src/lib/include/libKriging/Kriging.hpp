@@ -109,12 +109,12 @@ class Kriging {
     bool is_sigma2_estim;
   };
 
-  double logLikelihood(const arma::vec& _theta,
-                       arma::vec* grad_out,
-                       arma::mat* hess_out,
-                       Kriging::OKModel* okm_data) const;
-  double leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
-  double logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
+  double _logLikelihood(const arma::vec& _theta,
+                        arma::vec* grad_out,
+                        arma::mat* hess_out,
+                        Kriging::OKModel* okm_data) const;
+  double _leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
+  double _logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
@@ -145,12 +145,16 @@ class Kriging {
                              const Parameters& parameters
                              = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodEval(const arma::vec& theta,
-                                                                               const bool grad,
-                                                                               const bool hess);
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutEval(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
+                                                                              const bool grad,
+                                                                              const bool hess);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, const bool grad);
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostEval(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, const bool grad);
+
+  LIBKRIGING_EXPORT double logLikelihood();
+  LIBKRIGING_EXPORT double leaveOneOut();
+  LIBKRIGING_EXPORT double logMargPost();
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output

@@ -9,14 +9,14 @@
 ## ****************************************************************************
 
 ## True generic
-setGeneric(name = "logLikelihood",
-           def = function(object, ...) standardGeneric("logLikelihood"))
+setGeneric(name = "logLikelihoodFun",
+           def = function(object, ...) standardGeneric("logLikelihoodFun"))
 
-setGeneric(name = "logMargPost",
-           def = function(object, ...) standardGeneric("logMargPost"))
+setGeneric(name = "logMargPostFun",
+           def = function(object, ...) standardGeneric("logMargPostFun"))
 
-setGeneric(name = "leaveOneOut",
-           def = function(object, ...) standardGeneric("leaveOneOut"))
+setGeneric(name = "leaveOneOutFun",
+           def = function(object, ...) standardGeneric("leaveOneOutFun"))
 
 ## *****************************************************************************
 ##' Coerce an object into an object with S4 class \code{"km"} from the
@@ -39,12 +39,67 @@ as.km <- function(x, ...) {
 
 ## *****************************************************************************
 ##' Compute the leave-One-Out error of a model given in \code{object},
-##' possibly at a different value of the parameters.
+##' at a different value of the parameters.
 ##'
-##' @title Compute Leave-One-Out 
+##' @title Leave-One-Out function
 ##' 
 ##' @param object An object representing a fitted model.
-##' @param ... Further arguments for methods.
+##' @param ... Further arguments of function (eg. range).
+##'
+##' @return The Leave-One-Out sum of squares.
+##' @export
+leaveOneOutFun <- function (object, ...) {
+    UseMethod("leaveOneOutFun")
+}
+
+## *****************************************************************************
+##' Compute the log-Likelihood of a model given in \code{object},
+##' at a different value of the parameters.
+##'
+##' @title Log-Likelihood function
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. range).
+##'
+##' @return The log-likelihood.
+##' @export
+logLikelihoodFun <- function (object, ...) {
+    UseMethod("logLikelihoodFun")
+}
+
+## *****************************************************************************
+##' Compute the log-Marginal Posterior of a model given in
+##' \code{object}, at a different value of the parameters.
+##'
+##' @title log-Marginal Posterior function
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. range).
+##'
+##' @return The log-marginal posterior.
+##' @export
+logMargPostFun <- function (object, ...) {
+    UseMethod("logMargPostFun")
+}
+
+
+## True generic
+setGeneric(name = "logLikelihood",
+           def = function(object, ...) standardGeneric("logLikelihood"))
+
+setGeneric(name = "logMargPost",
+           def = function(object, ...) standardGeneric("logMargPost"))
+
+setGeneric(name = "leaveOneOut",
+           def = function(object, ...) standardGeneric("leaveOneOut"))
+
+## *****************************************************************************
+##' Compute the leave-One-Out error of a model given in \code{object}.
+##'
+##' @title Compute Leave-One-Out
+##' 
+##' @param object An object representing a fitted model.
+##' @param ... Ignored.
 ##'
 ##' @return The Leave-One-Out sum of squares.
 ##' @export
@@ -53,13 +108,12 @@ leaveOneOut <- function (object, ...) {
 }
 
 ## *****************************************************************************
-##' Compute the log-Likelihood of a model given in \code{object},
-##' possibly at a different value of the parameters.
+##' Compute the log-Likelihood of a model given in \code{object}.
 ##'
 ##' @title Compute Log-Likelihood
 ##'
 ##' @param object An object representing a fitted model.
-##' @param ... Further arguments for methods.
+##' @param ... Ignored.
 ##'
 ##' @return The log-likelihood.
 ##' @export
@@ -69,12 +123,12 @@ logLikelihood <- function (object, ...) {
 
 ## *****************************************************************************
 ##' Compute the log-Marginal Posterior of a model given in
-##' \code{object}, possibly at a different value of the parameters.
+##' \code{object}.
 ##'
 ##' @title Compute log-Marginal Posterior
 ##'
 ##' @param object An object representing a fitted model.
-##' @param ... Further arguments for methods.
+##' @param ... Ignored.
 ##'
 ##' @return The log-marginal posterior.
 ##' @export

@@ -13,12 +13,12 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F))
 r <- Kriging(y, X, "gauss")
 
-ll = Vectorize(function(x) logLikelihood(r,x)$logLikelihood)
+ll = Vectorize(function(x) logLikelihoodFun(r,x)$logLikelihood)
 plot(ll,xlim=c(0.000001,1))
   for (x in seq(0.000001,1,,11)){
     envx = new.env()
-    ll2x = logLikelihood(r,x)$logLikelihood
-    gll2x = logLikelihood(r,x,grad = T)$logLikelihoodGrad
+    ll2x = logLikelihoodFun(r,x)$logLikelihood
+    gll2x = logLikelihoodFun(r,x,grad = T)$logLikelihoodGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
 
@@ -53,7 +53,7 @@ ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                     function(x) {
                       # print(dim(x))
                       #print(matrix(unlist(x),ncol=2));
-                      y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+                      y=-logLikelihoodFun(r,matrix(unlist(x),ncol=2))$logLikelihood
                       #print(y);
                       y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -111,7 +111,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        y=-logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        y=-logLikelihoodFun(r,matrix(unlist(x),ncol=2))$logLikelihood
         #print(y);
         y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -198,7 +198,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        -logLikelihood(r,matrix(unlist(x),ncol=2))$logLikelihood
+        -logLikelihoodFun(r,matrix(unlist(x),ncol=2))$logLikelihood
         #print(y);
         })}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))

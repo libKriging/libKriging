@@ -11,8 +11,8 @@
 | predict             | predict()             |              |                 |
 | simulate            | simulate()            |              |                 |
 | update              | update()              |              |                 |
-| logLik              | logLikelihood()       |              |                 |
-| loo                 | leaveOneOut()         |              |                 |
+| logLik              | logLikelihoodFun()       |              |                 |
+| loo                 | leaveOneOutFun()         |              |                 |
 |                     |                       |              |                 |
 | kernel:gauss        | (..,"gauss"           |              |                 |
 | kernel:matern3_2    |                       |              |                 |
