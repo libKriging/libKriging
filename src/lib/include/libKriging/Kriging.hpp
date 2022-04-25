@@ -110,9 +110,9 @@ class Kriging {
   };
 
   double _logLikelihood(const arma::vec& _theta,
-                       arma::vec* grad_out,
-                       arma::mat* hess_out,
-                       Kriging::OKModel* okm_data) const;
+                        arma::vec* grad_out,
+                        arma::mat* hess_out,
+                        Kriging::OKModel* okm_data) const;
   double _leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
   double _logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const;
 
@@ -146,8 +146,8 @@ class Kriging {
                              = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                               const bool grad,
-                                                                               const bool hess);
+                                                                              const bool grad,
+                                                                              const bool hess);
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, const bool grad);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, const bool grad);

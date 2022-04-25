@@ -48,7 +48,7 @@ class PyNuggetKriging {
   std::string summary() const;
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
-                                                                                 const bool want_grad);
+                                                                                const bool want_grad);
 
   std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool want_grad);
 

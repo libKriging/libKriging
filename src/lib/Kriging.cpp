@@ -82,9 +82,9 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
 // Objective function for fit : -logLikelihood
 
 double Kriging::_logLikelihood(const arma::vec& _theta,
-                              arma::vec* grad_out,
-                              arma::mat* hess_out,
-                              Kriging::OKModel* okm_data) const {
+                               arma::vec* grad_out,
+                               arma::mat* hess_out,
+                               Kriging::OKModel* okm_data) const {
   // arma::cout << " theta: " << _theta << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //  model@covariance <- vect2covparam(model@covariance, param)
@@ -302,8 +302,8 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodFun(const arma::vec& _theta,
-                                                                                      const bool _grad,
-                                                                                      const bool _hess) {
+                                                                                     const bool _grad,
+                                                                                     const bool _hess) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -713,15 +713,15 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const ar
 }
 
 LIBKRIGING_EXPORT double Kriging::logLikelihood() {
-  return std::get<0>(Kriging::logLikelihoodFun(m_theta,false,false)); 
+  return std::get<0>(Kriging::logLikelihoodFun(m_theta, false, false));
 }
 
-LIBKRIGING_EXPORT double Kriging::leaveOneOut() { 
-  return std::get<0>(Kriging::leaveOneOutFun(m_theta,false));
+LIBKRIGING_EXPORT double Kriging::leaveOneOut() {
+  return std::get<0>(Kriging::leaveOneOutFun(m_theta, false));
 }
 
-LIBKRIGING_EXPORT double Kriging::logMargPost() { 
-  return std::get<0>(Kriging::logMargPostFun(m_theta,false)); 
+LIBKRIGING_EXPORT double Kriging::logMargPost() {
+  return std::get<0>(Kriging::logMargPostFun(m_theta, false));
 }
 
 double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma::mat* hess_out)> f,

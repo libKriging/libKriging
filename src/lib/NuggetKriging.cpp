@@ -81,8 +81,8 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::colvec& y,
 // Objective function for fit : -logLikelihood
 
 double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
-                                    arma::vec* grad_out,
-                                    NuggetKriging::OKModel* okm_data) const {
+                                     arma::vec* grad_out,
+                                     NuggetKriging::OKModel* okm_data) const {
   // arma::cout << " theta, alpha: " << _theta_alpha.head(m_X.n_cols) << "," << _theta_alpha.at(m_X.n_cols) <<
   // arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
@@ -218,7 +218,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(const arma::vec& _theta_alpha,
-                                                                                 const bool _grad) {
+                                                                                const bool _grad) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -241,8 +241,8 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
 
 double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
-                                  arma::vec* grad_out,
-                                  NuggetKriging::OKModel* okm_data) const {
+                                   arma::vec* grad_out,
+                                   NuggetKriging::OKModel* okm_data) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
   // In RobustGaSP:
@@ -441,7 +441,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(const arma::vec& _theta,
-                                                                               const bool _grad) {
+                                                                              const bool _grad) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -460,20 +460,20 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(co
   return std::make_tuple(lmp, std::move(grad));
 }
 
-LIBKRIGING_EXPORT double NuggetKriging::logLikelihood() { 
+LIBKRIGING_EXPORT double NuggetKriging::logLikelihood() {
   int d = m_theta.n_elem;
   arma::vec _theta_alpha = arma::vec(d + 1);
   _theta_alpha.head(d) = m_theta;
-  _theta_alpha.at(d) = m_sigma2/(m_sigma2+m_nugget);
-  return std::get<0>(NuggetKriging::logLikelihoodFun(_theta_alpha,false)); 
+  _theta_alpha.at(d) = m_sigma2 / (m_sigma2 + m_nugget);
+  return std::get<0>(NuggetKriging::logLikelihoodFun(_theta_alpha, false));
 }
 
-LIBKRIGING_EXPORT double NuggetKriging::logMargPost() { 
+LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
   int d = m_theta.n_elem;
   arma::vec _theta_alpha = arma::vec(d + 1);
   _theta_alpha.head(d) = m_theta;
-  _theta_alpha.at(d) = m_sigma2/(m_sigma2+m_nugget);
-  return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha,false)); 
+  _theta_alpha.at(d) = m_sigma2 / (m_sigma2 + m_nugget);
+  return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false));
 }
 
 /** Fit the kriging object on (X,y):

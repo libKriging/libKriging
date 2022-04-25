@@ -170,7 +170,7 @@ class NuggetKriging {
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, const bool grad);
 
-  LIBKRIGING_EXPORT double logLikelihood(); 
+  LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double logMargPost();
 
   /** Compute the prediction for given points X'

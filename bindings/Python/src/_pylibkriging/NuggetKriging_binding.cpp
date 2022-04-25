@@ -81,7 +81,7 @@ double PyNuggetKriging::logLikelihood() {
 }
 
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py::array_t<double>& theta,
-                                                                         const bool want_grad) {
+                                                                        const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, want_grad);
   return {lmp, carma::col_to_arr(grad)};
