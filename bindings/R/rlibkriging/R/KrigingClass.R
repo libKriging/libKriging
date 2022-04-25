@@ -495,6 +495,58 @@ update.Kriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' @return The log-Likelihood computed for given
 #'     \eqn{\boldsymbol{theta}}{\theta}.
 #' 
+#' @method logLikelihoodFun Kriging
+#' @export 
+#' @aliases logLikelihoodFun,Kriging,Kriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, kernel = "gauss")
+#' print(r)
+#' ll <- function(theta) logLikelihoodFun(r, theta)$logLikelihoodFun
+#' t <- seq(from = 0.0001, to = 2, length.out = 101)
+#' plot(t, ll(t), type = 'l')
+#' abline(v = as.list(r)$theta, col = "blue")
+#' 
+logLikelihoodFun.Kriging <- function(object, theta,
+                                  grad = FALSE, hess = FALSE, ...) {
+  k <- kriging_model(object) 
+  if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
+  if (ncol(theta) != ncol(k$X))
+      stop("Input theta must have ", ncol(k$X), " columns (instead of ",
+           ncol(theta),")")
+  out <- list(logLikelihoodFun = matrix(NA, nrow = nrow(theta)),
+              logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
+                                         ncol = ncol(theta)),
+              logLikelihoodHess = array(NA, dim = c(nrow(theta), ncol(theta),
+                                                    ncol(theta))))
+  for (i in 1:nrow(theta)) {
+      ll <- kriging_logLikelihoodFun(object, theta[i, ],
+                                  grad = isTRUE(grad), hess = isTRUE(hess))
+      out$logLikelihoodFun[i] <- ll$logLikelihoodFun
+      if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+      if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
+  }
+  if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
+  if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
+
+  return(out)
+}
+
+## ****************************************************************************
+#' Get Log-Likelihood of Kriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#' 
+#' @return The log-Likelihood computed for fitted
+#'     \eqn{\boldsymbol{theta}}{\theta}.
+#' 
 #' @method logLikelihood Kriging
 #' @export 
 #' @aliases logLikelihood,Kriging,Kriging-method
@@ -506,37 +558,13 @@ update.Kriging <- function(object, newy, newX, normalize = FALSE, ...) {
 #' y <- f(X)
 #' r <- Kriging(y, X, kernel = "gauss")
 #' print(r)
-#' ll <- function(theta) logLikelihood(r, theta)$logLikelihood
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
-#' plot(t, ll(t), type = 'l')
-#' abline(v = as.list(r)$theta, col = "blue")
+#' logLikelihood(r)
 #' 
-logLikelihood.Kriging <- function(object, theta,
-                                  grad = FALSE, hess = FALSE, ...) {
-  k <- kriging_model(object) 
-  if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
-  if (ncol(theta) != ncol(k$X))
-      stop("Input theta must have ", ncol(k$X), " columns (instead of ",
-           ncol(theta),")")
-  out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
-              logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
-                                         ncol = ncol(theta)),
-              logLikelihoodHess = array(NA, dim = c(nrow(theta), ncol(theta),
-                                                    ncol(theta))))
-  for (i in 1:nrow(theta)) {
-      ll <- kriging_logLikelihood(object, theta[i, ],
-                                  grad = isTRUE(grad), hess = isTRUE(hess))
-      out$logLikelihood[i] <- ll$logLikelihood
-      if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-      if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
-  }
-  if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
-  if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
-
-  return(out)
+logLikelihood.Kriging <- function(object, ...) {
+  return(kriging_logLikelihood(object))
 }
 
-## setMethod("logLikelihood", "Kriging", logLikelihood.Kriging)
+## setMethod("logLikelihood", "Kriging", logLikelihoodFun.Kriging)
 
 ## ****************************************************************************
 #' Compute Leave-One-Out (LOO) error for an object with S3 class
@@ -563,9 +591,9 @@ logLikelihood.Kriging <- function(object, theta,
 #' @return The leave-One-Out value computed for the given vector
 #'     \eqn{\boldsymbol{\theta}}{\theta} of correlation ranges.
 #' 
-#' @method leaveOneOut Kriging
+#' @method leaveOneOutFun Kriging
 #' @export 
-#' @aliases leaveOneOut,Kriging,Kriging-method
+#' @aliases leaveOneOutFun,Kriging,Kriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -574,11 +602,11 @@ logLikelihood.Kriging <- function(object, theta,
 #' y <- f(X)
 #' r <- Kriging(y, X, kernel = "gauss", objective = "LOO")
 #' print(r)
-#' loo <-  function(theta) leaveOneOut(r,theta)$leaveOneOut
+#' loo <-  function(theta) leaveOneOutFun(r,theta)$leaveOneOut
 #' t <-  seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, loo(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
-leaveOneOut.Kriging <- function(object, theta, grad = FALSE, ...) {
+leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
     k <- kriging_model(object) 
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
     if (ncol(theta) != ncol(k$X))
@@ -588,12 +616,40 @@ leaveOneOut.Kriging <- function(object, theta, grad = FALSE, ...) {
                 leaveOneOutGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        loo <- kriging_leaveOneOut(object,theta[i,], isTRUE(grad))
+        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(grad))
         out$leaveOneOut[i] <- loo$leaveOneOut
         if (isTRUE(grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
     }    
     if (!isTRUE(grad)) out$leaveOneOutGrad <- NULL
     return(out)
+}
+
+## ****************************************************************************
+#' Get leaveOneOut of Kriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#' 
+#' @return The leaveOneOut computed for fitted
+#'     \eqn{\boldsymbol{theta}}{\theta}.
+#' 
+#' @method leaveOneOut Kriging
+#' @export 
+#' @aliases leaveOneOut,Kriging,Kriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(5))
+#' y <- f(X)
+#' r <- Kriging(y, X, kernel = "gauss")
+#' print(r)
+#' leaveOneOut(r)
+#' 
+leaveOneOut.Kriging <- function(object, ...) {
+  return(kriging_leaveOneOut(object))
 }
 
 ##****************************************************************************
@@ -614,9 +670,9 @@ leaveOneOut.Kriging <- function(object, theta, grad = FALSE, ...) {
 #' @return The value of the log-marginal posterior computed for the
 #'     given vector theta.
 #' 
-#' @method logMargPost Kriging
+#' @method logMargPostFun Kriging
 #' @export 
-#' @aliases logMargPost,Kriging,Kriging-method
+#' @aliases logMargPostFun,Kriging,Kriging-method
 #'
 #' @references
 #' XXXY A reference describing the model (prior, ...)
@@ -630,11 +686,11 @@ leaveOneOut.Kriging <- function(object, theta, grad = FALSE, ...) {
 #' y <- f(X)
 #' r <- Kriging(y, X, "gauss")
 #' print(r)
-#' lmp <- function(theta) logMargPost(r, theta)$logMargPost
+#' lmp <- function(theta) logMargPostFun(r, theta)$logMargPost
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
-logMargPost.Kriging <- function(object, theta, grad = FALSE, ...) {
+logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
     k <- kriging_model(object) 
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
     if (ncol(theta) != ncol(k$X))
@@ -644,7 +700,7 @@ logMargPost.Kriging <- function(object, theta, grad = FALSE, ...) {
                 logMargPostGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        lmp <- kriging_logMargPost(object, theta[i, ], grad = isTRUE(grad))
+        lmp <- kriging_logMargPostFun(object, theta[i, ], grad = isTRUE(grad))
         out$logMargPost[i] <- lmp$logMargPost
         if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }
@@ -652,36 +708,30 @@ logMargPost.Kriging <- function(object, theta, grad = FALSE, ...) {
     return(out)
 }
 
-##############################################################################
-
-
 ## ****************************************************************************
-#' Print the content of a \code{Kriging} object.
-#'
-#' @title Print a \code{Kriging} object
+#' Get logMargPost of Kriging Model
+#' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
-#'
-#' @param x A (S3) \code{Kriging} Object.
-#' @param ... Ignored.
-#'
-#' @return NULL
-#'
-#' @export
-#' @method print Kriging
+#' 
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#' 
+#' @return The logMargPost computed for fitted
+#'     \eqn{\boldsymbol{theta}}{\theta}.
+#' 
+#' @method logMargPost Kriging
+#' @export 
+#' @aliases logMargPost,Kriging,Kriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X)
-#' r <- Kriging(y, X, "gauss")
+#' r <- Kriging(y, X, kernel = "gauss")
 #' print(r)
-#' ## same thing
-#' r
-print.Kriging <- function(x, ...) {
-    if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
-    k=kriging_model(x)
-    p = paste0("Kriging model:\n\n",kriging_summary(x),"\n")
-    cat(p)
-    ## return(p)
+#' logMargPost(r)
+#' 
+logMargPost.Kriging <- function(object, ...) {
+  return(kriging_logMargPost(object))
 }

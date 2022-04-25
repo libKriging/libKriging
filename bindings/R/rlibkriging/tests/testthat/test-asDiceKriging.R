@@ -38,7 +38,7 @@ test_that("m1.argmax(loo) == KM1.argmax(loo)",
 
 plot(Vectorize(function(.t) leaveOneOutFun(param = as.numeric(.t), model = km1)))
 abline(v = km1@covariance@range.val)
-plot(Vectorize(function(.t) leaveOneOut(KM1@Kriging, as.numeric(.t))),
+plot(Vectorize(function(.t) leaveOneOutFun(KM1@Kriging, as.numeric(.t))),
      add = TRUE, col = 'red')
 abline(v = KM1@covariance@range.val, col = 'red')
 
@@ -89,7 +89,7 @@ ll <- function(Theta){
 }
 as_ll <- function(Theta){
     apply(Theta, 1,
-          function(theta) logLikelihood(KM1@Kriging, theta)$logLikelihood[1])
+          function(theta) logLikelihoodFun(KM1@Kriging, theta)$logLikelihoodFun[1])
 }
 t <- seq(from = 0.01, to = 2, length.out = 51)
 ttg <- expand.grid(t, t)
@@ -178,16 +178,16 @@ suppressWarnings(KM2 <<- rlibkriging::KM(formula = formula,design = design,
 ## plot(Vectorize(function(.t) DiceKriging::logLikFun(.t,k)[1]),
 ##      xlim = c(0.000001, 1))
 ## plot(Vectorize(function(.t)
-##         rlibkriging::logLikelihood(as_k@Kriging, .t)$logLikelihood[1]),
+##         rlibkriging::logLikelihoodFun(as_k@Kriging, .t)$logLikelihoodFun[1]),
 ##      xlim = c(0.000001, 1))
 
 x <- runif(ncol(X))
 test_that("DiceKriging::logLik == rlibkriging::logLikelihood",
           expect_equal(DiceKriging::logLikFun(x, km2)[1],
-                       rlibkriging::logLikelihood(KM2@Kriging,x)$logLikelihood[1]))
+                       rlibkriging::logLikelihoodFun(KM2@Kriging,x)$logLikelihoodFun[1]))
 test_that("DiceKriging::leaveOneOut == rlibkriging::leaveOneOut",
           expect_equal(DiceKriging::leaveOneOutFun(x, km2)[1],
-                       rlibkriging::leaveOneOut(KM2@Kriging,x)$leaveOneOut[1]))
+                       rlibkriging::leaveOneOutFun(KM2@Kriging,x)$leaveOneOut[1]))
 
 x <- matrix(x,ncol=d)
 test_that("Consitency of 'DiceKriging' and 'rlibkriging' 'predict' methods",
@@ -266,10 +266,10 @@ test_args <-  function(formula, design, response ,covtype, estim.method ) {
     ##}
     ##abline(v=k@covariance@range.val)
     ##if (e=="MLE") {
-    ##  plot(Vectorize(function(t)rlibkriging::logLikelihood(as_k@Kriging,t)$logLikelihood[1]),
+    ##  plot(Vectorize(function(t)rlibkriging::logLikelihoodFun(as_k@Kriging,t)$logLikelihoodFun[1]),
     ##       xlim = c(0.0001,2), add=T, col='red')
     ##} else {
-    ##  plot(Vectorize(function(t)rlibkriging::leaveOneOut(as_k@Kriging,t)$leaveOneOut[1]),
+    ##  plot(Vectorize(function(t)rlibkriging::leaveOneOutFun(as_k@Kriging,t)$leaveOneOut[1]),
     ##       xlim=c(0.0001,2),add=T,col='red')
     ##}
     ##abline(v=as_k@covariance@range.val,col='red')
@@ -277,10 +277,10 @@ test_args <-  function(formula, design, response ,covtype, estim.method ) {
   t <- runif(ncol(X))
     test_that("DiceKriging::logLikFun == rlibkriging::logLikelihood",
               expect_equal(DiceKriging::logLikFun(t, km2)[1],
-                           rlibkriging::logLikelihood(KM2@Kriging,t)$logLikelihood[1]))
+                           rlibkriging::logLikelihoodFun(KM2@Kriging,t)$logLikelihoodFun[1]))
     test_that("DiceKriging::leaveOneOutFun == rlibkriging::leaveOneOut",
               expect_equal(DiceKriging::leaveOneOutFun(t, km2)[1],
-                           rlibkriging::leaveOneOut(KM2@Kriging, t)$leaveOneOut[1]))
+                           rlibkriging::leaveOneOutFun(KM2@Kriging, t)$leaveOneOut[1]))
     
     x <- matrix(runif(d),ncol=d)
     test_that("DiceKriging::predict == rlibkriging::predict",

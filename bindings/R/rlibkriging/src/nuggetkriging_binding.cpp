@@ -220,14 +220,14 @@ void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool normalize
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logLikelihood(Rcpp::List k, arma::vec theta_alpha, bool grad = false) {
+Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_alpha, bool grad = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodEval(theta_alpha, grad);
+  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_alpha, grad);
   if (grad) {
     return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll),
                               Rcpp::Named("logLikelihoodGrad") = std::get<1>(ll));
@@ -237,20 +237,42 @@ Rcpp::List nuggetkriging_logLikelihood(Rcpp::List k, arma::vec theta_alpha, bool
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logMargPost(Rcpp::List k, arma::vec theta, bool grad = false) {
+double nuggetkriging_logLikelihood(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostEval(theta, grad);
+  return impl_ptr->logLikelihood();
+}
+
+// [[Rcpp::export]]
+Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = false) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+
+  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad);
   if (grad) {
     return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp),
                               Rcpp::Named("logMargPostGrad") = std::get<1>(lmp));
   } else {
     return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   }
+}
+
+// [[Rcpp::export]]
+double nuggetkriging_logMargPost(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+
+  return impl_ptr->logMargPost();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

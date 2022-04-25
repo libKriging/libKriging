@@ -63,7 +63,7 @@ leaveOneOut <- function (object, ...) {
 ##'
 ##' @return The log-likelihood.
 ##' @export
-logLikelihood <- function (object, ...) {
+logLikelihoodFun <- function (object, ...) {
     UseMethod("logLikelihood")
 }
 

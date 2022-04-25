@@ -23,12 +23,12 @@ for (x in seq(0.01,1,,11)){
 }
 
 r <- Kriging(y, X, kernel)
-ll2 = function(theta) leaveOneOut(r,theta)$leaveOneOut[1]
+ll2 = function(theta) leaveOneOutFun(r,theta)$leaveOneOut[1]
 # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
 for (x in seq(0.01,1,,11)){
   envx = new.env()
-  ll2x = leaveOneOut(r,x)$leaveOneOut[1]
-  gll2x = leaveOneOut(r,x,grad=T)$leaveOneOutGrad
+  ll2x = leaveOneOutFun(r,x)$leaveOneOut[1]
+  gll2x = leaveOneOutFun(r,x,grad=T)$leaveOneOutGrad
   arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 }
 
@@ -36,10 +36,10 @@ precision <- 1e-8  # the following tests should work with it, since the computat
 x=.5
 xenv=new.env()
 test_that(desc="leaveOneOut is the same that DiceKriging one",
-         expect_equal(leaveOneOut(r,x)$leaveOneOut[1],DiceKriging::leaveOneOutFun(x,k,xenv),tolerance = precision))
+         expect_equal(leaveOneOutFun(r,x)$leaveOneOut[1],DiceKriging::leaveOneOutFun(x,k,xenv),tolerance = precision))
 
 test_that(desc="leaveOneOut Grad is the same that DiceKriging one",
-          expect_equal(leaveOneOut(r,x,grad=T)$leaveOneOutGrad,DiceKriging::leaveOneOutGrad(x,k,xenv),tolerance= precision))
+          expect_equal(leaveOneOutFun(r,x,grad=T)$leaveOneOutGrad,DiceKriging::leaveOneOutGrad(x,k,xenv),tolerance= precision))
 }
 
 

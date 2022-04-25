@@ -26,7 +26,7 @@ lmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
                       y=RobustGaSP:::neg_log_marginal_post_approx_ref(param=(x),nugget=0, nugget.est=model@nugget.est, 
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
@@ -44,7 +44,7 @@ lmp_lk = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-(x))),ncol=1))$logMargPost
+                      y=-logMargPostFun(r,matrix(unlist(exp(-(x))),ncol=1))$logMargPost
                       y})}
 lmp_lk(1)
 
@@ -75,7 +75,7 @@ dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
 #                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2])))
 
 
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
                       y=RobustGaSP:::neg_log_marginal_post_approx_ref_deriv(param=(x),nugget=0, nugget.est=model@nugget.est, 
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
@@ -89,7 +89,7 @@ dlmp_rgasp(1)
 dlmp_lk = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-(x))),ncol=1),TRUE)$logMargPostGrad
+                      y=-logMargPostFun(r,matrix(unlist(exp(-(x))),ncol=1),TRUE)$logMargPostGrad
                       y})}
 -exp(-1)*dlmp_lk(1)
 
@@ -197,7 +197,7 @@ lmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
     
 #    print(RobustGaSP:::log_marginal_lik(param=(x),nugget=0,nugget_est=model@nugget.est, 
 #                                        R0=model@R0,X=model@X, zero_mean=model@zero_mean,
@@ -226,7 +226,7 @@ points(log(k@beta_hat[1]),log(k@beta_hat[2]))
 lmp_lk = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-(x))),ncol=2))$logMargPost
+                      y=-logMargPostFun(r,matrix(unlist(exp(-(x))),ncol=2))$logMargPost
                       y})}
 lmp_lk(c(1,1))
 
@@ -244,7 +244,7 @@ dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
                       y=RobustGaSP:::neg_log_marginal_post_approx_ref_deriv(param=(x),nugget=0, nugget.est=model@nugget.est, 
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
@@ -258,7 +258,7 @@ dlmp_rgasp(c(1,1))
 dlmp_lk = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-(x))),ncol=2),TRUE)$logMargPostGrad
+                      y=-logMargPostFun(r,matrix(unlist(exp(-(x))),ncol=2),TRUE)$logMargPostGrad
                       y})}
 -exp(-1)*dlmp_lk(c(1,1))
 

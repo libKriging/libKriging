@@ -25,12 +25,12 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   
   library(rlibkriging)
   r <- Kriging(y, X, kernel)
-  ll2 = function(theta) logLikelihood(r,theta)$logLikelihood
+  ll2 = function(theta) logLikelihoodFun(r,theta)$logLikelihoodFun
   # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
   for (x in seq(0.01,1,,11)){
     envx = new.env()
-    ll2x = logLikelihood(r,x)$logLikelihood
-    gll2x = logLikelihood(r,x,grad = T)$logLikelihoodGrad
+    ll2x = logLikelihoodFun(r,x)$logLikelihoodFun
+    gll2x = logLikelihoodFun(r,x,grad = T)$logLikelihoodGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
   
@@ -38,10 +38,10 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   x=.5
   xenv=new.env()
   test_that(desc="logLik is the same that DiceKriging one", 
-            expect_equal(logLikelihood(r,x)$logLikelihood[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
+            expect_equal(logLikelihoodFun(r,x)$logLikelihoodFun[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
   
   test_that(desc="logLik Grad is the same that DiceKriging one", 
-            expect_equal(logLikelihood(r,x,grad=T)$logLikelihoodGrad,DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
+            expect_equal(logLikelihoodFun(r,x,grad=T)$logLikelihoodGrad,DiceKriging::logLikGrad(x,k,xenv),tolerance= precision))
 }
 
 
@@ -67,10 +67,10 @@ for (kernel in c("matern3_2","matern5_2","gauss","exp")) {
   x=c(.2,.5,.7)
   xenv=new.env()
   test_that(desc="logLik is the same that DiceKriging one", 
-            expect_equal(logLikelihood(r,x)$logLikelihood[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
+            expect_equal(logLikelihoodFun(r,x)$logLikelihoodFun[1],DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
   
   test_that(desc="logLik Grad is the same that DiceKriging one", 
-            expect_equal(logLikelihood(r,x,grad=T)$logLikelihoodGrad[1,],t(DiceKriging::logLikGrad(x,k,xenv))[1,],tolerance= precision))
+            expect_equal(logLikelihoodFun(r,x,grad=T)$logLikelihoodGrad[1,],t(DiceKriging::logLikGrad(x,k,xenv))[1,],tolerance= precision))
 }
 
 

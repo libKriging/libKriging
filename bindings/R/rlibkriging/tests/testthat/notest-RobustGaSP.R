@@ -25,7 +25,7 @@ lmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
                       y=RobustGaSP:::neg_log_marginal_post_approx_ref(param=exp(x),nugget=0, nugget.est=model@nugget.est, 
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
@@ -41,7 +41,7 @@ lmp_lk = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-exp(x))),ncol=1))$logMargPost
+                      y=-logMargPostFun(r,matrix(unlist(exp(-exp(x))),ncol=1))$logMargPost
                       y})}
 lines(seq(0.1,0.9,,101),lmp_lk(seq(0.1,0.9,,101)),col='red')
 
@@ -145,7 +145,7 @@ lmp_rgasp = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      #y=-logMargPost(r,matrix(unlist(x),ncol=2))$logMargPost
+                      #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
                       y=RobustGaSP:::neg_log_marginal_post_approx_ref(param=exp(x),nugget=0, nugget.est=model@nugget.est, 
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
@@ -159,7 +159,7 @@ lmp_lk = function(X,deriv=FALSE) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      y=-logMargPost(r,matrix(unlist(exp(-exp(x))),ncol=2),deriv)$logMargPost
+                      y=-logMargPostFun(r,matrix(unlist(exp(-exp(x))),ncol=2),deriv)$logMargPost
                       y})}
 
 

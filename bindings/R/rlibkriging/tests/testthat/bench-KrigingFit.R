@@ -27,15 +27,15 @@ for (i in 1:N) {
                     )
 
 
-  ll_cpp <- logLikelihood(r, t(as.list(r)$theta))$logLikelihood
+  ll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta))$logLikelihoodFun
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- logLikelihood(r, t(as.list(r)$theta))$logLikelihoodGrad
+  gll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta))$logLikelihoodGrad
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
     
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))/ll_cpp>.1)
-    stop("LL function is not the same bw DiceKriging/libKriging: ",logLikelihood(r,t(as.list(r)$theta))," vs. ",DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))  
+    stop("LL function is not the same bw DiceKriging/libKriging: ",logLikelihoodFun(r,t(as.list(r)$theta))," vs. ",DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))  
   
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)

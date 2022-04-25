@@ -56,22 +56,22 @@ for (kernel in c("matern5_2","matern3_2")) {
   r <- Kriging(y, X, kernel)
   ## Should be equal:
   #lmp(1.0); lmp_deriv(1.0);
-  #logMargPost(r,1.0,grad = T)
+  #logMargPostFun(r,1.0,grad = T)
   #lmp(0.1); lmp_deriv(0.1);
-  #logMargPost(r,0.1,grad = T)
-  #ll2 = function(theta) logMargPost(r,theta)$logMargPost
+  #logMargPostFun(r,0.1,grad = T)
+  #ll2 = function(theta) logMargPostFun(r,theta)$logMargPost
   # plot(Vectorize(ll2),col='red',add=T,xlim=c(0.01,2)) # FIXME fails with "error: chol(): decomposition failed"
   for (x in seq(0.01,2,,11)){
-    ll2x = logMargPost(r,x)$logMargPost
-    gll2x = logMargPost(r,x,grad = T)$logMargPostGrad
+    ll2x = logMargPostFun(r,x)$logMargPost
+    gll2x = logMargPostFun(r,x,grad = T)$logMargPostGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
   
   precision <- 1e-8  # the following tests should work with it, since the computations are analytical
   x=.5
   test_that(desc="logMargPost is the same that RobustGaSP one", 
-            expect_equal(logMargPost(r,x)$logMargPost[1],lmp(x),tolerance = precision))
+            expect_equal(logMargPostFun(r,x)$logMargPost[1],lmp(x),tolerance = precision))
   
   test_that(desc="logMargPost Grad is the same that RobustGaSP one", 
-            expect_equal(logMargPost(r,x,grad = T)$logMargPostGrad[1],lmp_deriv(x),tolerance= precision))
+            expect_equal(logMargPostFun(r,x,grad = T)$logMargPostGrad[1],lmp_deriv(x),tolerance= precision))
 }

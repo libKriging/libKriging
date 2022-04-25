@@ -22,9 +22,9 @@ alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
 test_that(desc="Nugget / Fit: 1D / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
-ll = Vectorize(function(x) logLikelihood(r,c(x,alpha_k))$logLikelihood)
+ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_k))$logLikelihoodFun)
 plot(ll,xlim=c(0.001,1))
-#ll = Vectorize(function(x) logLikelihood(r,c(x,alpha_r))$logLikelihood)
+#ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_r))$logLikelihoodFun)
 #plot(ll_,xlim=c(0.001,1))
 
 theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
@@ -64,7 +64,7 @@ ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
                   apply(X,1,
                     function(x) {
-                      y=-logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
+                      y=-logLikelihoodFun(r,c(unlist(x),alpha_k))$logLikelihoodFun
                       #print(y);
                       y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -127,7 +127,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        y=-logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
+        y=-logLikelihoodFun(r,c(unlist(x),alpha_k))$logLikelihoodFun
         #print(y);
         y})}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
@@ -178,7 +178,7 @@ apply(X,1,
       function(x) {
         # print(dim(x))
         #print(matrix(unlist(x),ncol=2));
-        -logLikelihood(r,c(unlist(x),alpha_k))$logLikelihood
+        -logLikelihoodFun(r,c(unlist(x),alpha_k))$logLikelihoodFun
         #print(y);
         })}
 #DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))

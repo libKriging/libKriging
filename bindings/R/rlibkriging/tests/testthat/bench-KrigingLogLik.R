@@ -24,13 +24,13 @@ for (x in xx){
 r <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
-  times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- logLikelihood(r,rep(x,3)))
-  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- logLikelihood(r,rep(x,3),grad=T))
+  times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- logLikelihoodFun(r,rep(x,3)))
+  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- logLikelihoodFun(r,rep(x,3),grad=T))
   i <- i+1
 }
 
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,3),k))(xx))
-points(xx,Vectorize(function(x)logLikelihood(r,rep(x,3))$logLikelihood)(xx),col='red')
+points(xx,Vectorize(function(x)logLikelihoodFun(r,rep(x,3))$logLikelihoodFun)(xx),col='red')
 
 plot(xx,log(times$R_ll),ylim=c(log(min(min(times$R_ll,na.rm = T),min(times$cpp_ll,na.rm = T))),log(max(max(times$R_ll,na.rm = T),max(times$cpp_ll,na.rm = T)))),xlab="x",ylab="log(user_time (s))", panel.first=grid())
 text(20,-1,"DiceKriging")

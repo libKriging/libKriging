@@ -20,11 +20,11 @@ points(X)
 r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 
 # ll = function(X) {
-#   logLikelihood(r,X,grad=F)$logLikelihood
+#   logLikelihoodFun(r,X,grad=F)$logLikelihoodFun
 # }
 # contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 # gll = function(X) {
-#   logLikelihood(r,X,grad=T)$logLikelihoodGrad
+#   logLikelihoodFun(r,X,grad=T)$logLikelihoodGrad
 # }
 # for (ix in 1:21) {
 # for (iy in 1:21) {
@@ -41,44 +41,44 @@ p = capture.output(print(r))
 
 context("logLikelihood")
 
-ll = function(Theta){apply(Theta,1,function(theta) logLikelihood(r,theta)$logLikelihood)}
+ll = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,theta)$logLikelihoodFun)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
-# logLikelihood(r,t(as.list(r)$theta))
+# logLikelihoodFun(r,t(as.list(r)$theta))
 
-test_that("logLikelihood returned",
-          expect_equal(names(logLikelihood(r,runif(d))),c("logLikelihood")))
-test_that("logLikelihood logLikelihoodGrad returned",
-          expect_equal(names(logLikelihood(r,runif(d),grad=T)),c("logLikelihood","logLikelihoodGrad")))
-test_that("logLikelihood logLikelihoodGrad logLikelihoodHess returned",
-          expect_equal(names(logLikelihood(r,runif(d),grad=T,hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
+test_that("logLikelihoodFun returned",
+          expect_equal(names(logLikelihoodFun(r,runif(d))),c("logLikelihood")))
+test_that("logLikelihoodFun logLikelihoodGrad returned",
+          expect_equal(names(logLikelihoodFun(r,runif(d),grad=T)),c("logLikelihood","logLikelihoodGrad")))
+test_that("logLikelihoodFun logLikelihoodGrad logLikelihoodHess returned",
+          expect_equal(names(logLikelihoodFun(r,runif(d),grad=T,hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
 
-test_that("logLikelihood dim",
-          expect_equal(dim(logLikelihood(r,rbind(runif(d),runif(d)))$logLikelihood),c(2,1)))
+test_that("logLikelihoodFun dim",
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)))$logLikelihoodFun),c(2,1)))
 test_that("logLikelihoodGrad dim",
-          expect_equal(dim(logLikelihood(r,rbind(runif(d),runif(d)),grad=T)$logLikelihoodGrad),c(2,d)))
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),grad=T)$logLikelihoodGrad),c(2,d)))
 test_that("logLikelihoodHess dim",
-          expect_equal(dim(logLikelihood(r,rbind(runif(d),runif(d)),grad=T,hess=T)$logLikelihoodHess),c(2,d,d)))
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),grad=T,hess=T)$logLikelihoodHess),c(2,d,d)))
 
 
 context("leaveOneOut")
 
-loo = function(Theta){apply(Theta,1,function(theta) leaveOneOut(r,theta)$leaveOneOut)}
+loo = function(Theta){apply(Theta,1,function(theta) leaveOneOutFun(r,theta)$leaveOneOut)}
 t=seq(0.01,2,,51)
 contour(t,t,matrix(loo(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2])
-# leaveOneOut(r,t(as.list(r)$theta))
+# leaveOneOutFun(r,t(as.list(r)$theta))
 
 test_that("leaveOneOut returned",
-          expect_equal(names(leaveOneOut(r,runif(d))),c("leaveOneOut")))
+          expect_equal(names(leaveOneOutFun(r,runif(d))),c("leaveOneOut")))
 test_that("leaveOneOut leaveOneOutGrad returned",
-          expect_equal(names(leaveOneOut(r,runif(d),grad=T)),c("leaveOneOut","leaveOneOutGrad")))
+          expect_equal(names(leaveOneOutFun(r,runif(d),grad=T)),c("leaveOneOut","leaveOneOutGrad")))
 
 test_that("leaveOneOut dim",
-          expect_equal(dim(leaveOneOut(r,rbind(runif(d),runif(d)))$leaveOneOut),c(2,1)))
+          expect_equal(dim(leaveOneOutFun(r,rbind(runif(d),runif(d)))$leaveOneOut),c(2,1)))
 test_that("leaveOneOutGrad dim",
-          expect_equal(dim(leaveOneOut(r,rbind(runif(d),runif(d)),grad=T)$leaveOneOutGrad),c(2,d)))
+          expect_equal(dim(leaveOneOutFun(r,rbind(runif(d),runif(d)),grad=T)$leaveOneOutGrad),c(2,d)))
 
 
 context("predict")
@@ -127,11 +127,11 @@ points(X2,col='red')
 
 #r20 <- Kriging(c(y,y2), rbind(X,X2),"gauss")
 #ll = function(X) {
-#  logLikelihood(r20,X,grad=F)$logLikelihood
+#  logLikelihoodFun(r20,X,grad=F)$logLikelihoodFun
 #}
 #contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 #gll = function(X) {
-#  logLikelihood(r20,X,grad=T)$logLikelihoodGrad
+#  logLikelihoodFun(r20,X,grad=T)$logLikelihoodGrad
 #}
 #for (ix in 1:21) {
 #for (iy in 1:21) {
@@ -148,14 +148,14 @@ contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2])
 
 r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2)))
-ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihood(r2,theta)$logLikelihood)}
+ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r2,theta)$logLikelihoodFun)}
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red')
 
 p2 = capture.output(print(r2))
 
 update(object=r,y2,X2)
-llu = function(Theta){apply(Theta,1,function(theta) logLikelihood(r,theta)$logLikelihood)}
+llu = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,theta)$logLikelihoodFun)}
 contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='blue')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='blue')
 
