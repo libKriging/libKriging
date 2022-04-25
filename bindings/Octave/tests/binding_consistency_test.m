@@ -25,11 +25,11 @@ try
     k_m = Kriging(y, X, kernel, "constant", false, "BFGS", "LL") % lk.Parameters() % FIXME parameters arg not mapped
     s = size(X);
     x = 0.3 * ones(s(2), 1);
-    [loo, loograd] = k_m.leaveOneOut(x, true);
+    [loo, loograd] = k_m.leaveOneOutFun(x, true);
     assert(relative_error(loo, loo_ref) < tolerance)
     assert(relative_error(loograd, loograd_ref) < tolerance)
 
-    [ll, llgrad] = k_m.logLikelihood(x, true, false); % flags are optional; then results are driven by the output
+    [ll, llgrad] = k_m.logLikelihoodFun(x, true, false); % flags are optional; then results are driven by the output
     assert(relative_error(ll, ll_ref) < tolerance)
     assert(relative_error(llgrad, llgrad_ref) < tolerance)
 
@@ -59,7 +59,7 @@ for i = 1:10
         s = size(X);
         x = 0.3 * ones(s(2), 1);
 
-        [ll, llgrad] = k_m.logLikelihood(x, true, false);
+        [ll, llgrad] = k_m.logLikelihoodFun(x, true, false);
         assert(relative_error(ll, ll_ref) < tolerance)
         assert(relative_error(llgrad, llgrad_ref) < tolerance)
 

@@ -141,7 +141,7 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set<0>(km->summary(), "Model description");
 }
 
-void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -149,12 +149,22 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
-  auto [ll, llgrad] = km->logLikelihoodEval(input.get<1, arma::vec>("theta"), want_grad);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<1, arma::vec>("theta"), want_grad);
   output.set<0>(ll, "ll");                  // FIXME better name
   output.setOptional<1>(llgrad, "llgrad");  // FIXME better name
 }
 
-void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->logLikelihood(), "Model logLikelihood");
+}
+
+void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -162,9 +172,19 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
-  auto [lmp, lmpgrad] = km->logMargPostEval(input.get<1, arma::vec>("theta"), want_grad);
+  auto [lmp, lmpgrad] = km->logMargPostFun(input.get<1, arma::vec>("theta"), want_grad);
   output.set<0>(lmp, "lmp");                  // FIXME better name
   output.setOptional<1>(lmpgrad, "lmpgrad");  // FIXME better name
+}
+
+void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
+  output.set<0>(km->logMargPost(), "Model logMargPost");
 }
 
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
