@@ -81,7 +81,7 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
 
 // Objective function for fit : -logLikelihood
 
-double Kriging::logLikelihood(const arma::vec& _theta,
+double Kriging::_logLikelihood(const arma::vec& _theta,
                               arma::vec* grad_out,
                               arma::mat* hess_out,
                               Kriging::OKModel* okm_data) const {
@@ -301,7 +301,7 @@ double Kriging::logLikelihood(const arma::vec& _theta,
   return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodEval(const arma::vec& _theta,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodFun(const arma::vec& _theta,
                                                                                       const bool _grad,
                                                                                       const bool _hess) {
   arma::mat T;
@@ -317,13 +317,13 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoo
   if (_grad || _hess) {
     grad = arma::vec(_theta.n_elem);
     if (!_hess) {
-      ll = logLikelihood(_theta, &grad, nullptr, &okm_data);
+      ll = _logLikelihood(_theta, &grad, nullptr, &okm_data);
     } else {
       hess = arma::mat(_theta.n_elem, _theta.n_elem);
-      ll = logLikelihood(_theta, &grad, &hess, &okm_data);
+      ll = _logLikelihood(_theta, &grad, &hess, &okm_data);
     }
   } else
-    ll = logLikelihood(_theta, nullptr, nullptr, &okm_data);
+    ll = _logLikelihood(_theta, nullptr, nullptr, &okm_data);
 
   return std::make_tuple(ll, std::move(grad), std::move(hess));
 }
@@ -339,7 +339,7 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
   return c;
 }
 
-double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const {
+double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const {
   // arma::cout << " theta: " << _theta << arma::endl;
   //' @ref https://github.com/DiceKrigingClub/DiceKriging/blob/master/R/leaveOneOutFun.R
   // model@covariance <- vect2covparam(model@covariance, param)
@@ -463,7 +463,7 @@ double Kriging::leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigin
   return loo;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutEval(const arma::vec& _theta, const bool _grad) {
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const arma::vec& _theta, const bool _grad) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -475,16 +475,16 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutEval(const a
   arma::vec grad;
   if (_grad) {
     grad = arma::vec(_theta.n_elem);
-    loo = leaveOneOut(_theta, &grad, &okm_data);
+    loo = _leaveOneOut(_theta, &grad, &okm_data);
   } else
-    loo = leaveOneOut(_theta, nullptr, &okm_data);
+    loo = _leaveOneOut(_theta, nullptr, &okm_data);
 
   return std::make_tuple(loo, std::move(grad));
 }
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
 
-double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const {
+double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
   // In RobustGaSP:
@@ -693,7 +693,7 @@ double Kriging::logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigin
   return (log_marginal_lik + log_approx_ref_prior);
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostEval(const arma::vec& _theta, const bool _grad) {
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const arma::vec& _theta, const bool _grad) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -705,11 +705,23 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostEval(const a
   arma::vec grad;
   if (_grad) {
     grad = arma::vec(_theta.n_elem);
-    lmp = logMargPost(_theta, &grad, &okm_data);
+    lmp = _logMargPost(_theta, &grad, &okm_data);
   } else
-    lmp = logMargPost(_theta, nullptr, &okm_data);
+    lmp = _logMargPost(_theta, nullptr, &okm_data);
 
   return std::make_tuple(lmp, std::move(grad));
+}
+
+LIBKRIGING_EXPORT double Kriging::logLikelihood() {
+  return std::get<0>(Kriging::logLikelihoodFun(m_theta,false,false)); 
+}
+
+LIBKRIGING_EXPORT double Kriging::leaveOneOut() { 
+  return std::get<0>(Kriging::leaveOneOutFun(m_theta,false));
+}
+
+LIBKRIGING_EXPORT double Kriging::logMargPost() { 
+  return std::get<0>(Kriging::logMargPostFun(m_theta,false)); 
 }
 
 double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma::mat* hess_out)> f,
@@ -834,7 +846,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
           arma::vec _theta = 1 / arma::exp(_gamma);
-          double ll = this->logLikelihood(_theta, grad_out, hess_out, okm_data);
+          double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
           if (grad_out != nullptr)
             *grad_out = *grad_out % _theta;
           if (hess_out != nullptr)
@@ -847,7 +859,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
           arma::vec _theta = 1 / arma::exp(_gamma);
-          double loo = this->leaveOneOut(_theta, grad_out, okm_data);
+          double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
           if (grad_out != nullptr)
             *grad_out = -*grad_out % _theta;
           return loo;
@@ -860,7 +872,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
           const arma::vec& _theta = 1 / arma::exp(_gamma);
-          double lmp = this->logMargPost(_theta, grad_out, okm_data);
+          double lmp = this->_logMargPost(_theta, grad_out, okm_data);
           if (grad_out != nullptr)
             *grad_out = *grad_out % _theta;
           return -lmp;

@@ -114,7 +114,7 @@ double Bench::LogLik(Kriging& ok, const arma::vec& theta) {
 
   double s = 0;
   for (int i = 0; i < n; i++) {
-    s += ok.logLikelihood(theta, nullptr, nullptr, &okm_data);
+    s += ok._logLikelihood(theta, nullptr, nullptr, &okm_data);
   }
   return s / n;
 }
@@ -133,7 +133,7 @@ arma::vec Bench::LogLikGrad(Kriging& ok, const arma::vec& theta) {
 
   arma::vec s = arma::zeros(theta.n_elem);
   for (int i = 0; i < n; i++) {
-    s += ok.logLikelihood(theta, &grad, nullptr, &okm_data);
+    s += ok._logLikelihood(theta, &grad, nullptr, &okm_data);
   }
   return s / n;
 }

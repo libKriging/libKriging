@@ -47,7 +47,7 @@ TEST_CASE("workflow") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-    return std::get<1>(ok.logLikelihoodEval(theta_vec, true, false));
+    return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));
   });
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("logLikelihoodFun benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodFun#" + std::to_string(i)) {
-      return std::get<0>(ok.logLikelihoodEval(theta_vec, false, false));  //
+      return std::get<0>(ok.logLikelihoodFun(theta_vec, false, false));  //
     };
   });
 }
@@ -86,7 +86,7 @@ TEST_CASE("logLikelihoodGrad benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodGrad#" + std::to_string(i)) {
-      return std::get<1>(ok.logLikelihoodEval(theta_vec, true, false));  //
+      return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));  //
     };
   });
 }
