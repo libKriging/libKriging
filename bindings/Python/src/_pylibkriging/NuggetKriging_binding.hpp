@@ -47,10 +47,13 @@ class PyNuggetKriging {
 
   std::string summary() const;
 
-  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodEval(const py::array_t<double>& theta,
+  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
                                                                                  const bool want_grad);
 
-  std::tuple<double, py::array_t<double>> logMargPostEval(const py::array_t<double>& theta, const bool want_grad);
+  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool want_grad);
+
+  double logLikelihood();
+  double logMargPost();
 
  private:
   std::unique_ptr<NuggetKriging> m_internal;

@@ -19,7 +19,7 @@ set(CARMA_DEV_TARGET false)
 # set(BUILD_TESTS on CACHE BOOL "Enable test in carma") 
 add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 
-set(pylibkriging_SRCS src/_pylibkriging/pylibkirging.cpp)
+set(pylibkriging_SRCS src/_pylibkriging/pylibkriging.cpp)
 list(APPEND pylibkriging_SRCS
         src/_pylibkriging/LinearRegression_binding.cpp src/_pylibkriging/LinearRegression_binding.hpp
         src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp

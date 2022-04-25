@@ -63,11 +63,11 @@ def test_data1():
     r = lk.Kriging(y, X, kernel, lk.RegressionModel.Constant, False, "BFGS", "LL", lk.KrigingParameters())
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    loo, loograd = r.leaveOneOut(x, True)
+    loo, loograd = r.leaveOneOutFun(x, True)
     assert relative_error(loo, loo_ref) < tolerance
     assert relative_error(loograd, loograd_ref) < tolerance
 
-    ll, llgrad, llhess = r.logLikelihood(x, True, False)
+    ll, llgrad, llhess = r.logLikelihoodFun(x, True, False)
     assert relative_error(ll, ll_ref) < tolerance
     assert relative_error(llgrad, llgrad_ref) < tolerance
 
@@ -90,6 +90,6 @@ def test_data2(i):
 
     x = 0.3 * np.ones(np.shape(X)[1])
 
-    ll, llgrad, llhess = r.logLikelihood(x, True, False)
+    ll, llgrad, llhess = r.logLikelihoodFun(x, True, False)
     assert relative_error(ll, ll_ref) < tolerance
     assert relative_error(llgrad, llgrad_ref) < tolerance
