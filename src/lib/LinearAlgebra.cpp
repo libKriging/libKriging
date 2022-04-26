@@ -26,8 +26,6 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower(X, 0);
 }
 
-bool LinearAlgebra::warn_chol = false;
-
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate 
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
 arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
@@ -44,7 +42,6 @@ arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
     }
   } else {
     if (inc_cond>0) 
-      if (warn_chol) 
         arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
     return R;
   }
