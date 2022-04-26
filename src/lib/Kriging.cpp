@@ -64,6 +64,9 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
                                    const std::string& optim,
                                    const std::string& objective,
                                    const Parameters& parameters) {
+  if (y.n_elem != X.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)+"), y: ("+std::to_string(y.n_elem)+")");
+
   make_Cov(covType);
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
@@ -846,35 +849,34 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
-          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
-          arma::vec _theta = 1 / arma::exp(_gamma);
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
+          const arma::vec _theta = 1 / arma::exp(_gamma);
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > ll: " << ll << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
           if (grad_out != nullptr){
-            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
             *grad_out = *grad_out % _theta ;
           }
           if (hess_out != nullptr){
-            if (Optim::log_level>2) arma::cout << "  > hess ll: " << hess_out << arma::endl;
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > hess ll: " << hess_out << arma::endl;
             *hess_out = -*grad_out + *hess_out % _theta;
           }
-
           return -ll;
         }};
     } else {
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-          arma::vec _theta = _gamma;
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          const arma::vec _theta = _gamma;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > ll: " << ll << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
           if (grad_out != nullptr) {
-            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
             *grad_out = -*grad_out;
           }
           if (hess_out != nullptr) {
-            if (Optim::log_level>2) arma::cout << "  > hess ll: " << hess_out << arma::endl;
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > hess ll: " << hess_out << arma::endl;
             *hess_out = -*hess_out;
           }
           return -ll;
@@ -885,26 +887,28 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
-          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
-          arma::vec _theta = 1 / arma::exp(_gamma);
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
+          const arma::vec _theta = 1 / arma::exp(_gamma);
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > loo: " << loo << arma::endl;
-          if (grad_out != nullptr)
-            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
+          if (grad_out != nullptr) {
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
             *grad_out = -*grad_out % _theta;
+          }
           return loo;
         }};
     } else {
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-          arma::vec _theta = _gamma;
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          const arma::vec _theta = _gamma;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > loo: " << loo << arma::endl;
-          //if (grad_out != nullptr)
-            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
+          //if (grad_out != nullptr) {
+          //  if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
           //  *grad_out = *grad_out; // so not necessary
+          // }
           return loo;
         }};
     }
@@ -915,26 +919,28 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
-          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
           const arma::vec& _theta = 1 / arma::exp(_gamma);
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double lmp = this->_logMargPost(_theta, grad_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > lmp: " << lmp << arma::endl;
-          if (grad_out != nullptr)
-            if (Optim::log_level>2) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
+          if (grad_out != nullptr) {
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
             *grad_out = *grad_out % _theta;
+          }
           return -lmp;
         }};
     } else {
       fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
-          arma::vec _theta = _gamma;
-          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          const arma::vec _theta = _gamma;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
           double lmp = this->_logMargPost(_theta, grad_out, okm_data);
-          if (Optim::log_level>2) arma::cout << "  > lmp: " << lmp << arma::endl;
-          if (grad_out != nullptr)
-            if (Optim::log_level>2) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
+          //DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
+          if (grad_out != nullptr) {
+            //DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
             *grad_out = -*grad_out; 
+          }
           return -lmp;
         }};
     }
@@ -1012,7 +1018,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
     Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
-    double min_ofn_tmp = fit_ofn(-arma::log(m_theta), nullptr, nullptr, &okm_data);
+    arma::vec gamma_tmp = arma::vec(d );
+    gamma_tmp = m_theta;
+    if (Optim::reparametrize) {
+      gamma_tmp = -arma::log(m_theta);
+    }
+
+    double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, nullptr, &okm_data);
 
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
@@ -1023,6 +1035,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_sigma2 = parameters.is_sigma2_estim;
 
   } else {
+
     arma::vec theta_upper = 2.0 * trans(max(X, 0) - min(X, 0));  
     //arma::cout << "theta_upper:" << theta_upper << arma::endl;
     arma::vec theta_lower = 1E-3 * trans(max(X, 0) - min(X, 0));
@@ -1051,6 +1064,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     //arma::cout << "theta_lower:" << theta_lower << arma::endl;
      
     if (optim.rfind("BFGS", 0) == 0) {
+
       Random::init();
   
       // FIXME parameters.has needs to implemtented (no use case in current code)
@@ -1067,7 +1081,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       } else {  // just use given theta(s) as starting values for multi-bfgs
         theta0 = arma::mat(parameters.theta);
       }
-  
       //arma::cout << "theta0:" << theta0 << arma::endl;
 
       if (Optim::reparametrize)  {
@@ -1091,6 +1104,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
           arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
           arma::cout << "  start_point: " << gamma_tmp.t() << " ";
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
@@ -1131,7 +1145,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         //    algo_settings);
   
         lbfgsb::Optimizer optimizer{d};
-        optimizer.iprint = Optim::log_level-1;
+        optimizer.iprint = Optim::log_level-2;
         optimizer.max_iter = Optim::max_iteration;
         optimizer.pgtol = Optim::gradient_tolerance;
         optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
@@ -1155,6 +1169,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                       nullptr,
                       &okm_data); 
   
+        if (Optim::log_level>0) {
+          arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
+          arma::cout << "  best solution: " << gamma_tmp.t() << " ";
+        }
+
         if (min_ofn_tmp < min_ofn) {
           m_theta = gamma_tmp;
           if (Optim::reparametrize) 
@@ -1210,6 +1229,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
           arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
           arma::cout << "  start_point: " << gamma_tmp.t() << " ";
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
@@ -1459,6 +1479,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
+  if (newy.n_elem != newX.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(newX.n_rows) + "x" + std::to_string(newX.n_cols)+"), y: ("+std::to_string(newy.n_elem)+")");
+  
   // rebuild starting parameters
   Parameters parameters{this->m_sigma2,
                         true,
