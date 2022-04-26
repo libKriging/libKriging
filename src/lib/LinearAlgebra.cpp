@@ -23,6 +23,12 @@ LIBKRIGING_EXPORT double LinearAlgebra::get_num_nugget() {
 };
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
+  return LinearAlgebra::safe_chol_lower(X, 0);
+}
+
+// Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate 
+//' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
+arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
   arma::mat R = arma::mat(X.n_rows, X.n_cols);
   bool ok = arma::chol(R, X, "lower");
   if (!ok) {
@@ -30,11 +36,13 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
       throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
     else {
-      arma::cout << "[WARNING]: chol failed, adding numerical nugget (on diagonal)" << arma::endl;
       X /= 1.0 + LinearAlgebra::num_nugget;
       X.diag().ones();
-      return LinearAlgebra::safe_chol_lower(X);
+      return LinearAlgebra::safe_chol_lower(X, inc_cond+1);
     }
-  } else
+  } else {
+    if (inc_cond>0) 
+        arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
     return R;
+  }
 }
