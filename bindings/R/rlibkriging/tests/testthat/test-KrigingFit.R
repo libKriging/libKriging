@@ -5,7 +5,7 @@ context("Fit: 1D")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 n <- 5
-set.seed(1234)
+set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 k = NULL

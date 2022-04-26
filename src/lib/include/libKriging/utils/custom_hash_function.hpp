@@ -4,6 +4,7 @@
 #include <armadillo>
 #include <functional>
 #include "libKriging/Kriging.hpp"
+#include "libKriging/NuggetKriging.hpp"
 #include "libKriging/utils/cache_details.hpp"
 
 template <>
@@ -64,6 +65,29 @@ struct std::hash<Kriging::OKModel*> {
         bool is_beta_estim;
         double sigma2;
         bool is_sigma2_estim;
+      };
+
+      //      return std::hash<arma::mat>{}(*s);
+    } else {
+      return 0;
+    }
+  }
+};
+
+template <>
+struct std::hash<NuggetKriging::OKModel*> {
+  std::size_t operator()(const NuggetKriging::OKModel* s) const noexcept {
+    if (s != nullptr) {
+      struct OKModel {
+        arma::mat T;
+        arma::mat M;
+        arma::colvec z;
+        arma::colvec beta;
+        bool is_beta_estim;
+        double sigma2;
+        bool is_sigma2_estim;
+        double nugget;
+        bool is_nugget_estim;
       };
 
       //      return std::hash<arma::mat>{}(*s);
