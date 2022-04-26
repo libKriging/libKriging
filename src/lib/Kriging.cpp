@@ -8,6 +8,7 @@
 
 //#include "libKriging/Bench.hpp"
 #include "libKriging/Trend.hpp"
+#include "libKriging/Optim.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -17,11 +18,9 @@
 #include "libKriging/Kriging.hpp"
 
 #include <cassert>
-#include <optim.hpp>
+#include <lbfgsb_cpp/lbfgsb.hpp>
 #include <tuple>
 #include <vector>
-
-#include <lbfgsb_cpp/lbfgsb.hpp>
 
 /************************************************/
 /**      Kriging implementation        **/
@@ -730,13 +729,13 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
                     arma::vec& x_0,
                     const arma::vec& x_lower,
                     const arma::vec& x_upper) {
-  // arma::cout << "x_0: " << x_0 << " ";
+  if (Optim::log_level>0) arma::cout << "x_0: " << x_0 << " ";
 
   double delta = 0.1;
-  double x_tol = 0.001;
-  double y_tol = 1;
-  double g_tol = 0.01;
-  int max_iteration = 20;
+  double x_tol = 0.01; //Optim::solution_rel_tolerance;
+  double y_tol = Optim::objective_rel_tolerance;
+  double g_tol = Optim::gradient_tolerance;
+  int max_iteration = Optim::max_iteration;
 
   arma::vec x_previous(x_0.n_elem);
   arma::vec x_best(x_0.n_elem);
@@ -749,28 +748,30 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
   arma::mat hess(x.n_elem, x.n_elem);
   int i = 0;
   while (i < max_iteration) {
-    // arma::cout << "iteration: " << i << arma::endl;
-    // arma::cout << "  x: " << x << arma::endl;
+    if (Optim::log_level>0) {
+      arma::cout << "iteration: " << i << arma::endl;
+      arma::cout << "  x: " << x << arma::endl;
+    }
 
     f_previous = f_new;
     f_new = f(x, &grad, &hess);
-    // arma::cout << "    f_new: " << f_new << arma::endl;
+    if (Optim::log_level>1) arma::cout << "    f_new: " << f_new << arma::endl;
     if (f_best > f_new) {
       f_best = f_new;
       x_best = x;
     }
 
-    if (std::abs(f_new - f_previous) < y_tol) {
-      // arma::cout << "  X f_new ~ f_previous" << arma::endl;
+    if (std::abs((f_new - f_previous)/f_previous) < y_tol) {
+      if (Optim::log_level>0) arma::cout << "  X f_new ~ f_previous" << arma::endl;
       break;
     }
     if (arma::abs(grad).max() < g_tol) {
-      // arma::cout << "  X grad ~ 0" << arma::endl;
+      if (Optim::log_level>0) arma::cout << "  X grad ~ 0" << arma::endl;
       break;
     }
 
     arma::vec delta_x(x.n_elem);
-    // arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
+    if (Optim::log_level>2) arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
     if (arma::all(arma::eig_sym(hess) > 0)) {
       // try to fit a second order polynom to use its minimizer. Otherwise, just iterate with conjugate gradient
       // arma::cout << "!";
@@ -778,28 +779,28 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
     } else {
       delta_x = delta * grad / std::sqrt(arma::sum(arma::cdot(grad, grad)));
     }
-    // arma::cout << "  delta_x: " << delta_x << arma::endl;
+    if (Optim::log_level>2) arma::cout << "  delta_x: " << delta_x << arma::endl;
 
     arma::vec x_next = x - delta_x;
-    // arma::cout << "  x_next: " << x_next << arma::endl;
+    if (Optim::log_level>1) arma::cout << "  x_next: " << x_next << arma::endl;
 
     for (int j = 0; j < x_next.n_elem; j++) {
       if (x_next[j] < x_lower[j]) {
-        // arma::cout << "    <" << x_lower[j] << arma::endl;
+        if (Optim::log_level>2) arma::cout << "    <" << x_lower[j] << arma::endl;
         delta_x = delta_x * (x[j] - x_lower[j]) / (x[j] - x_next[j]) / 2;
         x_next = x - delta_x;
       }
       if (x_next[j] > x_upper[j]) {
-        // arma::cout << "    >" << x_upper[j] << arma::endl;
+        if (Optim::log_level>2) arma::cout << "    >" << x_upper[j] << arma::endl;
         delta_x = delta_x * (x_upper[j] - x[j]) / (x_next[j] - x[j]) / 2;
         x_next = x - delta_x;
       }
     }
-    // arma::cout << "    delta_x: " << delta << arma::endl;
-    // arma::cout << "    x_next: " << x_next << arma::endl;
+    if (Optim::log_level>2) arma::cout << "    delta_x: " << delta << arma::endl;
+    if (Optim::log_level>2) arma::cout << "    x_next: " << x_next << arma::endl;
 
-    if (arma::abs(x - x_next).max() < x_tol) {
-      // arma::cout << "  X x_0 ~ x_next" << arma::endl;
+    if (arma::abs((x - x_next) / x).max() < x_tol) {
+      if (Optim::log_level>1) arma::cout << "  X x_0 ~ x_next" << arma::endl;
       break;
     }
 
@@ -808,11 +809,11 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
 
     // TODO : keep best result instead of last one
     ++i;
-    // arma::cout << "  f_best: " << f_best << arma::endl;
+    if (Optim::log_level>0) arma::cout << "  f_best: " << f_best << arma::endl;
   }
 
   x_0 = x_best;
-  // arma::cout << " " << x_0 << " " << f_best << arma::endl;
+  if (Optim::log_level>0) arma::cout << " " << x_0 << " " << f_best << arma::endl;
 
   return f_best;
 }
@@ -833,55 +834,112 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                                     const std::string& optim,
                                     const std::string& objective,
                                     const Parameters& parameters) {
-  arma::uword n = X.n_rows;
-  arma::uword d = X.n_cols;
-
-  arma::vec theta_lower = 1e-3 * trans(max(X, 0) - min(X, 0));
-  arma::vec theta_upper = 2 * trans(max(X, 0) - min(X, 0));
+  const arma::uword n = X.n_rows;
+  const arma::uword d = X.n_cols;
 
   std::function<double(const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data)>
       fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
-    fit_ofn = CacheFunction{
+    if (Optim::reparametrize) {
+      fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
+          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
           arma::vec _theta = 1 / arma::exp(_gamma);
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
           double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
-          if (grad_out != nullptr)
-            *grad_out = *grad_out % _theta;
-          if (hess_out != nullptr)
+          if (Optim::log_level>2) arma::cout << "  > ll: " << ll << arma::endl;
+          if (grad_out != nullptr){
+            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+            *grad_out = *grad_out % _theta ;
+          }
+          if (hess_out != nullptr){
+            if (Optim::log_level>2) arma::cout << "  > hess ll: " << hess_out << arma::endl;
             *hess_out = -*grad_out + *hess_out % _theta;
+          }
+
           return -ll;
         }};
-
+    } else {
+      fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          arma::vec _theta = _gamma;
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
+          if (Optim::log_level>2) arma::cout << "  > ll: " << ll << arma::endl;
+          if (grad_out != nullptr) {
+            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+            *grad_out = -*grad_out;
+          }
+          if (hess_out != nullptr) {
+            if (Optim::log_level>2) arma::cout << "  > hess ll: " << hess_out << arma::endl;
+            *hess_out = -*hess_out;
+          }
+          return -ll;
+        }};
+    }
   } else if (objective.compare("LOO") == 0) {
-    fit_ofn = CacheFunction{
+    if (Optim::reparametrize) {
+      fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
+          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
           arma::vec _theta = 1 / arma::exp(_gamma);
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
           double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
+          if (Optim::log_level>2) arma::cout << "  > loo: " << loo << arma::endl;
           if (grad_out != nullptr)
+            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
             *grad_out = -*grad_out % _theta;
           return loo;
         }};
-
+    } else {
+      fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          arma::vec _theta = _gamma;
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
+          if (Optim::log_level>2) arma::cout << "  > loo: " << loo << arma::endl;
+          //if (grad_out != nullptr)
+            if (Optim::log_level>2) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+          //  *grad_out = *grad_out; // so not necessary
+          return loo;
+        }};
+    }
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
-    fit_ofn = CacheFunction{
+    if (Optim::reparametrize) {
+      fit_ofn = CacheFunction{
         [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
           // Change variable for opt: . -> 1/exp(.)
+          if (Optim::log_level>2) arma::cout << "> gamma: " << _gamma << arma::endl;
           const arma::vec& _theta = 1 / arma::exp(_gamma);
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
           double lmp = this->_logMargPost(_theta, grad_out, okm_data);
+          if (Optim::log_level>2) arma::cout << "  > lmp: " << lmp << arma::endl;
           if (grad_out != nullptr)
+            if (Optim::log_level>2) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
             *grad_out = *grad_out % _theta;
           return -lmp;
         }};
-
-  } else
-    throw std::invalid_argument("Unsupported fit objective: " + objective);
+    } else {
+      fit_ofn = CacheFunction{
+        [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          arma::vec _theta = _gamma;
+          if (Optim::log_level>2) arma::cout << "> theta: " << _theta << arma::endl;
+          double lmp = this->_logMargPost(_theta, grad_out, okm_data);
+          if (Optim::log_level>2) arma::cout << "  > lmp: " << lmp << arma::endl;
+          if (grad_out != nullptr)
+            if (Optim::log_level>2) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
+            *grad_out = -*grad_out; 
+          return -lmp;
+        }};
+    }
+  } else 
+    throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
 
   arma::rowvec centerX(d);
   arma::rowvec scaleX(d);
@@ -964,133 +1022,235 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_sigma2 = okm_data.sigma2;
     m_est_sigma2 = parameters.is_sigma2_estim;
 
-  } else if (optim.rfind("BFGS", 0) == 0) {
-    Random::init();
-
-    // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;
-      try {
-        multistart = std::stoi(optim.substr(4));
-      } catch (std::invalid_argument) {
-        // let multistart = 1
+  } else {
+    arma::vec theta_upper = 2.0 * trans(max(X, 0) - min(X, 0));  
+    //arma::cout << "theta_upper:" << theta_upper << arma::endl;
+    arma::vec theta_lower = 1E-3 * trans(max(X, 0) - min(X, 0));
+    
+    if (Optim::theta_lower_factor > 0) {
+      arma::vec dy2 = arma::zeros(n * n);
+      for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
+        int i = (int)ij / n;
+        int j = ij % n;  // i,j <-> i*n+j
+        if (i < j) {
+          dy2[ij] = m_y.at(i) - m_y.at(j);
+          dy2[ij] *=  dy2[ij];
+          dy2[j * n + i] =  dy2[ij];
+        }
       }
-      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-               % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
-    } else {  // just use given theta(s) as starting values for multi-bfgs
-      theta0 = arma::mat(parameters.theta);
+      //dy2 /= arma::var(m_y);
+      arma::vec dy2dX_slope = dy2 / sqrt(arma::sum(m_dX % m_dX, 0)).t();
+      dy2dX_slope.replace(arma::datum::nan, 0.0); // we are not interested in same points where dX=0, and dy=0
+      //arma::cout << "dy2dX_slope:" << dy2dX_slope << arma::endl;
+      arma::vec worst_dX = arma::abs(m_dX.col(arma::index_max(dy2dX_slope))); // worst slope dX point
+      //arma::cout << "worst_dX:" << worst_dX << arma::endl;
+      //arma::vec weighted_mean_dX = (arma::mean( m_dX % trans(arma::repmat(dy2, 1, m_dX.n_rows)), 1)) / arma::sum(dy2); // weighted mean dX point
+      //arma::cout << "weighted_mean_dX:" << weighted_mean_dX << arma::endl;
+      theta_lower = arma::min(theta_upper,Optim::theta_lower_factor / worst_dX);
     }
-
-    // arma::cout << "theta0:" << theta0 << arma::endl;
-
-    optim::algo_settings_t algo_settings;
-    algo_settings.print_level = 0;
-    algo_settings.iter_max = 20;
-    algo_settings.rel_sol_change_tol = 0.01;
-    algo_settings.grad_err_tol = 1e-8;
-    algo_settings.vals_bound = true;
-    algo_settings.lower_bounds = -arma::log(theta_upper);
-    algo_settings.upper_bounds = -arma::log(theta_lower);
-    double min_ofn = std::numeric_limits<double>::infinity();
-
-    for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec gamma_tmp = -arma::log(theta0.row(i)).t();
-      // arma::cout << "gamma_tmp:" << gamma_tmp << arma::endl;
-      arma::mat T;
-      arma::mat M;
-      arma::colvec z;
-      arma::colvec beta;
-      if (parameters.has_beta)
-        beta = parameters.beta;
-      double sigma2 = -1;
-      if (parameters.has_sigma2)
-        sigma2 = parameters.sigma2;
-
-      Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
-
-      bool bfgs_ok = optim::lbfgs(
-          gamma_tmp,
-          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-            return fit_ofn(vals_inp, grad_out, nullptr, &okm_data);
-          },
-          nullptr,
-          algo_settings);
-
-      double min_ofn_tmp
-          = fit_ofn(gamma_tmp,
-                    nullptr,
-                    nullptr,
-                    &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
-
-      if (min_ofn_tmp < min_ofn) {
-        m_theta = 1 / arma::exp(gamma_tmp);
-        m_est_theta = true;
-        min_ofn = min_ofn_tmp;
-        m_T = std::move(okm_data.T);
-        m_M = std::move(okm_data.M);
-        m_z = std::move(okm_data.z);
-        m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.is_beta_estim;
-        m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.is_sigma2_estim;
+    //arma::cout << "theta_lower:" << theta_lower << arma::endl;
+     
+    if (optim.rfind("BFGS", 0) == 0) {
+      Random::init();
+  
+      // FIXME parameters.has needs to implemtented (no use case in current code)
+      if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+        int multistart = 1;
+        try {
+          multistart = std::stoi(optim.substr(4));
+        } catch (std::invalid_argument) {
+          // let multistart = 1
+        }
+        theta0 = arma::repmat(trans(theta_lower), multistart, 1) + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+        //theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+        //         % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1); 
+      } else {  // just use given theta(s) as starting values for multi-bfgs
+        theta0 = arma::mat(parameters.theta);
       }
-    }
-  } else if (optim.rfind("Newton", 0) == 0) {
-    Random::init();
+  
+      //arma::cout << "theta0:" << theta0 << arma::endl;
 
-    // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;
-      try {
-        multistart = std::stoi(optim.substr(4));
-      } catch (std::invalid_argument) {
-        // let multistart = 1
+      if (Optim::reparametrize)  {
+        arma::vec theta_lower_tmp = theta_lower;
+        theta_lower = -arma::log(theta_upper);
+        theta_upper = -arma::log(theta_lower_tmp);
       }
-      theta0 = Random::randu_mat(multistart, d) % (max(m_X, 0) - min(m_X, 0));
-    } else {  // just use given theta(s) as starting values for multi-bfgs
-      theta0 = arma::mat(parameters.theta);
-    }
 
-    // arma::cout << "theta0:" << theta0 << arma::endl;
+      double min_ofn = std::numeric_limits<double>::infinity();
+  
+      for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+        arma::vec gamma_tmp = theta0.row(i).t();
+        if (Optim::reparametrize) 
+          gamma_tmp = -arma::log(theta0.row(i).t());
 
-    double min_ofn = std::numeric_limits<double>::infinity();
-    for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-      arma::vec gamma_tmp = -arma::log(theta0.row(i)).t();
-      arma::mat T;
-      arma::mat M;
-      arma::colvec z;
-      arma::colvec beta;
-      if (parameters.has_beta)
-        beta = parameters.beta;
-      double sigma2 = -1;
-      if (parameters.has_sigma2)
-        sigma2 = parameters.sigma2;
+        theta_lower = arma::min(gamma_tmp, theta_lower);
+        theta_upper = arma::max(gamma_tmp, theta_upper);
 
-      Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
+        if (Optim::log_level>0) {
+          arma::cout << "BFGS:" << arma::endl;
+          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
+          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
+          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+          arma::cout << "  start_point: " << gamma_tmp.t() << " ";
+          arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
+          arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
+        }
 
-      double min_ofn_tmp = optim_newton(
-          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
-            return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
-          },
-          gamma_tmp,
-          -arma::log(2 * trans(max(m_X, 0) - min(m_X, 0))) * d,
-          -arma::log(1e-10 * arma::ones<arma::vec>(d)));
+        arma::mat T;
+        arma::mat M;
+        arma::colvec z;
+        arma::colvec beta;
+        if (parameters.has_beta)
+          beta = parameters.beta;
+        double sigma2 = -1;
+        if (parameters.has_sigma2)
+          sigma2 = parameters.sigma2;
+  
+        Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
+ 
+        //// Using OptimLib
+        // optim::algo_settings_t algo_settings;
+        // algo_settings.print_level = Optim::log_level;
+        // algo_settings.iter_max = Optim::max_iteration;
+        // algo_settings.rel_objfn_change_tol = Optim::objective_rel_tolerance;
+        // algo_settings.grad_err_tol = Optim::gradient_tolerance;
+        // algo_settings.lbfgs_settings.par_M=5;
+        // algo_settings.vals_bound = true;
+        // algo_settings.lower_bounds = theta_lower;
+        // algo_settings.upper_bounds = theta_upper;
+        //// turn-around for optimlib::lbfgs boundary bad behavior !!!
+        // algo_settings.lower_bounds = arma::max(arma::zeros(algo_settings.lower_bounds.n_elem), algo_settings.lower_bounds - 1E-3 * (algo_settings.upper_bounds - algo_settings.lower_bounds));
+        // algo_settings.upper_bounds = algo_settings.upper_bounds + 1E-1 * (algo_settings.upper_bounds - algo_settings.lower_bounds);
+        //
+        // bool bfgs_ok = optim::lbfgs(
+        //    gamma_tmp,
+        //    [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+        //      return fit_ofn(vals_inp, grad_out, nullptr, &okm_data);
+        //    },
+        //    nullptr,
+        //    algo_settings);
+  
+        lbfgsb::Optimizer optimizer{d};
+        optimizer.iprint = Optim::log_level-1;
+        optimizer.max_iter = Optim::max_iteration;
+        optimizer.pgtol = Optim::gradient_tolerance;
+        optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+        arma::ivec bounds_type{d, arma::fill::value(2)}; // means both upper & lower bounds
 
-      if (min_ofn_tmp < min_ofn) {
-        m_theta = 1 / arma::exp(gamma_tmp);
-        m_est_theta = true;
-        min_ofn = min_ofn_tmp;
-        m_T = std::move(okm_data.T);
-        m_M = std::move(okm_data.M);
-        m_z = std::move(okm_data.z);
-        m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.is_beta_estim;
-        m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.is_sigma2_estim;
+        auto result = optimizer.minimize(
+            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+                  return fit_ofn(vals_inp, &grad_out, nullptr, &okm_data);
+            },
+            gamma_tmp, 
+            theta_lower.memptr(), 
+            theta_upper.memptr(), 
+            bounds_type.memptr()
+            );
+        if (Optim::log_level>1) result.print();
+
+        // this last call of fit_ofn is to ensure that T and z are up-to-date with solution found.
+        double min_ofn_tmp
+            = fit_ofn(gamma_tmp,
+                      nullptr,
+                      nullptr,
+                      &okm_data); 
+  
+        if (min_ofn_tmp < min_ofn) {
+          m_theta = gamma_tmp;
+          if (Optim::reparametrize) 
+            m_theta = 1 / arma::exp(gamma_tmp);
+          m_est_theta = true;
+          min_ofn = min_ofn_tmp;
+          m_T = std::move(okm_data.T);
+          m_M = std::move(okm_data.M);
+          m_z = std::move(okm_data.z);
+          m_beta = std::move(okm_data.beta);
+          m_est_beta = parameters.is_beta_estim;
+          m_sigma2 = okm_data.sigma2;
+          m_est_sigma2 = parameters.is_sigma2_estim;
+        }
       }
-    }
-  } else
-    throw std::runtime_error("Not a suitable optim: " + optim);
+    } else if (optim.rfind("Newton", 0) == 0) {
+
+      Random::init();
+  
+      // FIXME parameters.has needs to implemtented (no use case in current code)
+      if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+        int multistart = 1;
+        try {
+          multistart = std::stoi(optim.substr(4));
+        } catch (std::invalid_argument) {
+          // let multistart = 1
+        }
+        theta0 = arma::repmat(trans(theta_lower), multistart, 1) + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+      } else {  // just use given theta(s) as starting values for multi-bfgs
+        theta0 = arma::mat(parameters.theta);
+      }
+  
+      // arma::cout << "theta0:" << theta0 << arma::endl;
+  
+      if (Optim::reparametrize)  {
+        arma::vec theta_lower_tmp = theta_lower;
+        theta_lower = -arma::log(theta_upper);
+        theta_upper = -arma::log(theta_lower_tmp);
+      }
+
+      double min_ofn = std::numeric_limits<double>::infinity();
+
+      for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+        arma::vec gamma_tmp = theta0.row(i).t();
+        if (Optim::reparametrize) 
+          gamma_tmp = -arma::log(theta0.row(i).t());
+
+        theta_lower = arma::min(gamma_tmp, theta_lower);
+        theta_upper = arma::max(gamma_tmp, theta_upper);
+
+        if (Optim::log_level>0) {
+          arma::cout << "Newton:" << arma::endl;
+          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
+          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
+          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+          arma::cout << "  start_point: " << gamma_tmp.t() << " ";
+          arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
+          arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
+        }
+
+        arma::mat T;
+        arma::mat M;
+        arma::colvec z;
+        arma::colvec beta;
+        if (parameters.has_beta)
+          beta = parameters.beta;
+        double sigma2 = -1;
+        if (parameters.has_sigma2)
+          sigma2 = parameters.sigma2;
+  
+        Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
+  
+        double min_ofn_tmp = optim_newton(
+            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
+              return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
+            },
+            gamma_tmp, theta_upper, theta_lower);
+
+        if (min_ofn_tmp < min_ofn) {
+          m_theta = gamma_tmp;
+          if (Optim::reparametrize) 
+            m_theta = 1 / arma::exp(gamma_tmp);
+          m_est_theta = true;
+          min_ofn = min_ofn_tmp;
+          m_T = std::move(okm_data.T);
+          m_M = std::move(okm_data.M);
+          m_z = std::move(okm_data.z);
+          m_beta = std::move(okm_data.beta);
+          m_est_beta = parameters.is_beta_estim;
+          m_sigma2 = okm_data.sigma2;
+          m_est_sigma2 = parameters.is_sigma2_estim;
+        }
+      }
+    } else
+      throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS*, Newton*)");
+  }
 
   if (!parameters.has_sigma2)
     m_sigma2 *= scaleY * scaleY;

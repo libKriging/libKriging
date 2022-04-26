@@ -8,6 +8,7 @@ add_library(Kriging
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         Trend.cpp include/libKriging/Trend.hpp
+        Optim.cpp include/libKriging/Optim.hpp
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
         Covariance.cpp include/libKriging/Covariance.hpp
