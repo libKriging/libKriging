@@ -122,7 +122,7 @@ library(rlibkriging)
 k_R <- Kriging(y, X, "gauss")
 print(k_R)
 # you can also check logLikelhood using:
-# ll = function(t) logLikelihoodFun(k_R,t)$logLikelihoodFun; plot(ll)
+# ll = function(t) logLikelihoodFun(k_R,t)$logLikelihood; plot(ll)
 x <- as.matrix(seq(0, 1, , 100))
 p <- predict(k_R, x, TRUE, FALSE)
 
