@@ -63,27 +63,22 @@ std::string PyNuggetKriging::summary() const {
   return m_internal->summary();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(
-    const py::array_t<double>& theta,
+std::tuple<double, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(
+    const py::array_t<double>& theta_alpha,
     const bool want_grad) {
-  arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, want_grad);
-  return {
-      llo,
-      carma::col_to_arr(grad),
-      // carma::mat_to_arr(hess)  // FIXME error in hessian transmission
-      {}  //
-  };
+  arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_alpha, want_grad);
+  return {llo, carma::col_to_arr(grad)};
 }
 
 double PyNuggetKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
-std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py::array_t<double>& theta,
+std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py::array_t<double>& theta_alpha,
                                                                         const bool want_grad) {
-  arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, want_grad);
+  arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta_alpha, want_grad);
   return {lmp, carma::col_to_arr(grad)};
 }
 
