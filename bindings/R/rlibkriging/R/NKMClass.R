@@ -168,10 +168,6 @@ NKM <- function(formula = ~1, design, response,
         stop("The formal args 'nugget' and 'noise.var' ",
              "can not be used for now.")
     }
-    if (!is.null(lower) || !is.null(upper)) {
-        stop("The formal args 'lower', 'upper' and 'parinit' ",
-             "can not be used for now.")
-    }
     if ((multistart != 1) || !is.null(control) || !gr || iso) {
          stop("The formal args 'multistart', 'control', 'gr' ",
               "and 'iso' can not be used for now.")
@@ -222,12 +218,27 @@ NKM <- function(formula = ~1, design, response,
     }
     if (length(parameters) == 0) parameters <- NULL
     
+    # DiceKriging standard bounds for theta
+    bounds_heuristic = optim_variogram_bounds_heuristic_used()
+    optim_use_variogram_bounds_heuristic(FALSE)
+    theta_lower_factor = optim_get_theta_lower_factor()
+    if (is.null(lower)) lower = 1E-10
+    optim_set_theta_lower_factor(lower)
+    if (is.null(upper)) upper = 2.0
+    theta_upper_factor = optim_get_theta_upper_factor()
+    optim_set_theta_upper_factor(upper)
+
     r <- rlibkriging::NuggetKriging(y = response, X = design, kernel = covtype,
                               regmodel = formula,
                               normalize = FALSE,
                               objective = estim.method, optim = optim.method,
                               parameters = parameters)
     
+    # Back to previous setup
+    optim_use_variogram_bounds_heuristic(bounds_heuristic)
+    optim_set_lower_theta_factor(theta_lower_factor)
+    optim_set_upper_theta_factor(theta_upper_factor)
+
     return(as.km.NuggetKriging(r, .call = match.call()))
 }
 
