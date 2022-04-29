@@ -168,8 +168,8 @@ KM <- function(formula = ~1, design, response,
         stop("The formal args 'nugget' and 'noise.var' ",
              "can not be used for now.")
     }
-    if ((multistart != 1) || !is.null(control) || !gr || iso) {
-         stop("The formal args 'multistart', 'control', 'gr' ",
+    if (!is.null(control) || !gr || iso) {
+         stop("The formal args'control', 'gr' ",
               "and 'iso' can not be used for now.")
     }
     if (scaling || !is.null(knots) || !is.null(kernel)) {
@@ -227,7 +227,7 @@ KM <- function(formula = ~1, design, response,
     r <- rlibkriging::Kriging(y = response, X = design, kernel = covtype,
                               regmodel = formula,
                               normalize = FALSE,
-                              objective = estim.method, optim = optim.method,
+                              objective = estim.method, optim = paste0(optim.method,multistart),
                               parameters = parameters)
     
     # Back to previous setup
