@@ -10,22 +10,42 @@
 
 bool Optim::reparametrize = true;
 
-LIBKRIGING_EXPORT void Optim::set_reparametrize(bool do_reparametrize) {
+LIBKRIGING_EXPORT void Optim::use_reparametrize(bool do_reparametrize) {
   Optim::reparametrize = do_reparametrize;
 };
 
-LIBKRIGING_EXPORT bool Optim::get_reparametrize() {
+LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
   return Optim::reparametrize;
 };
 
-double Optim::theta_lower_factor = 0.05;
+double Optim::theta_lower_factor = 1E-2;
 
-LIBKRIGING_EXPORT void Optim::set_theta_lower_factor_heuristic(double _theta_lower_factor) {
+LIBKRIGING_EXPORT void Optim::set_theta_lower_factor(double _theta_lower_factor) {
   Optim::theta_lower_factor = _theta_lower_factor;
 };
 
-LIBKRIGING_EXPORT double Optim::get_theta_lower_factor_heuristic() {
+LIBKRIGING_EXPORT double Optim::get_theta_lower_factor() {
   return Optim::theta_lower_factor;
+};
+
+double Optim::theta_upper_factor = 10.0;
+
+LIBKRIGING_EXPORT void Optim::set_theta_upper_factor(double _theta_upper_factor) {
+  Optim::theta_upper_factor = _theta_upper_factor;
+};
+
+LIBKRIGING_EXPORT double Optim::get_theta_upper_factor() {
+  return Optim::theta_upper_factor;
+};
+
+bool Optim::variogram_bounds_heuristic = true;
+
+LIBKRIGING_EXPORT void Optim::use_variogram_bounds_heuristic(bool _variogram_bounds_heuristic) {
+  Optim::variogram_bounds_heuristic = _variogram_bounds_heuristic;
+};
+
+LIBKRIGING_EXPORT bool Optim::variogram_bounds_heuristic_used() {
+  return Optim::variogram_bounds_heuristic;
 };
 
 int Optim::log_level = 0;

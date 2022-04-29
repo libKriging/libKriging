@@ -8,12 +8,20 @@
 class Optim {
  public:
   static bool reparametrize;
-  LIBKRIGING_EXPORT static void set_reparametrize(bool do_reparametrize);
-  LIBKRIGING_EXPORT static bool get_reparametrize();
+  LIBKRIGING_EXPORT static void use_reparametrize(bool do_reparametrize);
+  LIBKRIGING_EXPORT static bool is_reparametrized();
 
   static double theta_lower_factor;
-  LIBKRIGING_EXPORT static void set_theta_lower_factor_heuristic(double _theta_lower_factor);
-  LIBKRIGING_EXPORT static double get_theta_lower_factor_heuristic();
+  LIBKRIGING_EXPORT static void set_theta_lower_factor(double _theta_lower_factor);
+  LIBKRIGING_EXPORT static double get_theta_lower_factor();
+
+  static double theta_upper_factor;
+  LIBKRIGING_EXPORT static void set_theta_upper_factor(double _theta_upper_factor);
+  LIBKRIGING_EXPORT static double get_theta_upper_factor();
+
+  static bool variogram_bounds_heuristic;
+  LIBKRIGING_EXPORT static void use_variogram_bounds_heuristic(bool _variogram_bounds_heuristic);
+  LIBKRIGING_EXPORT static bool variogram_bounds_heuristic_used();
 
   static int log_level;
   LIBKRIGING_EXPORT static void log(int t);
