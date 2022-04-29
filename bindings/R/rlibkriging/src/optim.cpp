@@ -9,37 +9,67 @@
 
 //' @export
 // [[Rcpp::export]]
-bool optim_get_reparametrize() {
+bool optim_is_reparametrized() {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);
-  return impl_ptr->get_reparametrize();
+  return impl_ptr->is_reparametrized();
 }
 
 //' @export
 // [[Rcpp::export]]
-void optim_set_reparametrize(bool reparametrize) {
+void optim_use_reparametrize(bool reparametrize) {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);
-  impl_ptr->set_reparametrize(reparametrize);
-}
-
-
-//' @export
-// [[Rcpp::export]]
-double optim_get_theta_lower_factor_heuristic() {
-  Optim* la = new Optim();
-  Rcpp::XPtr<Optim> impl_ptr(la);
-  return impl_ptr->get_theta_lower_factor_heuristic();
+  impl_ptr->use_reparametrize(reparametrize);
 }
 
 //' @export
 // [[Rcpp::export]]
-void optim_set_theta_lower_factor_heuristic(double theta_lower_factor) {
+double optim_get_theta_lower_factor() {
   Optim* la = new Optim();
   Rcpp::XPtr<Optim> impl_ptr(la);
-  impl_ptr->set_theta_lower_factor_heuristic(theta_lower_factor);
+  return impl_ptr->get_theta_lower_factor();
 }
 
+//' @export
+// [[Rcpp::export]]
+void optim_set_theta_lower_factor(double theta_lower_factor) {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  impl_ptr->set_theta_lower_factor(theta_lower_factor);
+}
+
+//' @export
+// [[Rcpp::export]]
+double optim_get_theta_upper_factor() {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  return impl_ptr->get_theta_upper_factor();
+}
+
+//' @export
+// [[Rcpp::export]]
+void optim_set_theta_upper_factor(double theta_upper_factor) {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  impl_ptr->set_theta_upper_factor(theta_upper_factor);
+}
+
+//' @export
+// [[Rcpp::export]]
+bool optim_variogram_bounds_heuristic_used() {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  return impl_ptr->variogram_bounds_heuristic_used();
+}
+
+//' @export
+// [[Rcpp::export]]
+void optim_use_variogram_bounds_heuristic(bool variogram_bounds_heuristic) {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  impl_ptr->use_variogram_bounds_heuristic(variogram_bounds_heuristic);
+}
 
 //' @export
 // [[Rcpp::export]]
