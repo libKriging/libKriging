@@ -1,8 +1,8 @@
 library(testthat)
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#packageDescription("rlibkriging")
-rlibkriging:::linalg_set_num_nugget(1E-10)
-default_nugget = rlibkriging:::linalg_get_num_nugget()
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+packageDescription("rlibkriging")
+rlibkriging:::linalgset_num_nugget(1E-10)
+default_nugget = rlibkriging:::linalgget_num_nugget()
 
 #############################################################
 
@@ -31,8 +31,8 @@ try( cholR <- chol(R) ) # Should not fail
 
 test_that(desc="Kriging fit withOUT num nugget would also pass", expect_true(!is.null(cholR)))
 
-rlibkriging:::linalg_set_num_nugget(0.0)
-rlibkriging:::linalg_get_num_nugget()
+rlibkriging:::linalgset_num_nugget(0.0)
+rlibkriging:::linalgget_num_nugget()
 
 r_nonugget = NULL
 try( r_nonugget <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
@@ -46,7 +46,7 @@ try( cholR_nonugget <- chol(R_nonugget) ) # Should not fail
 
 test_that(desc="Kriging fit withOUT num nugget would also pass", expect_true(!is.null(cholR_nonugget)))
 
-rlibkriging:::linalg_set_num_nugget(default_nugget)
+rlibkriging:::linalgset_num_nugget(default_nugget)
 
 #############################################################
 
@@ -126,4 +126,4 @@ test_that(desc="Kriging fit withOUT num nugget would also pass", expect_true(!is
 test_that(desc="Kriging fit mith and without num nugget are identical", 
 expect_true(all(capture.output(print(r_nonugget)) == capture.output(print(r)))))
 
-rlibkriging:::linalg_set_num_nugget(default_nugget)
+rlibkriging:::linalgset_num_nugget(default_nugget)

@@ -41,13 +41,3 @@ regmodel2formula = function(regmodel) {
     return(~.^2)
   else stop("Unsupported regmodel ",regmodel)
 }
-
-as_numeric_matrix = function(x) {
-  if (is.matrix(x) & is.numeric(x))
-    return(x)
-  if (is.vector(x) & is.numeric(x))
-    return(matrix(x,nrow=1))
-  if (is.data.frame(x))
-    return(data.matrix(x))
-  stop(paste0("Data no convertible to numeric matrix: ", typeof(x)))
-}
