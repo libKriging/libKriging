@@ -96,7 +96,7 @@ if (requireNamespace("DiceKriging", quietly = TRUE))
 #' @param coef.var Optional value for a fixed variance. If given, no
 #'     optimization is done.
 #'
-#' @param nugget,nugget.estim,nugget.var Not implemented yet. 
+#' @param nugget,nugget.estim,noise.var Not implemented yet. 
 #'
 #' @param estim.method Estimation criterion. \code{"MLE"} for
 #'     Maximum-Likelihood or \code{"LOO"} for Leave-One-Out
@@ -143,7 +143,7 @@ if (requireNamespace("DiceKriging", quietly = TRUE))
 NKM <- function(formula = ~1, design, response,
                covtype = c("matern5_2", "gauss", "matern3_2", "exp"),
                coef.trend = NULL, coef.cov = NULL, coef.var = NULL,
-               nugget = NULL, nugget.estim = TRUE, nugget.var = NULL,
+               nugget = NULL, nugget.estim = TRUE, noise.var = NULL,
                estim.method = c("MLE", "LOO"), penalty = NULL,
                optim.method = "BFGS",
                lower = NULL, upper = NULL, parinit = NULL,
@@ -159,6 +159,14 @@ NKM <- function(formula = ~1, design, response,
     ## get rid of unimplemented formals.
     if (!is.null(penalty)) {
         stop("The formal arg 'penalty' can not be used for now.")
+    }
+    if (!nugget.estim) {
+        stop("The formal args 'nugget.estim=FALSE' ",
+             "can only be used with KM()")
+    }
+    if (!is.null(nugget) || !is.null(noise.var)) {
+        stop("The formal args 'nugget' and 'noise.var' ",
+             "can not be used for now.")
     }
     if (!is.null(lower) || !is.null(upper)) {
         stop("The formal args 'lower', 'upper' and 'parinit' ",
@@ -216,12 +224,11 @@ NKM <- function(formula = ~1, design, response,
     
     r <- rlibkriging::NuggetKriging(y = response, X = design, kernel = covtype,
                               regmodel = formula,
-                              normalize = FALSE, 
+                              normalize = FALSE,
                               objective = estim.method, optim = optim.method,
                               parameters = parameters)
     
     return(as.km.NuggetKriging(r, .call = match.call()))
-    
 }
 
 ## *****************************************************************************

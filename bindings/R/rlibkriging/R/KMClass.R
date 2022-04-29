@@ -10,6 +10,7 @@
 ## Register the S3 class "Kriging" to define the class of the @Kriging
 ## slot in a `KM` object
 setOldClass("Kriging")
+setOldClass("NuggetKriging")
 
 ## *****************************************************************************
 #' @title S4 class for Kriging Models Extending the \code{"km"} Class
@@ -96,7 +97,7 @@ if (requireNamespace("DiceKriging", quietly = TRUE))
 #' @param coef.var Optional value for a fixed variance. If given, no
 #'     optimization is done.
 #'
-#' @param nugget,nugget.estim,nugget.var Not implemented yet. 
+#' @param nugget,nugget.estim,noise.var Not implemented yet. 
 #'
 #' @param estim.method Estimation criterion. \code{"MLE"} for
 #'     Maximum-Likelihood or \code{"LOO"} for Leave-One-Out
@@ -142,7 +143,7 @@ if (requireNamespace("DiceKriging", quietly = TRUE))
 KM <- function(formula = ~1, design, response,
                covtype = c("matern5_2", "gauss", "matern3_2", "exp"),
                coef.trend = NULL, coef.cov = NULL, coef.var = NULL,
-               nugget = NULL, nugget.estim = FALSE, nugget.var = NULL,
+               nugget = NULL, nugget.estim = FALSE, noise.var = NULL,
                estim.method = c("MLE", "LOO"), penalty = NULL,
                optim.method = "BFGS",
                lower = NULL, upper = NULL, parinit = NULL,
@@ -159,8 +160,12 @@ KM <- function(formula = ~1, design, response,
     if (!is.null(penalty)) {
         stop("The formal arg 'penalty' can not be used for now.")
     }
-    if (!is.null(nugget) || nugget.estim || !is.null(nugget.var)) {
-        stop("The formal args 'nugget', 'nugget.estim' and 'nugget.var' ",
+    if (nugget.estim) {
+        stop("The formal args 'nugget.estim' ",
+             "can only be used with NKM()")
+    }
+    if (!is.null(nugget) || !is.null(noise.var)) {
+        stop("The formal args 'nugget' and 'noise.var' ",
              "can not be used for now.")
     }
     if (!is.null(lower) || !is.null(upper)) {
@@ -215,12 +220,11 @@ KM <- function(formula = ~1, design, response,
     
     r <- rlibkriging::Kriging(y = response, X = design, kernel = covtype,
                               regmodel = formula,
-                              normalize = FALSE, 
+                              normalize = FALSE,
                               objective = estim.method, optim = optim.method,
                               parameters = parameters)
     
     return(as.km.Kriging(r, .call = match.call()))
-    
 }
 
 ## *****************************************************************************
