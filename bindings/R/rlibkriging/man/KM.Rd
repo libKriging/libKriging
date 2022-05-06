@@ -14,7 +14,7 @@ KM(
   coef.var = NULL,
   nugget = NULL,
   nugget.estim = FALSE,
-  nugget.var = NULL,
+  noise.var = NULL,
   estim.method = c("MLE", "LOO"),
   penalty = NULL,
   optim.method = "BFGS",
@@ -51,7 +51,7 @@ value. If given, no optimization is done.}
 \item{coef.var}{Optional value for a fixed variance. If given, no
 optimization is done.}
 
-\item{nugget, nugget.estim, nugget.var}{Not implemented yet.}
+\item{nugget, nugget.estim, noise.var}{Not implemented yet.}
 
 \item{estim.method}{Estimation criterion. \code{"MLE"} for
 Maximum-Likelihood or \code{"LOO"} for Leave-One-Out
