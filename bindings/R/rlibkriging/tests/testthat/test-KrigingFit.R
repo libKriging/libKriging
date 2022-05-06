@@ -1,5 +1,8 @@
 library(testthat)
-library(rlibkriging)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#rlibkriging:::optim_log(2)
+#rlibkriging:::optim_use_reparametrize(FALSE)
+#rlibkriging:::optim_set_theta_lower_factor(0.02)
 
 context("Fit: 1D")
 
@@ -14,15 +17,15 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- Kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) logLikelihoodFun(r,x)$logLikelihood)
-plot(ll,xlim=c(0.000001,1))
-  for (x in seq(0.000001,1,,11)){
+plot(ll,xlim=c(0.000001,10))
+  for (x in seq(0.000001,10,,11)){
     envx = new.env()
     ll2x = logLikelihoodFun(r,x)$logLikelihood
     gll2x = logLikelihoodFun(r,x,grad = T)$logLikelihoodGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
 
-theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
+theta_ref = optimize(ll,interval=c(0.001,10),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
@@ -158,6 +161,12 @@ contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
 # use same startup point for convergence
 r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
              parameters=list(theta=matrix(k@parinit,ncol=2)))
+#mll2_fun <- function(x) -apply(x,1,
+#                              function(theta)
+#                                r$logLikelihoodFun(theta)$logLikelihood
+#)
+#contour(x,x,matrix(mll2_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
+
 l = as.list(r)
 
 save(list=ls(),file="fit-2d.Rdata")

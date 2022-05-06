@@ -1,6 +1,6 @@
-#install.packages("bindings/R/rlibkriging_0.3-2_R_x86_64-pc-linux-gnu.tar.gz")
-
 library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#rlibkriging:::optim_log(3)
 
 kernel="gauss"
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {

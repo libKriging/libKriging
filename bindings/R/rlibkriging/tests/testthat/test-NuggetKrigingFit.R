@@ -1,5 +1,6 @@
 library(testthat)
-library(rlibkriging)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#rlibkriging:::optim_log(3)
 
 context("Fit: 1D")
 
@@ -50,7 +51,8 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS10")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS20")
+#plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 l = as.list(r)
 
 save(list=ls(),file="fit-nugget-2d.Rdata")
