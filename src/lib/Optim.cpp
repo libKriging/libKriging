@@ -18,7 +18,7 @@ LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
   return Optim::reparametrize;
 };
 
-double Optim::theta_lower_factor = 1E-2;
+double Optim::theta_lower_factor = 0.02;
 
 LIBKRIGING_EXPORT void Optim::set_theta_lower_factor(double _theta_lower_factor) {
   Optim::theta_lower_factor = _theta_lower_factor;
