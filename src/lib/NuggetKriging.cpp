@@ -29,21 +29,21 @@
 void NuggetKriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_gauss;
-    Dln_CovNorm = Covariance::Dln_CovNorm_gauss;
-    CovNorm_pow = 2;
+    Cov = Covariance::Cov_gauss;
+    DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
+    Cov_pow = 2;
   } else if (covType.compare("exp") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_exp;
-    Dln_CovNorm = Covariance::Dln_CovNorm_exp;
-    CovNorm_pow = 1;
+    Cov = Covariance::Cov_exp;
+    DlnCovDtheta = Covariance::DlnCovDtheta_exp;
+    Cov_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern32;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern32;
-    // CovNorm_pow = 1.5;
+    Cov = Covariance::Cov_matern32;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
+    Cov_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern52;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern52;
-    // CovNorm_pow = 2.5;
+    Cov = Covariance::Cov_matern52;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
+    Cov_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
@@ -116,7 +116,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta) * _alpha;
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j) , _theta) * _alpha;
     }
   }
 
@@ -183,7 +183,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     arma::cube gradC = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradC.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradC.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j) , _theta);
       }
     }
 
@@ -195,7 +195,6 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
           gradC_k.at(i, j) = gradC_k.at(j, i) = gradC.slice(i).col(j)[k];
         }
       }
-      gradC_k /= _theta.at(k);
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
       term1.at(k)
@@ -305,7 +304,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta) * _alpha;
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j) , _theta) * _alpha;
     }
   }
 
@@ -401,7 +400,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradR.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j) , _theta);
       }
     }
 
@@ -414,7 +413,6 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
-      gradR_k /= _theta.at(k);
 
       Wb_k = trans(solve(
                  trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
@@ -940,7 +938,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
       if (arma::all(dij == 0))
         R_pred.at(i, j) = 1.0;  // m_sigma2 + m_nugget;
       else
-        R_pred.at(i, j) *= CovNorm_fun(dij / m_theta);
+        R_pred.at(i, j) *= Cov(dij , m_theta);
     }
   }
   arma::mat Tinv_pred = solve(m_T, R_pred, arma::solve_opts::fast);
@@ -973,7 +971,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
     for (arma::uword i = 0; i < m; i++) {
       R_predpred.at(i, i) = 1;
       for (arma::uword j = 0; j < i; j++) {
-        R_predpred.at(i, j) = R_predpred.at(j, i) *= CovNorm_fun((Xpnorm.col(i) - Xpnorm.col(j)) / m_theta);
+        R_predpred.at(i, j) = R_predpred.at(j, i) *= Cov((Xpnorm.col(i) - Xpnorm.col(j)) , m_theta);
       }
     }
     // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
@@ -1031,7 +1029,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < m; i++) {
     Sigma.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      Sigma.at(i, j) = Sigma.at(j, i) *= CovNorm_fun((Xpnorm.col(i) - Xpnorm.col(j)) / m_theta);
+      Sigma.at(i, j) = Sigma.at(j, i) *= Cov((Xpnorm.col(i) - Xpnorm.col(j)) , m_theta);
     }
   }
 
@@ -1045,7 +1043,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
       // if (arma::all(dij==0))
       //  Sigma21.at(i, j) = 1.0;//m_sigma2 + m_nugget;
       // else
-      Sigma21.at(i, j) = CovNorm_fun((Xtnorm.col(i) - Xpnorm.col(j)) / m_theta);
+      Sigma21.at(i, j) = Cov((Xtnorm.col(i) - Xpnorm.col(j)) , m_theta);
     }
   }
   Sigma21 *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
