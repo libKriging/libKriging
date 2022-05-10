@@ -30,21 +30,21 @@
 void Kriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_gauss;
-    Dln_CovNorm = Covariance::Dln_CovNorm_gauss;
-    CovNorm_pow = 2;
+    Cov = Covariance::Cov_gauss;
+    DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
+    Cov_pow = 2;
   } else if (covType.compare("exp") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_exp;
-    Dln_CovNorm = Covariance::Dln_CovNorm_exp;
-    CovNorm_pow = 1;
+    Cov = Covariance::Cov_exp;
+    DlnCovDtheta = Covariance::DlnCovDtheta_exp;
+    Cov_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern32;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern32;
-    // CovNorm_pow = 1.5;
+    Cov = Covariance::Cov_matern32;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
+    Cov_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern52;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern52;
-    // CovNorm_pow = 2.5;
+    Cov = Covariance::Cov_matern52;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
+    Cov_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
@@ -114,9 +114,9 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta);
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j) , _theta);
     }
-  }
+  }  
   // t0 = Bench::toc("Rvfast        ", t0);
 
   // Cholesky decompostion of covariance matrix
@@ -194,7 +194,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradR.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j) , _theta);
       }
     }
     // t0 = Bench::toc(" gradR              ", t0);
@@ -208,7 +208,6 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
-      gradR_k /= _theta.at(k);
       // t0 = Bench::toc(" gradR_k      ", t0);
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
@@ -251,9 +250,9 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
             for (arma::uword i = 0; i < n; i++) {
               hessR_k_l.at(i, i) = 0;
               for (arma::uword j = 0; j < i; j++) {
-                double dln_k = gradR.slice(i).col(j)[k] / _theta.at(k);
+                double dln_k = gradR.slice(i).col(j)[k];
                 hessR_k_l.at(i, j) = hessR_k_l.at(j, i)
-                    = dln_k * (dln_k / R.at(i, j) - (CovNorm_pow + 1) / _theta.at(k));
+                    = dln_k * (dln_k / R.at(i, j) - (Cov_pow + 1) / _theta.at(k));
                 // !! NO: it just work for exp type kernels. Matern MUST have a special treatment !!!
               }
             }
@@ -262,7 +261,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
               hessR_k_l.at(i, i) = 0;
               for (arma::uword j = 0; j < i; j++) {
                 hessR_k_l.at(i, j) = hessR_k_l.at(j, i)
-                    = gradR.slice(i).col(j)[k] / _theta.at(k) * gradR.slice(i).col(j)[l] / _theta.at(l) / R.at(i, j);
+                    = gradR.slice(i).col(j)[k] * gradR.slice(i).col(j)[l] / R.at(i, j);
               }
             }
           }
@@ -376,7 +375,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta);
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j) , _theta);
     }
   }
   // t0 = Bench::toc("R             ", t0);
@@ -437,7 +436,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradR.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j) , _theta);
       }
     }
     // t0 = Bench::toc(" gradR              ", t0);
@@ -451,7 +450,6 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
-      gradR_k /= _theta.at(k);
 
       arma::colvec diagdQ = -DiagABA(Q, gradR_k);
       // t0 = Bench::toc(" diagdQ       ", t0);
@@ -546,7 +544,7 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta);
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j) , _theta);
     }
   }
   // t0 = Bench::toc("R             ", t0);
@@ -659,7 +657,7 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradR.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j) , _theta);
       }
     }
     // t0 = Bench::toc(" gradR              ", t0);
@@ -674,7 +672,6 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
-      gradR_k /= _theta.at(k);
       // t0 = Bench::toc(" gradR_k", t0);
 
       Wb_k = trans(solve(
@@ -1326,7 +1323,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
   arma::mat R_pred = arma::mat(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
-      R_pred.at(i, j) = CovNorm_fun((Xtnorm.col(i) - Xpnorm.col(j)) / m_theta);
+      R_pred.at(i, j) = Cov((Xtnorm.col(i) - Xpnorm.col(j)) , m_theta);
     }
   }
 
@@ -1361,7 +1358,7 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     for (arma::uword i = 0; i < m; i++) {
       R_predpred.at(i, i) = 1;
       for (arma::uword j = 0; j < i; j++) {
-          R_predpred.at(i, j) = R_predpred.at(j, i) = CovNorm_fun((Xpnorm.col(i) - Xpnorm.col(j)) / m_theta);
+          R_predpred.at(i, j) = R_predpred.at(j, i) = Cov((Xpnorm.col(i) - Xpnorm.col(j)) , m_theta);
       }
     }
     // Need to compute matrices computed in withStd case
@@ -1414,7 +1411,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   for (arma::uword i = 0; i < m; i++) {
     Sigma.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      Sigma.at(i, j) = Sigma.at(j, i) = CovNorm_fun((Xpnorm.col(i) - Xpnorm.col(j)) / m_theta);
+      Sigma.at(i, j) = Sigma.at(j, i) = Cov((Xpnorm.col(i) - Xpnorm.col(j)) , m_theta);
     }
   }
   // t0 = Bench::toc("Sigma          ", t0);
@@ -1426,7 +1423,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat Sigma21(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
-      Sigma21.at(i, j) = CovNorm_fun((Xtnorm.col(i) - Xpnorm.col(j)) / m_theta);
+      Sigma21.at(i, j) = Cov((Xtnorm.col(i) - Xpnorm.col(j)) , m_theta);
     }
   }
   // t0 = Bench::toc("Sigma21        ", t0);

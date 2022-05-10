@@ -113,10 +113,9 @@ class NuggetKriging {
   bool m_est_sigma2;
   double m_nugget;
   bool m_est_nugget;
-  std::function<double(const arma::vec&)>
-      CovNorm_fun;  // dist_norm is L1 distance between to points of X, divided by theta
-  std::function<arma::vec(const arma::vec&)> Dln_CovNorm;
-  double CovNorm_pow;  // power factor used in hessian
+  std::function<double(const arma::vec&, const arma::vec&)> Cov;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
+  double Cov_pow;  // power factor used in hessian
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
