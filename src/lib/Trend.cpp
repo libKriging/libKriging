@@ -32,9 +32,9 @@ std::string Trend::toString(const Trend::RegressionModel& e) {
 }
 
 arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
-                                       const arma::mat& newXt) {
-  arma::uword n = newXt.n_cols;
-  arma::uword d = newXt.n_rows;
+                                       const arma::mat& newX) {
+  arma::uword n = newX.n_rows;
+  arma::uword d = newX.n_cols;
   arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
     case Trend::RegressionModel::Constant: {
@@ -47,7 +47,7 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
       F.set_size(n, 1 + d);
       F.col(0) = arma::ones(n, 1);
       for (arma::uword i = 0; i < d; i++) {
-        F.col(i + 1) = newXt.col(i);
+        F.col(i + 1) = newX.col(i);
       }
       return F;
     } break;
@@ -57,10 +57,10 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
       F.col(0) = arma::ones(n, 1);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
-        F.col(count) = newXt.col(i);
+        F.col(count) = newX.col(i);
         count += 1;
         for (arma::uword j = 0; j < i; j++) {
-          F.col(count) = newXt.col(i) % newXt.col(j);
+          F.col(count) = newX.col(i) % newX.col(j);
           count += 1;
         }
       }
@@ -72,10 +72,10 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
       F.col(0) = arma::ones(n, 1);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
-        F.col(count) = newXt.col(i);
+        F.col(count) = newX.col(i);
         count += 1;
         for (arma::uword j = 0; j <= i; j++) {
-          F.col(count) = newXt.col(i) % newXt.col(j);
+          F.col(count) = newX.col(i) % newX.col(j);
           count += 1;
         }
       }
