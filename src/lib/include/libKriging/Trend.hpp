@@ -15,9 +15,7 @@ class Trend {
   LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
 
   LIBKRIGING_EXPORT static arma::mat regressionModelMatrix(const RegressionModel& regmodel,
-                                                           const arma::mat& newX,
-                                                           arma::uword n,
-                                                           arma::uword d);
+                                                           const arma::mat& newXt);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_TREND_HPP
