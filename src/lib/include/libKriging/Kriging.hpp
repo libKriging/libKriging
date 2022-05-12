@@ -92,6 +92,7 @@ class Kriging {
 
   std::function<double(const arma::vec&, const arma::vec&)> Cov; 
   std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx;
   double Cov_pow;
   
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
@@ -161,9 +162,10 @@ class Kriging {
    * @param cov is true if return also cov matrix between Xp
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
-  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> predict(const arma::mat& Xp,
+  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& Xp,
                                                                               bool withStd,
-                                                                              bool withCov);
+                                                                              bool withCov,
+                                                                              bool withDeriv);
 
   /** Draw sample trajectories of kriging at given points X'
    * @param Xp is m*d matrix of points where to simulate output

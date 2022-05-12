@@ -32,18 +32,22 @@ void Kriging::make_Cov(const std::string& covType) {
   if (covType.compare("gauss") == 0) {
     Cov = Covariance::Cov_gauss;
     DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
+    DlnCovDx = Covariance::DlnCovDx_gauss;
     Cov_pow = 2;
   } else if (covType.compare("exp") == 0) {
     Cov = Covariance::Cov_exp;
     DlnCovDtheta = Covariance::DlnCovDtheta_exp;
+    DlnCovDx = Covariance::DlnCovDx_exp;
     Cov_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
     Cov = Covariance::Cov_matern32;
     DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
+    DlnCovDx = Covariance::DlnCovDx_matern32;
     Cov_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
     Cov = Covariance::Cov_matern52;
     DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
+    DlnCovDx = Covariance::DlnCovDx_matern52;
     Cov_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
@@ -986,7 +990,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
   // Define regression matrix
   m_regmodel = regmodel;
-  m_F = Trend::regressionModelMatrix(regmodel, m_X, n, d);
+  m_F = Trend::regressionModelMatrix(regmodel, m_X);
 
   arma::mat theta0 = parameters.theta;
   if (parameters.has_theta) {
@@ -1294,9 +1298,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
  * @param cov is true if return also cov matrix between Xp
  * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
  */
-LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::predict(const arma::mat& Xp,
+LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat, arma::mat, arma::mat> Kriging::predict(const arma::mat& Xp,
                                                                                      bool withStd,
-                                                                                     bool withCov) {
+                                                                                     bool withCov,
+                                                                                     bool withDeriv) {
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1304,10 +1309,10 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     throw std::runtime_error("Predict locations have wrong dimension: " + std::to_string(Xp.n_cols) + " instead of "+ std::to_string(d));
 
   arma::colvec pred_mean(m);
-  arma::colvec pred_stdev(m);
-  arma::mat pred_cov(m, m);
-  pred_stdev.zeros();
-  pred_cov.zeros();
+  arma::colvec pred_stdev = arma::zeros(m);
+  arma::mat pred_cov = arma::zeros(m, m);
+  arma::mat pred_mean_deriv = arma::zeros(m, d);
+  arma::mat pred_stdev_deriv = arma::zeros(m, d);
 
   arma::mat Xtnorm = trans(m_X); // already normalized if needed
   arma::mat Xpnorm = Xp;
@@ -1315,11 +1320,19 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
   Xpnorm.each_row() -= m_centerX;
   Xpnorm.each_row() /= m_scaleX;
 
+  /** @ref: https://github.com/cran/DiceKriging/blob/master/R/kmStruct.R#L191 */ 
+  // beta <- object@trend.coef
+
   // Define regression matrix
-  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
+  // F.newdata <- model.matrix(object@trend.formula, data = data.frame(newdata))
+  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm);
   Xpnorm = trans(Xpnorm);
 
   // Compute covariance between training data and new data to predict
+  // c.newdata <- covMat1Mat2(object@covariance, X1 = X, X2 = newdata,
+  //                          nugget.flag = object@covariance@nugget.flag)
+  // ## compute c(x) for x = newdata ; remark that for prediction (or filtering), cov(Yi, Yj)=0
+  // ## even if Yi and Yj are the outputs related to the equal points xi and xj. 
   arma::mat R_pred = arma::mat(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
@@ -1327,33 +1340,48 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
     }
   }
 
+  // Tinv.c.newdata <- backsolve(t(T), c.newdata, upper.tri=FALSE)
   arma::mat Tinv_pred = solve(m_T, R_pred, arma::solve_opts::fast);
+  // y.predict.trend <- F.newdata%*%beta
+  // y.predict.complement <- t(Tinv.c.newdata)%*%z
+  // y.predict <- y.predict.trend + y.predict.complement  
   pred_mean = F_p * m_beta + trans(Tinv_pred) * m_z;
   // Un-normalize predictor
   pred_mean = m_centerY + m_scaleY * pred_mean;
 
-  if (withStd) {
-    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
+  arma::mat s2_predict_mat;
+  arma::mat FinvMtM;
+  double total_sd2;
+  if (withStd | withCov) { // Will use chol(t(M)%*%M) in all these cases
+      total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
+      // Type = "UK"
+      // T.M <- chol(t(M)%*%M)
+      arma::mat TM = trans(chol(trans(m_M) * m_M)); // same that arma::qr_econ(Q, TM, m_M);
+      // s2.predict.mat <- backsolve(t(T.M), t(F.newdata - t(Tinv.c.newdata)%*%M) , upper.tri = FALSE)
+      s2_predict_mat = solve(TM, trans(F_p - trans(Tinv_pred) * m_M), arma::solve_opts::fast);
 
+      if (withDeriv) {
+        arma::mat m = trans(F_p - trans(Tinv_pred) * m_M);
+        arma::mat invMtM = inv_sympd(m_M.t() * m_M);
+        FinvMtM = (F_p - trans(Tinv_pred) * m_M) * inv_sympd(m_M.t() * m_M);
+      }
+  }
+
+  if (withStd) {
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
     arma::colvec s2_predict_1 = trans(sum(Tinv_pred % Tinv_pred, 0));
     s2_predict_1.transform([](double val) { return (val > 1.0 ? 1.0 : val); }); // constrain this first part to not be negative (rationale: it is the whole stdev for simple kriging)
-    // Type = "UK"
-    // T.M <- chol(t(M)%*%M)
-    arma::mat TM = trans(chol(trans(m_M) * m_M)); // same that arma::qr_econ(Q, TM, m_M);
-    // s2.predict.mat <- backsolve(t(T.M), t(F.newdata - t(Tinv.c.newdata)%*%M) , upper.tri = FALSE)
-    arma::mat s2_predict_mat = solve(TM, trans(F_p - trans(Tinv_pred) * m_M), arma::solve_opts::fast);
+
     // s2.predict.2 <- apply(s2.predict.mat, 2, crossprod)
     arma::colvec s2_predict_2 = trans(sum(s2_predict_mat % s2_predict_mat, 0));
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
+
     arma::mat s2_predict = total_sd2 * (1.0 - s2_predict_1 + s2_predict_2);
     s2_predict.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
   }  
   
   if (withCov) {
-    double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
-
     arma::mat R_predpred = arma::mat(m, m);
     for (arma::uword i = 0; i < m; i++) {
       R_predpred.at(i, i) = 1;
@@ -1361,13 +1389,65 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> Kriging::pre
           R_predpred.at(i, j) = R_predpred.at(j, i) = Cov((Xpnorm.col(i) - Xpnorm.col(j)) , m_theta);
       }
     }
-    // Need to compute matrices computed in withStd case
-    arma::mat TM = trans(chol(trans(m_M) * m_M));
-    arma::mat s2_predict_mat = solve(TM, trans(F_p - trans(Tinv_pred) * m_M), arma::solve_opts::fast);
+
     pred_cov = total_sd2 * (R_predpred - trans(Tinv_pred) * Tinv_pred + trans(s2_predict_mat) * s2_predict_mat);
   }
 
-  return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
+  if (withDeriv) {
+    /** @ref: https://github.com/cran/DiceOptim/blob/master/R/EI.grad.R#L156 */
+    // # Compute derivatives of the covariance and trend functions
+    for (arma::uword i = 0; i < m; i++) { // for each Xp predict point... should be parallel ?
+
+      // dc <- covVector.dx(x=newdata.num, X=X, object=covStruct, c=c)  
+      arma::mat dc = arma::mat(n, d); 
+      for (arma::uword j = 0; j < n; j++) {
+        dc.row(j) = R_pred.at(j,i) * trans(DlnCovDx(Xpnorm.col(i) - Xtnorm.col(j) , m_theta));
+      }
+
+      //f.deltax <- trend.deltax(x=newdata.num, model=model)
+      /** @ref: https://github.com/cran/DiceKriging/blob/master/R/trend.deltax.R#L69 */
+      // // A <- matrix(x, nrow=d, ncol=d, byrow=TRUE)
+      // // Apos <- A+h*diag(d)
+      // // Aneg <- A-h*diag(d)
+      // // newpoints <- data.frame(rbind(Apos, Aneg))
+      // // f.newdata <- model.matrix(model@trend.formula, data = newpoints)
+      // // f.deltax <- (f.newdata[1:d,]-f.newdata[(d+1):(2*d),])/(2*h)
+      const double h = 1.0E-5; // Value is sensitive only for non linear trends. Otherwise, it gives exact results.
+      arma::mat tXpn_i_repd = arma::trans( Xpnorm.col(i) * arma::ones(1,d)); // just duplicate Xp.row(i) d times
+  
+      arma::mat F_dx = 
+        (Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd + h * arma::eye(d,d)) 
+        - 
+        Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd - h * arma::eye(d,d))) / (2*h);
+
+      //# Compute gradients of the kriging mean and variance
+      //W <- backsolve(t(T), dc, upper.tri=FALSE)
+      arma::mat W = solve(m_T, dc, LinearAlgebra::default_solve_opts);
+
+      //kriging.mean.grad <- t(W)%*%z + t(model@trend.coef%*%f.deltax)
+      pred_mean_deriv.row(i) = trans(F_dx * m_beta + trans(W) * m_z);
+
+      //...
+      // F.newdata <- model.matrix(model@trend.formula, data=newdata)
+      // v <- predx$Tinv.c
+      // c <- predx$c
+      // ...
+      //  if (type=="UK")
+      //  { tuuinv <- solve(t(u)%*%u)
+      //  kriging.sd2.grad <-  t( -2*t(v)%*%W +
+      //                            2*(F.newdata - t(v)%*%u )%*% tuuinv %*%
+      //                            (f.deltax - t(t(W)%*%u) ))
+      //  kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
+      if (withStd) {
+        arma::mat pred_stdev_deriv_noTrend = Tinv_pred.t() * W;
+        pred_stdev_deriv.row(i) = (-pred_stdev_deriv_noTrend.row(i) + FinvMtM.row(i) * (F_dx.t() - trans(m_M) * W)) * total_sd2/pred_stdev.at(i);
+      }
+    }
+    pred_mean_deriv *= m_scaleY;
+    pred_stdev_deriv *= m_scaleY;
+  }
+
+  return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov), std::move(pred_mean_deriv), std::move(pred_stdev_deriv));
   /*if (withStd)
     if (withCov)
       return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
@@ -1398,7 +1478,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   Xpnorm.each_row() /= m_scaleX;
 
   // Define regression matrix
-  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
+  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm);
   Xpnorm = trans(Xpnorm);
   // t0 = Bench::toc("Xpnorm         ", t0);
 
