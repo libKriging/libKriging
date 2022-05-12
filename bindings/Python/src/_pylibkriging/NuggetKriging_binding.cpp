@@ -39,12 +39,16 @@ void PyNuggetKriging::fit(const py::array_t<double>& y,
   m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
 }
 
-std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyNuggetKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov) {
+std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
+PyNuggetKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  auto [y_predict, y_stderr, y_cov] = m_internal->predict(mat_X, withStd, withCov);
-  return std::make_tuple(
-      carma::col_to_arr(y_predict, true), carma::col_to_arr(y_stderr, true), carma::mat_to_arr(y_cov, true));
+  auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv] = m_internal->predict(mat_X, withStd, withCov, withDeriv);
+    return std::make_tuple(
+      carma::col_to_arr(y_predict, true), 
+      carma::col_to_arr(y_stderr, true), 
+      carma::mat_to_arr(y_cov, true), 
+      carma::mat_to_arr(y_mean_deriv, true), 
+      carma::mat_to_arr(y_stderr_deriv, true));
 }
 
 py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp) {

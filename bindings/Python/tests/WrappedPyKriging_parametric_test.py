@@ -17,7 +17,7 @@ def test_kriging_f_order(n, m):
 
     rl = lk.WrappedPyKriging(y, X, "gauss")
 
-    y_pred, _stderr, _cov = rl.predict(X, True, True)
+    y_pred, _stderr, _cov, mean_deriv, stderr_deriv = rl.predict(X, True, True, True)
 
 
 # @pytest.mark.skip(reason="Needs to be stabilized; got runtime error: chol(): decomposition failed")
@@ -31,4 +31,4 @@ def test_kriging_c_order(n, m):
 
     rl = lk.WrappedPyKriging(y, X, "gauss")
 
-    y_pred, _stderr, _cov = rl.predict(X, True, True)
+    y_pred, _stderr, _cov, mean_deriv, stderr_deriv = rl.predict(X, True, True, True)

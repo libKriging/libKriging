@@ -106,7 +106,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
 r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
 l = as.list(r)
 
-save(list=ls(),file="fit-2d-multistart.Rdata")
+# save(list=ls(),file="fit-2d-multistart.Rdata")
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));
@@ -169,7 +169,7 @@ r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
 
 l = as.list(r)
 
-save(list=ls(),file="fit-2d.Rdata")
+# save(list=ls(),file="fit-2d.Rdata")
 
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
@@ -199,7 +199,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- Kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
 l = as.list(r)
 
-save(list=ls(),file="fit-2d-not01.Rdata")
+# save(list=ls(),file="fit-2d-not01.Rdata")
 
 ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));

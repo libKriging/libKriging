@@ -37,9 +37,10 @@ class PyNuggetKriging {
   // see
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
-  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X,
+  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X,
                                                                                     bool withStd,
-                                                                                    bool withCov);
+                                                                                    bool withCov,
+                                                                                    bool withDeriv);
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
 

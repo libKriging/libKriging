@@ -15,7 +15,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- NuggetKriging(y, X, "gauss", optim = "BFGS10")
 l = as.list(r)
 
-save(list=ls(),file="fit-nugget-1d.Rdata")
+# save(list=ls(),file="fit-nugget-1d.Rdata")
 
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
@@ -55,7 +55,7 @@ r <- NuggetKriging(y, X, "gauss", optim = "BFGS20")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 l = as.list(r)
 
-save(list=ls(),file="fit-nugget-2d.Rdata")
+# save(list=ls(),file="fit-nugget-2d.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
@@ -116,7 +116,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
 r <- NuggetKriging(y, X, "gauss", parameters=list(theta=parinit))
 l = as.list(r)
 
-save(list=ls(),file="fit-nugget-multistart.Rdata")
+# save(list=ls(),file="fit-nugget-multistart.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
@@ -167,7 +167,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- NuggetKriging(y, X, "gauss",, optim = "BFGS10")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
 l = as.list(r)
 
-save(list=ls(),file="fit-nugget-2d-not01.Rdata")
+# save(list=ls(),file="fit-nugget-2d-not01.Rdata")
 
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
