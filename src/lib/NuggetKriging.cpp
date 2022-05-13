@@ -959,7 +959,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
+LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX) {
   // rebuild starting parameters
   Parameters parameters{arma::vec(1, arma::fill::value(this->m_nugget)),
                         true,
@@ -975,6 +975,7 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
+  bool normalize = (m_centerY == 0.0 && m_scaleY == 1) && (m_centerX.is_zero() && m_scaleX.is_zero());
   this->fit(
       arma::join_cols(m_y, newy), arma::join_cols(m_X, newX), m_regmodel, normalize, m_optim, m_objective, parameters);
 }

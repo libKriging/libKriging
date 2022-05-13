@@ -53,10 +53,10 @@ py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, co
   return carma::mat_to_arr(result, true);
 }
 
-void PyNuggetKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX, bool normalize) {
+void PyNuggetKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX) {
   arma::mat mat_y = carma::arr_to_col<double>(newy);
   arma::mat mat_X = carma::arr_to_mat<double>(newX);
-  m_internal->update(mat_y, mat_X, normalize);
+  m_internal->update(mat_y, mat_X);
 }
 
 std::string PyNuggetKriging::summary() const {

@@ -60,5 +60,5 @@ end
 Xn = [0.3;0.4];
 yn = f(Xn);
 disp(k_m.summary());
-k_m.update(yn, Xn, false)
+k_m.update(yn, Xn)
 disp(k_m.summary());

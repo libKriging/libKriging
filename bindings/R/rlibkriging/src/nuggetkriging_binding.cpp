@@ -204,14 +204,14 @@ arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) 
 }
 
 // [[Rcpp::export]]
-void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool normalize = false) {
+void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  impl_ptr->update(y, X, normalize);
+  impl_ptr->update(y, X);
 
   // Rcpp::List obj;
   // obj.attr("object") = impl_ptr;
