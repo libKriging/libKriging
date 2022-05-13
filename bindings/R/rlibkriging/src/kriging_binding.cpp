@@ -182,14 +182,14 @@ arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
 }
 
 // [[Rcpp::export]]
-void kriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool normalize = false) {
+void kriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  impl_ptr->update(y, X, normalize);
+  impl_ptr->update(y, X);
 
   // Rcpp::List obj;
   // obj.attr("object") = impl_ptr;

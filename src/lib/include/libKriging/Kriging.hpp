@@ -177,10 +177,8 @@ class Kriging {
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output
    * @param newX is m*d matrix of new input
-   * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
-   * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX, bool normalize);
+  LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
 };

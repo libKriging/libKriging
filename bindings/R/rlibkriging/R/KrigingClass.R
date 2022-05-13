@@ -416,9 +416,6 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #'
 #' @param newX Numeric matrix of new input points.
 #' 
-#' @param normalize Logical. If \code{TRUE}, the input \code{X} and
-#'     the output \code{y} are normalized to lie in \eqn{[0, 1]}.
-#'
 #' @param ... Ignored.
 #' 
 #' @section Caution: The method \emph{does not return the updated
@@ -457,7 +454,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' lines(x, p2_x$mean - 2 * p2_x$stdev, col = "red")
 #' lines(x, p2_x$mean + 2 * p2_x$stdev, col = "red")
 #' 
-update.Kriging <- function(object, newy, newX, normalize = FALSE, ...) {
+update.Kriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object) 
@@ -470,7 +467,7 @@ update.Kriging <- function(object, newy, newX, normalize = FALSE, ...) {
         stop("Objects 'newX' and 'newy' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    kriging_update(object, newy, newX, normalize = normalize)
+    kriging_update(object, newy, newX)
     
     invisible(NULL)
     
