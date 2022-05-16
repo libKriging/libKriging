@@ -19,6 +19,7 @@ add_library(Kriging
         Bench.cpp include/libKriging/Bench.hpp
         CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
         include/libKriging/utils/LinearHashStorage.hpp
+        include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/version.hpp ${VERSION_FILE})
 
 if (CXX_CLANG_TIDY)

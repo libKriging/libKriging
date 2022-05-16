@@ -15,6 +15,7 @@
 #include "libKriging/Random.hpp"
 #include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/NuggetKriging.hpp"
+#include "libKriging/utils/data_from_arma_vec.hpp"
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
