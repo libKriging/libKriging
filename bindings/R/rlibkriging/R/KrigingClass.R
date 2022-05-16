@@ -223,9 +223,9 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
     
     model@gr <- FALSE
     
-    model@T <- m$T
-    model@z <- as.numeric(m$z)
-    model@M <- m$M
+    model@T <- t(m$T) * sqrt(m$sigma2)
+    model@z <- as.numeric(m$z) / sqrt(m$sigma2)
+    model@M <- m$M / sqrt(m$sigma2)
     
     covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel, 
                       sd2 = m$sigma2, var.names = names(data), 
