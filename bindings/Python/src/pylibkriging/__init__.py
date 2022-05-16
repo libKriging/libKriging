@@ -27,6 +27,6 @@ from _pylibkriging import *
 from _pylibkriging import __version__, __build_type__
 
 # Type alias to switch to the right binding
-Kriging = PyKriging
+Kriging = WrappedPyKriging
 NuggetKriging = PyNuggetKriging
 LinearRegression = PyLinearRegression
