@@ -107,11 +107,11 @@ py::array_t<double> PyNuggetKriging::X() {
 }
 
 py::array_t<double> PyNuggetKriging::centerX() {
-  return carma::col_to_arr(m_internal->centerX());
+  return carma::col_to_arr(m_internal->centerX().t());
 }
 
 py::array_t<double> PyNuggetKriging::scaleX() {
-  return carma::col_to_arr(m_internal->scaleX());
+  return carma::col_to_arr(m_internal->scaleX().t());
 }
 
 py::array_t<double> PyNuggetKriging::y() {
