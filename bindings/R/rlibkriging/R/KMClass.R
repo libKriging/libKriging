@@ -10,7 +10,6 @@
 ## Register the S3 class "Kriging" to define the class of the @Kriging
 ## slot in a `KM` object
 setOldClass("Kriging")
-setOldClass("NuggetKriging")
 
 ## *****************************************************************************
 #' @title S4 class for Kriging Models Extending the \code{"km"} Class
