@@ -121,11 +121,11 @@ py::array_t<double> PyKriging::X() {
 }
 
 py::array_t<double> PyKriging::centerX() {
-  return carma::col_to_arr(m_internal->centerX().t());
+  return carma::row_to_arr(m_internal->centerX());
 }
 
 py::array_t<double> PyKriging::scaleX() {
-  return carma::col_to_arr(m_internal->scaleX().t());
+  return carma::row_to_arr(m_internal->scaleX());
 }
 
 py::array_t<double> PyKriging::y() {
