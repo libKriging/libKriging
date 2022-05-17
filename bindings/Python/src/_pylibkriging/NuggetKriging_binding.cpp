@@ -89,3 +89,91 @@ std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py
 double PyNuggetKriging::logMargPost() {
   return m_internal->logMargPost();
 }
+
+std::string PyNuggetKriging::kernel() {
+  return m_internal->kernel();
+}
+
+std::string PyNuggetKriging::optim() {
+  return m_internal->optim();
+}
+
+std::string PyNuggetKriging::objective() {
+  return m_internal->objective();
+}
+
+py::array_t<double> PyNuggetKriging::X() {
+  return carma::mat_to_arr(m_internal->X(), true);
+}
+
+py::array_t<double> PyNuggetKriging::centerX() {
+  return carma::col_to_arr(m_internal->centerX(), true);
+}
+
+py::array_t<double> PyNuggetKriging::scaleX() {
+  return carma::col_to_arr(m_internal->scaleX(), true);
+}
+
+py::array_t<double> PyNuggetKriging::y() {
+  return carma::col_to_arr(m_internal->y(), true);
+}
+
+double PyNuggetKriging::centerY() {
+  return m_internal->centerY();
+}
+
+double PyNuggetKriging::scaleY() {
+  return m_internal->scaleY();
+}
+
+std::string PyNuggetKriging::regmodel() {
+  return Trend::toString(m_internal->regmodel());
+}
+
+py::array_t<double> PyNuggetKriging::F() {
+  return carma::mat_to_arr(m_internal->F(), true);
+}
+
+py::array_t<double> PyNuggetKriging::T() {
+  return carma::mat_to_arr(m_internal->T(), true);
+}
+
+py::array_t<double> PyNuggetKriging::M() {
+  return carma::mat_to_arr(m_internal->M(), true);
+}
+
+py::array_t<double> PyNuggetKriging::z() {
+  return carma::col_to_arr(m_internal->z(), true);
+}
+
+py::array_t<double> PyNuggetKriging::beta() {
+  return carma::col_to_arr(m_internal->beta(), true);
+}
+
+bool PyNuggetKriging::is_beta_estim() {
+  return m_internal->is_beta_estim();
+}
+
+py::array_t<double> PyNuggetKriging::theta() {
+  return carma::col_to_arr(m_internal->theta(), true);
+}
+
+bool PyNuggetKriging::is_theta_estim() {
+  return m_internal->is_theta_estim();
+}
+
+double PyNuggetKriging::sigma2() {
+  return m_internal->sigma2();
+}
+
+bool PyNuggetKriging::is_sigma2_estim() {
+  return m_internal->is_sigma2_estim();
+}
+
+double PyNuggetKriging::nugget() {
+  return m_internal->nugget();
+}
+
+bool PyNuggetKriging::is_nugget_estim() {
+  return m_internal->is_nugget_estim();
+}

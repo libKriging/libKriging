@@ -103,3 +103,83 @@ std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::arra
 double PyKriging::logMargPost() {
   return m_internal->logMargPost();
 }
+
+std::string PyKriging::kernel() {
+  return m_internal->kernel();
+}
+
+std::string PyKriging::optim() {
+  return m_internal->optim();
+}
+
+std::string PyKriging::objective() {
+  return m_internal->objective();
+}
+
+py::array_t<double> PyKriging::X() {
+  return carma::mat_to_arr(m_internal->X(), true);
+}
+
+py::array_t<double> PyKriging::centerX() {
+  return carma::col_to_arr(m_internal->centerX(), true);
+}
+
+py::array_t<double> PyKriging::scaleX() {
+  return carma::col_to_arr(m_internal->scaleX(), true);
+}
+
+py::array_t<double> PyKriging::y() {
+  return carma::col_to_arr(m_internal->y(), true);
+}
+
+double PyKriging::centerY() {
+  return m_internal->centerY();
+}
+
+double PyKriging::scaleY() {
+  return m_internal->scaleY();
+}
+
+std::string PyKriging::regmodel() {
+  return Trend::toString(m_internal->regmodel());
+}
+
+py::array_t<double> PyKriging::F() {
+  return carma::mat_to_arr(m_internal->F(), true);
+}
+
+py::array_t<double> PyKriging::T() {
+  return carma::mat_to_arr(m_internal->T(), true);
+}
+
+py::array_t<double> PyKriging::M() {
+  return carma::mat_to_arr(m_internal->M(), true);
+}
+
+py::array_t<double> PyKriging::z() {
+  return carma::col_to_arr(m_internal->z(), true);
+}
+
+py::array_t<double> PyKriging::beta() {
+  return carma::col_to_arr(m_internal->beta(), true);
+}
+
+bool PyKriging::is_beta_estim() {
+  return m_internal->is_beta_estim();
+}
+
+py::array_t<double> PyKriging::theta() {
+  return carma::col_to_arr(m_internal->theta(), true);
+}
+
+bool PyKriging::is_theta_estim() {
+  return m_internal->is_theta_estim();
+}
+
+double PyKriging::sigma2() {
+  return m_internal->sigma2();
+}
+
+bool PyKriging::is_sigma2_estim() {
+  return m_internal->is_sigma2_estim();
+}
