@@ -1,7 +1,7 @@
 library(testthat)
 
 # install.packages("../rlib0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
-library(rlibkriging)
+#library(rlibkriging)
 
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)

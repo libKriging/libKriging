@@ -1,5 +1,5 @@
 library(testthat)
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   context(paste0("Check predict 1D for kernel ",kernel))
