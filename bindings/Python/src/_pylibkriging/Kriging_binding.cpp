@@ -117,19 +117,19 @@ std::string PyKriging::objective() {
 }
 
 py::array_t<double> PyKriging::X() {
-  return carma::mat_to_arr(m_internal->X(), true);
+  return carma::mat_to_arr(m_internal->X());
 }
 
 py::array_t<double> PyKriging::centerX() {
-  return carma::col_to_arr(m_internal->centerX(), true);
+  return carma::col_to_arr(m_internal->centerX());
 }
 
 py::array_t<double> PyKriging::scaleX() {
-  return carma::col_to_arr(m_internal->scaleX(), true);
+  return carma::col_to_arr(m_internal->scaleX());
 }
 
 py::array_t<double> PyKriging::y() {
-  return carma::col_to_arr(m_internal->y(), true);
+  return carma::col_to_arr(m_internal->y());
 }
 
 double PyKriging::centerY() {
@@ -145,23 +145,23 @@ std::string PyKriging::regmodel() {
 }
 
 py::array_t<double> PyKriging::F() {
-  return carma::mat_to_arr(m_internal->F(), true);
+  return carma::mat_to_arr(m_internal->F());
 }
 
 py::array_t<double> PyKriging::T() {
-  return carma::mat_to_arr(m_internal->T(), true);
+  return carma::mat_to_arr(m_internal->T());
 }
 
 py::array_t<double> PyKriging::M() {
-  return carma::mat_to_arr(m_internal->M(), true);
+  return carma::mat_to_arr(m_internal->M());
 }
 
 py::array_t<double> PyKriging::z() {
-  return carma::col_to_arr(m_internal->z(), true);
+  return carma::col_to_arr(m_internal->z());
 }
 
 py::array_t<double> PyKriging::beta() {
-  return carma::col_to_arr(m_internal->beta(), true);
+  return carma::col_to_arr(m_internal->beta());
 }
 
 bool PyKriging::is_beta_estim() {
@@ -169,7 +169,7 @@ bool PyKriging::is_beta_estim() {
 }
 
 py::array_t<double> PyKriging::theta() {
-  return carma::col_to_arr(m_internal->theta(), true);
+  return carma::col_to_arr(m_internal->theta());
 }
 
 bool PyKriging::is_theta_estim() {
