@@ -11,7 +11,7 @@ build: ./Rlibs/.prepared
 	mkdir -p ./Rlibs
 	## --no-multiarch is only usefull for windows with visual studio mode
 	export R_LIBS=$(PWD)/Rlibs && Rscript -e "Rcpp::compileAttributes(pkgdir = 'rlibkriging', verbose = TRUE)"
-	export R_LIBS=$(PWD)/Rlibs && Rscript -e "roxygen2::roxygenise(package.dir = 'rlibkriging')"
+	# export R_LIBS=$(PWD)/Rlibs && Rscript -e "roxygen2::roxygenise(package.dir = 'rlibkriging')"
 	export R_LIBS=$(PWD)/Rlibs && R CMD INSTALL --no-multiarch -l ./Rlibs --build rlibkriging
 	uname -a > ./Rlibs/rlibkriging/.installed
 	date >> ./Rlibs/rlibkriging/.installed
