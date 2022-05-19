@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-BASEDIR=$(cd $(dirname "$0") ; pwd -P)
-test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 if [[ "$DEBUG_CI" == "true" ]]; then
   CTEST_FLAGS="--verbose --output-on-failure"

@@ -5,8 +5,9 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-BASEDIR=$(cd $(dirname "$0") ; pwd -P)
-test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 "${BASEDIR}"/../windows/install.sh
 

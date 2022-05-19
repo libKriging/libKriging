@@ -15,8 +15,9 @@ export ENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING:-auto}
 export ENABLE_MATLAB_BINDING=${ENABLE_MATLAB_BINDING:-auto}
 export ENABLE_PYTHON_BINDING=${ENABLE_PYTHON_BINDING:-auto}
 
-BASEDIR=$(cd $(dirname "$0") ; pwd -P)
-test -f ${BASEDIR}/loadenv.sh && . ${BASEDIR}/loadenv.sh 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
