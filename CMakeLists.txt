@@ -168,6 +168,7 @@ add_definitions(-DOPTIM_ENABLE_ARMA_WRAPPERS)
 include(cmake/installOptimLibHeaders.cmake)
 include_directories(SYSTEM ${CMAKE_BINARY_DIR}/dependencies/optim/header_only_version)
 
+add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 add_subdirectory(dependencies/lbfgsb_cpp)
 
 #------------------------------------------------------
