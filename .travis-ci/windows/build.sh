@@ -30,8 +30,8 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 # export EXTRA_SYSTEM_LIBRARY_PATH="C:/Program Files/MATLAB/R2022a/extern/lib/win64/microsoft"
 # EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBLAS_NAMES=libmwblas -DLAPACK_NAMES=libmwlapack"
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR:-build}
+cd ${BUILD_DIR:-build}
 cmake \
   -DCMAKE_Fortran_COMPILER=$(command -v gfortran) \
   -DCMAKE_GENERATOR_PLATFORM=x64 \

@@ -14,7 +14,7 @@ if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
 
-export LIBKRIGING_PATH=${PWD}/build/installed
+export LIBKRIGING_PATH=${PWD}/${BUILD_DIR:-build}/installed
 export PATH=${LIBKRIGING_PATH}/bin:${PATH}
 
 cd bindings/R

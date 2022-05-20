@@ -19,7 +19,7 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     travis_terminate 1
 fi
 
-cd build
+cd ${BUILD_DIR:-build}
 
 # Cleanup compiled libs to check right path finding
 rm -fr src/lib

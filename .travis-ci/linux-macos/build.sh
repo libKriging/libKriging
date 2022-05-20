@@ -51,8 +51,8 @@ case "$COMPILER" in
     ;;
 esac
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR:-build}
+cd ${BUILD_DIR:-build}
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="${MODE}" \

@@ -25,7 +25,7 @@ if [ -z "${GIT_TAG}" ]; then
 fi
 echo "Release tag '${GIT_TAG}' in branch '$(git branch --show-current)'"
 
-PREFIX=build/bindings/Octave
+PREFIX=${BUILD_DIR:-build}/bindings/Octave
 
 PACKAGE_DIR=octave-package
 [ -d "${PACKAGE_DIR}" ] && rm -fr "${PACKAGE_DIR}"
@@ -49,4 +49,4 @@ case $ARCH in
 esac
 
 RELEASE_FILE="${PACKAGE_DIR}"/mLibKriging_${GIT_TAG#v}_${ARCHZ}.tgz
-tar czvf "${RELEASE_FILE}" -C build/installed/bindings/Octave .
+tar czvf "${RELEASE_FILE}" -C ${BUILD_DIR:-build}/installed/bindings/Octave .

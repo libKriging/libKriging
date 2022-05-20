@@ -32,7 +32,7 @@ BUILD_TEST=false \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} ${EXTRA_CMAKE_OPTIONS}" \
     "${BASEDIR}"/../linux-macos/build.sh
 
-export LIBKRIGING_PATH=${PWD}/build/installed
+export LIBKRIGING_PATH=${PWD}/${BUILD_DIR:-build}/installed
 
 NPROC=1
 if ( command -v nproc >/dev/null 2>&1 ); then
