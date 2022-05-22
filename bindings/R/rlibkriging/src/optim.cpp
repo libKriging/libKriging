@@ -79,7 +79,6 @@ void optim_log(int l) {
   impl_ptr->log(l);
 }
 
-
 //' @export
 // [[Rcpp::export]]
 int optim_get_max_iteration() {
@@ -96,7 +95,6 @@ void optim_set_max_iteration(int max_iteration) {
   impl_ptr->set_max_iteration(max_iteration);
 }
 
-
 //' @export
 // [[Rcpp::export]]
 double optim_get_gradient_tolerance() {
@@ -112,7 +110,6 @@ void optim_set_gradient_tolerance(double gradient_tolerance) {
   Rcpp::XPtr<Optim> impl_ptr(la);
   impl_ptr->set_gradient_tolerance(gradient_tolerance);
 }
-
 
 //' @export
 // [[Rcpp::export]]

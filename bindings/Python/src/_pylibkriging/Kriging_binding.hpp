@@ -37,10 +37,8 @@ class PyKriging {
   // see
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
-  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X,
-                                                                                    bool withStd,
-                                                                                    bool withCov,
-                                                                                    bool withDeriv);
+  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
+  predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv);
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
 
@@ -69,7 +67,7 @@ class PyKriging {
   py::array_t<double> y();
   double centerY();
   double scaleY();
-  std::string regmodel(); //Trend::toString(km->regmodel())
+  std::string regmodel();  // Trend::toString(km->regmodel())
   py::array_t<double> F();
   py::array_t<double> T();
   py::array_t<double> M();

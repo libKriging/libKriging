@@ -209,7 +209,7 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool grad = f
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, grad, hess);
-  
+
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {
     ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
@@ -217,7 +217,7 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool grad = f
   if (hess) {
     ret.push_back(std::get<2>(ll), "logLikelihoodHess");
   }
-  
+
   return ret;
 }
 

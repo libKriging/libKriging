@@ -103,7 +103,8 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const bool withStd = flag_output_compliance<2>(input, "withStd", output, 1);
   const bool withCov = flag_output_compliance<3>(input, "withCov", output, 2);
   const bool withDeriv = flag_output_compliance<4>(input, "withDeriv", output, 3);
-  auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m] = km->predict(input.get<1, arma::mat>("matrix"), withStd, withCov, withDeriv);
+  auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m]
+      = km->predict(input.get<1, arma::mat>("matrix"), withStd, withCov, withDeriv);
   output.set<0>(y_pred, "predicted response");
   output.setOptional<1>(stderr_v, "stderr vector");
   output.setOptional<2>(cov_m, "cov matrix");

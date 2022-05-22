@@ -12,7 +12,7 @@ class LinearAlgebra {
   static double num_nugget;
   LIBKRIGING_EXPORT static void set_num_nugget(double nugget);
   LIBKRIGING_EXPORT static double get_num_nugget();
-  
+
   static bool warn_chol;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
   static arma::mat safe_chol_lower(arma::mat X, int warn);

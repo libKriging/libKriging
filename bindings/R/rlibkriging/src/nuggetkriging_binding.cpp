@@ -179,14 +179,14 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, b
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
   auto pred = impl_ptr->predict(X, stdev, cov, deriv);
-  
+
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   if (stdev) {
     ret.push_back(std::get<1>(pred), "stdev");
   }
   if (cov) {
     ret.push_back(std::get<2>(pred), "cov");
-  }  
+  }
   if (deriv) {
     ret.push_back(std::get<3>(pred), "mean_deriv");
     ret.push_back(std::get<4>(pred), "stdev_deriv");
@@ -231,12 +231,12 @@ Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_alpha, b
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_alpha, grad);
-  
+
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {
     ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
   }
-  
+
   return ret;
 }
 
@@ -260,7 +260,7 @@ Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad);
-  
+
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   if (grad) {
     ret.push_back(std::get<1>(lmp), "logMargPostGrad");
