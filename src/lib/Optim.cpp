@@ -18,13 +18,13 @@ LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
   return Optim::reparametrize;
 };
 
-std::function<double(const double&)> Optim::reparam_to = [](const double& _theta) {
+std::function<double(const double&)> Optim::reparam_to_ = [](const double& _theta) {
   return -std::log(_theta); 
 };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_to = [](const arma::vec& _theta) {
   return -arma::log(_theta); 
 };
-std::function<double(const double&)> Optim::reparam_from = [](const double& _gamma) {
+std::function<double(const double&)> Optim::reparam_from_ = [](const double& _gamma) {
   return std::exp(-_gamma); 
 };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_from = [](const arma::vec& _gamma) {

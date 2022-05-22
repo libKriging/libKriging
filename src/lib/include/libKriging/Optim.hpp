@@ -10,12 +10,12 @@ class Optim {
   static bool reparametrize;
   LIBKRIGING_EXPORT static void use_reparametrize(bool do_reparametrize);
   LIBKRIGING_EXPORT static bool is_reparametrized();
-  static std::function<double(const double&)> reparam_to;
+  static std::function<double(const double&)> reparam_to_;
   static std::function<arma::vec(const arma::vec&)> reparam_to;
+  static std::function<double(const double&)> reparam_from_;
   static std::function<arma::vec(const arma::vec&)> reparam_from;
-  static std::function<double(const double&)> reparam_from;
+  static std::function<double(const double&, const double&)> reparam_from_deriv_;
   static std::function<arma::vec(const arma::vec&, const arma::vec&)> reparam_from_deriv;
-  static std::function<double(const double&, const double&)> reparam_from_deriv;
   static std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> reparam_from_deriv2;
 
   static double theta_lower_factor;
