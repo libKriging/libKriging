@@ -662,7 +662,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     gamma_tmp.at(d) = sigma2 / (nugget + sigma2);
     if (Optim::reparametrize) {
       gamma_tmp.head(d) = Optim::reparam_to(m_theta);
-      gamma_tmp.at(d) = Optim::reparam_to(sigma2 / (nugget + sigma2));
+      gamma_tmp.at(d) = Optim::reparam_to_(sigma2 / (nugget + sigma2));
     }
 
     double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, &okm_data);
@@ -849,8 +849,10 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         bounds_type.memptr()
         );
         arma::vec sol_to_lb = gamma_tmp.head(d) - theta_lower;
-        if (Optim::reparametrize)
-          sol_to_lb = gamma_tmp.head(d) - gamma_upper;
+        if (Optim::reparametrize) {
+          sol_to_lb = gamma_tmp - gamma_upper;
+          sol_to_lb = sol_to_lb.head(d);
+        }
         if (retry < Optim::max_restart & result.num_iters <= 2*d & any(abs(sol_to_lb) < arma::datum::eps)) { // we fastly converged to one bound
           gamma_tmp.head(d) = (theta0.row(i).t() + theta_lower) / pow(2.0,retry+1); // so, re-use previous starting point and change it to middle-point
           gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
