@@ -27,6 +27,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
 }
 
 bool LinearAlgebra::warn_chol = false;
+int LinearAlgebra::max_inc_choldiag = 10;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
@@ -35,12 +36,13 @@ arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
   arma::mat R = arma::mat(X.n_rows, X.n_cols);
   bool ok = arma::chol(R, X, "lower");
   if (!ok) {
-    if (LinearAlgebra::num_nugget <= 0.0)
+    if (inc_cond > max_inc_choldiag) {
+      throw std::runtime_error("[ERROR] Exceed max numerical nugget added to force chol matrix");
+    } else if (LinearAlgebra::num_nugget <= 0.0) {
       throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
-    else {
-      X /= 1.0 + LinearAlgebra::num_nugget;
-      X.diag().ones();
+    } else {
+      X.diag() += LinearAlgebra::num_nugget; // inc diagonal
       return LinearAlgebra::safe_chol_lower(X, inc_cond + 1);
     }
   } else {
