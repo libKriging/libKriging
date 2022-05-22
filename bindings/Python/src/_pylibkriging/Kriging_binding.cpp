@@ -56,10 +56,10 @@ py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py
   return carma::mat_to_arr(result, true);
 }
 
-void PyKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX, bool normalize) {
+void PyKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX) {
   arma::mat mat_y = carma::arr_to_col<double>(newy);
   arma::mat mat_X = carma::arr_to_mat<double>(newX);
-  m_internal->update(mat_y, mat_X, normalize);
+  m_internal->update(mat_y, mat_X);
 }
 
 std::string PyKriging::summary() const {

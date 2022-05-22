@@ -1136,7 +1136,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
  * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
-LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX, bool normalize = false) {
+LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX) {
   if (newy.n_elem != newX.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(newX.n_rows) + "x" + std::to_string(newX.n_cols)+"), y: ("+std::to_string(newy.n_elem)+")");
     
@@ -1155,6 +1155,7 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
+  bool normalize = (m_centerY == 0.0 && m_scaleY == 1) && (m_centerX.is_zero() && m_scaleX.is_zero());
   this->fit(
       arma::join_cols(m_y, newy), arma::join_cols(m_X, newX), m_regmodel, normalize, m_optim, m_objective, parameters);
 }

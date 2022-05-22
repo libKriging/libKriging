@@ -23,4 +23,3 @@ install.packages("foreach", repos=repos, type=type)
 install.packages("RobustGaSP", repos=repos, type=type)
 install.packages("roxygen2", repos=repos, type=type)
 install.packages("pkgbuild", repos=repos, type=type)
-

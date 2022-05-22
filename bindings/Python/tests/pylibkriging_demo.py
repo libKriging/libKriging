@@ -46,7 +46,7 @@ def test_kriging():
     Xn = np.array([0.3, 0.4])
     yn = [f(xi) for xi in Xn]
     print(k_py.summary())
-    k_py.update(yn, Xn, False)
+    k_py.update(yn, Xn)
     print(k_py.summary())
 
 
