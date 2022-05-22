@@ -37,9 +37,8 @@ class PyKriging {
   // see
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
-  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X,
-                                                                                    bool withStd,
-                                                                                    bool withCov);
+  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
+  predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv);
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
 
@@ -58,6 +57,27 @@ class PyKriging {
   double logLikelihood();
   double leaveOneOut();
   double logMargPost();
+
+  std::string kernel();
+  std::string optim();
+  std::string objective();
+  py::array_t<double> X();
+  py::array_t<double> centerX();
+  py::array_t<double> scaleX();
+  py::array_t<double> y();
+  double centerY();
+  double scaleY();
+  std::string regmodel();  // Trend::toString(km->regmodel())
+  py::array_t<double> F();
+  py::array_t<double> T();
+  py::array_t<double> M();
+  py::array_t<double> z();
+  py::array_t<double> beta();
+  bool is_beta_estim();
+  py::array_t<double> theta();
+  bool is_theta_estim();
+  double sigma2();
+  bool is_sigma2_estim();
 
  private:
   std::unique_ptr<Kriging> m_internal;

@@ -6,14 +6,13 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 fi
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
-
-. ${BASEDIR}/loadenv.sh
 
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
@@ -25,10 +24,11 @@ MAKE_SHARED_LIBS=on
 BUILD_TEST=false \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
+    FC=$(R CMD config FC) \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH}" \
     "${BASEDIR}"/../linux-macos/build.sh
 
-export LIBKRIGING_PATH=${PWD}/build/installed
+export LIBKRIGING_PATH=${PWD}/${BUILD_DIR:-build}/installed
 export PATH=${LIBKRIGING_PATH}/bin:${PATH}
 
 cd bindings/R

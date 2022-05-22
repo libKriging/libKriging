@@ -6,9 +6,6 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
-
 # Default configuration when used out of travis-ci
 MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
@@ -18,11 +15,13 @@ export ENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING:-auto}
 export ENABLE_MATLAB_BINDING=${ENABLE_MATLAB_BINDING:-auto}
 export ENABLE_PYTHON_BINDING=${ENABLE_PYTHON_BINDING:-auto}
 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
+
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
-
-. ${BASEDIR}/loadenv.sh
 
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
@@ -31,9 +30,10 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 # export EXTRA_SYSTEM_LIBRARY_PATH="C:/Program Files/MATLAB/R2022a/extern/lib/win64/microsoft"
 # EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBLAS_NAMES=libmwblas -DLAPACK_NAMES=libmwlapack"
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR:-build}
+cd ${BUILD_DIR:-build}
 cmake \
+  -DCMAKE_Fortran_COMPILER=$(command -v gfortran) \
   -DCMAKE_GENERATOR_PLATFORM=x64 \
   -DEXTRA_SYSTEM_LIBRARY_PATH="${EXTRA_SYSTEM_LIBRARY_PATH}" \
   -DENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING} \

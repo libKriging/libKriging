@@ -1,4 +1,5 @@
 library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 ## install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
 ## library(rlibkriging)
@@ -126,6 +127,10 @@ set.seed(123)
 X <- as.matrix(runif(5))
 y <- f(X)
 points(X, y, col = 'blue')
+
+#rlibkriging:::optim_log(2)
+#rlibkriging:::optim_use_variogram_bounds_heuristic(TRUE)
+
 r <- Kriging(y, X, kernel = "gauss")
 x <- seq(from = 0, to = 1, length.out = 101)
 s_x <- simulate(r, nsim = 3, x = x)

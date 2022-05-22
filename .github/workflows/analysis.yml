@@ -168,14 +168,6 @@ jobs:
           fi
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
-      - name: pre-install-macos
-        shell: bash
-        run: |
-          if [ "${ENABLE_R_BINDING}" == "on" ]; then
-            brew install coreutils # for readlink -f : FIXME usefull ?
-          fi
-        if: runner.os == 'macOS'
-
       - name: install
         shell: bash
         run: .travis-ci/${BUILD_NAME}/install.sh

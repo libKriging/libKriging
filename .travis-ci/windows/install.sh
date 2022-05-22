@@ -6,7 +6,8 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 fi
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
@@ -16,15 +17,15 @@ fi
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
 	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
 	pushd ${HOME}/Downloads 
-	${BASEDIR}/install_conda.bat
+	"${BASEDIR}"/install_conda.bat
 	popd
 fi
 $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
 $HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge openblas liblapack
-
-. ${BASEDIR}/loadenv.sh
+# $HOME/Miniconda3/condabin/conda.bat install -c conda-forge fortran-compiler
+choco install mingw
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # Check if python is available (it could be a python wrapper given by Windows)

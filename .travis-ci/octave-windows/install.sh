@@ -6,7 +6,8 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 fi
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 "${BASEDIR}"/../windows/install.sh
 

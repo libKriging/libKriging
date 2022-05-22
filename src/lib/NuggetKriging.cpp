@@ -6,17 +6,19 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-#include "libKriging/Trend.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/LinearAlgebra.hpp"
-#include "libKriging/Random.hpp"
-#include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Optim.hpp"
+#include "libKriging/Random.hpp"
+#include "libKriging/Trend.hpp"
+#include "libKriging/utils/custom_hash_function.hpp"
+#include "libKriging/utils/data_from_arma_vec.hpp"
 
 #include <cassert>
-#include <optim.hpp>
+#include <lbfgsb_cpp/lbfgsb.hpp>
 #include <tuple>
 #include <vector>
 
@@ -28,21 +30,25 @@
 void NuggetKriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_gauss;
-    Dln_CovNorm = Covariance::Dln_CovNorm_gauss;
-    CovNorm_pow = 2;
+    Cov = Covariance::Cov_gauss;
+    DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
+    DlnCovDx = Covariance::DlnCovDx_gauss;
+    Cov_pow = 2;
   } else if (covType.compare("exp") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_exp;
-    Dln_CovNorm = Covariance::Dln_CovNorm_exp;
-    CovNorm_pow = 1;
+    Cov = Covariance::Cov_exp;
+    DlnCovDtheta = Covariance::DlnCovDtheta_exp;
+    DlnCovDx = Covariance::DlnCovDx_exp;
+    Cov_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern32;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern32;
-    // CovNorm_pow = 1.5;
+    Cov = Covariance::Cov_matern32;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
+    DlnCovDx = Covariance::DlnCovDx_matern32;
+    Cov_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
-    CovNorm_fun = Covariance::CovNorm_fun_matern52;
-    Dln_CovNorm = Covariance::Dln_CovNorm_matern52;
-    // CovNorm_pow = 2.5;
+    Cov = Covariance::Cov_matern52;
+    DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
+    DlnCovDx = Covariance::DlnCovDx_matern52;
+    Cov_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
@@ -62,6 +68,10 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::colvec& y,
                                                const std::string& optim,
                                                const std::string& objective,
                                                const Parameters& parameters) {
+  if (y.n_elem != X.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
+                             + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
+
   make_Cov(covType);
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
@@ -83,24 +93,23 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::colvec& y,
 double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
                                      arma::vec* grad_out,
                                      NuggetKriging::OKModel* okm_data) const {
-  // arma::cout << " theta, alpha: " << _theta_alpha.head(m_X.n_cols) << "," << _theta_alpha.at(m_X.n_cols) <<
-  // arma::endl;
+  // arma::cout << " theta, alpha: " << _theta_alpha.t() << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
-  //  model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
-  //  model@covariance@sd2 <- 1
-  //  model@covariance@nugget <- 0
-  //  alpha <- param[nparam]
+  //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
+  //   model@covariance@sd2 <- 1
+  //   model@covariance@nugget <- 0
+  //   alpha <- param[nparam]
   //
-  //  aux <- covMatrix(model@covariance, model@X)
-  //  R0 <- aux[[1]] - diag(aux[[2]])
-  //  R <- alpha * R0 + (1 - alpha) * diag(model@n)
+  //   aux <- covMatrix(model@covariance, model@X)
+  //   R0 <- aux[[1]] - diag(aux[[2]])
+  //   R <- alpha * R0 + (1 - alpha) * diag(model@n)
   //
-  //  T <- chol(R)
-  //  x <- backsolve(t(T), model@y, upper.tri = FALSE)
-  //  M <- backsolve(t(T), model@F, upper.tri = FALSE)
-  //  z <- compute.z(x=x, M=M, beta=beta)
-  //  v <- compute.sigma2.hat(z)
-  //  logLik <- -0.5 * (model@n * log(2 * pi * v) + 2*sum(log(diag(T))) + model@n)
+  //   T <- chol(R)
+  //   x <- backsolve(t(T), model@y, upper.tri = FALSE)
+  //   M <- backsolve(t(T), model@F, upper.tri = FALSE)
+  //   z <- compute.z(x=x, M=M, beta=beta)
+  //   v <- compute.sigma2.hat(z)
+  //   logLik <- -0.5 * (model@n * log(2 * pi * v) + 2*sum(log(diag(T))) + model@n)
 
   NuggetKriging::OKModel* fd = okm_data;
   arma::uword n = m_X.n_rows;
@@ -113,7 +122,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta) * _alpha;
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _alpha;
     }
   }
 
@@ -180,7 +189,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     arma::cube gradC = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradC.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradC.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
       }
     }
 
@@ -192,7 +201,6 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
           gradC_k.at(i, j) = gradC_k.at(j, i) = gradC.slice(i).col(j)[k];
         }
       }
-      gradC_k /= _theta.at(k);
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
       term1.at(k)
@@ -302,7 +310,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = CovNorm_fun(m_dX.col(i * n + j) / _theta) * _alpha;
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _alpha;
     }
   }
 
@@ -398,7 +406,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        gradR.slice(i).col(j) = R.at(i, j) * Dln_CovNorm(m_dX.col(i * n + j) / _theta);
+        gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
       }
     }
 
@@ -411,7 +419,6 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
-      gradR_k /= _theta.at(k);
 
       Wb_k = trans(solve(
                  trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
@@ -492,44 +499,76 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                           const std::string& optim,
                                           const std::string& objective,
                                           const Parameters& parameters) {
-  arma::uword n = X.n_rows;
-  arma::uword d = X.n_cols;
-
-  arma::vec theta_lower = 1e-3 * trans(max(X, 0) - min(X, 0));
-  arma::vec theta_upper = 2 * trans(max(X, 0) - min(X, 0));
+  const arma::uword n = X.n_rows;
+  const arma::uword d = X.n_cols;
 
   std::function<double(const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
-    fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
-      // Change variable for opt: . -> 1/exp(.)
-      arma::vec _theta_alpha = 1 / arma::exp(_gamma);
-      _theta_alpha[_theta_alpha.n_elem - 1] = _gamma[_theta_alpha.n_elem - 1];  // opt!
-      double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
-      if (grad_out != nullptr) {
-        (*grad_out).head(_theta_alpha.n_elem - 1) %= _theta_alpha.head(_theta_alpha.n_elem - 1);
-        (*grad_out).at(_theta_alpha.n_elem - 1) *= -1;
-      }
-      return -ll;
-    }};
+    if (Optim::reparametrize) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+        // Change variable for opt: . -> 1/exp(.)
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
+        arma::vec _theta_alpha = 1 / arma::exp(_gamma);
+        _theta_alpha[_theta_alpha.n_elem - 1] = 1 / exp(_gamma[_theta_alpha.n_elem - 1]);  // opt!
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
+        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
+        // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
+        if (grad_out != nullptr) {
+          // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+          (*grad_out).head(_theta_alpha.n_elem - 1) %= _theta_alpha.head(_theta_alpha.n_elem - 1);
+          (*grad_out).at(_theta_alpha.n_elem - 1) *= _theta_alpha.at(_theta_alpha.n_elem - 1);
+        }
+        return -ll;
+      }};
+    } else {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+        const arma::vec _theta_alpha = _gamma;
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
+        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
+        // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
+        if (grad_out != nullptr) {
+          // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
+          *grad_out = -*grad_out;
+        }
+        return -ll;
+      }};
+    }
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
-    fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
-      // Change variable for opt: . -> 1/exp(.)
-      arma::vec _theta_alpha = 1 / arma::exp(_gamma);
-      _theta_alpha[_theta_alpha.n_elem - 1] = _gamma[_theta_alpha.n_elem - 1];  // opt!
-      double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
-      if (grad_out != nullptr) {
-        (*grad_out).head(_theta_alpha.n_elem - 1) %= _theta_alpha.head(_theta_alpha.n_elem - 1);
-        (*grad_out).at(_theta_alpha.n_elem - 1) *= -1;
-      }
-      return -lmp;
-    }};
-
+    if (Optim::reparametrize) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+        // Change variable for opt: . -> 1/exp(.)
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
+        arma::vec _theta_alpha = 1 / arma::exp(_gamma);
+        _theta_alpha[_theta_alpha.n_elem - 1] = 1 / exp(_gamma[_theta_alpha.n_elem - 1]);  // opt!
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
+        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
+        // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
+        if (grad_out != nullptr) {
+          // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
+          (*grad_out).head(_theta_alpha.n_elem - 1) %= _theta_alpha.head(_theta_alpha.n_elem - 1);
+          (*grad_out).at(_theta_alpha.n_elem - 1) *= _theta_alpha.at(_theta_alpha.n_elem - 1);
+        }
+        return -lmp;
+      }};
+    } else {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+        const arma::vec _theta_alpha = _gamma;
+        // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
+        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
+        // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
+        if (grad_out != nullptr) {
+          // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
+          *grad_out = -*grad_out;
+        }
+        return -lmp;
+      }};
+    }
   } else
-    throw std::invalid_argument("Unsupported fit objective: " + objective);
+    throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LMP)");
 
   arma::rowvec centerX(d);
   arma::rowvec scaleX(d);
@@ -573,7 +612,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
 
   // Define regression matrix
   m_regmodel = regmodel;
-  m_F = Trend::regressionModelMatrix(regmodel, m_X, n, d);
+  m_F = Trend::regressionModelMatrix(regmodel, m_X);
 
   arma::mat theta0 = parameters.theta;
   if (parameters.has_theta) {
@@ -619,8 +658,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                     nugget + sigma2};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
-    gamma_tmp.head(d) = -arma::log(m_theta);
+    gamma_tmp.head(d) = m_theta;
     gamma_tmp.at(d) = sigma2 / (nugget + sigma2);
+    if (Optim::reparametrize) {
+      gamma_tmp.head(d) = -arma::log(m_theta);
+      gamma_tmp.at(d) = -log(sigma2 / (nugget + sigma2));
+    }
+
     double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, &okm_data);
 
     m_T = std::move(okm_data.T);
@@ -636,6 +680,35 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
 
+    arma::vec theta_lower = Optim::theta_lower_factor * trans(max(X, 0) - min(X, 0));
+    arma::vec theta_upper = Optim::theta_upper_factor * trans(max(X, 0) - min(X, 0));
+
+    if (Optim::variogram_bounds_heuristic) {
+      arma::vec dy2 = arma::zeros(n * n);
+      for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
+        int i = (int)ij / n;
+        int j = ij % n;  // i,j <-> i*n+j
+        if (i < j) {
+          dy2[ij] = m_y.at(i) - m_y.at(j);
+          dy2[ij] *= dy2[ij];
+          dy2[j * n + i] = dy2[ij];
+        }
+      }
+      // dy2 /= arma::var(m_y);
+      arma::vec dy2dX2_slope = dy2 / arma::sum(m_dX % m_dX, 0).t();
+      // arma::cout << "dy2dX_slope:" << dy2dX_slope << arma::endl;
+      dy2dX2_slope.replace(arma::datum::nan, 0.0);  // we are not interested in same points where dX=0, and dy=0
+      arma::vec w = dy2dX2_slope / sum(dy2dX2_slope);
+      arma::mat steepest_dX_mean = arma::abs(m_dX) * w;
+
+      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor / steepest_dX_mean);
+      theta_upper = arma::min(theta_upper, Optim::theta_upper_factor / steepest_dX_mean);
+      theta_lower = arma::min(theta_lower, theta_upper);
+      theta_upper = arma::max(theta_lower, theta_upper);
+    }
+    // arma::cout << "theta_lower:" << theta_lower << arma::endl;
+    // arma::cout << "theta_upper:" << theta_upper << arma::endl;
+
     // FIXME parameters.has needs to implemtented (no use case in current code)
     if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
       int multistart = 1;
@@ -644,50 +717,76 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       } catch (std::invalid_argument) {
         // let multistart = 1
       }
-      theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-               % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+      theta0 = arma::repmat(trans(theta_lower), multistart, 1)
+               + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta);
     }
-
     // arma::cout << "theta0:" << theta0 << arma::endl;
+
+    if (Optim::reparametrize) {
+      arma::vec theta_lower_tmp = theta_lower;
+      theta_lower = -arma::log(theta_upper);
+      theta_upper = -arma::log(theta_lower_tmp);
+    }
+
+    double alpha_upper = 1.0;
+    double alpha_lower = 1E-3;
 
     arma::vec alpha0;
     if (parameters.has_sigma2 & parameters.has_nugget) {
       alpha0 = arma::vec(parameters.sigma2.n_elem * parameters.nugget.n_elem);
       for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
         for (size_t j = 0; j < parameters.nugget.n_elem; j++) {
-          if (parameters.sigma2[i] <= 0 | parameters.nugget[j] <= 0)
-            alpha0[i + j * parameters.sigma2.n_elem] = Random::randu();
+          if (parameters.sigma2[i] < 0 | parameters.nugget[j] < 0 | parameters.sigma2[i] + parameters.nugget[j] < 0)
+            alpha0[i + j * parameters.sigma2.n_elem] = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
           else
             alpha0[i + j * parameters.sigma2.n_elem]
                 = parameters.sigma2[i] / (parameters.sigma2[i] + parameters.nugget[j]);
         }
       }
     } else {
-      alpha0 = Random::randu_vec(theta0.n_rows);
+      alpha0 = alpha_lower + (alpha_upper - alpha_lower) * Random::randu_vec(theta0.n_rows);
     }
-
     // arma::cout << "alpha0:" << alpha0 << arma::endl;
 
-    optim::algo_settings_t algo_settings;
-    algo_settings.print_level = 0;
-    algo_settings.iter_max = 20;
-    algo_settings.rel_sol_change_tol = 0.01;
-    algo_settings.grad_err_tol = 1e-8;
-    algo_settings.vals_bound = true;
-    algo_settings.lower_bounds = arma::vec(d + 1);
-    algo_settings.lower_bounds.head(d) = -arma::log(theta_upper);
-    algo_settings.lower_bounds.at(d) = 0;
-    algo_settings.upper_bounds = arma::vec(d + 1);
-    algo_settings.upper_bounds.head(d) = -arma::log(theta_lower);
-    algo_settings.upper_bounds.at(d) = 1;
+    if (Optim::reparametrize) {
+      double alpha_lower_tmp = alpha_lower;
+      alpha_lower = -log(alpha_upper);
+      alpha_upper = -log(alpha_lower_tmp);
+    }
+
     double min_ofn = std::numeric_limits<double>::infinity();
 
     for (arma::uword i = 0; i < theta0.n_rows; i++) {
       arma::vec gamma_tmp = arma::vec(d + 1);
-      gamma_tmp.head(d) = -arma::log(theta0.row(i)).t();
+      gamma_tmp.head(d) = theta0.row(i).t();
       gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
+      if (Optim::reparametrize) {
+        gamma_tmp.head(d) = -arma::log(theta0.row(i)).t();
+        gamma_tmp.at(d) = -log(alpha0[i % alpha0.n_elem]);
+      }
+
+      theta_lower = arma::min(gamma_tmp.head(d), theta_lower);
+      theta_upper = arma::max(gamma_tmp.head(d), theta_upper);
+      alpha_lower = std::min(gamma_tmp.at(d), alpha_lower);
+      alpha_upper = std::max(gamma_tmp.at(d), alpha_upper);
+
+      if (Optim::log_level > 0) {
+        arma::cout << "BFGS:" << arma::endl;
+        arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
+        arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
+        arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+        arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+        arma::cout << "  start_point: " << gamma_tmp.t() << "";
+        arma::cout << "  lower_bounds: " << theta_lower.t() << "";
+        arma::cout << "                " << alpha_lower << arma::endl;
+        arma::cout << "  upper_bounds: " << theta_upper.t() << "";
+        arma::cout << "                " << alpha_upper << arma::endl;
+      }
+
       arma::mat T;
       arma::mat M;
       arma::colvec z;
@@ -712,21 +811,63 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                       parameters.is_nugget_estim,
                                       nugget + sigma2};
 
-      bool bfgs_ok = optim::lbfgs(
-          gamma_tmp,
-          [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-            return fit_ofn(vals_inp, grad_out, &okm_data);
-          },
-          nullptr,
-          algo_settings);
+      //// Using OptimLib
+      // optim::algo_settings_t algo_settings;
+      // algo_settings.print_level = 0;
+      // algo_settings.iter_max = 20;
+      // algo_settings.rel_sol_change_tol = 0.01;
+      // algo_settings.grad_err_tol = 1e-8;
+      // algo_settings.vals_bound = true;
+      // algo_settings.lower_bounds = arma::vec(d + 1);
+      // algo_settings.lower_bounds.head(d) = -arma::log(theta_upper);
+      // algo_settings.lower_bounds.at(d) = 0;
+      // algo_settings.upper_bounds = arma::vec(d + 1);
+      // algo_settings.upper_bounds.head(d) = -arma::log(theta_lower);
+      // algo_settings.upper_bounds.at(d) = 1;
+      //
+      // bool bfgs_ok = optim::lbfgs(
+      //     gamma_tmp,
+      //     [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
+      //       return fit_ofn(vals_inp, grad_out, &okm_data);
+      //     },
+      //     nullptr,
+      //     algo_settings);
 
-      double min_ofn_tmp
-          = fit_ofn(gamma_tmp,
-                    nullptr,
-                    &okm_data);  // this last call also ensure that T and z are up-to-date with solution found.
+      lbfgsb::Optimizer optimizer{d + 1};
+      optimizer.iprint = Optim::log_level - 2;
+      optimizer.max_iter = Optim::max_iteration;
+      optimizer.pgtol = Optim::gradient_tolerance;
+      optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+      arma::ivec bounds_type{d + 1, arma::fill::value(2)};  // means both upper & lower bounds
+      arma::vec theta_alpha_lower = arma::vec(d + 1);
+      theta_alpha_lower.head(d) = theta_lower;
+      theta_alpha_lower.at(d) = alpha_lower;
+      arma::vec theta_alpha_upper = arma::vec(d + 1);
+      theta_alpha_upper.head(d) = theta_upper;
+      theta_alpha_upper.at(d) = alpha_upper;
+      auto result = optimizer.minimize(
+          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+            return fit_ofn(vals_inp, &grad_out, &okm_data);
+          },
+          gamma_tmp,
+          theta_alpha_lower.memptr(),
+          theta_alpha_upper.memptr(),
+          bounds_type.memptr());
+      if (Optim::log_level > 1)
+        result.print();
+
+      // this last call also ensure that T and z are up-to-date with solution found.
+      double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, &okm_data);
+
+      if (Optim::log_level > 0) {
+        arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
+        arma::cout << "  best solution: " << gamma_tmp.t() << "";
+      }
 
       if (min_ofn_tmp < min_ofn) {
-        m_theta = 1 / arma::exp(gamma_tmp.head(d));
+        m_theta = gamma_tmp.head(d);
+        if (Optim::reparametrize)
+          m_theta = 1 / arma::exp(gamma_tmp.head(d));
         m_est_theta = true;
         min_ofn = min_ofn_tmp;
         m_T = std::move(okm_data.T);
@@ -741,7 +882,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       }
     }
   } else
-    throw std::runtime_error("Not a suitable optim: " + optim);
+    throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS**)");
 
   if (!parameters.has_sigma2)
     m_sigma2 *= scaleY * scaleY;
@@ -757,97 +898,132 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
  * @param cov is true if return also cov matrix between Xp
  * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
  */
-LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKriging::predict(const arma::mat& Xp,
-                                                                                           bool withStd,
-                                                                                           bool withCov) {
+LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat, arma::mat, arma::mat>
+NuggetKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv) {
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
-  arma::colvec pred_mean(m);
-  arma::colvec pred_stdev(m);
-  arma::mat pred_cov(m, m);
-  pred_stdev.zeros();
-  pred_cov.zeros();
+  arma::uword d = m_X.n_cols;
+  if (Xp.n_cols != d)
+    throw std::runtime_error("Predict locations have wrong dimension: " + std::to_string(Xp.n_cols) + " instead of "
+                             + std::to_string(d));
 
-  arma::mat Xtnorm = trans(m_X);
-  Xtnorm.each_col() /= m_theta;
+  arma::colvec pred_mean(m);
+  arma::colvec pred_stdev = arma::zeros(m);
+  arma::mat pred_cov = arma::zeros(m, m);
+  arma::mat pred_mean_deriv = arma::zeros(m, d);
+  arma::mat pred_stdev_deriv = arma::zeros(m, d);
+
+  arma::mat Xtnorm = trans(m_X);  // already normalized if needed
   arma::mat Xpnorm = Xp;
   // Normalize Xp
   Xpnorm.each_row() -= m_centerX;
   Xpnorm.each_row() /= m_scaleX;
 
   // Define regression matrix
-  arma::uword d = m_X.n_cols;
-  arma::mat Ftest = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
+  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm);
+  Xpnorm = trans(Xpnorm);
 
   // Compute covariance between training data and new data to predict
-  arma::mat R = arma::ones(n, m);
+  arma::mat R_pred = arma::ones(n, m);
   // double total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) + m_nugget;
   double total_sd2 = (m_sigma2 + m_nugget) * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
   // R *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
-  R *= m_sigma2 / total_sd2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
-  Xpnorm = trans(Xpnorm);
-  Xpnorm.each_col() /= m_theta;
+  R_pred *= m_sigma2 / total_sd2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
       arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
       if (arma::all(dij == 0))
-        R.at(i, j) = 1.0;  // m_sigma2 + m_nugget;
+        R_pred.at(i, j) = 1.0;  // m_sigma2 + m_nugget;
       else
-        R.at(i, j) *= CovNorm_fun(dij);
+        R_pred.at(i, j) *= Cov(dij, m_theta);
     }
   }
-  arma::mat Tinv_newdata = solve(m_T, R, arma::solve_opts::fast);
-  pred_mean = Ftest * m_beta + trans(Tinv_newdata) * m_z;
+  arma::mat Tinv_pred = solve(m_T, R_pred, arma::solve_opts::fast);
+  pred_mean = F_p * m_beta + trans(Tinv_pred) * m_z;
   // Un-normalize predictor
   pred_mean = m_centerY + m_scaleY * pred_mean;
 
+  arma::mat s2_predict_mat;
+  arma::mat FinvMtM;
+  if (withStd | withCov) {
+    arma::mat TM = trans(chol(trans(m_M) * m_M));
+    s2_predict_mat = solve(TM, trans(F_p - trans(Tinv_pred) * m_M), arma::solve_opts::fast);
+
+    if (withDeriv) {
+      arma::mat m = trans(F_p - trans(Tinv_pred) * m_M);
+      arma::mat invMtM = inv_sympd(m_M.t() * m_M);
+      FinvMtM = (F_p - trans(Tinv_pred) * m_M) * inv_sympd(m_M.t() * m_M);
+    }
+  }
   if (withStd) {
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
-    arma::colvec s2_predict_1 = total_sd2 * trans(sum(Tinv_newdata % Tinv_newdata, 0));
-    // Type = "UK"
-    // T.M <- chol(t(M)%*%M)
-    arma::mat TM = trans(chol(trans(m_M) * m_M));
-    // s2.predict.mat <- backsolve(t(T.M), t(F.newdata - t(Tinv.c.newdata)%*%M) , upper.tri = FALSE)
-    arma::mat s2_predict_mat = solve(TM, trans(Ftest - trans(Tinv_newdata) * m_M), arma::solve_opts::fast);
+    arma::colvec s2_predict_1 = trans(sum(Tinv_pred % Tinv_pred, 0));
+    s2_predict_1.transform([](double val) {
+      return (val > 1.0 ? 1.0 : val);
+    });  // constrain this first part to not be negative (rationale: it is the whole stdev for simple kriging)
+
     // s2.predict.2 <- apply(s2.predict.mat, 2, crossprod)
-    arma::colvec s2_predict_2 = total_sd2 * trans(sum(s2_predict_mat % s2_predict_mat, 0));
+    arma::colvec s2_predict_2 = trans(sum(s2_predict_mat % s2_predict_mat, 0));
     // s2.predict <- pmax(total.sd2 - s2.predict.1 + s2.predict.2, 0)
-    arma::mat s2_predict = total_sd2 - s2_predict_1 + s2_predict_2;
-    s2_predict.elem(find(pred_stdev < 0)).zeros();
-    s2_predict.transform([](double val) { return (std::isnan(val) ? 0.0 : val); });
+
+    arma::mat s2_predict = total_sd2 * (1.0 - s2_predict_1 + s2_predict_2);
+    s2_predict.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
-    if (withCov) {
-      // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
-      arma::mat C_newdata = arma::ones(m, m);
-      // C_newdata *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
-      C_newdata *= m_sigma2 / total_sd2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
-      for (arma::uword i = 0; i < m; i++) {
-        C_newdata.at(i, i) = 1;
-        for (arma::uword j = 0; j < i; j++) {
-          C_newdata.at(i, j) = C_newdata.at(j, i) *= CovNorm_fun(Xpnorm.col(i) - Xpnorm.col(j));
-        }
-      }
-      // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
-      // cond.cov <- cond.cov + crossprod(s2.predict.mat)
-      pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
-    }
-  } else if (withCov) {
-    arma::mat C_newdata = arma::ones(m, m);
-    // C_newdata *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
-    C_newdata *= m_sigma2 / total_sd2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
-    for (arma::uword i = 0; i < m; i++) {
-      C_newdata.at(i, i) = 1;
-      for (arma::uword j = 0; j < i; j++) {
-        C_newdata.at(j, i) = C_newdata.at(i, j) *= CovNorm_fun(Xpnorm.col(i) - Xpnorm.col(j));
-      }
-    }
-    // Need to compute matrices computed in withStd case
-    arma::mat TM = trans(chol(trans(m_M) * m_M));
-    arma::mat s2_predict_mat = solve(TM, trans(Ftest - trans(Tinv_newdata) * m_M), arma::solve_opts::fast);
-    pred_cov = total_sd2 * (C_newdata - trans(Tinv_newdata) * Tinv_newdata + trans(s2_predict_mat) * s2_predict_mat);
   }
 
-  return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
+  if (withCov) {
+    // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
+    arma::mat R_predpred = arma::ones(m, m);
+    // C_newdata *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
+    R_predpred *= m_sigma2 / total_sd2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
+    for (arma::uword i = 0; i < m; i++) {
+      R_predpred.at(i, i) = 1;
+      for (arma::uword j = 0; j < i; j++) {
+        R_predpred.at(i, j) = R_predpred.at(j, i) *= Cov((Xpnorm.col(i) - Xpnorm.col(j)), m_theta);
+      }
+    }
+    // cond.cov <- C.newdata - crossprod(Tinv.c.newdata)
+    // cond.cov <- cond.cov + crossprod(s2.predict.mat)
+
+    pred_cov = total_sd2 * (R_predpred - trans(Tinv_pred) * Tinv_pred + trans(s2_predict_mat) * s2_predict_mat);
+  }
+
+  if (withDeriv) {
+    // # Compute derivatives of the covariance and trend functions
+    for (arma::uword i = 0; i < m; i++) {  // for each Xp predict point... should be parallel ?
+
+      arma::mat dc = arma::mat(n, d);
+      for (arma::uword j = 0; j < n; j++) {
+        dc.row(j) = R_pred.at(j, i) * trans(DlnCovDx(Xpnorm.col(i) - Xtnorm.col(j), m_theta));
+      }
+
+      const double h = 1.0E-5;  // Value is sensitive only for non linear trends. Otherwise, it gives exact results.
+      arma::mat tXpn_i_repd = arma::trans(Xpnorm.col(i) * arma::ones(1, d));  // just duplicate Xp.row(i) d times
+
+      arma::mat F_dx = (Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd + h * arma::eye(d, d))
+                        - Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd - h * arma::eye(d, d)))
+                       / (2 * h);
+
+      //# Compute gradients of the kriging mean and variance
+      arma::mat W = solve(m_T, dc, LinearAlgebra::default_solve_opts);
+
+      pred_mean_deriv.row(i) = trans(F_dx * m_beta + trans(W) * m_z);
+
+      if (withStd) {
+        arma::mat pred_stdev_deriv_noTrend = Tinv_pred.t() * W;
+        pred_stdev_deriv.row(i) = (-pred_stdev_deriv_noTrend.row(i) + FinvMtM.row(i) * (F_dx.t() - trans(m_M) * W))
+                                  * total_sd2 / pred_stdev.at(i);
+      }
+    }
+    pred_mean_deriv *= m_scaleY;
+    pred_stdev_deriv *= m_scaleY;
+  }
+
+  return std::make_tuple(std::move(pred_mean),
+                         std::move(pred_stdev),
+                         std::move(pred_cov),
+                         std::move(pred_mean_deriv),
+                         std::move(pred_stdev_deriv));
   /*if (withStd)
     if (withCov)
       return std::make_tuple(std::move(pred_mean), std::move(pred_stdev), std::move(pred_cov));
@@ -866,9 +1042,12 @@ LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat> NuggetKrigin
  */
 LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int seed, const arma::mat& Xp) {
   // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
-  double nugget_sim = 1e-10;
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
+  arma::uword d = m_X.n_cols;
+  if (Xp.n_cols != d)
+    throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(Xp.n_cols) + " instead of "
+                             + std::to_string(d));
 
   arma::mat Xpnorm = Xp;
   // Normalize Xp
@@ -876,13 +1055,13 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   Xpnorm.each_row() /= m_scaleX;
 
   // Define regression matrix
-  arma::uword d = m_X.n_cols;
-  arma::mat F_newdata = Trend::regressionModelMatrix(m_regmodel, Xpnorm, m, d);
-
-  arma::colvec y_trend = F_newdata * m_beta;  // / std::sqrt(m_sigma2);
-
+  arma::mat F_p = Trend::regressionModelMatrix(m_regmodel, Xpnorm);
   Xpnorm = trans(Xpnorm);
-  Xpnorm.each_col() /= m_theta;
+  // t0 = Bench::toc("Xpnorm         ", t0);
+
+  // auto t0 = Bench::tic();
+  arma::colvec y_trend = F_p * m_beta;  // / std::sqrt(m_sigma2);
+  // t0 = Bench::toc("y_trend        ", t0);
 
   // Compute covariance between new data
   arma::mat Sigma = arma::ones(m, m);
@@ -893,7 +1072,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < m; i++) {
     Sigma.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      Sigma.at(i, j) = Sigma.at(j, i) *= CovNorm_fun(Xpnorm.col(i) - Xpnorm.col(j));
+      Sigma.at(i, j) = Sigma.at(j, i) *= Cov((Xpnorm.col(i) - Xpnorm.col(j)), m_theta);
     }
   }
 
@@ -901,15 +1080,13 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   // Compute covariance between training data and new data to predict
   // Sigma21 <- covMat1Mat2(object@covariance, X1 = object@X, X2 = newdata, nugget.flag = FALSE)
   arma::mat Xtnorm = trans(m_X);
-  Xtnorm.each_col() /= m_theta;
   arma::mat Sigma21(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
-      arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
       // if (arma::all(dij==0))
       //  Sigma21.at(i, j) = 1.0;//m_sigma2 + m_nugget;
       // else
-      Sigma21.at(i, j) = CovNorm_fun(dij);
+      Sigma21.at(i, j) = Cov((Xtnorm.col(i) - Xpnorm.col(j)), m_theta);
     }
   }
   Sigma21 *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;
@@ -935,8 +1112,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   }
 
   // T.cond <- chol(Sigma.cond + diag(nugget.sim, m, m))
-  Sigma_cond.diag() += LinearAlgebra::num_nugget;
-  arma::mat tT_cond = chol(Sigma_cond, "lower");
+  arma::mat tT_cond = LinearAlgebra::safe_chol_lower(Sigma_cond);
 
   // white.noise <- matrix(rnorm(m*nsim), m, nsim)
   // y.rand.cond <- t(T.cond) %*% white.noise
@@ -960,6 +1136,10 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
  * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
 LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::mat& newX) {
+  if (newy.n_elem != newX.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(newX.n_rows) + "x"
+                             + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
+
   // rebuild starting parameters
   Parameters parameters{arma::vec(1, arma::fill::value(this->m_nugget)),
                         true,

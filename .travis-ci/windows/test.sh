@@ -2,7 +2,8 @@
 set -eo pipefail
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 if [[ "$DEBUG_CI" == "true" ]]; then
   CTEST_FLAGS="--verbose --output-on-failure"
@@ -18,9 +19,7 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     travis_terminate 1
 fi
 
-. ${BASEDIR}/loadenv.sh
-
-cd build
+cd ${BUILD_DIR:-build}
 
 # Cleanup compiled libs to check right path finding
 rm -fr src/lib

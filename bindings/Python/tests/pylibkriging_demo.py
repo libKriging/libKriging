@@ -11,8 +11,8 @@ def test_kriging():
     print(k_py.summary())
 
     x = np.arange(0, 1, 1 / 99)
-    p = k_py.predict(x, True, False)
-    p = {"mean": p[0], "stdev": p[1], "cov": p[2]}  # This should be done by predict
+    p = k_py.predict(x, True, False, False)
+    p = {"mean": p[0], "stdev": p[1], "cov": p[2], "mean_deriv": p[3], "stdev_deriv": p[4]}  # This should be done by predict
 
     try:
         import matplotlib.pyplot as pyplot

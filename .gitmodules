@@ -17,3 +17,6 @@
 [submodule "dependencies/optim"]
 	path = dependencies/optim
 	url = https://github.com/libKriging/optim.git
+[submodule "dependencies/lbfgsb_cpp"]
+	path = dependencies/lbfgsb_cpp
+	url = https://github.com/libKriging/lbfgsb_cpp.git

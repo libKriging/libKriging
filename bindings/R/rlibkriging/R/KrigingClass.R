@@ -298,6 +298,9 @@ print.Kriging <- function(x, ...) {
 #' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
 #'
+#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#'     of the predictions are returned.
+#'
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -327,15 +330,16 @@ print.Kriging <- function(x, ...) {
 #' lines(x, p_x$mean, col = "blue")
 #' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
 #' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
-predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, ...) {
+predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     ## manage the data frame case. Ideally we should then warn
+    if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(k$X))
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(kriging_predict(object, x, stdev, cov))
+    return(kriging_predict(object, x, stdev, cov, deriv))
 }
 
 ## predict <- function (...) UseMethod("predict")
@@ -389,6 +393,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, ...) {
 simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object) 
+    if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x = matrix(x, ncol = ncol(k$X))
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
@@ -457,8 +462,10 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 update.Kriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- kriging_model(object) 
+    k <- kriging_model(object)
+    if (is.data.frame(newX)) newX = data.matrix(newX)
     if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
+    if (is.data.frame(newy)) newy = data.matrix(newy)
     if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
     if (ncol(newX) != ncol(k$X))
         stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
@@ -510,27 +517,28 @@ update.Kriging <- function(object, newy, newX, ...) {
 #' 
 logLikelihoodFun.Kriging <- function(object, theta,
                                   grad = FALSE, hess = FALSE, ...) {
-  k <- kriging_model(object) 
-  if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
-  if (ncol(theta) != ncol(k$X))
-      stop("Input theta must have ", ncol(k$X), " columns (instead of ",
-           ncol(theta),")")
-  out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
-              logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
-                                         ncol = ncol(theta)),
-              logLikelihoodHess = array(NA, dim = c(nrow(theta), ncol(theta),
-                                                    ncol(theta))))
-  for (i in 1:nrow(theta)) {
-      ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                  grad = isTRUE(grad), hess = isTRUE(hess))
-      out$logLikelihood[i] <- ll$logLikelihood
-      if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-      if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
-  }
-  if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
-  if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
-
-  return(out)
+    k <- kriging_model(object)
+    if (is.data.frame(theta)) theta = data.matrix(theta)
+    if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
+    if (ncol(theta) != ncol(k$X))
+        stop("Input theta must have ", ncol(k$X), " columns (instead of ",
+             ncol(theta),")")
+    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
+                logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
+                                           ncol = ncol(theta)),
+                logLikelihoodHess = array(NA, dim = c(nrow(theta), ncol(theta),
+                                                      ncol(theta))))
+    for (i in 1:nrow(theta)) {
+        ll <- kriging_logLikelihoodFun(object, theta[i, ],
+                                    grad = isTRUE(grad), hess = isTRUE(hess))
+        out$logLikelihood[i] <- ll$logLikelihood
+        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
+    }
+    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
+  
+    return(out)
 }
 
 ## ****************************************************************************
@@ -605,6 +613,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' abline(v = as.list(r)$theta, col = "blue")
 leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
     k <- kriging_model(object) 
+    if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
     if (ncol(theta) != ncol(k$X))
         stop("Input theta must have ", ncol(k$X), " columns (instead of ",
@@ -688,7 +697,8 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' plot(t, lmp(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
 logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
-    k <- kriging_model(object) 
+    k <- kriging_model(object)
+    if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
     if (ncol(theta) != ncol(k$X))
         stop("Input theta must have ", ncol(k$X), " columns (instead of ",

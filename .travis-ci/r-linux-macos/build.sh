@@ -5,6 +5,10 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
+
 # Default configuration when used out of travis-ci
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
@@ -19,12 +23,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   MAKE_SHARED_LIBS=off # Quick workaround for not found armadillo lib
 fi
 
-# to get readlink on MacOS (no effect on Linux)
-if [[ -e /usr/local/opt/coreutils/libexec/gnubin/readlink ]]; then
-    export PATH=/usr/local/opt/coreutils/libexec/gnubin:$PATH
-fi
-BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
 MODE=${MODE:-Release}
 
 BUILD_TEST=false \
@@ -34,10 +32,15 @@ BUILD_TEST=false \
     EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} ${EXTRA_CMAKE_OPTIONS}" \
     "${BASEDIR}"/../linux-macos/build.sh
 
-export LIBKRIGING_PATH=${PWD}/build/installed
- 
+export LIBKRIGING_PATH=${PWD}/${BUILD_DIR:-build}/installed
+
+NPROC=1
+if ( command -v nproc >/dev/null 2>&1 ); then
+  NPROC=$(nproc)
+fi
+
 cd bindings/R
 make uninstall || true
 make clean
-MAKEFLAGS=-j$(nproc)
+MAKEFLAGS=-j${NPROC}
 MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make

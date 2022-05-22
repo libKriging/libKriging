@@ -8,6 +8,7 @@ add_library(Kriging
         LinearRegression.cpp include/libKriging/LinearRegression.hpp
         LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         Trend.cpp include/libKriging/Trend.hpp
+        Optim.cpp include/libKriging/Optim.hpp
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
         Covariance.cpp include/libKriging/Covariance.hpp
@@ -18,6 +19,7 @@ add_library(Kriging
         Bench.cpp include/libKriging/Bench.hpp
         CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
         include/libKriging/utils/LinearHashStorage.hpp
+        include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/version.hpp ${VERSION_FILE})
 
 if (CXX_CLANG_TIDY)
@@ -26,7 +28,7 @@ if (CXX_CLANG_TIDY)
             CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
 endif ()
 
-target_link_libraries(Kriging PUBLIC armadillo)
+target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp)
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html

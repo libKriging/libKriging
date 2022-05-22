@@ -1,7 +1,11 @@
 # make
 export PATH="/c/Program Files/make/make-4.3/bin":${PATH}
 
-REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe")
+REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe" |& grep -v "Permission denied") || true
+if [ -z "$REXE" ]; then
+  echo "Cannot find R executable" >&2
+  exit 1
+fi
 RDIR=$(dirname "$REXE")
 export PATH="$RDIR":$PATH
 

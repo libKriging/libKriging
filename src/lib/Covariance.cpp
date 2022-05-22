@@ -19,53 +19,94 @@
 //' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
 // Covariance function on normalized data
 
-std::function<double(const arma::vec&)> Covariance::CovNorm_fun_gauss = [](const arma::vec& _dist_norm) {
-  const double temp = arma::dot(_dist_norm, _dist_norm);
-  return exp(-0.5 * temp);
-};
+std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_gauss
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        const arma::vec& dXnorm = _dX / _theta;
+        return exp(-0.5 * arma::dot(dXnorm, dXnorm));
+      };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_gauss
-    = [](const arma::vec& _dist_norm) { return _dist_norm % _dist_norm; };
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_gauss
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::conv_to<arma::colvec>::from(_dX % _dX / arma::pow(_theta, 3));
+      };
 
-std::function<double(const arma::vec&)> Covariance::CovNorm_fun_exp
-    = [](const arma::vec& _dist_norm) { return exp(-arma::sum(arma::abs(_dist_norm))); };
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_gauss
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::conv_to<arma::colvec>::from(-_dX / arma::square(_theta));
+      };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_exp
-    = [](const arma::vec& _dist_norm) { return arma::abs(_dist_norm); };
+std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_exp
+    = [](const arma::vec& _dX, const arma::vec& _theta) { return exp(-arma::sum(arma::abs(_dX / _theta))); };
+
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_exp
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::conv_to<arma::colvec>::from(arma::abs(_dX / arma::square(_theta)));
+      };
+
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_exp
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::conv_to<arma::colvec>::from(-arma::sign(_dX) / _theta);
+      };
 
 const double SQRT_3 = std::sqrt(3.0);
 
-std::function<double(const arma::vec&)> Covariance::CovNorm_fun_matern32 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_3 * arma::abs(_dist_norm);
-  return exp(-arma::sum(d - arma::log1p(d)));
-};
+std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_matern32
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_3 * arma::abs(_dX / _theta);
+        return exp(-arma::sum(d - arma::log1p(d)));
+      };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_matern32 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_3 * arma::abs(_dist_norm);
-  return arma::conv_to<arma::vec>::from((d % d) / (1 + d));
-};
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_matern32
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_3 * arma::abs(_dX / _theta);
+        return arma::conv_to<arma::colvec>::from((d % d) / (1 + d) / _theta);
+      };
+
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_matern32
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_3 * arma::abs(_dX / _theta);
+        return arma::conv_to<arma::colvec>::from(-SQRT_3 * arma::sign(_dX) % d / (1 + d) / _theta);
+      };
 
 const double SQRT_5 = std::sqrt(5.0);
 
-std::function<double(const arma::vec&)> Covariance::CovNorm_fun_matern52 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_5 * arma::abs(_dist_norm);
-  return exp(-arma::sum(d - arma::log1p(d + (d % d) / 3)));
-};
+std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_matern52
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_5 * arma::abs(_dX / _theta);
+        return exp(-arma::sum(d - arma::log1p(d + (d % d) / 3)));
+      };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_matern52 = [](const arma::vec& _dist_norm) {
-  arma::vec d = SQRT_5 * arma::abs(_dist_norm);
-  arma::vec a = 1 + d;
-  arma::vec b = (d % d) / 3;
-  return arma::conv_to<arma::vec>::from((a % b) / (a + b));
-};
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_matern52
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_5 * arma::abs(_dX / _theta);
+        arma::vec a = 1 + d;
+        arma::vec b = (d % d) / 3;
+        return arma::conv_to<arma::colvec>::from((a % b) / (a + b) / _theta);
+      };
+
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_matern52
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        arma::vec d = SQRT_5 * arma::abs(_dX / _theta);
+        arma::vec a = 1 + d;
+        arma::vec b = d / 3;
+        return arma::conv_to<arma::colvec>::from(-SQRT_5 * arma::sign(_dX) % (a % b) / (a + d % b) / _theta);
+      };
 
 const double EPSILON = 1E-13;
 
-std::function<double(const arma::vec&)> Covariance::CovNorm_fun_whitenoise = [](const arma::vec& _dist_norm) {
-  if (arma::sum(arma::abs(_dist_norm)) < EPSILON)
-    return 1.0;
-  return 0.0;
-};
+std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_whitenoise
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        if (arma::sum(arma::abs(_dX / _theta)) < EPSILON)
+          return 1.0;
+        return 0.0;
+      };
 
-std::function<arma::vec(const arma::vec&)> Covariance::Dln_CovNorm_whitenoise
-    = [](const arma::vec& _dist_norm) { return arma::vec(_dist_norm.n_elem); };
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_whitenoise
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::vec(_dX.n_elem);  // TBD
+      };
+
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_whitenoise
+    = [](const arma::vec& _dX, const arma::vec& _theta) {
+        return arma::vec(_dX.n_elem);  // TBD
+      };

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
+if [[ "$DEBUG_CI" == "true" ]]; then
+  set -x
+fi
+
 if [ "${GITHUB_ACTIONS:=false}" == "false" ]; then
   
   # ~/.R/Makevars will override values in $(R_HOME}/etc$(R_ARCH)/Makeconf
@@ -10,7 +14,11 @@ if [ "${GITHUB_ACTIONS:=false}" == "false" ]; then
   mkdir -p ~/.R
   
   # Could be updated after install; cannot fail
-  REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe")
+  REXE=$(which R 2>/dev/null) || REXE=$(find "/c/Program Files" -wholename "*/bin/x64/R.exe" |& grep -v "Permission denied" || true)
+  if [ -z "$REXE" ]; then
+    echo "Cannot find R executable" >&2
+    exit 1
+  fi
   RVERSION=$("$REXE" --version 2>&1 | grep -o "R version [[:digit:]]\.[[:digit:]]")
   
   # https://cran.r-project.org/bin/windows/Rtools

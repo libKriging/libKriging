@@ -149,25 +149,28 @@ std::string kriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false) {
+Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false, bool deriv = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  auto pred = impl_ptr->predict(X, stdev, cov);
-  if (stdev & cov) {
-    return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred),
-                              Rcpp::Named("stdev") = std::get<1>(pred),
-                              Rcpp::Named("cov") = std::get<2>(pred));
-  } else if (stdev & !cov) {
-    return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred), Rcpp::Named("stdev") = std::get<1>(pred));
-  } else if (!stdev & cov) {
-    return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred), Rcpp::Named("cov") = std::get<2>(pred));
-  } else if (!stdev & !cov) {
-    return Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
+  auto pred = impl_ptr->predict(X, stdev, cov, deriv);
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
+  if (stdev) {
+    ret.push_back(std::get<1>(pred), "stdev");
   }
+  if (cov) {
+    ret.push_back(std::get<2>(pred), "cov");
+  }
+  if (deriv) {
+    ret.push_back(std::get<3>(pred), "mean_deriv");
+    ret.push_back(std::get<4>(pred), "stdev_deriv");
+  }
+
+  return ret;
 }
 
 // [[Rcpp::export]]
@@ -206,16 +209,16 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool grad = f
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, grad, hess);
-  if (hess) {
-    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll),
-                              Rcpp::Named("logLikelihoodGrad") = std::get<1>(ll),
-                              Rcpp::Named("logLikelihoodHess") = std::get<2>(ll));
-  } else if (grad & !hess) {
-    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll),
-                              Rcpp::Named("logLikelihoodGrad") = std::get<1>(ll));
-  } else if (!grad & !hess) {
-    return Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+  if (grad) {
+    ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
   }
+  if (hess) {
+    ret.push_back(std::get<2>(ll), "logLikelihoodHess");
+  }
+
+  return ret;
 }
 
 // [[Rcpp::export]]
@@ -238,12 +241,13 @@ Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool grad = fal
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, grad);
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
   if (grad) {
-    return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo),
-                              Rcpp::Named("leaveOneOutGrad") = std::get<1>(loo));
-  } else {
-    return Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
+    ret.push_back(std::get<1>(loo), "leaveOneOutGrad");
   }
+
+  return ret;
 }
 
 // [[Rcpp::export]]
@@ -266,12 +270,13 @@ Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = fal
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad);
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   if (grad) {
-    return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp),
-                              Rcpp::Named("logMargPostGrad") = std::get<1>(lmp));
-  } else {
-    return Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
+    ret.push_back(std::get<1>(lmp), "logMargPostGrad");
   }
+
+  return ret;
 }
 
 // [[Rcpp::export]]

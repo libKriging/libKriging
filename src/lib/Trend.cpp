@@ -6,8 +6,8 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-#include "libKriging/Trend.hpp"
 #include "libKriging/KrigingException.hpp"
+#include "libKriging/Trend.hpp"
 
 #include <cassert>
 
@@ -31,10 +31,9 @@ std::string Trend::toString(const Trend::RegressionModel& e) {
   return Trend::enum_RegressionModel_strings[static_cast<int>(e)];
 }
 
-arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel,
-                                       const arma::mat& newX,
-                                       arma::uword n,
-                                       arma::uword d) {
+arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, const arma::mat& newX) {
+  arma::uword n = newX.n_rows;
+  arma::uword d = newX.n_cols;
   arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
     case Trend::RegressionModel::Constant: {

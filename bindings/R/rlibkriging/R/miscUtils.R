@@ -42,50 +42,12 @@ regmodel2formula = function(regmodel) {
   else stop("Unsupported regmodel ",regmodel)
 }
 
-
-## Setup computing parameters used in \code{Kriging} Object
-
-## ****************************************************************************
-#' Setup numerical nugget used in Cholesky decompositions
-#'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#' 
-#' @param x Numerical nugget value.
-#' @param ... Ignored
-#' 
-#' @export
-set_num_nugget <- function(x, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    linalg_set_num_nugget(x)
-}
-
-
-## ****************************************************************************
-#' Get numerical nugget used in Cholesky decompositions
-#'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#' 
-#' @param ... Ignored
-#' 
-#' @return numerical nugget used.
-#' 
-#' @export
-get_num_nugget <- function(...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    return(linalg_get_num_nugget())
-}
-
-
-## ****************************************************************************
-#' Set random ssed used in fit/optim
-#'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#' 
-#' @param x Seed for mt19937 RNG
-#' @param ... Ignored
-#' #' 
-#' @export
-reset_seed <- function(x,...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    random_reset_seed(x)
+as_numeric_matrix = function(x) {
+  if (is.matrix(x) & is.numeric(x))
+    return(x)
+  if (is.vector(x) & is.numeric(x))
+    return(matrix(x,nrow=1))
+  if (is.data.frame(x))
+    return(data.matrix(x))
+  stop(paste0("Data no convertible to numeric matrix: ", typeof(x)))
 }

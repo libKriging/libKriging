@@ -99,15 +99,19 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 5}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
   const bool withStd = flag_output_compliance<2>(input, "withStd", output, 1);
   const bool withCov = flag_output_compliance<3>(input, "withCov", output, 2);
-  auto [y_pred, stderr_v, cov_m] = km->predict(input.get<1, arma::mat>("matrix"), withStd, withCov);
+  const bool withDeriv = flag_output_compliance<4>(input, "withDeriv", output, 3);
+  auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m]
+      = km->predict(input.get<1, arma::mat>("matrix"), withStd, withCov, withDeriv);
   output.set<0>(y_pred, "predicted response");
   output.setOptional<1>(stderr_v, "stderr vector");
   output.setOptional<2>(cov_m, "cov matrix");
+  output.setOptional<3>(mean_deriv_m, "predicted mean deriv matrix");
+  output.setOptional<4>(stderr_deriv_m, "predicted stdev deriv matrix");
 }
 
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -145,11 +149,11 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
+                 RequiresArg::Range{2, 3}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObject<0, NuggetKriging>("NuggetKriging reference");
   const bool want_grad = flag_output_compliance<2>(input, "want_grad", output, 1);
-  auto [ll, llgrad] = km->logLikelihoodFun(input.get<1, arma::vec>("theta"), want_grad);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<1, arma::vec>("theta_alpha"), want_grad);
   output.set<0>(ll, "ll");                  // FIXME better name
   output.setOptional<1>(llgrad, "llgrad");  // FIXME better name
 }

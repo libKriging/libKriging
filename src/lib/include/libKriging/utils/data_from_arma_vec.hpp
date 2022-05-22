@@ -1,0 +1,10 @@
+#ifndef LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_DATA_FROM_ARMA_VEC_HPP
+#define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_DATA_FROM_ARMA_VEC_HPP
+
+namespace std {
+inline double* data(arma::vec& x) {
+  return x.memptr();
+}
+}  // namespace std
+
+#endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_DATA_FROM_ARMA_VEC_HPP

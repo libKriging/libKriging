@@ -1,11 +1,14 @@
 library(testthat)
-library(rlibkriging)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#rlibkriging:::optim_log(2)
+#rlibkriging:::optim_use_reparametrize(FALSE)
+#rlibkriging:::optim_set_theta_lower_factor(0.02)
 
 context("Fit: 1D")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 n <- 5
-set.seed(1234)
+set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 k = NULL
@@ -14,15 +17,15 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- Kriging(y, X, "gauss")
 
 ll = Vectorize(function(x) logLikelihoodFun(r,x)$logLikelihood)
-plot(ll,xlim=c(0.000001,1))
-  for (x in seq(0.000001,1,,11)){
+plot(ll,xlim=c(0.000001,10))
+  for (x in seq(0.000001,10,,11)){
     envx = new.env()
     ll2x = logLikelihoodFun(r,x)$logLikelihood
     gll2x = logLikelihoodFun(r,x,grad = T)$logLikelihoodGrad
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
 
-theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
+theta_ref = optimize(ll,interval=c(0.001,10),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
@@ -103,7 +106,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
 r <- Kriging(y, X, "gauss", parameters=list(theta=parinit))
 l = as.list(r)
 
-save(list=ls(),file="fit-2d-multistart.Rdata")
+# save(list=ls(),file="fit-2d-multistart.Rdata")
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));
@@ -158,9 +161,15 @@ contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
 # use same startup point for convergence
 r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
              parameters=list(theta=matrix(k@parinit,ncol=2)))
+#mll2_fun <- function(x) -apply(x,1,
+#                              function(theta)
+#                                r$logLikelihoodFun(theta)$logLikelihood
+#)
+#contour(x,x,matrix(mll2_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
+
 l = as.list(r)
 
-save(list=ls(),file="fit-2d.Rdata")
+# save(list=ls(),file="fit-2d.Rdata")
 
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='red')
 points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
@@ -190,7 +199,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 r <- Kriging(y, X, "gauss",parameters=list(theta=matrix(c(0.25,10),ncol=2)))
 l = as.list(r)
 
-save(list=ls(),file="fit-2d-not01.Rdata")
+# save(list=ls(),file="fit-2d-not01.Rdata")
 
 ll_r = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
 # print(dim(X));

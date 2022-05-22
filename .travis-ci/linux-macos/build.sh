@@ -19,6 +19,10 @@ export ENABLE_MEMCHECK=${ENABLE_MEMCHECK:-off}
 export ENABLE_STATIC_ANALYSIS=${ENABLE_STATIC_ANALYSIS:-off}
 export SANITIZE=${SANITIZE:-off}
 
+BASEDIR=$(dirname "$0")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
+test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
+
 if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
     cd "${TRAVIS_BUILD_DIR}"
 fi
@@ -47,8 +51,8 @@ case "$COMPILER" in
     ;;
 esac
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR:-build}
+cd ${BUILD_DIR:-build}
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE="${MODE}" \

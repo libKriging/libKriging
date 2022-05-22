@@ -298,6 +298,9 @@ print.NuggetKriging <- function(x, ...) {
 #' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
 #'
+#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#'     of the predictions are returned.
+#'
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -327,15 +330,16 @@ print.NuggetKriging <- function(x, ...) {
 #' lines(x, p_x$mean, col = "blue")
 #' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
 #' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
-predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, ...) {
+predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     ## manage the data frame case. Ideally we should then warn
+    if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(k$X))
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(nuggetkriging_predict(object, x, stdev, cov))
+    return(nuggetkriging_predict(object, x, stdev, cov, deriv))
 }
 
 ## predict <- function (...) UseMethod("predict")
@@ -389,6 +393,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, ...) {
 simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object) 
+    if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x = matrix(x, ncol = ncol(k$X))
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
@@ -458,7 +463,9 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object) 
+    if (is.data.frame(newX)) newX = data.matrix(newX)
     if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
+    if (is.data.frame(newy)) newy = data.matrix(newy)
     if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
     if (ncol(newX) != ncol(k$X))
         stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
@@ -510,23 +517,24 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' 
 logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                   grad = FALSE, ...) {
-  k <- nuggetkriging_model(object) 
-  if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
-  if (ncol(theta_alpha) != ncol(k$X)+1)
-      stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
-           ncol(theta_alpha),")")
-  out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_alpha)),
-              logLikelihoodGrad = matrix(NA,nrow=nrow(theta_alpha),
-                                         ncol = ncol(theta_alpha)))
-  for (i in 1:nrow(theta_alpha)) {
-      ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
-                                  grad = isTRUE(grad))
-      out$logLikelihood[i] <- ll$logLikelihood
-      if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-  }
-  if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
-
-  return(out)
+    k <- nuggetkriging_model(object) 
+    if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
+    if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
+    if (ncol(theta_alpha) != ncol(k$X)+1)
+        stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
+             ncol(theta_alpha),")")
+    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_alpha)),
+                logLikelihoodGrad = matrix(NA,nrow=nrow(theta_alpha),
+                                           ncol = ncol(theta_alpha)))
+    for (i in 1:nrow(theta_alpha)) {
+        ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
+                                    grad = isTRUE(grad))
+        out$logLikelihood[i] <- ll$logLikelihood
+        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+    }
+    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
+  
+    return(out)
 }
 
 
@@ -598,7 +606,8 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' plot(t, lmp(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
 logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
-    k <- nuggetkriging_model(object) 
+    k <- nuggetkriging_model(object)
+    if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha,ncol=ncol(k$X)+1)
     if (ncol(theta_alpha) != ncol(k$X)+1)
         stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
