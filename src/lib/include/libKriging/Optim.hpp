@@ -10,6 +10,13 @@ class Optim {
   static bool reparametrize;
   LIBKRIGING_EXPORT static void use_reparametrize(bool do_reparametrize);
   LIBKRIGING_EXPORT static bool is_reparametrized();
+  static std::function<double(const double&)> reparam_to;
+  static std::function<arma::vec(const arma::vec&)> reparam_to;
+  static std::function<arma::vec(const arma::vec&)> reparam_from;
+  static std::function<double(const double&)> reparam_from;
+  static std::function<arma::vec(const arma::vec&, const arma::vec&)> reparam_from_deriv;
+  static std::function<double(const double&, const double&)> reparam_from_deriv;
+  static std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> reparam_from_deriv2;
 
   static double theta_lower_factor;
   LIBKRIGING_EXPORT static void set_theta_lower_factor(double _theta_lower_factor);
@@ -25,6 +32,8 @@ class Optim {
 
   static int log_level;
   LIBKRIGING_EXPORT static void log(int t);
+  
+  static int max_restart; // eg. for wrong convergence to bounds
 
   static int max_iteration;
   LIBKRIGING_EXPORT static void set_max_iteration(int max_iteration_val);
