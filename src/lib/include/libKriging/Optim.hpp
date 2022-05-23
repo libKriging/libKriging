@@ -32,8 +32,8 @@ class Optim {
 
   static int log_level;
   LIBKRIGING_EXPORT static void log(int t);
-  
-  static int max_restart; // eg. for wrong convergence to bounds
+
+  static int max_restart;  // eg. for wrong convergence to bounds
 
   static int max_iteration;
   LIBKRIGING_EXPORT static void set_max_iteration(int max_iteration_val);

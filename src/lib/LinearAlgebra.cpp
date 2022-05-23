@@ -42,7 +42,7 @@ arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
       throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
-      X.diag() += LinearAlgebra::num_nugget; // inc diagonal
+      X.diag() += LinearAlgebra::num_nugget;  // inc diagonal
       return LinearAlgebra::safe_chol_lower(X, inc_cond + 1);
     }
   } else {

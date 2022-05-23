@@ -507,8 +507,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = Optim::reparam_from(_gamma);
@@ -517,13 +516,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-          *grad_out = -Optim::reparam_from_deriv(_theta_alpha,*grad_out);
+          *grad_out = -Optim::reparam_from_deriv(_theta_alpha, *grad_out);
         }
         return -ll;
       }};
     } else {
-      fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
@@ -539,8 +537,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = Optim::reparam_from(_gamma);
@@ -549,13 +546,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
-          *grad_out = - Optim::reparam_from_deriv(_theta_alpha,*grad_out);
+          *grad_out = -Optim::reparam_from_deriv(_theta_alpha, *grad_out);
         }
         return -lmp;
       }};
     } else {
-      fit_ofn = CacheFunction{
-        [this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
@@ -839,33 +835,36 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       arma::ivec bounds_type{d + 1, arma::fill::value(2)};  // means both upper & lower bounds
       int retry = 0;
       while (retry <= Optim::max_restart) {
-      auto result = optimizer.minimize(
-          [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-            return fit_ofn(vals_inp, &grad_out, &okm_data);
-          },
-          gamma_tmp,
-        gamma_lower.memptr(), 
-        gamma_upper.memptr(), 
-        bounds_type.memptr()
-        );
+        auto result = optimizer.minimize(
+            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+              return fit_ofn(vals_inp, &grad_out, &okm_data);
+            },
+            gamma_tmp,
+            gamma_lower.memptr(),
+            gamma_upper.memptr(),
+            bounds_type.memptr());
         arma::vec sol_to_lb = gamma_tmp.head(d) - theta_lower;
         if (Optim::reparametrize) {
           sol_to_lb = gamma_tmp - gamma_upper;
           sol_to_lb = sol_to_lb.head(d);
         }
-        if (retry < Optim::max_restart & result.num_iters <= 2*d & any(abs(sol_to_lb) < arma::datum::eps)) { // we fastly converged to one bound
-          gamma_tmp.head(d) = (theta0.row(i).t() + theta_lower) / pow(2.0,retry+1); // so, re-use previous starting point and change it to middle-point
+        if (retry < Optim::max_restart & result.num_iters <= 2 * d
+            & any(abs(sol_to_lb) < arma::datum::eps)) {  // we fastly converged to one bound
+          gamma_tmp.head(d)
+              = (theta0.row(i).t() + theta_lower)
+                / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
           gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
-          if (Optim::log_level>0)
+          if (Optim::log_level > 0)
             arma::cout << "    start_point: " << gamma_tmp.t() << " ";
           if (Optim::reparametrize)
             gamma_tmp = Optim::reparam_to(gamma_tmp);
-          if (Optim::log_level>0) {
+          if (Optim::log_level > 0) {
             arma::cout << "    iterations: " << result.num_iters << arma::endl;
           }
           retry++;
         } else {
-      if (Optim::log_level>1) result.print();
+          if (Optim::log_level > 1)
+            result.print();
           break;
         }
       }
@@ -1121,7 +1120,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   Sigma_cond.diag() += m_nugget;
   for (arma::uword i = 0; i < Tinv_Sigma21.n_cols; i++) {
     for (arma::uword j = 0; j <= i; j++) {
-      Sigma_cond.at(i, j) -= cdot(Tinv_Sigma21.col(i),Tinv_Sigma21.col(j));
+      Sigma_cond.at(i, j) -= cdot(Tinv_Sigma21.col(i), Tinv_Sigma21.col(j));
       Sigma_cond.at(j, i) = Sigma_cond.at(i, j);
     }
   }

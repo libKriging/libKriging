@@ -866,17 +866,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-          const arma::vec _theta = Optim::reparam_from(_gamma);
+            const arma::vec _theta = Optim::reparam_from(_gamma);
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
             double ll = this->_logLikelihood(_theta, grad_out, hess_out, okm_data);
             // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
             if (grad_out != nullptr) {
               // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-            *grad_out = -Optim::reparam_from_deriv(_theta,*grad_out);
+              *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
             }
             if (hess_out != nullptr) {
               // DEBUG: if (Optim::log_level>3) arma::cout << "  > hess ll: " << hess_out << arma::endl;
-            *hess_out = -Optim::reparam_from_deriv2(_theta,*grad_out,*hess_out);
+              *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
             }
             return -ll;
           }};
@@ -904,13 +904,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-          const arma::vec _theta = Optim::reparam_from(_gamma);
+            const arma::vec _theta = Optim::reparam_from(_gamma);
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
             double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
             // DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
             if (grad_out != nullptr) {
               // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-            *grad_out = Optim::reparam_from_deriv(_theta,*grad_out);
+              *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
             }
             return loo;
           }};
@@ -936,13 +936,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-          const arma::vec _theta = Optim::reparam_from(_gamma);
+            const arma::vec _theta = Optim::reparam_from(_gamma);
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
             double lmp = this->_logMargPost(_theta, grad_out, okm_data);
             // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
             if (grad_out != nullptr) {
               // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
-            *grad_out = - Optim::reparam_from_deriv(_theta,*grad_out);
+              *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
             }
             return -lmp;
           }};
@@ -1184,30 +1184,32 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
         int retry = 0;
         while (retry <= Optim::max_restart) {
-        auto result = optimizer.minimize(
-            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-              return fit_ofn(vals_inp, &grad_out, nullptr, &okm_data);
-            },
-            gamma_tmp,
-            gamma_lower.memptr(), 
-            gamma_upper.memptr(), 
-            bounds_type.memptr()
-            );
+          auto result = optimizer.minimize(
+              [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+                return fit_ofn(vals_inp, &grad_out, nullptr, &okm_data);
+              },
+              gamma_tmp,
+              gamma_lower.memptr(),
+              gamma_upper.memptr(),
+              bounds_type.memptr());
           arma::vec sol_to_lb = gamma_tmp - theta_lower;
           if (Optim::reparametrize)
             sol_to_lb = gamma_tmp - gamma_upper;
-          if (retry < Optim::max_restart & result.num_iters <= 2*d & any(abs(sol_to_lb) < arma::datum::eps)) { // we fastly converged to one bound
-            gamma_tmp = (theta0.row(i).t() + theta_lower) / pow(2.0,retry+1); // so, re-use previous starting point and change it to middle-point
-            if (Optim::log_level>0)
+          if (retry < Optim::max_restart & result.num_iters <= 2 * d
+              & any(abs(sol_to_lb) < arma::datum::eps)) {  // we fastly converged to one bound
+            gamma_tmp = (theta0.row(i).t() + theta_lower)
+                        / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
+            if (Optim::log_level > 0)
               arma::cout << "    start_point: " << gamma_tmp.t() << " ";
             if (Optim::reparametrize)
               gamma_tmp = Optim::reparam_to(gamma_tmp);
-            if (Optim::log_level>0) {
+            if (Optim::log_level > 0) {
               arma::cout << "    iterations: " << result.num_iters << arma::endl;
             }
             retry++;
           } else {
-        if (Optim::log_level>1) result.print();
+            if (Optim::log_level > 1)
+              result.print();
             break;
           }
         }
@@ -1305,7 +1307,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
             gamma_lower,
             gamma_upper);
 
-        if (Optim::log_level>0) {
+        if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
           if (Optim::reparametrize)
             arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp.t()) << " ";
@@ -1574,7 +1576,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat Sigma_cond = trimatl(Sigma);
   for (arma::uword i = 0; i < Tinv_Sigma21.n_cols; i++) {
     for (arma::uword j = 0; j <= i; j++) {
-      Sigma_cond.at(i, j) -= cdot(Tinv_Sigma21.col(i),Tinv_Sigma21.col(j));
+      Sigma_cond.at(i, j) -= cdot(Tinv_Sigma21.col(i), Tinv_Sigma21.col(j));
       Sigma_cond.at(j, i) = Sigma_cond.at(i, j);
     }
   }
