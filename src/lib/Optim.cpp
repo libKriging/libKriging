@@ -18,6 +18,19 @@ LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
   return Optim::reparametrize;
 };
 
+std::function<double(const double&)> Optim::reparam_to_ = [](const double& _theta) { return -std::log(_theta); };
+std::function<arma::vec(const arma::vec&)> Optim::reparam_to
+    = [](const arma::vec& _theta) { return arma::conv_to<arma::colvec>::from(-arma::log(_theta)); };
+std::function<double(const double&)> Optim::reparam_from_ = [](const double& _gamma) { return std::exp(-_gamma); };
+std::function<arma::vec(const arma::vec&)> Optim::reparam_from
+    = [](const arma::vec& _gamma) { return arma::conv_to<arma::colvec>::from(arma::exp(-_gamma)); };
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Optim::reparam_from_deriv =
+    [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(-_grad % _theta); };
+std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> Optim::reparam_from_deriv2
+    = [](const arma::vec& _theta, const arma::vec& _grad, const arma::mat& _hess) {
+        return arma::conv_to<arma::mat>::from(_grad - _hess % _theta);
+      };
+
 double Optim::theta_lower_factor = 0.02;
 
 LIBKRIGING_EXPORT void Optim::set_theta_lower_factor(double _theta_lower_factor) {
@@ -53,6 +66,8 @@ int Optim::log_level = 0;
 LIBKRIGING_EXPORT void Optim::log(int l) {
   Optim::log_level = l;
 };
+
+int Optim::max_restart = 10;
 
 int Optim::max_iteration = 20;
 
