@@ -8,7 +8,7 @@ if [[ ! -d "${LIBKRIGING_PATH}" ]]; then
 fi
 
 BASEDIR=$(dirname "$0")
-BASEDIR=$(readlink -f "${BASEDIR}")
+BASEDIR=$(cd "$BASEDIR" && pwd -P)
 
 TMPDIR=$(mktemp -d)
 ARMA_LIBS=$(cmake -DLIBKRIGING_PATH="${LIBKRIGING_PATH}" -B "${TMPDIR}" "${BASEDIR}" | sed -n -r -e 's/^-- EXTERNAL_LIBS=(.*)$/\1/p')
