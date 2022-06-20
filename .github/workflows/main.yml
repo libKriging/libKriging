@@ -68,10 +68,10 @@ jobs:
             os: macOS-10.15
             mode: Debug
             enable_python: on
-          #- name: "Windows Debug"
-          #  os: windows-2019
-          #  mode: Debug
-          #  enable_python: on
+          - name: "Windows Debug"
+            os: windows-2019
+            mode: Debug
+            enable_python: on
           - name: "Octave Linux"
             os: ubuntu-20.04
             mode: Release
