@@ -31,6 +31,16 @@ if [[ "$DEBUG_CI" == "true" ]]; then
     else
       echo "No Fortran compiler command found"
     fi
+    
+    echo "------------------------------------"
+
+    if ( R CMD config FC >/dev/null 2>&1 ); then
+      FC=$(R CMD config FC | awk '{ print $1 }')
+      echo "R Fortran config: ${FC}"
+      ${FC} --version 2>&1 | sed 's/^/  /'
+    else
+      echo "No R Fortran compiler command found"
+    fi
 
     echo "------------------------------------"
 

@@ -30,10 +30,20 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 # export EXTRA_SYSTEM_LIBRARY_PATH="C:/Program Files/MATLAB/R2022a/extern/lib/win64/microsoft"
 # EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBLAS_NAMES=libmwblas -DLAPACK_NAMES=libmwlapack"
 
+if [[ -z ${CMAKE_Fortran_COMPILER} ]]; then
+  CMAKE_Fortran_COMPILER="$(R CMD config FC | awk '{ print $1 }')"
+fi
+
+if [[ -z ${Fortran_LINK_FLAGS} ]]; then
+  Fortran_LINK_FLAGS="$(R CMD config FLIBS)"
+fi
+
+
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}
 cmake \
-  -DCMAKE_Fortran_COMPILER=$(command -v gfortran) \
+  -DCMAKE_Fortran_COMPILER="${CMAKE_Fortran_COMPILER}" \
+  -DFortran_LINK_FLAGS="${Fortran_LINK_FLAGS}" \
   -DCMAKE_GENERATOR_PLATFORM=x64 \
   -DEXTRA_SYSTEM_LIBRARY_PATH="${EXTRA_SYSTEM_LIBRARY_PATH}" \
   -DENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING} \

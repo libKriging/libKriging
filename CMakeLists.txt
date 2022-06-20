@@ -28,7 +28,6 @@ project(libKriging
 #------------------------------------------------------
 
 enable_language(CXX)
-enable_language(Fortran)
 
 #------------------------------------------------------
 
@@ -170,6 +169,9 @@ include_directories(SYSTEM ${CMAKE_BINARY_DIR}/dependencies/optim/header_only_ve
 
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 add_subdirectory(dependencies/lbfgsb_cpp)
+#set(lbfgsb_INSTALL_DIR "${CMAKE_BINARY_DIR}/lbfgsb-installed")
+#set(lbfgsb_DIR "${lbfgsb_INSTALL_DIR}/lib/cmake/lbfgsb")
+#find_package(lbfgsb CONFIG REQUIRED)
 
 #------------------------------------------------------
 
