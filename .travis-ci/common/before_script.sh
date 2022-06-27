@@ -100,7 +100,11 @@ if [[ "$DEBUG_CI" == "true" ]]; then
     # Python3 is named python in Windows, but we add a symlink
     if ( command -v python3 >/dev/null 2>&1 ); then
       echo "Python3 config: $(command -v python3)"
-      python3 --version 2>&1 | sed 's/^/  /'
+      {
+        python3 --version 2>&1 | sed 's/^/  /'
+      } || {
+        echo "Cannot execute python3 --version"
+      }
     else
       echo "No python3 command found"
     fi
