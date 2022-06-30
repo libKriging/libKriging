@@ -12,7 +12,7 @@
 setOldClass("NuggetKriging")
 
 ## *****************************************************************************
-#' @name NKM
+#' @name NKM-class
 #' @title S4 class for NuggetKriging Models Extending the \code{"km"} Class
 #' 
 #' @description This class is intended to be used either by using its
