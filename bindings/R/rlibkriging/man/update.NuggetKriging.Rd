@@ -4,7 +4,7 @@
 \alias{update.NuggetKriging}
 \title{Update a \code{NuggetKriging} Object with New Points}
 \usage{
-\method{update}{NuggetKriging}(object, newy, newX, normalize = FALSE, ...)
+\method{update}{NuggetKriging}(object, newy, newX, ...)
 }
 \arguments{
 \item{object}{S3 NuggetKriging object.}
@@ -12,9 +12,6 @@
 \item{newy}{Numeric vector of new responses (output).}
 
 \item{newX}{Numeric matrix of new input points.}
-
-\item{normalize}{Logical. If \code{TRUE}, the input \code{X} and
-the output \code{y} are normalized to lie in \eqn{[0, 1]}.}
 
 \item{...}{Ignored.}
 }

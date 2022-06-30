@@ -5,9 +5,9 @@ Version: 0.6-0
 Date: 2022-05-23
 Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>, Yves Deville <deville.yves@alpestat.com>
 Maintainer: Yves Deville <deville.yves@alpestat.com>
-Description: An R interface to the libKriging library that should
-    provide most/some of the features of the DiceKriging package with
-    improved performance.
+Description: An R interface to C++ libKriging library that should
+    provide most standard kriging / gaussian process regression features 
+    (like in DiceKriging, kergp or RobustGaSP packages).
 License: Apache License (>= 2)
 Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
@@ -16,4 +16,4 @@ Imports: Rcpp (>= 0.12.11), methods
 Suggests: DiceKriging, testthat, RobustGaSP, utils, DiceDesign, foreach
 SystemRequirements: GNU make
 URL: https://github.com/libKriging
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.0

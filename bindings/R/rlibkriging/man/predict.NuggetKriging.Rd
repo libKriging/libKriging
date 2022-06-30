@@ -4,7 +4,7 @@
 \alias{predict.NuggetKriging}
 \title{Prediction Method  for a \code{NuggetKriging} Object}
 \usage{
-\method{predict}{NuggetKriging}(object, x, stdev = TRUE, cov = FALSE, ...)
+\method{predict}{NuggetKriging}(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...)
 }
 \arguments{
 \item{object}{S3 NuggetKriging object.}
@@ -16,6 +16,9 @@ is returned.}
 
 \item{cov}{\code{Logical}. If \code{TRUE} the covariance matrix of
 the predictions is returned.}
+
+\item{deriv}{\code{Logical}. If \code{TRUE} the derivatives of mean and sd
+of the predictions are returned.}
 
 \item{...}{Ignored.}
 }
