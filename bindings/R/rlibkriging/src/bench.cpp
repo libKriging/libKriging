@@ -25,7 +25,6 @@ arma::mat bench_cholsym(int n, arma::mat X) {
 }
 
 //' @export
-//' @export
 // [[Rcpp::export]]
 arma::mat bench_invsympd(int n, arma::mat X) {
   Bench* b = new Bench(n);

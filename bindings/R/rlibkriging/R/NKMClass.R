@@ -12,7 +12,6 @@
 setOldClass("NuggetKriging")
 
 ## *****************************************************************************
-#' @name NKM-class
 #' @title S4 class for NuggetKriging Models Extending the \code{"km"} Class
 #' 
 #' @description This class is intended to be used either by using its
@@ -55,12 +54,12 @@ setOldClass("NuggetKriging")
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
+#' @name NKM-class
 #' @rdname NKM-class
+#' @exportClass NKM
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
 #'     \pkg{DiceKriging} package. The creator \code{\link{NKM}}.
-#' 
-#' @export
 #' 
 if (requireNamespace("DiceKriging", quietly = TRUE))
   setClass("NKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "km")

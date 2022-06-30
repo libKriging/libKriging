@@ -12,7 +12,6 @@
 setOldClass("Kriging")
 
 ## *****************************************************************************
-#' @name KM-class
 #' @title S4 class for Kriging Models Extending the \code{"km"} Class
 #' 
 #' @description This class is intended to be used either by using its
@@ -55,12 +54,12 @@ setOldClass("Kriging")
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
+#' @name KM-class
 #' @rdname KM-class
+#' @exportClass KM
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
 #'     \pkg{DiceKriging} package. The creator \code{\link{KM}}.
-#' 
-#' @export
 #' 
 if (requireNamespace("DiceKriging", quietly = TRUE))
   setClass("KM", slots = c("Kriging" = "Kriging"), contains = "km")
