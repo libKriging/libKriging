@@ -11,7 +11,7 @@
 ## slot in a `NKM` object
 setOldClass("NuggetKriging")
 
-if (requireNamespace("DiceKriging", quietly = TRUE))
+#if (requireNamespace("DiceKriging", quietly = TRUE))
 ## *****************************************************************************
 #' @title S4 class for NuggetKriging Models Extending the \code{"km"} Class
 #' 
@@ -57,6 +57,7 @@ if (requireNamespace("DiceKriging", quietly = TRUE))
 #'
 #' @name NKM-class
 #' @rdname NKM-class
+#' @import DiceKriging
 #' @export
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
