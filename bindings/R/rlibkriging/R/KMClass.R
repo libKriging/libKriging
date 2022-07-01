@@ -11,6 +11,7 @@
 ## slot in a `KM` object
 setOldClass("Kriging")
 
+if (requireNamespace("DiceKriging", quietly = TRUE))
 ## *****************************************************************************
 #' @title S4 class for Kriging Models Extending the \code{"km"} Class
 #' 
@@ -56,13 +57,12 @@ setOldClass("Kriging")
 #'
 #' @name KM-class
 #' @rdname KM-class
-#' @exportClass KM
+#' @export
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
 #'     \pkg{DiceKriging} package. The creator \code{\link{KM}}.
 #' 
-if (requireNamespace("DiceKriging", quietly = TRUE))
-  setClass("KM", slots = c("Kriging" = "Kriging"), contains = "km")
+setClass("KM", slots = c("Kriging" = "Kriging"), contains = "km")
 
 ## *****************************************************************************
 #' Create an object of S4 class \code{"KM"} similar to a
