@@ -7,12 +7,14 @@
 
 #include "libKriging/LinearAlgebra.hpp"
 
+// [[Rcpp::export]]
 double linalg_get_num_nugget() {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->get_num_nugget();
 }
 
+// [[Rcpp::export]]
 void linalg_set_num_nugget(double nugget) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
