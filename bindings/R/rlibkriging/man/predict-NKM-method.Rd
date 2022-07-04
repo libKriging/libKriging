@@ -73,7 +73,7 @@ y <- apply(design.fact, 1, DiceKriging::branin) + rnorm(nrow(design.fact))
 ## library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget
 ## m1 <- km(design = design.fact, response = y, covtype = "gauss",
-            nugget.estim=TRUE,
+##          nugget.estim=TRUE,
 ##          parinit = c(.5, 1), control = list(trace = FALSE))
 KM1 <- NKM(design = design.fact, response = y, covtype = "gauss",
                parinit = c(.5, 1))
