@@ -730,7 +730,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       alpha0 = arma::vec(parameters.sigma2.n_elem * parameters.nugget.n_elem);
       for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
         for (size_t j = 0; j < parameters.nugget.n_elem; j++) {
-          if ((parameters.sigma2[i] < 0) | (parameters.nugget[j] < 0) | (parameters.sigma2[i] + parameters.nugget[j] < 0))
+          if ((parameters.sigma2[i] < 0) | (parameters.nugget[j] < 0)
+              | (parameters.sigma2[i] + parameters.nugget[j] < 0))
             alpha0[i + j * parameters.sigma2.n_elem] = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
           else
             alpha0[i + j * parameters.sigma2.n_elem]
