@@ -57,7 +57,7 @@ setOldClass("Kriging")
 #'
 #' @name KM-class
 #' @rdname KM-class
-#' @import DiceKriging
+#' @importFrom DiceKriging km
 #' @export
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the

@@ -57,7 +57,7 @@ setOldClass("NuggetKriging")
 #'
 #' @name NKM-class
 #' @rdname NKM-class
-#' @import DiceKriging
+#' @importFrom DiceKriging km
 #' @export
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
