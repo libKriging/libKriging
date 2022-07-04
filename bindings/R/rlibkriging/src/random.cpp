@@ -7,8 +7,6 @@
 
 #include "libKriging/Random.hpp"
 
-//' @export
-// [[Rcpp::export]]
 void random_reset_seed(unsigned int seed) {
   Random* r = new Random();
   Rcpp::XPtr<Random> impl_ptr(r);
