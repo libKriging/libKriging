@@ -165,7 +165,6 @@ as.list.NuggetKriging <- function(x, ...) {
 #'     contains an extra \code{NuggetKriging} slot.
 #'
 #' @importFrom methods new
-#' @importFrom stats model.matrix
 #' @export
 #' @method as.km NuggetKriging
 #' 
@@ -205,7 +204,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     model@d <- ncol(m$X)
     model@n <- nrow(m$X)
     model@F <- m$F
-    colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
+    colnames(model@F) <- colnames(stats::model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
     model@noise.flag <- FALSE
     model@noise.var <- 0
@@ -314,7 +313,6 @@ print.NuggetKriging <- function(x, ...) {
 #'     and \code{cov} to \code{cov.compute}. These names are chosen
 #'     \pkg{Python} and \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
-#' @importFrom stats predict
 #' @method predict NuggetKriging
 #' @export 
 #' 
@@ -374,7 +372,6 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #'     \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
 #' 
-#' @importFrom stats simulate runif
 #' @method simulate NuggetKriging
 #' @export
 #' 
@@ -431,7 +428,6 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #'     \code{\link[DiceKriging]{update.km}} in \pkg{DiceKriging} and
 #'     \code{\link{update,KM-method}}.
 #'  
-#' @importFrom stats update
 #' @method update NuggetKriging
 #' @export 
 #' 
@@ -512,7 +508,7 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
 #' ll <- function(theta) logLikelihoodFun(r, c(theta,alpha))$logLikelihood
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
 #' 
@@ -576,14 +572,14 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' @author Yann Richet \email{yann.richet.irsn.fr}
 #' 
 #' @param object S3 NuggetKriging object.
-#' @param theta Numeric vector of coorelation range parameters at
+#' @param theta_alpha Numeric vector of coorelation range parameters at
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
-#'     (w.r.t theta)?
+#'     (w.r.t theta_alpha)?
 #' @param ... Not used.
 #' 
 #' @return The value of the log-marginal posterior computed for the
-#'     given vector theta.
+#'     given vector theta_alpha.
 #' 
 #' @method logMargPostFun NuggetKriging
 #' @export 

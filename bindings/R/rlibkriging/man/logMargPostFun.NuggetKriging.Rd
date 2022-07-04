@@ -10,17 +10,17 @@
 \arguments{
 \item{object}{S3 NuggetKriging object.}
 
+\item{theta_alpha}{Numeric vector of coorelation range parameters at
+which the function is to be evaluated.}
+
 \item{grad}{Logical. Should the function return the gradient
-(w.r.t theta)?}
+(w.r.t theta_alpha)?}
 
 \item{...}{Not used.}
-
-\item{theta}{Numeric vector of coorelation range parameters at
-which the function is to be evaluated.}
 }
 \value{
 The value of the log-marginal posterior computed for the
-    given vector theta.
+    given vector theta_alpha.
 }
 \description{
 Compute the log-marginal posterior of a kriging model, using the

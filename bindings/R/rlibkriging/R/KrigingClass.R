@@ -165,7 +165,6 @@ as.list.Kriging <- function(x, ...) {
 #'     contains an extra \code{Kriging} slot.
 #'
 #' @importFrom methods new
-#' @importFrom stats model.matrix
 #' @export
 #' @method as.km Kriging
 #' 
@@ -205,7 +204,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
     model@d <- ncol(m$X)
     model@n <- nrow(m$X)
     model@F <- m$F
-    colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
+    colnames(model@F) <- colnames(stats::model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
     model@noise.flag <- FALSE
     model@noise.var <- 0

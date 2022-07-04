@@ -730,7 +730,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       alpha0 = arma::vec(parameters.sigma2.n_elem * parameters.nugget.n_elem);
       for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
         for (size_t j = 0; j < parameters.nugget.n_elem; j++) {
-          if ((parameters.sigma2[i] < 0 | parameters.nugget[j] < 0) | (parameters.sigma2[i] + parameters.nugget[j] < 0))
+          if ((parameters.sigma2[i] < 0) | (parameters.nugget[j] < 0) | (parameters.sigma2[i] + parameters.nugget[j] < 0))
             alpha0[i + j * parameters.sigma2.n_elem] = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
           else
             alpha0[i + j * parameters.sigma2.n_elem]
@@ -848,8 +848,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
           sol_to_lb = gamma_tmp - gamma_upper;
           sol_to_lb = sol_to_lb.head(d);
         }
-        if ((retry < Optim::max_restart & result.num_iters <= 2 * d)
-            & any(abs(sol_to_lb) < arma::datum::eps)) {  // we fastly converged to one bound
+        if ((retry < Optim::max_restart) & (result.num_iters <= 2 * d)
+            & (any(abs(sol_to_lb) < arma::datum::eps))) {  // we fastly converged to one bound
           gamma_tmp.head(d)
               = (theta0.row(i).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
