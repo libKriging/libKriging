@@ -165,6 +165,7 @@ as.list.NuggetKriging <- function(x, ...) {
 #'     contains an extra \code{NuggetKriging} slot.
 #'
 #' @importFrom methods new
+#' @importFrom stats model.matrix
 #' @export
 #' @method as.km NuggetKriging
 #' 
@@ -204,7 +205,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     model@d <- ncol(m$X)
     model@n <- nrow(m$X)
     model@F <- m$F
-    colnames(model@F) <- colnames(stats::model.matrix(model@trend.formula,data))
+    colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
     model@noise.flag <- FALSE
     model@noise.var <- 0

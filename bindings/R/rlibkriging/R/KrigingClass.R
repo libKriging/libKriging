@@ -165,6 +165,7 @@ as.list.Kriging <- function(x, ...) {
 #'     contains an extra \code{Kriging} slot.
 #'
 #' @importFrom methods new
+#' @importFrom stats model.matrix
 #' @export
 #' @method as.km Kriging
 #' 
@@ -204,7 +205,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
     model@d <- ncol(m$X)
     model@n <- nrow(m$X)
     model@F <- m$F
-    colnames(model@F) <- colnames(stats::model.matrix(model@trend.formula,data))
+    colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
     model@noise.flag <- FALSE
     model@noise.var <- 0
@@ -313,7 +314,6 @@ print.Kriging <- function(x, ...) {
 #'     and \code{cov} to \code{cov.compute}. These names are chosen
 #'     \pkg{Python} and \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
-#' @importFrom stats predict
 #' @method predict Kriging
 #' @export 
 #' 
@@ -373,7 +373,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
 #'     \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
 #' 
-#' @importFrom stats simulate runif
+#' @importFrom stats runif
 #' @method simulate Kriging
 #' @export
 #' 
@@ -430,7 +430,6 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #'     \code{\link[DiceKriging]{update.km}} in \pkg{DiceKriging} and
 #'     \code{\link{update,KM-method}}.
 #'  
-#' @importFrom stats update
 #' @method update Kriging
 #' @export 
 #' 
