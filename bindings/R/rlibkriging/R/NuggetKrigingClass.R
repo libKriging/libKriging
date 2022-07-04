@@ -490,13 +490,13 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object An S3 NuggetKriging object.
-#' @param theta A numeric vector of (positive) range parameters at
+#' @param theta_alpha A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
 #' @param ... Not used.
 #' 
 #' @return The log-Likelihood computed for given
-#'     \eqn{\boldsymbol{theta}}{\theta}.
+#'     \eqn{\boldsymbol{theta_alpha}}{\theta_alpha}.
 #' 
 #' @method logLikelihoodFun NuggetKriging
 #' @export 

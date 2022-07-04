@@ -10,16 +10,16 @@
 \arguments{
 \item{object}{An S3 NuggetKriging object.}
 
+\item{theta_alpha}{A numeric vector of (positive) range parameters at
+which the log-likelihood will be evaluated.}
+
 \item{grad}{Logical. Should the function return the gradient?}
 
 \item{...}{Not used.}
-
-\item{theta}{A numeric vector of (positive) range parameters at
-which the log-likelihood will be evaluated.}
 }
 \value{
 The log-Likelihood computed for given
-    \eqn{\boldsymbol{theta}}{\theta}.
+    \eqn{\boldsymbol{theta_alpha}}{\theta_alpha}.
 }
 \description{
 Compute Log-Likelihood of NuggetKriging Model
