@@ -34,7 +34,7 @@ y <- f(X) + 0.01*rnorm(nrow(X))
 r <- NuggetKriging(y, X, "gauss")
 print(r)
 alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-lmp <- function(theta) logMargPostFun(r, c(theta,alpha))$logMargPost
+lmp <- function(theta) logMargPostFun(r, cbind(theta,alpha))$logMargPost
 t <- seq(from = 0.0001, to = 2, length.out = 101)
 plot(t, lmp(t), type = "l")
 abline(v = as.list(r)$theta, col = "blue")

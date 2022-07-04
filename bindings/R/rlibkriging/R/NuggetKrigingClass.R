@@ -508,7 +508,7 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' r <- NuggetKriging(y, X, kernel = "gauss")
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' ll <- function(theta) logLikelihoodFun(r, c(theta,alpha))$logLikelihood
+#' ll <- function(theta) logLikelihoodFun(r, cbind(theta,alpha))$logLikelihood
 #' t <- seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
@@ -599,7 +599,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' r <- NuggetKriging(y, X, "gauss")
 #' print(r)
 #' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' lmp <- function(theta) logMargPostFun(r, c(theta,alpha))$logMargPost
+#' lmp <- function(theta) logMargPostFun(r, cbind(theta,alpha))$logMargPost
 #' t <- seq(from = 0.0001, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = as.list(r)$theta, col = "blue")
