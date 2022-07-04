@@ -1099,7 +1099,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         int multistart = 1;
         try {
           multistart = std::stoi(optim.substr(4));
-        } catch (std::invalid_argument) {
+        } catch (std::invalid_argument&) {
           // let multistart = 1
         }
         theta0 = arma::repmat(trans(theta_lower), multistart, 1)
@@ -1195,7 +1195,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::vec sol_to_lb = gamma_tmp - theta_lower;
           if (Optim::reparametrize)
             sol_to_lb = gamma_tmp - gamma_upper;
-          if (retry < Optim::max_restart & result.num_iters <= 2 * d
+          if ((retry < Optim::max_restart & result.num_iters <= 2 * d)
               & any(abs(sol_to_lb) < arma::datum::eps)) {  // we fastly converged to one bound
             gamma_tmp = (theta0.row(i).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
@@ -1248,7 +1248,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         int multistart = 1;
         try {
           multistart = std::stoi(optim.substr(4));
-        } catch (std::invalid_argument) {
+        } catch (std::invalid_argument&) {
           // let multistart = 1
         }
         theta0 = arma::repmat(trans(theta_lower), multistart, 1)

@@ -68,9 +68,8 @@ struct std::hash<Kriging::OKModel*> {
       };
 
       //      return std::hash<arma::mat>{}(*s);
-    } else {
-      return 0;
     }
+    return 0;
   }
 };
 
@@ -91,9 +90,8 @@ struct std::hash<NuggetKriging::OKModel*> {
       };
 
       //      return std::hash<arma::mat>{}(*s);
-    } else {
-      return 0;
     }
+    return 0;
   }
 };
 
