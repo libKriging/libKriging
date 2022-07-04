@@ -214,14 +214,14 @@ KM <- function(formula = ~1, design, response,
     if (length(parameters) == 0) parameters <- NULL
     
     # DiceKriging standard bounds for theta
-    bounds_heuristic = rlibkriging:::optim_variogram_bounds_heuristic_used()
-    rlibkriging:::optim_use_variogram_bounds_heuristic(FALSE)
-    theta_lower_factor = rlibkriging:::optim_get_theta_lower_factor()
+    bounds_heuristic = optim_variogram_bounds_heuristic_used()
+    optim_use_variogram_bounds_heuristic(FALSE)
+    theta_lower_factor = optim_get_theta_lower_factor()
     if (is.null(lower)) lower = 1E-10
-    rlibkriging:::optim_set_theta_lower_factor(lower)
+    optim_set_theta_lower_factor(lower)
     if (is.null(upper)) upper = 2.0
-    theta_upper_factor = rlibkriging:::optim_get_theta_upper_factor()
-    rlibkriging:::optim_set_theta_upper_factor(upper)
+    theta_upper_factor = optim_get_theta_upper_factor()
+    optim_set_theta_upper_factor(upper)
 
     if (multistart<=1) multistart=""
     r <- rlibkriging::Kriging(y = response, X = design, kernel = covtype,
@@ -232,9 +232,9 @@ KM <- function(formula = ~1, design, response,
                               parameters = parameters)
     
     # Back to previous setup
-    rlibkriging:::optim_use_variogram_bounds_heuristic(bounds_heuristic)
-    rlibkriging:::optim_set_theta_lower_factor(theta_lower_factor)
-    rlibkriging:::optim_set_theta_upper_factor(theta_upper_factor)
+    optim_use_variogram_bounds_heuristic(bounds_heuristic)
+    optim_set_theta_lower_factor(theta_lower_factor)
+    optim_set_theta_upper_factor(theta_upper_factor)
 
     return(as.km.Kriging(r, .call = match.call()))
 }

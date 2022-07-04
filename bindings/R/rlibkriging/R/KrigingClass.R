@@ -56,7 +56,8 @@
 #' @export
 #' @useDynLib rlibkriging, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
-#'
+#' @importFrom utils methods
+#' 
 #' @examples
 #' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)

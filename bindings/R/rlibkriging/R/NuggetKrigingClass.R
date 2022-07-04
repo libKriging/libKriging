@@ -56,6 +56,7 @@
 #' @export
 #' @useDynLib rlibkriging, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
+#' @importFrom utils methods
 #'
 #' @examples
 #' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
