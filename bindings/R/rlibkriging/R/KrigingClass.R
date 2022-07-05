@@ -581,7 +581,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #'
 #' @title Leave-One-Out Method for the S3 class \code{"Kriging"}
 #' 
-#' @author Yann Richet \email{yann.richet.irsn.fr}
+#' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object A \code{Kriging} object.
 #' @param theta A numeric vector of range parameters at which the LOO
@@ -663,7 +663,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #'
 #' @title Compute Log-Marginal-Posterior of Kriging Model
 #' 
-#' @author Yann Richet \email{yann.richet.irsn.fr}
+#' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object S3 Kriging object.
 #' @param theta Numeric vector of coorelation range parameters at
