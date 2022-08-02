@@ -10,7 +10,7 @@
 ##        $ install_name_tool -delete_rpath ${__OLD_LC_RPATH__} ./Rlibs/rlibkriging/libs/rlibkriging.so
 
 ifneq ("${MAKE_SHARED_LIBS}","off")
-	EXTRA_PKG_LIBS= -Wl,-rpath,${LIBKRIGING_PATH}/lib
+	EXTRA_PKG_LIBS= -Wl,-rpath,"${LIBKRIGING_PATH}"/lib
 
 	ifeq ("$(shell uname -s)","Linux")
 		LIB_SUFFIX=so
@@ -32,11 +32,15 @@ EXTERNAL_LIBS=$(shell ../../tools/ExternalLibsExtractor.sh)
 CXX_STD = CXX11
 
 #PKG_CFLAGS=
-PKG_CPPFLAGS=-I${LIBKRIGING_PATH}/include -include "libKriging/utils/lkalloc.hpp" -DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc -DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free
+PKG_CPPFLAGS=-I"${LIBKRIGING_PATH}"/include -include "libKriging/utils/lkalloc.hpp" -DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc -DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
-PKG_LIBS=-L${LIBKRIGING_PATH}/lib -lKriging -larmadillo -llbfgsb $(EXTRA_PKG_LIBS) $(EXTERNAL_LIBS)
+PKG_LIBS=-L"${LIBKRIGING_PATH}"/lib -lKriging -larmadillo -llbfgsb $(EXTRA_PKG_LIBS) $(EXTERNAL_LIBS)
 MAKEFLAGS=-j$(nproc)
 
-$(SHLIB): .check ${LIBKRIGING_PATH}/lib/libKriging.$(LIB_SUFFIX) ${LIBKRIGING_PATH}/lib/libarmadillo.$(LIB_SUFFIX)
+null      :=
+SPACE     := $(null) $(null)
+
+# Funky workaround to rewrite path by escaping spaces with a backslash  
+$(SHLIB): .check $(subst $(SPACE),\$(SPACE),${LIBKRIGING_PATH})/lib/libKriging.$(LIB_SUFFIX) $(subst $(SPACE),\$(SPACE),${LIBKRIGING_PATH})/lib/libarmadillo.$(LIB_SUFFIX)
 
 include ../../check.mk
