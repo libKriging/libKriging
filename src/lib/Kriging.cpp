@@ -1151,30 +1151,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
         Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
-        //// Using OptimLib
-        // optim::algo_settings_t algo_settings;
-        // algo_settings.print_level = Optim::log_level;
-        // algo_settings.iter_max = Optim::max_iteration;
-        // algo_settings.rel_objfn_change_tol = Optim::objective_rel_tolerance;
-        // algo_settings.grad_err_tol = Optim::gradient_tolerance;
-        // algo_settings.lbfgs_settings.par_M=5;
-        // algo_settings.vals_bound = true;
-        // algo_settings.lower_bounds = theta_lower;
-        // algo_settings.upper_bounds = theta_upper;
-        //// turn-around for optimlib::lbfgs boundary bad behavior !!!
-        // algo_settings.lower_bounds = arma::max(arma::zeros(algo_settings.lower_bounds.n_elem),
-        // algo_settings.lower_bounds - 1E-3 * (algo_settings.upper_bounds - algo_settings.lower_bounds));
-        // algo_settings.upper_bounds = algo_settings.upper_bounds + 1E-1 * (algo_settings.upper_bounds -
-        // algo_settings.lower_bounds);
-        //
-        // bool bfgs_ok = optim::lbfgs(
-        //    gamma_tmp,
-        //    [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-        //      return fit_ofn(vals_inp, grad_out, nullptr, &okm_data);
-        //    },
-        //    nullptr,
-        //    algo_settings);
-
         lbfgsb::Optimizer optimizer{d};
         optimizer.iprint = Optim::log_level - 2;
         optimizer.max_iter = Optim::max_iteration;

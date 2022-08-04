@@ -163,10 +163,6 @@ set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 
-add_definitions(-DOPTIM_ENABLE_ARMA_WRAPPERS)
-include(cmake/installOptimLibHeaders.cmake)
-include_directories(SYSTEM ${CMAKE_BINARY_DIR}/dependencies/optim/header_only_version)
-
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 add_subdirectory(dependencies/lbfgsb_cpp)
 #set(lbfgsb_INSTALL_DIR "${CMAKE_BINARY_DIR}/lbfgsb-installed")
