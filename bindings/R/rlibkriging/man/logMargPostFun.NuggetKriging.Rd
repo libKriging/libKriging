@@ -46,5 +46,5 @@ XXXY A reference describing the model (prior, ...)
 \code{\link[RobustGaSP]{rgasp}} in the RobustGaSP package.
 }
 \author{
-Yann Richet \email{yann.richet.irsn.fr}
+Yann Richet \email{yann.richet@irsn.fr}
 }

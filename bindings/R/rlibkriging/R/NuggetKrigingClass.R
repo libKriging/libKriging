@@ -570,7 +570,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #'
 #' @title Compute Log-Marginal-Posterior of NuggetKriging Model
 #' 
-#' @author Yann Richet \email{yann.richet.irsn.fr}
+#' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object S3 NuggetKriging object.
 #' @param theta_alpha Numeric vector of coorelation range parameters at

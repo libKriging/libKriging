@@ -45,5 +45,5 @@ plot(t, loo(t), type = "l")
 abline(v = as.list(r)$theta, col = "blue")
 }
 \author{
-Yann Richet \email{yann.richet.irsn.fr}
+Yann Richet \email{yann.richet@irsn.fr}
 }
