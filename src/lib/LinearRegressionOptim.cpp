@@ -1,7 +1,9 @@
 #include "libKriging/LinearRegressionOptim.hpp"
 
-// @ref: https://www.kthohr.com/optimlib.html
-#include <optim.hpp>
+#include "libKriging/utils/data_from_arma_vec.hpp"
+
+#include <lbfgsb_cpp/lbfgsb.hpp>
+#include "libKriging/Optim.hpp"
 
 LIBKRIGING_EXPORT
 LinearRegressionOptim::LinearRegressionOptim() : m_sig2{} {};
@@ -43,30 +45,35 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) 
 LIBKRIGING_EXPORT
 // returned object should hold error state instead of void
 void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
-  int n = X.n_rows;
-  int k = X.n_cols;
+  arma::uword n = X.n_rows;
+  arma::uword k = X.n_cols;
 
   // We will replace that by a BFGS optimization. Just as a proof of concept for BFGS usage.
   // coef = arma::solve(X, y);
   m_coef = arma::ones(k);
   arma::cout << "Initial solution vector :\n" << m_coef << arma::endl;
-  optim::algo_settings_t algo_settings;
+
+  // like in Kriging.cpp
+  arma::vec theta_lower = Optim::theta_lower_factor * trans(max(X, 0) - min(X, 0));
+  arma::vec theta_upper = Optim::theta_upper_factor * trans(max(X, 0) - min(X, 0));
+  arma::vec gamma_lower = theta_lower;
+  arma::vec gamma_upper = theta_upper;
+
+  lbfgsb::Optimizer optimizer{k};
+  optimizer.iprint = -1;
+  optimizer.max_iter = 100;
+  optimizer.pgtol = 0.01;
+  optimizer.factr = 1e7;
+  arma::ivec bounds_type{k, arma::fill::value(2)};  // means both upper & lower bounds
+
   err_fn_data fn_data{y, X};
-  algo_settings.iter_max = 100;
-  algo_settings.grad_err_tol = 0.01;
-  algo_settings.print_level = 4;
-  algo_settings.conv_failure_switch = 2;
-  bool bfgs_ok = optim::bfgs(
-      m_coef,
-      [&fn_data](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-        return err_fn(vals_inp, grad_out, &fn_data);
-      },
-      nullptr,
-      algo_settings);
-  if (!bfgs_ok) {
-    std::cout.flush();
-    throw std::runtime_error("BFGS failed");
-  }
+  auto result
+      = optimizer.minimize([&fn_data](const arma::vec& vals_inp,
+                                      arma::vec& grad_out) -> double { return err_fn(vals_inp, &grad_out, &fn_data); },
+                           m_coef,
+                           gamma_lower.memptr(),
+                           gamma_upper.memptr(),
+                           bounds_type.memptr());
   arma::cout << "Coef: " << m_coef << arma::endl;
   arma::colvec resid = y - X * m_coef;
 

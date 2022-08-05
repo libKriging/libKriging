@@ -806,28 +806,6 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
                                       parameters.is_nugget_estim,
                                       nugget + sigma2};
 
-      //// Using OptimLib
-      // optim::algo_settings_t algo_settings;
-      // algo_settings.print_level = 0;
-      // algo_settings.iter_max = 20;
-      // algo_settings.rel_sol_change_tol = 0.01;
-      // algo_settings.grad_err_tol = 1e-8;
-      // algo_settings.vals_bound = true;
-      // algo_settings.lower_bounds = arma::vec(d + 1);
-      // algo_settings.lower_bounds.head(d) = -arma::log(theta_upper);
-      // algo_settings.lower_bounds.at(d) = 0;
-      // algo_settings.upper_bounds = arma::vec(d + 1);
-      // algo_settings.upper_bounds.head(d) = -arma::log(theta_lower);
-      // algo_settings.upper_bounds.at(d) = 1;
-      //
-      // bool bfgs_ok = optim::lbfgs(
-      //     gamma_tmp,
-      //     [&okm_data, this, fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, void*) -> double {
-      //       return fit_ofn(vals_inp, grad_out, &okm_data);
-      //     },
-      //     nullptr,
-      //     algo_settings);
-
       lbfgsb::Optimizer optimizer{d + 1};
       optimizer.iprint = Optim::log_level - 2;
       optimizer.max_iter = Optim::max_iteration;

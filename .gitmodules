@@ -14,9 +14,6 @@
 	path = dependencies/Catch2
 	url = https://github.com/catchorg/Catch2.git
 	branch = v2.x
-[submodule "dependencies/optim"]
-	path = dependencies/optim
-	url = https://github.com/libKriging/optim.git
 [submodule "dependencies/lbfgsb_cpp"]
 	path = dependencies/lbfgsb_cpp
 	url = https://github.com/libKriging/lbfgsb_cpp.git
