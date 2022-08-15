@@ -51,6 +51,8 @@ option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
+option(LBFGSB_SHOW_BUILD OFF)
+
 set(PYBIND11_PYTHON_VERSION 3.6)
 
 #------------------------------------------------------
@@ -164,10 +166,21 @@ add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
+
+if (NOT CMAKE_Fortran_COMPILER)
+    set(CMAKE_Fortran_COMPILER gfortran)
+endif()
+if (NOT Fortran_LINK_FLAGS)
+    set(Fortran_LINK_FLAGS "-lgfortran -lquadmath -lm")
+endif()
+set(ignoreUnusedVariable ${LBFGSB_SHOW_BUILD})
+message(STATUS "Compiling lbfgsb_cpp as an external library")
+
 add_subdirectory(dependencies/lbfgsb_cpp)
 #set(lbfgsb_INSTALL_DIR "${CMAKE_BINARY_DIR}/lbfgsb-installed")
 #set(lbfgsb_DIR "${lbfgsb_INSTALL_DIR}/lib/cmake/lbfgsb")
 #find_package(lbfgsb CONFIG REQUIRED)
+message(STATUS "Compilation of lbfgsb_cpp done")
 
 #------------------------------------------------------
 
