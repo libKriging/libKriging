@@ -817,7 +817,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       int retry = 0;
       while (retry <= Optim::max_restart) {
         auto result = optimizer.minimize(
-            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+            [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
               return fit_ofn(vals_inp, &grad_out, &okm_data);
             },
             gamma_tmp,
