@@ -7,8 +7,8 @@
 
 class Trend {
  public:
-  LIBKRIGING_EXPORT enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
-  LIBKRIGING_EXPORT static const char* enum_RegressionModel_strings[];
+  enum class LIBKRIGING_EXPORT RegressionModel { Constant, Linear, Interactive, Quadratic };
+  LIBKRIGING_EXPORT static const char* const enum_RegressionModel_strings[];
 
  public:
   LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
