@@ -91,8 +91,7 @@ class CacheFunction<Callable, std::function<R(Args...)>, Contexts...> : public C
       ANALYSE(m_eval_timer += diffAndUpdateTimer(t));
     } else {
 #ifdef LIBKRIGING_CACHE_VERIFY
-      auto expected_result = m_callable(std::forward<Args>(args)...);
-      assert(expected_result == finder->second);
+      assert(m_callable(std::forward<Args>(args)...) == finder->second);  // test if expected result corresponds
 #endif
     }
     return finder->second;
