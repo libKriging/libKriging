@@ -40,7 +40,7 @@ auto prepare_and_run_bench = [](auto&& bench) {
 };
 
 TEST_CASE("workflow") {
-  prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
+  prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int) {
     Kriging ok = Kriging("gauss");
     Kriging::Parameters parameters{0, false, true, arma::vec(), false, true, arma::vec(), false, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
