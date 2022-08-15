@@ -80,6 +80,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .value("Quadratic", Trend::RegressionModel::Quadratic)
       .export_values();
 
+  const Trend::RegressionModel default_regmodel = Trend::RegressionModel::Constant;
+  const bool default_normalize = false;
+  const std::string default_optim = "BFGS";
+  const std::string default_objective = "LL";
+
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<Kriging::Parameters>(m, "KrigingParameters").def(py::init<>());
 
@@ -98,10 +103,10 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = Kriging::Parameters{})
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
@@ -149,19 +154,19 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = Kriging::Parameters{})
       .def("fit",
            &Kriging::fit,
            py::arg("y"),
            py::arg("X"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = Kriging::Parameters{})
       .def("predict", &Kriging::predict)
       .def("simulate", &Kriging::simulate)
@@ -213,10 +218,10 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = NuggetKriging::Parameters{})
       .def("fit", &PyNuggetKriging::fit)
       .def("predict", &PyNuggetKriging::predict)
@@ -265,19 +270,19 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = NuggetKriging::Parameters{})
       .def("fit",
            &NuggetKriging::fit,
            py::arg("y"),
            py::arg("X"),
-           py::arg("regmodel") = Trend::RegressionModel::Constant,
-           py::arg("normalize") = false,
-           py::arg("optim") = "BFGS",
-           py::arg("objective") = "LL",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
            py::arg("parameters") = NuggetKriging::Parameters{})
       .def("predict", &NuggetKriging::predict)
       .def("simulate", &NuggetKriging::simulate)
