@@ -792,10 +792,10 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         beta = parameters.beta();
       double sigma2 = -1;
       if (parameters.has_sigma2())
-        sigma2 = parameters.sigma2()[0];  // pass the initial given value (usefull if not to be estimated)
+        sigma2 = parameters.sigma2()[0];  // pass the initial given value (useful if not to be estimated)
       double nugget = -1;
       if (parameters.has_nugget())
-        nugget = parameters.nugget()[0];  // pass the initial given value (usefull if not to be estimated)
+        nugget = parameters.nugget()[0];  // pass the initial given value (useful if not to be estimated)
 
       NuggetKriging::OKModel okm_data{T,
                                       M,
@@ -1136,17 +1136,13 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{arma::vec(1, arma::fill::value(this->m_nugget)),
-                        true,
+  Parameters parameters{std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget))),
                         this->m_est_nugget,
-                        arma::vec(1, arma::fill::value(this->m_sigma2)),
-                        true,
+                        std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2))),
                         this->m_est_sigma2,
-                        trans(this->m_theta),
-                        true,
+                        std::make_optional(trans(this->m_theta)),
                         this->m_est_theta,
-                        trans(this->m_beta),
-                        true,
+                        std::make_optional(trans(this->m_beta)),
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)

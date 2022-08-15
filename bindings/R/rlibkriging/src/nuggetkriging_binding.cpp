@@ -11,6 +11,8 @@
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
+#include <optional>
+
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,
                              arma::mat X,
@@ -96,24 +98,21 @@ Rcpp::List new_NuggetKriging(arma::vec y,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  ok->fit(std::move(y),
-          std::move(X),
-          Trend::fromString(regmodel),
-          normalize,
-          optim,
-          objective,
-          NuggetKriging::Parameters{_parameters["nugget"],
-                                    _parameters["has_nugget"],
-                                    _parameters["is_nugget_estim"],
-                                    _parameters["sigma2"],
-                                    _parameters["has_sigma2"],
-                                    _parameters["is_sigma2_estim"],
-                                    _parameters["theta"],
-                                    _parameters["has_theta"],
-                                    _parameters["is_theta_estim"],
-                                    _parameters["beta"],
-                                    _parameters["has_beta"],
-                                    _parameters["is_beta_estim"]});
+  ok->fit(
+      std::move(y),
+      std::move(X),
+      Trend::fromString(regmodel),
+      normalize,
+      optim,
+      objective,
+      NuggetKriging::Parameters{(_parameters["has_nugget"]) ? std::make_optional(_parameters["nugget"]) : std::nullopt,
+                                _parameters["is_nugget_estim"],
+                                (_parameters["has_sigma2"]) ? std::make_optional(_parameters["sigma2"]) : std::nullopt,
+                                _parameters["is_sigma2_estim"],
+                                (_parameters["has_theta"]) ? std::make_optional(_parameters["theta"]) : std::nullopt,
+                                _parameters["is_theta_estim"],
+                                (_parameters["has_beta"]) ? std::make_optional(_parameters["beta"]) : std::nullopt,
+                                _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
 

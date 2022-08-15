@@ -1,6 +1,7 @@
 #ifndef LIBKRIGING_NUGGETKRIGING_HPP
 #define LIBKRIGING_NUGGETKRIGING_HPP
 
+#include <optional>
 #include <utility>
 
 #include "libKriging/utils/lk_armadillo.hpp"
@@ -16,59 +17,47 @@ class NuggetKriging {
  public:
   class Parameters {
    private:
-    arma::vec m_nugget;
-    bool m_has_nugget = false;
+    std::optional<arma::vec> m_nugget = std::nullopt;
     bool m_is_nugget_estim = true;
-    arma::vec m_sigma2;
-    bool m_has_sigma2 = false;
+    std::optional<arma::vec> m_sigma2 = std::nullopt;
     bool m_is_sigma2_estim = true;
-    arma::mat m_theta;
-    bool m_has_theta = false;
+    std::optional<arma::mat> m_theta = std::nullopt;
     bool m_is_theta_estim = true;
-    arma::colvec m_beta;
-    bool m_has_beta = false;
+    std::optional<arma::colvec> m_beta = std::nullopt;
     bool m_is_beta_estim = true;
 
    public:
     Parameters() {}
 
-    Parameters(arma::vec nugget,
-               bool has_nugget,
+    Parameters(std::optional<arma::vec> nugget,
                bool is_nugget_estim,
-               arma::vec sigma2,
-               bool has_sigma2,
+               std::optional<arma::vec> sigma2,
                bool is_sigma2_estim,
-               arma::mat theta,
-               bool has_theta,
+               std::optional<arma::mat> theta,
                bool is_theta_estim,
-               arma::colvec beta,
-               bool has_beta,
+               std::optional<arma::colvec> beta,
                bool is_beta_estim)
         : m_nugget(std::move(nugget)),
-          m_has_nugget(has_nugget),
           m_is_nugget_estim(is_nugget_estim),
           m_sigma2(std::move(sigma2)),
-          m_has_sigma2(has_sigma2),
           m_is_sigma2_estim(is_sigma2_estim),
           m_theta(std::move(theta)),
-          m_has_theta(has_theta),
           m_is_theta_estim(is_theta_estim),
           m_beta(std::move(beta)),
-          m_has_beta(has_beta),
           m_is_beta_estim(is_beta_estim) {}
 
-    auto nugget() const -> auto& { return m_nugget; }
-    auto has_nugget() const -> auto{ return m_has_nugget; }
-    auto is_nugget_estim() const -> auto{ return m_is_nugget_estim; }
-    auto sigma2() const -> auto& { return m_sigma2; }
-    auto has_sigma2() const -> auto{ return m_has_sigma2; }
-    auto is_sigma2_estim() const -> auto{ return m_is_sigma2_estim; }
-    auto theta() const -> auto& { return m_theta; }
-    auto has_theta() const -> auto{ return m_has_theta; }
-    auto is_theta_estim() const -> auto{ return m_is_theta_estim; }
-    auto beta() const -> auto& { return m_beta; }
-    auto has_beta() const -> auto{ return m_has_beta; }
-    auto is_beta_estim() const -> auto{ return m_is_beta_estim; }
+    [[nodiscard]] auto nugget() const -> auto& { return *m_nugget; }
+    [[nodiscard]] bool has_nugget() const { return m_nugget.has_value(); }
+    [[nodiscard]] bool is_nugget_estim() const { return m_is_nugget_estim; }
+    [[nodiscard]] auto sigma2() const -> auto& { return *m_sigma2; }
+    [[nodiscard]] bool has_sigma2() const { return m_sigma2.has_value(); }
+    [[nodiscard]] bool is_sigma2_estim() const { return m_is_sigma2_estim; }
+    [[nodiscard]] auto theta() const -> auto& { return *m_theta; }
+    [[nodiscard]] bool has_theta() const { return m_theta.has_value(); }
+    [[nodiscard]] bool is_theta_estim() const { return m_is_theta_estim; }
+    [[nodiscard]] auto beta() const -> auto& { return *m_beta; }
+    [[nodiscard]] bool has_beta() const { return m_beta.has_value(); }
+    [[nodiscard]] bool is_beta_estim() const { return m_is_beta_estim; }
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };

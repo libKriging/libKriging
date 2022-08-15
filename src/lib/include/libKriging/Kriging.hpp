@@ -1,6 +1,7 @@
 #ifndef LIBKRIGING_KRIGING_HPP
 #define LIBKRIGING_KRIGING_HPP
 
+#include <optional>
 #include <utility>
 
 #include "libKriging/utils/lk_armadillo.hpp"
@@ -16,47 +17,38 @@ class Kriging {
  public:
   class Parameters {
    private:
-    double m_sigma2 = -1;
-    bool m_has_sigma2 = false;
+    std::optional<double> m_sigma2 = std::nullopt;
     bool m_is_sigma2_estim = true;
-    arma::mat m_theta;
-    bool m_has_theta = false;
+    std::optional<arma::mat> m_theta = std::nullopt;
     bool m_is_theta_estim = true;
-    arma::colvec m_beta;
-    bool m_has_beta = false;
+    std::optional<arma::colvec> m_beta = std::nullopt;
     bool m_is_beta_estim = true;
 
    public:
     Parameters() {}
 
-    Parameters(double sigma2,
-               bool has_sigma2,
+    Parameters(std::optional<double> sigma2,
                bool is_sigma2_estim,
-               arma::mat theta,
-               bool has_theta,
+               std::optional<arma::mat> theta,
                bool is_theta_estim,
-               arma::vec beta,
-               bool has_beta,
+               std::optional<arma::vec> beta,
                bool is_beta_estim)
         : m_sigma2(sigma2),
-          m_has_sigma2(has_sigma2),
           m_is_sigma2_estim(is_sigma2_estim),
           m_theta(std::move(theta)),
-          m_has_theta(has_theta),
           m_is_theta_estim(is_theta_estim),
           m_beta(std::move(beta)),
-          m_has_beta(has_beta),
           m_is_beta_estim(is_beta_estim) {}
 
-    [[nodiscard]] auto sigma2() const -> auto{ return m_sigma2; }
-    [[nodiscard]] auto has_sigma2() const -> auto{ return m_has_sigma2; }
-    [[nodiscard]] auto is_sigma2_estim() const -> auto{ return m_is_sigma2_estim; }
-    [[nodiscard]] auto theta() const -> auto& { return m_theta; }
-    [[nodiscard]] auto has_theta() const -> auto{ return m_has_theta; }
-    [[nodiscard]] auto is_theta_estim() const -> auto{ return m_is_theta_estim; }
-    [[nodiscard]] auto beta() const -> auto& { return m_beta; }
-    [[nodiscard]] auto has_beta() const -> auto{ return m_has_beta; }
-    [[nodiscard]] auto is_beta_estim() const -> auto{ return m_is_beta_estim; }
+    [[nodiscard]] auto sigma2() const -> auto& { return *m_sigma2; }
+    [[nodiscard]] bool has_sigma2() const { return m_sigma2.has_value(); }
+    [[nodiscard]] bool is_sigma2_estim() const { return m_is_sigma2_estim; }
+    [[nodiscard]] auto theta() const -> auto& { return *m_theta; }
+    [[nodiscard]] bool has_theta() const { return m_theta.has_value(); }
+    [[nodiscard]] bool is_theta_estim() const { return m_is_theta_estim; }
+    [[nodiscard]] auto beta() const -> auto& { return *m_beta; }
+    [[nodiscard]] bool has_beta() const { return m_beta.has_value(); }
+    [[nodiscard]] bool is_beta_estim() const { return m_is_beta_estim; }
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };

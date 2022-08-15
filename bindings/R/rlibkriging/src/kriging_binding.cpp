@@ -11,6 +11,8 @@
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
+#include <optional>
+
 // [[Rcpp::export]]
 Rcpp::List new_Kriging(arma::vec y,
                        arma::mat X,
@@ -85,14 +87,11 @@ Rcpp::List new_Kriging(arma::vec y,
           normalize,
           optim,
           objective,
-          Kriging::Parameters{_parameters["sigma2"],
-                              _parameters["has_sigma2"],
+          Kriging::Parameters{(_parameters["has_sigma2"]) ? std::make_optional(_parameters["sigma2"]) : std::nullopt,
                               _parameters["is_sigma2_estim"],
-                              _parameters["theta"],
-                              _parameters["has_theta"],
+                              (_parameters["has_theta"]) ? std::make_optional(_parameters["theta"]) : std::nullopt,
                               _parameters["is_theta_estim"],
-                              _parameters["beta"],
-                              _parameters["has_beta"],
+                              (_parameters["has_beta"]) ? std::make_optional(_parameters["beta"]) : std::nullopt,
                               _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);

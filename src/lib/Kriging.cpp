@@ -6,7 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-//#include "libKriging/Bench.hpp"
+// #include "libKriging/Bench.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
@@ -1444,8 +1444,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
                         - Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd - h * arma::eye(d, d)))
                        / (2 * h);
 
-      //# Compute gradients of the kriging mean and variance
-      // W <- backsolve(t(T), dc, upper.tri=FALSE)
+      // # Compute gradients of the kriging mean and variance
+      //  W <- backsolve(t(T), dc, upper.tri=FALSE)
       arma::mat W = solve(m_T, dc, LinearAlgebra::default_solve_opts);
 
       // kriging.mean.grad <- t(W)%*%z + t(model@trend.coef%*%f.deltax)
@@ -1592,14 +1592,11 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{this->m_sigma2,
-                        true,
+  Parameters parameters{std::make_optional(this->m_sigma2),
                         this->m_est_sigma2,
-                        trans(this->m_theta),
-                        true,
+                        std::make_optional(trans(this->m_theta)),
                         this->m_est_theta,
-                        trans(this->m_beta),
-                        true,
+                        std::make_optional(trans(this->m_beta)),
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
