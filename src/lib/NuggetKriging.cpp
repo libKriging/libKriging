@@ -612,21 +612,21 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
 
-  arma::mat theta0 = parameters.theta;
-  if (parameters.has_theta) {
-    if (parameters.theta.n_cols != d && parameters.theta.n_rows == d)
-      theta0 = parameters.theta.t();
+  arma::mat theta0 = parameters.theta();
+  if (parameters.has_theta()) {
+    if (parameters.theta().n_cols != d && parameters.theta().n_rows == d)
+      theta0 = parameters.theta().t();
     if (theta0.n_cols != d)
       throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
   }
 
   if (optim == "none") {  // just keep given theta, no optimisation of ll
-    if (!parameters.has_theta)
+    if (!parameters.has_theta())
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
-    if (!parameters.has_nugget)
+    if (!parameters.has_nugget())
       throw std::runtime_error("Nugget should be given, when optim=none");
-    if (!parameters.has_sigma2)
+    if (!parameters.has_sigma2())
       throw std::runtime_error("Sigma2 should be given, when optim=none");
 
     m_theta = trans(theta0.row(0));
@@ -635,24 +635,24 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    if (parameters.has_beta)
-      beta = parameters.beta;
+    if (parameters.has_beta())
+      beta = parameters.beta();
     double sigma2 = -1;
-    if (parameters.has_sigma2)
-      sigma2 = parameters.sigma2[0];  // otherwise sigma2 will be re-calculated using given theta
+    if (parameters.has_sigma2())
+      sigma2 = parameters.sigma2()[0];  // otherwise sigma2 will be re-calculated using given theta
     double nugget = -1;
-    if (parameters.has_nugget)
-      nugget = parameters.nugget[0];
+    if (parameters.has_nugget())
+      nugget = parameters.nugget()[0];
 
     NuggetKriging::OKModel okm_data{T,
                                     M,
                                     z,
                                     beta,
-                                    parameters.is_beta_estim,
+                                    parameters.is_beta_estim(),
                                     sigma2,
-                                    parameters.is_sigma2_estim,
+                                    parameters.is_sigma2_estim(),
                                     nugget,
-                                    parameters.is_nugget_estim,
+                                    parameters.is_nugget_estim(),
                                     nugget + sigma2};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
@@ -669,11 +669,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
     m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.is_beta_estim;
+    m_est_beta = parameters.is_beta_estim();
     m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = parameters.is_sigma2_estim;
+    m_est_sigma2 = parameters.is_sigma2_estim();
     m_nugget = okm_data.nugget;
-    m_est_nugget = parameters.is_nugget_estim;
+    m_est_nugget = parameters.is_nugget_estim();
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
@@ -708,7 +708,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     // arma::cout << "theta_upper:" << theta_upper << arma::endl;
 
     // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+    if (!parameters.has_theta()) {  // no theta given, so draw 10 random uniform starting values
       int multistart = 1;
       try {
         multistart = std::stoi(optim.substr(4));
@@ -720,7 +720,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
-      theta0 = arma::mat(parameters.theta);
+      theta0 = arma::mat(parameters.theta());
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -728,16 +728,16 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     double alpha_lower = 1E-3;
 
     arma::vec alpha0;
-    if (parameters.has_sigma2 & parameters.has_nugget) {
-      alpha0 = arma::vec(parameters.sigma2.n_elem * parameters.nugget.n_elem);
-      for (size_t i = 0; i < parameters.sigma2.n_elem; i++) {
-        for (size_t j = 0; j < parameters.nugget.n_elem; j++) {
-          if ((parameters.sigma2[i] < 0) | (parameters.nugget[j] < 0)
-              | (parameters.sigma2[i] + parameters.nugget[j] < 0))
-            alpha0[i + j * parameters.sigma2.n_elem] = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
+    if (parameters.has_sigma2() & parameters.has_nugget()) {
+      alpha0 = arma::vec(parameters.sigma2().n_elem * parameters.nugget().n_elem);
+      for (size_t i = 0; i < parameters.sigma2().n_elem; i++) {
+        for (size_t j = 0; j < parameters.nugget().n_elem; j++) {
+          if ((parameters.sigma2()[i] < 0) | (parameters.nugget()[j] < 0)
+              | (parameters.sigma2()[i] + parameters.nugget()[j] < 0))
+            alpha0[i + j * parameters.sigma2().n_elem] = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
           else
-            alpha0[i + j * parameters.sigma2.n_elem]
-                = parameters.sigma2[i] / (parameters.sigma2[i] + parameters.nugget[j]);
+            alpha0[i + j * parameters.sigma2().n_elem]
+                = parameters.sigma2()[i] / (parameters.sigma2()[i] + parameters.nugget()[j]);
         }
       }
     } else {
@@ -788,24 +788,24 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::colvec z;
       arma::colvec beta;
-      if (parameters.has_beta)
-        beta = parameters.beta;
+      if (parameters.has_beta())
+        beta = parameters.beta();
       double sigma2 = -1;
-      if (parameters.has_sigma2)
-        sigma2 = parameters.sigma2[0];  // pass the initial given value (usefull if not to be estimated)
+      if (parameters.has_sigma2())
+        sigma2 = parameters.sigma2()[0];  // pass the initial given value (usefull if not to be estimated)
       double nugget = -1;
-      if (parameters.has_nugget)
-        nugget = parameters.nugget[0];  // pass the initial given value (usefull if not to be estimated)
+      if (parameters.has_nugget())
+        nugget = parameters.nugget()[0];  // pass the initial given value (usefull if not to be estimated)
 
       NuggetKriging::OKModel okm_data{T,
                                       M,
                                       z,
                                       beta,
-                                      parameters.is_beta_estim,
+                                      parameters.is_beta_estim(),
                                       sigma2,
-                                      parameters.is_sigma2_estim,
+                                      parameters.is_sigma2_estim(),
                                       nugget,
-                                      parameters.is_nugget_estim,
+                                      parameters.is_nugget_estim(),
                                       nugget + sigma2};
 
       lbfgsb::Optimizer optimizer{d + 1};
@@ -871,19 +871,19 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         m_M = std::move(okm_data.M);
         m_z = std::move(okm_data.z);
         m_beta = std::move(okm_data.beta);
-        m_est_beta = parameters.is_beta_estim;
+        m_est_beta = parameters.is_beta_estim();
         m_sigma2 = okm_data.sigma2;
-        m_est_sigma2 = parameters.is_sigma2_estim;
+        m_est_sigma2 = parameters.is_sigma2_estim();
         m_nugget = okm_data.nugget;
-        m_est_nugget = parameters.is_nugget_estim;
+        m_est_nugget = parameters.is_nugget_estim();
       }
     }
   } else
     throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS**)");
 
-  if (!parameters.has_sigma2)
+  if (!parameters.has_sigma2())
     m_sigma2 *= scaleY * scaleY;
-  if (!parameters.has_nugget)
+  if (!parameters.has_nugget())
     m_nugget *= scaleY * scaleY;
 
   // arma::cout << "theta:" << m_theta << arma::endl;

@@ -14,38 +14,49 @@
  */
 class Kriging {
  public:
-  struct Parameters {
-    double sigma2;
-    bool has_sigma2;
-    bool is_sigma2_estim;
-    arma::mat theta;
-    bool has_theta;
-    bool is_theta_estim;
-    arma::colvec beta;
-    bool has_beta;
-    bool is_beta_estim;
+  class Parameters {
+   private:
+    double m_sigma2 = -1;
+    bool m_has_sigma2 = false;
+    bool m_is_sigma2_estim = true;
+    arma::mat m_theta;
+    bool m_has_theta = false;
+    bool m_is_theta_estim = true;
+    arma::colvec m_beta;
+    bool m_has_beta = false;
+    bool m_is_beta_estim = true;
 
-    Parameters()
-        : sigma2(-1),
-          has_sigma2(false),
-          is_sigma2_estim(true),
-          theta(arma::mat()),
-          has_theta(false),
-          is_theta_estim(true),
-          beta(arma::vec()),
-          has_beta(false),
-          is_beta_estim(true) {}
+   public:
+    Parameters() {}
 
-    Parameters(double s2, bool h_s2, bool e_s2, arma::mat t, bool h_t, bool e_t, arma::vec b, bool h_b, bool e_b)
-        : sigma2(s2),
-          has_sigma2(h_s2),
-          is_sigma2_estim(e_s2),
-          theta(std::move(t)),
-          has_theta(h_t),
-          is_theta_estim(e_t),
-          beta(std::move(b)),
-          has_beta(h_b),
-          is_beta_estim(e_b) {}
+    Parameters(double sigma2,
+               bool has_sigma2,
+               bool is_sigma2_estim,
+               arma::mat theta,
+               bool has_theta,
+               bool is_theta_estim,
+               arma::vec beta,
+               bool has_beta,
+               bool is_beta_estim)
+        : m_sigma2(sigma2),
+          m_has_sigma2(has_sigma2),
+          m_is_sigma2_estim(is_sigma2_estim),
+          m_theta(std::move(theta)),
+          m_has_theta(has_theta),
+          m_is_theta_estim(is_theta_estim),
+          m_beta(std::move(beta)),
+          m_has_beta(has_beta),
+          m_is_beta_estim(is_beta_estim) {}
+
+    [[nodiscard]] auto sigma2() const -> auto{ return m_sigma2; }
+    [[nodiscard]] auto has_sigma2() const -> auto{ return m_has_sigma2; }
+    [[nodiscard]] auto is_sigma2_estim() const -> auto{ return m_is_sigma2_estim; }
+    [[nodiscard]] auto theta() const -> auto& { return m_theta; }
+    [[nodiscard]] auto has_theta() const -> auto{ return m_has_theta; }
+    [[nodiscard]] auto is_theta_estim() const -> auto{ return m_is_theta_estim; }
+    [[nodiscard]] auto beta() const -> auto& { return m_beta; }
+    [[nodiscard]] auto has_beta() const -> auto{ return m_has_beta; }
+    [[nodiscard]] auto is_beta_estim() const -> auto{ return m_is_beta_estim; }
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
@@ -144,8 +155,7 @@ class Kriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters
-                             = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
+                             const Parameters& parameters = Parameters{});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
                                                                               bool grad,

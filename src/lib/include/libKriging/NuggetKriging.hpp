@@ -14,58 +14,61 @@
  */
 class NuggetKriging {
  public:
-  struct Parameters {
-    arma::vec nugget;
-    bool has_nugget;
-    bool is_nugget_estim;
-    arma::vec sigma2;
-    bool has_sigma2;
-    bool is_sigma2_estim;
-    arma::mat theta;
-    bool has_theta;
-    bool is_theta_estim;
-    arma::colvec beta;
-    bool has_beta;
-    bool is_beta_estim;
+  class Parameters {
+   private:
+    arma::vec m_nugget;
+    bool m_has_nugget = false;
+    bool m_is_nugget_estim = true;
+    arma::vec m_sigma2;
+    bool m_has_sigma2 = false;
+    bool m_is_sigma2_estim = true;
+    arma::mat m_theta;
+    bool m_has_theta = false;
+    bool m_is_theta_estim = true;
+    arma::colvec m_beta;
+    bool m_has_beta = false;
+    bool m_is_beta_estim = true;
 
-    Parameters()
-        : nugget(arma::vec()),
-          has_nugget(false),
-          is_nugget_estim(true),
-          sigma2(arma::vec()),
-          has_sigma2(false),
-          is_sigma2_estim(true),
-          theta(arma::mat()),
-          has_theta(false),
-          is_theta_estim(true),
-          beta(arma::vec()),
-          has_beta(false),
-          is_beta_estim(true) {}
+   public:
+    Parameters() {}
 
-    Parameters(arma::vec n,
-               bool h_n,
-               bool e_n,
-               arma::vec s2,
-               bool h_s2,
-               bool e_s2,
-               arma::mat t,
-               bool h_t,
-               bool e_t,
-               arma::vec b,
-               bool h_b,
-               bool e_b)
-        : nugget(std::move(n)),
-          has_nugget(h_n),
-          is_nugget_estim(e_n),
-          sigma2(std::move(s2)),
-          has_sigma2(h_s2),
-          is_sigma2_estim(e_s2),
-          theta(std::move(t)),
-          has_theta(h_t),
-          is_theta_estim(e_t),
-          beta(std::move(b)),
-          has_beta(h_b),
-          is_beta_estim(e_b) {}
+    Parameters(arma::vec nugget,
+               bool has_nugget,
+               bool is_nugget_estim,
+               arma::vec sigma2,
+               bool has_sigma2,
+               bool is_sigma2_estim,
+               arma::mat theta,
+               bool has_theta,
+               bool is_theta_estim,
+               arma::colvec beta,
+               bool has_beta,
+               bool is_beta_estim)
+        : m_nugget(std::move(nugget)),
+          m_has_nugget(has_nugget),
+          m_is_nugget_estim(is_nugget_estim),
+          m_sigma2(std::move(sigma2)),
+          m_has_sigma2(has_sigma2),
+          m_is_sigma2_estim(is_sigma2_estim),
+          m_theta(std::move(theta)),
+          m_has_theta(has_theta),
+          m_is_theta_estim(is_theta_estim),
+          m_beta(std::move(beta)),
+          m_has_beta(has_beta),
+          m_is_beta_estim(is_beta_estim) {}
+
+    auto nugget() const -> auto& { return m_nugget; }
+    auto has_nugget() const -> auto{ return m_has_nugget; }
+    auto is_nugget_estim() const -> auto{ return m_is_nugget_estim; }
+    auto sigma2() const -> auto& { return m_sigma2; }
+    auto has_sigma2() const -> auto{ return m_has_sigma2; }
+    auto is_sigma2_estim() const -> auto{ return m_is_sigma2_estim; }
+    auto theta() const -> auto& { return m_theta; }
+    auto has_theta() const -> auto{ return m_has_theta; }
+    auto is_theta_estim() const -> auto{ return m_is_theta_estim; }
+    auto beta() const -> auto& { return m_beta; }
+    auto has_beta() const -> auto{ return m_has_beta; }
+    auto is_beta_estim() const -> auto{ return m_is_beta_estim; }
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
