@@ -27,7 +27,7 @@ void setter(const T&, mxArray*&);
 /* Specialization */
 
 template <>
-inline auto converter<mxArray*>(mxArray* x, const std::string& parameter) {
+inline auto converter<mxArray*>(mxArray* x, const std::string& /*parameter*/) {
   return x;
 }
 
@@ -88,7 +88,7 @@ inline auto converter<arma::mat>(mxArray* x, const std::string& parameter) {
 }
 
 template <>
-inline auto converter<ObjectRef>(mxArray* x, const std::string& parameter) {
+inline auto converter<ObjectRef>(mxArray* x, const std::string& /*parameter*/) {
   return getObject(x);
 }
 

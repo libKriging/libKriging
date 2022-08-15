@@ -59,7 +59,7 @@ class MxMapper : public NonCopyable {
   }
 
   template <int I, typename T>
-  void setOptional(const T& t, const char* msg = nullptr) {
+  void setOptional(const T& t, const char* /*msg*/ = nullptr) {
     static_assert(I >= 0);
     if (I >= m_n) {
       return;
