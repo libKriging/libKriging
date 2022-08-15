@@ -1375,7 +1375,7 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
   arma::mat s2_predict_mat;
   arma::mat FinvMtM;
   double total_sd2;
-  if (withStd | withCov) {  // Will use chol(t(M)%*%M) in all these cases
+  if (withStd || withCov) {  // Will use chol(t(M)%*%M) in all these cases
     total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
     // Type = "UK"
     // T.M <- chol(t(M)%*%M)
