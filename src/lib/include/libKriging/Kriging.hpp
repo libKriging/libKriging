@@ -1,6 +1,8 @@
 #ifndef LIBKRIGING_KRIGING_HPP
 #define LIBKRIGING_KRIGING_HPP
 
+#include <utility>
+
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Trend.hpp"
@@ -38,34 +40,34 @@ class Kriging {
         : sigma2(s2),
           has_sigma2(h_s2),
           is_sigma2_estim(e_s2),
-          theta(t),
+          theta(std::move(t)),
           has_theta(h_t),
           is_theta_estim(e_t),
-          beta(b),
+          beta(std::move(b)),
           has_beta(h_b),
           is_beta_estim(e_b) {}
   };
 
-  const std::string& kernel() const { return m_covType; };
-  const std::string& optim() const { return m_optim; };
-  const std::string& objective() const { return m_objective; };
-  const arma::mat& X() const { return m_X; };
-  const arma::rowvec& centerX() const { return m_centerX; };
-  const arma::rowvec& scaleX() const { return m_scaleX; };
-  const arma::colvec& y() const { return m_y; };
-  const double& centerY() const { return m_centerY; };
-  const double& scaleY() const { return m_scaleY; };
-  const Trend::RegressionModel& regmodel() const { return m_regmodel; };
-  const arma::mat& F() const { return m_F; };
-  const arma::mat& T() const { return m_T; };
-  const arma::mat& M() const { return m_M; };
-  const arma::colvec& z() const { return m_z; };
-  const arma::colvec& beta() const { return m_beta; };
-  const bool& is_beta_estim() const { return m_est_beta; };
-  const arma::vec& theta() const { return m_theta; };
-  const bool& is_theta_estim() const { return m_est_theta; };
-  const double& sigma2() const { return m_sigma2; };
-  const bool& is_sigma2_estim() const { return m_est_sigma2; };
+  [[nodiscard]] const std::string& kernel() const { return m_covType; };
+  [[nodiscard]] const std::string& optim() const { return m_optim; };
+  [[nodiscard]] const std::string& objective() const { return m_objective; };
+  [[nodiscard]] const arma::mat& X() const { return m_X; };
+  [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
+  [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
+  [[nodiscard]] const arma::colvec& y() const { return m_y; };
+  [[nodiscard]] const double& centerY() const { return m_centerY; };
+  [[nodiscard]] const double& scaleY() const { return m_scaleY; };
+  [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
+  [[nodiscard]] const arma::mat& F() const { return m_F; };
+  [[nodiscard]] const arma::mat& T() const { return m_T; };
+  [[nodiscard]] const arma::mat& M() const { return m_M; };
+  [[nodiscard]] const arma::colvec& z() const { return m_z; };
+  [[nodiscard]] const arma::colvec& beta() const { return m_beta; };
+  [[nodiscard]] const bool& is_beta_estim() const { return m_est_beta; };
+  [[nodiscard]] const arma::vec& theta() const { return m_theta; };
+  [[nodiscard]] const bool& is_theta_estim() const { return m_est_theta; };
+  [[nodiscard]] const double& sigma2() const { return m_sigma2; };
+  [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
 
  private:
   std::string m_covType;
@@ -146,11 +148,11 @@ class Kriging {
                              = Parameters{-1, false, true, arma::mat(), false, true, arma::vec(), false, true});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                              const bool grad,
-                                                                              const bool hess);
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, const bool grad);
+                                                                              bool grad,
+                                                                              bool hess);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool grad);
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad);
 
   LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double leaveOneOut();
@@ -173,7 +175,7 @@ class Kriging {
    * @param seed random seed setup for sample simulations
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const int seed, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& Xp);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output
