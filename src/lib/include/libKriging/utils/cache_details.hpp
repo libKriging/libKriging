@@ -18,8 +18,6 @@ static std::size_t hashValue(T&& t) {
   return std::hash<std::decay_t<T>>{}(std::forward<T>(t));
 }
 
-#pragma GCC push_options
-#pragma GCC optimize ("unroll-loops")
 template <typename Tuple, std::size_t... ids>
 static std::size_t _tupleHash(Tuple&& tuple, const std::index_sequence<ids...>&&) {
   if constexpr (sizeof...(ids) == 0) {
@@ -28,13 +26,17 @@ static std::size_t _tupleHash(Tuple&& tuple, const std::index_sequence<ids...>&&
     return hashValue(std::get<0>(tuple));
   } else {
     std::size_t result = 0;
+#if defined(__clang__)
+#pragma clang loop unroll(full)
+#elif defined(__GNUC__)
+#pragma GCC unroll 10
+#endif
     for (auto const& hash : {hashValue(std::get<ids>(tuple))...}) {
       result = composeHash(result, hash);
     }
     return result;
   }
 }
-#pragma GCC pop_options    
 
 template <typename Tuple>
 static std::size_t tupleHash(Tuple&& tuple) {
