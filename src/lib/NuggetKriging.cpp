@@ -454,7 +454,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(co
   arma::colvec z;
   arma::colvec beta;
   double sigma2{};
-  NuggetKriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  double nugget{};
+  double var{};
+  NuggetKriging::OKModel okm_data{T, M, z, beta, true, sigma2, true, nugget, false, var};
 
   double lmp = -1;
   arma::vec grad;
@@ -661,7 +663,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       gamma_tmp.at(d) = Optim::reparam_to_(sigma2 / (nugget + sigma2));
     }
 
-    double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, &okm_data);
+    /* double min_ofn_tmp = */ fit_ofn(gamma_tmp, nullptr, &okm_data);
 
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
@@ -999,7 +1001,7 @@ NuggetKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool wit
                         - Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd - h * arma::eye(d, d)))
                        / (2 * h);
 
-      //# Compute gradients of the kriging mean and variance
+      // # Compute gradients of the kriging mean and variance
       arma::mat W = solve(m_T, dc, LinearAlgebra::default_solve_opts);
 
       pred_mean_deriv.row(i) = trans(F_dx * m_beta + trans(W) * m_z);
