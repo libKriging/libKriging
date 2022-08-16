@@ -17,15 +17,18 @@ class Kriging {
  public:
   class Parameters {
    private:
-    std::optional<double> m_sigma2 = std::nullopt;
+    std::optional<double> m_sigma2;
     bool m_is_sigma2_estim = true;
-    std::optional<arma::mat> m_theta = std::nullopt;
+    std::optional<arma::mat> m_theta;
     bool m_is_theta_estim = true;
-    std::optional<arma::colvec> m_beta = std::nullopt;
+    std::optional<arma::colvec> m_beta;
     bool m_is_beta_estim = true;
 
    public:
     Parameters() {}
+    Parameters(const Parameters&) = default;
+    Parameters(Parameters&&) = default;
+    ~Parameters() = default;
 
     Parameters(std::optional<double> sigma2,
                bool is_sigma2_estim,
@@ -40,13 +43,13 @@ class Kriging {
           m_beta(std::move(beta)),
           m_is_beta_estim(is_beta_estim) {}
 
-    [[nodiscard]] auto sigma2() const -> auto& { return *m_sigma2; }
+    [[nodiscard]] auto sigma2() const -> auto& { return m_sigma2.value(); }
     [[nodiscard]] bool has_sigma2() const { return m_sigma2.has_value(); }
     [[nodiscard]] bool is_sigma2_estim() const { return m_is_sigma2_estim; }
-    [[nodiscard]] auto theta() const -> auto& { return *m_theta; }
+    [[nodiscard]] auto theta() const -> auto& { return m_theta.value(); }
     [[nodiscard]] bool has_theta() const { return m_theta.has_value(); }
     [[nodiscard]] bool is_theta_estim() const { return m_is_theta_estim; }
-    [[nodiscard]] auto beta() const -> auto& { return *m_beta; }
+    [[nodiscard]] auto beta() const -> auto& { return m_beta.value(); }
     [[nodiscard]] bool has_beta() const { return m_beta.has_value(); }
     [[nodiscard]] bool is_beta_estim() const { return m_is_beta_estim; }
 
