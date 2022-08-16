@@ -1635,3 +1635,23 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
   oss << "    * optim: " << m_optim << "\n";
   return oss.str();
 }
+
+template <typename T>
+std::ostream& operator<<(std::ostream& o, const std::optional<T>& t) {
+  if (t.has_value()) {
+    o << *t;
+  } else {
+    o << "<no value>";
+  }
+  return o;
+}
+
+std::ostream& operator<<(std::ostream& o, const Kriging::Parameters& parameters) {
+  o << "sigma2 = " << parameters.m_sigma2 << "\n";
+  o << "is_sigma2_estim = " << parameters.m_is_sigma2_estim << "\n";
+  o << "theta = " << parameters.m_theta << "\n";
+  o << "is_theta_estim = " << parameters.m_is_theta_estim << "\n";
+  o << "beta = " << parameters.m_beta << "\n";
+  o << "is_beta_estim = " << parameters.m_is_beta_estim << "\n";
+  return o;
+}

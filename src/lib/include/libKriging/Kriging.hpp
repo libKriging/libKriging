@@ -49,6 +49,8 @@ class Kriging {
     [[nodiscard]] auto beta() const -> auto& { return *m_beta; }
     [[nodiscard]] bool has_beta() const { return m_beta.has_value(); }
     [[nodiscard]] bool is_beta_estim() const { return m_is_beta_estim; }
+
+    friend std::ostream& operator<<(std::ostream& o, const Kriging::Parameters& parameters);
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
