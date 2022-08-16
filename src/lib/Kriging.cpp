@@ -1007,8 +1007,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
 
-  arma::mat theta0 = parameters.theta();
+  arma::mat theta0;
   if (parameters.has_theta()) {
+    theta0 = parameters.theta();
     if (parameters.theta().n_cols != d && parameters.theta().n_rows == d)
       theta0 = parameters.theta().t();
     if (theta0.n_cols != d)
