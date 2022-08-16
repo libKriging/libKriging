@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>  // required to use std::nullopt as default value
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -85,8 +86,15 @@ PYBIND11_MODULE(_pylibkriging, m) {
   const std::string default_optim = "BFGS";
   const std::string default_objective = "LL";
 
-  // Quick and dirty manual wrapper (cf optional argument mapping)
-  py::class_<Kriging::Parameters>(m, "KrigingParameters").def(py::init<>());
+  py::class_<Kriging::Parameters>(m, "KrigingParameters")
+      .def(py::init<>())
+      .def(py::init<std::optional<double>, bool, std::optional<arma::mat>, bool, std::optional<arma::vec>, bool>(),
+           py::arg("sigma2") = std::nullopt,
+           py::arg("is_sigma2_estim") = true,
+           py::arg("theta") = std::nullopt,
+           py::arg("is_theta_estim") = true,
+           py::arg("beta") = std::nullopt,
+           py::arg("is_beta_estim") = true);
 
   // Quick and dirty manual wrapper (cf optional argument mapping)
   // Backup solution // FIXME remove it if not necessary

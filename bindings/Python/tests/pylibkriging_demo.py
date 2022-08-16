@@ -7,7 +7,7 @@ def test_kriging():
     y = [f(xi) for xi in X]
 
     import pylibkriging as lk
-    k_py = lk.Kriging(y, X, "gauss")
+    k_py = lk.Kriging(y, X, "gauss", parameters=lk.KrigingParameters(sigma2=1, is_theta_estim=False))
     print(k_py.summary())
 
     x = np.arange(0, 1, 1 / 99)
