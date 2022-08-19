@@ -355,25 +355,36 @@ find_program(OCTAVE_CONFIG_EXECUTABLE
              NAMES octave-config
         )
 if (OCTAVE_CONFIG_EXECUTABLE)
+    set(octave_version_command ${OCTAVE_CONFIG_EXECUTABLE} --version)
+    execute_process(COMMAND ${octave_version_command}
+            OUTPUT_VARIABLE octave_version_output
+            ERROR_VARIABLE octave_version_output
+            RESULT_VARIABLE octave_version_result
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT ${octave_version_result} EQUAL 0)
+        message(STATUS ${octave_version_output})
+        message(SEND_ERROR "Cannot get octave version")
+    endif()
     if (ENABLE_OCTAVE_BINDING STREQUAL "OFF")
-        message(STATUS "Octave binding available but disabled as requested.")
+        message(STATUS "Octave binding available [v${octave_version_output}] but disabled as requested.")
     else()
-        message(STATUS "Octave binding available.")
+        message(STATUS "Octave binding available [v${octave_version_output}]")
     endif()
 else()
-    message(STATUS "Octave binding not available.")
+    message(STATUS "Octave binding not available")
 endif()
 
 # set(Matlab_ROOT_DIR) # should be defined to help finder
 find_package(Matlab COMPONENTS MAIN_PROGRAM)
 if (Matlab_FOUND)
+    matlab_get_release_name_from_version(${Matlab_VERSION_STRING} Matlab_RELEASE_NAME)
     if(ENABLE_MATLAB_BINDING STREQUAL "OFF")
-        message(STATUS "Matlab binding available but disabled as requested.")
+        message(STATUS "Matlab binding available [v${Matlab_VERSION_STRING} -- ${Matlab_RELEASE_NAME}] but disabled as requested.")
     else()
-        message(STATUS "Matlab binding available.")
+        message(STATUS "Matlab binding available [v${Matlab_VERSION_STRING} -- ${Matlab_RELEASE_NAME}]")
     endif()
 else()
-    message(STATUS "Matlab binding not available.")
+    message(STATUS "Matlab binding not available")
 endif()
 
 set(OCTAVE_BINDING_MODE)
