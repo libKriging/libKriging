@@ -34,7 +34,7 @@ class Kriging {
                bool is_sigma2_estim,
                std::optional<arma::mat> theta,
                bool is_theta_estim,
-               std::optional<arma::vec> beta,
+               std::optional<arma::colvec> beta,
                bool is_beta_estim)
         : m_sigma2(sigma2),
           m_is_sigma2_estim(is_sigma2_estim),
