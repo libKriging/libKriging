@@ -1,6 +1,5 @@
 #include "RequiresArg.hpp"
 
-#include <iostream>
 #include "formatString.hpp"
 
 namespace RequiresArg {

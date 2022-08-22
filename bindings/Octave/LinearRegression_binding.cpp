@@ -31,7 +31,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{3}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  auto* lin_reg = input.getObject<LinearRegression>(0, "LinearRegression reference");
+  auto* lin_reg = input.getObjectFromRef<LinearRegression>(0, "LinearRegression reference");
   lin_reg->fit(input.get<arma::vec>(1, "vector"), input.get<arma::mat>(2, "matrix"));
 }
 
@@ -41,7 +41,7 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{2}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
-  auto* lin_reg = input.getObject<LinearRegression>(0, "LinearRegression reference");
+  auto* lin_reg = input.getObjectFromRef<LinearRegression>(0, "LinearRegression reference");
   auto [y_pred, stderr_v] = lin_reg->predict(input.get<arma::mat>(1, "matrix"));
   output.set(0, y_pred, "predicted response");
   output.setOptional(1, stderr_v, "prediction error");

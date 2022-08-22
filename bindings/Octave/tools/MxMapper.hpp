@@ -78,7 +78,7 @@ class MxMapper : public NonCopyable {
   }
 
   template <typename T>
-  T* getObject(int I, const char* msg = nullptr) {
+  T* getObjectFromRef(int I, const char* msg = nullptr) {
     assert(I >= 0);
     if (I >= m_n) {
       throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
@@ -92,10 +92,27 @@ class MxMapper : public NonCopyable {
     return ptr;
   }
 
+  template <typename T>
+  std::optional<T*> getOptionalObject(int I, const char* msg = nullptr) {
+    assert(I >= 0);
+    if (I >= m_n) {
+      return std::nullopt;
+    }
+    m_accesses.set(I);
+    // mxGetClassName(m_p[I]); // if you need more info
+    mxArray* ref_array = mxGetProperty(m_p[I], 0, "ref");  // by convention how we build object
+    ObjectCollector::ref_t ref = getObject(ref_array);
+    auto ptr = ObjectCollector::getObject<T>(ref);
+    if (ptr == nullptr) {
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
+    }
+    return std::make_optional<T*>(ptr);
+  }
+
   [[nodiscard]] int count() const { return m_n; }
 
   static std::string parameterStr(int I, const char* msg) {
-    if (msg) {
+    if (msg != nullptr) {
       return "parameter " + std::to_string(I) + " '" + msg + "'";
     } else {
       return "parameter " + std::to_string(I);

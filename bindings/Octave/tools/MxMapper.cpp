@@ -12,7 +12,9 @@ MxMapper::MxMapper(const char* name, const int n, mxArray** p, const RequiresArg
 MxMapper::~MxMapper() {
   for (int i = 0; i < m_n; ++i) {
     if (!m_accesses[i]) {
+#ifdef MEX_DEBUG
       mexWarnMsgIdAndTxt("mLibKriging:unusedArgument", "%s argument #%d never used", m_name, i);
+#endif
     }
   }
 }

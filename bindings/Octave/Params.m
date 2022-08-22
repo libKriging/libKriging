@@ -1,4 +1,4 @@
-classdef Params
+classdef Params < handle
     % attributes doc: https://fr.mathworks.com/help/matlab/matlab_oop/property-attributes.html
     properties %(NonCopyable, Transient, Access = protected, Hidden) 
         ref

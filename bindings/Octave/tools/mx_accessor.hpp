@@ -4,7 +4,6 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cstring>
-#include <iostream>
 
 #include "ObjectAccessor.hpp"
 #include "mex.h"

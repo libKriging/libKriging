@@ -59,7 +59,7 @@ void display(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  auto* params = input.getObject<Params>(0, "Params reference");
+  auto* params = input.getObjectFromRef<Params>(0, "Params reference");
   params->display();
 }
 }  // namespace ParamsBinding

@@ -7,7 +7,8 @@ isOctave = exist('OCTAVE_VERSION', 'builtin') ~= 0
 X = [0.0;0.2;0.5;0.8;1.0];
 f = @(x) 1-1/2.*(sin(12*x)./(1+x)+2*cos(7.*x).*x.^5+0.7)
 y = f(X);
-k_m = Kriging(y, X, "gauss");
+% k_m = Kriging(y, X, "gauss"); % without optional and parameters
+k_m = Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", Params("is_sigma2_estim", true))
 disp(k_m.summary());
 
 % session

@@ -21,6 +21,7 @@ add_subdirectory(tools)
 add_mex_function(NAME mLibKriging
         SOURCES mLibKriging.cpp
         LinearRegression_binding.cpp LinearRegression_binding.hpp
+        common_binding.cpp common_binding.hpp
         Kriging_binding.cpp Kriging_binding.hpp
         NuggetKriging_binding.cpp NuggetKriging_binding.hpp
         Params_binding.cpp Params_binding.hpp

@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <variant>
 #include "libKriging/utils/lk_armadillo.hpp"
+#include "tools/MxException.hpp"
 
 class Params {
  public:
@@ -23,6 +24,13 @@ class Params {
     m_kv[key] = SupportedTypes(value);
   }
 
+  /*! get value from an entry key
+   *
+   * @tparam T type requested on the key entry
+   * @param key dictionary entry
+   * @return nullopt if not found, or optional of T* for the value of the given entry. If it is nullptr, it means that
+   * the entry was available but not with the requested type.
+   */
   template <typename T>
   [[nodiscard]] std::optional<T> get(const std::string& key) const {
     auto finder = m_kv.find(key);
@@ -32,10 +40,9 @@ class Params {
       const auto& values = finder->second;
       const T* value = std::get_if<T>(&values);
       if (value == nullptr) {
-        return std::nullopt;
-      } else {
-        return std::make_optional(*value);
+        throw MxException(LOCATION(), "mLibKriging:Params", "Incompatible type for entry '", key, "'");
       }
+      return std::make_optional(*value);
     }
   }
 

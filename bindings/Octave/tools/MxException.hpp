@@ -6,8 +6,10 @@
 #include "formatString.hpp"
 
 #ifdef MEX_DEBUG
-#define LOCATION() \
-  MxException::Location { __FILE__, __LINE__ }
+#define LOCATION()        \
+  MxException::Location { \
+    __FILE__, __LINE__    \
+  }
 #else
 #define LOCATION() \
   MxException::NoLocation {}
