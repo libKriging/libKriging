@@ -29,38 +29,38 @@ class MxMapper : public NonCopyable {
  public:
   ~MxMapper();
 
-  template <int I, typename T>
-  typename converter_trait<T>::type get(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  typename converter_trait<T>::type get(const int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
-    return converter<T>(m_p[I], parameterStr<I>(msg));
+    return converter<T>(m_p[I], parameterStr(I, msg));
   }
 
-  template <int I, typename T>
-  std::optional<typename converter_trait<T>::type> getOptional(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  std::optional<typename converter_trait<T>::type> getOptional(int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n)
       return std::nullopt;
     m_accesses.set(I);
-    return converter<T>(m_p[I], parameterStr<I>(msg));
+    return converter<T>(m_p[I], parameterStr(I, msg));
   }
 
-  template <int I, typename T>
-  void set(const T& t, const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  void set(int I, const T& t, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
     setter<T>(t, m_p[I]);
   }
 
-  template <int I, typename T>
-  void setOptional(const T& t, const char* /*msg*/ = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  void setOptional(int I, const T& t, const char* /*msg*/ = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
       return;
     }
@@ -68,14 +68,14 @@ class MxMapper : public NonCopyable {
     setter<T>(t, m_p[I]);
   }
 
-  template <int I, typename T>
-  T* getObject(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  T* getObject(int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
-    auto ref = get<I, ObjectRef>(msg);
+    auto ref = get<ObjectRef>(I, msg);
     auto ptr = ObjectCollector::getObject<T>(ref);
     if (ptr == nullptr) {
       throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
@@ -83,10 +83,9 @@ class MxMapper : public NonCopyable {
     return ptr;
   }
 
-  int count() const { return m_n; }
+  [[nodiscard]] int count() const { return m_n; }
 
-  template <int I>
-  static std::string parameterStr(const char* msg) {
+  static std::string parameterStr(int I, const char* msg) {
     if (msg) {
       return "parameter " + std::to_string(I) + " '" + msg + "'";
     } else {

@@ -43,7 +43,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
     return help_page();
 
   MxMapper input{"Input", std::min(1, nrhs), const_cast<mxArray**>(prhs)};
-  std::string command = input.get<0, std::string>("command");
+  std::string command = input.get<std::string>(0, "command");
 
 #ifdef MEX_DEBUG
   mexPrintf("  with command: %s\n", command.c_str());
