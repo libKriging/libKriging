@@ -23,6 +23,8 @@ add_mex_function(NAME mLibKriging
         LinearRegression_binding.cpp LinearRegression_binding.hpp
         Kriging_binding.cpp Kriging_binding.hpp
         NuggetKriging_binding.cpp NuggetKriging_binding.hpp
+        Params_binding.cpp Params_binding.hpp
+        Params.cpp Params.hpp
         LINK_LIBRARIES Kriging OctaveShared)
 
 install(TARGETS mLibKriging
@@ -33,6 +35,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Kriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/NuggetKriging.m
+        ${CMAKE_CURRENT_SOURCE_DIR}/Params.m
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/${OCTAVE_BINDING_MODE}
         )
 

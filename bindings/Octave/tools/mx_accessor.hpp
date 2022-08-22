@@ -4,9 +4,16 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cstring>
+#include <iostream>
 
 #include "ObjectAccessor.hpp"
 #include "mex.h"
+
+enum class eMxType { String, Matrix, Uint64, Int32, Logical, Scalar, Unknown };
+
+std::ostream& operator<<(std::ostream& o, eMxType type);
+
+eMxType get_type(mxArray*);
 
 template <typename T>
 struct converter_trait {

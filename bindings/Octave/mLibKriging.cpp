@@ -1,6 +1,7 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NuggetKriging_binding.hpp"
+#include "Params_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
 #include "tools/MxMapper.hpp"
@@ -52,6 +53,14 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
   switch (fnv_hash(command)) {
     case "help"_hash:
       return help_page();
+
+    case "Params::new"_hash:
+      return ParamsBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Params::delete"_hash:
+      return ParamsBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Params::display"_hash:
+      return ParamsBinding::display(nlhs, plhs, nrhs - 1, prhs + 1);
+
     case "LinearRegression::new"_hash:
       return LinearRegressionBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
     case "LinearRegression::delete"_hash:

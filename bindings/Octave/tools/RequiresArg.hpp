@@ -17,11 +17,12 @@ struct Exactly {
 struct Range {
   unsigned min, max;
 };
+struct KVPairs {};
 struct Autodetect {};
 
-using Requirement = std::variant<AtLeast, Exactly, Range, Autodetect>;
+using Requirement = std::variant<AtLeast, Exactly, Range, KVPairs, Autodetect>;
 
-bool validate(const Requirement& v, const unsigned n);
+bool validate(const Requirement& v, unsigned n);
 std::string describe(const Requirement& v);
 }  // namespace RequiresArg
 

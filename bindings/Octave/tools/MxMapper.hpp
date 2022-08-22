@@ -29,6 +29,15 @@ class MxMapper : public NonCopyable {
  public:
   ~MxMapper();
 
+  eMxType getType(const int I, const char* msg = nullptr) {
+    assert(I >= 0);
+    if (I >= m_n) {
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
+    }
+    m_accesses.set(I);
+    return get_type(m_p[I]);
+  }
+
   template <typename T>
   typename converter_trait<T>::type get(const int I, const char* msg = nullptr) {
     assert(I >= 0);
