@@ -31,7 +31,7 @@ class NuggetKriging {
     Parameters(const Parameters&) = default;
     Parameters(Parameters&&) = default;
     ~Parameters() = default;
-    
+
     Parameters(std::optional<arma::vec> nugget,
                bool is_nugget_estim,
                std::optional<arma::vec> sigma2,
