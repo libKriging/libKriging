@@ -71,11 +71,11 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     echo "------------------------------------"
 
-    if ( command -v octave-cli >/dev/null 2>&1 ); then
-      echo "Octave config: $(command -v octave-cli)"
-      octave-cli --version 2>&1 | sed 's/^/  /'
+    if ( command -v octave-config >/dev/null 2>&1 ); then
+      echo "Octave config: $(command -v octave-config)"
+      octave-config --version 2>&1 | sed 's/^/  /'
     else
-      echo "No octave-cli command found"
+      echo "No octave-config command found"
     fi
 
     echo "------------------------------------"
