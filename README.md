@@ -6,38 +6,41 @@
 Table of contents
 
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
-  - [pylibkriging for Python](#pylibkriging-for-python)
-  - [rlibkriging for R](#rlibkriging-for-r)
-  - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
-  - [Expected demo results](#expected-demo-results)
-  - [Tested installation](#tested-installation)
+    - [pylibkriging for Python](#pylibkriging-for-python)
+    - [rlibkriging for R](#rlibkriging-for-r)
+    - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
+    - [Expected demo results](#expected-demo-results)
+    - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
-  - [Requirements (more details)](#requirements-more-details)
-  - [Get the code](#get-the-code)
-  - [Helper scripts for CI](#helper-scripts-for-ci)
-  - [Compilation and tests *manually*](#compilation-and-tests-manually)
-    - [Preamble](#preamble)
-    - [Compilation for Linux and macOS](#compilation-for-linux-and-macos)
-    - [Compilation for Windows 64bits with Visual Studio](#compilation-for-windows-64bits-with-visual-studio)
-    - [Compilation for Linux/Mac/Windows using R toolchain](#compilation-for-linuxmacwindows-using-r-toolchain)
-  - [Deployment](#deployment)
-    - [For Linux and macOS](#for-linux-and-macos)
-    - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
-  - [Assisted compilation and installation](#assisted-compilation-and-installation)
-    - [Using `pip install` from GitHub](#using-pip-install-from-github)
+    - [Requirements (more details)](#requirements-more-details)
+    - [Get the code](#get-the-code)
+    - [Helper scripts for CI](#helper-scripts-for-ci)
+    - [Compilation and tests *manually*](#compilation-and-tests-manually)
+        - [Preamble](#preamble)
+        - [Compilation for Linux and macOS](#compilation-for-linux-and-macos)
+        - [Compilation for Windows 64bits with Visual Studio](#compilation-for-windows-64bits-with-visual-studio)
+        - [Compilation for Linux/Mac/Windows using R toolchain](#compilation-for-linuxmacwindows-using-r-toolchain)
+    - [Deployment](#deployment)
+        - [For Linux and macOS](#for-linux-and-macos)
+        - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
+    - [Assisted compilation and installation](#assisted-compilation-and-installation)
+        - [Using `pip install` from GitHub](#using-pip-install-from-github)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation from pre-built packages
 
-For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can use [released binaries](https://github.com/libKriging/libKriging/releases).
+For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can
+use [released binaries](https://github.com/libKriging/libKriging/releases).
 
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
 ```shell
 pip3 install pylibkriging
 ```
+
 or for pre-release packages (according to your OS and Python version)
+
 ```shell
 pip3 install https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/pylibkriging-0.5.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
@@ -49,22 +52,25 @@ pip3 install https://github.com/libKriging/libKriging/releases/download/v0.5.0-a
 
 ```python
 import numpy as np
+
 X = [0.0, 0.25, 0.5, 0.75, 1.0]
 f = lambda x: (1 - 1 / 2 * (np.sin(12 * x) / (1 + x) + 2 * np.cos(7 * x) * x ** 5 + 0.7))
 y = [f(xi) for xi in X]
 
 import pylibkriging as lk
+
 k_py = lk.Kriging(y, X, "gauss")
 print(k_py.summary())
 # you can also check logLikelhood using:
-#def ll(t): return k_py.logLikelihoodFun(t,False,False)[0]
-#t = np.arange(0,1,1/99); pyplot.figure(1); pyplot.plot(t, [ll(ti) for ti in t]); pyplot.show()
+# def ll(t): return k_py.logLikelihoodFun(t,False,False)[0]
+# t = np.arange(0,1,1/99); pyplot.figure(1); pyplot.plot(t, [ll(ti) for ti in t]); pyplot.show()
 
 x = np.arange(0, 1, 1 / 99)
 p = k_py.predict(x, True, False)
 p = {"mean": p[0], "stdev": p[1], "cov": p[2]}  # This should be done by predict
 
 import matplotlib.pyplot as pyplot
+
 pyplot.figure(1)
 pyplot.plot(x, [f(xi) for xi in x])
 pyplot.scatter(X, [f(xi) for xi in X])
@@ -97,11 +103,12 @@ os.environ['PATH'] = 'c:\\Users\\User\\Path\\to\\dlls' + os.pathsep + os.environ
 import pylibkriging as lk
 ```
 </details>
-  
+
 ## rlibkriging for R
 
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 (CRAN repo will come soon...)
+
 ```R
 # in R
 install.packages("Rcpp")
@@ -145,15 +152,20 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 ⚠️ Matlab binary package are done on request (GitHub Action does not support all required Operating Systems)
 
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
+
 ```shell
 # example
 curl -LO https://github.com/libKriging/libKriging/releases/download/v0.5.1/mLibKriging_0.5.1_Linux-x86_64.tgz
 ```
+
 Then
+
 ```shell
 octave --path /path/to/mLibKriging/installation
 ```
+
 or inside Octave or Matlab
+
 ```matlab
 addpath("path/to/mLibKriging")
 ```
@@ -207,19 +219,22 @@ Using the previous linked examples (in Python, R, Octave or Matlab), you should 
 
 ## Tested installation
 
-with libKriging 0.5.1
+with libKriging 0.6.0
 
 <!-- ✔ ⌛️ ✘ -->
-|        | Linux Ubuntu:20                             | macOS 10 & 11 (x86-64)                      | macOS 12 (ARM)                         | Windows 10                                                                  |
-|:-------|:--------------------------------------------|:--------------------------------------------|:---------------------------------------|:----------------------------------------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9** | <span style="color:green">✔</span> 3.6-3.9                                  |
-| R      | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:green">✔</span> 3.6-4.1  | <span style="color:orange"><b>?</b></span> | <span style="color:green">✔</span> 3.6-4.1                                  |
-| Octave | <span style="color:green">✔</span> 5.2.0    | <span style="color:green">✔</span> 6.2      | <span style="color:green">✔</span> 6.4** | <span style="color:green">✔</span> 5.2, <span style="color:red">✘</span>6.2 |
-| Matlab | <span style="color:green">️✔</span> R2022   | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022 | <span style="color:green">✔</span> R2022**                                  |
 
-*requires extra DLLs. See [python installation](#pylibkriging-for-python)
+|        | Linux Ubuntu:20                             | macOS 11 & 12 (x86-64)                      | macOS 12 (ARM)                                   | Windows 10                                 |
+|:-------|:--------------------------------------------|:--------------------------------------------|:-------------------------------------------------|:-------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9**         | <span style="color:green">✔</span> 3.6-3.9 |
+| R      | <span style="color:green">✔</span> 4.2      | <span style="color:green">✔</span> 4.2      | <span style="color:orange"><b>?</b></span>**     | <span style="color:green">✔</span> 4.2     |
+| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:orange"><b>?</b></span> 6.4** | <span style="color:green">✔</span> 6.2     |
+| Matlab | <span style="color:green">️✔</span> R2022a  | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022           | <span style="color:green">✔</span> R2022** |
 
-**no pre-built package nor CI
+* \* : requires extra DLLs. See [python installation](#pylibkriging-for-python)
+
+* ** : no pre-built package nor CI
+
+* <span style="color:orange"><b>?</b></span> : requires manual verification (not updated since previous release)
 
 # Compilation
 
@@ -228,14 +243,14 @@ with libKriging 0.5.1
 * CMake ≥ 3.13
 
 * C++ Compiler with C++17 support
-  
+
 * Linear algebra packages providing blas and lapack functions.
-  
+
   You can use standard blas and lapack, OpenBlas, MKL.
 
 * Python ≥ 3.6 (optional)
 
-* Octave ≥ 4.2 (optional)
+* Octave ≥ 6.0 (optional)
 
 * Matlab ≥ R2021 (optional)
 
@@ -244,13 +259,15 @@ with libKriging 0.5.1
 ## Get the code
 
 Just clone it with its submodules:
+
 ```
 git clone --recurse-submodules https://github.com/libKriging/libKriging.git
 ```
-  
+
 ## Helper scripts for CI
 
-Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests" instructions (and it should be also easier).
+Note: calling these scripts "by hand" should produce the same results as following "Compilation and unit tests"
+instructions (and it should be also easier).
 They use the preset of options also used in CI workflow.
 
 To configure it, you can define following environment variables ([more details](docs/dev/AllCMakeOptions.md)):
@@ -273,7 +290,8 @@ Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
 | `linux-macos`    | for Linux or macOS             | C++, mlibkriging, pylibkriging |
 
 Then:
-* Go into `libKriging` root directory  
+
+* Go into `libKriging` root directory
     ```shell
     cd libKriging
     ```
@@ -292,109 +310,112 @@ Then:
   .travis-ci/${BUILD_NAME}/test.sh
   ```
 
-  
 ## Compilation and tests *manually*
 
 ### Preamble
 
 We assume that:
-  * [libKriging](https://github.com/libKriging/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*
-    (could be a relative path like `..`)
-  * you have built a fresh new directory *`${BUILD}`* 
-    (should be an absolute path)
-  * following commands are executed in *`${BUILD}`* directory 
-  
+
+* [libKriging](https://github.com/libKriging/libKriging.git) code is available locally in directory *`${LIBKRIGING}`*
+  (could be a relative path like `..`)
+* you have built a fresh new directory *`${BUILD}`*
+  (should be an absolute path)
+* following commands are executed in *`${BUILD}`* directory
+
 PS: *`${NAME}`* syntax represents a word or an absolute path of your choice
 
-Select your compilation *`${MODE}`* between: 
-  * `Release` : produce an optimized code
-  * `Debug` (default) : produce a debug code
-  * `Coverage` : for code coverage analysis (not yet tested with Windows)
+Select your compilation *`${MODE}`* between:
 
-Following commands are made for Unix shell. To use them with Windows use [git-bash](https://gitforwindows.org) or [Mingw](http://www.mingw.org) environments.
+* `Release` : produce an optimized code
+* `Debug` (default) : produce a debug code
+* `Coverage` : for code coverage analysis (not yet tested with Windows)
+
+Following commands are made for Unix shell. To use them with Windows use [git-bash](https://gitforwindows.org)
+or [Mingw](http://www.mingw.org) environments.
 
 ### Compilation for Linux and macOS
 
 <details>
 <summary>👆 expand the details</summary>
-  
-  * Configure
-      ```shell
-      cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
-      ```
-  * Build
-      ```shell
-      cmake --build .
-      ```
-  * Run tests
-      ```shell
-      ctest
-      ```
-  * Build documentation (requires doxygen)
-      ```shell
-      cmake --build . --target doc
-      ```
-  * if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
-      ```shell
-      cmake --build . --target coverage --config Coverage
-      ```
-      or 
-      ```shell
-      cmake --build . --target coverage-report --config Coverage
-      ```
-      to produce a html report located in `${BUILD}/coverage/index.html`
+
+* Configure
+    ```shell
+    cmake -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
+    ```
+* Build
+    ```shell
+    cmake --build .
+    ```
+* Run tests
+    ```shell
+    ctest
+    ```
+* Build documentation (requires doxygen)
+    ```shell
+    cmake --build . --target doc
+    ```
+* if you have selected `MODE=Coverage` mode, you can generate code coverage analysis over all tests using
+    ```shell
+    cmake --build . --target coverage --config Coverage
+    ```
+  or
+    ```shell
+    cmake --build . --target coverage-report --config Coverage
+    ```
+  to produce a html report located in `${BUILD}/coverage/index.html`
 
 </details>
-   
+
 ### Compilation for Windows 64bits with Visual Studio
 
 <details>
 <summary>👆 expand the details</summary>
 
-  * Configure
-      ```shell
-      cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
-      ```
-      where `EXTRA_SYSTEM_LIBRARY_PATH` is an extra path where libraries (e.g. OpenBLAS) can be found.
-  * Build
-      ```shell
-      cmake --build . --target ALL_BUILD --config ${MODE}
-      ```
-  * Run tests
-      ```shell
-      export PATH=${BUILD}/src/lib/${MODE}:$PATH
-      ctest -C ${MODE}
-      ```
-    
+* Configure
+    ```shell
+    cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} ${LIBKRIGING}
+    ```
+  where `EXTRA_SYSTEM_LIBRARY_PATH` is an extra path where libraries (e.g. OpenBLAS) can be found.
+* Build
+    ```shell
+    cmake --build . --target ALL_BUILD --config ${MODE}
+    ```
+* Run tests
+    ```shell
+    export PATH=${BUILD}/src/lib/${MODE}:$PATH
+    ctest -C ${MODE}
+    ```
+
 </details>
-    
+
 ### Compilation for Linux/Mac/Windows using R toolchain
 
 <details>
 <summary>👆 expand the details</summary>
 
-  With this method, you need [R](https://cran.r-project.org) (and [R-tools](https://cran.r-project.org/bin/windows/Rtools/) if you are on Windows).
-  
-  We assume you have previous requirements and also `make` command available in your `PATH`.
-  
-  * Configure
-      ```shell
-      CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
-      ```
-  * Build
-      ```shell
-      cmake --build .
-      ```
-  * Run tests
-      ```shell
-      ctest
-      ```
-    
+With this method, you need [R](https://cran.r-project.org) (
+and [R-tools](https://cran.r-project.org/bin/windows/Rtools/) if you are on Windows).
+
+We assume you have previous requirements and also `make` command available in your `PATH`.
+
+* Configure
+    ```shell
+    CC=$(R CMD config CC) CXX=$(R CMD config CXX) cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=${MODE} ${LIBKRIGING}
+    ```
+* Build
+    ```shell
+    cmake --build .
+    ```
+* Run tests
+    ```shell
+    ctest
+    ```
+
 </details>
-       
+
 ## Deployment
 
-To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to 
+To deploy libKriging as an installed library, you have to add `-DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX}` option to
 first `cmake` configuration command.
 
 If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directory is `${BUILD}/installed`.
@@ -407,11 +428,15 @@ If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation d
 ```shell
 cmake -DCMAKE_BUILD_TYPE=${MODE} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING}
 ```
-and then 
+
+and then
+
 ```shell
 cmake --build . --target install
 ```
+
 aka with classical makefiles
+
 ```shell
 make install
 ```
@@ -426,7 +451,9 @@ make install
 ```shell
 cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DEXTRA_SYSTEM_LIBRARY_PATH=${EXTRA_SYSTEM_LIBRARY_PATH} -DCMAKE_INSTALL_PREFIX:PATH=${INSTALL_PREFIX} ${LIBKRIGING} 
 ```
-and then 
+
+and then
+
 ```shell
 cmake --build . --target install --config ${MODE}
 ```
@@ -437,11 +464,13 @@ cmake --build . --target install --config ${MODE}
 
 ### Using `pip install` from GitHub
 
-You don't need to download libKriging. `pip install` will do everything. To do that, you need the [Compilation requirements](#requirements-more-details).
+You don't need to download libKriging. `pip install` will do everything. To do that, you need
+the [Compilation requirements](#requirements-more-details).
 
 ```shell
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git"
 ```
+
 will download, compile and install pylibkriging from *master* branch.
 
 <details>
@@ -466,6 +495,7 @@ Successfully installed pylibkriging-0.4.8
 </details>
 
 To get a particular version (branch or tag ≥v0.4.9), you can use:
+
 ```shell
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 ```

@@ -73,7 +73,7 @@ jobs:
             mode: Debug
             enable_python: on
           - name: "Octave Linux"
-            os: ubuntu-20.04
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release
             enable_python: on
             enable_octave: on
