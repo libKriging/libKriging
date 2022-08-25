@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
-          repository: libKrigin/rlibkriging
+          repository: libKriging/rlibkriging
           token: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
           ref: master
 
