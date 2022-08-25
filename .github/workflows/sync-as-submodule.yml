@@ -13,12 +13,13 @@ jobs:
       - uses: actions/checkout@v2
         with: 
           repository: libKrigin/rlibkriging
-          token: ${{ secrets.PRIVATE_TOKEN_GITHUB }}
+          token: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
 
       - name: Pull & update submodules recursively
         run: |
           git submodule update --init --recursive
           git submodule update --recursive --remote
+
       - name: Commit
         run: |
           git config user.email "actions@github.com"
