@@ -7,7 +7,10 @@
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
 
+// Should be included Only in Debug build
 #include "BindingTest.hpp"
+#include "DictTest.hpp"
+
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NuggetKriging_binding.hpp"
@@ -52,6 +55,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
             libkriging link debugging demo
     
     )pbdoc");
+
+    m.def("check_dict_entry", &check_dict_entry, R"pbdoc(libkriging dict debugging demo)pbdoc");
   }
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
