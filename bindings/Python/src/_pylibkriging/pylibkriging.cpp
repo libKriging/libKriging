@@ -8,7 +8,7 @@
 #include <libKriging/LinearRegression.hpp>
 
 // Should be included Only in Debug build
-#include "BindingTest.hpp"
+#include "ArrayBindingTest.hpp"
 #include "DictTest.hpp"
 
 #include "Kriging_binding.hpp"

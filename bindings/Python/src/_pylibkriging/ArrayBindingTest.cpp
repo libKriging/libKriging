@@ -1,4 +1,4 @@
-#include "BindingTest.hpp"
+#include "ArrayBindingTest.hpp"
 
 #include "libKriging/utils/lk_armadillo.hpp"
 

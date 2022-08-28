@@ -30,7 +30,7 @@ list(APPEND pylibkriging_SRCS
 
 # TODO Should be only compiled in Debug Mode
 list(APPEND pylibkriging_SRCS
-        src/_pylibkriging/BindingTest.cpp src/_pylibkriging/BindingTest.hpp
+        src/_pylibkriging/ArrayBindingTest.cpp src/_pylibkriging/ArrayBindingTest.hpp
         src/_pylibkriging/DictTest.cpp src/_pylibkriging/DictTest.hpp
         )
 
