@@ -223,12 +223,12 @@ with libKriging 0.6.0
 
 <!-- ✔ ⌛️ ✘ -->
 
-|        | Linux Ubuntu:20                             | macOS 11 & 12 (x86-64)                      | macOS 12 (ARM)                                   | Windows 10                                 |
-|:-------|:--------------------------------------------|:--------------------------------------------|:-------------------------------------------------|:-------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9**         | <span style="color:green">✔</span> 3.6-3.9 |
-| R      | <span style="color:green">✔</span> 4.2      | <span style="color:green">✔</span> 4.2      | <span style="color:orange"><b>?</b></span>**     | <span style="color:green">✔</span> 4.2     |
-| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:orange"><b>?</b></span> 6.4** | <span style="color:green">✔</span> 6.2     |
-| Matlab | <span style="color:green">️✔</span> R2022a  | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022           | <span style="color:green">✔</span> R2022** |
+|        | Linux Ubuntu:20                             | macOS 11 & 12 (x86-64)                      | macOS 12 (ARM)                               | Windows 10                                 |
+|:-------|:--------------------------------------------|:--------------------------------------------|:---------------------------------------------|:-------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9**     | <span style="color:green">✔</span> 3.6-3.9 |
+| R      | <span style="color:green">✔</span> 4.2      | <span style="color:green">✔</span> 4.2      | <span style="color:orange"><b>?</b></span>** | <span style="color:green">✔</span> 4.2     |
+| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">7.1</span>**       | <span style="color:green">✔</span> 6.2     |
+| Matlab | <span style="color:green">️✔</span> R2022a  | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022       | <span style="color:green">✔</span> R2022** |
 
 * \* : requires extra DLLs. See [python installation](#pylibkriging-for-python)
 
