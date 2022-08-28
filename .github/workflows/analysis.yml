@@ -62,7 +62,7 @@ jobs:
       matrix:
         include:
           - name: "Coverage mode"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Debug
             enable_python: on
             enable_octave: on
