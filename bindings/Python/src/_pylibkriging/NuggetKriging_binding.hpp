@@ -23,6 +23,14 @@ class PyNuggetKriging {
                   const std::string& optim,
                   const std::string& objective,
                   const NuggetKriging::Parameters& parameters);
+  PyNuggetKriging(const py::array_t<double>& y,
+                  const py::array_t<double>& X,
+                  const std::string& covType,
+                  const Trend::RegressionModel& regmodel,
+                  bool normalize,
+                  const std::string& optim,
+                  const std::string& objective,
+                  const py::dict& dict);
   ~PyNuggetKriging();
 
   void fit(const py::array_t<double>& y,
@@ -31,7 +39,7 @@ class PyNuggetKriging {
            bool normalize,
            const std::string& optim,
            const std::string& objective,
-           const NuggetKriging::Parameters& parameters);
+           const py::dict& dict);
 
   // TODO The result should be a namedtuple
   // see

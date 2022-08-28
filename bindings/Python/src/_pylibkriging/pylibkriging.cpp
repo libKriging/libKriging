@@ -112,7 +112,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     bool,
                     const std::string&,
                     const std::string&,
-                    const Kriging::Parameters&>(),
+                    const py::dict&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -120,7 +120,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = Kriging::Parameters{})
+           py::arg("parameters") = py::dict{})
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
@@ -227,7 +227,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     bool,
                     const std::string&,
                     const std::string&,
-                    const NuggetKriging::Parameters&>(),
+                    const py::dict&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -235,7 +235,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = NuggetKriging::Parameters{})
+           py::arg("parameters") = py::dict{})
       .def("fit", &PyNuggetKriging::fit)
       .def("predict", &PyNuggetKriging::predict)
       .def("simulate", &PyNuggetKriging::simulate)
