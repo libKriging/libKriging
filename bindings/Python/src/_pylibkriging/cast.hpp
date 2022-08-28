@@ -21,7 +21,7 @@ struct CastSupportedType {};
 template <typename T>
 std::optional<T> get_entry(const py::dict& dict, std::string_view key) {
   auto finder = std::find_if(
-      dict.begin(), dict.end(), [&key](const auto& kv) { return static_cast<std::string>(py::str(kv.first)) == key; });
+      dict.begin(), dict.end(), [&key](const auto& kv) { return kv.first.template cast<std::string_view>() == key; });
   if (finder != dict.end()) {
     auto opt_val = my_cast<T>(finder->second);
     if (opt_val.has_value()) {

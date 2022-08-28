@@ -3,7 +3,7 @@
 
 template <>
 std::optional<bool> my_cast<bool>(py::handle obj) {
-  const auto py_type_name = py::str(obj.get_type()).cast<std::string_view>();
+  const auto py_type_name = py::str(obj.get_type()).cast<std::string>();
   if (py_type_name == "<class 'bool'>") {
     return std::make_optional<bool>(obj.cast<bool>());
   } else {
@@ -13,7 +13,7 @@ std::optional<bool> my_cast<bool>(py::handle obj) {
 
 template <>
 std::optional<int> my_cast<int>(py::handle obj) {
-  const auto py_type_name = py::str(obj.get_type()).cast<std::string_view>();
+  const auto py_type_name = py::str(obj.get_type()).cast<std::string>();
   if (py_type_name == "<class 'int'>") {
     return std::make_optional<int>(obj.cast<int>());
   } else {
@@ -23,7 +23,7 @@ std::optional<int> my_cast<int>(py::handle obj) {
 
 template <>
 std::optional<double> my_cast<double>(py::handle obj) {
-  const auto py_type_name = py::str(obj.get_type()).cast<std::string_view>();
+  const auto py_type_name = py::str(obj.get_type()).cast<std::string>();
   if (py_type_name == "<class 'int'>") {
     return std::make_optional<double>(obj.cast<int>());
   } else if (py_type_name == "<class 'float'>") {
@@ -35,7 +35,7 @@ std::optional<double> my_cast<double>(py::handle obj) {
 
 template <>
 std::optional<std::string> my_cast<std::string>(py::handle obj) {
-  const auto py_type_name = py::str(obj.get_type()).cast<std::string_view>();
+  const auto py_type_name = py::str(obj.get_type()).cast<std::string>();
   if (py_type_name == "<class 'str'>") {
     return std::make_optional<std::string>(obj.cast<std::string>());
   } else {
@@ -45,7 +45,7 @@ std::optional<std::string> my_cast<std::string>(py::handle obj) {
 
 template <>
 std::optional<arma::mat> my_cast<arma::mat>(py::handle obj) {
-  const auto py_type_name = py::str(obj.get_type()).cast<std::string_view>();
+  const auto py_type_name = py::str(obj.get_type()).cast<std::string>();
   if (py_type_name == "<class 'numpy.ndarray'>") {
     py::array_t<double> arr = obj.cast<py::array_t<double>>();
     return std::make_optional<arma::mat>(carma::arr_to_mat(arr));
