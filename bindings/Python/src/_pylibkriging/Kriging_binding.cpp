@@ -35,12 +35,12 @@ PyKriging::PyKriging(const py::array_t<double>& y,
                      const py::dict& dict) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  Kriging::Parameters parameters(get_entry<double>(dict, "sigma2"),
+  Kriging::Parameters parameters{get_entry<double>(dict, "sigma2"),
                                  get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                  get_entry<arma::mat>(dict, "theta"),
                                  get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                  get_entry<arma::colvec>(dict, "beta"),
-                                 get_entry<bool>(dict, "is_beta_estim").value_or(true));
+                                 get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal = std::make_unique<Kriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
 
@@ -55,12 +55,12 @@ void PyKriging::fit(const py::array_t<double>& y,
                     const py::dict& dict) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  Kriging::Parameters parameters(get_entry<double>(dict, "sigma2"),
+  Kriging::Parameters parameters{get_entry<double>(dict, "sigma2"),
                                  get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                  get_entry<arma::mat>(dict, "theta"),
                                  get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                  get_entry<arma::colvec>(dict, "beta"),
-                                 get_entry<bool>(dict, "is_beta_estim").value_or(true));
+                                 get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
 }
 

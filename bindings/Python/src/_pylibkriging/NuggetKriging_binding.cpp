@@ -36,14 +36,14 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                  const py::dict& dict) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  NuggetKriging::Parameters parameters(get_entry<arma::vec>(dict, "nugget"),
+  NuggetKriging::Parameters parameters{get_entry<arma::vec>(dict, "nugget"),
                                        get_entry<bool>(dict, "is_nugger_estim").value_or(true),
                                        get_entry<arma::vec>(dict, "sigma2"),
                                        get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                        get_entry<arma::mat>(dict, "theta"),
                                        get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                        get_entry<arma::colvec>(dict, "beta"),
-                                       get_entry<bool>(dict, "is_beta_estim").value_or(true));
+                                       get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal
       = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
@@ -59,14 +59,14 @@ void PyNuggetKriging::fit(const py::array_t<double>& y,
                           const py::dict& dict) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  NuggetKriging::Parameters parameters(get_entry<arma::vec>(dict, "nugget"),
+  NuggetKriging::Parameters parameters{get_entry<arma::vec>(dict, "nugget"),
                                        get_entry<bool>(dict, "is_nugger_estim").value_or(true),
                                        get_entry<arma::vec>(dict, "sigma2"),
                                        get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                        get_entry<arma::mat>(dict, "theta"),
                                        get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                        get_entry<arma::colvec>(dict, "beta"),
-                                       get_entry<bool>(dict, "is_beta_estim").value_or(true));
+                                       get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
 }
 

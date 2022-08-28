@@ -10,51 +10,24 @@
 
 #include "libKriging/libKriging_exports.h"
 
+// Putting this struct inside Kriging gives the following error:
+// error: default member initializer for 'is_sigma2_estim' needed within
+//    definition of enclosing class 'Kriging' outside of member functions
+struct KrigingParameters {
+  std::optional<double> sigma2;
+  bool is_sigma2_estim = true;
+  std::optional<arma::mat> theta;
+  bool is_theta_estim = true;
+  std::optional<arma::colvec> beta;
+  bool is_beta_estim = true;
+};
+
 /** Ordinary kriging regression
  * @ingroup Regression
  */
 class Kriging {
  public:
-  class Parameters {
-   private:
-    std::optional<double> m_sigma2;
-    bool m_is_sigma2_estim = true;
-    std::optional<arma::mat> m_theta;
-    bool m_is_theta_estim = true;
-    std::optional<arma::colvec> m_beta;
-    bool m_is_beta_estim = true;
-
-   public:
-    Parameters() {}
-    Parameters(const Parameters&) = default;
-    Parameters(Parameters&&) = default;
-    ~Parameters() = default;
-
-    Parameters(std::optional<double> sigma2,
-               bool is_sigma2_estim,
-               std::optional<arma::mat> theta,
-               bool is_theta_estim,
-               std::optional<arma::colvec> beta,
-               bool is_beta_estim)
-        : m_sigma2(sigma2),
-          m_is_sigma2_estim(is_sigma2_estim),
-          m_theta(std::move(theta)),
-          m_is_theta_estim(is_theta_estim),
-          m_beta(std::move(beta)),
-          m_is_beta_estim(is_beta_estim) {}
-
-    [[nodiscard]] auto sigma2() const -> auto& { return m_sigma2.value(); }
-    [[nodiscard]] bool has_sigma2() const { return m_sigma2.has_value(); }
-    [[nodiscard]] bool is_sigma2_estim() const { return m_is_sigma2_estim; }
-    [[nodiscard]] auto theta() const -> auto& { return m_theta.value(); }
-    [[nodiscard]] bool has_theta() const { return m_theta.has_value(); }
-    [[nodiscard]] bool is_theta_estim() const { return m_is_theta_estim; }
-    [[nodiscard]] auto beta() const -> auto& { return m_beta.value(); }
-    [[nodiscard]] bool has_beta() const { return m_beta.has_value(); }
-    [[nodiscard]] bool is_beta_estim() const { return m_is_beta_estim; }
-
-    friend std::ostream& operator<<(std::ostream& o, const Kriging::Parameters& parameters);
-  };
+  using Parameters = KrigingParameters;
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
   [[nodiscard]] const std::string& optim() const { return m_optim; };
@@ -136,7 +109,7 @@ class Kriging {
                             bool normalize = false,
                             const std::string& optim = "BFGS",
                             const std::string& objective = "LL",
-                            const Parameters& parameters = Parameters{});
+                            const Parameters& parameters = {});
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -152,7 +125,7 @@ class Kriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = Parameters{});
+                             const Parameters& parameters = {});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
                                                                               bool grad,

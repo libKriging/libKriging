@@ -12,14 +12,14 @@ namespace NuggetKrigingBinding {
 static NuggetKriging::Parameters makeParameters(std::optional<Params*> dict) {
   if (dict) {
     const Params& params = *dict.value();
-    return NuggetKriging::Parameters(params.get<arma::mat>("nugget"),
+    return NuggetKriging::Parameters{params.get<arma::mat>("nugget"),
                                      params.get<bool>("is_nugget_estim").value_or(true),
                                      params.get<arma::mat>("sigma2"),  // should be converted as arma::vec by execution
                                      params.get<bool>("is_sigma2_estim").value_or(true),
                                      params.get<arma::mat>("theta"),
                                      params.get<bool>("is_theta_estim").value_or(true),
                                      params.get<arma::mat>("beta"),  // should be converted as arma::colvec by execution
-                                     params.get<bool>("is_beta_estim").value_or(true));
+                                     params.get<bool>("is_beta_estim").value_or(true)};
   } else {
     return NuggetKriging::Parameters{};
   }

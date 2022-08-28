@@ -11,12 +11,12 @@
 static Kriging::Parameters makeParameters(std::optional<Params*> dict) {
   if (dict) {
     const Params& params = *dict.value();
-    return Kriging::Parameters(params.get<double>("sigma2"),
+    return Kriging::Parameters{params.get<double>("sigma2"),
                                params.get<bool>("is_sigma2_estim").value_or(true),
                                params.get<arma::mat>("theta"),
                                params.get<bool>("is_theta_estim").value_or(true),
                                params.get<arma::mat>("beta"),  // should be converted as arma::colvec by execution
-                               params.get<bool>("is_beta_estim").value_or(true));
+                               params.get<bool>("is_beta_estim").value_or(true)};
   } else {
     return Kriging::Parameters{};
   }
