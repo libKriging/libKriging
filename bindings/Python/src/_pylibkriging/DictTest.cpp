@@ -6,7 +6,7 @@
 
 #include "../../../Octave/tools/formatString.hpp"
 #include "../../../Octave/tools/string_hash.hpp"
-#include "cast.hpp"
+#include "py_to_cpp_cast.hpp"
 
 template <typename T>
 bool check_dict_entryT(const py::dict& dict, std::string_view name) {

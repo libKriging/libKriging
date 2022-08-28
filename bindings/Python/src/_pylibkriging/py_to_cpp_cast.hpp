@@ -1,5 +1,5 @@
-#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_CAST_HPP
-#define LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_CAST_HPP
+#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_PY_TO_CPP_CAST_HPP
+#define LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_PY_TO_CPP_CAST_HPP
 
 #include "libKriging/utils/lk_armadillo.hpp"  // should always be before any armadillo include
 
@@ -13,7 +13,7 @@
 namespace py = pybind11;
 
 template <typename T>
-std::optional<T> my_cast(py::handle);
+std::optional<T> to_cpp_cast(py::handle obj);
 
 template <typename T>
 struct CastSupportedType {};
@@ -23,7 +23,7 @@ std::optional<T> get_entry(const py::dict& dict, std::string_view key) {
   auto finder = std::find_if(
       dict.begin(), dict.end(), [&key](const auto& kv) { return kv.first.template cast<std::string_view>() == key; });
   if (finder != dict.end()) {
-    auto opt_val = my_cast<T>(finder->second);
+    auto opt_val = to_cpp_cast<T>(finder->second);
     if (opt_val.has_value()) {
       return opt_val;
     } else {
@@ -70,4 +70,4 @@ struct CastSupportedType<arma::rowvec> {
   static constexpr std::string_view name = "numpy row vector";
 };
 
-#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_CAST_HPP
+#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC__PYLIBKRIGING_PY_TO_CPP_CAST_HPP
