@@ -29,7 +29,7 @@ def pytest_configure():
     pytest.suppress = suppress
     pytest.debug_only = skipif(pylibkriging.__build_type__ != 'Debug',
                                reason="Only for debug mode")
-    pytest.direct_mapping = pytest.mark.skip # carma bug inside
+    pytest.direct_mapping = pytest.mark.skip  # FIXME carma bug inside
 
 
 def _test_import_pylibkriging():
