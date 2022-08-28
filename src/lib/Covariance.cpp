@@ -102,11 +102,11 @@ std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_whiten
       };
 
 std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDtheta_whitenoise
-    = [](const arma::vec& _dX, const arma::vec& _theta) {
+    = [](const arma::vec& _dX, const arma::vec& /*_theta*/) {
         return arma::vec(_dX.n_elem);  // TBD
       };
 
 std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovDx_whitenoise
-    = [](const arma::vec& _dX, const arma::vec& _theta) {
+    = [](const arma::vec& _dX, const arma::vec& /*_theta*/) {
         return arma::vec(_dX.n_elem);  // TBD
       };

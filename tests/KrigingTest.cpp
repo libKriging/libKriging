@@ -40,9 +40,9 @@ auto prepare_and_run_bench = [](auto&& bench) {
 };
 
 TEST_CASE("workflow") {
-  prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
+  prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int) {
     Kriging ok = Kriging("gauss");
-    Kriging::Parameters parameters{0, false, true, arma::vec(), false, true, arma::vec(), false, true};
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
@@ -55,7 +55,7 @@ TEST_CASE("fit benchmark", "[.benchmark]") {
   prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int i) {
     Kriging ok = Kriging("gauss");
     BENCHMARK("Kriging::fit#" + std::to_string(i)) {
-      Kriging::Parameters parameters{0, false, true, arma::vec(), false, true, arma::vec(), false, true};
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
       return ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
     };
   });

@@ -8,6 +8,12 @@
 #include "ObjectAccessor.hpp"
 #include "mex.h"
 
+enum class eMxType { String, Matrix, Uint64, Int32, Logical, Scalar, Unknown };
+
+std::ostream& operator<<(std::ostream& o, eMxType type);
+
+eMxType get_type(mxArray*);
+
 template <typename T>
 struct converter_trait {
   using type = T;
@@ -27,7 +33,7 @@ void setter(const T&, mxArray*&);
 /* Specialization */
 
 template <>
-inline auto converter<mxArray*>(mxArray* x, const std::string& parameter) {
+inline auto converter<mxArray*>(mxArray* x, const std::string& /*parameter*/) {
   return x;
 }
 
@@ -88,7 +94,7 @@ inline auto converter<arma::mat>(mxArray* x, const std::string& parameter) {
 }
 
 template <>
-inline auto converter<ObjectRef>(mxArray* x, const std::string& parameter) {
+inline auto converter<ObjectRef>(mxArray* x, const std::string& /*parameter*/) {
   return getObject(x);
 }
 

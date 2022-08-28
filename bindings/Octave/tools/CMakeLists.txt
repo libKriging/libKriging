@@ -5,7 +5,7 @@ add_library(OctaveShared
         relative_error.cpp relative_error.hpp
         ObjectAccessor.cpp ObjectAccessor.hpp
         RequiresArg.cpp RequiresArg.hpp
-        mx_accessor.hpp
+        mx_accessor.cpp mx_accessor.hpp
         overload.hpp
         MxMapper.cpp MxMapper.hpp
         MxException.hpp

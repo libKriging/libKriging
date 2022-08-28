@@ -15,6 +15,9 @@ Checks:  "\
   -cert-err60-cpp,\
   -modernize-use-trailing-return-type,\
   -fuchsia-default-arguments-calls, \
+  -fuchsia-default-arguments-declarations, \
+  -fuchsia-overloaded-operator, \
+  -llvm-else-after-return, \  
   -llvmlibc-*"
 
 # All checkers turned on, minus:
@@ -34,7 +37,7 @@ Checks:  "\
 
 # Like in https://github.com/Kitware/CMake/blob/master/.clang-tidy
 #   pattern should be filtered as `find | grep -E PATTERN` do
-# Unfortunately, I did'nt succeed to enable it and filter out armadillo headers
+# Unfortunately, I didn't succeed to enable it and filter out armadillo headers
 HeaderFilterRegex: 'src/lib/.*\.(hpp|cpp)$'
 #CheckOptions:
 

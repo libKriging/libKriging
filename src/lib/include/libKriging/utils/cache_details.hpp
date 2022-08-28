@@ -26,7 +26,11 @@ static std::size_t _tupleHash(Tuple&& tuple, const std::index_sequence<ids...>&&
     return hashValue(std::get<0>(tuple));
   } else {
     std::size_t result = 0;
-#pragma unroll
+#if defined(__clang__)
+#pragma clang loop unroll(full)
+#elif defined(__GNUC__)
+#pragma GCC unroll 10
+#endif
     for (auto const& hash : {hashValue(std::get<ids>(tuple))...}) {
       result = composeHash(result, hash);
     }

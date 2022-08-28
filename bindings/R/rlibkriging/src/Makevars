@@ -29,7 +29,7 @@ endif
 
 EXTERNAL_LIBS=$(shell ../../tools/ExternalLibsExtractor.sh)
 
-CXX_STD = CXX11
+CXX_STD = CXX17
 
 #PKG_CFLAGS=
 PKG_CPPFLAGS=-I"${LIBKRIGING_PATH}"/include -include "libKriging/utils/lkalloc.hpp" -DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc -DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free

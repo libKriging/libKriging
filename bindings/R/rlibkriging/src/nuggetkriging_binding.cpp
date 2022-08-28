@@ -11,6 +11,9 @@
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
+#include <optional>
+#include "retrofit_utils.hpp"
+
 // [[Rcpp::export]]
 Rcpp::List new_NuggetKriging(arma::vec y,
                              arma::mat X,
@@ -102,18 +105,15 @@ Rcpp::List new_NuggetKriging(arma::vec y,
           normalize,
           optim,
           objective,
-          NuggetKriging::Parameters{_parameters["nugget"],
-                                    _parameters["has_nugget"],
-                                    _parameters["is_nugget_estim"],
-                                    _parameters["sigma2"],
-                                    _parameters["has_sigma2"],
-                                    _parameters["is_sigma2_estim"],
-                                    _parameters["theta"],
-                                    _parameters["has_theta"],
-                                    _parameters["is_theta_estim"],
-                                    _parameters["beta"],
-                                    _parameters["has_beta"],
-                                    _parameters["is_beta_estim"]});
+          NuggetKriging::Parameters{
+              (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
+              _parameters["is_nugget_estim"],
+              (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+              _parameters["is_sigma2_estim"],
+              (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+              _parameters["is_theta_estim"],
+              (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+              _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
 

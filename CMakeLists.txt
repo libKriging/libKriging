@@ -51,6 +51,8 @@ option(LIBKRIGING_BENCHMARK_TESTS "Enable benchmark tests while testing" OFF)
 option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
+option(LBFGSB_SHOW_BUILD OFF)
+
 set(PYBIND11_PYTHON_VERSION 3.6)
 
 #------------------------------------------------------
@@ -164,10 +166,21 @@ add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
+
+if (NOT CMAKE_Fortran_COMPILER)
+    set(CMAKE_Fortran_COMPILER gfortran)
+endif()
+if (NOT Fortran_LINK_FLAGS)
+    set(Fortran_LINK_FLAGS "-lgfortran -lquadmath -lm")
+endif()
+set(ignoreUnusedVariable ${LBFGSB_SHOW_BUILD})
+message(STATUS "Compiling lbfgsb_cpp as an external library")
+
 add_subdirectory(dependencies/lbfgsb_cpp)
 #set(lbfgsb_INSTALL_DIR "${CMAKE_BINARY_DIR}/lbfgsb-installed")
 #set(lbfgsb_DIR "${lbfgsb_INSTALL_DIR}/lib/cmake/lbfgsb")
 #find_package(lbfgsb CONFIG REQUIRED)
+message(STATUS "Compilation of lbfgsb_cpp done")
 
 #------------------------------------------------------
 
@@ -342,25 +355,36 @@ find_program(OCTAVE_CONFIG_EXECUTABLE
              NAMES octave-config
         )
 if (OCTAVE_CONFIG_EXECUTABLE)
+    set(octave_version_command ${OCTAVE_CONFIG_EXECUTABLE} --version)
+    execute_process(COMMAND ${octave_version_command}
+            OUTPUT_VARIABLE octave_version_output
+            ERROR_VARIABLE octave_version_output
+            RESULT_VARIABLE octave_version_result
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT ${octave_version_result} EQUAL 0)
+        message(STATUS ${octave_version_output})
+        message(SEND_ERROR "Cannot get octave version")
+    endif()
     if (ENABLE_OCTAVE_BINDING STREQUAL "OFF")
-        message(STATUS "Octave binding available but disabled as requested.")
+        message(STATUS "Octave binding available [v${octave_version_output}] but disabled as requested.")
     else()
-        message(STATUS "Octave binding available.")
+        message(STATUS "Octave binding available [v${octave_version_output}]")
     endif()
 else()
-    message(STATUS "Octave binding not available.")
+    message(STATUS "Octave binding not available")
 endif()
 
 # set(Matlab_ROOT_DIR) # should be defined to help finder
 find_package(Matlab COMPONENTS MAIN_PROGRAM)
 if (Matlab_FOUND)
+    matlab_get_release_name_from_version(${Matlab_VERSION_STRING} Matlab_RELEASE_NAME)
     if(ENABLE_MATLAB_BINDING STREQUAL "OFF")
-        message(STATUS "Matlab binding available but disabled as requested.")
+        message(STATUS "Matlab binding available [v${Matlab_VERSION_STRING} -- ${Matlab_RELEASE_NAME}] but disabled as requested.")
     else()
-        message(STATUS "Matlab binding available.")
+        message(STATUS "Matlab binding available [v${Matlab_VERSION_STRING} -- ${Matlab_RELEASE_NAME}]")
     endif()
 else()
-    message(STATUS "Matlab binding not available.")
+    message(STATUS "Matlab binding not available")
 endif()
 
 set(OCTAVE_BINDING_MODE)

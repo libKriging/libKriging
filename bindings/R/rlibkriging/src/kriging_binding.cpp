@@ -11,6 +11,9 @@
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
+#include <optional>
+#include "retrofit_utils.hpp"
+
 // [[Rcpp::export]]
 Rcpp::List new_Kriging(arma::vec y,
                        arma::mat X,
@@ -79,21 +82,19 @@ Rcpp::List new_Kriging(arma::vec y,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  ok->fit(std::move(y),
-          std::move(X),
-          Trend::fromString(regmodel),
-          normalize,
-          optim,
-          objective,
-          Kriging::Parameters{_parameters["sigma2"],
-                              _parameters["has_sigma2"],
-                              _parameters["is_sigma2_estim"],
-                              _parameters["theta"],
-                              _parameters["has_theta"],
-                              _parameters["is_theta_estim"],
-                              _parameters["beta"],
-                              _parameters["has_beta"],
-                              _parameters["is_beta_estim"]});
+  ok->fit(
+      std::move(y),
+      std::move(X),
+      Trend::fromString(regmodel),
+      normalize,
+      optim,
+      objective,
+      Kriging::Parameters{(_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
+                          _parameters["is_sigma2_estim"],
+                          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+                          _parameters["is_theta_estim"],
+                          (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
+                          _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
 

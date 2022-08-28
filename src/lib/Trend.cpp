@@ -11,7 +11,7 @@
 
 #include <cassert>
 
-const char* Trend::enum_RegressionModel_strings[] = {"constant", "linear", "interactive", "quadratic"};
+const char* const Trend::enum_RegressionModel_strings[] = {"constant", "linear", "interactive", "quadratic"};
 
 Trend::RegressionModel Trend::fromString(const std::string& value) {
   static auto begin = std::begin(Trend::enum_RegressionModel_strings);

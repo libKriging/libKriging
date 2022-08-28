@@ -23,6 +23,14 @@ class PyKriging {
             const std::string& optim,
             const std::string& objective,
             const Kriging::Parameters& parameters);
+  PyKriging(const py::array_t<double>& y,
+            const py::array_t<double>& X,
+            const std::string& covType,
+            const Trend::RegressionModel& regmodel,
+            bool normalize,
+            const std::string& optim,
+            const std::string& objective,
+            const py::dict& dict);
   ~PyKriging();
 
   void fit(const py::array_t<double>& y,
@@ -31,7 +39,7 @@ class PyKriging {
            bool normalize,
            const std::string& optim,
            const std::string& objective,
-           const Kriging::Parameters& parameters);
+           const py::dict& dict);
 
   // TODO The result should be a namedtuple
   // see

@@ -5,12 +5,10 @@
 
 #include "libKriging/libKriging_exports.h"
 
-class Trend {
- public:
-  LIBKRIGING_EXPORT enum class RegressionModel { Constant, Linear, Interactive, Quadratic };
-  LIBKRIGING_EXPORT static const char* enum_RegressionModel_strings[];
+struct Trend {
+  enum class LIBKRIGING_EXPORT RegressionModel { Constant, Linear, Interactive, Quadratic };
+  LIBKRIGING_EXPORT static const char* const enum_RegressionModel_strings[];
 
- public:
   LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
   LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
 

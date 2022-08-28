@@ -6,6 +6,7 @@
 
 #include <libKriging/Kriging.hpp>
 #include <libKriging/Trend.hpp>
+#include "py_to_cpp_cast.hpp"
 
 #include <random>
 
@@ -24,6 +25,25 @@ PyKriging::PyKriging(const py::array_t<double>& y,
   m_internal = std::make_unique<Kriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
 
+PyKriging::PyKriging(const py::array_t<double>& y,
+                     const py::array_t<double>& X,
+                     const std::string& covType,
+                     const Trend::RegressionModel& regmodel,
+                     bool normalize,
+                     const std::string& optim,
+                     const std::string& objective,
+                     const py::dict& dict) {
+  arma::colvec mat_y = carma::arr_to_col_view<double>(y);
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X);
+  Kriging::Parameters parameters{get_entry<double>(dict, "sigma2"),
+                                 get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
+                                 get_entry<arma::mat>(dict, "theta"),
+                                 get_entry<bool>(dict, "is_theta_estim").value_or(true),
+                                 get_entry<arma::colvec>(dict, "beta"),
+                                 get_entry<bool>(dict, "is_beta_estim").value_or(true)};
+  m_internal = std::make_unique<Kriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+}
+
 PyKriging::~PyKriging() {}
 
 void PyKriging::fit(const py::array_t<double>& y,
@@ -32,9 +52,15 @@ void PyKriging::fit(const py::array_t<double>& y,
                     bool normalize,
                     const std::string& optim,
                     const std::string& objective,
-                    const Kriging::Parameters& parameters) {
+                    const py::dict& dict) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
+  Kriging::Parameters parameters{get_entry<double>(dict, "sigma2"),
+                                 get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
+                                 get_entry<arma::mat>(dict, "theta"),
+                                 get_entry<bool>(dict, "is_theta_estim").value_or(true),
+                                 get_entry<arma::colvec>(dict, "beta"),
+                                 get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
 }
 

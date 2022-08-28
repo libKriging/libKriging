@@ -6,7 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-//#include "libKriging/Bench.hpp"
+// #include "libKriging/Bench.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
@@ -796,7 +796,7 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
     if (Optim::log_level > 1)
       arma::cout << "  x_next: " << x_next << arma::endl;
 
-    for (int j = 0; j < x_next.n_elem; j++) {
+    for (arma::uword j = 0; j < x_next.n_elem; j++) {
       if (x_next[j] < x_lower[j]) {
         if (Optim::log_level > 2)
           arma::cout << "    <" << x_lower[j] << arma::endl;
@@ -901,7 +901,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   } else if (objective.compare("LOO") == 0) {
     if (Optim::reparametrize) {
       fit_ofn = CacheFunction{
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
             const arma::vec _theta = Optim::reparam_from(_gamma);
@@ -916,7 +916,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           }};
     } else {
       fit_ofn = CacheFunction{
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
             double loo = this->_leaveOneOut(_theta, grad_out, okm_data);
@@ -933,7 +933,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
       fit_ofn = CacheFunction{
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
             const arma::vec _theta = Optim::reparam_from(_gamma);
@@ -948,7 +948,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           }};
     } else {
       fit_ofn = CacheFunction{
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
+          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
             double lmp = this->_logMargPost(_theta, grad_out, okm_data);
@@ -1007,17 +1007,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
 
-  arma::mat theta0 = parameters.theta;
-  if (parameters.has_theta) {
-    if (parameters.theta.n_cols != d && parameters.theta.n_rows == d)
-      theta0 = parameters.theta.t();
+  arma::mat theta0;
+  if (parameters.theta.has_value()) {
+    theta0 = parameters.theta.value();
+    if (parameters.theta.value().n_cols != d && parameters.theta.value().n_rows == d)
+      theta0 = parameters.theta.value().t();
     if (theta0.n_cols != d)
       throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
   }
 
   if (optim == "none") {  // just keep given theta, no optimisation of ll
-    if (!parameters.has_theta)
+    if (!parameters.theta.has_value())
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
     m_theta = trans(theta0.row(0));
@@ -1026,11 +1027,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    if (parameters.has_beta)
-      beta = parameters.beta;
+    if (parameters.beta.has_value())
+      beta = parameters.beta.value();
     double sigma2 = -1;
-    if (parameters.has_sigma2)
-      sigma2 = parameters.sigma2;  // otherwise sigma2 will be re-calculated using given theta
+    if (parameters.sigma2.has_value())
+      sigma2 = parameters.sigma2.value();  // otherwise sigma2 will be re-calculated using given theta
 
     Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
@@ -1040,7 +1041,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       gamma_tmp = Optim::reparam_to(m_theta);
     }
 
-    double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, nullptr, &okm_data);
+    /* double min_ofn_tmp = */ fit_ofn(gamma_tmp, nullptr, nullptr, &okm_data);
 
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
@@ -1095,7 +1096,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       Random::init();
 
       // FIXME parameters.has needs to implemtented (no use case in current code)
-      if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+      if (!parameters.theta.has_value()) {  // no theta given, so draw 10 random uniform starting values
         int multistart = 1;
         try {
           multistart = std::stoi(optim.substr(4));
@@ -1107,7 +1108,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
         //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
       } else {  // just use given theta(s) as starting values for multi-bfgs
-        theta0 = arma::mat(parameters.theta);
+        theta0 = arma::mat(parameters.theta.value());
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -1143,11 +1144,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         arma::mat M;
         arma::colvec z;
         arma::colvec beta;
-        if (parameters.has_beta)
-          beta = parameters.beta;
+        if (parameters.beta.has_value())
+          beta = parameters.beta.value();
         double sigma2 = -1;
-        if (parameters.has_sigma2)
-          sigma2 = parameters.sigma2;
+        if (parameters.sigma2.has_value())
+          sigma2 = parameters.sigma2.value();
 
         Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
@@ -1161,7 +1162,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         int retry = 0;
         while (retry <= Optim::max_restart) {
           auto result = optimizer.minimize(
-              [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+              [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                 return fit_ofn(vals_inp, &grad_out, nullptr, &okm_data);
               },
               gamma_tmp,
@@ -1171,8 +1172,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::vec sol_to_lb = gamma_tmp - theta_lower;
           if (Optim::reparametrize)
             sol_to_lb = gamma_tmp - gamma_upper;
-          if ((retry < Optim::max_restart) & (result.num_iters <= 2 * d)
-              & (any(abs(sol_to_lb) < arma::datum::eps))) {  // we fastly converged to one bound
+          if ((retry < Optim::max_restart) && (result.num_iters <= 2 * d)
+              && (any(abs(sol_to_lb) < arma::datum::eps))) {  // we fastly converged to one bound
             gamma_tmp = (theta0.row(i).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
             if (Optim::log_level > 0)
@@ -1220,7 +1221,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       Random::init();
 
       // FIXME parameters.has needs to implemtented (no use case in current code)
-      if (!parameters.has_theta) {  // no theta given, so draw 10 random uniform starting values
+      if (!parameters.theta.has_value()) {  // no theta given, so draw 10 random uniform starting values
         int multistart = 1;
         try {
           multistart = std::stoi(optim.substr(4));
@@ -1230,7 +1231,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         theta0 = arma::repmat(trans(theta_lower), multistart, 1)
                  + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
       } else {  // just use given theta(s) as starting values for multi-bfgs
-        theta0 = arma::mat(parameters.theta);
+        theta0 = arma::mat(parameters.theta.value());
       }
 
       // arma::cout << "theta0:" << theta0 << arma::endl;
@@ -1267,16 +1268,16 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         arma::mat M;
         arma::colvec z;
         arma::colvec beta;
-        if (parameters.has_beta)
-          beta = parameters.beta;
+        if (parameters.beta.has_value())
+          beta = parameters.beta.value();
         double sigma2 = -1;
-        if (parameters.has_sigma2)
-          sigma2 = parameters.sigma2;
+        if (parameters.sigma2.has_value())
+          sigma2 = parameters.sigma2.value();
 
         Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
         double min_ofn_tmp = optim_newton(
-            [&okm_data, this, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
+            [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
               return fit_ofn(vals_inp, grad_out, hess_out, &okm_data);
             },
             gamma_tmp,
@@ -1310,7 +1311,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS*, Newton*)");
   }
 
-  if (!parameters.has_sigma2)
+  if (!parameters.sigma2.has_value())
     m_sigma2 *= scaleY * scaleY;
 
   // arma::cout << "theta:" << m_theta << arma::endl;
@@ -1375,7 +1376,7 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
   arma::mat s2_predict_mat;
   arma::mat FinvMtM;
   double total_sd2;
-  if (withStd | withCov) {  // Will use chol(t(M)%*%M) in all these cases
+  if (withStd || withCov) {  // Will use chol(t(M)%*%M) in all these cases
     total_sd2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0);
     // Type = "UK"
     // T.M <- chol(t(M)%*%M)
@@ -1444,8 +1445,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
                         - Trend::regressionModelMatrix(m_regmodel, tXpn_i_repd - h * arma::eye(d, d)))
                        / (2 * h);
 
-      //# Compute gradients of the kriging mean and variance
-      // W <- backsolve(t(T), dc, upper.tri=FALSE)
+      // # Compute gradients of the kriging mean and variance
+      //  W <- backsolve(t(T), dc, upper.tri=FALSE)
       arma::mat W = solve(m_T, dc, LinearAlgebra::default_solve_opts);
 
       // kriging.mean.grad <- t(W)%*%z + t(model@trend.coef%*%f.deltax)
@@ -1592,14 +1593,11 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{this->m_sigma2,
-                        true,
+  Parameters parameters{std::make_optional(this->m_sigma2),
                         this->m_est_sigma2,
-                        trans(this->m_theta),
-                        true,
+                        std::make_optional(trans(this->m_theta)),
                         this->m_est_theta,
-                        trans(this->m_beta),
-                        true,
+                        std::make_optional(trans(this->m_beta)),
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)

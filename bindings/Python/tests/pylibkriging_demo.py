@@ -7,12 +7,13 @@ def test_kriging():
     y = [f(xi) for xi in X]
 
     import pylibkriging as lk
-    k_py = lk.Kriging(y, X, "gauss")
+    k_py = lk.Kriging(y, X, "gauss", parameters={'sigma2': 1, 'is_theta_estim': False})
     print(k_py.summary())
 
     x = np.arange(0, 1, 1 / 99)
     p = k_py.predict(x, True, False, False)
-    p = {"mean": p[0], "stdev": p[1], "cov": p[2], "mean_deriv": p[3], "stdev_deriv": p[4]}  # This should be done by predict
+    p = {"mean": p[0], "stdev": p[1], "cov": p[2], "mean_deriv": p[3],
+         "stdev_deriv": p[4]}  # This should be done by predict
 
     try:
         import matplotlib.pyplot as pyplot

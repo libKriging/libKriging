@@ -25,7 +25,13 @@ list(APPEND pylibkriging_SRCS
         src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp
         src/_pylibkriging/NuggetKriging_binding.cpp src/_pylibkriging/NuggetKriging_binding.hpp
         src/_pylibkriging/RandomGenerator.cpp src/_pylibkriging/RandomGenerator.hpp
-        src/_pylibkriging/BindingTest.cpp src/_pylibkriging/BindingTest.hpp
+        src/_pylibkriging/py_to_cpp_cast.cpp src/_pylibkriging/py_to_cpp_cast.hpp
+        )
+
+# TODO Should be only compiled in Debug Mode
+list(APPEND pylibkriging_SRCS
+        src/_pylibkriging/ArrayBindingTest.cpp src/_pylibkriging/ArrayBindingTest.hpp
+        src/_pylibkriging/DictTest.cpp src/_pylibkriging/DictTest.hpp
         )
 
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})

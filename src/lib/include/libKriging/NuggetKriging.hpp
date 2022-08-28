@@ -1,93 +1,58 @@
 #ifndef LIBKRIGING_NUGGETKRIGING_HPP
 #define LIBKRIGING_NUGGETKRIGING_HPP
 
+#include <optional>
+#include <utility>
+
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Trend.hpp"
 
 #include "libKriging/libKriging_exports.h"
 
+// Putting this struct inside Kriging gives the following error:
+// error: default member initializer for 'is_sigma2_estim' needed within
+//    definition of enclosing class 'NuggetKriging' outside of member functions
+struct NuggetKrigingParameters {
+  std::optional<arma::vec> nugget;
+  bool is_nugget_estim = true;
+  std::optional<arma::vec> sigma2;
+  bool is_sigma2_estim = true;
+  std::optional<arma::mat> theta;
+  bool is_theta_estim = true;
+  std::optional<arma::colvec> beta;
+  bool is_beta_estim = true;
+};
+
 /** Ordinary kriging regression
  * @ingroup Regression
  */
 class NuggetKriging {
  public:
-  struct Parameters {
-    arma::vec nugget;
-    bool has_nugget;
-    bool is_nugget_estim;
-    arma::vec sigma2;
-    bool has_sigma2;
-    bool is_sigma2_estim;
-    arma::mat theta;
-    bool has_theta;
-    bool is_theta_estim;
-    arma::colvec beta;
-    bool has_beta;
-    bool is_beta_estim;
+  using Parameters = NuggetKrigingParameters;
 
-    Parameters()
-        : nugget(arma::vec()),
-          has_nugget(false),
-          is_nugget_estim(true),
-          sigma2(arma::vec()),
-          has_sigma2(false),
-          is_sigma2_estim(true),
-          theta(arma::mat()),
-          has_theta(false),
-          is_theta_estim(true),
-          beta(arma::vec()),
-          has_beta(false),
-          is_beta_estim(true) {}
-
-    Parameters(arma::vec n,
-               bool h_n,
-               bool e_n,
-               arma::vec s2,
-               bool h_s2,
-               bool e_s2,
-               arma::mat t,
-               bool h_t,
-               bool e_t,
-               arma::vec b,
-               bool h_b,
-               bool e_b)
-        : nugget(n),
-          has_nugget(h_n),
-          is_nugget_estim(e_n),
-          sigma2(s2),
-          has_sigma2(h_s2),
-          is_sigma2_estim(e_s2),
-          theta(t),
-          has_theta(h_t),
-          is_theta_estim(e_t),
-          beta(b),
-          has_beta(h_b),
-          is_beta_estim(e_b) {}
-  };
-
-  const std::string& kernel() const { return m_covType; };
-  const std::string& optim() const { return m_optim; };
-  const std::string& objective() const { return m_objective; };
-  const arma::mat& X() const { return m_X; };
-  const arma::rowvec& centerX() const { return m_centerX; };
-  const arma::rowvec& scaleX() const { return m_scaleX; };
-  const arma::colvec& y() const { return m_y; };
-  const double& centerY() const { return m_centerY; };
-  const double& scaleY() const { return m_scaleY; };
-  const Trend::RegressionModel& regmodel() const { return m_regmodel; };
-  const arma::mat& F() const { return m_F; };
-  const arma::mat& T() const { return m_T; };
-  const arma::mat& M() const { return m_M; };
-  const arma::colvec& z() const { return m_z; };
-  const arma::colvec& beta() const { return m_beta; };
-  const bool& is_beta_estim() const { return m_est_beta; };
-  const arma::vec& theta() const { return m_theta; };
-  const bool& is_theta_estim() const { return m_est_theta; };
-  const double& sigma2() const { return m_sigma2; };
-  const bool& is_sigma2_estim() const { return m_est_sigma2; };
-  const double& nugget() const { return m_nugget; };
-  const bool& is_nugget_estim() const { return m_est_nugget; };
+  [[nodiscard]] const std::string& kernel() const { return m_covType; };
+  [[nodiscard]] const std::string& optim() const { return m_optim; };
+  [[nodiscard]] const std::string& objective() const { return m_objective; };
+  [[nodiscard]] const arma::mat& X() const { return m_X; };
+  [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
+  [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
+  [[nodiscard]] const arma::colvec& y() const { return m_y; };
+  [[nodiscard]] const double& centerY() const { return m_centerY; };
+  [[nodiscard]] const double& scaleY() const { return m_scaleY; };
+  [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
+  [[nodiscard]] const arma::mat& F() const { return m_F; };
+  [[nodiscard]] const arma::mat& T() const { return m_T; };
+  [[nodiscard]] const arma::mat& M() const { return m_M; };
+  [[nodiscard]] const arma::colvec& z() const { return m_z; };
+  [[nodiscard]] const arma::colvec& beta() const { return m_beta; };
+  [[nodiscard]] const bool& is_beta_estim() const { return m_est_beta; };
+  [[nodiscard]] const arma::vec& theta() const { return m_theta; };
+  [[nodiscard]] const bool& is_theta_estim() const { return m_est_theta; };
+  [[nodiscard]] const double& sigma2() const { return m_sigma2; };
+  [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
+  [[nodiscard]] const double& nugget() const { return m_nugget; };
+  [[nodiscard]] const bool& is_nugget_estim() const { return m_est_nugget; };
 
  private:
   std::string m_covType;
@@ -166,9 +131,9 @@ class NuggetKriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad);
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, const bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad);
 
   LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double logMargPost();
@@ -190,7 +155,7 @@ class NuggetKriging {
    * @param seed random seed setup for sample simulations
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(const int nsim, const int seed, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& Xp);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output

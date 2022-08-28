@@ -29,38 +29,47 @@ class MxMapper : public NonCopyable {
  public:
   ~MxMapper();
 
-  template <int I, typename T>
-  typename converter_trait<T>::type get(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  eMxType getType(const int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
-    return converter<T>(m_p[I], parameterStr<I>(msg));
+    return get_type(m_p[I]);
   }
 
-  template <int I, typename T>
-  std::optional<typename converter_trait<T>::type> getOptional(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  typename converter_trait<T>::type get(const int I, const char* msg = nullptr) {
+    assert(I >= 0);
+    if (I >= m_n) {
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
+    }
+    m_accesses.set(I);
+    return converter<T>(m_p[I], parameterStr(I, msg));
+  }
+
+  template <typename T>
+  std::optional<typename converter_trait<T>::type> getOptional(int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n)
       return std::nullopt;
     m_accesses.set(I);
-    return converter<T>(m_p[I], parameterStr<I>(msg));
+    return converter<T>(m_p[I], parameterStr(I, msg));
   }
 
-  template <int I, typename T>
-  void set(const T& t, const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  void set(int I, const T& t, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
     setter<T>(t, m_p[I]);
   }
 
-  template <int I, typename T>
-  void setOptional(const T& t, const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  void setOptional(int I, const T& t, const char* /*msg*/ = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
       return;
     }
@@ -68,14 +77,14 @@ class MxMapper : public NonCopyable {
     setter<T>(t, m_p[I]);
   }
 
-  template <int I, typename T>
-  T* getObject(const char* msg = nullptr) {
-    static_assert(I >= 0);
+  template <typename T>
+  T* getObjectFromRef(int I, const char* msg = nullptr) {
+    assert(I >= 0);
     if (I >= m_n) {
-      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr<I>(msg));
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Unavailable ", parameterStr(I, msg));
     }
     m_accesses.set(I);
-    auto ref = get<I, ObjectRef>(msg);
+    auto ref = get<ObjectRef>(I, msg);
     auto ptr = ObjectCollector::getObject<T>(ref);
     if (ptr == nullptr) {
       throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
@@ -83,11 +92,27 @@ class MxMapper : public NonCopyable {
     return ptr;
   }
 
-  int count() const { return m_n; }
+  template <typename T>
+  std::optional<T*> getOptionalObject(int I, const char* msg = nullptr) {
+    assert(I >= 0);
+    if (I >= m_n) {
+      return std::nullopt;
+    }
+    m_accesses.set(I);
+    // mxGetClassName(m_p[I]); // if you need more info
+    mxArray* ref_array = mxGetProperty(m_p[I], 0, "ref");  // by convention how we build object
+    ObjectCollector::ref_t ref = getObject(ref_array);
+    auto ptr = ObjectCollector::getObject<T>(ref);
+    if (ptr == nullptr) {
+      throw MxException(LOCATION(), "mLibKriging:missingArg", "Undefined reference object");
+    }
+    return std::make_optional<T*>(ptr);
+  }
 
-  template <int I>
-  static std::string parameterStr(const char* msg) {
-    if (msg) {
+  [[nodiscard]] int count() const { return m_n; }
+
+  static std::string parameterStr(int I, const char* msg) {
+    if (msg != nullptr) {
       return "parameter " + std::to_string(I) + " '" + msg + "'";
     } else {
       return "parameter " + std::to_string(I);
