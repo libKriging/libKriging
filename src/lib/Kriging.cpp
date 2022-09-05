@@ -1602,8 +1602,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(
-      arma::join_cols((m_y+centerY)*scaleY, newy), // de-normalize previous data according to suite unnormed new data
-      arma::join_cols((m_X.each_row()+centerX).each_row() % scaleX, newX), 
+      arma::join_cols((m_y + this->m_centerY) * this->m_scaleY, newy), // de-normalize previous data according to suite unnormed new data
+      arma::join_cols((m_X.each_row() + this->m_centerX).each_row() % this->m_scaleX, newX), 
       m_regmodel, m_normalize, m_optim, m_objective, parameters);
 }
 
