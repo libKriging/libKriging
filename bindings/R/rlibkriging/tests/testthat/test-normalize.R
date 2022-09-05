@@ -12,7 +12,7 @@ X <- as.matrix(runif(n))
 X10 = 10*X
 
 y = f(X)
-y10 = 10*y
+y50 = 50*y
 
 library(rlibkriging)
 
@@ -20,69 +20,69 @@ library(rlibkriging)
 context("no normalize")
 
 r_nonorm <- Kriging(y, X, "gauss", normalize=F)
-r10_nonorm <- Kriging(y10, X10, "gauss", normalize=F)
+r1050_nonorm <- Kriging(y50, X10, "gauss", normalize=F)
 
 test_that(desc="theta nonorm",
-          expect_equal( r_nonorm$theta()*10 , r10_nonorm$theta() ,tol=0.01))
+          expect_equal( r_nonorm$theta()*10 , r1050_nonorm$theta() ,tol=0.01))
 test_that(desc="beta nonorm",
-          expect_equal(r_nonorm$beta()*10 , r10_nonorm$beta(),tol=0.01))
+          expect_equal(r_nonorm$beta()*50 , r1050_nonorm$beta(),tol=0.01))
 test_that(desc="sigma2 nonorm",
-          expect_equal(r_nonorm$sigma2()*100 , r10_nonorm$sigma2(),tol=0.01))
+          expect_equal(r_nonorm$sigma2()*50*50 , r1050_nonorm$sigma2(),tol=0.01))
 
 
-test_that(desc="predict nonorm10 = 10*nonorm",
-          expect_equal(lapply(r_nonorm$predict(0.5),function(...)10*...), r10_nonorm$predict(10*0.5),tol=0.01))
+test_that(desc="predict nonorm",
+          expect_equal(lapply(r_nonorm$predict(0.5),function(...)50*...), r1050_nonorm$predict(10*0.5),tol=0.01))
 
-test_that(desc="simulate nonorm10 = 10*nonorm",
-          expect_equal(10*r_nonorm$simulate(1,x=0.5), r10_nonorm$simulate(1,x=10*0.5),tol=0.01))
+test_that(desc="simulate nonorm",
+          expect_equal(50*r_nonorm$simulate(1,x=0.5), r1050_nonorm$simulate(1,x=10*0.5),tol=0.01))
 
 
 r_nonorm$update(newX=0.5,newy=f(0.5))
-r10_nonorm$update(newX=10*0.5,newy=10*f(0.5))
+r1050_nonorm$update(newX=10*0.5,newy=50*f(0.5))
 
 
-test_that(desc="update theta nonorm10 = 10*nonorm",
-          expect_equal(r_nonorm$theta()*10 , r10_nonorm$theta(),tol=0.01))
-test_that(desc="update beta nonorm10 = 10*nonorm",
-          expect_equal(r_nonorm$beta()*10 , r10_nonorm$beta(),tol=0.01))
-test_that(desc="update sigma2 nonorm10 = 10*nonorm",
-          expect_equal(r_nonorm$sigma2()*100 , r10_nonorm$sigma2(),tol=0.01))
+test_that(desc="update theta nonorm",
+          expect_equal(r_nonorm$theta()*10 , r1050_nonorm$theta(),tol=0.01))
+test_that(desc="update beta nonorm",
+          expect_equal(r_nonorm$beta()*50 , r1050_nonorm$beta(),tol=0.01))
+test_that(desc="update sigma2 nonorm",
+          expect_equal(r_nonorm$sigma2()*50*50 , r1050_nonorm$sigma2(),tol=0.01))
 
 
 
 context("normalize")
 
 r_norm <- Kriging(y, X, "gauss", normalize=T)
-r10_norm <- Kriging(y10, X10, "gauss", normalize=T)
+r1050_norm <- Kriging(y50, X10, "gauss", normalize=T)
 
 test_that(desc="theta norm",
-          expect_equal(r_norm$theta()*10 , r10_norm$theta(),tol=0.01))
+          expect_equal(r_norm$theta() , r1050_norm$theta(),tol=0.01))
 test_that(desc="beta norm",
-          expect_equal(r_norm$beta()*10 , r10_norm$beta(),tol=0.01))
+          expect_equal(r_norm$beta() , r1050_norm$beta(),tol=0.01))
 test_that(desc="sigma2 norm",
-          expect_equal(r_norm$sigma2()*100 , r10_norm$sigma2(),tol=0.01))
+          expect_equal(r_norm$sigma2() , r1050_norm$sigma2(),tol=0.01))
 
 
-test_that(desc="predict norm10 = 10*norm",
-          expect_equal(lapply(r_norm$predict(0.5),function(...)10*...), r10_norm$predict(10*0.5),tol=0.01))
+test_that(desc="predict norm",
+          expect_equal(lapply(r_norm$predict(0.5),function(...)50*...), r1050_norm$predict(10*0.5),tol=0.01))
 
-test_that(desc="simulate norm10 = 10*norm",
-          expect_equal(10*r_norm$simulate(1,x=0.5), r10_norm$simulate(1,x=10*0.5),tol=0.01))
+test_that(desc="simulate norm",
+          expect_equal(50*r_norm$simulate(1,x=0.5), r1050_norm$simulate(1,x=10*0.5),tol=0.01))
 
 
 plot(seq(0,1,,101),r_norm$simulate(1,seed=123,x=seq(0,1,,101)))
 points(X,y,col='red')
-plot(seq(0,10,,101),r10_norm$simulate(1,seed=123,x=seq(0,10,,101)))
-points(X10,y10,col='red')
+plot(seq(0,10,,101),r1050_norm$simulate(1,seed=123,x=seq(0,10,,101)))
+points(X10,y50,col='red')
 
 r_norm$update(newX=0.5,newy=f(0.5))
-r10_norm$update(newX=10*0.5,newy=10*f(0.5))
+r1050_norm$update(newX=10*0.5,newy=50*f(0.5))
 
-test_that(desc="update theta norm10 = 10*norm",
-          expect_equal(r_norm$theta()*10 , r10_norm$theta(),tol=0.01))
-test_that(desc="update beta norm10 = 10*norm",
-          expect_equal(r_norm$beta()*10 , r10_norm$beta(),tol=0.01))
-test_that(desc="update sigma2 norm10 = 10*norm",
-          expect_equal(r_norm$sigma2()*100 , r10_norm$sigma2(),tol=0.01))
+test_that(desc="update theta norm",
+          expect_equal(r_norm$theta() , r1050_norm$theta(),tol=0.01))
+test_that(desc="update beta norm",
+          expect_equal(r_norm$beta() , r1050_norm$beta(),tol=0.01))
+test_that(desc="update sigma2 norm",
+          expect_equal(r_norm$sigma2() , r1050_norm$sigma2(),tol=0.01))
 
 
