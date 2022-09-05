@@ -40,6 +40,7 @@ class NuggetKriging {
   [[nodiscard]] const arma::colvec& y() const { return m_y; };
   [[nodiscard]] const double& centerY() const { return m_centerY; };
   [[nodiscard]] const double& scaleY() const { return m_scaleY; };
+  [[nodiscard]] const bool& normalize() const { return m_normalize; };
   [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
   [[nodiscard]] const arma::mat& F() const { return m_F; };
   [[nodiscard]] const arma::mat& T() const { return m_T; };
@@ -62,6 +63,7 @@ class NuggetKriging {
   arma::colvec m_y;
   double m_centerY;
   double m_scaleY;
+  bool m_normalize;
   Trend::RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
