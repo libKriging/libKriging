@@ -968,7 +968,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   double centerY;
   double scaleY;
   // Normalization of inputs and output
-  if (normalize) {
+  m_normalize = normalize;
+  if (m_normalize) {
     centerX = min(X, 0);
     scaleX = max(X, 0) - min(X, 0);
     centerY = min(y);
@@ -1052,8 +1053,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_est_sigma2 = parameters.is_sigma2_estim;
 
   } else {
-    arma::vec theta_lower = Optim::theta_lower_factor * trans(max(X, 0) - min(X, 0));
-    arma::vec theta_upper = Optim::theta_upper_factor * trans(max(X, 0) - min(X, 0));
+    arma::vec theta_lower = Optim::theta_lower_factor * trans(max(m_X, 0) - min(m_X, 0));
+    arma::vec theta_upper = Optim::theta_upper_factor * trans(max(m_X, 0) - min(m_X, 0));
 
     if (Optim::variogram_bounds_heuristic) {
       arma::vec dy2 = arma::zeros(n * n);
@@ -1135,6 +1136,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
           arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+          arma::cout << "  normalize: " << m_normalize << arma::endl;
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
           arma::cout << "  start_point: " << theta0.row(i).t() << " ";
@@ -1259,6 +1261,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
           arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+          arma::cout << "  normalize: " << m_normalize << arma::endl;
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
           arma::cout << "  start_point: " << theta0.row(i).t() << " ";
@@ -1308,11 +1311,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         }
       }
     } else
-      throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS*, Newton*)");
+      throw std::runtime_error("Unsupported optim: " + optim + " (supported are: none, BFGS[#], Newton[#])");
   }
-
-  if (!parameters.sigma2.has_value())
-    m_sigma2 *= scaleY * scaleY;
 
   // arma::cout << "theta:" << m_theta << arma::endl;
 }
@@ -1405,6 +1405,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
     arma::mat s2_predict = total_sd2 * (1.0 - s2_predict_1 + s2_predict_2);
     s2_predict.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
+
+    pred_stdev *= m_scaleY;
   }
 
   if (withCov) {
@@ -1417,6 +1419,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
     }
 
     pred_cov = total_sd2 * (R_predpred - trans(Tinv_pred) * Tinv_pred + trans(s2_predict_mat) * s2_predict_mat);
+
+    pred_cov *= m_scaleY;
   }
 
   if (withDeriv) {
@@ -1593,17 +1597,22 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{std::make_optional(this->m_sigma2),
+  Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta)),
+                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
                         this->m_est_theta,
-                        std::make_optional(trans(this->m_beta)),
+                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
-  bool normalize = (m_centerY == 0.0 && m_scaleY == 1) && (m_centerX.is_zero() && m_scaleX.is_zero());
-  this->fit(
-      arma::join_cols(m_y, newy), arma::join_cols(m_X, newX), m_regmodel, normalize, m_optim, m_objective, parameters);
+  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+                            newy),  // de-normalize previous data according to suite unnormed new data
+            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX),
+            m_regmodel,
+            m_normalize,
+            m_optim,
+            m_objective,
+            parameters);
 }
 
 LIBKRIGING_EXPORT std::string Kriging::summary() const {
@@ -1616,7 +1625,16 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
     });
   };
 
-  oss << "* data: " << m_X.n_rows << " x " << m_X.n_cols << " -> " << m_y.n_rows << " x " << m_y.n_cols << "\n";
+  oss << "* data";
+  oss << ((m_normalize) ? " (normalized): " : ": ");
+  arma::rowvec Xmins = arma::min(m_X, 0);
+  arma::rowvec Xmaxs = arma::max(m_X, 0);
+  for (arma::uword i = 0; i < m_X.n_cols; i++) {
+    oss << "[" << Xmins[i] << "," << Xmaxs[i] << "]";
+    if (i < m_X.n_cols - 1)
+      oss << "x";
+  }
+  oss << " -> [" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
   oss << "* trend " << Trend::toString(m_regmodel);
   oss << ((m_est_beta) ? " (est.): " : ": ");
   colvec_printer(m_beta);
