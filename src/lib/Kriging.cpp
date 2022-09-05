@@ -1595,9 +1595,9 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
   // rebuild starting parameters
   Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta % this->m_scaleX) ),
+                        std::make_optional(trans(this->m_theta) % this->m_scaleX ),
                         this->m_est_theta,
-                        std::make_optional(trans(this->m_beta * this->m_scaleY)),
+                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
