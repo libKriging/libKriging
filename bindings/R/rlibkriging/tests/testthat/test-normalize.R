@@ -31,7 +31,7 @@ test_that(desc="sigma2 nonorm",
 
 
 test_that(desc="predict nonorm",
-          expect_equal(lapply(r_nonorm$predict(0.5),function(...)50*...), r1050_nonorm$predict(10*0.5),tol=0.01))
+          expect_equal(lapply(r_nonorm$predict(0.5),function(...){50*...}), r1050_nonorm$predict(10*0.5),tol=0.01))
 
 test_that(desc="simulate nonorm",
           expect_equal(50*r_nonorm$simulate(1,x=0.5), r1050_nonorm$simulate(1,x=10*0.5),tol=0.01))
@@ -64,10 +64,10 @@ test_that(desc="sigma2 norm",
 
 
 test_that(desc="predict norm",
-          expect_equal(lapply(r_norm$predict(0.5),function(...)...), r1050_norm$predict(10*0.5),tol=0.01))
+          expect_equal(lapply(r_norm$predict(0.5),function(...){50*...}), r1050_norm$predict(10*0.5),tol=0.01))
 
 test_that(desc="simulate norm",
-          expect_equal(r_norm$simulate(1,x=0.5), r1050_norm$simulate(1,x=10*0.5),tol=0.01))
+          expect_equal(50*r_norm$simulate(1,x=0.5), r1050_norm$simulate(1,x=10*0.5),tol=0.01))
 
 
 plot(seq(0,1,,101),r_norm$simulate(1,seed=123,x=seq(0,1,,101)))
