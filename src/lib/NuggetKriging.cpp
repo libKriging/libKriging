@@ -984,7 +984,7 @@ NuggetKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool wit
     // cond.cov <- cond.cov + crossprod(s2.predict.mat)
 
     pred_cov = total_sd2 * (R_predpred - trans(Tinv_pred) * Tinv_pred + trans(s2_predict_mat) * s2_predict_mat);
-    
+
     pred_cov *= m_scaleY;
   }
 
@@ -1139,20 +1139,25 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& newy, const arma::
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_nugget,
-                        std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
-                        this->m_est_beta};
+  Parameters parameters{
+      std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
+      this->m_est_nugget,
+      std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
+      this->m_est_sigma2,
+      std::make_optional(trans(this->m_theta) % this->m_scaleX),
+      this->m_est_theta,
+      std::make_optional(trans(this->m_beta) * this->m_scaleY),
+      this->m_est_beta};
   // re-fit
   // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
-  this->fit(
-      arma::join_cols(m_y * this->m_scaleY + this->m_centerY, newy), // de-normalize previous data according to suite unnormed new data
-      arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX), 
-      m_regmodel, m_normalize, m_optim, m_objective, parameters);
+  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+                            newy),  // de-normalize previous data according to suite unnormed new data
+            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX),
+            m_regmodel,
+            m_normalize,
+            m_optim,
+            m_objective,
+            parameters);
 }
 
 LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
@@ -1167,11 +1172,12 @@ LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
 
   oss << "* data";
   oss << ((m_normalize) ? " (normalized): " : ": ");
-  arma::rowvec Xmins = arma::min(m_X,0);
-  arma::rowvec Xmaxs = arma::max(m_X,0);
+  arma::rowvec Xmins = arma::min(m_X, 0);
+  arma::rowvec Xmaxs = arma::max(m_X, 0);
   for (arma::uword i = 0; i < m_X.n_cols; i++) {
     oss << "[" << Xmins[i] << "," << Xmaxs[i] << "]";
-    if (i<m_X.n_cols-1) oss << "x";
+    if (i < m_X.n_cols - 1)
+      oss << "x";
   }
   oss << " -> [" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
   oss << "* trend " << Trend::toString(m_regmodel);
