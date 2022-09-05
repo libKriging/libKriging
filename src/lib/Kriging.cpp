@@ -1405,6 +1405,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
     arma::mat s2_predict = total_sd2 * (1.0 - s2_predict_1 + s2_predict_2);
     s2_predict.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
     pred_stdev = sqrt(s2_predict);
+
+    pred_stdev *= m_scaleY;
   }
 
   if (withCov) {
@@ -1417,6 +1419,8 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
     }
 
     pred_cov = total_sd2 * (R_predpred - trans(Tinv_pred) * Tinv_pred + trans(s2_predict_mat) * s2_predict_mat);
+
+    pred_cov *= m_scaleY;
   }
 
   if (withDeriv) {
