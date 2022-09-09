@@ -37,7 +37,7 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   NuggetKriging::Parameters parameters{get_entry<arma::vec>(dict, "nugget"),
-                                       get_entry<bool>(dict, "is_nugger_estim").value_or(true),
+                                       get_entry<bool>(dict, "is_nugget_estim").value_or(true),
                                        get_entry<arma::vec>(dict, "sigma2"),
                                        get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                        get_entry<arma::mat>(dict, "theta"),
@@ -60,7 +60,7 @@ void PyNuggetKriging::fit(const py::array_t<double>& y,
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   NuggetKriging::Parameters parameters{get_entry<arma::vec>(dict, "nugget"),
-                                       get_entry<bool>(dict, "is_nugger_estim").value_or(true),
+                                       get_entry<bool>(dict, "is_nugget_estim").value_or(true),
                                        get_entry<arma::vec>(dict, "sigma2"),
                                        get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
                                        get_entry<arma::mat>(dict, "theta"),
@@ -154,6 +154,10 @@ double PyNuggetKriging::centerY() {
 
 double PyNuggetKriging::scaleY() {
   return m_internal->scaleY();
+}
+
+bool PyNuggetKriging::normalize() {
+  return m_internal->normalize();
 }
 
 std::string PyNuggetKriging::regmodel() {

@@ -71,6 +71,7 @@ class PyNuggetKriging {
   py::array_t<double> y();
   double centerY();
   double scaleY();
+  bool normalize();
   std::string regmodel();  // Trend::toString(km->regmodel())
   py::array_t<double> F();
   py::array_t<double> T();

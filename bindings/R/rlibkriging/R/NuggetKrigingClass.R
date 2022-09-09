@@ -446,7 +446,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
 #' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
 #' newX <- as.matrix(runif(3))
-#' newy <- f(newX)
+#' newy <- f(newX) + 0.01*rnorm(nrow(newX))
 #' points(newX, newy, col = "red")
 #' 
 #' ## change the content of the object 'KrigObj'
@@ -555,8 +555,8 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
-#' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
+#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' r <- NuggetKriging(y, X, kernel = "gauss")
 #' print(r)
 #' logLikelihood(r)
 #' 
@@ -573,7 +573,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object S3 NuggetKriging object.
-#' @param theta_alpha Numeric vector of coorelation range parameters at
+#' @param theta_alpha Numeric vector of correlation range and variance parameters at
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
 #'     (w.r.t theta_alpha)?

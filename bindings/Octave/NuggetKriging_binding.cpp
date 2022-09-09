@@ -283,6 +283,16 @@ void scaleY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->scaleY(), "scaleY");
 }
 
+void normalize(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
+  output.set(0, km->normalize(), "normalize");
+}
+
 void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

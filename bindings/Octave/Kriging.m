@@ -99,6 +99,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::scaleY", obj.ref, varargin{:});
         end
 
+        function varargout = normalize(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::normalize", obj.ref, varargin{:});
+        end
+
         function varargout = regmodel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::regmodel", obj.ref, varargin{:});
         end

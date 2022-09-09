@@ -115,6 +115,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::scaleY"_hash:
       return KrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::normalize"_hash:
+      return KrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::regmodel"_hash:
       return KrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::F"_hash:
@@ -179,6 +181,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::scaleY"_hash:
       return NuggetKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::normalize"_hash:
+      return NuggetKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::regmodel"_hash:
       return NuggetKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::F"_hash:

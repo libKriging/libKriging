@@ -666,7 +666,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object S3 Kriging object.
-#' @param theta Numeric vector of coorelation range parameters at
+#' @param theta Numeric vector of correlation range parameters at
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
 #'     (w.r.t theta)?

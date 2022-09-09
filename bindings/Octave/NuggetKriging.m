@@ -91,6 +91,10 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::scaleY", obj.ref, varargin{:});
         end
 
+        function varargout = normalize(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::normalize", obj.ref, varargin{:});
+        end
+
         function varargout = regmodel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::regmodel", obj.ref, varargin{:});
         end

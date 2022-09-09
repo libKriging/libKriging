@@ -125,6 +125,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
                                       Rcpp::Named("y") = impl_ptr->y(),
                                       Rcpp::Named("centerY") = impl_ptr->centerY(),
                                       Rcpp::Named("scaleY") = impl_ptr->scaleY(),
+                                      Rcpp::Named("normalize") = impl_ptr->normalize(),
                                       Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
                                       Rcpp::Named("beta") = impl_ptr->beta(),
                                       Rcpp::Named("is_beta_estim") = impl_ptr->is_beta_estim());
@@ -372,6 +373,15 @@ double kriging_scaleY(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->scaleY();
+}
+
+// [[Rcpp::export]]
+bool kriging_normalize(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->normalize();
 }
 
 // [[Rcpp::export]]
