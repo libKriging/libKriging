@@ -188,7 +188,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     if (!requireNamespace("DiceKriging", quietly = TRUE))
         stop("Package \"DiceKriging\" not found")
     
-    model <- new("NKM")
+    model <- new("NuggetKM")
     model@NuggetKriging <- x
     
     if (is.null(.call))

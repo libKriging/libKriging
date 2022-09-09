@@ -190,7 +190,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
     if (!requireNamespace("DiceKriging", quietly = TRUE))
         stop("Package \"DiceKriging\" not found")
     
-    model <- new("NKM")
+    model <- new("NoiseKM")
     model@NoiseKriging <- x
     
     if (is.null(.call))
