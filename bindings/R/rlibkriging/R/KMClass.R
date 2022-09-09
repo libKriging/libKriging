@@ -162,11 +162,11 @@ KM <- function(formula = ~1, design, response,
     }
     if (nugget.estim) {
         stop("The formal args 'nugget.estim' ",
-             "can only be used with NKM()")
+             "can only be used with NuggetKM()")
     }
     if (!is.null(nugget) || !is.null(noise.var)) {
         stop("The formal args 'nugget' and 'noise.var' ",
-             "can not be used for now.")
+             "can only be used with NoiseKM() or NuggetKM()")
     }
     if (!is.null(control) || !gr || iso) {
          stop("The formal args'control', 'gr' ",
