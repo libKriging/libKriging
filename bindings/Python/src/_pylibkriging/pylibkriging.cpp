@@ -14,6 +14,7 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
 #include "NuggetKriging_binding.hpp"
+#include "NoiseKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)
@@ -257,6 +258,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("y", &PyNuggetKriging::y)
       .def("centerY", &PyNuggetKriging::centerY)
       .def("scaleY", &PyNuggetKriging::scaleY)
+      .def("normalize", &PyNuggetKriging::normalize)
       .def("regmodel", &PyNuggetKriging::regmodel)
       .def("F", &PyNuggetKriging::F)
       .def("T", &PyNuggetKriging::T)
@@ -317,6 +319,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("y", &NuggetKriging::y)
       .def("centerY", &NuggetKriging::centerY)
       .def("scaleY", &NuggetKriging::scaleY)
+      .def("normalize", &NuggetKriging::normalize)
       .def("regmodel", &NuggetKriging::regmodel)
       .def("F", &NuggetKriging::F)
       .def("T", &NuggetKriging::T)
@@ -330,4 +333,121 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_sigma2_estim", &NuggetKriging::is_sigma2_estim)
       .def("nugget", &NuggetKriging::nugget)
       .def("is_nugget_estim", &NuggetKriging::is_nugget_estim);
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  py::class_<NoiseKriging::Parameters>(m, "NoiseKrigingParameters").def(py::init<>());
+
+  // Quick and dirty manual wrapper (cf optional argument mapping)
+  // Backup solution // FIXME remove it if not necessary
+  py::class_<PyNoiseKriging>(m, "WrappedPyNoiseKriging")
+      .def(py::init<const std::string&>())
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const std::string&,
+                    const Trend::RegressionModel&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const py::dict&>(),
+           py::arg("y"),
+           py::arg("noise"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{})
+      .def("fit", &PyNoiseKriging::fit)
+      .def("predict", &PyNoiseKriging::predict)
+      .def("simulate", &PyNoiseKriging::simulate)
+      .def("update", &PyNoiseKriging::update)
+      .def("summary", &PyNoiseKriging::summary)
+      .def("logLikelihoodFun", &PyNoiseKriging::logLikelihoodFun)
+      .def("logLikelihood", &PyNoiseKriging::logLikelihood)
+
+      .def("kernel", &PyNoiseKriging::kernel)
+      .def("optim", &PyNoiseKriging::optim)
+      .def("objective", &PyNoiseKriging::objective)
+      .def("X", &PyNoiseKriging::X)
+      .def("centerX", &PyNoiseKriging::centerX)
+      .def("scaleX", &PyNoiseKriging::scaleX)
+      .def("y", &PyNoiseKriging::y)
+      .def("centerY", &PyNoiseKriging::centerY)
+      .def("scaleY", &PyNoiseKriging::scaleY)
+      .def("normalize", &PyNoiseKriging::normalize)
+      .def("noise", &PyNoiseKriging::noise)
+      .def("regmodel", &PyNoiseKriging::regmodel)
+      .def("F", &PyNoiseKriging::F)
+      .def("T", &PyNoiseKriging::T)
+      .def("M", &PyNoiseKriging::M)
+      .def("z", &PyNoiseKriging::z)
+      .def("beta", &PyNoiseKriging::beta)
+      .def("is_beta_estim", &PyNoiseKriging::is_beta_estim)
+      .def("theta", &PyNoiseKriging::theta)
+      .def("is_theta_estim", &PyNoiseKriging::is_theta_estim)
+      .def("sigma2", &PyNoiseKriging::sigma2)
+      .def("is_sigma2_estim", &PyNoiseKriging::is_sigma2_estim);
+
+  // Automated mapper
+  py::class_<NoiseKriging>(m, "PyNoiseKriging")
+      .def(py::init<const std::string&>())
+      .def(py::init<const arma::colvec&,
+                    const arma::colvec&,
+                    const arma::mat&,
+                    const std::string&,
+                    const Trend::RegressionModel&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const NoiseKriging::Parameters&>(),
+           py::arg("y"),
+           py::arg("noise"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = NoiseKriging::Parameters{})
+      .def("fit",
+           &NoiseKriging::fit,
+           py::arg("y"),
+           py::arg("noise"),
+           py::arg("X"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = NoiseKriging::Parameters{})
+      .def("predict", &NoiseKriging::predict)
+      .def("simulate", &NoiseKriging::simulate)
+      .def("update", &NoiseKriging::update)
+      .def("summary", &NoiseKriging::summary)
+      .def("logLikelihoodFun", &NoiseKriging::logLikelihoodFun)
+      .def("logLikelihood", &NoiseKriging::logLikelihood)
+
+      .def("kernel", &NoiseKriging::kernel)
+      .def("optim", &NoiseKriging::optim)
+      .def("objective", &NoiseKriging::objective)
+      .def("X", &NoiseKriging::X)
+      .def("centerX", &NoiseKriging::centerX)
+      .def("scaleX", &NoiseKriging::scaleX)
+      .def("y", &NoiseKriging::y)
+      .def("centerY", &NoiseKriging::centerY)
+      .def("scaleY", &NoiseKriging::scaleY)
+      .def("noise", &NoiseKriging::noise)
+      .def("normalize", &NoiseKriging::normalize)
+      .def("regmodel", &NoiseKriging::regmodel)
+      .def("F", &NoiseKriging::F)
+      .def("T", &NoiseKriging::T)
+      .def("M", &NoiseKriging::M)
+      .def("z", &NoiseKriging::z)
+      .def("beta", &NoiseKriging::beta)
+      .def("is_beta_estim", &NoiseKriging::is_beta_estim)
+      .def("theta", &NoiseKriging::theta)
+      .def("is_theta_estim", &NoiseKriging::is_theta_estim)
+      .def("sigma2", &NoiseKriging::sigma2)
+      .def("is_sigma2_estim", &NoiseKriging::is_sigma2_estim);
 }
