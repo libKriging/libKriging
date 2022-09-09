@@ -1,5 +1,6 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
+#include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
 #include "Params_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
@@ -115,6 +116,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::scaleY"_hash:
       return KrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::normalize"_hash:
+      return KrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::regmodel"_hash:
       return KrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::F"_hash:
@@ -179,6 +182,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::scaleY"_hash:
       return NuggetKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::normalize"_hash:
+      return NuggetKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::regmodel"_hash:
       return NuggetKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::F"_hash:
@@ -205,6 +210,70 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::nugget(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::is_nugget_estim "_hash:
       return NuggetKrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "NoiseKriging::new"_hash:
+      return NoiseKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::delete"_hash:
+      return NoiseKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::fit"_hash:
+      return NoiseKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::predict"_hash:
+      return NoiseKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::simulate"_hash:
+      return NoiseKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::update"_hash:
+      return NoiseKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::summary"_hash:
+      return NoiseKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::logLikelihoodFun"_hash:
+      return NoiseKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::logLikelihood"_hash:
+      return NoiseKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "NoiseKriging::kernel"_hash:
+      return NoiseKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::optim"_hash:
+      return NoiseKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::objective"_hash:
+      return NoiseKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::X"_hash:
+      return NoiseKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::centerX"_hash:
+      return NoiseKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::scaleX"_hash:
+      return NoiseKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::y"_hash:
+      return NoiseKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::centerY"_hash:
+      return NoiseKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::scaleY"_hash:
+      return NoiseKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::normalize"_hash:
+      return NoiseKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::noise"_hash:
+      return NoiseKrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::regmodel"_hash:
+      return NoiseKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::F"_hash:
+      return NoiseKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::T"_hash:
+      return NoiseKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::M"_hash:
+      return NoiseKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::z"_hash:
+      return NoiseKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::beta"_hash:
+      return NoiseKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::is_beta_estim"_hash:
+      return NoiseKrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::theta"_hash:
+      return NoiseKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::is_theta_estim"_hash:
+      return NoiseKrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::sigma2"_hash:
+      return NoiseKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::is_sigma2_estim "_hash:
+      return NoiseKrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

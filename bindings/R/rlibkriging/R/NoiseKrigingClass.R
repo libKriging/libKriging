@@ -1,29 +1,31 @@
 ## ****************************************************************************
-## This file contains stuff related to the S3 class "NuggetKriging".
+## This file contains stuff related to the S3 class "NoiseKriging".
 ## As an S3 class, it has no formal definition. 
 ## ****************************************************************************
 
 
 ## ****************************************************************************
-#' Create an object with S3 class \code{"NuggetKriging"} using
+#' Create an object with S3 class \code{"NoiseKriging"} using
 #' the \pkg{libKriging} library.
 #'
 #' The hyper-parameters (variance and vector of correlation ranges)
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @title Create a \code{NuggetKriging} Object using \pkg{libKriging}
+#' @title Create a \code{NoiseKriging} Object using \pkg{libKriging}
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param y Numeric vector of response values. 
+#' 
+#' @param noise Numeric vector of response variances. 
 #'
 #' @param X Numeric matrix of input design.
 #'
 #' @param kernel Character defining the covariance model:
 #'     \code{"gauss"}, \code{"exp"}, ... See XXX.
 #'
-#' @param regmodel Universal NuggetKriging linear trend.
+#' @param regmodel Universal NoiseKriging linear trend.
 #'
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
@@ -49,7 +51,7 @@
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
 #' 
-#' @return An object with S3 class \code{"NuggetKriging"}. Should be used
+#' @return An object with S3 class \code{"NoiseKriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
 #'     methods.
 #' 
@@ -63,7 +65,7 @@
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' ## fit and print
-#' (k_R <- NuggetKriging(y, X, kernel = "gauss"))
+#' (k_R <- NoiseKriging(y, X, kernel = "gauss"))
 #' 
 #' x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
 #' p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
@@ -76,7 +78,7 @@
 #' plot(f, main = "True function and conditional simulations")
 #' points(X, y, pch = 16)
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
-NuggetKriging <- function(y, X, kernel,
+NoiseKriging <- function(y, noise, X, kernel,
                     regmodel = c("constant", "linear", "interactive"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
@@ -86,13 +88,13 @@ NuggetKriging <- function(y, X, kernel,
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
-    nk <- new_NuggetKriging(y = y, X = X, kernel = kernel,
+    nk <- new_NoiseKriging(y = y, noise = noise, X = X, kernel = kernel,
                       regmodel = regmodel,
                       normalize = normalize,
                       optim = optim,
                       objective = objective,
                       parameters = parameters)
-    class(nk) <- "NuggetKriging"
+    class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in methods(class=class(nk))) {
         if (regexec(paste0(".",class(nk)),f)[[1]]>0) {
@@ -103,24 +105,24 @@ NuggetKriging <- function(y, X, kernel,
         }
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
         eval(parse(text=paste0(
-            "nk$", d, " <- function() nuggetkriging_", d, "(nk)"
+            "nk$", d, " <- function() noisekriging_", d, "(nk)"
             )))
     }
     nk
 }
 
 ## ****************************************************************************
-#' Coerce a \code{NuggetKriging} Object into a List
+#' Coerce a \code{NoiseKriging} Object into a List
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param x An object with class \code{"NuggetKriging"}.
+#' @param x An object with class \code{"NoiseKriging"}.
 #' @param ... Ignored
 #'
 #' @return A list with its elements copying the content of the
-#'     \code{NuggetKriging} object fields: \code{kernel}, \code{optim},
+#'     \code{NoiseKriging} object fields: \code{kernel}, \code{optim},
 #'     \code{objective}, \code{theta} (vector of ranges),
 #'     \code{sigma2} (variance), \code{X}, \code{centerX},
 #'     \code{scaleX}, \code{y}, \code{centerY}, \code{scaleY},
@@ -128,32 +130,32 @@ NuggetKriging <- function(y, X, kernel,
 #'     \code{beta}.
 #' 
 #' @export
-#' @method as.list NuggetKriging
-#' @aliases as.list,NuggetKriging,NuggetKriging-method
+#' @method as.list NoiseKriging
+#' @aliases as.list,NoiseKriging,NoiseKriging-method
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, X, kernel = "gauss")
 #' l <- as.list(r)
 #' cat(paste0(names(l), " =" , l, collapse = "\n"))
-as.list.NuggetKriging <- function(x, ...) {
+as.list.NoiseKriging <- function(x, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    nuggetkriging_model(x)
+    noisekriging_model(x)
 }
 
-## setMethod("as.list", "NuggetKriging", as.list.NuggetKriging)
+## setMethod("as.list", "NoiseKriging", as.list.NoiseKriging)
 
 ## ****************************************************************************
-#' Coerce a \code{NuggetKriging} object into the \code{"km"} class of the
+#' Coerce a \code{NoiseKriging} object into the \code{"km"} class of the
 #' \pkg{DiceKriging} package.
 #'
-#' @title Coerce a \code{NuggetKriging} Object into the Class \code{"km"}
+#' @title Coerce a \code{NoiseKriging} Object into the Class \code{"km"}
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param x An object with S3 class \code{"NuggetKriging"}.
+#' @param x An object with S3 class \code{"NoiseKriging"}.
 #' 
 #' @param .call Force the \code{call} slot to be filled in the
 #'     returned \code{km} object.
@@ -162,24 +164,24 @@ as.list.NuggetKriging <- function(x, ...) {
 #' 
 #' @return An object of having the S4 class \code{"KM"} which extends
 #'     the \code{"km"} class of the \pkg{DiceKriging} package and
-#'     contains an extra \code{NuggetKriging} slot.
+#'     contains an extra \code{NoiseKriging} slot.
 #'
 #' @importFrom methods new
 #' @importFrom stats model.matrix
 #' @export
-#' @method as.km NuggetKriging
+#' @method as.km NoiseKriging
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, X, "gauss")
 #' print(r)
 #' k <- as.km(r)
 #' print(k)
 #' 
-as.km.NuggetKriging <- function(x, .call = NULL, ...) {
+as.km.NoiseKriging <- function(x, .call = NULL, ...) {
     
     ## loadDiceKriging()
     ## if (! "DiceKriging" %in% installed.packages())
@@ -189,14 +191,14 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
         stop("Package \"DiceKriging\" not found")
     
     model <- new("NKM")
-    model@NuggetKriging <- x
+    model@NoiseKriging <- x
     
     if (is.null(.call))
         model@call <- match.call()
     else
         model@call <- .call
     
-    m <- nuggetkriging_model(x)
+    m <- noisekriging_model(x)
     data <- data.frame(m$X)
     model@trend.formula <- regmodel2formula(m$regmodel)
     model@trend.coef <- as.numeric(m$beta)
@@ -208,9 +210,9 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
     model@noise.flag <- FALSE
-    model@noise.var <- 0
+    model@noise.var <- m$noise
     
-    model@case <- "LLconcentration_beta_v_alpha"
+    model@case <- "LLconcentration_beta"
     
     model@known.param <- "None"
     model@param.estim <- NA
@@ -230,7 +232,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     
     covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel, 
                       sd2 = m$sigma2, var.names = names(data), 
-                      nugget = m$nugget, nugget.flag = TRUE, nugget.estim = TRUE,
+                      noise = m$noise, noise.flag = TRUE, noise.estim = TRUE,
                       known.covparam = "")
     
     covStruct@range.names <- "theta" 
@@ -244,52 +246,52 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 }
 
 ## ****************************************************************************
-#' Print the content of a \code{NuggetKriging} object.
+#' Print the content of a \code{NoiseKriging} object.
 #'
-#' @title Print a \code{NuggetKriging} object
+#' @title Print a \code{NoiseKriging} object
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
-#' @param x A (S3) \code{NuggetKriging} Object.
+#' @param x A (S3) \code{NoiseKriging} Object.
 #' @param ... Ignored.
 #'
 #' @return NULL
 #'
 #' @export
-#' @method print NuggetKriging
+#' @method print NoiseKriging
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, X, "gauss")
 #' print(r)
 #' ## same thing
 #' r
-print.NuggetKriging <- function(x, ...) {
+print.NoiseKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
-    k=nuggetkriging_model(x)
-    p = paste0("NuggetKriging model:\n\n",nuggetkriging_summary(x),"\n")
+    k=noisekriging_model(x)
+    p = paste0("NoiseKriging model:\n\n",noisekriging_summary(x),"\n")
     cat(p)
     ## return(p)
 }
 
-## setMethod("print", "NuggetKriging", print.NuggetKriging)
+## setMethod("print", "NoiseKriging", print.NoiseKriging)
 
 
 ## ****************************************************************************
-#' Predict from a \code{NuggetKriging} object.
+#' Predict from a \code{NoiseKriging} object.
 #'
 #' Given "new" input points, the method compute the expectation,
 #' variance and (optionnally) the covariance of the corresponding
 #' stochastic process, conditional on the values at the input points
 #' used when fitting the model.
 #'
-#' @title Prediction Method  for a \code{NuggetKriging} Object
+#' @title Prediction Method  for a \code{NoiseKriging} Object
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object S3 NuggetKriging object.
+#' @param object S3 NoiseKriging object.
 #' 
 #' @param x Input points where the prediction must be computed.
 #'
@@ -314,7 +316,7 @@ print.NuggetKriging <- function(x, ...) {
 #'     and \code{cov} to \code{cov.compute}. These names are chosen
 #'     \pkg{Python} and \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
-#' @method predict NuggetKriging
+#' @method predict NoiseKriging
 #' @export 
 #' 
 #' @examples
@@ -324,39 +326,39 @@ print.NuggetKriging <- function(x, ...) {
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue", pch = 16)
-#' r <- NuggetKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, X, "gauss")
 #' x <-seq(from = 0, to = 1, length.out = 101)
 #' p_x <- predict(r, x)
 #' lines(x, p_x$mean, col = "blue")
 #' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
 #' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
-predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
+predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- nuggetkriging_model(object)
+    k <- noisekriging_model(object)
     ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(k$X))
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(nuggetkriging_predict(object, x, stdev, cov, deriv))
+    return(noisekriging_predict(object, x, stdev, cov, deriv))
 }
 
 ## predict <- function (...) UseMethod("predict")
-## setMethod("predict", "NuggetKriging", predict.NuggetKriging)
+## setMethod("predict", "NoiseKriging", predict.NoiseKriging)
 
 ## ****************************************************************************
-#' Simulation from a \code{NuggetKriging} model object.
+#' Simulation from a \code{NoiseKriging} model object.
 #'
 #' This method draws paths of the stochastic process at new input
 #' points conditional on the values at the input points used in the
 #' fit.
 #'
-#' @title Simulation from a \code{NuggetKriging} Object
+#' @title Simulation from a \code{NoiseKriging} Object
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object S3 NuggetKriging object.
+#' @param object S3 NoiseKriging object.
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
@@ -373,7 +375,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #'     \pkg{Octave} interfaces to \pkg{libKriging}.
 #' 
 #' 
-#' @method simulate NuggetKriging
+#' @method simulate NoiseKriging
 #' @export
 #' 
 #' @examples
@@ -383,15 +385,15 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' r <- NuggetKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, X, kernel = "gauss")
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' s_x <- simulate(r, nsim = 3, x = x)
 #' lines(x, s_x[ , 1], col = "blue")
 #' lines(x, s_x[ , 2], col = "blue")
 #' lines(x, s_x[ , 3], col = "blue")
-simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
+simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- nuggetkriging_model(object) 
+    k <- noisekriging_model(object) 
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x = matrix(x, ncol = ncol(k$X))
     if (ncol(x) != ncol(k$X))
@@ -399,24 +401,26 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x))
+    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x))
 }
 
 ## simulate <- function (...) UseMethod("simulate")
-## setMethod("simulate", "NuggetKriging", simulate.NuggetKriging)
+## setMethod("simulate", "NoiseKriging", simulate.NoiseKriging)
 
 
-## removed by Yves @aliases update,NuggetKriging,NuggetKriging-method
+## removed by Yves @aliases update,NoiseKriging,NoiseKriging-method
 ## *****************************************************************************
-#' Update a \code{NuggetKriging} model object with new points
+#' Update a \code{NoiseKriging} model object with new points
 #' 
-#' @title Update a \code{NuggetKriging} Object with New Points
+#' @title Update a \code{NoiseKriging} Object with New Points
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' 
-#' @param object S3 NuggetKriging object.
+#' @param object S3 NoiseKriging object.
 #'
 #' @param newy Numeric vector of new responses (output).
+#' 
+#' @param newnoise Numeric vector of new noise variances (output).
 #'
 #' @param newX Numeric matrix of new input points.
 #' 
@@ -429,7 +433,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #'     \code{\link[DiceKriging]{update.km}} in \pkg{DiceKriging} and
 #'     \code{\link{update,KM-method}}.
 #'  
-#' @method update NuggetKriging
+#' @method update NoiseKriging
 #' @export 
 #' 
 #' @examples
@@ -439,7 +443,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' KrigObj <- NuggetKriging(y, X, "gauss")
+#' KrigObj <- NoiseKriging(y, rep(0.01^2,5), X, "gauss")
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' p_x <- predict(KrigObj, x)
 #' lines(x, p_x$mean, col = "blue")
@@ -450,82 +454,85 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' points(newX, newy, col = "red")
 #' 
 #' ## change the content of the object 'KrigObj'
-#' update(KrigObj, newy, newX)
+#' update(KrigObj, newy, rep(0.01^2,3), newX)
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' p2_x <- predict(KrigObj, x)
 #' lines(x, p2_x$mean, col = "red")
 #' lines(x, p2_x$mean - 2 * p2_x$stdev, col = "red")
 #' lines(x, p2_x$mean + 2 * p2_x$stdev, col = "red")
 #' 
-update.NuggetKriging <- function(object, newy, newX, ...) {
+update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- nuggetkriging_model(object) 
+    k <- noisekriging_model(object) 
     if (is.data.frame(newX)) newX = data.matrix(newX)
     if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
     if (is.data.frame(newy)) newy = data.matrix(newy)
     if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
+    if (!is.matrix(newnoise)) newnoise <- matrix(newnoise, ncol = ncol(k$y))
     if (ncol(newX) != ncol(k$X))
         stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
              ncol(newX), ")")
     if (nrow(newy) != nrow(newX))
         stop("Objects 'newX' and 'newy' must have the same number of rows.")
+    if (nrow(newnoise) != nrow(newX))
+        stop("Objects 'newnoise' and 'newy' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    nuggetkriging_update(object, newy, newX)
+    noisekriging_update(object, newy, newnoise, newX)
     
     invisible(NULL)
     
 }
 
 ## update <- function(...) UseMethod("update")
-## setMethod("update", "NuggetKriging", update.NuggetKriging)
+## setMethod("update", "NoiseKriging", update.NoiseKriging)
 ## setGeneric(name = "update", def = function(...) standardGeneric("update"))
 
 ## ****************************************************************************
-#' Compute Log-Likelihood of NuggetKriging Model
+#' Compute Log-Likelihood of NoiseKriging Model
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object An S3 NuggetKriging object.
-#' @param theta_alpha A numeric vector of (positive) range parameters at
+#' @param object An S3 NoiseKriging object.
+#' @param theta_sigma2 A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
 #' @param ... Not used.
 #' 
 #' @return The log-Likelihood computed for given
-#'     \eqn{\boldsymbol{theta_alpha}}{\theta_alpha}.
+#'     \eqn{\boldsymbol{theta_sigma2}}{\theta_sigma2}.
 #' 
-#' @method logLikelihoodFun NuggetKriging
+#' @method logLikelihoodFun NoiseKriging
 #' @export 
-#' @aliases logLikelihoodFun,NuggetKriging,NuggetKriging-method
+#' @aliases logLikelihoodFun,NoiseKriging,NoiseKriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
 #' print(r)
-#' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
+#' alpha = as.list(r)$sigma2/(as.list(r)$noise+as.list(r)$sigma2)
 #' ll <- function(theta) logLikelihoodFun(r, cbind(theta,alpha))$logLikelihood
 #' t <- seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
 #' 
-logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
+logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                   grad = FALSE, ...) {
-    k <- nuggetkriging_model(object) 
-    if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
-    if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
-    if (ncol(theta_alpha) != ncol(k$X)+1)
-        stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
-             ncol(theta_alpha),")")
-    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_alpha)),
-                logLikelihoodGrad = matrix(NA,nrow=nrow(theta_alpha),
-                                           ncol = ncol(theta_alpha)))
-    for (i in 1:nrow(theta_alpha)) {
-        ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
+    k <- noisekriging_model(object) 
+    if (is.data.frame(theta_sigma2)) theta_sigma2 = data.matrix(theta_sigma2)
+    if (!is.matrix(theta_sigma2)) theta_sigma2 <- matrix(theta_sigma2, ncol = ncol(k$X)+1)
+    if (ncol(theta_sigma2) != ncol(k$X)+1)
+        stop("Input theta_sigma2 must have ", ncol(k$X)+1, " columns (instead of ",
+             ncol(theta_sigma2),")")
+    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_sigma2)),
+                logLikelihoodGrad = matrix(NA,nrow=nrow(theta_sigma2),
+                                           ncol = ncol(theta_sigma2)))
+    for (i in 1:nrow(theta_sigma2)) {
+        ll <- noisekriging_logLikelihoodFun(object, theta_sigma2[i, ],
                                     grad = isTRUE(grad))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
@@ -537,116 +544,29 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 
 
 ## ****************************************************************************
-#' Get logLikelihood of NuggetKriging Model
+#' Get logLikelihood of NoiseKriging Model
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object An S3 NuggetKriging object.
+#' @param object An S3 NoiseKriging object.
 #' @param ... Not used.
 #' 
 #' @return The logLikelihood computed for fitted
 #'     \eqn{\boldsymbol{theta}}{\theta}.
 #' 
-#' @method logLikelihood NuggetKriging
+#' @method logLikelihood NoiseKriging
 #' @export 
-#' @aliases logLikelihood,NuggetKriging,NuggetKriging-method
+#' @aliases logLikelihood,NoiseKriging,NoiseKriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
 #' print(r)
 #' logLikelihood(r)
 #' 
-logLikelihood.NuggetKriging <- function(object, ...) {
-  return(nuggetkriging_logLikelihood(object))
+logLikelihood.NoiseKriging <- function(object, ...) {
+  return(noisekriging_logLikelihood(object))
 }
-
-##****************************************************************************
-#' Compute the log-marginal posterior of a kriging model, using the
-#' prior XXXY.
-#'
-#' @title Compute Log-Marginal-Posterior of NuggetKriging Model
-#' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#' 
-#' @param object S3 NuggetKriging object.
-#' @param theta_alpha Numeric vector of correlation range and variance parameters at
-#'     which the function is to be evaluated.
-#' @param grad Logical. Should the function return the gradient
-#'     (w.r.t theta_alpha)?
-#' @param ... Not used.
-#' 
-#' @return The value of the log-marginal posterior computed for the
-#'     given vector theta_alpha.
-#' 
-#' @method logMargPostFun NuggetKriging
-#' @export 
-#' @aliases logMargPostFun,NuggetKriging,NuggetKriging-method
-#'
-#' @references
-#' XXXY A reference describing the model (prior, ...)
-#'
-#' @seealso \code{\link[RobustGaSP]{rgasp}} in the RobustGaSP package.
-#' 
-#' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
-#' print(r)
-#' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' lmp <- function(theta) logMargPostFun(r, cbind(theta,alpha))$logMargPost
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
-#' plot(t, lmp(t), type = "l")
-#' abline(v = as.list(r)$theta, col = "blue")
-logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
-    k <- nuggetkriging_model(object)
-    if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
-    if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha,ncol=ncol(k$X)+1)
-    if (ncol(theta_alpha) != ncol(k$X)+1)
-        stop("Input theta_alpha must have ", ncol(k$X)+1, " columns (instead of ",
-             ncol(theta_alpha), ")")
-    out <- list(logMargPost = matrix(NA, nrow = nrow(theta_alpha)),
-                logMargPostGrad = matrix(NA, nrow = nrow(theta_alpha),
-                                         ncol = ncol(theta_alpha)))
-    for (i in 1:nrow(theta_alpha)) {
-        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], grad = isTRUE(grad))
-        out$logMargPost[i] <- lmp$logMargPost
-        if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
-    }
-    if (!isTRUE(grad)) out$logMargPostGrad <- NULL
-    return(out)
-}
-
-## ****************************************************************************
-#' Get logMargPost of NuggetKriging Model
-#' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#' 
-#' @param object An S3 NuggetKriging object.
-#' @param ... Not used.
-#' 
-#' @return The logMargPost computed for fitted
-#'     \eqn{\boldsymbol{theta}}{\theta}.
-#' 
-#' @method logMargPost NuggetKriging
-#' @export 
-#' @aliases logMargPost,NuggetKriging,NuggetKriging-method
-#' 
-#' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' logMargPost(r)
-#' 
-logMargPost.NuggetKriging <- function(object, ...) {
-  return(nuggetkriging_logMargPost(object))
-}
-

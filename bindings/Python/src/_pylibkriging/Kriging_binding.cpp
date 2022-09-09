@@ -166,6 +166,10 @@ double PyKriging::scaleY() {
   return m_internal->scaleY();
 }
 
+bool PyKriging::normalize() {
+  return m_internal->normalize();
+}
+
 std::string PyKriging::regmodel() {
   return Trend::toString(m_internal->regmodel());
 }

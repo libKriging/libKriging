@@ -25,6 +25,7 @@ void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void centerY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void scaleY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void normalize(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void T(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

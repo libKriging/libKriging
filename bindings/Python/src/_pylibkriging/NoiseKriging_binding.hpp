@@ -1,10 +1,10 @@
-#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_NUGGETKRIGING_BINDING_HPP
-#define LIBKRIGING_BINDINGS_PYTHON_SRC_NUGGETKRIGING_BINDING_HPP
+#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_NOISEKRIGING_BINDING_HPP
+#define LIBKRIGING_BINDINGS_PYTHON_SRC_NOISEKRIGING_BINDING_HPP
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <libKriging/NuggetKriging.hpp>
+#include <libKriging/NoiseKriging.hpp>
 #include <libKriging/Trend.hpp>
 
 #include <string>
@@ -12,28 +12,31 @@
 
 namespace py = pybind11;
 
-class PyNuggetKriging {
+class PyNoiseKriging {
  public:
-  PyNuggetKriging(const std::string& kernel);
-  PyNuggetKriging(const py::array_t<double>& y,
-                  const py::array_t<double>& X,
-                  const std::string& covType,
-                  const Trend::RegressionModel& regmodel,
-                  bool normalize,
-                  const std::string& optim,
-                  const std::string& objective,
-                  const NuggetKriging::Parameters& parameters);
-  PyNuggetKriging(const py::array_t<double>& y,
-                  const py::array_t<double>& X,
-                  const std::string& covType,
-                  const Trend::RegressionModel& regmodel,
-                  bool normalize,
-                  const std::string& optim,
-                  const std::string& objective,
-                  const py::dict& dict);
-  ~PyNuggetKriging();
+  PyNoiseKriging(const std::string& kernel);
+  PyNoiseKriging(const py::array_t<double>& y,
+                 const py::array_t<double>& noise,
+                 const py::array_t<double>& X,
+                 const std::string& covType,
+                 const Trend::RegressionModel& regmodel,
+                 bool normalize,
+                 const std::string& optim,
+                 const std::string& objective,
+                 const NoiseKriging::Parameters& parameters);
+  PyNoiseKriging(const py::array_t<double>& y,
+                 const py::array_t<double>& noise,
+                 const py::array_t<double>& X,
+                 const std::string& covType,
+                 const Trend::RegressionModel& regmodel,
+                 bool normalize,
+                 const std::string& optim,
+                 const std::string& objective,
+                 const py::dict& dict);
+  ~PyNoiseKriging();
 
   void fit(const py::array_t<double>& y,
+           const py::array_t<double>& noise,
            const py::array_t<double>& X,
            const Trend::RegressionModel& regmodel,
            bool normalize,
@@ -50,17 +53,14 @@ class PyNuggetKriging {
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
 
-  void update(const py::array_t<double>& newy, const py::array_t<double>& newX);
+  void update(const py::array_t<double>& newy, const py::array_t<double>& newnoise, const py::array_t<double>& newX);
 
   std::string summary() const;
 
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta_alpha,
                                                            const bool want_grad);
 
-  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta_alpha, const bool want_grad);
-
   double logLikelihood();
-  double logMargPost();
 
   std::string kernel();
   std::string optim();
@@ -71,6 +71,7 @@ class PyNuggetKriging {
   py::array_t<double> y();
   double centerY();
   double scaleY();
+  py::array_t<double> noise();
   bool normalize();
   std::string regmodel();  // Trend::toString(km->regmodel())
   py::array_t<double> F();
@@ -83,11 +84,9 @@ class PyNuggetKriging {
   bool is_theta_estim();
   double sigma2();
   bool is_sigma2_estim();
-  double nugget();
-  bool is_nugget_estim();
 
  private:
-  std::unique_ptr<NuggetKriging> m_internal;
+  std::unique_ptr<NoiseKriging> m_internal;
 };
 
-#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_NUGGETKRIGING_BINDING_HPP
+#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_NOISEKRIGING_BINDING_HPP

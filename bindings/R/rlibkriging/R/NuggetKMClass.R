@@ -1,5 +1,5 @@
 ## *****************************************************************************
-## This file contains stuff related to the S4 class "NKM" including its
+## This file contains stuff related to the S4 class "NuggetKM" including its
 ## definition as a class extending "km" from the DiceKriging package.
 ## ****************************************************************************
     
@@ -8,7 +8,7 @@
 #}
 
 ## Register the S3 class "NuggetKriging" to define the class of the @NuggetKriging
-## slot in a `NKM` object
+## slot in a `NuggetKM` object
 setOldClass("NuggetKriging")
 
 #if (requireNamespace("DiceKriging", quietly = TRUE))
@@ -51,30 +51,30 @@ setOldClass("NuggetKriging")
 #' @slot param.estim Logical. Is an estimation used?
 #'
 #' @slot NuggetKriging A copy of the \code{NuggetKriging} object used to create
-#'     the current \code{NKM} object.
+#'     the current \code{NuggetKM} object.
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
-#' @name NKM-class
-#' @rdname NKM-class
+#' @name NuggetKM-class
+#' @rdname NuggetKM-class
 #' @importFrom DiceKriging km
 #' @export
 #'
 #' @seealso \code{\link[DiceKriging]{km-class}} in the
-#'     \pkg{DiceKriging} package. The creator \code{\link{NKM}}.
+#'     \pkg{DiceKriging} package. The creator \code{\link{NuggetKM}}.
 #' 
-setClass("NKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "km")
+setClass("NuggetKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "km")
 
 ## *****************************************************************************
-#' Create an object of S4 class \code{"NKM"} similar to a
+#' Create an object of S4 class \code{"NuggetKM"} similar to a
 #' \code{km} object in the \pkg{DiceKriging} package.
 #' 
-#' The class \code{"NKM"} extends the \code{"km"} class of the
+#' The class \code{"NuggetKM"} extends the \code{"km"} class of the
 #' \pkg{DiceKriging} package, hence has all slots of \code{"km"}. It
 #' also has an extra slot \code{"NuggetKriging"} slot which contains a copy
 #' of the original object. 
 #'
-#' @title Create an \code{NKM} Object
+#' @title Create an \code{NuggetKM} Object
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
@@ -120,12 +120,12 @@ setClass("NKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "km")
 #'
 #' @param ... Ignored.
 #'
-#' @return A NKM object. See \bold{Details}.
+#' @return A NuggetKM object. See \bold{Details}.
 #'
 #' @seealso \code{\link[DiceKriging]{km}} in the \pkg{DiceKriging}
 #'     package for more details on the slots.
 #'
-#' @export NKM
+#' @export NuggetKM
 #' @examples
 #' # a 16-points factorial design, and the corresponding response
 #' d <- 2; n <- 16
@@ -133,15 +133,15 @@ setClass("NKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "km")
 #'                                      x2 = seq(0, 1, length = 4)))
 #' y <- apply(design.fact, 1, DiceKriging::branin) + rnorm(nrow(design.fact))
 #' 
-#' # Using `km` from DiceKriging and a similar `NKM` object 
+#' # Using `km` from DiceKriging and a similar `NuggetKM` object 
 #' # kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
 #' km1 <- DiceKriging::km(design = design.fact, response = y, covtype = "gauss",
 #'                        nugget.estim=TRUE,
 #'                        parinit = c(.5, 1), control = list(trace = FALSE))
-#' KM1 <- NKM(design = design.fact, response = y, covtype = "gauss",
+#' KM1 <- NuggetKM(design = design.fact, response = y, covtype = "gauss",
 #'           parinit = c(.5, 1))
 #' 
-NKM <- function(formula = ~1, design, response,
+NuggetKM <- function(formula = ~1, design, response,
                covtype = c("matern5_2", "gauss", "matern3_2", "exp"),
                coef.trend = NULL, coef.cov = NULL, coef.var = NULL,
                nugget = NULL, nugget.estim = TRUE, noise.var = NULL,
@@ -246,10 +246,10 @@ NKM <- function(formula = ~1, design, response,
 }
 
 ## *****************************************************************************
-## 'predict' S4 method We no longer export 'predict.NKM'
+## 'predict' S4 method We no longer export 'predict.NuggetKM'
 ## *****************************************************************************
 
-predict.NKM <- function(object, newdata, type = "UK",
+predict.NuggetKM <- function(object, newdata, type = "UK",
                        se.compute = TRUE,
                        cov.compute = FALSE,
                        light.return = TRUE,
@@ -298,17 +298,17 @@ predict.NKM <- function(object, newdata, type = "UK",
 #' conditional covariance can be returned as well.
 #'
 #' Without a dedicated \code{predict} method for the class
-#' \code{"NKM"}, this method would have been inherited from the
+#' \code{"NuggetKM"}, this method would have been inherited from the
 #' \code{"km"} class. The dedicated method is expected to run faster.
-#' A comparison can be made by coercing a \code{NKM} object to a
+#' A comparison can be made by coercing a \code{NuggetKM} object to a
 #' \code{km} object with \code{\link{as.km}} before calling
 #' \code{predict}.
 #' 
-#' @title Prediction Method for a \code{NKM} Object
+#' @title Prediction Method for a \code{NuggetKM} Object
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object \code{NKM} object.
+#' @param object \code{NuggetKM} object.
 #' @param newdata Matrix of "new" input points where to perform
 #'     prediction.
 #' @param type character giving the kriging type. For now only
@@ -333,9 +333,9 @@ predict.NKM <- function(object, newdata, type = "UK",
 #'     is returned in \code{cov}.
 #' 
 #' @importFrom stats qt
-#' @method predict NKM
+#' @method predict NuggetKM
 #' @exportMethod predict
-#' @aliases predict,NKM-method
+#' @aliases predict,NuggetKM-method
 #'
 #' @examples
 #' ## a 16-points factorial design, and the corresponding response
@@ -348,19 +348,19 @@ predict.NKM <- function(object, newdata, type = "UK",
 #' ## m1 <- km(design = design.fact, response = y, covtype = "gauss",
 #' ##          nugget.estim=TRUE,
 #' ##          parinit = c(.5, 1), control = list(trace = FALSE))
-#' KM1 <- NKM(design = design.fact, response = y, covtype = "gauss",
+#' KM1 <- NuggetKM(design = design.fact, response = y, covtype = "gauss",
 #'                parinit = c(.5, 1))
 #' Pred <- predict(KM1, newdata = matrix(.5,ncol = 2), type = "UK",
 #'                 checkNames = FALSE, light.return = TRUE)
 #' 
-setMethod("predict", "NKM", predict.NKM)
+setMethod("predict", "NuggetKM", predict.NuggetKM)
 
 
 ## *****************************************************************************
-## 'simulate' S4 method We no longer export 'simulate.NKM'
+## 'simulate' S4 method We no longer export 'simulate.NuggetKM'
 ## *****************************************************************************
 
-simulate.NKM <- function(object, nsim = 1, seed = NULL, newdata,
+simulate.NuggetKM <- function(object, nsim = 1, seed = NULL, newdata,
                            cond = TRUE, nugget.sim = 0,
                            checkNames = FALSE, ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -377,17 +377,17 @@ simulate.NKM <- function(object, nsim = 1, seed = NULL, newdata,
 #' kriging model described in \code{object}.
 #'
 #' Without a dedicated \code{simulate} method for the class
-#' \code{"NKM"}, this method would have been inherited from the
+#' \code{"NuggetKM"}, this method would have been inherited from the
 #' \code{"km"} class. The dedicated method is expected to run faster.
-#' A comparison can be made by coercing a \code{NKM} object to a
+#' A comparison can be made by coercing a \code{NuggetKM} object to a
 #' \code{km} object with \code{\link{as.km}} before calling
 #' \code{simulate}.
 #'
-#' @title Simulation from a \code{NKM} Object
+#' @title Simulation from a \code{NuggetKM} Object
 #' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object A \code{NKM} object.
+#' @param object A \code{NuggetKM} object.
 #'
 #' @param nsim Integer: number of response vectors to simulate.
 #'
@@ -412,9 +412,9 @@ simulate.NKM <- function(object, nsim = 1, seed = NULL, newdata,
 #'     \code{nsim} columns containing as its columns the simulated
 #'     paths at the input points given in \code{newdata}.
 #' 
-#' XXX method simulate NKM
+#' XXX method simulate NuggetKM
 #' @export
-#' @aliases simulate,NKM-method
+#' @aliases simulate,NuggetKM-method
 #' @exportMethod simulate
 #'
 #' @examples
@@ -424,20 +424,20 @@ simulate.NKM <- function(object, nsim = 1, seed = NULL, newdata,
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = 'blue')
-#' k <- NKM(design = X, response = y, covtype = "gauss")
+#' k <- NuggetKM(design = X, response = y, covtype = "gauss")
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' s_x <- simulate(k, nsim = 3, newdata = x)
 #' lines(x, s_x[ , 1], col = 'blue')
 #' lines(x, s_x[ , 2], col = 'blue')
 #' lines(x, s_x[ , 3], col = 'blue')
 #' 
-setMethod("simulate", "NKM", simulate.NKM)
+setMethod("simulate", "NuggetKM", simulate.NuggetKM)
 
 ## *****************************************************************************
-## 'update' S4 method We no longer export 'update.NKM'
+## 'update' S4 method We no longer export 'update.NuggetKM'
 ## *****************************************************************************
 
-update.NKM <- function(object,
+update.NuggetKM <- function(object,
                       newX,
                       newy,
                       newX.alreadyExist =  FALSE,
@@ -473,17 +473,17 @@ update.NKM <- function(object,
 #' fit as stored in \code{object} are used to achieve some savings.
 #'
 #' Without a dedicated \code{update} method for the class
-#' \code{"NKM"}, this would have been inherited from the class
+#' \code{"NuggetKM"}, this would have been inherited from the class
 #' \code{"km"}. The dedicated method is expected to run faster.  A
-#' comparison can be made by coercing a \code{NKM} object to a
+#' comparison can be made by coercing a \code{NuggetKM} object to a
 #' \code{km} object with \code{\link{as.km}} before calling
 #' \code{update}.
 #'
-#' @title Update a \code{NKM} Object with New Points
+#' @title Update a \code{NuggetKM} Object with New Points
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
-#' @param object A NKM object.
+#' @param object A NuggetKM object.
 #' @param newX A numeric matrix containing the new design points. It
 #'     must have \code{object@d} columns in correspondence with those
 #'     of the design matrix used to fit the model which is stored as
@@ -510,14 +510,14 @@ update.NKM <- function(object,
 #' @param newF New trend matrix. XXXY?
 #' @param ... Ignored.
 #'
-#' @return The updated \code{NKM} object.
+#' @return The updated \code{NuggetKM} object.
 #' 
-#' @seealso \code{\link{as.km}} to coerce a \code{NKM} object to the
+#' @seealso \code{\link{as.km}} to coerce a \code{NuggetKM} object to the
 #'     class \code{"km"}.
 #'
 #' @export
 #' @exportMethod update
-#' @aliases update,NKM-method
+#' @aliases update,NuggetKM-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -526,14 +526,14 @@ update.NKM <- function(object,
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' KMobj <- NKM(design = X, response = y,covtype = "gauss")
+#' KMobj <- NuggetKM(design = X, response = y,covtype = "gauss")
 #' x <-  seq(from = 0, to = 1, length.out = 101)
 #' p_x <- predict(KMobj, x)
 #' lines(x, p_x$mean, col = "blue")
 #' lines(x, p_x$lower95, col = "blue")
 #' lines(x, p_x$upper95, col = "blue")
 #' newX <- as.matrix(runif(3))
-#' newy <- f(newX)
+#' newy <- f(newX) + 0.01*rnorm(nrow(newX))
 #' points(newX, newy, col = "red")
 #' 
 #' ## replace the object by its udated version
@@ -545,5 +545,5 @@ update.NKM <- function(object,
 #' lines(x, p2_x$lower95, col = "red")
 #' lines(x, p2_x$upper95, col = "red")
 #' 
-setMethod("update", "NKM", update.NKM)
+setMethod("update", "NuggetKM", update.NuggetKM)
 
