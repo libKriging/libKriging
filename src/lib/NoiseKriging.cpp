@@ -864,15 +864,15 @@ LIBKRIGING_EXPORT std::string NoiseKriging::summary() const {
   };
 
   oss << "* data";
-  oss << ((m_normalize) ? " (normalized): " : ": ");
+  oss << ((m_normalize) ? " (normalized): " : ": ") << m_X.n_rows << "x";
   arma::rowvec Xmins = arma::min(m_X, 0);
   arma::rowvec Xmaxs = arma::max(m_X, 0);
   for (arma::uword i = 0; i < m_X.n_cols; i++) {
     oss << "[" << Xmins[i] << "," << Xmaxs[i] << "]";
     if (i < m_X.n_cols - 1)
-      oss << "x";
+      oss << ",";
   }
-  oss << " -> [" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
+  oss << " -> " << m_y.n_elem << "x[" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
   oss << "* trend " << Trend::toString(m_regmodel);
   oss << ((m_est_beta) ? " (est.): " : ": ");
   colvec_printer(m_beta);
