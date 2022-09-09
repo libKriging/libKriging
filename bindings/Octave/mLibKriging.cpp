@@ -1,7 +1,7 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
-#include "NuggetKriging_binding.hpp"
 #include "NoiseKriging_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "Params_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"

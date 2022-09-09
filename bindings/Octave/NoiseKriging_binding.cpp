@@ -13,11 +13,11 @@ static NoiseKriging::Parameters makeParameters(std::optional<Params*> dict) {
   if (dict) {
     const Params& params = *dict.value();
     return NoiseKriging::Parameters{params.get<arma::mat>("sigma2"),  // should be converted as arma::vec by execution
-                                     params.get<bool>("is_sigma2_estim").value_or(true),
-                                     params.get<arma::mat>("theta"),
-                                     params.get<bool>("is_theta_estim").value_or(true),
-                                     params.get<arma::mat>("beta"),  // should be converted as arma::colvec by execution
-                                     params.get<bool>("is_beta_estim").value_or(true)};
+                                    params.get<bool>("is_sigma2_estim").value_or(true),
+                                    params.get<arma::mat>("theta"),
+                                    params.get<bool>("is_theta_estim").value_or(true),
+                                    params.get<arma::mat>("beta"),  // should be converted as arma::colvec by execution
+                                    params.get<bool>("is_beta_estim").value_or(true)};
   } else {
     return NoiseKriging::Parameters{};
   }
@@ -35,14 +35,14 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
   const auto parameters = makeParameters(input.getOptionalObject<Params>(8, "parameters"));
   auto km = buildObject<NoiseKriging>(input.get<arma::vec>(0, "vector"),
-                                       input.get<arma::vec>(1, "vector"),
-                                       input.get<arma::mat>(2, "matrix"),
-                                       input.get<std::string>(3, "kernel"),
-                                       regmodel,
-                                       normalize,
-                                       optim,
-                                       objective,
-                                       parameters);
+                                      input.get<arma::vec>(1, "vector"),
+                                      input.get<arma::mat>(2, "matrix"),
+                                      input.get<std::string>(3, "kernel"),
+                                      regmodel,
+                                      normalize,
+                                      optim,
+                                      objective,
+                                      parameters);
   output.set(0, km, "new object reference");
 }
 

@@ -16,14 +16,14 @@
 
 // [[Rcpp::export]]
 Rcpp::List new_NoiseKriging(arma::vec y,
-                             arma::vec noise,
-                             arma::mat X,
-                             std::string kernel,
-                             std::string regmodel = "constant",
-                             bool normalize = false,
-                             std::string optim = "BFGS",
-                             std::string objective = "LL",
-                             Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                            arma::vec noise,
+                            arma::mat X,
+                            std::string kernel,
+                            std::string regmodel = "constant",
+                            bool normalize = false,
+                            std::string optim = "BFGS",
+                            std::string objective = "LL",
+                            Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   NoiseKriging* ok = new NoiseKriging(kernel);
 
   Rcpp::List _parameters;

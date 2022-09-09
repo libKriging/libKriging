@@ -13,8 +13,8 @@
 
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
-#include "NuggetKriging_binding.hpp"
 #include "NoiseKriging_binding.hpp"
+#include "NuggetKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)

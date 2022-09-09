@@ -931,7 +931,7 @@ NuggetKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool wit
       if (arma::any(dij != 0))
         R_pred.at(i, j) *= Cov(dij, m_theta);
       else
-        R_pred.at(i, j) = 1.0; // nugget kriging interpolates
+        R_pred.at(i, j) = 1.0;  // nugget kriging interpolates
     }
   }
   arma::mat Tinv_pred = solve(m_T, R_pred, arma::solve_opts::fast);
@@ -1083,11 +1083,11 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat Sigma21(n, m);
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < m; j++) {
-        arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
-    if (arma::any(dij != 0))
-        Sigma21.at(i, j) = Cov(dij, m_theta);        
+      arma::vec dij = Xtnorm.col(i) - Xpnorm.col(j);
+      if (arma::any(dij != 0))
+        Sigma21.at(i, j) = Cov(dij, m_theta);
       else
-        Sigma21.at(i, j) = 1.0; // to interpolate design points
+        Sigma21.at(i, j) = 1.0;  // to interpolate design points
     }
   }
   Sigma21 *= m_sigma2 * (m_objective.compare("LMP") == 0 ? (n - d) / (n - d - 2) : 1.0) / total_sd2;

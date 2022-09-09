@@ -99,14 +99,14 @@ class NoiseKriging {
   LIBKRIGING_EXPORT NoiseKriging(const std::string& covType);
 
   LIBKRIGING_EXPORT NoiseKriging(const arma::colvec& y,
-                                  const arma::colvec& noise,
-                                  const arma::mat& X,
-                                  const std::string& covType,
-                                  const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
-                                  bool normalize = false,
-                                  const std::string& optim = "BFGS",
-                                  const std::string& objective = "LL",
-                                  const Parameters& parameters = Parameters{});
+                                 const arma::colvec& noise,
+                                 const arma::mat& X,
+                                 const std::string& covType,
+                                 const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
+                                 bool normalize = false,
+                                 const std::string& optim = "BFGS",
+                                 const std::string& objective = "LL",
+                                 const Parameters& parameters = Parameters{});
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

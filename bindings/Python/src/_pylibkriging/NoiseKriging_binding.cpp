@@ -13,62 +13,62 @@
 PyNoiseKriging::PyNoiseKriging(const std::string& kernel) : m_internal{new NoiseKriging{kernel}} {}
 
 PyNoiseKriging::PyNoiseKriging(const py::array_t<double>& y,
-                                 const py::array_t<double>& noise,
-                                 const py::array_t<double>& X,
-                                 const std::string& covType,
-                                 const Trend::RegressionModel& regmodel,
-                                 bool normalize,
-                                 const std::string& optim,
-                                 const std::string& objective,
-                                 const NoiseKriging::Parameters& parameters) {
+                               const py::array_t<double>& noise,
+                               const py::array_t<double>& X,
+                               const std::string& covType,
+                               const Trend::RegressionModel& regmodel,
+                               bool normalize,
+                               const std::string& optim,
+                               const std::string& objective,
+                               const NoiseKriging::Parameters& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::colvec mat_noise = carma::arr_to_col_view<double>(noise);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal
-      = std::make_unique<NoiseKriging>(mat_y,mat_noise, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+  m_internal = std::make_unique<NoiseKriging>(
+      mat_y, mat_noise, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
 
 PyNoiseKriging::PyNoiseKriging(const py::array_t<double>& y,
-                                 const py::array_t<double>& noise, 
-                                 const py::array_t<double>& X,
-                                 const std::string& covType,
-                                 const Trend::RegressionModel& regmodel,
-                                 bool normalize,
-                                 const std::string& optim,
-                                 const std::string& objective,
-                                 const py::dict& dict) {
+                               const py::array_t<double>& noise,
+                               const py::array_t<double>& X,
+                               const std::string& covType,
+                               const Trend::RegressionModel& regmodel,
+                               bool normalize,
+                               const std::string& optim,
+                               const std::string& objective,
+                               const py::dict& dict) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::colvec mat_noise = carma::arr_to_col_view<double>(noise);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   NoiseKriging::Parameters parameters{get_entry<arma::vec>(dict, "sigma2"),
-                                       get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
-                                       get_entry<arma::mat>(dict, "theta"),
-                                       get_entry<bool>(dict, "is_theta_estim").value_or(true),
-                                       get_entry<arma::colvec>(dict, "beta"),
-                                       get_entry<bool>(dict, "is_beta_estim").value_or(true)};
-  m_internal
-      = std::make_unique<NoiseKriging>(mat_y, mat_noise, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+                                      get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
+                                      get_entry<arma::mat>(dict, "theta"),
+                                      get_entry<bool>(dict, "is_theta_estim").value_or(true),
+                                      get_entry<arma::colvec>(dict, "beta"),
+                                      get_entry<bool>(dict, "is_beta_estim").value_or(true)};
+  m_internal = std::make_unique<NoiseKriging>(
+      mat_y, mat_noise, mat_X, covType, regmodel, normalize, optim, objective, parameters);
 }
 
 PyNoiseKriging::~PyNoiseKriging() {}
 
 void PyNoiseKriging::fit(const py::array_t<double>& y,
-                          const py::array_t<double>& noise,
-                          const py::array_t<double>& X,
-                          const Trend::RegressionModel& regmodel,
-                          bool normalize,
-                          const std::string& optim,
-                          const std::string& objective,
-                          const py::dict& dict) {
+                         const py::array_t<double>& noise,
+                         const py::array_t<double>& X,
+                         const Trend::RegressionModel& regmodel,
+                         bool normalize,
+                         const std::string& optim,
+                         const std::string& objective,
+                         const py::dict& dict) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_noise = carma::arr_to_col_view<double>(noise);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   NoiseKriging::Parameters parameters{get_entry<arma::vec>(dict, "sigma2"),
-                                       get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
-                                       get_entry<arma::mat>(dict, "theta"),
-                                       get_entry<bool>(dict, "is_theta_estim").value_or(true),
-                                       get_entry<arma::colvec>(dict, "beta"),
-                                       get_entry<bool>(dict, "is_beta_estim").value_or(true)};
+                                      get_entry<bool>(dict, "is_sigma2_estim").value_or(true),
+                                      get_entry<arma::mat>(dict, "theta"),
+                                      get_entry<bool>(dict, "is_theta_estim").value_or(true),
+                                      get_entry<arma::colvec>(dict, "beta"),
+                                      get_entry<bool>(dict, "is_beta_estim").value_or(true)};
   m_internal->fit(mat_y, mat_noise, mat_X, regmodel, normalize, optim, objective, parameters);
 }
 
@@ -90,7 +90,9 @@ py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, con
   return carma::mat_to_arr(result, true);
 }
 
-void PyNoiseKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newnoise, const py::array_t<double>& newX) {
+void PyNoiseKriging::update(const py::array_t<double>& newy,
+                            const py::array_t<double>& newnoise,
+                            const py::array_t<double>& newX) {
   arma::mat mat_y = carma::arr_to_col<double>(newy);
   arma::mat mat_noise = carma::arr_to_col<double>(newnoise);
   arma::mat mat_X = carma::arr_to_mat<double>(newX);
@@ -102,7 +104,7 @@ std::string PyNoiseKriging::summary() const {
 }
 
 std::tuple<double, py::array_t<double>> PyNoiseKriging::logLikelihoodFun(const py::array_t<double>& theta_sigma2,
-                                                                          const bool want_grad) {
+                                                                         const bool want_grad) {
   arma::vec vec_theta_sigma2 = carma::arr_to_col<double>(theta_sigma2);
   auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_sigma2, want_grad);
   return {llo, carma::col_to_arr(grad)};

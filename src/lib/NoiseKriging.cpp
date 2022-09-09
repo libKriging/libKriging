@@ -61,14 +61,14 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const std::string& covType) {
 }
 
 LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::colvec& y,
-                                              const arma::colvec& noise,
-                                               const arma::mat& X,
-                                               const std::string& covType,
-                                               const Trend::RegressionModel& regmodel,
-                                               bool normalize,
-                                               const std::string& optim,
-                                               const std::string& objective,
-                                               const Parameters& parameters) {
+                                             const arma::colvec& noise,
+                                             const arma::mat& X,
+                                             const std::string& covType,
+                                             const Trend::RegressionModel& regmodel,
+                                             bool normalize,
+                                             const std::string& optim,
+                                             const std::string& objective,
+                                             const Parameters& parameters) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
@@ -92,25 +92,25 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::colvec& y,
 // Objective function for fit : -logLikelihood
 
 double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
-                                     arma::vec* grad_out,
-                                     NoiseKriging::OKModel* okm_data) const {
+                                    arma::vec* grad_out,
+                                    NoiseKriging::OKModel* okm_data) const {
   // arma::cout << " theta, alpha: " << _theta_sigma2.t() << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam-1)])
-	//   model@covariance@sd2 <- param[nparam]
+  //   model@covariance@sd2 <- param[nparam]
   //
   //   aux <- covMatrix(model@covariance, model@X, noise.var=model@noise.var)
-	//   
-	//   C <- aux[[1]]
-	//   vn <- aux[[2]]
+  //
+  //   C <- aux[[1]]
+  //   vn <- aux[[2]]
 
   //   T <- chol(C)
   //   x <- backsolve(t(T), model@y, upper.tri = FALSE)
   //   M <- backsolve(t(T), model@F, upper.tri = FALSE)
-	//   z <- compute.z(x=x, M=M, beta=beta)
-	//   
-  //   logLik <-  -0.5*(model@n * log(2*pi) + 2*sum(log(diag(T))) + t(z)%*%z)     
-	//   
+  //   z <- compute.z(x=x, M=M, beta=beta)
+  //
+  //   logLik <-  -0.5*(model@n * log(2*pi) + 2*sum(log(diag(T))) + t(z)%*%z)
+  //
   //   envir$T <- T
   //   envir$C <- C
   //   envir$vn <- vn
@@ -125,9 +125,9 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
   arma::mat R = arma::mat(n, n);
   for (arma::uword i = 0; i < n; i++) {
-    R.at(i, i) = _sigma2 + m_noise[i] ;
+    R.at(i, i) = _sigma2 + m_noise[i];
     for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _sigma2 ;
+      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _sigma2;
     }
   }
 
@@ -151,25 +151,25 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   if (grad_out != nullptr) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikGrad.R
     // model@covariance <- vect2covparam(model@covariance, param[1:(nparam-1)])
-		// model@covariance@sd2 <- sigma2 <- param[nparam]
-		// 
-		// logLik.derivative <- matrix(0,nparam,1)
-		// 					
-		// C <- envir$C
-		// T <- envir$T 
-		// vn <- envir$vn
-		// z <- envir$z
-    // 
-		// x <- backsolve(T,z)			# x := T^(-1)*z
-		// Cinv <- chol2inv(T)			# Invert R from given T
-    // 
+    // model@covariance@sd2 <- sigma2 <- param[nparam]
+    //
+    // logLik.derivative <- matrix(0,nparam,1)
+    //
+    // C <- envir$C
+    // T <- envir$T
+    // vn <- envir$vn
+    // z <- envir$z
+    //
+    // x <- backsolve(T,z)			# x := T^(-1)*z
+    // Cinv <- chol2inv(T)			# Invert R from given T
+    //
     // for (k in 1:(nparam)) {
-		// 	gradC.k <- covMatrixDerivative(model@covariance, X = model@X, 
+    // 	gradC.k <- covMatrixDerivative(model@covariance, X = model@X,
     //                                  C0 = C - diag(vn, nrow = nrow(C)), k = k)
-		// 	term1 <- -t(x)%*%gradC.k%*%x
-		// 	term2 <- sum(Cinv*gradC.k)			# economic computation of trace(Cinv%*%gradC.k)
-		// 	logLik.derivative[k] <- -0.5*(term1 + term2) #/sigma2
-		// }
+    // 	term1 <- -t(x)%*%gradC.k%*%x
+    // 	term2 <- sum(Cinv*gradC.k)			# economic computation of trace(Cinv%*%gradC.k)
+    // 	logLik.derivative[k] <- -0.5*(term1 + term2) #/sigma2
+    // }
 
     std::vector<arma::mat> gradsC(d);  // if (hess_out != nullptr)
     arma::vec term1 = arma::vec(d);    // if (hess_out != nullptr)
@@ -196,14 +196,13 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
         }
       }
 
-      term1.at(k)
-          = as_scalar((trans(x) * gradC_k) * x);
-      double term2 = -arma::trace(Cinv * gradC_k); 
+      term1.at(k) = as_scalar((trans(x) * gradC_k) * x);
+      double term2 = -arma::trace(Cinv * gradC_k);
       (*grad_out).at(k) = (term1.at(k) + term2) / 2;
     }  // for (arma::uword k = 0; k < m_X.n_cols; k++)
 
     arma::mat dCdv = (R - arma::diagmat(m_noise)) / _sigma2;
-    double _term1 = -as_scalar((trans(x) * dCdv) * x); // ?????
+    double _term1 = -as_scalar((trans(x) * dCdv) * x);  // ?????
     double _term2 = arma::accu(arma::dot(Cinv, dCdv));
     (*grad_out).at(d) = -0.5 * (_term1 + _term2);
 
@@ -213,7 +212,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NoiseKriging::logLikelihoodFun(const arma::vec& _theta_sigma2,
-                                                                                const bool _grad) {
+                                                                               const bool _grad) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -253,13 +252,13 @@ LIBKRIGING_EXPORT double NoiseKriging::logLikelihood() {
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
 LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
-                                          const arma::colvec& noise,
-                                          const arma::mat& X,
-                                          const Trend::RegressionModel& regmodel,
-                                          bool normalize,
-                                          const std::string& optim,
-                                          const std::string& objective,
-                                          const Parameters& parameters) {
+                                         const arma::colvec& noise,
+                                         const arma::mat& X,
+                                         const Trend::RegressionModel& regmodel,
+                                         bool normalize,
+                                         const std::string& optim,
+                                         const std::string& objective,
+                                         const Parameters& parameters) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
@@ -323,7 +322,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     newX.each_row() -= centerX;
     newX.each_row() /= scaleX;
     arma::colvec newy = (y - centerY) / scaleY;
-    arma::colvec newnoise = noise / (scaleY*scaleY);
+    arma::colvec newnoise = noise / (scaleY * scaleY);
     this->m_X = newX;
     this->m_y = newy;
     this->m_noise = newnoise;
@@ -374,15 +373,11 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     if (parameters.sigma2.has_value())
       sigma2 = parameters.sigma2.value()[0];  // otherwise sigma2 will be re-calculated using given theta
 
-    NoiseKriging::OKModel okm_data{T,
-                                    M,
-                                    z,
-                                    beta,
-                                    parameters.is_beta_estim};
+    NoiseKriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
     gamma_tmp.head(d) = m_theta;
-    gamma_tmp.at(d) = m_sigma2 ;
+    gamma_tmp.at(d) = m_sigma2;
     if (Optim::reparametrize) {
       gamma_tmp.head(d) = Optim::reparam_to(m_theta);
       gamma_tmp.at(d) = Optim::reparam_to_(m_sigma2);
@@ -449,9 +444,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
     // see https://github.com/cran/DiceKriging/blob/547135515e32fa0a37260b9cd01631c1b7a69a5b/R/kmNuggets.init.R#L30
-    double sigma2_variogram = 0.5*arma::mean(dy2.elem( arma::find( dX2 > arma::median(dX2) )));
-    double sigma2_lower = 0.1*(sigma2_variogram-arma::max(m_noise));
-    double sigma2_upper = 10*(sigma2_variogram-arma::min(m_noise));
+    double sigma2_variogram = 0.5 * arma::mean(dy2.elem(arma::find(dX2 > arma::median(dX2))));
+    double sigma2_lower = 0.1 * (sigma2_variogram - arma::max(m_noise));
+    double sigma2_upper = 10 * (sigma2_variogram - arma::min(m_noise));
     arma::vec sigma20;
     if (parameters.sigma2.has_value()) {
       sigma20 = arma::vec(parameters.sigma2.value());
@@ -507,11 +502,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       if (parameters.beta.has_value())
         beta = parameters.beta.value();
 
-      NoiseKriging::OKModel okm_data{T,
-                                      M,
-                                      z,
-                                      beta,
-                                      parameters.is_beta_estim};
+      NoiseKriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim};
 
       lbfgsb::Optimizer optimizer{d + 1};
       optimizer.iprint = Optim::log_level - 2;
@@ -652,7 +643,7 @@ NoiseKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool with
   if (withStd) {
     // s2.predict.1 <- apply(Tinv.c.newdata, 2, crossprod)
     arma::colvec s2_predict_1 = trans(sum(Tinv_pred % Tinv_pred, 0));
-    //s2_predict_1.transform([](double val) {
+    // s2_predict_1.transform([](double val) {
     //  return (val > 1.0 ? 1.0 : val);
     //});  // constrain this first part to not be negative (rationale: it is the whole stdev for simple kriging)
 
@@ -665,13 +656,13 @@ NoiseKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool with
     pred_stdev = sqrt(s2_predict);
 
     pred_stdev *= m_scaleY;
- }
+  }
 
   if (withCov) {
     // C.newdata <- covMatrix(object@covariance, newdata)[[1]]
     arma::mat R_predpred = arma::ones(m, m);
     for (arma::uword i = 0; i < m; i++) {
-      //R_predpred.at(i, i) = 1;
+      // R_predpred.at(i, i) = 1;
       for (arma::uword j = 0; j < i; j++) {
         R_predpred.at(i, j) = R_predpred.at(j, i) *= Cov((Xpnorm.col(i) - Xpnorm.col(j)), m_theta);
       }
@@ -709,8 +700,8 @@ NoiseKriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool with
 
       if (withStd) {
         arma::mat pred_stdev_deriv_noTrend = Tinv_pred.t() * W;
-        pred_stdev_deriv.row(i) = (-pred_stdev_deriv_noTrend.row(i) + FinvMtM.row(i) * (F_dx.t() - trans(m_M) * W))
-                                  / pred_stdev.at(i);
+        pred_stdev_deriv.row(i)
+            = (-pred_stdev_deriv_noTrend.row(i) + FinvMtM.row(i) * (F_dx.t() - trans(m_M) * W)) / pred_stdev.at(i);
       }
     }
     pred_mean_deriv *= m_scaleY;
@@ -846,7 +837,7 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& newy, const arma::v
                             newy),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
                             newnoise),  // de-normalize previous data according to suite unnormed new data
-            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX),            
+            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX),
             m_regmodel,
             m_normalize,
             m_optim,

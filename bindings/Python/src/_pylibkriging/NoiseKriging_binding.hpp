@@ -16,23 +16,23 @@ class PyNoiseKriging {
  public:
   PyNoiseKriging(const std::string& kernel);
   PyNoiseKriging(const py::array_t<double>& y,
-                  const py::array_t<double>& noise,
-                  const py::array_t<double>& X,
-                  const std::string& covType,
-                  const Trend::RegressionModel& regmodel,
-                  bool normalize,
-                  const std::string& optim,
-                  const std::string& objective,
-                  const NoiseKriging::Parameters& parameters);
+                 const py::array_t<double>& noise,
+                 const py::array_t<double>& X,
+                 const std::string& covType,
+                 const Trend::RegressionModel& regmodel,
+                 bool normalize,
+                 const std::string& optim,
+                 const std::string& objective,
+                 const NoiseKriging::Parameters& parameters);
   PyNoiseKriging(const py::array_t<double>& y,
-                  const py::array_t<double>& noise,
-                  const py::array_t<double>& X,
-                  const std::string& covType,
-                  const Trend::RegressionModel& regmodel,
-                  bool normalize,
-                  const std::string& optim,
-                  const std::string& objective,
-                  const py::dict& dict);
+                 const py::array_t<double>& noise,
+                 const py::array_t<double>& X,
+                 const std::string& covType,
+                 const Trend::RegressionModel& regmodel,
+                 bool normalize,
+                 const std::string& optim,
+                 const std::string& objective,
+                 const py::dict& dict);
   ~PyNoiseKriging();
 
   void fit(const py::array_t<double>& y,
