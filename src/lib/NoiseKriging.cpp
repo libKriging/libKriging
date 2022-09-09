@@ -302,7 +302,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
   double centerY;
   double scaleY;
   // Normalization of inputs and output
-  if (normalize) {
+  m_normalize = normalize;
+  if (m_normalize) {
     centerX = min(X, 0);
     scaleX = max(X, 0) - min(X, 0);
     centerY = min(y);
