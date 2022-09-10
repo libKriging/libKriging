@@ -65,7 +65,7 @@
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' ## fit and print
-#' (k_R <- NoiseKriging(y, X, kernel = "gauss"))
+#' (k_R <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss"))
 #' 
 #' x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
 #' p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
@@ -137,7 +137,7 @@ NoiseKriging <- function(y, noise, X, kernel,
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss")
 #' l <- as.list(r)
 #' cat(paste0(names(l), " =" , l, collapse = "\n"))
 as.list.NoiseKriging <- function(x, ...) {
@@ -176,7 +176,7 @@ as.list.NoiseKriging <- function(x, ...) {
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
 #' print(r)
 #' k <- as.km(r)
 #' print(k)
@@ -264,7 +264,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 #' set.seed(123)
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
 #' print(r)
 #' ## same thing
 #' r
@@ -326,7 +326,7 @@ print.NoiseKriging <- function(x, ...) {
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue", pch = 16)
-#' r <- NoiseKriging(y, X, "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
 #' x <-seq(from = 0, to = 1, length.out = 101)
 #' p_x <- predict(r, x)
 #' lines(x, p_x$mean, col = "blue")
@@ -385,7 +385,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' r <- NoiseKriging(y, X, kernel = "gauss")
+#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss")
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' s_x <- simulate(r, nsim = 3, x = x)
 #' lines(x, s_x[ , 1], col = "blue")

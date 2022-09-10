@@ -71,7 +71,7 @@ X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 y <- f(X) + 0.01*rnorm(nrow(X))
 ## fit and print
-(k_R <- NoiseKriging(y, X, kernel = "gauss"))
+(k_R <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss"))
 
 x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
 p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)

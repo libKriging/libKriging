@@ -136,10 +136,10 @@ setClass("NoiseKM", slots = c("NoiseKriging" = "NoiseKriging"), contains = "km")
 #' # Using `km` from DiceKriging and a similar `NoiseKM` object 
 #' # kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
 #' km1 <- DiceKriging::km(design = design.fact, response = y, covtype = "gauss",
-#'                        nugget.estim=TRUE,
+#'                        noise.var=rep(1,nrow(design.fact)),
 #'                        parinit = c(.5, 1), control = list(trace = FALSE))
 #' KM1 <- NoiseKM(design = design.fact, response = y, covtype = "gauss",
-#'           parinit = c(.5, 1))
+#'           noise=rep(1,nrow(design.fact)), parinit = c(.5, 1))
 #' 
 NoiseKM <- function(formula = ~1, design, response,
                covtype = c("matern5_2", "gauss", "matern3_2", "exp"),
@@ -161,13 +161,13 @@ NoiseKM <- function(formula = ~1, design, response,
     if (!is.null(penalty)) {
         stop("The formal arg 'penalty' can not be used for now.")
     }
-    if (!nugget.estim) {
-        stop("The formal args 'nugget.estim=FALSE' ",
-             "can only be used with KM()")
+    if (nugget.estim) {
+        stop("The formal args 'nugget.estim=TRUE' ",
+             "can only be used with NuggetKM().")
     }
     if (!is.null(nugget)) {
-        stop("The formal args 'nugget' and 'noise.var' ",
-             "can not be used for now.")
+        stop("The formal args 'nugget'",
+             "can only be used with NuggetKM().")
     }
     if (!is.null(control) || !gr || iso) {
          stop("The formal args 'control', 'gr' ",
@@ -187,7 +187,6 @@ NoiseKM <- function(formula = ~1, design, response,
     }
     
     if (estim.method == "MLE") estim.method <- "LL"
-    else if (estim.method == "LOO") estim.method <- "LOO"
     
     if (optim.method != "BFGS")
         warning("Cannot setup optim.method ", optim.method,". Ignored.")
@@ -212,10 +211,6 @@ NoiseKM <- function(formula = ~1, design, response,
     if (!is.null(parinit)) {
         parameters <- c(parameters,
                         list(theta = matrix(parinit, ncol = ncol(design))))
-    }
-    if (!is.null(nugget)) {
-        parameters <- c(parameters,
-                        list(nugget = nugget))
     }
     if (length(parameters) == 0) parameters <- NULL
     
@@ -346,9 +341,10 @@ predict.NoiseKM <- function(object, newdata, type = "UK",
 #' ## library(DiceKriging)
 #' ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget
 #' ## m1 <- km(design = design.fact, response = y, covtype = "gauss",
-#' ##          nugget.estim=TRUE,
+#' ##          noise.var=rep(1,nrow(design.fact)),
 #' ##          parinit = c(.5, 1), control = list(trace = FALSE))
 #' KM1 <- NoiseKM(design = design.fact, response = y, covtype = "gauss",
+#'                noise=rep(1,nrow(design.fact)),
 #'                parinit = c(.5, 1))
 #' Pred <- predict(KM1, newdata = matrix(.5,ncol = 2), type = "UK",
 #'                 checkNames = FALSE, light.return = TRUE)
@@ -424,7 +420,7 @@ simulate.NoiseKM <- function(object, nsim = 1, seed = NULL, newdata,
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = 'blue')
-#' k <- NoiseKM(design = X, response = y, covtype = "gauss")
+#' k <- NoiseKM(design = X, response = y, covtype = "gauss", noise=rep(0.01^2,nrow(X)))
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' s_x <- simulate(k, nsim = 3, newdata = x)
 #' lines(x, s_x[ , 1], col = 'blue')
@@ -524,7 +520,7 @@ update.NoiseKM <- function(object,
 #' X <- as.matrix(runif(5))
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' KMobj <- NoiseKM(design = X, response = y, noise.var=rep(0.01^2,5), covtype = "gauss")
+#' KMobj <- NoiseKM(design = X, response = y, noise=rep(0.01^2,5), covtype = "gauss")
 #' x <-  seq(from = 0, to = 1, length.out = 101)
 #' p_x <- predict(KMobj, x)
 #' lines(x, p_x$mean, col = "blue")

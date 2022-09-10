@@ -73,9 +73,10 @@ y <- apply(design.fact, 1, DiceKriging::branin) + rnorm(nrow(design.fact))
 ## library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget
 ## m1 <- km(design = design.fact, response = y, covtype = "gauss",
-##          nugget.estim=TRUE,
+##          noise.var=rep(1,nrow(design.fact)),
 ##          parinit = c(.5, 1), control = list(trace = FALSE))
 KM1 <- NoiseKM(design = design.fact, response = y, covtype = "gauss",
+               noise=rep(1,nrow(design.fact)),
                parinit = c(.5, 1))
 Pred <- predict(KM1, newdata = matrix(.5,ncol = 2), type = "UK",
                 checkNames = FALSE, light.return = TRUE)

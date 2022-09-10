@@ -97,10 +97,10 @@ y <- apply(design.fact, 1, DiceKriging::branin) + rnorm(nrow(design.fact))
 # Using `km` from DiceKriging and a similar `NoiseKM` object 
 # kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
 km1 <- DiceKriging::km(design = design.fact, response = y, covtype = "gauss",
-                       nugget.estim=TRUE,
+                       noise.var=rep(1,nrow(design.fact)),
                        parinit = c(.5, 1), control = list(trace = FALSE))
 KM1 <- NoiseKM(design = design.fact, response = y, covtype = "gauss",
-          parinit = c(.5, 1))
+          noise=rep(1,nrow(design.fact)), parinit = c(.5, 1))
 
 }
 \seealso{

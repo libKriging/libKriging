@@ -29,7 +29,7 @@ f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.
 set.seed(123)
 X <- as.matrix(runif(5))
 y <- f(X) + 0.01*rnorm(nrow(X))
-r <- NoiseKriging(y, X, kernel = "gauss")
+r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss")
 l <- as.list(r)
 cat(paste0(names(l), " =" , l, collapse = "\n"))
 }
