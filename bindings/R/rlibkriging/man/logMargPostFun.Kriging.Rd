@@ -10,7 +10,7 @@
 \arguments{
 \item{object}{S3 Kriging object.}
 
-\item{theta}{Numeric vector of coorelation range parameters at
+\item{theta}{Numeric vector of correlation range parameters at
 which the function is to be evaluated.}
 
 \item{grad}{Logical. Should the function return the gradient

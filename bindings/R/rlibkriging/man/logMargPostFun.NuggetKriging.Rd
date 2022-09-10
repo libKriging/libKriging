@@ -10,7 +10,7 @@
 \arguments{
 \item{object}{S3 NuggetKriging object.}
 
-\item{theta_alpha}{Numeric vector of coorelation range parameters at
+\item{theta_alpha}{Numeric vector of correlation range and variance parameters at
 which the function is to be evaluated.}
 
 \item{grad}{Logical. Should the function return the gradient
