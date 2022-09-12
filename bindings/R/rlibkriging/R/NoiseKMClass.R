@@ -455,7 +455,7 @@ update.NoiseKM <- function(object,
     ## duplicate to avoid changing 'object' in an inconsistent
     ## way (
     obK <- object@NoiseKriging
-    update.NoiseKriging(obK, newy, newnoise.var, newX)
+    update.NoiseKriging(obK, newy=newy, newnoise=newnoise.var, newX=newX)
     
     return(as.km(obK))
     
