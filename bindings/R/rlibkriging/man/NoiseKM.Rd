@@ -51,7 +51,9 @@ value. If given, no optimization is done.}
 \item{coef.var}{Optional value for a fixed variance. If given, no
 optimization is done.}
 
-\item{nugget, nugget.estim, noise.var}{Not implemented yet.}
+\item{nugget, nugget.estim}{Not implemented.}
+
+\item{noise.var}{Vector of output values variance.}
 
 \item{estim.method}{Estimation criterion. \code{"MLE"} for
 Maximum-Likelihood or \code{"LOO"} for Leave-One-Out

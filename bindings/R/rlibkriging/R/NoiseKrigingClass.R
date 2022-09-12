@@ -514,8 +514,8 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
 #' y <- f(X) + 0.01*rnorm(nrow(X))
 #' r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
 #' print(r)
-#' alpha = as.list(r)$sigma2/(as.list(r)$noise+as.list(r)$sigma2)
-#' ll <- function(theta) logLikelihoodFun(r, cbind(theta,alpha))$logLikelihood
+#' sigma2 = as.list(r)$sigma2
+#' ll <- function(theta) logLikelihoodFun(r, cbind(theta,sigma2))$logLikelihood
 #' t <- seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, ll(t), type = 'l')
 #' abline(v = as.list(r)$theta, col = "blue")
