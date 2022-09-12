@@ -8,11 +8,11 @@
   object,
   newX,
   newy,
+  newnoise.var,
   newX.alreadyExist = FALSE,
   cov.reestim = TRUE,
   trend.reestim = cov.reestim,
   nugget.reestim = FALSE,
-  newnoise.var,
   kmcontrol = NULL,
   newF = NULL,
   ...
@@ -28,6 +28,9 @@ of the design matrix used to fit the model which is stored as
 
 \item{newy}{A numeric vector of new response values, in
 correspondence with the rows of \code{newX}.}
+
+\item{newnoise.var}{Variance of an additional noise on
+the new response.}
 
 \item{newX.alreadyExist}{Logical. If TRUE, \code{newX} can contain
 some input points that are already in \code{object@X}.}
@@ -45,9 +48,6 @@ all the observations. Only \code{TRUE} can be used for now.}
 \item{nugget.reestim}{Logical. If \code{TRUE} the nugget effect
 will be re-estimated using all the observations. Only
 \code{FALSE} can be used for now.}
-
-\item{newnoise.var}{Variance of an additional noise on
-the new response.}
 
 \item{kmcontrol}{A list of options to tune the fit. Not available
 yet.}

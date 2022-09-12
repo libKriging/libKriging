@@ -438,10 +438,10 @@ setMethod("simulate", "NoiseKM", simulate.NoiseKM)
 update.NoiseKM <- function(object,
                       newX,
                       newy,
+                      newnoise.var,
                       newX.alreadyExist =  FALSE,
                       cov.reestim = TRUE,trend.reestim = cov.reestim,
                       nugget.reestim = FALSE,
-                      newnoise.var,
                       kmcontrol = NULL, newF = NULL,
                       ...) {
     
@@ -486,6 +486,8 @@ update.NoiseKM <- function(object,
 #'     \code{object@X}.
 #' @param newy A numeric vector of new response values, in
 #'     correspondence with the rows of \code{newX}.
+#' @param newnoise.var Variance of an additional noise on
+#'     the new response.
 #' @param newX.alreadyExist Logical. If TRUE, \code{newX} can contain
 #'     some input points that are already in \code{object@X}.
 #' @param cov.reestim Logical. If \code{TRUE}, the vector
@@ -499,8 +501,6 @@ update.NoiseKM <- function(object,
 #' @param nugget.reestim Logical. If \code{TRUE} the nugget effect
 #'     will be re-estimated using all the observations. Only
 #'     \code{FALSE} can be used for now.
-#' @param newnoise.var Variance of an additional noise on
-#'     the new response.
 #' @param kmcontrol A list of options to tune the fit. Not available
 #'     yet.
 #' @param newF New trend matrix. XXXY?
