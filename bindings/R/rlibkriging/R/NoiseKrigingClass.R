@@ -209,8 +209,8 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
     model@F <- m$F
     colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
     model@p <- ncol(m$F)
-    model@noise.flag <- FALSE
-    model@noise.var <- m$noise
+    model@noise.flag <- TRUE
+    model@noise.var <- as.numeric(m$noise)
     
     model@case <- "LLconcentration_beta"
     
@@ -232,7 +232,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
     
     covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel, 
                       sd2 = m$sigma2, var.names = names(data), 
-                      noise = m$noise, noise.flag = TRUE, noise.estim = TRUE,
+                      nugget = 0, nugget.flag = FALSE, nugget.estim = FALSE,
                       known.covparam = "")
     
     covStruct@range.names <- "theta" 

@@ -97,7 +97,9 @@ setClass("NoiseKM", slots = c("NoiseKriging" = "NoiseKriging"), contains = "km")
 #' @param coef.var Optional value for a fixed variance. If given, no
 #'     optimization is done.
 #'
-#' @param nugget,nugget.estim,noise.var Not implemented yet. 
+#' @param noise.var Vector of output values variance.
+#' 
+#' @param nugget,nugget.estim Not implemented. 
 #'
 #' @param estim.method Estimation criterion. \code{"MLE"} for
 #'     Maximum-Likelihood or \code{"LOO"} for Leave-One-Out
