@@ -13,3 +13,24 @@ void random_reset_seed(unsigned int seed) {
   Rcpp::XPtr<Random> impl_ptr(r);
   impl_ptr->reset_seed(seed);
 }
+
+// [[Rcpp::export]]
+double random_randu() {
+  Random* r = new Random();
+  Rcpp::XPtr<Random> impl_ptr(r);
+  return impl_ptr->randu();
+}
+
+// [[Rcpp::export]]
+arma::vec random_randu_vec(unsigned int n) {
+  Random* r = new Random();
+  Rcpp::XPtr<Random> impl_ptr(r);
+  return impl_ptr->randu_vec(n);
+}
+
+// [[Rcpp::export]]
+arma::mat random_randu_mat(unsigned int n,unsigned int d) {
+  Random* r = new Random();
+  Rcpp::XPtr<Random> impl_ptr(r);
+  return impl_ptr->randu_mat(n,d);
+}
