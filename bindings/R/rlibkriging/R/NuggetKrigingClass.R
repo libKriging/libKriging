@@ -331,11 +331,13 @@ print.NuggetKriging <- function(x, ...) {
 #' 
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' 
-#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
+#' ## include design points to see interpolation
+#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101)))
 #' p <- predict(k, x)
 #' 
 #' lines(x, p$mean, col = "blue")
-#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+#'  border = NA, col = rgb(0, 0, 1, 0.2))
 predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
@@ -453,10 +455,12 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' 
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' 
-#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
+#' ## include design points to see interpolation
+#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101)))
 #' p <- predict(k, x)
 #' lines(x, p$mean, col = "blue")
-#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+#'  border = NA, col = rgb(0, 0, 1, 0.2))
 #' 
 #' newX <- as.matrix(runif(3))
 #' newy <- f(newX) + 0.1 * rnorm(nrow(newX))
@@ -465,10 +469,12 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' ## change the content of the object 'k'
 #' update(k, newy, newX)
 #' 
-#' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
+#' ## include design points to see interpolation
+#' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101)))
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
-#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
+#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
+#'  border = NA, col = rgb(1, 0, 0, 0.2))
 update.NuggetKriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -640,7 +646,8 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' lmp <- function(theta_alpha) k$logMargPostFun(theta_alpha)$logMargPost
 #' t <- seq(from = 0.4, to = 0.6, length.out = 51)
 #' a <- seq(from = 0.9, to = 1, length.out = 51)
-#' contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
+#' contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),
+#'  nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
     k <- nuggetkriging_model(object)
