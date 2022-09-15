@@ -12,7 +12,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS10")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-1d.Rdata")
@@ -51,7 +51,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS20")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 l = as.list(r)
 
@@ -164,7 +164,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=TRUE,optim="BFGS",multistart=20)#,parinit = c(0.5,5))
-r <- NuggetKriging(y, X, "gauss",, optim = "BFGS10")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
+r <- NuggetKriging(y, X, "gauss",, optim = "BFGS")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-2d-not01.Rdata")

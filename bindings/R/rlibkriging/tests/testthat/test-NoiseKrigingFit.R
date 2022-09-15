@@ -12,7 +12,7 @@ y = f(X) + 0.1*rnorm(nrow(X))
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,noise.var=rep(0.1^2,nrow(X)),covtype = "gauss",control = list(trace=F),nugget.estim=F,optim.method='BFGS',multistart = 20)
-r <- NoiseKriging(y,rep(0.1^2,nrow(X)), X, "gauss", optim = "BFGS10")
+r <- NoiseKriging(y,rep(0.1^2,nrow(X)), X, "gauss", optim = "BFGS")
 l = as.list(r)
 
 ll = Vectorize(function(x) logLikelihoodFun(r,c(x,k@covariance@sd2))$logLikelihood)
@@ -47,7 +47,7 @@ y = f(X)+ 10*rnorm(nrow(X))
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,noise.var=rep(10^2,nrow(X)),covtype = "gauss",control = list(trace=F),nugget.estim=F,optim.method='BFGS',multistart = 20)
-r <- NoiseKriging(y, noise=rep(10^2,nrow(X)),X, "gauss", optim = "BFGS20")
+r <- NoiseKriging(y, noise=rep(10^2,nrow(X)),X, "gauss", optim = "BFGS")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 l = as.list(r)
 
@@ -160,7 +160,7 @@ y = f(X) + 10*rnorm(nrow(X))
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,noise.var=rep(10^2,nrow(X)),covtype = "gauss",control = list(trace=F),nugget.estim=FALSE,optim="BFGS",multistart=20)#,parinit = c(0.5,5))
-r <- NoiseKriging(y,noise=rep(10^2,nrow(X)), X, "gauss",, optim = "BFGS10")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
+r <- NoiseKriging(y,noise=rep(10^2,nrow(X)), X, "gauss",, optim = "BFGS")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-2d-not01.Rdata")
