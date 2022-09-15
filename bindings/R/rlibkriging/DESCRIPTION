@@ -1,17 +1,30 @@
 Package: rlibkriging
 Type: Package
-Title: Kriging Models using the libKriging Library
+Title: Kriging Models using the 'libKriging' Library
 Version: 0.7-0
 Date: 2022-09-15
-Author: Pascal Havé <hpwxf@haveneer.com>, Yann Richet <yann.richet@irsn.fr>, Yves Deville <deville.yves@alpestat.com>
-Maintainer: Yves Deville <deville.yves@alpestat.com>
-Description: An R interface to C++ libKriging library that should
-    provide most standard kriging / gaussian process regression features 
-    (like in DiceKriging, kergp or RobustGaSP packages).
+Authors@R: 
+    c(person(given = "Pascal",
+             family = "Havé",
+             role = c("aut"),
+             email = "hpwxf@haveneer.com"),
+      person(given = "Yann",
+             family = "Richet",
+             role = c("aut","cre"),
+             email = "yann.richet@irsn.fr",
+             comment = c(ORCID = "0000-0002-5677-8458")),
+      person(given = "Yves",
+             family = "Deville",
+             role = c("aut"),
+             email = "deville.yves@alpestat.com"))
+Maintainer: Yann Richet <yann.richet@irsn.fr>
+Description: Interface to 'libKriging' 'C++' library <https://github.com/libKriging> that should
+    provide most standard Kriging / Gaussian process regression features
+    (like in 'DiceKriging', 'kergp' or 'RobustGaSP' packages).
 License: Apache License (>= 2)
 Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
-Depends: R (>= 2.14)
+Depends: R (>= 4.2)
 Imports: Rcpp (>= 0.12.11), methods, DiceKriging
 Suggests: testthat, RobustGaSP, utils, DiceDesign, foreach
 SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran
