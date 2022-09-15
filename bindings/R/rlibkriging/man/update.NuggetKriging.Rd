@@ -40,10 +40,12 @@ points(X, y, col = "blue")
 
 k <- NuggetKriging(y, X, "matern3_2")
 
-x <- sort(c(X,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
+## include design points to see interpolation
+x <- sort(c(X,seq(from = 0, to = 1, length.out = 101)))
 p <- predict(k, x)
 lines(x, p$mean, col = "blue")
-polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+ border = NA, col = rgb(0, 0, 1, 0.2))
 
 newX <- as.matrix(runif(3))
 newy <- f(newX) + 0.1 * rnorm(nrow(newX))
@@ -52,10 +54,12 @@ points(newX, newy, col = "red")
 ## change the content of the object 'k'
 update(k, newy, newX)
 
-x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
+## include design points to see interpolation
+x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101)))
 p2 <- predict(k, x)
 lines(x, p2$mean, col = "red")
-polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
+polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
+ border = NA, col = rgb(1, 0, 0, 0.2))
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

@@ -50,7 +50,8 @@ abline(v = k$theta(), col = "blue")
 lmp <- function(theta_alpha) k$logMargPostFun(theta_alpha)$logMargPost
 t <- seq(from = 0.4, to = 0.6, length.out = 51)
 a <- seq(from = 0.9, to = 1, length.out = 51)
-contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
+contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),
+ nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
 points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 }
 \references{

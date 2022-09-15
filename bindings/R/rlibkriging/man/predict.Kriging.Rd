@@ -57,7 +57,8 @@ x <-seq(from = 0, to = 1, length.out = 101)
 p <- predict(k, x)
 
 lines(x, p$mean, col = "blue")
-polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+ border = NA, col = rgb(0, 0, 1, 0.2))
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}
