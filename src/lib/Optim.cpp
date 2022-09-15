@@ -79,7 +79,7 @@ LIBKRIGING_EXPORT int Optim::get_max_iteration() {
   return Optim::max_iteration;
 };
 
-double Optim::gradient_tolerance = 0.01;
+double Optim::gradient_tolerance = 0.001;
 
 LIBKRIGING_EXPORT void Optim::set_gradient_tolerance(double gradient_tolerance_val) {
   Optim::gradient_tolerance = gradient_tolerance_val;
