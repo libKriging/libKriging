@@ -1137,9 +1137,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
           arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
           arma::cout << "  normalize: " << m_normalize << arma::endl;
-          arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
-          arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
-          arma::cout << "  start_point: " << theta0.row(i).t() << " ";
+          arma::cout << "  lower_bounds: " << theta_lower << " ";
+          arma::cout << "  upper_bounds: " << theta_upper << " ";
+          arma::cout << "  start_point: " << theta0.row(i) << " ";
         }
 
         arma::mat T;
@@ -1171,11 +1171,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               gamma_lower.memptr(),
               gamma_upper.memptr(),
               bounds_type.memptr());
-          arma::vec sol_to_lb = gamma_tmp - theta_lower;
-          if (Optim::reparametrize)
-            sol_to_lb = gamma_tmp - gamma_upper;
-          if ((retry < Optim::max_restart) && (result.num_iters <= 2 * d)
-              && (any(abs(sol_to_lb) < arma::datum::eps))) {  // we fastly converged to one bound
+          double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower));
+          double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper));
+          double sol_to_b = Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
+          if ((retry < Optim::max_restart)                                 //&& (result.num_iters <= 2 * d)
+              && ((sol_to_b < arma::datum::eps)                            // we fastly converged to one bound
+                  || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
             gamma_tmp = (theta0.row(i).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
             if (Optim::log_level > 0)
@@ -1185,6 +1186,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
             if (Optim::log_level > 0) {
               arma::cout << "    iterations: " << result.num_iters << arma::endl;
             }
+            gamma_lower = arma::min(gamma_tmp, gamma_lower);
+            gamma_upper = arma::max(gamma_tmp, gamma_upper);
             retry++;
           } else {
             if (Optim::log_level > 1)
@@ -1199,9 +1202,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
           if (Optim::reparametrize)
-            arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp.t()) << " ";
+            arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp) << " ";
           else
-            arma::cout << "  best solution: " << gamma_tmp.t() << " ";
+            arma::cout << "  best solution: " << gamma_tmp << " ";
         }
 
         if (min_ofn_tmp < min_ofn) {
@@ -1262,9 +1265,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
           arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
           arma::cout << "  normalize: " << m_normalize << arma::endl;
-          arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
-          arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
-          arma::cout << "  start_point: " << theta0.row(i).t() << " ";
+          arma::cout << "  lower_bounds: " << theta_lower << " ";
+          arma::cout << "  upper_bounds: " << theta_upper << " ";
+          arma::cout << "  start_point: " << theta0.row(i) << " ";
         }
 
         arma::mat T;
@@ -1290,9 +1293,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
           if (Optim::reparametrize)
-            arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp.t()) << " ";
+            arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp) << " ";
           else
-            arma::cout << "  best solution: " << gamma_tmp.t() << " ";
+            arma::cout << "  best solution: " << gamma_tmp << " ";
         }
 
         if (min_ofn_tmp < min_ofn) {
