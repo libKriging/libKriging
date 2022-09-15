@@ -257,7 +257,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 #' @param x A (S3) \code{NoiseKriging} Object.
 #' @param ... Ignored.
 #'
-#' @return NULL
+#' @return String of printed object.
 #'
 #' @export
 #' @method print NoiseKriging
@@ -278,7 +278,7 @@ print.NoiseKriging <- function(x, ...) {
     k=noisekriging_model(x)
     p = paste0("NoiseKriging model:\n\n",noisekriging_summary(x),"\n")
     cat(p)
-    ## return(p)
+    invisible(p)
 }
 
 ## setMethod("print", "NoiseKriging", print.NoiseKriging)
@@ -436,6 +436,8 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' 
 #' @param ... Ignored.
 #' 
+#' @return No return value. NoiseKriging object argument is modified.
+#' 
 #' @section Caution: The method \emph{does not return the updated
 #'     object}, but instead changes the content of
 #'     \code{object}. This behaviour is quite unusual in R and
@@ -493,7 +495,6 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
     noisekriging_update(object, newy, newnoise, newX)
     
     invisible(NULL)
-    
 }
 
 ## update <- function(...) UseMethod("update")

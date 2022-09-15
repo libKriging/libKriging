@@ -258,7 +258,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
 #' @param x A (S3) \code{Kriging} Object.
 #' @param ... Ignored.
 #'
-#' @return NULL
+#' @return String of printed object.
 #'
 #' @export
 #' @method print Kriging
@@ -279,7 +279,7 @@ print.Kriging <- function(x, ...) {
     k=kriging_model(x)
     p = paste0("Kriging model:\n\n",kriging_summary(x),"\n")
     cat(p)
-    ## return(p)
+    invisible(p)
 }
 
 ## setMethod("print", "Kriging", print.Kriging)
@@ -436,6 +436,8 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' 
 #' @param ... Ignored.
 #' 
+#' @return No return value. Kriging object argument is modified.
+#' 
 #' @section Caution: The method \emph{does not return the updated
 #'     object}, but instead changes the content of
 #'     \code{object}. This behaviour is quite unusual in R and
@@ -490,7 +492,6 @@ update.Kriging <- function(object, newy, newX, ...) {
     kriging_update(object, newy, newX)
     
     invisible(NULL)
-    
 }
 
 ## update <- function(...) UseMethod("update")

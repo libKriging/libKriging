@@ -15,6 +15,9 @@
 
 \item{...}{Ignored.}
 }
+\value{
+No return value. Kriging object argument is modified.
+}
 \description{
 Update a \code{Kriging} model object with new points
 }

@@ -17,6 +17,9 @@
 
 \item{...}{Ignored.}
 }
+\value{
+No return value. NoiseKriging object argument is modified.
+}
 \description{
 Update a \code{NoiseKriging} model object with new points
 }

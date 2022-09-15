@@ -11,6 +11,9 @@
 
 \item{...}{Ignored.}
 }
+\value{
+String of printed object.
+}
 \description{
 Print the content of a \code{NuggetKriging} object.
 }

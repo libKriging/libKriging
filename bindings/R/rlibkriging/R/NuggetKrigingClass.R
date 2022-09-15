@@ -254,7 +254,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 #' @param x A (S3) \code{NuggetKriging} Object.
 #' @param ... Ignored.
 #'
-#' @return NULL
+#' @return String of printed object.
 #'
 #' @export
 #' @method print NuggetKriging
@@ -275,7 +275,7 @@ print.NuggetKriging <- function(x, ...) {
     k=nuggetkriging_model(x)
     p = paste0("NuggetKriging model:\n\n",nuggetkriging_summary(x),"\n")
     cat(p)
-    ## return(p)
+    invisible(p)
 }
 
 ## setMethod("print", "NuggetKriging", print.NuggetKriging)
@@ -331,7 +331,7 @@ print.NuggetKriging <- function(x, ...) {
 #' 
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' 
-#' x <-seq(from = 0, to = 1, length.out = 101)
+#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
 #' p <- predict(k, x)
 #' 
 #' lines(x, p$mean, col = "blue")
@@ -431,6 +431,8 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' 
 #' @param ... Ignored.
 #' 
+#' @return No return value. NuggetKriging object argument is modified.
+#' 
 #' @section Caution: The method \emph{does not return the updated
 #'     object}, but instead changes the content of
 #'     \code{object}. This behaviour is quite unusual in R and
@@ -451,7 +453,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' 
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' 
-#' x <- seq(from = 0, to = 1, length.out = 101)
+#' x <- sort(c(X,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
 #' p <- predict(k, x)
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
@@ -463,7 +465,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' ## change the content of the object 'k'
 #' update(k, newy, newX)
 #' 
-#' x <- seq(from = 0, to = 1, length.out = 101)
+#' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101))) # include design points to see interpolation
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
