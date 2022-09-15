@@ -29,8 +29,8 @@ arma::vec random_randu_vec(unsigned int n) {
 }
 
 // [[Rcpp::export]]
-arma::mat random_randu_mat(unsigned int n,unsigned int d) {
+arma::mat random_randu_mat(unsigned int n, unsigned int d) {
   Random* r = new Random();
   Rcpp::XPtr<Random> impl_ptr(r);
-  return impl_ptr->randu_mat(n,d);
+  return impl_ptr->randu_mat(n, d);
 }
