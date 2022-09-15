@@ -431,14 +431,15 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
 
     (*grad_out).head(d) = ans - (a * CL / t - b * CL) / pow(_theta, 2.0);
 
-    arma::mat gradR_d = arma::ones(n, n);
+    arma::mat gradR_d = R / _alpha;
+    gradR_d.diag().zeros();
     Wb_k = trans(
                solve(trans(L), solve(L, gradR_d, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
            - gradR_d * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
     double ans_d = -0.5 * sum(Wb_k.diag())
                    + (m_X.n_rows - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
 
-    (*grad_out).at(d) = ans_d - (a * 1.0 / t - b * 1.0);
+    (*grad_out).at(d) = ans_d;  //- (a * 1.0 / t - b * 1.0);
 
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
@@ -780,11 +781,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
         arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
         arma::cout << "  normalize: " << m_normalize << arma::endl;
-        arma::cout << "  lower_bounds: " << theta_lower.t() << "";
+        arma::cout << "  lower_bounds: " << theta_lower << "";
         arma::cout << "                " << alpha_lower << arma::endl;
-        arma::cout << "  upper_bounds: " << theta_upper.t() << "";
+        arma::cout << "  upper_bounds: " << theta_upper << "";
         arma::cout << "                " << alpha_upper << arma::endl;
-        arma::cout << "  start_point: " << theta0.row(i).t() << "";
+        arma::cout << "  start_point: " << theta0.row(i) << "";
         arma::cout << "               " << alpha0[i % alpha0.n_elem] << arma::endl;
       }
 
@@ -828,13 +829,17 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
             gamma_lower.memptr(),
             gamma_upper.memptr(),
             bounds_type.memptr());
-        arma::vec sol_to_lb = gamma_tmp.head(d) - theta_lower;
-        if (Optim::reparametrize) {
-          sol_to_lb = gamma_tmp - gamma_upper;
-          sol_to_lb = sol_to_lb.head(d);
-        }
-        if ((retry < Optim::max_restart) && (result.num_iters <= 2 * d)
-            && (any(abs(sol_to_lb) < arma::datum::eps))) {  // we fastly converged to one bound
+        double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
+        double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
+        double sol_to_b_theta
+            = Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
+        double sol_to_b_alpha = Optim::reparametrize
+                                    ? abs(gamma_tmp.at(d) - gamma_upper.at(d))
+                                    : abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider alpha lower bound
+        double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
+        if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
+            && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
+                || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
           gamma_tmp.head(d)
               = (theta0.row(i).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
@@ -846,6 +851,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
           if (Optim::log_level > 0) {
             arma::cout << "    iterations: " << result.num_iters << arma::endl;
           }
+          gamma_lower = arma::min(gamma_tmp, gamma_lower);
+          gamma_upper = arma::max(gamma_tmp, gamma_upper);
           retry++;
         } else {
           if (Optim::log_level > 1)
@@ -860,9 +867,9 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       if (Optim::log_level > 0) {
         arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
         if (Optim::reparametrize)
-          arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp.t()) << " ";
+          arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp) << " ";
         else
-          arma::cout << "  best solution: " << gamma_tmp.t() << "";
+          arma::cout << "  best solution: " << gamma_tmp << "";
       }
 
       if (min_ofn_tmp < min_ofn) {
