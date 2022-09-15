@@ -60,7 +60,7 @@ l = as.list(r)
 alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
 alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
 test_that(desc="Nugget / Fit: 2D (Branin) / fit of alpha by DiceKriging is same that libKriging",
-          expect_equal(alpha_k,alpha_r, tol= 1e-4))
+          expect_equal(alpha_k,alpha_r, tol= 1e-3))
 
 ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                   # print(dim(X));
