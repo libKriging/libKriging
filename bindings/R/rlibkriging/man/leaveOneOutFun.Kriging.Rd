@@ -35,14 +35,16 @@ with \eqn{j \neq i}{j != i}.
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
+X <- as.matrix(runif(10))
 y <- f(X)
-r <- Kriging(y, X, kernel = "gauss", objective = "LOO")
-print(r)
-loo <-  function(theta) leaveOneOutFun(r,theta)$leaveOneOut
-t <-  seq(from = 0.0001, to = 2, length.out = 101)
+
+k <- Kriging(y, X, kernel = "matern3_2", objective = "LOO", optim="BFGS")
+print(k)
+
+loo <-  function(theta) leaveOneOutFun(k, theta)$leaveOneOut
+t <-  seq(from = 0.001, to = 2, length.out = 101)
 plot(t, loo(t), type = "l")
-abline(v = as.list(r)$theta, col = "blue")
+abline(v = k$theta(), col = "blue")
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

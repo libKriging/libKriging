@@ -29,14 +29,17 @@ prior XXXY.
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
+X <- as.matrix(runif(10))
 y <- f(X)
-r <- Kriging(y, X, "gauss")
-print(r)
-lmp <- function(theta) logMargPostFun(r, theta)$logMargPost
-t <- seq(from = 0.0001, to = 2, length.out = 101)
+
+k <- Kriging(y, X, "matern3_2", objective="LMP")
+print(k)
+
+lmp <- function(theta) logMargPostFun(k, theta)$logMargPost
+
+t <- seq(from = 0.01, to = 2, length.out = 101)
 plot(t, lmp(t), type = "l")
-abline(v = as.list(r)$theta, col = "blue")
+abline(v = k$theta(), col = "blue")
 }
 \references{
 XXXY A reference describing the model (prior, ...)

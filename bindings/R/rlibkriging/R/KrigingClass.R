@@ -21,7 +21,7 @@
 #' @param X Numeric matrix of input design.
 #'
 #' @param kernel Character defining the covariance model:
-#'     \code{"gauss"}, \code{"exp"}, ... See XXX.
+#'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
 #'
 #' @param regmodel Universal Kriging linear trend.
 #'
@@ -59,22 +59,25 @@
 #' @importFrom utils methods
 #' 
 #' @examples
-#' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
 #' ## fit and print
-#' (k_R <- Kriging(y, X, kernel = "gauss"))
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' print(k)
 #' 
-#' x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
-#' p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
+#' x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
+#' p <- predict(k, x = x, stdev = TRUE, cov = FALSE)
+#' 
 #' plot(f)
 #' points(X, y)
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-#'         border = NA, col = rgb(0, 0, 1, 0.2))
-#' s <- simulate(k_R, nsim = 10, seed = 123, x = x)
-#' plot(f, main = "True function and conditional simulations")
-#' points(X, y, pch = 16)
+#' border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
+#' s <- simulate(k, nsim = 10, seed = 123, x = x)
+#' 
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 Kriging <- function(y, X, kernel,
                     regmodel = c("constant", "linear", "interactive"),
@@ -133,10 +136,12 @@ Kriging <- function(y, X, kernel,
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' l <- as.list(r)
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' 
+#' l <- as.list(k)
 #' cat(paste0(names(l), " =" , l, collapse = "\n"))
 as.list.Kriging <- function(x, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -172,13 +177,14 @@ as.list.Kriging <- function(x, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, "gauss")
-#' print(r)
-#' k <- as.km(r)
+#' 
+#' k <- Kriging(y, X, "matern3_2")
 #' print(k)
 #' 
+#' k_km <- as.km(k)
+#' print(k_km)
 as.km.Kriging <- function(x, .call = NULL, ...) {
     
     ## loadDiceKriging()
@@ -260,12 +266,14 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, "gauss")
-#' print(r)
+#' 
+#' k <- Kriging(y, X, "matern3_2")
+#' 
+#' print(k)
 #' ## same thing
-#' r
+#' k
 print.Kriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=kriging_model(x)
@@ -321,15 +329,17 @@ print.Kriging <- function(x, ...) {
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
 #' points(X, y, col = "blue", pch = 16)
-#' r <- Kriging(y, X, "gauss")
+#' 
+#' k <- Kriging(y, X, "matern3_2")
+#' 
 #' x <-seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(r, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' 
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
 predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
@@ -381,15 +391,18 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
 #' points(X, y, col = "blue")
-#' r <- Kriging(y, X, kernel = "gauss")
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' s_x <- simulate(r, nsim = 3, x = x)
-#' lines(x, s_x[ , 1], col = "blue")
-#' lines(x, s_x[ , 2], col = "blue")
-#' lines(x, s_x[ , 3], col = "blue")
+#' s <- simulate(k, nsim = 3, x = x)
+#' 
+#' lines(x, s[ , 1], col = "blue")
+#' lines(x, s[ , 2], col = "blue")
+#' lines(x, s[ , 3], col = "blue")
 simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object) 
@@ -437,27 +450,28 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
 #' points(X, y, col = "blue")
-#' KrigObj <- Kriging(y, X, "gauss")
+#' 
+#' k <- Kriging(y, X, "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(KrigObj, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
 #' newX <- as.matrix(runif(3))
 #' newy <- f(newX)
 #' points(newX, newy, col = "red")
 #' 
-#' ## change the content of the object 'KrigObj'
-#' update(KrigObj, newy, newX)
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p2_x <- predict(KrigObj, x)
-#' lines(x, p2_x$mean, col = "red")
-#' lines(x, p2_x$mean - 2 * p2_x$stdev, col = "red")
-#' lines(x, p2_x$mean + 2 * p2_x$stdev, col = "red")
+#' ## change the content of the object 'k'
+#' update(k, newy, newX)
 #' 
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p2 <- predict(k, x)
+#' lines(x, p2$mean, col = "red")
+#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
 update.Kriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -505,15 +519,17 @@ update.Kriging <- function(object, newy, newX, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' ll <- function(theta) logLikelihoodFun(r, theta)$logLikelihood
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
-#' plot(t, ll(t), type = 'l')
-#' abline(v = as.list(r)$theta, col = "blue")
 #' 
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' print(k)
+#' 
+#' ll <- function(theta) logLikelihoodFun(k, theta)$logLikelihood
+#' 
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
+#' plot(t, ll(t), type = 'l')
+#' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
                                   grad = FALSE, hess = FALSE, ...) {
     k <- kriging_model(object)
@@ -558,12 +574,13 @@ logLikelihoodFun.Kriging <- function(object, theta,
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' logLikelihood(r)
 #' 
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LL")
+#' print(k)
+#' 
+#' logLikelihood(k)
 logLikelihood.Kriging <- function(object, ...) {
   return(kriging_logLikelihood(object))
 }
@@ -602,14 +619,16 @@ logLikelihood.Kriging <- function(object, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss", objective = "LOO")
-#' print(r)
-#' loo <-  function(theta) leaveOneOutFun(r,theta)$leaveOneOut
-#' t <-  seq(from = 0.0001, to = 2, length.out = 101)
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2", objective = "LOO", optim="BFGS")
+#' print(k)
+#' 
+#' loo <-  function(theta) leaveOneOutFun(k, theta)$leaveOneOut
+#' t <-  seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, loo(t), type = "l")
-#' abline(v = as.list(r)$theta, col = "blue")
+#' abline(v = k$theta(), col = "blue")
 leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
     k <- kriging_model(object) 
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -647,12 +666,13 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' leaveOneOut(r)
 #' 
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LOO")
+#' print(k)
+#' 
+#' leaveOneOut(k)
 leaveOneOut.Kriging <- function(object, ...) {
   return(kriging_leaveOneOut(object))
 }
@@ -687,14 +707,17 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, "gauss")
-#' print(r)
-#' lmp <- function(theta) logMargPostFun(r, theta)$logMargPost
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
+#' 
+#' k <- Kriging(y, X, "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' lmp <- function(theta) logMargPostFun(k, theta)$logMargPost
+#' 
+#' t <- seq(from = 0.01, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
-#' abline(v = as.list(r)$theta, col = "blue")
+#' abline(v = k$theta(), col = "blue")
 logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -732,12 +755,13 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
+#' X <- as.matrix(runif(10))
 #' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' logMargPost(r)
 #' 
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' logMargPost(k)
 logMargPost.Kriging <- function(object, ...) {
   return(kriging_logMargPost(object))
 }

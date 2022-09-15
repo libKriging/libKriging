@@ -47,15 +47,17 @@ The names of the formal arguments differ from those of the
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 plot(f)
 set.seed(123)
-X <- as.matrix(runif(5))
-y <- f(X) + 0.01*rnorm(nrow(X))
+X <- as.matrix(runif(10))
+y <- f(X) + X/10 * rnorm(nrow(X))
 points(X, y, col = "blue", pch = 16)
-r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
+
+k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+
 x <-seq(from = 0, to = 1, length.out = 101)
-p_x <- predict(r, x)
-lines(x, p_x$mean, col = "blue")
-lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+p <- predict(k, x)
+
+lines(x, p$mean, col = "blue")
+polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

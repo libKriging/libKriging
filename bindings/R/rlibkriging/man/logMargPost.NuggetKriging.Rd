@@ -14,7 +14,7 @@
 }
 \value{
 The logMargPost computed for fitted
-    \eqn{\boldsymbol{theta}}{\theta}.
+    \eqn{\boldsymbol{theta_alpha}}{\theta,\frac{\sigma^2}{\sigma^2+nugget}}.
 }
 \description{
 Get logMargPost of NuggetKriging Model
@@ -22,12 +22,13 @@ Get logMargPost of NuggetKriging Model
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
-y <- f(X)
-r <- Kriging(y, X, kernel = "gauss")
-print(r)
-logMargPost(r)
+X <- as.matrix(runif(10))
+y <- f(X) + 0.1 * rnorm(nrow(X))
 
+k <- NuggetKriging(y, X, kernel = "matern3_2", objective="LMP")
+print(k)
+
+logMargPost(k)
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

@@ -22,12 +22,13 @@ Get Log-Likelihood of Kriging Model
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
+X <- as.matrix(runif(10))
 y <- f(X)
-r <- Kriging(y, X, kernel = "gauss")
-print(r)
-logLikelihood(r)
 
+k <- Kriging(y, X, kernel = "matern3_2", objective="LL")
+print(k)
+
+logLikelihood(k)
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

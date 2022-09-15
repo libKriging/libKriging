@@ -17,12 +17,14 @@ Print the content of a \code{Kriging} object.
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
+X <- as.matrix(runif(10))
 y <- f(X)
-r <- Kriging(y, X, "gauss")
-print(r)
+
+k <- Kriging(y, X, "matern3_2")
+
+print(k)
 ## same thing
-r
+k
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

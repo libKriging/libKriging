@@ -14,7 +14,7 @@
 }
 \value{
 The logLikelihood computed for fitted
-    \eqn{\boldsymbol{theta}}{\theta}.
+    \eqn{\boldsymbol{theta_alpha}}{\theta,\frac{\sigma^2}{\sigma^2+nugget}}.
 }
 \description{
 Get logLikelihood of NuggetKriging Model
@@ -22,12 +22,13 @@ Get logLikelihood of NuggetKriging Model
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
-y <- f(X) + 0.01*rnorm(nrow(X))
-r <- NuggetKriging(y, X, kernel = "gauss")
-print(r)
-logLikelihood(r)
+X <- as.matrix(runif(10))
+y <- f(X) + 0.1 * rnorm(nrow(X))
 
+k <- NuggetKriging(y, X, kernel = "matern3_2", objective="LL")
+print(k)
+
+logLikelihood(k)
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

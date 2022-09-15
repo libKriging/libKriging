@@ -14,7 +14,7 @@
 }
 \value{
 The logLikelihood computed for fitted
-    \eqn{\boldsymbol{theta}}{\theta}.
+    \eqn{\boldsymbol{theta_sigma2}}{theta,\sigma^2}.
 }
 \description{
 Get logLikelihood of NoiseKriging Model
@@ -22,12 +22,13 @@ Get logLikelihood of NoiseKriging Model
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
-y <- f(X) + 0.01*rnorm(nrow(X))
-r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
-print(r)
-logLikelihood(r)
+X <- as.matrix(runif(10))
+y <- f(X) + X/10 * rnorm(nrow(X))
 
+k <- NoiseKriging(y, (X/10)^2, X, kernel = "matern3_2", objective="LL")
+print(k)
+
+logLikelihood(k)
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

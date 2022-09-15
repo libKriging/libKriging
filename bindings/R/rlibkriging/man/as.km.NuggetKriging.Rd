@@ -26,13 +26,14 @@ Coerce a \code{NuggetKriging} object into the \code{"km"} class of the
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
-y <- f(X) + 0.01*rnorm(nrow(X))
-r <- NuggetKriging(y, X, "gauss")
-print(r)
-k <- as.km(r)
+X <- as.matrix(runif(10))
+y <- f(X) + 0.1 * rnorm(nrow(X))
+
+k <- NuggetKriging(y, X, "matern3_2")
 print(k)
 
+k_km <- as.km(k)
+print(k_km)
 }
 \author{
 Yann Richet \email{yann.richet@irsn.fr}

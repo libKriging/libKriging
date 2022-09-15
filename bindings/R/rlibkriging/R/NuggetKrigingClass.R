@@ -21,7 +21,7 @@
 #' @param X Numeric matrix of input design.
 #'
 #' @param kernel Character defining the covariance model:
-#'     \code{"gauss"}, \code{"exp"}, ... See XXX.
+#'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
 #'
 #' @param regmodel Universal NuggetKriging linear trend.
 #'
@@ -30,24 +30,20 @@
 #'     values in the interval \eqn{[0, 1]}.
 #'
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"},
-#'     \code{"Newton"} and \code{"none"}, the later simply keeping
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"}, 
+#'     the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
-#'     \code{"Newton"} uses both the gradient and the Hessian of the
-#'     objective.
+#'     \code{"BFGS"} uses the gradient of the objective.
 #'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
-#'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares and \code{"LMP"} for the Log-Marginal Posterior.
+#'     Log-Likelihood and \code{"LMP"} for the Log-Marginal Posterior.
 #' 
-#' @param parameters Initial values for the hyper-parameters. When
-#'     provided this must be named list with elements \code{"sigma2"}
-#'     and \code{"theta"} containing the initial value(s) for the
-#'     variance and for the range parameters. If \code{theta} is a
-#'     matrix with more than one row, each row is used as a starting
-#'     point for optimization.
+#' @param parameters Initial values for the hyper-parameters. When provided this
+#'     must be named list with some elements \code{"sigma2"}, \code{"theta"}, \code{"nugget"} 
+#'     containing the initial value(s) for the variance, range and nugget 
+#'     parameters. If \code{theta} is a matrix with more than one row, 
+#'     each row is used as a starting point for optimization.
 #' 
 #' @return An object with S3 class \code{"NuggetKriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -59,22 +55,25 @@
 #' @importFrom utils methods
 #'
 #' @examples
-#' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' ## fit and print
-#' (k_R <- NuggetKriging(y, X, kernel = "gauss"))
+#' k <- NuggetKriging(y, X, kernel = "matern3_2")
+#' print(k)
 #' 
-#' x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
-#' p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
+#' x <- sort(c(X,as.matrix(seq(from = 0, to = 1, length.out = 101))))
+#' p <- predict(k, x = x, stdev = TRUE, cov = FALSE)
+#' 
 #' plot(f)
 #' points(X, y)
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-#'         border = NA, col = rgb(0, 0, 1, 0.2))
-#' s <- simulate(k_R, nsim = 10, seed = 123, x = x)
-#' plot(f, main = "True function and conditional simulations")
-#' points(X, y, pch = 16)
+#' border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
+#' s <- simulate(k, nsim = 10, seed = 123, x = x)
+#' 
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 NuggetKriging <- function(y, X, kernel,
                     regmodel = c("constant", "linear", "interactive"),
@@ -131,12 +130,14 @@ NuggetKriging <- function(y, X, kernel,
 #' @method as.list NuggetKriging
 #' @aliases as.list,NuggetKriging,NuggetKriging-method
 #' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.7)
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
-#' l <- as.list(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2")
+#' 
+#' l <- as.list(k)
 #' cat(paste0(names(l), " =" , l, collapse = "\n"))
 as.list.NuggetKriging <- function(x, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -172,13 +173,14 @@ as.list.NuggetKriging <- function(x, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
-#' print(r)
-#' k <- as.km(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' 
+#' k <- NuggetKriging(y, X, "matern3_2")
 #' print(k)
 #' 
+#' k_km <- as.km(k)
+#' print(k_km)
 as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     
     ## loadDiceKriging()
@@ -260,12 +262,14 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
-#' print(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' 
+#' k <- NuggetKriging(y, X, "matern3_2")
+#' 
+#' print(k)
 #' ## same thing
-#' r
+#' k
 print.NuggetKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=nuggetkriging_model(x)
@@ -321,15 +325,17 @@ print.NuggetKriging <- function(x, ...) {
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' points(X, y, col = "blue", pch = 16)
-#' r <- NuggetKriging(y, X, "gauss")
+#' 
+#' k <- NuggetKriging(y, X, "matern3_2")
+#' 
 #' x <-seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(r, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' 
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
 predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
@@ -380,15 +386,18 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1  *rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' r <- NuggetKriging(y, X, kernel = "gauss")
+#' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' s_x <- simulate(r, nsim = 3, x = x)
-#' lines(x, s_x[ , 1], col = "blue")
-#' lines(x, s_x[ , 2], col = "blue")
-#' lines(x, s_x[ , 3], col = "blue")
+#' s <- simulate(k, nsim = 3, x = x)
+#' 
+#' lines(x, s[ , 1], col = "blue")
+#' lines(x, s[ , 2], col = "blue")
+#' lines(x, s[ , 3], col = "blue")
 simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object) 
@@ -436,27 +445,28 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' KrigObj <- NuggetKriging(y, X, "gauss")
+#' 
+#' k <- NuggetKriging(y, X, "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(KrigObj, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
 #' newX <- as.matrix(runif(3))
-#' newy <- f(newX) + 0.01*rnorm(nrow(newX))
+#' newy <- f(newX) + 0.1 * rnorm(nrow(newX))
 #' points(newX, newy, col = "red")
 #' 
-#' ## change the content of the object 'KrigObj'
-#' update(KrigObj, newy, newX)
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p2_x <- predict(KrigObj, x)
-#' lines(x, p2_x$mean, col = "red")
-#' lines(x, p2_x$mean - 2 * p2_x$stdev, col = "red")
-#' lines(x, p2_x$mean + 2 * p2_x$stdev, col = "red")
+#' ## change the content of the object 'k'
+#' update(k, newy, newX)
 #' 
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p2 <- predict(k, x)
+#' lines(x, p2$mean, col = "red")
+#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
 update.NuggetKriging <- function(object, newy, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -475,7 +485,6 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
     nuggetkriging_update(object, newy, newX)
     
     invisible(NULL)
-    
 }
 
 ## update <- function(...) UseMethod("update")
@@ -488,13 +497,13 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object An S3 NuggetKriging object.
-#' @param theta_alpha A numeric vector of (positive) range parameters at
+#' @param theta_alpha A numeric vector of (positive) range parameters and variance over variance plus nugget at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
 #' @param ... Not used.
 #' 
 #' @return The log-Likelihood computed for given
-#'     \eqn{\boldsymbol{theta_alpha}}{\theta_alpha}.
+#'     \eqn{\boldsymbol{theta_alpha}}{\frac{\sigma^2}{\sigma^2+nugget}}.
 #' 
 #' @method logLikelihoodFun NuggetKriging
 #' @export 
@@ -503,16 +512,29 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
-#' print(r)
-#' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' ll <- function(theta) logLikelihoodFun(r, cbind(theta,alpha))$logLikelihood
-#' t <- seq(from = 0.001, to = 2, length.out = 101)
-#' plot(t, ll(t), type = 'l')
-#' abline(v = as.list(r)$theta, col = "blue")
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2")
+#' print(k)
+#' 
+#' theta0 = k$theta()
+#' ll_alpha <- function(alpha) logLikelihoodFun(k,cbind(theta0,alpha))$logLikelihood
+#' a <- seq(from = 0.9, to = 1.0, length.out = 101)
+#' plot(a, Vectorize(ll_alpha)(a), type = "l",xlim=c(0.9,1))
+#' abline(v = k$sigma2()/(k$sigma2()+k$nugget()), col = "blue")
+#' 
+#' alpha0 = k$sigma2()/(k$sigma2()+k$nugget())
+#' ll_theta <- function(theta) logLikelihoodFun(k,cbind(theta,alpha0))$logLikelihood
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
+#' plot(t, Vectorize(ll_theta)(t), type = 'l')
+#' abline(v = k$theta(), col = "blue")
+#' 
+#' ll <- function(theta_alpha) logLikelihoodFun(k,theta_alpha)$logLikelihood
+#' a <- seq(from = 0.9, to = 1.0, length.out = 31)
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
+#' contour(t,a,matrix(ncol=length(a),ll(expand.grid(t,a))),xlab="theta",ylab="sigma2/(sigma2+nugget)")
+#' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                   grad = FALSE, ...) {
     k <- nuggetkriging_model(object) 
@@ -545,7 +567,7 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 #' @param ... Not used.
 #' 
 #' @return The logLikelihood computed for fitted
-#'     \eqn{\boldsymbol{theta}}{\theta}.
+#'     \eqn{\boldsymbol{theta_alpha}}{\theta,\frac{\sigma^2}{\sigma^2+nugget}}.
 #' 
 #' @method logLikelihood NuggetKriging
 #' @export 
@@ -554,12 +576,13 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, kernel = "gauss")
-#' print(r)
-#' logLikelihood(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2", objective="LL")
+#' print(k)
+#' 
+#' logLikelihood(k)
 logLikelihood.NuggetKriging <- function(object, ...) {
   return(nuggetkriging_logLikelihood(object))
 }
@@ -573,14 +596,14 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object S3 NuggetKriging object.
-#' @param theta_alpha Numeric vector of correlation range and variance parameters at
+#' @param theta_alpha Numeric vector of correlation range and variance over variance plus nugget parameters at
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
 #'     (w.r.t theta_alpha)?
 #' @param ... Not used.
 #' 
 #' @return The value of the log-marginal posterior computed for the
-#'     given vector theta_alpha.
+#'     given vector \eqn{\boldsymbol{theta_alpha}}{\theta,\frac{\sigma^2}{\sigma^2+nugget}}.
 #' 
 #' @method logMargPostFun NuggetKriging
 #' @export 
@@ -594,15 +617,29 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NuggetKriging(y, X, "gauss")
-#' print(r)
-#' alpha = as.list(r)$sigma2/(as.list(r)$nugget+as.list(r)$sigma2)
-#' lmp <- function(theta) logMargPostFun(r, cbind(theta,alpha))$logMargPost
-#' t <- seq(from = 0.0001, to = 2, length.out = 101)
-#' plot(t, lmp(t), type = "l")
-#' abline(v = as.list(r)$theta, col = "blue")
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' 
+#' k <- NuggetKriging(y, X, "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' theta0 = k$theta()
+#' lmp_alpha <- function(alpha) k$logMargPostFun(cbind(theta0,alpha))$logMargPost
+#' a <- seq(from = 0.9, to = 1.0, length.out = 101)
+#' plot(a, Vectorize(lmp_alpha)(a), type = "l",xlim=c(0.9,1))
+#' abline(v = k$sigma2()/(k$sigma2()+k$nugget()), col = "blue")
+#' 
+#' alpha0 = k$sigma2()/(k$sigma2()+k$nugget())
+#' lmp_theta <- function(theta) k$logMargPostFun(cbind(theta,alpha0))$logMargPost
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
+#' plot(t, Vectorize(lmp_theta)(t), type = 'l')
+#' abline(v = k$theta(), col = "blue")
+#' 
+#' lmp <- function(theta_alpha) k$logMargPostFun(theta_alpha)$logMargPost
+#' t <- seq(from = 0.4, to = 0.6, length.out = 51)
+#' a <- seq(from = 0.9, to = 1, length.out = 51)
+#' contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
+#' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
@@ -631,7 +668,7 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...)
 #' @param ... Not used.
 #' 
 #' @return The logMargPost computed for fitted
-#'     \eqn{\boldsymbol{theta}}{\theta}.
+#'     \eqn{\boldsymbol{theta_alpha}}{\theta,\frac{\sigma^2}{\sigma^2+nugget}}.
 #' 
 #' @method logMargPost NuggetKriging
 #' @export 
@@ -640,13 +677,13 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...)
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X)
-#' r <- Kriging(y, X, kernel = "gauss")
-#' print(r)
-#' logMargPost(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
 #' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' logMargPost(k)
 logMargPost.NuggetKriging <- function(object, ...) {
   return(nuggetkriging_logMargPost(object))
 }
-

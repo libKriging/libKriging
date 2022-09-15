@@ -27,10 +27,12 @@ Coerce a \code{Kriging} Object into a List
 \examples{
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.7)
 set.seed(123)
-X <- as.matrix(runif(5))
+X <- as.matrix(runif(10))
 y <- f(X)
-r <- Kriging(y, X, kernel = "gauss")
-l <- as.list(r)
+
+k <- Kriging(y, X, kernel = "matern3_2")
+
+l <- as.list(k)
 cat(paste0(names(l), " =" , l, collapse = "\n"))
 }
 \author{

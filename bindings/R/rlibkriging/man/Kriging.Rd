@@ -21,7 +21,7 @@ Kriging(
 \item{X}{Numeric matrix of input design.}
 
 \item{kernel}{Character defining the covariance model:
-\code{"gauss"}, \code{"exp"}, ... See XXX.}
+\code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.}
 
 \item{regmodel}{Universal Kriging linear trend.}
 
@@ -64,22 +64,25 @@ are estimated thanks to the optimization of a criterion given by
 \code{objective}, using the method given in \code{optim}.
 }
 \examples{
-X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+set.seed(123)
+X <- as.matrix(runif(10))
 y <- f(X)
 ## fit and print
-(k_R <- Kriging(y, X, kernel = "gauss"))
+k <- Kriging(y, X, kernel = "matern3_2")
+print(k)
 
-x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
-p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
+x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
+p <- predict(k, x = x, stdev = TRUE, cov = FALSE)
+
 plot(f)
 points(X, y)
 lines(x, p$mean, col = "blue")
 polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-        border = NA, col = rgb(0, 0, 1, 0.2))
-s <- simulate(k_R, nsim = 10, seed = 123, x = x)
-plot(f, main = "True function and conditional simulations")
-points(X, y, pch = 16)
+border = NA, col = rgb(0, 0, 1, 0.2))
+
+s <- simulate(k, nsim = 10, seed = 123, x = x)
+
 matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 }
 \author{

@@ -23,7 +23,7 @@
 #' @param X Numeric matrix of input design.
 #'
 #' @param kernel Character defining the covariance model:
-#'     \code{"gauss"}, \code{"exp"}, ... See XXX.
+#'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
 #'
 #' @param regmodel Universal NoiseKriging linear trend.
 #'
@@ -32,17 +32,14 @@
 #'     values in the interval \eqn{[0, 1]}.
 #'
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"},
-#'     \code{"Newton"} and \code{"none"}, the later simply keeping
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"}, 
+#'     the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
-#'     \code{"Newton"} uses both the gradient and the Hessian of the
-#'     objective.
+#'     \code{"BFGS"} uses the gradient of the objective.
 #'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
-#'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares and \code{"LMP"} for the Log-Marginal Posterior.
+#'     Log-Likelihood.
 #' 
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
@@ -61,22 +58,25 @@
 #' @importFrom utils methods
 #'
 #' @examples
-#' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
 #' ## fit and print
-#' (k_R <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss"))
+#' k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
+#' print(k)
 #' 
-#' x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
-#' p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
+#' x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
+#' p <- predict(k,x = x, stdev = TRUE, cov = FALSE)
+#' 
 #' plot(f)
 #' points(X, y)
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-#'         border = NA, col = rgb(0, 0, 1, 0.2))
-#' s <- simulate(k_R, nsim = 10, seed = 123, x = x)
-#' plot(f, main = "True function and conditional simulations")
-#' points(X, y, pch = 16)
+#' border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
+#' s <- simulate(k, nsim = 10, seed = 123, x = x)
+#' 
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 NoiseKriging <- function(y, noise, X, kernel,
                     regmodel = c("constant", "linear", "interactive"),
@@ -133,12 +133,14 @@ NoiseKriging <- function(y, noise, X, kernel,
 #' @method as.list NoiseKriging
 #' @aliases as.list,NoiseKriging,NoiseKriging-method
 #' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x ) + 2 * cos(7 * x) * x^5 + 0.7)
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss")
-#' l <- as.list(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
+#' 
+#' k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
+#' 
+#' l <- as.list(k)
 #' cat(paste0(names(l), " =" , l, collapse = "\n"))
 as.list.NoiseKriging <- function(x, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -172,15 +174,16 @@ as.list.NoiseKriging <- function(x, ...) {
 #' @method as.km NoiseKriging
 #' 
 #' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
-#' print(r)
-#' k <- as.km(r)
-#' print(k)
-#' 
+#'f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#'set.seed(123)
+#'X <- as.matrix(runif(10))
+#'y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
+#'## fit and print
+#'k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
+#'print(k)
+#'
+#' k_km <- as.km(k)
+#' print(k_km)
 as.km.NoiseKriging <- function(x, .call = NULL, ...) {
     
     ## loadDiceKriging()
@@ -262,12 +265,14 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
-#' print(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
+#' 
+#' k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
+#' 
+#' print(k)
 #' ## same thing
-#' r
+#' k
 print.NoiseKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=noisekriging_model(x)
@@ -323,15 +328,17 @@ print.NoiseKriging <- function(x, ...) {
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
 #' points(X, y, col = "blue", pch = 16)
-#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, "gauss")
+#' 
+#' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+#' 
 #' x <-seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(r, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' 
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
 predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
@@ -382,15 +389,18 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' r <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss")
+#' 
+#' k <- NoiseKriging(y, (X/10)^2, X, kernel = "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' s_x <- simulate(r, nsim = 3, x = x)
-#' lines(x, s_x[ , 1], col = "blue")
-#' lines(x, s_x[ , 2], col = "blue")
-#' lines(x, s_x[ , 3], col = "blue")
+#' s <- simulate(k, nsim = 3, x = x)
+#' 
+#' lines(x, s[ , 1], col = "blue")
+#' lines(x, s[ , 2], col = "blue")
+#' lines(x, s[ , 3], col = "blue")
 simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object) 
@@ -440,27 +450,28 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
 #' plot(f)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
 #' points(X, y, col = "blue")
-#' KrigObj <- NoiseKriging(y, rep(0.01^2,5), X, "gauss")
+#' 
+#' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+#' 
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' p_x <- predict(KrigObj, x)
-#' lines(x, p_x$mean, col = "blue")
-#' lines(x, p_x$mean - 2 * p_x$stdev, col = "blue")
-#' lines(x, p_x$mean + 2 * p_x$stdev, col = "blue")
+#' p <- predict(k, x)
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
 #' newX <- as.matrix(runif(3))
-#' newy <- f(newX) + 0.01*rnorm(nrow(newX))
+#' newy <- f(newX) + 0.1 * rnorm(nrow(newX))
 #' points(newX, newy, col = "red")
 #' 
-#' ## change the content of the object 'KrigObj'
-#' update(KrigObj, newy, rep(0.01^2,3), newX)
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p2_x <- predict(KrigObj, x)
-#' lines(x, p2_x$mean, col = "red")
-#' lines(x, p2_x$mean - 2 * p2_x$stdev, col = "red")
-#' lines(x, p2_x$mean + 2 * p2_x$stdev, col = "red")
+#' ## change the content of the object 'k'
+#' update(k, newy, rep(0.1^2,3), newX)
 #' 
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p2 <- predict(k, x)
+#' lines(x, p2$mean, col = "red")
+#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
 update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
     
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -495,31 +506,43 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #' 
 #' @param object An S3 NoiseKriging object.
-#' @param theta_sigma2 A numeric vector of (positive) range parameters at
+#' @param theta_sigma2 A numeric vector of (positive) range parameters and variance at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
 #' @param ... Not used.
 #' 
 #' @return The log-Likelihood computed for given
-#'     \eqn{\boldsymbol{theta_sigma2}}{\theta_sigma2}.
+#'     \eqn{\boldsymbol{theta_sigma2}}{\theta,\sigma^2}.
 #' 
 #' @method logLikelihoodFun NoiseKriging
 #' @export 
 #' @aliases logLikelihoodFun,NoiseKriging,NoiseKriging-method
 #' 
-#' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
-#' print(r)
-#' sigma2 = as.list(r)$sigma2
-#' ll <- function(theta) logLikelihoodFun(r, cbind(theta,sigma2))$logLikelihood
-#' t <- seq(from = 0.001, to = 2, length.out = 101)
-#' plot(t, ll(t), type = 'l')
-#' abline(v = as.list(r)$theta, col = "blue")
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10  *rnorm(nrow(X))
 #' 
+#' k <- NoiseKriging(y, (X/10)^2, X, kernel = "matern3_2")
+#' print(k)
+#' 
+#' theta0 = k$theta()
+#' ll_sigma2 <- function(sigma2) logLikelihoodFun(k, cbind(theta0,sigma2))$logLikelihood
+#' s2 <- seq(from = 0.001, to = 1, length.out = 101)
+#' plot(s2, Vectorize(ll_sigma2)(s2), type = 'l')
+#' abline(v = k$sigma2(), col = "blue")
+#'
+#' sigma20 = k$sigma2()
+#' ll_theta <- function(theta) logLikelihoodFun(k, cbind(theta,sigma20))$logLikelihood
+#' t <- seq(from = 0.001, to = 2, length.out = 101)
+#' plot(t, Vectorize(ll_theta)(t), type = 'l')
+#' abline(v = k$theta(), col = "blue")
+#' 
+#' ll <- function(theta_sigma2) logLikelihoodFun(k, theta_sigma2)$logLikelihood
+#' s2 <- seq(from = 0.001, to = 1, length.out = 31)
+#' t <- seq(from = 0.001, to = 2, length.out = 31)
+#' contour(t,s2,matrix(ncol=length(s2),ll(expand.grid(t,s2))),xlab="theta",ylab="sigma2")
+#' points(k$theta(),k$sigma2(),col='blue')
 logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                   grad = FALSE, ...) {
     k <- noisekriging_model(object) 
@@ -552,7 +575,7 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
 #' @param ... Not used.
 #' 
 #' @return The logLikelihood computed for fitted
-#'     \eqn{\boldsymbol{theta}}{\theta}.
+#'     \eqn{\boldsymbol{theta_sigma2}}{theta,\sigma^2}.
 #' 
 #' @method logLikelihood NoiseKriging
 #' @export 
@@ -561,12 +584,13 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(5))
-#' y <- f(X) + 0.01*rnorm(nrow(X))
-#' r <- NoiseKriging(y, rep(0.01^2,5), X, kernel = "gauss")
-#' print(r)
-#' logLikelihood(r)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
 #' 
+#' k <- NoiseKriging(y, (X/10)^2, X, kernel = "matern3_2", objective="LL")
+#' print(k)
+#' 
+#' logLikelihood(k)
 logLikelihood.NoiseKriging <- function(object, ...) {
   return(noisekriging_logLikelihood(object))
 }

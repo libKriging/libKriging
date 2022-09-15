@@ -24,7 +24,7 @@ NoiseKriging(
 \item{X}{Numeric matrix of input design.}
 
 \item{kernel}{Character defining the covariance model:
-\code{"gauss"}, \code{"exp"}, ... See XXX.}
+\code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.}
 
 \item{regmodel}{Universal NoiseKriging linear trend.}
 
@@ -33,17 +33,14 @@ NoiseKriging(
 values in the interval \eqn{[0, 1]}.}
 
 \item{optim}{Character giving the Optimization method used to fit
-hyper-parameters. Possible values are: \code{"BFGS"},
-\code{"Newton"} and \code{"none"}, the later simply keeping
+hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"}, 
+the later simply keeping
 the values given in \code{parameters}. The method
-\code{"BFGS"} uses the gradient of the objective. The method
-\code{"Newton"} uses both the gradient and the Hessian of the
-objective.}
+\code{"BFGS"} uses the gradient of the objective.}
 
 \item{objective}{Character giving the objective function to
 optimize. Possible values are: \code{"LL"} for the
-Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-squares and \code{"LMP"} for the Log-Marginal Posterior.}
+Log-Likelihood.}
 
 \item{parameters}{Initial values for the hyper-parameters. When
 provided this must be named list with elements \code{"sigma2"}
@@ -67,22 +64,25 @@ are estimated thanks to the optimization of a criterion given by
 \code{objective}, using the method given in \code{optim}.
 }
 \examples{
-X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-y <- f(X) + 0.01*rnorm(nrow(X))
+set.seed(123)
+X <- as.matrix(runif(10))
+y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
 ## fit and print
-(k_R <- NoiseKriging(y, rep(0.01^2,nrow(X)), X, kernel = "gauss"))
+k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
+print(k)
 
-x <- as.matrix(seq(from = 0, to = 1, length.out = 100))
-p <- predict(k_R, x = x, stdev = TRUE, cov = FALSE)
+x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
+p <- predict(k,x = x, stdev = TRUE, cov = FALSE)
+
 plot(f)
 points(X, y)
 lines(x, p$mean, col = "blue")
 polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-        border = NA, col = rgb(0, 0, 1, 0.2))
-s <- simulate(k_R, nsim = 10, seed = 123, x = x)
-plot(f, main = "True function and conditional simulations")
-points(X, y, pch = 16)
+border = NA, col = rgb(0, 0, 1, 0.2))
+
+s <- simulate(k, nsim = 10, seed = 123, x = x)
+
 matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 }
 \author{
