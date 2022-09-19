@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
+# Avoid to export package (like armadillo) into ~/.cmake
+# This behaviour is required to submit package to CRAN
+set(CMAKE_EXPORT_NO_PACKAGE_REGISTRY ON)
+set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON)
+
 # CMake utils
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
