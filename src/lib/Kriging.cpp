@@ -1013,6 +1013,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     theta0 = parameters.theta.value();
     if (parameters.theta.value().n_cols != d && parameters.theta.value().n_rows == d)
       theta0 = parameters.theta.value().t();
+    if (m_normalize)
+      theta0.each_row() /= scaleX;
     if (theta0.n_cols != d)
       throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
@@ -1028,11 +1030,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    if (parameters.beta.has_value())
+    if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
+      if (m_normalize)
+        beta /= scaleY;
+    }
     double sigma2 = -1;
-    if (parameters.sigma2.has_value())
+    if (parameters.sigma2.has_value()) {
       sigma2 = parameters.sigma2.value();  // otherwise sigma2 will be re-calculated using given theta
+      if (m_normalize)
+        sigma2 /= (scaleY * scaleY);
+    }
 
     Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
@@ -1110,6 +1118,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
       } else {  // just use given theta(s) as starting values for multi-bfgs
         theta0 = arma::mat(parameters.theta.value());
+        if (m_normalize)
+          theta0.each_row() /= scaleX;
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -1146,11 +1156,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         arma::mat M;
         arma::colvec z;
         arma::colvec beta;
-        if (parameters.beta.has_value())
+        if (parameters.beta.has_value()) {
           beta = parameters.beta.value();
+          if (m_normalize)
+            beta /= scaleY;
+        }
         double sigma2 = -1;
-        if (parameters.sigma2.has_value())
+        if (parameters.sigma2.has_value()) {
           sigma2 = parameters.sigma2.value();
+          if (m_normalize)
+            sigma2 /= (scaleY * scaleY);
+        }
 
         Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 
@@ -1237,6 +1253,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                  + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
       } else {  // just use given theta(s) as starting values for multi-bfgs
         theta0 = arma::mat(parameters.theta.value());
+        if (m_normalize)
+          theta0.each_row() /= scaleX;
       }
 
       // arma::cout << "theta0:" << theta0 << arma::endl;
@@ -1274,11 +1292,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         arma::mat M;
         arma::colvec z;
         arma::colvec beta;
-        if (parameters.beta.has_value())
+        if (parameters.beta.has_value()) {
           beta = parameters.beta.value();
+          if (m_normalize)
+            beta /= scaleY;
+        }
         double sigma2 = -1;
-        if (parameters.sigma2.has_value())
+        if (parameters.sigma2.has_value()) {
           sigma2 = parameters.sigma2.value();
+          if (m_normalize)
+            sigma2 /= (scaleY * scaleY);
+        }
 
         Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
 

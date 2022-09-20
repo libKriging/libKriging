@@ -86,3 +86,40 @@ test_that(desc="update sigma2 norm",
           expect_equal(r_norm$sigma2() , r1050_norm$sigma2(),tol=0.01))
 
 
+
+context("normalize with parameters")
+
+r_norm_param <- Kriging(y, X, "gauss", normalize=T, parameters=list(theta=matrix(0.2),beta=matrix(0.4),sigma2=0.15))
+r1050_norm_param <- Kriging(y50, X10, "gauss", normalize=T, parameters=list(theta=matrix(0.2*10),beta=matrix(0.4*50),sigma2=0.15*50*50))
+
+test_that(desc="theta norm_param",
+          expect_equal(r_norm_param$theta() , r1050_norm_param$theta(),tol=0.01))
+test_that(desc="beta norm_param",
+          expect_equal(r_norm_param$beta() , r1050_norm_param$beta(),tol=0.01))
+test_that(desc="sigma2 norm_param",
+          expect_equal(r_norm_param$sigma2() , r1050_norm_param$sigma2(),tol=0.01))
+
+
+test_that(desc="predict norm_param",
+          expect_equal(lapply(r_norm_param$predict(0.5),function(...){50*...}), r1050_norm_param$predict(10*0.5),tol=0.01))
+
+test_that(desc="simulate norm_param",
+          expect_equal(50*r_norm_param$simulate(1,x=0.5), r1050_norm_param$simulate(1,x=10*0.5),tol=0.01))
+
+
+plot(seq(0,1,,101),r_norm_param$simulate(1,seed=123,x=seq(0,1,,101)))
+points(X,y,col='red')
+plot(seq(0,10,,101),r1050_norm_param$simulate(1,seed=123,x=seq(0,10,,101)))
+points(X10,y50,col='red')
+
+r_norm_param$update(newX=0.5,newy=f(0.5))
+r1050_norm_param$update(newX=10*0.5,newy=50*f(0.5))
+
+test_that(desc="update theta norm_param",
+          expect_equal(r_norm_param$theta() , r1050_norm_param$theta(),tol=0.01))
+test_that(desc="update beta norm_param",
+          expect_equal(r_norm_param$beta() , r1050_norm_param$beta(),tol=0.01))
+test_that(desc="update sigma2 norm_param",
+          expect_equal(r_norm_param$sigma2() , r1050_norm_param$sigma2(),tol=0.01))
+
+

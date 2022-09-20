@@ -348,6 +348,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     theta0 = parameters.theta.value();
     if (parameters.theta.value().n_cols != d && parameters.theta.value().n_rows == d)
       theta0 = parameters.theta.value().t();
+    if (m_normalize)
+      theta0.each_row() /= scaleX;
     if (theta0.n_cols != d)
       throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
@@ -362,16 +364,18 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     m_theta = trans(theta0.row(0));
     m_est_theta = false;
     m_sigma2 = parameters.sigma2.value()[0];
+    if (m_normalize)
+      m_sigma2 /= (scaleY * scaleY);
     m_est_sigma2 = false;
     arma::mat T;
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    if (parameters.beta.has_value())
+    if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
-    double sigma2 = -1;
-    if (parameters.sigma2.has_value())
-      sigma2 = parameters.sigma2.value()[0];  // otherwise sigma2 will be re-calculated using given theta
+      if (m_normalize)
+        beta /= scaleY;
+    }
 
     NoiseKriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim};
 
@@ -440,6 +444,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta.value());
+      if (m_normalize)
+        theta0.each_row() /= scaleX;
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -450,6 +456,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     arma::vec sigma20;
     if (parameters.sigma2.has_value()) {
       sigma20 = arma::vec(parameters.sigma2.value());
+      if (m_normalize)
+        sigma20 /= scaleY;
     } else {
       sigma20 = sigma2_lower + (sigma2_upper - sigma2_lower) * Random::randu_vec(theta0.n_rows);
     }
@@ -499,8 +507,11 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::colvec z;
       arma::colvec beta;
-      if (parameters.beta.has_value())
+      if (parameters.beta.has_value()) {
         beta = parameters.beta.value();
+        if (m_normalize)
+          beta /= scaleY;
+      }
 
       NoiseKriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim};
 

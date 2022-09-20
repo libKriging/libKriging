@@ -619,6 +619,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     theta0 = parameters.theta.value();
     if (parameters.theta.value().n_cols != d && parameters.theta.value().n_rows == d)
       theta0 = parameters.theta.value().t();
+    if (m_normalize)
+      theta0.each_row() /= scaleX;
     if (theta0.n_cols != d)
       throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
@@ -638,14 +640,23 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
-    if (parameters.beta.has_value())
+    if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
+      if (m_normalize)
+        beta /= scaleY;
+    }
     double sigma2 = -1;
-    if (parameters.sigma2.has_value())
+    if (parameters.sigma2.has_value()) {
       sigma2 = parameters.sigma2.value()[0];  // otherwise sigma2 will be re-calculated using given theta
+      if (m_normalize)
+        sigma2 /= (scaleY * scaleY);
+    }
     double nugget = -1;
-    if (parameters.nugget.has_value())
+    if (parameters.nugget.has_value()) {
       nugget = parameters.nugget.value()[0];
+      if (m_normalize)
+        nugget /= (scaleY * scaleY);
+    }
 
     NuggetKriging::OKModel okm_data{T,
                                     M,
@@ -724,6 +735,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
     } else {  // just use given theta(s) as starting values for multi-bfgs
       theta0 = arma::mat(parameters.theta.value());
+      if (m_normalize)
+        theta0.each_row() /= scaleX;
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -793,14 +806,23 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       arma::mat M;
       arma::colvec z;
       arma::colvec beta;
-      if (parameters.beta.has_value())
+      if (parameters.beta.has_value()) {
         beta = parameters.beta.value();
+        if (m_normalize)
+          beta /= scaleY;
+      }
       double sigma2 = -1;
-      if (parameters.sigma2.has_value())
-        sigma2 = parameters.sigma2.value()[0];  // pass the initial given value (useful if not to be estimated)
+      if (parameters.sigma2.has_value()) {
+        sigma2 = parameters.sigma2.value()[0];  // otherwise sigma2 will be re-calculated using given theta
+        if (m_normalize)
+          sigma2 /= (scaleY * scaleY);
+      }
       double nugget = -1;
-      if (parameters.nugget.has_value())
-        nugget = parameters.nugget.value()[0];  // pass the initial given value (useful if not to be estimated)
+      if (parameters.nugget.has_value()) {
+        nugget = parameters.nugget.value()[0];
+        if (m_normalize)
+          nugget /= (scaleY * scaleY);
+      }
 
       NuggetKriging::OKModel okm_data{T,
                                       M,
