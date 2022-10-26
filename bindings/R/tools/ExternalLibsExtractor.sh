@@ -12,5 +12,5 @@ BASEDIR=$(cd "$BASEDIR" && pwd -P)
 
 TMPDIR=$(mktemp -d)
 OUT=`cmake -DLIBKRIGING_PATH="${LIBKRIGING_PATH}" -B "${TMPDIR}" "${BASEDIR}"`
-ARMA_LIBS=$(`echo "$OUT"` | sed -n -r -e 's/^-- EXTERNAL_LIBS=(.*)$/\1/p')
+ARMA_LIBS=$(echo "$OUT" | sed -n -r -e 's/^-- EXTERNAL_LIBS=(.*)$/\1/p')
 rm -fr "${TMPDIR}"
