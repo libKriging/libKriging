@@ -54,7 +54,9 @@ void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
-  output.set(0, km->copy(), "copied object reference");
+  auto km_copy = buildObject<Kriging>();
+  *km_copy = km->copy();
+  output.set(0, km_copy, "copied object reference");
 }
 
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

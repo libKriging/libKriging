@@ -114,7 +114,8 @@ Rcpp::List noisekriging_copy(Rcpp::List k) {
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
   Rcpp::List obj;
-  Rcpp::XPtr<Kriging> impl_copy(impl_ptr->copy());
+  Rcpp::XPtr<NoiseKriging> impl_copy(new NoiseKriging());
+  *impl_copy = impl_ptr->copy();
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NoiseKriging";
   return obj;
