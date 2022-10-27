@@ -53,11 +53,10 @@ PyNoiseKriging::PyNoiseKriging(const py::array_t<double>& y,
 PyNoiseKriging::~PyNoiseKriging() {}
 
 PyNoiseKriging::PyNoiseKriging(const PyNoiseKriging& other)
-    : m_internal{std::make_unique<NoiseKriging>(*other.m_internal)} {}
+    : m_internal{std::make_unique<NoiseKriging>(*other.m_internal, ExplicitCopySpecifier{})} {}
 
 PyNoiseKriging PyNoiseKriging::copy() const {
-  auto copy_internal = std::make_unique<NoiseKriging>(*m_internal);
-  return PyNoiseKriging(std::move(copy_internal));
+  return PyNoiseKriging(*this);
 }
 
 void PyNoiseKriging::fit(const py::array_t<double>& y,

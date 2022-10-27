@@ -53,9 +53,8 @@ void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
-  auto km_copy = buildObject<Kriging>();
-  *km_copy = km->copy();
+  const auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
+  auto km_copy = buildObject<NuggetKriging>(*km, ExplicitCopySpecifier{});
   output.set(0, km_copy, "copied object reference");
 }
 

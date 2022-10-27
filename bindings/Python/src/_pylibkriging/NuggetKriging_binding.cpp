@@ -51,11 +51,10 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
 PyNuggetKriging::~PyNuggetKriging() {}
 
 PyNuggetKriging::PyNuggetKriging(const PyNuggetKriging& other)
-    : m_internal{std::make_unique<NuggetKriging>(*other.m_internal)} {}
+    : m_internal{std::make_unique<NuggetKriging>(*other.m_internal, ExplicitCopySpecifier{})} {}
 
 PyNuggetKriging PyNuggetKriging::copy() const {
-  auto copy_internal = std::make_unique<NuggetKriging>(*m_internal);
-  return PyNuggetKriging(std::move(copy_internal));
+  return PyNuggetKriging(*this);
 }
 
 void PyNuggetKriging::fit(const py::array_t<double>& y,

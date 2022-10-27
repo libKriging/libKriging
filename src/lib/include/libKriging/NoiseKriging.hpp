@@ -7,6 +7,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Trend.hpp"
+#include "libKriging/utils/ExplicitCopySpecifier.hpp"
 
 #include "libKriging/libKriging_exports.h"
 
@@ -26,6 +27,10 @@ struct NoiseKrigingParameters {
  * @ingroup Regression
  */
 class NoiseKriging {
+  NoiseKriging() = delete;
+  NoiseKriging(const NoiseKriging& other)
+      = default;  // Should be specialized is non default copy constructor is required
+
  public:
   using Parameters = NoiseKrigingParameters;
 
@@ -108,7 +113,7 @@ class NoiseKriging {
                                  const std::string& objective = "LL",
                                  const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT NoiseKriging copy() const { return *this; }
+  LIBKRIGING_EXPORT NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier) : NoiseKriging{other} {}
   
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
