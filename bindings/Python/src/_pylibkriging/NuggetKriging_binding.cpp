@@ -50,6 +50,14 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
 
 PyNuggetKriging::~PyNuggetKriging() {}
 
+PyNuggetKriging::PyNuggetKriging(const PyNuggetKriging& other)
+    : m_internal{std::make_unique<NuggetKriging>(*other.m_internal)} {}
+
+PyNuggetKriging PyNuggetKriging::copy() const {
+  auto copy_internal = std::make_unique<NuggetKriging>(*m_internal);
+  return PyNuggetKriging(std::move(copy_internal));
+}
+
 void PyNuggetKriging::fit(const py::array_t<double>& y,
                           const py::array_t<double>& X,
                           const Trend::RegressionModel& regmodel,

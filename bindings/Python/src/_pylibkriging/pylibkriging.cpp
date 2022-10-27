@@ -122,6 +122,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyKriging&>())
+      .def("copy", &PyKriging::copy)
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
@@ -183,6 +185,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = Kriging::Parameters{})
+      .def("copy", &Kriging::copy)
       .def("predict", &Kriging::predict)
       .def("simulate", &Kriging::simulate)
       .def("update", &Kriging::update)
@@ -239,6 +242,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyNuggetKriging&>())
+      .def("copy", &PyNuggetKriging::copy)
       .def("fit", &PyNuggetKriging::fit)
       .def("predict", &PyNuggetKriging::predict)
       .def("simulate", &PyNuggetKriging::simulate)
@@ -292,6 +297,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = NuggetKriging::Parameters{})
+      .def("copy", &NuggetKriging::copy)
       .def("fit",
            &NuggetKriging::fit,
            py::arg("y"),
@@ -359,6 +365,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyNoiseKriging&>())
+      .def("copy", &PyNoiseKriging::copy)
       .def("fit", &PyNoiseKriging::fit)
       .def("predict", &PyNoiseKriging::predict)
       .def("simulate", &PyNoiseKriging::simulate)
@@ -421,6 +429,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = NoiseKriging::Parameters{})
+      .def("copy", &NoiseKriging::copy)
       .def("predict", &NoiseKriging::predict)
       .def("simulate", &NoiseKriging::simulate)
       .def("update", &NoiseKriging::update)

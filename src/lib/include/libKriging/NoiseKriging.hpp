@@ -108,6 +108,8 @@ class NoiseKriging {
                                  const std::string& objective = "LL",
                                  const Parameters& parameters = Parameters{});
 
+  LIBKRIGING_EXPORT NoiseKriging copy() const { return *this; }
+  
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param noise is n length column vector of output variances

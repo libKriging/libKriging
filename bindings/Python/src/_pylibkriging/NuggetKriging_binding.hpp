@@ -13,6 +13,9 @@
 namespace py = pybind11;
 
 class PyNuggetKriging {
+ private:
+  PyNuggetKriging(std::unique_ptr<NuggetKriging> && internal) : m_internal(std::move(internal)) {}
+  
  public:
   PyNuggetKriging(const std::string& kernel);
   PyNuggetKriging(const py::array_t<double>& y,
@@ -32,6 +35,10 @@ class PyNuggetKriging {
                   const std::string& objective,
                   const py::dict& dict);
   ~PyNuggetKriging();
+  
+  PyNuggetKriging(const PyNuggetKriging & other);
+  
+  PyNuggetKriging copy() const;
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,

@@ -62,5 +62,6 @@ add_python_test(NAME WrappedPyLinearRegression FILENAME WrappedPyLinearRegressio
 add_python_test(NAME WrappedPyKrigingParametricTest FILENAME WrappedPyKriging_parametric_test.py)
 add_python_test(NAME PyLinearRegression FILENAME PyLinearRegression_test.py)
 add_python_test(NAME PyKrigingParametricTest FILENAME PyKriging_parametric_test.py)
+add_python_test(NAME KrigingCopyTest FILENAME PyKriging_copy_test.py)
 add_python_test(NAME binding_consistency FILENAME binding_consistency_test.py)
 add_python_test(NAME KrigingDemo FILENAME pylibkriging_demo.py)
