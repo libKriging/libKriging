@@ -53,7 +53,7 @@ void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<NoiseKriging>(0, "NoiseKriging reference");
-  output.set(0,km->copy() "copied object reference");
+  output.set(0, km->copy(), "copied object reference");
 }
 
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
