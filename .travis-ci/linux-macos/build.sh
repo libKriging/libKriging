@@ -9,6 +9,7 @@ fi
 # Default configuration when used out of travis-ci
 MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
+EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DCMAKE_INSTALL_LIBDIR=lib" # avoid using "lib64" for some distros
 BUILD_TEST=${BUILD_TEST:-true}
 
 export ENABLE_OCTAVE_BINDING=${ENABLE_OCTAVE_BINDING:-auto}
