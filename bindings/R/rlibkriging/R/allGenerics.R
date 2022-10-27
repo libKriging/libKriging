@@ -135,3 +135,18 @@ logLikelihood <- function (object, ...) {
 logMargPost <- function (object, ...) {
     UseMethod("logMargPost")
 }
+
+## *****************************************************************************
+##' Duplicate a model given in
+##' \code{object}.
+##'
+##' @title Duplicate object.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Ignored.
+##'
+##' @return The copied object.
+##' @export
+copy <- function (object, ...) {
+    UseMethod("copy")
+}

@@ -107,6 +107,19 @@ Rcpp::List new_NoiseKriging(arma::vec y,
 }
 
 // [[Rcpp::export]]
+Rcpp::List noisekriging_copy(Rcpp::List k) {
+  if (!k.inherits("NoiseKriging"))
+    Rcpp::stop("Input must be a NoiseKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr->copy();
+  obj.attr("class") = "NoiseKriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
 Rcpp::List noisekriging_model(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");

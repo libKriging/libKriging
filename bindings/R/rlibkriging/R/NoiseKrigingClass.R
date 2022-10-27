@@ -105,7 +105,7 @@ NoiseKriging <- function(y, noise, X, kernel,
         }
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
+    for (d in c('copy','kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() noisekriging_", d, "(nk)"
             )))
@@ -597,4 +597,32 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
 #' logLikelihood(k)
 logLikelihood.NoiseKriging <- function(object, ...) {
   return(noisekriging_logLikelihood(object))
+}
+
+## ****************************************************************************
+#' Duplicate a NoiseKriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 NoiseKriging object.
+#' @param ... Not used.
+#' 
+#' @return The copy of object.
+#' 
+#' @method copy NoiseKriging
+#' @export 
+#' @aliases copy,NoiseKriging,NoiseKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
+#' 
+#' k <- NoiseKriging(y, (X/10)^2, X, kernel = "matern3_2", objective="LL")
+#' print(k)
+#' 
+#' print(copy(k))
+copy.NoiseKriging <- function(object, ...) {
+  return(noisekriging_copy(object))
 }

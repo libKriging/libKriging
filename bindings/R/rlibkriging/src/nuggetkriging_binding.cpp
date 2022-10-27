@@ -124,6 +124,19 @@ Rcpp::List new_NuggetKriging(arma::vec y,
 }
 
 // [[Rcpp::export]]
+Rcpp::List nuggetkriging_copy(Rcpp::List k) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NoiseKriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr->copy();
+  obj.attr("class") = "NuggetKriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
 Rcpp::List nuggetkriging_model(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
