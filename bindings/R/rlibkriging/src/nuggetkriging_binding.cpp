@@ -131,8 +131,7 @@ Rcpp::List nuggetkriging_copy(Rcpp::List k) {
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
   Rcpp::List obj;
-  Rcpp::XPtr<NuggetKriging> impl_copy(new NuggetKriging());
-  *impl_copy = impl_ptr->copy();
+  Rcpp::XPtr<NuggetKriging> impl_copy(new NuggetKriging(*impl_ptr, ExplicitCopySpecifier{}));
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NuggetKriging";
   return obj;
