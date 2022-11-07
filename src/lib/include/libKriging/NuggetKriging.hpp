@@ -123,7 +123,7 @@ class NuggetKriging {
                                   const std::string& objective = "LL",
                                   const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT NuggetKriging(const NuggetKriging& other, ExplicitCopySpecifier) : NuggetKriging{other} {}
+  LIBKRIGING_EXPORT NuggetKriging(const NuggetKriging& other, ExplicitCopySpecifier);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

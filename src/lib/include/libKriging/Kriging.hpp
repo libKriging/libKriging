@@ -117,8 +117,8 @@ class Kriging {
                             const std::string& objective = "LL",
                             const Parameters& parameters = {});
 
-  LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
-  
+  LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
+
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param X is n*d matrix of input
