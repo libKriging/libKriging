@@ -104,7 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ macOS-11 ]
+        os: [ macOS-12 ]
         python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         include:
           - os: ubuntu-18.04
@@ -188,7 +188,7 @@ jobs:
             os: ubuntu-20.04
             force_update: on
           - name: "Octave macOS"
-            os: macOS-11
+            os: macOS-12
           - name: "Octave Windows"
             os: windows-2019
 
@@ -270,7 +270,7 @@ jobs:
           - name: "R Linux"
             os: ubuntu-20.04
           - name: "R macOS"
-            os: macOS-11
+            os: macOS-12  
           - name: "R Windows"
             os: windows-2019
             
