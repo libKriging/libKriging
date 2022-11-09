@@ -14,8 +14,8 @@ namespace py = pybind11;
 
 class PyKriging {
  private:
-  PyKriging(std::unique_ptr<Kriging> && internal) : m_internal(std::move(internal)) {}
-  
+  PyKriging(std::unique_ptr<Kriging>&& internal) : m_internal(std::move(internal)) {}
+
  public:
   PyKriging(const std::string& kernel);
   PyKriging(const py::array_t<double>& y,
@@ -35,9 +35,9 @@ class PyKriging {
             const std::string& objective,
             const py::dict& dict);
   ~PyKriging();
-  
-  PyKriging(const PyKriging & other);
-  
+
+  PyKriging(const PyKriging& other);
+
   [[nodiscard]] PyKriging copy() const;
 
   void fit(const py::array_t<double>& y,
