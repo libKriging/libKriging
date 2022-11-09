@@ -9,6 +9,10 @@ classdef Kriging < handle
             % fprintf("New Kriging\n");
             obj.ref = mLibKriging("Kriging::new", varargin{:});
         end
+
+        function varargout = copy(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::copy", obj.ref, varargin{:});
+        end
         
         function delete(obj, varargin)
             % disp(["ObjectRef = ", num2str(obj.ref)])

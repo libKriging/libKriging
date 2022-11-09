@@ -13,6 +13,9 @@
 namespace py = pybind11;
 
 class PyNoiseKriging {
+ private:
+  PyNoiseKriging(std::unique_ptr<NoiseKriging>&& internal) : m_internal(std::move(internal)) {}
+
  public:
   PyNoiseKriging(const std::string& kernel);
   PyNoiseKriging(const py::array_t<double>& y,
@@ -34,6 +37,10 @@ class PyNoiseKriging {
                  const std::string& objective,
                  const py::dict& dict);
   ~PyNoiseKriging();
+
+  PyNoiseKriging(const PyNoiseKriging& other);
+
+  PyNoiseKriging copy() const;
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& noise,

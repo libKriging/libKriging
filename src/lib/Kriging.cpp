@@ -77,6 +77,8 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::colvec& y,
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
 
+LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
+
 // arma::mat XtX(arma::mat &X) {
 //   arma::mat XtX = arma::zeros(X.n_cols,X.n_cols);
 //   for (arma::uword i = 0; i < X.n_cols; i++) {

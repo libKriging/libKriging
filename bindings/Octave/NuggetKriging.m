@@ -9,7 +9,11 @@ classdef NuggetKriging < handle
             % printf("New NuggetKriging\n");
             obj.ref = mLibKriging("NuggetKriging::new", varargin{:});
         end
-        
+
+        function varargout = copy(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::copy", obj.ref, varargin{:});
+        end
+
         function delete(obj, varargin)
             % disp(["ObjectRef = ", num2str(obj.ref)])
             % destroy the mex backend

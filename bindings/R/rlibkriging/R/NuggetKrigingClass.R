@@ -102,7 +102,7 @@ NuggetKriging <- function(y, X, kernel,
         }
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
+    for (d in c('copy','kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() nuggetkriging_", d, "(nk)"
             )))
@@ -695,4 +695,32 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...)
 #' logMargPost(k)
 logMargPost.NuggetKriging <- function(object, ...) {
   return(nuggetkriging_logMargPost(object))
+}
+
+## ****************************************************************************
+#' Duplicate a NuggetKriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 NuggetKriging object.
+#' @param ... Not used.
+#' 
+#' @return The copy of object.
+#' 
+#' @method copy NuggetKriging
+#' @export 
+#' @aliases copy,NuggetKriging,NuggetKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' 
+#' k <- NuggetKriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' print(copy(k))
+copy.NuggetKriging <- function(object, ...) {
+  return(nuggetkriging_copy(object))
 }

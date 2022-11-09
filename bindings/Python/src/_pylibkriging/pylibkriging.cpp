@@ -122,6 +122,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyKriging&>())
+      .def("copy", &PyKriging::copy)
       .def("fit", &PyKriging::fit)
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
@@ -155,67 +157,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("sigma2", &PyKriging::sigma2)
       .def("is_sigma2_estim", &PyKriging::is_sigma2_estim);
 
-  // Automated mapper
-  py::class_<Kriging>(m, "PyKriging")
-      .def(py::init<const std::string&>())
-      .def(py::init<const arma::colvec&,
-                    const arma::mat&,
-                    const std::string&,
-                    const Trend::RegressionModel&,
-                    bool,
-                    const std::string&,
-                    const std::string&,
-                    const Kriging::Parameters&>(),
-           py::arg("y"),
-           py::arg("X"),
-           py::arg("kernel"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = Kriging::Parameters{})
-      .def("fit",
-           &Kriging::fit,
-           py::arg("y"),
-           py::arg("X"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = Kriging::Parameters{})
-      .def("predict", &Kriging::predict)
-      .def("simulate", &Kriging::simulate)
-      .def("update", &Kriging::update)
-      .def("summary", &Kriging::summary)
-      .def("leaveOneOutFun", &Kriging::leaveOneOutFun)
-      .def("logLikelihoodFun", &Kriging::logLikelihoodFun)
-      .def("logMargPostFun", &Kriging::logMargPostFun)
-      .def("leaveOneOut", &Kriging::leaveOneOut)
-      .def("logLikelihood", &Kriging::logLikelihood)
-      .def("logMargPost", &Kriging::logMargPost)
-
-      .def("kernel", &Kriging::kernel)
-      .def("optim", &Kriging::optim)
-      .def("objective", &Kriging::objective)
-      .def("X", &Kriging::X)
-      .def("centerX", &Kriging::centerX)
-      .def("scaleX", &Kriging::scaleX)
-      .def("y", &Kriging::y)
-      .def("centerY", &Kriging::centerY)
-      .def("scaleY", &Kriging::scaleY)
-      .def("normalize", &Kriging::normalize)
-      .def("regmodel", &Kriging::regmodel)
-      .def("F", &Kriging::F)
-      .def("T", &Kriging::T)
-      .def("M", &Kriging::M)
-      .def("z", &Kriging::z)
-      .def("beta", &Kriging::beta)
-      .def("is_beta_estim", &Kriging::is_beta_estim)
-      .def("theta", &Kriging::theta)
-      .def("is_theta_estim", &Kriging::is_theta_estim)
-      .def("sigma2", &Kriging::sigma2)
-      .def("is_sigma2_estim", &Kriging::is_sigma2_estim);
-
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<NuggetKriging::Parameters>(m, "NuggetKrigingParameters").def(py::init<>());
 
@@ -239,6 +180,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyNuggetKriging&>())
+      .def("copy", &PyNuggetKriging::copy)
       .def("fit", &PyNuggetKriging::fit)
       .def("predict", &PyNuggetKriging::predict)
       .def("simulate", &PyNuggetKriging::simulate)
@@ -273,67 +216,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("nugget", &PyNuggetKriging::nugget)
       .def("is_nugget_estim", &PyNuggetKriging::is_nugget_estim);
 
-  // Automated mapper
-  py::class_<NuggetKriging>(m, "PyNuggetKriging")
-      .def(py::init<const std::string&>())
-      .def(py::init<const arma::colvec&,
-                    const arma::mat&,
-                    const std::string&,
-                    const Trend::RegressionModel&,
-                    bool,
-                    const std::string&,
-                    const std::string&,
-                    const NuggetKriging::Parameters&>(),
-           py::arg("y"),
-           py::arg("X"),
-           py::arg("kernel"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = NuggetKriging::Parameters{})
-      .def("fit",
-           &NuggetKriging::fit,
-           py::arg("y"),
-           py::arg("X"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = NuggetKriging::Parameters{})
-      .def("predict", &NuggetKriging::predict)
-      .def("simulate", &NuggetKriging::simulate)
-      .def("update", &NuggetKriging::update)
-      .def("summary", &NuggetKriging::summary)
-      .def("logLikelihoodFun", &NuggetKriging::logLikelihoodFun)
-      .def("logMargPostFun", &NuggetKriging::logMargPostFun)
-      .def("logLikelihood", &NuggetKriging::logLikelihood)
-      .def("logMargPost", &NuggetKriging::logMargPost)
-
-      .def("kernel", &NuggetKriging::kernel)
-      .def("optim", &NuggetKriging::optim)
-      .def("objective", &NuggetKriging::objective)
-      .def("X", &NuggetKriging::X)
-      .def("centerX", &NuggetKriging::centerX)
-      .def("scaleX", &NuggetKriging::scaleX)
-      .def("y", &NuggetKriging::y)
-      .def("centerY", &NuggetKriging::centerY)
-      .def("scaleY", &NuggetKriging::scaleY)
-      .def("normalize", &NuggetKriging::normalize)
-      .def("regmodel", &NuggetKriging::regmodel)
-      .def("F", &NuggetKriging::F)
-      .def("T", &NuggetKriging::T)
-      .def("M", &NuggetKriging::M)
-      .def("z", &NuggetKriging::z)
-      .def("beta", &NuggetKriging::beta)
-      .def("is_beta_estim", &NuggetKriging::is_beta_estim)
-      .def("theta", &NuggetKriging::theta)
-      .def("is_theta_estim", &NuggetKriging::is_theta_estim)
-      .def("sigma2", &NuggetKriging::sigma2)
-      .def("is_sigma2_estim", &NuggetKriging::is_sigma2_estim)
-      .def("nugget", &NuggetKriging::nugget)
-      .def("is_nugget_estim", &NuggetKriging::is_nugget_estim);
-
   // Quick and dirty manual wrapper (cf optional argument mapping)
   py::class_<NoiseKriging::Parameters>(m, "NoiseKrigingParameters").def(py::init<>());
 
@@ -359,6 +241,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
+      .def(py::init<const PyNoiseKriging&>())
+      .def("copy", &PyNoiseKriging::copy)
       .def("fit", &PyNoiseKriging::fit)
       .def("predict", &PyNoiseKriging::predict)
       .def("simulate", &PyNoiseKriging::simulate)
@@ -389,65 +273,4 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_theta_estim", &PyNoiseKriging::is_theta_estim)
       .def("sigma2", &PyNoiseKriging::sigma2)
       .def("is_sigma2_estim", &PyNoiseKriging::is_sigma2_estim);
-
-  // Automated mapper
-  py::class_<NoiseKriging>(m, "PyNoiseKriging")
-      .def(py::init<const std::string&>())
-      .def(py::init<const arma::colvec&,
-                    const arma::colvec&,
-                    const arma::mat&,
-                    const std::string&,
-                    const Trend::RegressionModel&,
-                    bool,
-                    const std::string&,
-                    const std::string&,
-                    const NoiseKriging::Parameters&>(),
-           py::arg("y"),
-           py::arg("noise"),
-           py::arg("X"),
-           py::arg("kernel"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = NoiseKriging::Parameters{})
-      .def("fit",
-           &NoiseKriging::fit,
-           py::arg("y"),
-           py::arg("noise"),
-           py::arg("X"),
-           py::arg("regmodel") = default_regmodel,
-           py::arg("normalize") = default_normalize,
-           py::arg("optim") = default_optim,
-           py::arg("objective") = default_objective,
-           py::arg("parameters") = NoiseKriging::Parameters{})
-      .def("predict", &NoiseKriging::predict)
-      .def("simulate", &NoiseKriging::simulate)
-      .def("update", &NoiseKriging::update)
-      .def("summary", &NoiseKriging::summary)
-      .def("logLikelihoodFun", &NoiseKriging::logLikelihoodFun)
-      .def("logLikelihood", &NoiseKriging::logLikelihood)
-
-      .def("kernel", &NoiseKriging::kernel)
-      .def("optim", &NoiseKriging::optim)
-      .def("objective", &NoiseKriging::objective)
-      .def("X", &NoiseKriging::X)
-      .def("centerX", &NoiseKriging::centerX)
-      .def("scaleX", &NoiseKriging::scaleX)
-      .def("y", &NoiseKriging::y)
-      .def("centerY", &NoiseKriging::centerY)
-      .def("scaleY", &NoiseKriging::scaleY)
-      .def("noise", &NoiseKriging::noise)
-      .def("normalize", &NoiseKriging::normalize)
-      .def("regmodel", &NoiseKriging::regmodel)
-      .def("F", &NoiseKriging::F)
-      .def("T", &NoiseKriging::T)
-      .def("M", &NoiseKriging::M)
-      .def("z", &NoiseKriging::z)
-      .def("beta", &NoiseKriging::beta)
-      .def("is_beta_estim", &NoiseKriging::is_beta_estim)
-      .def("theta", &NoiseKriging::theta)
-      .def("is_theta_estim", &NoiseKriging::is_theta_estim)
-      .def("sigma2", &NoiseKriging::sigma2)
-      .def("is_sigma2_estim", &NoiseKriging::is_sigma2_estim);
 }

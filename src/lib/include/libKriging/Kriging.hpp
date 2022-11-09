@@ -7,6 +7,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Trend.hpp"
+#include "libKriging/utils/ExplicitCopySpecifier.hpp"
 
 #include "libKriging/libKriging_exports.h"
 
@@ -26,6 +27,9 @@ struct KrigingParameters {
  * @ingroup Regression
  */
 class Kriging {
+  Kriging() = delete;
+  Kriging(const Kriging& other) = default;  // Should be specialized is non default copy constructor is required
+
  public:
   using Parameters = KrigingParameters;
 
@@ -112,6 +116,8 @@ class Kriging {
                             const std::string& optim = "BFGS",
                             const std::string& objective = "LL",
                             const Parameters& parameters = {});
+
+  LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

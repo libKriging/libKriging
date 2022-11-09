@@ -46,6 +46,13 @@ PyKriging::PyKriging(const py::array_t<double>& y,
 
 PyKriging::~PyKriging() {}
 
+PyKriging::PyKriging(const PyKriging& other)
+    : m_internal{std::make_unique<Kriging>(*other.m_internal, ExplicitCopySpecifier{})} {}
+
+PyKriging PyKriging::copy() const {
+  return PyKriging(*this);
+}
+
 void PyKriging::fit(const py::array_t<double>& y,
                     const py::array_t<double>& X,
                     const Trend::RegressionModel& regmodel,

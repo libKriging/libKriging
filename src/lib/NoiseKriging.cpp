@@ -77,6 +77,8 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::colvec& y,
   fit(y, X, noise, regmodel, normalize, optim, objective, parameters);
 }
 
+LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier) : NoiseKriging{other} {}
+
 // arma::mat XtX(arma::mat &X) {
 //   arma::mat XtX = arma::zeros(X.n_cols,X.n_cols);
 //   for (arma::uword i = 0; i < X.n_cols; i++) {

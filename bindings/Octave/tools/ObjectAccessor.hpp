@@ -11,7 +11,7 @@ struct ObjectRef {};
 struct EmptyObject {};
 
 template <typename T, typename... Args>
-ObjectCollector::ref_t buildObject(Args... args) {
+ObjectCollector::ref_t buildObject(Args&&... args) {
   return ObjectCollector::registerObject(new T{args...});
 }
 

@@ -46,6 +46,17 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km, "new object reference");
 }
 
+void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  auto km_copy = buildObject<Kriging>(*km, ExplicitCopySpecifier{});
+  output.set(0, km_copy, "copied object reference");
+}
+
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

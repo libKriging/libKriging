@@ -5,6 +5,7 @@
 
 namespace NoiseKrigingBinding {
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

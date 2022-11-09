@@ -769,3 +769,31 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
 logMargPost.Kriging <- function(object, ...) {
   return(kriging_logMargPost(object))
 }
+
+## ****************************************************************************
+#' Duplicate a Kriging Model
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#' 
+#' @return The copy of object.
+#' 
+#' @method copy Kriging
+#' @export 
+#' @aliases copy,Kriging,Kriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' 
+#' print(copy(k))
+copy.Kriging <- function(object, ...) {
+  return(kriging_copy(object))
+}

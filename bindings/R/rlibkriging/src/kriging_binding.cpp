@@ -105,6 +105,20 @@ Rcpp::List new_Kriging(arma::vec y,
 }
 
 // [[Rcpp::export]]
+Rcpp::List kriging_copy(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  Rcpp::List obj;
+  Rcpp::XPtr<Kriging> impl_copy(new Kriging(*impl_ptr, ExplicitCopySpecifier{}));
+  obj.attr("object") = impl_copy;
+  obj.attr("class") = "Kriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
 Rcpp::List kriging_model(Rcpp::List k) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

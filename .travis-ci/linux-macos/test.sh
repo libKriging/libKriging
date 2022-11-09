@@ -19,8 +19,17 @@ else
 
     # Cleanup compiled libs to check right path finding
     rm -fr src/lib
+        
     # add library directory search PATH for executables
-    export LD_LIBRARY_PATH=$PWD/installed/lib:${LD_LIBRARY_PATH}
+    case "$(uname -s)" in
+     Darwin)
+      export DYLD_LIBRARY_PATH=$PWD/installed/lib:${DYLD_LIBRARY_PATH}
+       ;;
+    
+     *)
+      export LD_LIBRARY_PATH=$PWD/installed/lib:${LD_LIBRARY_PATH}
+       ;;
+    esac
 
     ctest -C "${MODE}" ${CTEST_FLAGS}
 fi
