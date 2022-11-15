@@ -2,6 +2,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include <pybind11/pybind11.h>
 #include <carma>
 #include <libKriging/demo/DemoArmadilloClass.hpp>
 
@@ -26,7 +27,7 @@ py::array_t<double> direct_binding(py::array_t<double>& input1, py::array_t<doub
 
   double *ptr1 = (double*)buf1.ptr, *ptr2 = (double*)buf2.ptr, *ptr3 = (double*)buf3.ptr;
 
-  for (ssize_t idx = 0; idx < buf1.shape[0]; idx++)
+  for (pybind11::ssize_t idx = 0; idx < buf1.shape[0]; idx++)
     ptr3[idx] = ptr1[idx] + ptr2[idx];
 
   return result;
