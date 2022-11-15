@@ -276,7 +276,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 print.NoiseKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=noisekriging_model(x)
-    p = paste0("NoiseKriging model:\n\n",noisekriging_summary(x),"\n")
+    p = noisekriging_summary(x)
     cat(p)
     invisible(p)
 }

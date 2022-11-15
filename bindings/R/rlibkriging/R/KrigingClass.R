@@ -277,7 +277,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
 print.Kriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=kriging_model(x)
-    p = paste0("Kriging model:\n\n",kriging_summary(x),"\n")
+    p = kriging_summary(x)
     cat(p)
     invisible(p)
 }

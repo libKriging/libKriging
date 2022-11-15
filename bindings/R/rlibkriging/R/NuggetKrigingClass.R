@@ -273,7 +273,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 print.NuggetKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
     k=nuggetkriging_model(x)
-    p = paste0("NuggetKriging model:\n\n",nuggetkriging_summary(x),"\n")
+    p = nuggetkriging_summary(x)
     cat(p)
     invisible(p)
 }
