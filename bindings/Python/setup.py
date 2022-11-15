@@ -115,6 +115,8 @@ class CMakeBuild(build_ext):
 
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DENABLE_PYTHON_BINDING=on',
+                      '-DENABLE_OCTAVE_BINDING=off',
+                      '-DENABLE_MATLAB_BINDING=off',
                       '-DBUILD_SHARED_LIBS=off',
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'

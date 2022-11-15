@@ -23,7 +23,7 @@ env:
 jobs:
   check-release-consistency:
     name: Check Release Consistency
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     outputs:
       git-tag: ${{ steps.expose-variable.outputs.git-tag }}
       draft-release: ${{ steps.expose-variable.outputs.draft-release }}
@@ -91,7 +91,7 @@ jobs:
   display_release_tag:
     name: Release tag ${{ needs.check-release-consistency.outputs.git-tag }}
     needs: check-release-consistency
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Tag ${{ needs.check-release-consistency.outputs.git-tag }}
         shell: bash
@@ -104,14 +104,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ macOS-12 ]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        os: [ windows-2019, macOS-10.15 ]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
             # all versions done in one script wrapper
-        exclude:
-          - os: windows-2019
-            python-version: "3.10" # see issue #140
 
     steps:
       - uses: actions/checkout@v2
@@ -185,7 +182,7 @@ jobs:
       matrix:
         include:
           - name: "Octave Linux"
-            os: ubuntu-20.04
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             force_update: on
           - name: "Octave macOS"
             os: macOS-12
@@ -281,7 +278,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.0'
+          r-version: '4.2'
 
       - name: Check tag
         shell: bash
