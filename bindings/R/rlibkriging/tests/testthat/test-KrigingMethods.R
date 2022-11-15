@@ -154,6 +154,9 @@ points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red')
 
 p2 = capture.output(print(r2))
 
+rc = r$copy()
+pc = capture.output(print(rc))
+
 update(object=r,y2,X2)
 llu = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,theta)$logLikelihood)}
 contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='blue')
@@ -165,3 +168,8 @@ test_that("update",
           expect_false(all(p == pu)))
 test_that("update almost converge",
           expect_true(all(pu == p2)))
+
+test_that("copy is well done",
+          expect_true(all(pc == p)))
+test_that("copy is detached",
+          expect_false(all(pc == pu)))
