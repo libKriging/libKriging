@@ -104,14 +104,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ macOS-12 ]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        os: [ windows-2019, macOS-12 ]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
           - os: ubuntu-18.04
             # all versions done in one script wrapper
-        exclude:
-          - os: windows-2019
-            python-version: "3.10" # see issue #140
+#        exclude:
+#          - os: windows-2019
+#            python-version: "3.10" # see issue #140
 
     steps:
       - uses: actions/checkout@v2
