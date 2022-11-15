@@ -91,7 +91,7 @@ newy <- f(newX)
 points(newX, newy, col = "red")
 
 ## replace the object by its udated version
-KMobj <- update(KMobj, newy, newX)
+KMobj <- update(KMobj, newX=newX, newy=newy)
 
 x <- seq(from = 0, to = 1, length.out = 101)
 p2_x <- predict(KMobj, x)
