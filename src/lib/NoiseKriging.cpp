@@ -424,8 +424,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       arma::vec w = dy2dX2_slope / sum(dy2dX2_slope);
       arma::mat steepest_dX_mean = arma::abs(m_dX) * w;
 
-      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor / steepest_dX_mean);
-      theta_upper = arma::min(theta_upper, Optim::theta_upper_factor / steepest_dX_mean);
+      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor * steepest_dX_mean);
+      //no, only relevant for inf bound: theta_upper = arma::min(theta_upper, Optim::theta_upper_factor * steepest_dX_mean);
       theta_lower = arma::min(theta_lower, theta_upper);
       theta_upper = arma::max(theta_lower, theta_upper);
     }
