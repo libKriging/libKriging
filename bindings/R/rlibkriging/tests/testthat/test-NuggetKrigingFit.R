@@ -51,6 +51,9 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
+#rlibkriging:::optim_log(3)
+#rlibkriging:::optim_use_variogram_bounds_heuristic(T)
+#rlibkriging:::optim_set_max_iteration(100)
 r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 l = as.list(r)
@@ -69,7 +72,7 @@ ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                       y=-logLikelihoodFun(r,c(unlist(x),alpha_k))$logLikelihood
                       #print(y);
                       y})}
-#DiceView::contourview(ll,xlim=c(0.01,2),ylim=c(0.01,2))
+#DiceView::contourview(ll,dim=2,Xlim=c(0.01,2))
 x=seq(0.01,2,,51)
 contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 
@@ -81,7 +84,8 @@ points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue')
 test_that(desc="Nugget / Fit: 2D (Branin) / fit of theta 2D is _quite_ the same that DiceKriging one",
           expect_equal(ll(array(as.list(r)$theta)), ll(k@covariance@range.val), tol=1e-1))
 
-
+#lll = function(ta) r$logLikelihoodFun(ta)$logLikelihood
+#DiceView::sectionview(lll,vectorized=T,center=c(r$theta(),r$sigma2()/(r$sigma2()+r$nugget())))
 
 #############################################################
 
