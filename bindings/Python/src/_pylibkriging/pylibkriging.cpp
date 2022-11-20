@@ -87,7 +87,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .value("Quadratic", Trend::RegressionModel::Quadratic)
       .export_values();
 
-  const Trend::RegressionModel default_regmodel = Trend::RegressionModel::Constant;
+  const std::string default_regmodel = "constant";
   const bool default_normalize = false;
   const std::string default_optim = "BFGS";
   const std::string default_objective = "LL";
@@ -109,7 +109,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const py::array_t<double>&,
                     const py::array_t<double>&,
                     const std::string&,
-                    const Trend::RegressionModel&,
+                    const std::string&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -167,7 +167,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def(py::init<const py::array_t<double>&,
                     const py::array_t<double>&,
                     const std::string&,
-                    const Trend::RegressionModel&,
+                    const std::string&,
                     bool,
                     const std::string&,
                     const std::string&,
@@ -227,7 +227,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     const py::array_t<double>&,
                     const py::array_t<double>&,
                     const std::string&,
-                    const Trend::RegressionModel&,
+                    const std::string&,
                     bool,
                     const std::string&,
                     const std::string&,
