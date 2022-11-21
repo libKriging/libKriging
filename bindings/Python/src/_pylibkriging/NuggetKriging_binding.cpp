@@ -15,21 +15,21 @@ PyNuggetKriging::PyNuggetKriging(const std::string& kernel) : m_internal{new Nug
 PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                  const py::array_t<double>& X,
                                  const std::string& covType,
-                                 const Trend::RegressionModel& regmodel,
+                                 const std::string& regmodel,
                                  bool normalize,
                                  const std::string& optim,
                                  const std::string& objective,
                                  const NuggetKriging::Parameters& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal
-      = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+  m_internal = std::make_unique<NuggetKriging>(
+      mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
 }
 
 PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                  const py::array_t<double>& X,
                                  const std::string& covType,
-                                 const Trend::RegressionModel& regmodel,
+                                 const std::string& regmodel,
                                  bool normalize,
                                  const std::string& optim,
                                  const std::string& objective,
@@ -44,8 +44,8 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                        get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                        get_entry<arma::colvec>(dict, "beta"),
                                        get_entry<bool>(dict, "is_beta_estim").value_or(true)};
-  m_internal
-      = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, regmodel, normalize, optim, objective, parameters);
+  m_internal = std::make_unique<NuggetKriging>(
+      mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
 }
 
 PyNuggetKriging::~PyNuggetKriging() {}
@@ -59,7 +59,7 @@ PyNuggetKriging PyNuggetKriging::copy() const {
 
 void PyNuggetKriging::fit(const py::array_t<double>& y,
                           const py::array_t<double>& X,
-                          const Trend::RegressionModel& regmodel,
+                          const std::string& regmodel,
                           bool normalize,
                           const std::string& optim,
                           const std::string& objective,
@@ -74,7 +74,7 @@ void PyNuggetKriging::fit(const py::array_t<double>& y,
                                        get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                        get_entry<arma::colvec>(dict, "beta"),
                                        get_entry<bool>(dict, "is_beta_estim").value_or(true)};
-  m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, parameters);
+  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
