@@ -22,8 +22,8 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                  const NuggetKriging::Parameters& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal
-      = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+  m_internal = std::make_unique<NuggetKriging>(
+      mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
 }
 
 PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
@@ -44,8 +44,8 @@ PyNuggetKriging::PyNuggetKriging(const py::array_t<double>& y,
                                        get_entry<bool>(dict, "is_theta_estim").value_or(true),
                                        get_entry<arma::colvec>(dict, "beta"),
                                        get_entry<bool>(dict, "is_beta_estim").value_or(true)};
-  m_internal
-      = std::make_unique<NuggetKriging>(mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+  m_internal = std::make_unique<NuggetKriging>(
+      mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
 }
 
 PyNuggetKriging::~PyNuggetKriging() {}
