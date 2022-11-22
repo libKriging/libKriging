@@ -75,7 +75,7 @@
 #' s <- simulate(k, nsim = 10, seed = 123, x = x)
 #' 
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
-NuggetKriging <- function(y, X, kernel,
+NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                     regmodel = c("constant", "linear", "interactive"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
@@ -85,7 +85,12 @@ NuggetKriging <- function(y, X, kernel,
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
-    nk <- new_NuggetKriging(y = y, X = X, kernel = kernel,
+    if (is.character(y) && is.null(X) && is.null(kernel)) # just first arg for kernel, without naming
+        nk <- new_NuggetKriging(kernel = y)
+    else if (is.null(y) && is.null(X) && !is.null(kernel))
+        nk <- new_NuggetKriging(kernel = kernel)
+    else
+        nk <- new_NuggetKrigingFit(y = y, X = X, kernel = kernel,
                       regmodel = regmodel,
                       normalize = normalize,
                       optim = optim,
@@ -272,7 +277,6 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 #' k
 print.NuggetKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
-    k=nuggetkriging_model(x)
     p = nuggetkriging_summary(x)
     cat(p)
     invisible(p)
@@ -280,6 +284,88 @@ print.NuggetKriging <- function(x, ...) {
 
 ## setMethod("print", "NuggetKriging", print.NuggetKriging)
 
+## ****************************************************************************
+#' Fit \code{NuggetKriging} object on given data.
+#'
+#' The hyper-parameters (variance and vector of correlation ranges)
+#' are estimated thanks to the optimization of a criterion given by
+#' \code{objective}, using the method given in \code{optim}.
+#' 
+#' @title Fit Method for a \code{NuggetKriging} Object
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object S3 NuggetKriging object.
+#' 
+#' @param y Numeric vector of response values. 
+#'
+#' @param X Numeric matrix of input design.
+#'
+#' @param kernel Character defining the covariance model:
+#'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
+#'
+#' @param regmodel Universal NuggetKriging linear trend.
+#'
+#' @param normalize Logical. If \code{TRUE} both the input matrix
+#'     \code{X} and the response \code{y} in normalized to take
+#'     values in the interval \eqn{[0, 1]}.
+#'
+#' @param optim Character giving the Optimization method used to fit
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"}, 
+#'     the later simply keeping
+#'     the values given in \code{parameters}. The method
+#'     \code{"BFGS"} uses the gradient of the objective.
+#'
+#' @param objective Character giving the objective function to
+#'     optimize. Possible values are: \code{"LL"} for the
+#'     Log-Likelihood and \code{"LMP"} for the Log-Marginal Posterior.
+#' 
+#' @param parameters Initial values for the hyper-parameters. When provided this
+#'     must be named list with some elements \code{"sigma2"}, \code{"theta"}, \code{"nugget"} 
+#'     containing the initial value(s) for the variance, range and nugget 
+#'     parameters. If \code{theta} is a matrix with more than one row, 
+#'     each row is used as a starting point for optimization.
+#' 
+#' @param ... Ignored.
+#' 
+#' @return No return value. NuggetKriging object argument is modified.
+#' 
+#' @method fit NuggetKriging
+#' @export
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' plot(f)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' points(X, y, col = "blue", pch = 16)
+#' 
+#' k <- NuggetKriging("matern3_2")
+#' print(k)
+#' 
+#' fit(k,y,X)
+#' print(k)
+fit.NuggetKriging <- function(object, y, X,
+                    regmodel = c("constant", "linear", "interactive"),
+                    normalize = FALSE,
+                    optim = c("BFGS", "none"),
+                    objective = c("LL", "LMP"),
+                    parameters = NULL) {
+
+    regmodel <- match.arg(regmodel)
+    objective <- match.arg(objective)
+    if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
+
+    nuggetkriging_fit(object, y, X,
+                    regmodel,
+                    normalize,
+                    optim ,
+                    objective,
+                    parameters)
+
+    invisible(NULL)
+}
 
 ## ****************************************************************************
 #' Predict from a \code{NuggetKriging} object.

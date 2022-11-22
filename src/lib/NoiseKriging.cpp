@@ -74,7 +74,7 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::colvec& y,
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
 
   make_Cov(covType);
-  fit(y, X, noise, regmodel, normalize, optim, objective, parameters);
+  fit(y, noise, X, regmodel, normalize, optim, objective, parameters);
 }
 
 LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier) : NoiseKriging{other} {}

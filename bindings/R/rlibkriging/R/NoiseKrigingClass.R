@@ -78,17 +78,22 @@
 #' s <- simulate(k, nsim = 10, seed = 123, x = x)
 #' 
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
-NoiseKriging <- function(y, noise, X, kernel,
+NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                     regmodel = c("constant", "linear", "interactive"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
-                    objective = c("LL", "LMP"),
+                    objective = c("LL"),
                     parameters = NULL) {
 
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
-    nk <- new_NoiseKriging(y = y, noise = noise, X = X, kernel = kernel,
+    if (is.character(y) && is.null(X) && is.null(noise) && is.null(kernel)) # just first arg for kernel, without naming
+        nk <- new_NoiseKriging(kernel = y)
+    else if (is.null(y) && is.null(X) && !is.null(kernel))
+        nk <- new_NoiseKriging(kernel = kernel)
+    else
+        nk <- new_NoiseKrigingFit(y = y, noise = noise, X = X, kernel = kernel,
                       regmodel = regmodel,
                       normalize = normalize,
                       optim = optim,
@@ -275,7 +280,6 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 #' k
 print.NoiseKriging <- function(x, ...) {
     if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
-    k=noisekriging_model(x)
     p = noisekriging_summary(x)
     cat(p)
     invisible(p)
@@ -283,6 +287,91 @@ print.NoiseKriging <- function(x, ...) {
 
 ## setMethod("print", "NoiseKriging", print.NoiseKriging)
 
+## ****************************************************************************
+#' Fit \code{NoiseKriging} object on given data.
+#'
+#' The hyper-parameters (variance and vector of correlation ranges)
+#' are estimated thanks to the optimization of a criterion given by
+#' \code{objective}, using the method given in \code{optim}.
+#' 
+#' @title Fit Method for a \code{NoiseKriging} Object
+#' 
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' 
+#' @param object S3 NoiseKriging object.
+#' 
+#' @param y Numeric vector of response values. 
+#' 
+#' @param noise Numeric vector of response variances. 
+#'
+#' @param X Numeric matrix of input design.
+#'
+#' @param kernel Character defining the covariance model:
+#'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
+#'
+#' @param regmodel Universal NoiseKriging linear trend.
+#'
+#' @param normalize Logical. If \code{TRUE} both the input matrix
+#'     \code{X} and the response \code{y} in normalized to take
+#'     values in the interval \eqn{[0, 1]}.
+#'
+#' @param optim Character giving the Optimization method used to fit
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"}, 
+#'     the later simply keeping
+#'     the values given in \code{parameters}. The method
+#'     \code{"BFGS"} uses the gradient of the objective.
+#'
+#' @param objective Character giving the objective function to
+#'     optimize. Possible values are: \code{"LL"} for the
+#'     Log-Likelihood.
+#' 
+#' @param parameters Initial values for the hyper-parameters. When
+#'     provided this must be named list with elements \code{"sigma2"}
+#'     and \code{"theta"} containing the initial value(s) for the
+#'     variance and for the range parameters. If \code{theta} is a
+#'     matrix with more than one row, each row is used as a starting
+#'     point for optimization.
+#' 
+#' @param ... Ignored.
+#' 
+#' @return No return value. NoiseKriging object argument is modified.
+#' 
+#' @method fit NoiseKriging
+#' @export
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' plot(f)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
+#' points(X, y, col = "blue", pch = 16)
+#' 
+#' k <- NoiseKriging("matern3_2")
+#' print(k)
+#' 
+#' fit(k,y,noise=(X/10)^2,X)
+#' print(k)
+fit.NoiseKriging <- function(object, y, noise, X,
+                    regmodel = c("constant", "linear", "interactive"),
+                    normalize = FALSE,
+                    optim = c("BFGS", "none"),
+                    objective = c("LL"),
+                    parameters = NULL) {
+
+    regmodel <- match.arg(regmodel)
+    objective <- match.arg(objective)
+    if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
+
+    noisekriging_fit(object, y, noise, X,
+                    regmodel,
+                    normalize,
+                    optim ,
+                    objective,
+                    parameters)
+
+    invisible(NULL)
+}
 
 ## ****************************************************************************
 #' Predict from a \code{NoiseKriging} object.
@@ -424,8 +513,8 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' Update a \code{NoiseKriging} model object with new points
 #' 
 #' @title Update a \code{NoiseKriging} Object with New Points
+#' 
 #' @author Yann Richet \email{yann.richet@irsn.fr}
-#'
 #' 
 #' @param object S3 NoiseKriging object.
 #'
