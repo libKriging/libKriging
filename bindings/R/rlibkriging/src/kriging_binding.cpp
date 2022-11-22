@@ -28,14 +28,13 @@ Rcpp::List new_Kriging(std::string kernel) {
 
 // [[Rcpp::export]]
 Rcpp::List new_KrigingFit(arma::vec y,
-                       arma::mat X,
-                       std::string kernel,
-                       std::string regmodel = "constant",
-                       bool normalize = false,
-                       std::string optim = "BFGS",
-                       std::string objective = "LL",
-                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
-
+                          arma::mat X,
+                          std::string kernel,
+                          std::string regmodel = "constant",
+                          bool normalize = false,
+                          std::string optim = "BFGS",
+                          std::string objective = "LL",
+                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
     Rcpp::List params(parameters);
@@ -118,15 +117,15 @@ Rcpp::List new_KrigingFit(arma::vec y,
 
 // [[Rcpp::export]]
 void kriging_fit(Rcpp::List k,
-                       arma::vec y,
-                       arma::mat X,
-                       std::string regmodel = "constant",
-                       bool normalize = false,
-                       std::string optim = "BFGS",
-                       std::string objective = "LL",
-                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                 arma::vec y,
+                 arma::mat X,
+                 std::string regmodel = "constant",
+                 bool normalize = false,
+                 std::string optim = "BFGS",
+                 std::string objective = "LL",
+                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   if (!k.inherits("Kriging"))
-  Rcpp::stop("Input must be a Kriging object.");
+    Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);

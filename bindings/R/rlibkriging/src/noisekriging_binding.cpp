@@ -28,15 +28,14 @@ Rcpp::List new_NoiseKriging(std::string kernel) {
 
 // [[Rcpp::export]]
 Rcpp::List new_NoiseKrigingFit(arma::vec y,
-                            arma::vec noise,
-                            arma::mat X,
-                            std::string kernel,
-                            std::string regmodel = "constant",
-                            bool normalize = false,
-                            std::string optim = "BFGS",
-                            std::string objective = "LL",
-                            Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
-
+                               arma::vec noise,
+                               arma::mat X,
+                               std::string kernel,
+                               std::string regmodel = "constant",
+                               bool normalize = false,
+                               std::string optim = "BFGS",
+                               std::string objective = "LL",
+                               Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
     Rcpp::List params(parameters);
@@ -95,21 +94,21 @@ Rcpp::List new_NoiseKrigingFit(arma::vec y,
   }
 
   NoiseKriging* ok = new NoiseKriging(
-          std::move(y),
-          std::move(noise),
-          std::move(X),
-          kernel,
-          Trend::fromString(regmodel),
-          normalize,
-          optim,
-          objective,
-          NoiseKriging::Parameters{
-              (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
-              _parameters["is_sigma2_estim"],
-              (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-              _parameters["is_theta_estim"],
-              (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
-              _parameters["is_beta_estim"]});
+      std::move(y),
+      std::move(noise),
+      std::move(X),
+      kernel,
+      Trend::fromString(regmodel),
+      normalize,
+      optim,
+      objective,
+      NoiseKriging::Parameters{
+          (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+          _parameters["is_sigma2_estim"],
+          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+          _parameters["is_theta_estim"],
+          (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+          _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(ok);
 
@@ -119,19 +118,18 @@ Rcpp::List new_NoiseKrigingFit(arma::vec y,
   return obj;
 }
 
-
 // [[Rcpp::export]]
 void noisekriging_fit(Rcpp::List k,
-                       arma::vec y,
-                       arma::vec noise,
-                       arma::mat X,
-                       std::string regmodel = "constant",
-                       bool normalize = false,
-                       std::string optim = "BFGS",
-                       std::string objective = "LL",
-                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                      arma::vec y,
+                      arma::vec noise,
+                      arma::mat X,
+                      std::string regmodel = "constant",
+                      bool normalize = false,
+                      std::string optim = "BFGS",
+                      std::string objective = "LL",
+                      Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
   if (!k.inherits("NoiseKriging"))
-  Rcpp::stop("Input must be a NoiseKriging object.");
+    Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
@@ -193,21 +191,20 @@ void noisekriging_fit(Rcpp::List k,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  impl_ptr->fit(
-      std::move(y),
-      std::move(noise),
-      std::move(X),
-      Trend::fromString(regmodel),
-      normalize,
-      optim,
-      objective,
-      NoiseKriging::Parameters{
-              (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
-              _parameters["is_sigma2_estim"],
-              (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-              _parameters["is_theta_estim"],
-              (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
-              _parameters["is_beta_estim"]});
+  impl_ptr->fit(std::move(y),
+                std::move(noise),
+                std::move(X),
+                Trend::fromString(regmodel),
+                normalize,
+                optim,
+                objective,
+                NoiseKriging::Parameters{
+                    (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+                    _parameters["is_sigma2_estim"],
+                    (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+                    _parameters["is_theta_estim"],
+                    (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+                    _parameters["is_beta_estim"]});
 }
 
 // [[Rcpp::export]]

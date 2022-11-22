@@ -1655,7 +1655,7 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
     });
   };
 
-  if (m_X.is_empty() || m_X.n_rows == 0) { // not yet fitted
+  if (m_X.is_empty() || m_X.n_rows == 0) {  // not yet fitted
     oss << "* covariance:\n";
     oss << "  * kernel: " << m_covType << "\n";
   } else {
