@@ -15,15 +15,140 @@
 #include "retrofit_utils.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List new_NuggetKriging(arma::vec y,
-                             arma::mat X,
-                             std::string kernel,
-                             std::string regmodel = "constant",
-                             bool normalize = false,
-                             std::string optim = "BFGS",
-                             std::string objective = "LL",
-                             Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+Rcpp::List new_NuggetKriging(std::string kernel) {
   NuggetKriging* ok = new NuggetKriging(kernel);
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
+
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "NuggetKriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
+Rcpp::List new_NuggetKrigingFit(arma::vec y,
+                                arma::mat X,
+                                std::string kernel,
+                                std::string regmodel = "constant",
+                                bool normalize = false,
+                                std::string optim = "BFGS",
+                                std::string objective = "LL",
+                                Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+  Rcpp::List _parameters;
+  if (parameters.isNotNull()) {
+    Rcpp::List params(parameters);
+    _parameters = Rcpp::List::create();
+    if (params.containsElementNamed("sigma2")) {
+      _parameters.push_back(params["sigma2"], "sigma2");
+      _parameters.push_back(true, "has_sigma2");
+      _parameters.push_back(!(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]),
+                            "is_sigma2_estim");
+    } else {
+      //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_sigma2");
+      _parameters.push_back(-1, "sigma2");
+      _parameters.push_back(false, "has_sigma2");
+      _parameters.push_back(true, "is_sigma2_estim");
+    }
+    if (params.containsElementNamed("nugget")) {
+      _parameters.push_back(params["nugget"], "nugget");
+      _parameters.push_back(true, "has_nugget");
+      _parameters.push_back(!(params.containsElementNamed("is_nugget_estim") && !params["is_nugget_estim"]),
+                            "is_nugget_estim");
+    } else {
+      //_parameters.push_back(Rcpp::runif(1), "nugget"); // turnaround mingw bug:
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_nugget");
+      _parameters.push_back(-1, "nugget");
+      _parameters.push_back(false, "has_nugget");
+      _parameters.push_back(true, "is_nugget_estim");
+    }
+    if (params.containsElementNamed("theta")) {
+      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
+      _parameters.push_back(true, "has_theta");
+      _parameters.push_back(!(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]),
+                            "is_theta_estim");
+    } else {
+      // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
+      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols,
+      // r.begin()), "theta"); _parameters.push_back(true, "has_theta");
+      _parameters.push_back(Rcpp::NumericMatrix(0, 0), "theta");
+      _parameters.push_back(false, "has_theta");
+      _parameters.push_back(true, "is_theta_estim");
+    }
+    if (params.containsElementNamed("beta")) {
+      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["beta"]), "beta");
+      _parameters.push_back(true, "has_beta");
+      _parameters.push_back(!(params.containsElementNamed("is_beta_estim") && !params["is_beta_estim"]),
+                            "is_beta_estim");
+    } else {
+      _parameters.push_back(Rcpp::NumericVector(0), "beta");
+      _parameters.push_back(false, "has_beta");
+      _parameters.push_back(true, "is_beta_estim");
+    }
+  } else {
+    // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
+    // https://github.com/msys2/MINGW-packages/issues/5019
+    _parameters = Rcpp::List::create(  // Rcpp::Named("sigma2") = Rcpp::runif(1),
+                                       // Rcpp::Named("has_sigma2") = true,
+        Rcpp::Named("sigma2") = -1,
+        Rcpp::Named("has_sigma2") = false,
+        Rcpp::Named("is_sigma2_estim") = true,
+        // Rcpp::Named("nugget") = Rcpp::runif(1),
+        // Rcpp::Named("has_nugget") = true,
+        Rcpp::Named("nugget") = -1,
+        Rcpp::Named("has_nugget") = false,
+        Rcpp::Named("is_nugget_estim") = true,
+        // Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
+        // Rcpp::Named("has_theta") = true,
+        Rcpp::Named("theta") = Rcpp::NumericMatrix(0, 0),
+        Rcpp::Named("has_theta") = false,
+        Rcpp::Named("is_theta_estim") = true,
+        Rcpp::Named("beta") = Rcpp::NumericVector(0),
+        Rcpp::Named("has_beta") = false,
+        Rcpp::Named("is_beta_estim") = true);
+  }
+
+  NuggetKriging* ok = new NuggetKriging(
+      std::move(y),
+      std::move(X),
+      kernel,
+      Trend::fromString(regmodel),
+      normalize,
+      optim,
+      objective,
+      NuggetKriging::Parameters{
+          (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
+          _parameters["is_nugget_estim"],
+          (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+          _parameters["is_sigma2_estim"],
+          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+          _parameters["is_theta_estim"],
+          (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+          _parameters["is_beta_estim"]});
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
+
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "NuggetKriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
+void nuggetkriging_fit(Rcpp::List k,
+                       arma::vec y,
+                       arma::mat X,
+                       std::string regmodel = "constant",
+                       bool normalize = false,
+                       std::string optim = "BFGS",
+                       std::string objective = "LL",
+                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
@@ -99,28 +224,21 @@ Rcpp::List new_NuggetKriging(arma::vec y,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  ok->fit(std::move(y),
-          std::move(X),
-          Trend::fromString(regmodel),
-          normalize,
-          optim,
-          objective,
-          NuggetKriging::Parameters{
-              (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
-              _parameters["is_nugget_estim"],
-              (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
-              _parameters["is_sigma2_estim"],
-              (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-              _parameters["is_theta_estim"],
-              (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
-              _parameters["is_beta_estim"]});
-
-  Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
-
-  Rcpp::List obj;
-  obj.attr("object") = impl_ptr;
-  obj.attr("class") = "NuggetKriging";
-  return obj;
+  impl_ptr->fit(std::move(y),
+                std::move(X),
+                Trend::fromString(regmodel),
+                normalize,
+                optim,
+                objective,
+                NuggetKriging::Parameters{
+                    (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
+                    _parameters["is_nugget_estim"],
+                    (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+                    _parameters["is_sigma2_estim"],
+                    (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+                    _parameters["is_theta_estim"],
+                    (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+                    _parameters["is_beta_estim"]});
 }
 
 // [[Rcpp::export]]

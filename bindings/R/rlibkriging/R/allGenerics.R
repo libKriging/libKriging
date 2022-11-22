@@ -48,7 +48,7 @@ as.km <- function(x, ...) {
 ##'
 ##' @return The Leave-One-Out sum of squares.
 ##' @export
-leaveOneOutFun <- function (object, ...) {
+leaveOneOutFun <- function(object, ...) {
     UseMethod("leaveOneOutFun")
 }
 
@@ -63,7 +63,7 @@ leaveOneOutFun <- function (object, ...) {
 ##'
 ##' @return The log-likelihood.
 ##' @export
-logLikelihoodFun <- function (object, ...) {
+logLikelihoodFun <- function(object, ...) {
     UseMethod("logLikelihoodFun")
 }
 
@@ -78,7 +78,7 @@ logLikelihoodFun <- function (object, ...) {
 ##'
 ##' @return The log-marginal posterior.
 ##' @export
-logMargPostFun <- function (object, ...) {
+logMargPostFun <- function(object, ...) {
     UseMethod("logMargPostFun")
 }
 
@@ -103,7 +103,7 @@ setGeneric(name = "leaveOneOut",
 ##'
 ##' @return The Leave-One-Out sum of squares.
 ##' @export
-leaveOneOut <- function (object, ...) {
+leaveOneOut <- function(object, ...) {
     UseMethod("leaveOneOut")
 }
 
@@ -117,7 +117,7 @@ leaveOneOut <- function (object, ...) {
 ##'
 ##' @return The log-likelihood.
 ##' @export
-logLikelihood <- function (object, ...) {
+logLikelihood <- function(object, ...) {
     UseMethod("logLikelihood")
 }
 
@@ -132,7 +132,7 @@ logLikelihood <- function (object, ...) {
 ##'
 ##' @return The log-marginal posterior.
 ##' @export
-logMargPost <- function (object, ...) {
+logMargPost <- function(object, ...) {
     UseMethod("logMargPost")
 }
 
@@ -147,6 +147,21 @@ logMargPost <- function (object, ...) {
 ##'
 ##' @return The copied object.
 ##' @export
-copy <- function (object, ...) {
+copy <- function(object, ...) {
     UseMethod("copy")
+}
+
+## *****************************************************************************
+##' Fit a model given in
+##' \code{object}.
+##'
+##' @title Fit model on data.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function
+##'
+##' @return No return value. Kriging object argument is modified.
+##' @export
+fit <- function(object, ...) {
+    UseMethod("fit")
 }
