@@ -875,35 +875,40 @@ LIBKRIGING_EXPORT std::string NoiseKriging::summary() const {
     });
   };
 
-  oss << "* data";
-  oss << ((m_normalize) ? " (normalized): " : ": ") << m_X.n_rows << "x";
-  arma::rowvec Xmins = arma::min(m_X, 0);
-  arma::rowvec Xmaxs = arma::max(m_X, 0);
-  for (arma::uword i = 0; i < m_X.n_cols; i++) {
-    oss << "[" << Xmins[i] << "," << Xmaxs[i] << "]";
-    if (i < m_X.n_cols - 1)
-      oss << ",";
+  if (m_X.is_empty() || m_X.n_rows == 0) { // not yet fitted
+    oss << "* covariance:\n";
+    oss << "  * kernel: " << m_covType << "\n";
+  } else {
+    oss << "* data";
+    oss << ((m_normalize) ? " (normalized): " : ": ") << m_X.n_rows << "x";
+    arma::rowvec Xmins = arma::min(m_X, 0);
+    arma::rowvec Xmaxs = arma::max(m_X, 0);
+    for (arma::uword i = 0; i < m_X.n_cols; i++) {
+      oss << "[" << Xmins[i] << "," << Xmaxs[i] << "]";
+      if (i < m_X.n_cols - 1)
+        oss << ",";
+    }
+    oss << " -> " << m_y.n_elem << "x[" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
+    oss << "* trend " << Trend::toString(m_regmodel);
+    oss << ((m_est_beta) ? " (est.): " : ": ");
+    colvec_printer(m_beta);
+    oss << "\n";
+    oss << "* variance";
+    oss << ((m_est_sigma2) ? " (est.): " : ": ");
+    oss << m_sigma2;
+    oss << "\n";
+    oss << "* covariance:\n";
+    oss << "  * kernel: " << m_covType << "\n";
+    oss << "  * range";
+    oss << ((m_est_theta) ? " (est.): " : ": ");
+    colvec_printer(m_theta);
+    oss << "\n";
+    oss << "  * noise: ";
+    colvec_printer(m_noise);
+    oss << "\n";
+    oss << "  * fit:\n";
+    oss << "    * objective: " << m_objective << "\n";
+    oss << "    * optim: " << m_optim << "\n";
   }
-  oss << " -> " << m_y.n_elem << "x[" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
-  oss << "* trend " << Trend::toString(m_regmodel);
-  oss << ((m_est_beta) ? " (est.): " : ": ");
-  colvec_printer(m_beta);
-  oss << "\n";
-  oss << "* variance";
-  oss << ((m_est_sigma2) ? " (est.): " : ": ");
-  oss << m_sigma2;
-  oss << "\n";
-  oss << "* covariance:\n";
-  oss << "  * kernel: " << m_covType << "\n";
-  oss << "  * range";
-  oss << ((m_est_theta) ? " (est.): " : ": ");
-  colvec_printer(m_theta);
-  oss << "\n";
-  oss << "  * noise: ";
-  colvec_printer(m_noise);
-  oss << "\n";
-  oss << "  * fit:\n";
-  oss << "    * objective: " << m_objective << "\n";
-  oss << "    * optim: " << m_optim << "\n";
   return oss.str();
 }
