@@ -1,5 +1,43 @@
 library(testthat)
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+
+
+context("Check predict args (T,F) are consistent")
+
+f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+plot(f)
+n <- 5
+set.seed(123)
+X <- as.matrix(runif(n))
+y = f(X)
+points(X,y)
+
+r <- Kriging(y,X,"matern3_2","constant",FALSE,"none","LL",
+               parameters=list(sigma2=0.2,theta=matrix(0.2)))
+
+x =seq(0,1,,101)
+pred_def_mean = r$predict(x)$mean
+pred_def_sd = r$predict(x)$stdev
+lines(x,pred_def_mean,col='blue')
+
+pred_TFF_mean = r$predict(x,T,F,F)$mean
+pred_TFF_sd = r$predict(x,T,F,F)$stdev
+lines(x,pred_TFF_mean,col='red')
+test_that(desc="predict(.,T,F,F) is is the same that default one", 
+          expect_equal(pred_TFF_mean,pred_def_mean))
+
+pred_TTF_mean = r$predict(x,T,T,F)$mean
+pred_TTF_sd = r$predict(x,T,T,F)$stdev
+lines(x,pred_TTF_mean,col='red')
+test_that(desc="predict(.,T,T,F) is is the same that default one", 
+          expect_equal(pred_TTF_mean,pred_def_mean))
+
+pred_TTT_mean = r$predict(x,T,T,T)$mean
+pred_TTT_sd = r$predict(x,T,T,T)$stdev
+lines(x,pred_TTT_mean,col='red')
+test_that(desc="predict(.,T,T,T) is is the same that default one", 
+          expect_equal(pred_TTT_mean,pred_def_mean))
+
 
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   context(paste0("Check predict 1D for kernel ",kernel))
