@@ -172,6 +172,11 @@ jobs:
         shell: bash
         run: .travis-ci/${BUILD_NAME}/install.sh
 
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
       - name: before_script
         shell: bash
         run: .travis-ci/common/before_script.sh
