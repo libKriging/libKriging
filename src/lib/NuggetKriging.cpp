@@ -860,8 +860,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         double sol_to_b_theta
             = Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
         double sol_to_b_alpha = Optim::reparametrize
-                                    ? abs(gamma_tmp.at(d) - gamma_upper.at(d))
-                                    : abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider alpha lower bound
+                                    ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
+                                    : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider alpha lower bound
         double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
         if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
             && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
