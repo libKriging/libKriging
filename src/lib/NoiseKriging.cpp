@@ -453,7 +453,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
     // see https://github.com/cran/DiceKriging/blob/547135515e32fa0a37260b9cd01631c1b7a69a5b/R/kmNuggets.init.R#L30
-    double sigma2_variogram = 0.5 * arma::mean(dy2.elem(arma::find(dX2 > arma::median(dX2))));
+    double sigma2_variogram = 0.5 * arma::mean(dy2.elem(arma::find(dX2 >= arma::median(dX2))));
     double sigma2_lower = 0.1 * (sigma2_variogram - arma::max(m_noise));
     double sigma2_upper = 10 * (sigma2_variogram - arma::min(m_noise));
     arma::vec sigma20;
