@@ -538,9 +538,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
         double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
         double sol_to_b_theta
             = Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
-        double sol_to_b_sigma2 = Optim::reparametrize
-                                     ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
-                                     : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper bound
+        double sol_to_b_sigma2
+            = Optim::reparametrize ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
+                                   : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper bound
         double sol_to_b = sol_to_b_theta < sol_to_b_sigma2 ? sol_to_b_theta : sol_to_b_sigma2;
         if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
             && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
