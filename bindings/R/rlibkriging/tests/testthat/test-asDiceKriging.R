@@ -16,7 +16,7 @@ d <- ncol(X)
 km1 <- DiceKriging::km(design = X, response = y, covtype = "gauss",
          formula = ~1, estim.method = "LOO",
          parinit = c(.15), control = list(trace = FALSE))
-rlibkriging::KM1 <- KM(design = X, response = y, covtype = "gauss",
+KM1 <- rlibkriging::KM(design = X, response = y, covtype = "gauss",
           formula = ~1, estim.method = "LOO",
           parinit = c(.15))
 

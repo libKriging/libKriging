@@ -1,5 +1,5 @@
 rlibkriging:::linalg_set_num_nugget(1E-10)
-rlibkriging:::linalg_set_chol_warning(true)
+rlibkriging:::linalg_set_chol_warning(TRUE)
 default_nugget = rlibkriging:::linalg_get_num_nugget()
 
 #############################################################
