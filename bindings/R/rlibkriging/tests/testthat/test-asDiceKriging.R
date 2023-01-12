@@ -13,7 +13,7 @@ y <- f(X)
 d <- ncol(X)
 
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
-DiceKriging::km1 <- km(design = X, response = y, covtype = "gauss",
+km1 <- DiceKriging::km(design = X, response = y, covtype = "gauss",
          formula = ~1, estim.method = "LOO",
          parinit = c(.15), control = list(trace = FALSE))
 rlibkriging::KM1 <- KM(design = X, response = y, covtype = "gauss",
