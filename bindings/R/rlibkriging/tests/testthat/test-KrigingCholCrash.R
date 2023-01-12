@@ -1,7 +1,5 @@
-library(testthat)
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#packageDescription("rlibkriging")
 rlibkriging:::linalg_set_num_nugget(1E-10)
+rlibkriging:::linalg_set_chol_warning(true)
 default_nugget = rlibkriging:::linalg_get_num_nugget()
 
 #############################################################

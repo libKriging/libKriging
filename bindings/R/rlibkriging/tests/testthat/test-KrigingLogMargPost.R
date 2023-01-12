@@ -1,5 +1,3 @@
-library(testthat)
-
 kernel_type = function(kernel) {
   if (kernel=="matern3_2") return("matern_3_2")
   if (kernel=="matern5_2") return("matern_5_2")

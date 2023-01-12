@@ -27,6 +27,11 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
 }
 
 bool LinearAlgebra::warn_chol = false;
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
+  LinearAlgebra::warn_chol = warn;
+};
+
 int LinearAlgebra::max_inc_choldiag = 10;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate

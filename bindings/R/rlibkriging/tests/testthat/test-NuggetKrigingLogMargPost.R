@@ -1,7 +1,3 @@
-library(testthat)
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#rlibkriging:::optim_log(3)
-
 kernel="gauss"
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   context(paste0("Check logMargPost for kernel ",kernel))

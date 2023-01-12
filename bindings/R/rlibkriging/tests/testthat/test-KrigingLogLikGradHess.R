@@ -1,5 +1,3 @@
-library(testthat)
-
 #kernel="matern3_2" #
 for (kernel in c("gauss","exp")){ # NOT YET WORKING: ,"matern3_2","matern5_2")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))

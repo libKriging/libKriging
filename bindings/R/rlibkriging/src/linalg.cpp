@@ -27,3 +27,10 @@ arma::mat linalg_chol_safe(arma::mat X) {
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->safe_chol_lower(X);
 }
+
+// [[Rcpp::export]]
+void linalg_set_chol_warning(bool warn) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  impl_ptr->set_chol_warning(warn);
+}
