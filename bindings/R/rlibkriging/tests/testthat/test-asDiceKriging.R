@@ -1,9 +1,3 @@
-library(testthat)
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-
-## install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
-## library(rlibkriging)
-##
 ## Changes by Yves remove the references to the packages as in 'rlibkriging::simulate',
 ## because simulate is not exported as such from rlibkriging
 
@@ -18,13 +12,11 @@ X <- cbind(runif(n))
 y <- f(X)
 d <- ncol(X)
 
-library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
-km1 <- km(design = X, response = y, covtype = "gauss",
+DiceKriging::km1 <- km(design = X, response = y, covtype = "gauss",
          formula = ~1, estim.method = "LOO",
          parinit = c(.15), control = list(trace = FALSE))
-library(rlibkriging)
-KM1 <- KM(design = X, response = y, covtype = "gauss",
+rlibkriging::KM1 <- KM(design = X, response = y, covtype = "gauss",
           formula = ~1, estim.method = "LOO",
           parinit = c(.15))
 
@@ -39,19 +31,13 @@ test_that("m1.argmax(loo) == KM1.argmax(loo)",
 
 plot(Vectorize(function(.t) DiceKriging::leaveOneOutFun(param = as.numeric(.t), model = km1)))
 abline(v = km1@covariance@range.val)
-plot(Vectorize(function(.t) leaveOneOutFun(KM1@Kriging, as.numeric(.t))),
+plot(Vectorize(function(.t) rlibkriging::leaveOneOutFun(KM1@Kriging, as.numeric(.t))),
      add = TRUE, col = 'red')
 abline(v = KM1@covariance@range.val, col = 'red')
 
 
 
 ##########################################################################
-
-library(testthat)
-
-## install.packages("../rlibkriging_0.1-10_R_x86_64-pc-linux-gnu.tar.gz",
-##                  repos = NULL)
-## library(rlibkriging)
 
 context("# A 2D example - Branin-Hoo function")
 
@@ -66,18 +52,18 @@ branin <- function (x) {
 d <- 2; n <- 16
 design.fact <- expand.grid(x1 = seq(0, 1, length.out = 4),
                            x2 = seq(0, 1, length.out = 4))
-y <- apply(design.fact, 1, branin) 
+y <- apply(design.fact, 1, DiceKriging::branin) 
 
 library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
-km1 <- km(design = design.fact, response = y, covtype = "gauss",
+km1 <- DiceKriging::km(design = design.fact, response = y, covtype = "gauss",
           parinit = c(.5, 1), control = list(trace = FALSE))
-KM1 <- KM(design = design.fact, response = y, covtype = "gauss",
+KM1 <- rlibkriging::KM(design = design.fact, response = y, covtype = "gauss",
           parinit = c(.5, 1))
 
 test_that("m1.logLikFun == as_m1.logLikFun",
-          expect_true(logLikFun(km1@covariance@range.val, km1) ==
-                      logLikFun(km1@covariance@range.val, KM1)))
+          expect_true(DiceKriging::logLikFun(km1@covariance@range.val, km1) ==
+                      DiceKriging::logLikFun(km1@covariance@range.val, KM1)))
 
 test_that("m1.argmax(logLig) == as_m1.argmax(logLig)", 
           expect_equal(km1@covariance@range.val,
@@ -86,11 +72,11 @@ test_that("m1.argmax(logLig) == as_m1.argmax(logLig)",
 
 ll <- function(Theta){
     apply(Theta, 1,
-          function(theta) logLikFun(theta, km1))
+          function(theta) DiceKriging::logLikFun(theta, km1))
 }
 as_ll <- function(Theta){
     apply(Theta, 1,
-          function(theta) logLikelihoodFun(KM1@Kriging, theta)$logLikelihood[1])
+          function(theta) rlibkriging::logLikelihoodFun(KM1@Kriging, theta)$logLikelihood[1])
 }
 t <- seq(from = 0.01, to = 2, length.out = 51)
 ttg <- expand.grid(t, t)
@@ -105,10 +91,10 @@ points(KM1@covariance@range.val[1],
        KM1@covariance@range.val[2],
        col = 'red')
 
-pred <- predict(km1,
+pred <- DiceKriging::predict(km1,
                 newdata = matrix(.5, ncol = 2), type = "UK",
                 checkNames = FALSE, light.return = TRUE)
-Pred <- predict(KM1,
+Pred <- DiceKriging::predict(KM1,
                 newdata = matrix(.5, ncol = 2), type = "UK",
                 checkNames = FALSE, light.return = TRUE)
 
@@ -198,16 +184,16 @@ x <- matrix(x,ncol=d)
 test_that("Consitency of 'DiceKriging' and 'rlibkriging' 'predict' methods",
           expect_equal(DiceKriging::predict(km2,newdata = x, type = "UK",
                                             checkNames = FALSE)$mean[1],
-                       predict(KM2, newdata = x, type = "UK")$mean[1],
+                       DiceKriging::predict(KM2, newdata = x, type = "UK")$mean[1],
                        tol = 0.01))
 
 x <- matrix(X[2, ], ncol = d) + 0.001
 n <-  1000
 set.seed(123)
-sims_km2 <- simulate(km2, nsim = n,newdata = x,
+sims_km2 <- DiceKriging::simulate(km2, nsim = n,newdata = x,
                      checkNames = FALSE, cond = TRUE,
                      nugget.sim=1e-10)
-sims_KM2 <- simulate(KM2, nsim = n, newdata = x,
+sims_KM2 <- DiceKriging::simulate(KM2, nsim = n, newdata = x,
                      checkNames = FALSE , cond = TRUE)
 t <- t.test(sims_km2, sims_KM2, var.equal = FALSE)
 
@@ -216,11 +202,11 @@ if (t$p.value < 0.05) {
     points(X, y)
     xx <-  seq(from = 0, to = 1, length.out = 101)
     for (i in 1:100) {
-        lines(xx, simulate(km2, nsim = 1, newdata = xx,
+        lines(xx, DiceKriging::simulate(km2, nsim = 1, newdata = xx,
                            checkNames = FALSE, cond = TRUE,
                            nugget.sim = 1e-10),
               col = rgb(0, 0, 1, 0.02))
-        lines(xx, simulate(KM2, nsim = 1, newdata = xx,
+        lines(xx, DiceKriging::simulate(KM2, nsim = 1, newdata = xx,
                            checkNames = FALSE, cond=TRUE,
                            nugget.sim = 0),
               col = rgb(1, 0, 0, 0.02))
@@ -253,11 +239,11 @@ test_args <-  function(formula, design, response ,covtype, estim.method ) {
     set.seed(123)
     
   parinit <- runif(ncol(design))
-    k <<- km(formula = formula, design = design,
+    k <<- DiceKriging::km(formula = formula, design = design,
              response = response, covtype = covtype,
              estim.method = estim.method,
              parinit = parinit, control = list(trace = FALSE))
-    as_k <<- KM(formula = formula, design = design,
+    as_k <<- rlibkriging::KM(formula = formula, design = design,
                 response = response, covtype = covtype,
                 estim.method = estim.method,
                 parinit = parinit)
@@ -291,15 +277,15 @@ test_args <-  function(formula, design, response ,covtype, estim.method ) {
     test_that("DiceKriging::predict == rlibkriging::predict",
               expect_equal(DiceKriging::predict(km2, newdata = x, type = "UK",
                                                 checkNames = FALSE)$mean[1],
-                           predict(KM2, newdata = x, type = "UK")$mean[1],
+                           DiceKriging::predict(KM2, newdata = x, type = "UK")$mean[1],
                            tol = 0.01))
     
     n <- 1000
     set.seed(123)
-    sims_km2 <<- simulate(km2, nsim = n, newdata = x,
+    sims_km2 <<- DiceKriging::simulate(km2, nsim = n, newdata = x,
                           checkNames = FALSE, cond = TRUE,
                           nugget.sim = 1e-10)
-    sims_KM2 <<- simulate(KM2, nsim = n,newdata = x,
+    sims_KM2 <<- DiceKriging::simulate(KM2, nsim = n,newdata = x,
                           checkNames = FALSE, cond = TRUE)
     t = t.test(t(sims_km2), sims_KM2, var.equal = FALSE , paired = FALSE)
     print(t)
