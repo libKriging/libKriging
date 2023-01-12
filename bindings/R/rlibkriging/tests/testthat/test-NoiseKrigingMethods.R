@@ -1,9 +1,3 @@
-library(testthat)
-
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-# install.packages("../rlib0.1-10_R_x86_64-pc-linux-gnu.tar.gz",repos=NULL)
-#library(rlibkriging)
-
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
   prod(sin(2*pi*( x * (seq(0,1,l=1+length(x))[-1])^2 )))

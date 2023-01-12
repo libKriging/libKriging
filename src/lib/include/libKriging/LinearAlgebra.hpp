@@ -14,6 +14,8 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static double get_num_nugget();
 
   static bool warn_chol;
+  LIBKRIGING_EXPORT static void set_chol_warning(bool warn);
+
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
   static arma::mat safe_chol_lower(arma::mat X, int warn);

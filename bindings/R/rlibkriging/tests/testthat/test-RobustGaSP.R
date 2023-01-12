@@ -1,5 +1,3 @@
-library(testthat)
-
 library(RobustGaSP)
 
 context("RobustGaSP / Fit: 1D")

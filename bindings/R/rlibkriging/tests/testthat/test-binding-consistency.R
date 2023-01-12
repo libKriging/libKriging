@@ -34,9 +34,6 @@ find_dir = function() {
   }
 }
 
-#library(testthat)
-#library(rlibkriging, lib = "/Users/pascal/haveneer/libKriging.perso/bindings/R/Rlibs")
-
 refpath = find_dir()
 print(paste0("Reference directory=", refpath))
 prefix = "data1-scal"

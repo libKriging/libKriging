@@ -1,9 +1,3 @@
-library(testthat)
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#rlibkriging:::optim_log(2)
-#rlibkriging:::optim_use_reparametrize(FALSE)
-#rlibkriging:::optim_set_theta_lower_factor(0.02)
-
 context("Fit: 1D")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
