@@ -864,7 +864,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
@@ -881,9 +881,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
             }
             return -ll;
-          }};
+          });
     } else {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
@@ -898,11 +898,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               *hess_out = -*hess_out;
             }
             return -ll;
-          }};
+          });
     }
   } else if (objective.compare("LOO") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
@@ -915,9 +915,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
             }
             return loo;
-          }};
+          });
     } else {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
@@ -928,13 +928,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
             //   *grad_out = *grad_out; // so not necessary
             //  }
             return loo;
-          }};
+          });
     }
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             // Change variable for opt: . -> 1/exp(.)
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
@@ -947,9 +947,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
             }
             return -lmp;
-          }};
+          });
     } else {
-      fit_ofn = CacheFunction{
+      fit_ofn = CacheFunction(
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
@@ -960,7 +960,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               *grad_out = -*grad_out;
             }
             return -lmp;
-          }};
+          });
     }
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
