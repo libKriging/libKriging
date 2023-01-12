@@ -3,6 +3,8 @@
 #include <tuple>
 #include "libKriging/CacheFunction.hpp"
 
+#ifndef LIBKRIGING_DISABLE_CACHE
+
 TEST_CASE("Cache of 0-arg function", "[core]") {
   auto f = []() -> double { return 1; };
 
@@ -188,3 +190,5 @@ TEST_CASE("Cache function behaves like std::function", "[core]") {
   REQUIRE(stat.total_hit == 2);
   REQUIRE(stat.cache_size == 2);
 }
+
+#endif /* LIBKRIGING_DISABLE_CACHE */

@@ -269,7 +269,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::OKModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_sigma2 = Optim::reparam_from(_gamma);
@@ -281,9 +281,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
           *grad_out = -Optim::reparam_from_deriv(_theta_sigma2, *grad_out);
         }
         return -ll;
-      }};
+      });
     } else {
-      fit_ofn = CacheFunction{[this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::OKModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::OKModel* okm_data) {
         const arma::vec _theta_sigma2 = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_sigma2 << arma::endl;
         double ll = this->_logLikelihood(_theta_sigma2, grad_out, okm_data);
@@ -293,7 +293,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
           *grad_out = -*grad_out;
         }
         return -ll;
-      }};
+      });
     }
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL)");

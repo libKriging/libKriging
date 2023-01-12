@@ -61,6 +61,8 @@ class CacheFunctionCommon {
 std::ostream& operator<<(std::ostream& o, const CacheFunctionCommon::CacheStat&);
 
 /* ----------------------------------------------------------------------------------------------------------------- */
+#ifndef LIBKRIGING_DISABLE_CACHE
+/* ----------------------------------------------------------------------------------------------------------------- */
 
 template <typename Callable, typename Signature, typename... Contexts>
 class CacheFunction {};
@@ -125,5 +127,19 @@ class CacheFunction<Callable, std::function<R(Args...)>, Contexts...> : public C
 
 template <typename F, typename... Contexts>
 CacheFunction(const F& f, const Contexts&...) -> CacheFunction<F, decltype(std::function{f}), Contexts...>;
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+#else /* LIBKRIGING_DISABLE_CACHE */
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+#define CacheFunction(x) (x)
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+#endif /* LIBKRIGING_DISABLE_CACHE */
+
+/* ----------------------------------------------------------------------------------------------------------------- */
 
 #endif  // LIBKRIGING_SRC_LIB_CACHE_HPP

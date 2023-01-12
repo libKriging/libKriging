@@ -307,6 +307,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LIBKRIGING_CXX_FLAGS}")
 
 #------------------------------------------------------
 
+# Workaround for AppleClang 10 in CRAN automated build
+if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11")
+    add_definitions(-DLIBKRIGING_DISABLE_CACHE)
+endif()
+
+#------------------------------------------------------
+
 # search for clang-tidy (while be used while adding library or executable)
 find_program(CLANG_TIDY clang-tidy)
 if (CLANG_TIDY)
