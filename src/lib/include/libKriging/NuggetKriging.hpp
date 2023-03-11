@@ -128,6 +128,9 @@ class NuggetKriging {
   static std::function<arma::vec(const arma::vec&)> reparam_to;
   static std::function<arma::vec(const arma::vec&)> reparam_from;
   static std::function<arma::vec(const arma::vec&, const arma::vec&)> reparam_from_deriv;
+  
+  static double alpha_lower;
+  static double alpha_upper;
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output

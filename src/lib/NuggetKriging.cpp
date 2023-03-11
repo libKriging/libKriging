@@ -489,26 +489,30 @@ LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
   return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false));
 }
 
-std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to
-= [](const arma::vec& _theta_alpha) { 
-  arma::vec _theta_malpha = _theta_alpha;
-  const arma::uword d = _theta_alpha.n_elem;
-  _theta_malpha.at(d) = 1- _theta_alpha.at(d);
-  return Optim::reparam_to(_theta_malpha); };
+    std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to
+    = [](const arma::vec& _theta_alpha) { 
+      arma::vec _theta_malpha = _theta_alpha;
+      const arma::uword d = _theta_alpha.n_elem-1;
+      _theta_malpha.at(d) = 1+alpha_lower- _theta_malpha.at(d);
+      return Optim::reparam_to(_theta_malpha); };
+    
+    std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from
+    = [](const arma::vec& _gamma) { 
+      arma::vec _theta_alpha = Optim::reparam_from(_gamma); 
+      const arma::uword d = _theta_alpha.n_elem-1;
+    _theta_alpha.at(d) = 1+alpha_lower- _theta_alpha.at(d);
+      return _theta_alpha; };
+    
+    std::function<arma::vec(const arma::vec&, const arma::vec&)> NuggetKriging::reparam_from_deriv
+    = [](const arma::vec& _theta_alpha, const arma::vec& _grad) { 
+      arma::vec D_theta_alpha = arma::conv_to<arma::colvec>::from(-_grad % _theta_alpha);
+      const arma::uword d = D_theta_alpha.n_elem-1;
+      D_theta_alpha.at(d) = (1+alpha_lower - _theta_alpha.at(d)) * _grad.at(d);
+    return D_theta_alpha; };
 
-std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from
-= [](const arma::vec& _gamma) { 
-  arma::vec _theta_alpha = Optim::reparam_from(_gamma); 
-  const arma::uword d = _theta_alpha.n_elem;
-  _theta_alpha.at(d) = 1- _theta_alpha.at(d);
-  return _theta_alpha; };
+    double NuggetKriging::alpha_upper = 1.0;
+    double NuggetKriging::alpha_lower = 1E-3;
 
-std::function<arma::vec(const arma::vec&, const arma::vec&)> NuggetKriging::reparam_from_deriv
-= [](const arma::vec& _theta_alpha, const arma::vec& _grad) { 
-  arma::vec D_theta_alpha = Optim::reparam_from_deriv(_theta_alpha, _grad);
-  const arma::uword d = D_theta_alpha.n_elem;
-  D_theta_alpha.at(d) = -D_theta_alpha.at(d);
-  return D_theta_alpha; };
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
  * @param X is n*d matrix of input
@@ -536,13 +540,24 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-        const arma::vec _theta_alpha = reparam_from(_gamma);
+        const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
-        // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
+        // DEBUG: if (Optim::log_level>3) arma::cout << "  > -ll: " << -ll << arma::endl;
         if (grad_out != nullptr) {
-          // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-          *grad_out = -reparam_from_deriv(_theta_alpha, *grad_out);
+          *grad_out = -NuggetKriging::reparam_from_deriv(_theta_alpha, *grad_out);
+          // DEBUG: 
+          //if (Optim::log_level>3) {
+          //  arma::cout << "  > grad -ll: " << *grad_out << arma::endl;
+          //  //// Check with numerical gradient:
+          //  //for (size_t i = 0; i <_gamma.n_elem; i++) {
+          //  //  arma::vec eps = arma::zeros(_gamma.n_elem);
+          //  //  eps(i) = 0.000001;
+          //  //  const arma::vec _theta_alpha_eps = reparam_from(_gamma + eps);
+          //  //  double ll_eps = this->_logLikelihood(_theta_alpha_eps, nullptr, okm_data);
+          //  //  arma::cout << "  > num_grad -ll: " << -(ll_eps - ll)/0.000001 << arma::endl;
+          //  //}
+          //}
         }
         return -ll;
       });
@@ -566,13 +581,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-        const arma::vec _theta_alpha = reparam_from(_gamma);
+        const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
-          *grad_out = -reparam_from_deriv(_theta_alpha, *grad_out);
+          *grad_out = -NuggetKriging::reparam_from_deriv(_theta_alpha, *grad_out);
         }
         return -lmp;
       });
@@ -697,7 +712,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     gamma_tmp.at(d) = sigma2 / (nugget + sigma2);
     if (Optim::reparametrize) {
       gamma_tmp.head(d) = Optim::reparam_to(m_theta);
-      gamma_tmp.at(d) = Optim::reparam_to_(1- sigma2 / (nugget + sigma2));
+      gamma_tmp.at(d) = Optim::reparam_to_(1+alpha_lower- sigma2 / (nugget + sigma2));
     }
 
     /* double min_ofn_tmp = */ fit_ofn(gamma_tmp, nullptr, &okm_data);
@@ -764,9 +779,6 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
-    double alpha_upper = 1.0;
-    double alpha_lower = 1E-3;
-
     arma::vec alpha0;
     if (parameters.sigma2.has_value() && parameters.nugget.has_value()) {
       alpha0 = arma::vec(parameters.sigma2.value().n_elem * parameters.nugget.value().n_elem);
@@ -775,14 +787,14 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
           if ((parameters.sigma2.value()[i] < 0) || (parameters.nugget.value()[j] < 0)
               || (parameters.sigma2.value()[i] + parameters.nugget.value()[j] < 0))
             alpha0[i + j * parameters.sigma2.value().n_elem]
-                = alpha_lower + (alpha_upper - alpha_lower) * Random::randu();
+                = alpha_lower + (alpha_upper - alpha_lower) * (1-std::pow(Random::randu(),3.0));
           else
             alpha0[i + j * parameters.sigma2.value().n_elem]
                 = parameters.sigma2.value()[i] / (parameters.sigma2.value()[i] + parameters.nugget.value()[j]);
         }
       }
     } else {
-      alpha0 = alpha_lower + (alpha_upper - alpha_lower) * Random::randu_vec(theta0.n_rows);
+      alpha0 = alpha_lower + (alpha_upper - alpha_lower) * (1-arma::pow(Random::randu_vec(theta0.n_rows),3.0));
     }
     // arma::cout << "alpha0:" << alpha0 << arma::endl;
 
@@ -794,8 +806,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     gamma_upper.at(d) = alpha_upper;
     if (Optim::reparametrize) {
       arma::vec gamma_lower_tmp = gamma_lower;
-      gamma_lower = reparam_to(gamma_upper);
-      gamma_upper = reparam_to(gamma_lower_tmp);
+      gamma_lower = NuggetKriging::reparam_to(gamma_upper);
+      gamma_upper = NuggetKriging::reparam_to(gamma_lower_tmp);
       double gamma_lower_at_d = gamma_lower.at(d);
       gamma_lower.at(d) = gamma_upper.at(d);
       gamma_upper.at(d) = gamma_lower_at_d;
@@ -808,7 +820,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       gamma_tmp.head(d) = theta0.row(i).t();
       gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
       if (Optim::reparametrize) {
-        gamma_tmp = reparam_to(gamma_tmp);
+        gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
       }
 
       gamma_lower = arma::min(gamma_tmp, gamma_lower);
@@ -866,10 +878,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       optimizer.iprint = Optim::log_level - 2;
       optimizer.max_iter = Optim::max_iteration;
       optimizer.pgtol = Optim::gradient_tolerance;
-      optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+      optimizer.factr = Optim::objective_rel_tolerance / 1E-11;
       arma::ivec bounds_type{d + 1, arma::fill::value(2)};  // means both upper & lower bounds
+      
       int retry = 0;
       while (retry <= Optim::max_restart) {
+        arma::vec gamma_0 = gamma_tmp;
         auto result = optimizer.minimize(
             [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
               return fit_ofn(vals_inp, &grad_out, &okm_data);
@@ -878,13 +892,26 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
             gamma_lower.memptr(),
             gamma_upper.memptr(),
             bounds_type.memptr());
+
+        if (Optim::log_level > 0) {
+          arma::cout << "     iterations: " << result.num_iters << arma::endl;
+          if (Optim::reparametrize) {
+            arma::cout << "     start_point: " << NuggetKriging::reparam_from(gamma_0).t() << " ";
+            arma::cout << "     solution: " << NuggetKriging::reparam_from(gamma_tmp).t() << " ";
+          } else {
+            arma::cout << "     start_point: " << gamma_0.t() << " ";
+            arma::cout << "     solution: " << gamma_tmp.t() << " ";
+          }
+        }
+
         double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
         double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
         double sol_to_b_theta
             = Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
-        double sol_to_b_alpha = Optim::reparametrize
-                                    ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
-                                    : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider alpha lower bound
+        double sol_to_b_alpha = std::abs(gamma_tmp.at(d) - gamma_lower.at(d)); // just consider alpha lower bound
+                                //Optim::reparametrize
+                                //    ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
+                                //    : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  
         double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
         if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
             && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
@@ -892,16 +919,14 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
           gamma_tmp.head(d)
               = (theta0.row(i).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
-          gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
-          if (Optim::log_level > 0)
-            arma::cout << "    start_point: " << gamma_tmp.t() << " ";
+          gamma_tmp.at(d) = alpha_upper - (alpha0[i % alpha0.n_elem] + alpha_upper) / pow(2.0, retry + 1);
+
           if (Optim::reparametrize)
-            gamma_tmp = reparam_to(gamma_tmp);
-          if (Optim::log_level > 0) {
-            arma::cout << "    iterations: " << result.num_iters << arma::endl;
-          }
+            gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
+
           gamma_lower = arma::min(gamma_tmp, gamma_lower);
           gamma_upper = arma::max(gamma_tmp, gamma_upper);
+          
           retry++;
         } else {
           if (Optim::log_level > 1)
@@ -916,7 +941,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       if (Optim::log_level > 0) {
         arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
         if (Optim::reparametrize)
-          arma::cout << "  best solution: " << reparam_from(gamma_tmp) << " ";
+          arma::cout << "  best solution: " << NuggetKriging::reparam_from(gamma_tmp) << " ";
         else
           arma::cout << "  best solution: " << gamma_tmp << "";
       }
