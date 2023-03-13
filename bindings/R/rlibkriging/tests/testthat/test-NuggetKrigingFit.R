@@ -19,12 +19,23 @@ alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
 test_that(desc="Nugget / Fit: 1D / fit of alpha by DiceKriging is same that libKriging",
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
-ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_k))$logLikelihood)
-plot(ll,xlim=c(0.001,1))
+ll_a = Vectorize(function(a) logLikelihoodFun(r,c(k@covariance@range.val,a))$logLikelihood)
+plot(ll_a,xlim=c(0.001,1))
+for (a in seq(0.01,1,,21)){
+  envx = new.env()
+  ll2x = logLikelihoodFun(r,c(k@covariance@range.val,a))$logLikelihood
+  gll2x = logLikelihoodFun(r,c(k@covariance@range.val,a),grad = T)$logLikelihoodGrad[,2]
+  arrows(a,ll2x,a+.1,ll2x+.1*gll2x,col='red')
+}
+abline(v=alpha_k,col='blue')
+abline(v=alpha_r,col='red')
+
+ll_t = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_k))$logLikelihood)
+plot(ll_t,xlim=c(0.001,1))
 #ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_r))$logLikelihood)
 #plot(ll_,xlim=c(0.001,1))
 
-theta_ref = optimize(ll,interval=c(0.001,1),maximum=T)$maximum
+theta_ref = optimize(ll_t,interval=c(0.001,1),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
@@ -34,6 +45,29 @@ test_that(desc="Nugget / Fit: 1D / fit of theta by DiceKriging is right",
 
 test_that(desc="Nugget / Fit: 1D / fit of theta by libKriging is right",
           expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
+
+# see joint ll over theta & alpha
+ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
+apply(X,1,
+     function(x) {
+       y=-logLikelihoodFun(r,c(unlist(x)))$logLikelihood
+       #print(y);
+       y})}
+# x=seq(0.01,0.99,,51)
+# without reparam: 
+# contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 50)
+# abline(v=(theta_ref),col='black')
+# abline(v=(as.list(r)$theta),col='red')
+# abline(v=(k@covariance@range.val),col='blue')
+# abline(h=(alpha_k),col='blue')
+# abline(h=(alpha_r),col='red')
+# with reparam:
+# contour(log(x),-log(1-x),matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 50)
+# abline(v=log(theta_ref),col='black')
+# abline(v=log(as.list(r)$theta),col='red')
+# abline(v=log(k@covariance@range.val),col='blue')
+# abline(h=-log(1-alpha_k),col='blue')
+# abline(h=-log(1-alpha_r),col='red')
 
 #############################################################
 
@@ -46,12 +80,13 @@ X <- cbind(runif(n),runif(n))
 y = f(X)
 k = NULL
 r = NULL
-k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-#rlibkriging:::optim_log(3)
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 1)
+#rlibkriging:::optim_log(4)
 #rlibkriging:::optim_use_variogram_bounds_heuristic(T)
 #rlibkriging:::optim_set_max_iteration(100)
 r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
+#sectionview(function(ta)r$logLikelihoodFun(ta)$logLikelihood,center=c(r$theta(),r$sigma2()/(r$sigma2()+r$nugget())))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-2d.Rdata")

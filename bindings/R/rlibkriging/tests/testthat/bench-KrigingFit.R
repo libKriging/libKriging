@@ -11,7 +11,7 @@ X <- DiceDesign::lhsDesign(n,dimension=6)$design #cbind(runif(n),runif(n))
 y <- f(X)
 d = ncol(X)
 
-N = 1
+N = 20
 times <- list(R=rep(NA, N), cpp=rep(NA, N))
 
 for (i in 1:N) {
@@ -44,7 +44,7 @@ for (i in 1:N) {
     warning("DiceKriging LL ",ll_R," << libKriging LL ",ll_cpp)
 }
 
-plot(times$R,times$cpp)
+plot(times$R,times$cpp, xlim=range(c(times$R,times$cpp)),ylim=range(c(times$R,times$cpp)))
 abline(a=0,b=1,col='red')
 abline(a=0,b=2,col='red')
 abline(a=0,b=0.5,col='red')

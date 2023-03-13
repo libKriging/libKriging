@@ -1182,6 +1182,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
         int retry = 0;
         while (retry <= Optim::max_restart) {
+          arma::vec gamma_0 = gamma_tmp;
           auto result = optimizer.minimize(
               [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                 return fit_ofn(vals_inp, &grad_out, nullptr, &okm_data);
@@ -1190,6 +1191,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
               gamma_lower.memptr(),
               gamma_upper.memptr(),
               bounds_type.memptr());
+
+          if (Optim::log_level > 0) {
+            arma::cout << "     iterations: " << result.num_iters << arma::endl;
+            if (Optim::reparametrize) {
+              arma::cout << "     start_point: " << Optim::reparam_from(gamma_0).t() << " ";
+              arma::cout << "     solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
+            } else {
+              arma::cout << "     start_point: " << gamma_0.t() << " ";
+              arma::cout << "     solution: " << gamma_tmp.t() << " ";
+            }
+          }
+
           double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower));
           double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper));
           double sol_to_b = Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
@@ -1198,15 +1211,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                   || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
             gamma_tmp = (theta0.row(i).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
-            if (Optim::log_level > 0)
-              arma::cout << "    start_point: " << gamma_tmp.t() << " ";
+
             if (Optim::reparametrize)
               gamma_tmp = Optim::reparam_to(gamma_tmp);
-            if (Optim::log_level > 0) {
-              arma::cout << "    iterations: " << result.num_iters << arma::endl;
-            }
+
             gamma_lower = arma::min(gamma_tmp, gamma_lower);
             gamma_upper = arma::max(gamma_tmp, gamma_upper);
+
             retry++;
           } else {
             if (Optim::log_level > 1)
