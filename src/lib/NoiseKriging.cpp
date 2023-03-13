@@ -536,16 +536,16 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
             gamma_upper.memptr(),
             bounds_type.memptr());
 
-          if (Optim::log_level > 0) {
-            arma::cout << "     iterations: " << result.num_iters << arma::endl;
-            if (Optim::reparametrize) {
-              arma::cout << "     start_point: " << Optim::reparam_from(gamma_0).t() << " ";
-              arma::cout << "     solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
-            } else {
-              arma::cout << "     start_point: " << gamma_0.t() << " ";
-              arma::cout << "     solution: " << gamma_tmp.t() << " ";
-            }
+        if (Optim::log_level > 0) {
+          arma::cout << "     iterations: " << result.num_iters << arma::endl;
+          if (Optim::reparametrize) {
+            arma::cout << "     start_point: " << Optim::reparam_from(gamma_0).t() << " ";
+            arma::cout << "     solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
+          } else {
+            arma::cout << "     start_point: " << gamma_0.t() << " ";
+            arma::cout << "     solution: " << gamma_tmp.t() << " ";
           }
+        }
 
         double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
         double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
@@ -558,7 +558,6 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
         if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
             && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
                 || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
-
           gamma_tmp.head(d)
               = (theta0.row(i).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point

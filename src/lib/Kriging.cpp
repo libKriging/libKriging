@@ -1209,16 +1209,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           if ((retry < Optim::max_restart)                                 //&& (result.num_iters <= 2 * d)
               && ((sol_to_b < arma::datum::eps)                            // we fastly converged to one bound
                   || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
-            
             gamma_tmp = (theta0.row(i).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
-            
+
             if (Optim::reparametrize)
               gamma_tmp = Optim::reparam_to(gamma_tmp);
 
             gamma_lower = arma::min(gamma_tmp, gamma_lower);
             gamma_upper = arma::max(gamma_tmp, gamma_upper);
-            
+
             retry++;
           } else {
             if (Optim::log_level > 1)
