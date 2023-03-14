@@ -148,7 +148,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
     finally = {
     }
   )
-r <- NuggetKriging(y, X, "gauss", parameters=list(theta=parinit))
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS20", parameters=list(theta=parinit))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-multistart.Rdata")

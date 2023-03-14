@@ -4,7 +4,7 @@
 
 library(testthat)
 
-f <- function(X) apply(X, 1, function(x) rnorm(1,0,0.01)+sum(sin(2*pi*(x-.5)^2)))
+f <- function(X) apply(X, 1, function(x) rnorm(1,0,0.1)+sum(sin(2*pi*(x-.5)^2)))
 n <- 1000
 set.seed(123)
 X <- DiceDesign::lhsDesign(n,dimension=6)$design #cbind(runif(n),runif(n))
@@ -29,13 +29,14 @@ for (i in 1:N) {
 r_alpha = r$sigma2()/(r$sigma2()+r$nugget())
   ll_cpp <- logLikelihoodFun(r, t(c(as.list(r)$theta,r_alpha)))$logLikelihood
   e <- new.env()
-  ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
+  k_alpha=k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+  ll_R <- DiceKriging::logLikFun(c(k@covariance@range.val,k_alpha), k, e)
 
   gll_cpp <- logLikelihoodFun(r, t(c(as.list(r)$theta,r_alpha)))$logLikelihoodGrad
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
 
-  # if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))/ll_cpp>.1)
-  #   stop("LL function is not the same bw DiceKriging/libKriging: ",logLikelihoodFun(r,t(c(as.list(r)$theta,r_alpha)))," vs. ",DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))
+   if (abs(ll_cpp - DiceKriging::logLikFun(param=c(as.numeric(t(as.list(r)$theta)),r_alpha),model=k))/ll_cpp>.1)
+     stop("LL function is not the same bw DiceKriging/libKriging: ",logLikelihoodFun(r,t(c(as.list(r)$theta,r_alpha)))," vs. ",DiceKriging::logLikFun(param=as.numeric(t(as.list(r)$theta)),model=k))
 
   if ((ll_cpp - ll_R)/ll_R < -.01 )
     warning("libKriging LL ",ll_cpp," << DiceKriging LL ",ll_R)

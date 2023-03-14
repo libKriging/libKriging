@@ -9,7 +9,7 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
+k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F), formula = as.formula("y~1+X"))
 ll = function(theta) DiceKriging::leaveOneOutFun(theta,k)
 
 plot(Vectorize(ll),ylab="LL",xlab="theta",xlim=c(0.01,1))
@@ -20,7 +20,7 @@ for (x in seq(0.01,1,,11)){
   arrows(x,llx,x+.1,llx+.1*gllx)
 }
 
-r <- Kriging(y, X, kernel)
+r <- Kriging(y, X, kernel, regmodel="linear")
 ll2 = function(theta) leaveOneOutFun(r,theta)$leaveOneOut[1]
 # plot(Vectorize(ll2),col='red',add=T) # FIXME fails with "error: chol(): decomposition failed"
 for (x in seq(0.01,1,,11)){

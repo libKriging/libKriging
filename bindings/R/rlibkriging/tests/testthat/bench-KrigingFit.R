@@ -18,7 +18,7 @@ for (i in 1:N) {
     set.seed(i)
     times$R[i]   = system.time(
                         k <- DiceKriging::km(design=X,response=y,covtype = "gauss",
-                         multistart = 1,control = list(trace=T,maxit=10)) #,lower=rep(0.001,d),upper=rep(2*sqrt(d),d))
+                         multistart = 1,control = list(trace=T,maxit=20)) #,lower=rep(0.001,d),upper=rep(2*sqrt(d),d))
                     )
     times$cpp[i] = system.time(
                         r <- Kriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
