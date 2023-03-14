@@ -100,7 +100,7 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in methods(class=class(nk))) {
+    for (f in .methods.NoiseKriging) { #methods(class=class(nk))) {
         if (regexec(paste0(".",class(nk)),f)[[1]]>0) {
             f_anon = sub(paste0(".",class(nk)),"",fixed=TRUE,f)
             eval(parse(text=paste0(

@@ -1,3 +1,19 @@
+# This will speedup the load of *Kriging classes, avoiding the methods() calls.
+.onLoad <- function(libname, pkgname) {
+    # build empty Kriging to inspect methods
+    nk <- new_Kriging(kernel="gauss")
+    class(nk) <- "Kriging"
+    assign(".methods.Kriging", methods(class="Kriging"), envir = parent.env(environment()))
+    
+    nk <- new_NuggetKriging(kernel="gauss")
+    class(nk) <- "NuggetKriging"
+    assign(".methods.NuggetKriging", methods(class="NuggetKriging"), envir = parent.env(environment()))
+    
+    nk <- new_NoiseKriging(kernel="gauss")
+    class(nk) <- "NoiseKriging"
+    assign(".methods.NoiseKriging", methods(class="NoiseKriging"), envir = parent.env(environment()))
+}
+
 ## ****************************************************************************
 ## This file contains stuff related to the generic functions, be they true
 ## generic function (for S4 methods) or S3 generic.
