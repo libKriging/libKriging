@@ -9,7 +9,7 @@ set.seed(123)
 X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
-k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F), formula = as.formula("y~1+X"))
+k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F), formula = as.formula("~."))
 ll = function(theta) DiceKriging::leaveOneOutFun(theta,k)
 
 plot(Vectorize(ll),ylab="LL",xlab="theta",xlim=c(0.01,1))
