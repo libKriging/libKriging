@@ -99,13 +99,10 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in .methods.Kriging) { #methods(class=class(nk))) {
-        if (regexec(paste0(".",class(nk)),f)[[1]]>0) {
-            f_anon = sub(paste0(".",class(nk)),"",fixed=TRUE,f)
-            eval(parse(text=paste0(
-                "nk$", f_anon, " <- function(...) ", f_anon, "(nk,...)"
-                )))
-        }
+    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
     }
     # This will allow to access kriging data/props using `k$d()`
     for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
@@ -171,7 +168,8 @@ as.list.Kriging <- function(x, ...) {
 #' @importFrom stats model.matrix
 #' @export
 #' @method as.km Kriging
-#'
+#' @aliases as.km,Kriging,Kriging-method
+#' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
