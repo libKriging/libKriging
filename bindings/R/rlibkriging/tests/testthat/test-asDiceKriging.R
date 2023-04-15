@@ -1,7 +1,6 @@
 ## Changes by Yves remove the references to the packages as in 'rlibkriging::simulate',
 ## because simulate is not exported as such from rlibkriging
 
-
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 }
@@ -16,6 +15,7 @@ d <- ncol(X)
 km1 <- DiceKriging::km(design = X, response = y, covtype = "gauss",
          formula = ~1, estim.method = "LOO",
          parinit = c(.15), control = list(trace = FALSE))
+library(rlibkriging)
 KM1 <- rlibkriging::KM(design = X, response = y, covtype = "gauss",
           formula = ~1, estim.method = "LOO",
           parinit = c(.15))
@@ -52,7 +52,7 @@ branin <- function (x) {
 d <- 2; n <- 16
 design.fact <- expand.grid(x1 = seq(0, 1, length.out = 4),
                            x2 = seq(0, 1, length.out = 4))
-y <- apply(design.fact, 1, DiceKriging::branin) 
+y <- apply(design.fact, 1, DiceKriging::branin)
 
 library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
