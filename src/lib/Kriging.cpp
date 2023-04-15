@@ -1034,23 +1034,25 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool is_beta_estim = parameters.is_beta_estim;
     if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
       if (m_normalize)
         beta /= scaleY;
     } else {
-      parameters.is_beta_estim = true; // force estim if no value given
+      is_beta_estim = true; // force estim if no value given
     }
     double sigma2 = -1;
+    bool is_sigma2_estim = parameters.is_sigma2_estim;
     if (parameters.sigma2.has_value()) {
       sigma2 = parameters.sigma2.value();  // otherwise sigma2 will be re-calculated using given theta
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
     } else {
-      parameters.is_sigma2_estim = true; // force estim if no value given
+      is_sigma2_estim = true; // force estim if no value given
     }
 
-    Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
+    Kriging::OKModel okm_data{T, M, z, beta, is_beta_estim, sigma2, is_sigma2_estim};
 
     arma::vec gamma_tmp = arma::vec(d);
     gamma_tmp = m_theta;
@@ -1063,13 +1065,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
-    m_est_beta = parameters.is_beta_estim;
+    m_est_beta = is_beta_estim;
     if (m_est_beta) {
       m_beta = std::move(okm_data.beta);
     } else {
       m_beta = beta;
     }
-    m_est_sigma2 = parameters.is_sigma2_estim;
+    m_est_sigma2 = is_sigma2_estim;
     if (m_est_sigma2) {
       m_sigma2 = okm_data.sigma2;
     } else {
