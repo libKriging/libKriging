@@ -172,6 +172,16 @@ class Kriging {
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /** Dump current Kriging object into an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load into the current object a Kriging state from an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT void load(const std::string filename);
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP
