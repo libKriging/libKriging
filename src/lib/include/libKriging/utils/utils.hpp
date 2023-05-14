@@ -1,7 +1,7 @@
 #ifndef LIBKRIGING_UTILS_HPP
 #define LIBKRIGING_UTILS_HPP
 
-#include <ostringstream>
+#include <sstream>
 #include <string>
 #include <utility>
 

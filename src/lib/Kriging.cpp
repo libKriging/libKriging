@@ -18,6 +18,7 @@
 #include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
 #include "libKriging/utils/hdf5utils.hpp"
+#include "libKriging/utils/utils.hpp"
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -1707,6 +1708,7 @@ void Kriging::save(const std::string filename) const {
 
   uint32_t version = 1;
   saveToHdf5(version, arma::hdf5_name(filename, "version", arma::hdf5_opts::none));
+  saveToHdf5(std::string("Kriging"), arma::hdf5_name(filename, "content", appflag));
 
   // Cov_pow & std::function embedded by make_Cov
   saveToHdf5(m_covType, arma::hdf5_name(filename, "covType", appflag));
@@ -1738,7 +1740,13 @@ Kriging Kriging::load(const std::string filename) {
   uint32_t version;
   loadFromHdf5(version, arma::hdf5_name(filename, "version"));
   if (version != 1) {
-    throw std::runtime_error("Bad version to load " + filename);
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 1"));
+  }
+  std::string content;
+  loadFromHdf5(content, arma::hdf5_name(filename, "content"));
+  if (content != "Kriging") {
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'Kriging'"));
   }
 
   std::string covType;
