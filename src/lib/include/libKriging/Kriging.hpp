@@ -108,7 +108,7 @@ class Kriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
 
-  LIBKRIGING_EXPORT Kriging(Kriging && ) = default;
+  LIBKRIGING_EXPORT Kriging(Kriging&&) = default;
 
   LIBKRIGING_EXPORT Kriging(const arma::colvec& y,
                             const arma::mat& X,
