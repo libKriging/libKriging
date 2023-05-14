@@ -58,8 +58,7 @@ TEST_CASE("save & reload") {
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
     ok.save("dump.h5");
 
-    Kriging ok_reloaded = Kriging("gauss");
-    ok_reloaded.load("dump.h5");
+    Kriging ok_reloaded = Kriging::load("dump.h5");
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);

@@ -101,6 +101,14 @@ std::string PyKriging::summary() const {
   return m_internal->summary();
 }
 
+void PyKriging::save(const std::string filename) const {
+    return m_internal->save(filename);
+}
+
+PyKriging PyKriging::load(const std::string filename) {
+    return PyKriging(std::make_unique<Kriging>(Kriging::load(filename)));
+}
+
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::array_t<double>& theta,
                                                                   const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);

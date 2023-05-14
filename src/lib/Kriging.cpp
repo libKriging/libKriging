@@ -1734,39 +1734,42 @@ void Kriging::save(const std::string filename) const {
   saveToHdf5(m_est_sigma2, arma::hdf5_name(filename, "est_sigma2", appflag));
 }
 
-void Kriging::load(const std::string filename) {
+Kriging Kriging::load(const std::string filename) {
   uint32_t version;
   loadFromHdf5(version, arma::hdf5_name(filename, "version"));
   if (version != 1) {
     throw std::runtime_error("Bad version to load " + filename);
   }
 
-  loadFromHdf5(m_covType, arma::hdf5_name(filename, "covType"));
-  make_Cov(m_covType);  // Cov_pow & std::function embedded by make_Cov
+  std::string covType;
+  loadFromHdf5(covType, arma::hdf5_name(filename, "covType"));
+  Kriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
 
-  m_X.load(arma::hdf5_name(filename, "X"));
-  m_centerX.load(arma::hdf5_name(filename, "centerX"));
-  m_scaleX.load(arma::hdf5_name(filename, "scaleX"));
-  m_y.load(arma::hdf5_name(filename, "y"));
-  loadFromHdf5(m_centerY, arma::hdf5_name(filename, "centerY"));
-  loadFromHdf5(m_scaleY, arma::hdf5_name(filename, "scaleY"));
-  loadFromHdf5(m_normalize, arma::hdf5_name(filename, "normalize"));
+  kr.m_X.load(arma::hdf5_name(filename, "X"));
+  kr.m_centerX.load(arma::hdf5_name(filename, "centerX"));
+  kr.m_scaleX.load(arma::hdf5_name(filename, "scaleX"));
+  kr.m_y.load(arma::hdf5_name(filename, "y"));
+  loadFromHdf5(kr.m_centerY, arma::hdf5_name(filename, "centerY"));
+  loadFromHdf5(kr.m_scaleY, arma::hdf5_name(filename, "scaleY"));
+  loadFromHdf5(kr.m_normalize, arma::hdf5_name(filename, "normalize"));
 
   std::string model;
   loadFromHdf5(model, arma::hdf5_name(filename, "regmodel"));
-  m_regmodel = Trend::fromString(model);
+  kr.m_regmodel = Trend::fromString(model);
 
-  loadFromHdf5(m_optim, arma::hdf5_name(filename, "optim"));
-  loadFromHdf5(m_objective, arma::hdf5_name(filename, "objective"));
-  m_dX.load(arma::hdf5_name(filename, "dX"));
-  m_F.load(arma::hdf5_name(filename, "F"));
-  m_T.load(arma::hdf5_name(filename, "T"));
-  m_M.load(arma::hdf5_name(filename, "M"));
-  m_z.load(arma::hdf5_name(filename, "z"));
-  m_beta.load(arma::hdf5_name(filename, "beta"));
-  loadFromHdf5(m_est_beta, arma::hdf5_name(filename, "est_beta"));
-  m_theta.load(arma::hdf5_name(filename, "theta"));
-  loadFromHdf5(m_est_theta, arma::hdf5_name(filename, "est_theta"));
-  loadFromHdf5(m_sigma2, arma::hdf5_name(filename, "sigma2"));
-  loadFromHdf5(m_est_sigma2, arma::hdf5_name(filename, "est_sigma2"));
+  loadFromHdf5(kr.m_optim, arma::hdf5_name(filename, "optim"));
+  loadFromHdf5(kr.m_objective, arma::hdf5_name(filename, "objective"));
+  kr.m_dX.load(arma::hdf5_name(filename, "dX"));
+  kr.m_F.load(arma::hdf5_name(filename, "F"));
+  kr.m_T.load(arma::hdf5_name(filename, "T"));
+  kr.m_M.load(arma::hdf5_name(filename, "M"));
+  kr.m_z.load(arma::hdf5_name(filename, "z"));
+  kr.m_beta.load(arma::hdf5_name(filename, "beta"));
+  loadFromHdf5(kr.m_est_beta, arma::hdf5_name(filename, "est_beta"));
+  kr.m_theta.load(arma::hdf5_name(filename, "theta"));
+  loadFromHdf5(kr.m_est_theta, arma::hdf5_name(filename, "est_theta"));
+  loadFromHdf5(kr.m_sigma2, arma::hdf5_name(filename, "sigma2"));
+  loadFromHdf5(kr.m_est_sigma2, arma::hdf5_name(filename, "est_sigma2"));
+
+  return kr;
 }
