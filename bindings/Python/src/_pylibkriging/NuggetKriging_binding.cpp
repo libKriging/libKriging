@@ -106,11 +106,11 @@ std::string PyNuggetKriging::summary() const {
 }
 
 void PyNuggetKriging::save(const std::string filename) const {
-    return m_internal->save(filename);
+  return m_internal->save(filename);
 }
 
 PyNuggetKriging PyNuggetKriging::load(const std::string filename) {
-    return PyNuggetKriging(std::make_unique<NuggetKriging>(NuggetKriging::load(filename)));
+  return PyNuggetKriging(std::make_unique<NuggetKriging>(NuggetKriging::load(filename)));
 }
 
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(const py::array_t<double>& theta_alpha,

@@ -111,11 +111,11 @@ std::string PyNoiseKriging::summary() const {
 }
 
 void PyNoiseKriging::save(const std::string filename) const {
-    return m_internal->save(filename);
+  return m_internal->save(filename);
 }
 
 PyNoiseKriging PyNoiseKriging::load(const std::string filename) {
-    return PyNoiseKriging(std::make_unique<NoiseKriging>(NoiseKriging::load(filename)));
+  return PyNoiseKriging(std::make_unique<NoiseKriging>(NoiseKriging::load(filename)));
 }
 
 std::tuple<double, py::array_t<double>> PyNoiseKriging::logLikelihoodFun(const py::array_t<double>& theta_sigma2,
