@@ -93,7 +93,7 @@ class MxMapper : public NonCopyable {
   }
 
   template <typename T>
-  std::optional<T*> getOptionalObject(int I, const char* msg = nullptr) {
+  std::optional<T*> getOptionalObject(int I, const char* = nullptr) {
     assert(I >= 0);
     if (I >= m_n) {
       return std::nullopt;

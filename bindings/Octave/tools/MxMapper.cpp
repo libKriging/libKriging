@@ -5,7 +5,7 @@ MxMapper::MxMapper(const char* name, const int n, mxArray** p, const RequiresArg
   assert(n < maxsize);
   assert(name != nullptr);
   if (!RequiresArg::validate(requirement, n)) {
-    throw MxException(LOCATION(), "mLibKriging:badArgs", name, " requires ", RequiresArg::describe(requirement));
+    throw MxException(LOCATION(), "mLibKriging:badArgs", m_name, " requires ", RequiresArg::describe(requirement));
   }
 }
 
