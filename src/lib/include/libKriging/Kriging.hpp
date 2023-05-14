@@ -180,7 +180,7 @@ class Kriging {
    */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
-  /** Load into the current object a Kriging state from an hdf5 file
+  /** Load a new Kriging object from an hdf5 file
    * @param filename
    */
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);

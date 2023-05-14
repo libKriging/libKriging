@@ -189,6 +189,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &PyNuggetKriging::simulate)
       .def("update", &PyNuggetKriging::update)
       .def("summary", &PyNuggetKriging::summary)
+      .def("save", &PyNuggetKriging::save)
+      .def_static("load", &PyNuggetKriging::load)
       .def("logLikelihoodFun", &PyNuggetKriging::logLikelihoodFun)
       .def("logMargPostFun", &PyNuggetKriging::logMargPostFun)
       .def("logLikelihood", &PyNuggetKriging::logLikelihood)
@@ -250,6 +252,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("simulate", &PyNoiseKriging::simulate)
       .def("update", &PyNoiseKriging::update)
       .def("summary", &PyNoiseKriging::summary)
+      .def("save", &PyNoiseKriging::save)
+      .def_static("load", &PyNoiseKriging::load)
       .def("logLikelihoodFun", &PyNoiseKriging::logLikelihoodFun)
       .def("logLikelihood", &PyNoiseKriging::logLikelihood)
 

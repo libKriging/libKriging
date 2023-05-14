@@ -114,6 +114,8 @@ class NuggetKriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NuggetKriging(const std::string& covType);
 
+  LIBKRIGING_EXPORT NuggetKriging(NuggetKriging&&) = default;
+
   LIBKRIGING_EXPORT NuggetKriging(const arma::colvec& y,
                                   const arma::mat& X,
                                   const std::string& covType,
@@ -181,6 +183,16 @@ class NuggetKriging {
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /** Dump current NuggetKriging object into an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a new NuggetKriging object from an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT static NuggetKriging load(const std::string filename);
 };
 
 #endif  // LIBKRIGING_NUGGETKRIGING_HPP

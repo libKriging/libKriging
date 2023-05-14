@@ -22,6 +22,7 @@ add_library(Kriging
         include/libKriging/utils/LinearHashStorage.hpp
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
+        utils/hdf5utils.cpp include/libKriging/utils/hdf5utils.hpp
         include/libKriging/version.hpp ${VERSION_FILE} )
 
 if (CXX_CLANG_TIDY)

@@ -105,6 +105,14 @@ std::string PyNuggetKriging::summary() const {
   return m_internal->summary();
 }
 
+void PyNuggetKriging::save(const std::string filename) const {
+    return m_internal->save(filename);
+}
+
+PyNuggetKriging PyNuggetKriging::load(const std::string filename) {
+    return PyNuggetKriging(std::make_unique<NuggetKriging>(NuggetKriging::load(filename)));
+}
+
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(const py::array_t<double>& theta_alpha,
                                                                           const bool want_grad) {
   arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
