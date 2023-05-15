@@ -560,6 +560,71 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
 }
 
 
+#' Save a NoiseKriging Model to a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NoiseKriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded NoiseKriging object.
+#'
+#' @method save NoiseKriging
+#' @export
+#' @aliases save,Kriging,Kriging-method
+#'
+#' @examples
+#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
+#'
+#' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+#' print(k)
+#' save(k,"k.h5")
+save.NoiseKriging <- function(object, filename, ...) {
+
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+
+    kriging_save(object, filename)
+
+    invisible(NULL)
+}
+
+
+#' Load a NoiseKriging Model from a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NoiseKriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded NoiseKriging object.
+#'
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
+#' points(X, y, col = "blue")
+#'
+#' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+#' print(k)
+#' save(k,"k.h5")
+#'
+#' print(load.NoiseKriging("k.h5"))
+load.NoiseKriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    return( noisekriging_load(filename) )
+}
+
+
 #' Compute Log-Likelihood of NoiseKriging Model
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}

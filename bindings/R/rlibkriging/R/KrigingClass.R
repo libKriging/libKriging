@@ -483,6 +483,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
     return(kriging_simulate(object, nsim = nsim, seed = seed, X = x))
 }
 
+
 #' Update a \code{Kriging} model object with new points
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
@@ -553,6 +554,68 @@ update.Kriging <- function(object, newy, newX, ...) {
     kriging_update(object, newy, newX)
 
     invisible(NULL)
+}
+
+#' Save a Kriging Model to a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded Kriging object.
+#'
+#' @method save Kriging
+#' @export
+#' @aliases save,Kriging,Kriging-method
+#'
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' save(k,"k.h5")
+save.Kriging <- function(object, filename, ...) {
+
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+
+    kriging_save(object, filename)
+
+    invisible(NULL)
+}
+
+#' Load a Kriging Model from a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 Kriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded Kriging object.
+#'
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
+#' print(k)
+#' save(k,"k.h5")
+#'
+#' print(load.Kriging("k.h5"))
+load.Kriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    return( kriging_load(filename) )
 }
 
 #' Compute Log-Likelihood of Kriging Model
@@ -841,5 +904,6 @@ logMargPost.Kriging <- function(object, ...) {
 #'
 #' print(copy(k))
 copy.Kriging <- function(object, ...) {
+  if (length(L <- list(...)) > 0) warnOnDots(L)
   return(kriging_copy(object))
 }

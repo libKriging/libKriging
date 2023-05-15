@@ -244,7 +244,7 @@ void nuggetkriging_fit(Rcpp::List k,
 // [[Rcpp::export]]
 Rcpp::List nuggetkriging_copy(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
-    Rcpp::stop("Input must be a NoiseKriging object.");
+    Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
@@ -353,6 +353,28 @@ void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
   // obj.attr("object") = impl_ptr;
   // obj.attr("class") = "NuggetKriging";
   // return obj;
+}
+
+// [[Rcpp::export]]
+void nuggetkriging_save(Rcpp::List k, std::string filename) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+
+  return impl_ptr->save(filename);
+}
+
+// [[Rcpp::export]]
+Rcpp::List nuggetkriging_load(std::string filename) {
+  NuggetKriging ok = NuggetKriging::load(filename);
+
+  Rcpp::List obj;
+  Rcpp::XPtr<NuggetKriging> impl_copy(new NuggetKriging(ok, ExplicitCopySpecifier{}));
+  obj.attr("object") = impl_copy;
+  obj.attr("class") = "NuggetKriging";
+  return obj;
 }
 
 // [[Rcpp::export]]

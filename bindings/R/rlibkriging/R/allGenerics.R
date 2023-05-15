@@ -165,3 +165,18 @@ copy <- function(object, ...) {
 fit <- function(object, ...) {
     UseMethod("fit")
 }
+
+## *****************************************************************************
+##' Save a model given in
+##' \code{object}.
+##'
+##' @title Save object.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Ignored.
+##'
+##' @return The saved object.
+##' @export
+save <- function(object, ...) {
+    UseMethod("save")
+}
