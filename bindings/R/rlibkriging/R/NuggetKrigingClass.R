@@ -580,7 +580,7 @@ save.NuggetKriging <- function(object, filename, ...) {
     if (!is.character(filename))
         stop("'filename' must be a string")
 
-    kriging_save(object, filename)
+    nuggetkriging_save(object, filename)
 
     invisible(NULL)
 }
@@ -613,7 +613,7 @@ load.NuggetKriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
-    return( noisekriging_load(filename) )
+    return( nuggetkriging_load(filename) )
 }
 
 

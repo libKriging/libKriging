@@ -332,17 +332,6 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_load(std::string filename) {
-  NoiseKriging ok = NoiseKriging::load(filename);
-
-  Rcpp::List obj;
-  Rcpp::XPtr<NoiseKriging> impl_copy(new NoiseKriging(ok, ExplicitCopySpecifier{}));
-  obj.attr("object") = impl_copy;
-  obj.attr("class") = "NoiseKriging";
-  return obj;
-}
-
-// [[Rcpp::export]]
 Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool grad = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");

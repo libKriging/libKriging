@@ -588,7 +588,7 @@ save.NoiseKriging <- function(object, filename, ...) {
     if (!is.character(filename))
         stop("'filename' must be a string")
 
-    kriging_save(object, filename)
+    noisekriging_save(object, filename)
 
     invisible(NULL)
 }

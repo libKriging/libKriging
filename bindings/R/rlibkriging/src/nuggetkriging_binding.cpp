@@ -367,17 +367,6 @@ void nuggetkriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_load(std::string filename) {
-  NuggetKriging ok = NuggetKriging::load(filename);
-
-  Rcpp::List obj;
-  Rcpp::XPtr<NuggetKriging> impl_copy(new NuggetKriging(ok, ExplicitCopySpecifier{}));
-  obj.attr("object") = impl_copy;
-  obj.attr("class") = "NuggetKriging";
-  return obj;
-}
-
-// [[Rcpp::export]]
 Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_alpha, bool grad = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
