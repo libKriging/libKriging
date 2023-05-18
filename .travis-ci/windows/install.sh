@@ -25,7 +25,11 @@ $HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
 # https://anaconda.org/search?q=blas
 $HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge openblas liblapack
 # $HOME/Miniconda3/condabin/conda.bat install -c conda-forge fortran-compiler
+
+# https://chocolatey.org/docs/commands-install
+# required to compile fortran part
 choco install mingw
+choco install -y --no-progress make --version 4.3
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # Check if python is available (it could be a python wrapper given by Windows)

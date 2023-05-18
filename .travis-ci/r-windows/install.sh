@@ -10,10 +10,6 @@ BASEDIR=$(cd "$BASEDIR" && pwd -P)
 
 "${BASEDIR}"/../windows/install.sh
 
-# https://chocolatey.org/docs/commands-install
-# https://chocolatey.org/packages/make
-choco install -y --no-progress make --version 4.3
-
 if [ "${GITHUB_ACTIONS:=false}" == "false" ]; then
 
   # Allow to fail
