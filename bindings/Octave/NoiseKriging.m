@@ -146,7 +146,7 @@ classdef NoiseKriging < handle
 
     methods (Static = true)
         function obj = load(varargin)
-            obj = Kriging([1], [1], "gauss") # TODO should find a more straightforward default ctor
+            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
             obj.ref = mLibKriging("NoiseKriging::load", varargin{:});
         end
     end
