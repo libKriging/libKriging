@@ -1040,7 +1040,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (m_normalize)
         beta /= scaleY;
     } else {
-      is_beta_estim = true; // force estim if no value given
+      is_beta_estim = true;  // force estim if no value given
     }
     double sigma2 = -1;
     bool is_sigma2_estim = parameters.is_sigma2_estim;
@@ -1049,7 +1049,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
     } else {
-      is_sigma2_estim = true; // force estim if no value given
+      is_sigma2_estim = true;  // force estim if no value given
     }
 
     Kriging::OKModel okm_data{T, M, z, beta, is_beta_estim, sigma2, is_sigma2_estim};

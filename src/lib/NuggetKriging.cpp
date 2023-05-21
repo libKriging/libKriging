@@ -687,7 +687,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       if (m_normalize)
         beta /= scaleY;
     } else {
-      is_beta_estim = true; // force estim if no value given
+      is_beta_estim = true;  // force estim if no value given
     }
     double sigma2 = -1;
     bool is_sigma2_estim = parameters.is_sigma2_estim;
@@ -696,7 +696,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
     } else {
-      is_sigma2_estim = true; // force estim if no value given
+      is_sigma2_estim = true;  // force estim if no value given
     }
     double nugget = -1;
     bool is_nugget_estim = parameters.is_nugget_estim;
@@ -705,19 +705,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       if (m_normalize)
         nugget /= (scaleY * scaleY);
     } else {
-      is_nugget_estim = true; // force estim if no value given
+      is_nugget_estim = true;  // force estim if no value given
     }
 
-    NuggetKriging::OKModel okm_data{T,
-                                    M,
-                                    z,
-                                    beta,
-                                    is_beta_estim,
-                                    sigma2,
-                                    is_sigma2_estim,
-                                    nugget,
-                                    is_nugget_estim,
-                                    nugget + sigma2};
+    NuggetKriging::OKModel okm_data{
+        T, M, z, beta, is_beta_estim, sigma2, is_sigma2_estim, nugget, is_nugget_estim, nugget + sigma2};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
     gamma_tmp.head(d) = m_theta;

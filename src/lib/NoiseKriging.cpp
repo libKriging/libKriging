@@ -381,7 +381,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       if (m_normalize)
         beta /= scaleY;
     } else {
-      is_beta_estim = true; // force estim if no value given
+      is_beta_estim = true;  // force estim if no value given
     }
 
     NoiseKriging::OKModel okm_data{T, M, z, beta, is_beta_estim};
