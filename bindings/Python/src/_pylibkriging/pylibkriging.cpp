@@ -15,6 +15,7 @@
 #include "LinearRegression_binding.hpp"
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
+#include "AnyKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 
 // To compare string at compile time (before latest C++)
@@ -279,4 +280,15 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_theta_estim", &PyNoiseKriging::is_theta_estim)
       .def("sigma2", &PyNoiseKriging::sigma2)
       .def("is_sigma2_estim", &PyNoiseKriging::is_sigma2_estim);
+
+    m.def("anykriging_describe", &KrigingLoader::describe, R"pbdoc(
+        Describe Kriging type in an HDF5 file
+    )pbdoc");
+
+    py::enum_<KrigingLoader::KrigingType>(m, "KrigingType")
+            .value("Kriging", KrigingLoader::KrigingType::Kriging)
+            .value("NoiseKriging", KrigingLoader::KrigingType::NoiseKriging)
+            .value("NuggetKriging", KrigingLoader::KrigingType::NuggetKriging)
+            .value("Unknown", KrigingLoader::KrigingType::Unknown)
+            .export_values();
 }

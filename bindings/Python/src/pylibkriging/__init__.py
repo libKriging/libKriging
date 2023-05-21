@@ -31,3 +31,16 @@ Kriging = WrappedPyKriging
 NuggetKriging = WrappedPyNuggetKriging
 NoiseKriging = WrappedPyNoiseKriging
 LinearRegression = PyLinearRegression
+
+
+def anykriging_load(filename):
+    str_filename = str(filename)
+    kind = anykriging_describe(str_filename)
+    if kind == KrigingType.Kriging:
+        return Kriging.load(str_filename)
+    elif kind == KrigingType.NoiseKriging:
+        return NoiseKriging.load(str_filename)
+    elif kind == KrigingType.NuggetKriging:
+        return NuggetKriging.load(str_filename)
+    else:
+        raise TypeError("Unknown Kriging type")

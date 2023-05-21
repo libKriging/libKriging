@@ -28,7 +28,7 @@ macro(add_python_test)
         set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONMALLOC=malloc")
     else ()
         add_test(NAME ${TEST_NAME}
-                COMMAND ${PYTHON_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
+                COMMAND ${PYTHON_EXECUTABLE} -m pytest -s ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
     endif ()
 
     if (ARGS_WILL_FAIL)
@@ -65,3 +65,4 @@ add_python_test(NAME PyKrigingParametricTest FILENAME PyKriging_parametric_test.
 add_python_test(NAME KrigingCopyTest FILENAME PyKriging_copy_test.py)
 add_python_test(NAME binding_consistency FILENAME binding_consistency_test.py)
 add_python_test(NAME KrigingDemo FILENAME pylibkriging_demo.py)
+add_python_test(NAME KrigingLoader FILENAME kriging_load_test.py)
