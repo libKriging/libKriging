@@ -16,33 +16,36 @@ library(rlibkriging)
 
 context("Kriging")
 
-r_noestim <- Kriging(y, X, "gauss", estim="none", parameters=list(theta= 0.1 ,sigma2= 0.01 ,beta= 0.123))
+r_noestim <- Kriging(y, X, "gauss", optim="none", parameters=list(theta= matrix(0.1) ,sigma2= 0.01 ,beta= matrix(0.123)))
+print(r_noestim)
 test_that(desc="theta noestim",
-          expect_equal( r_noestim$theta() , 0.1 ,tol=1E-10))
+          expect_equal( r_noestim$theta()[1] , 0.1 ,tol=1E-10))
 test_that(desc="sigma2 noestim",
           expect_equal( r_noestim$sigma2() , 0.01 ,tol=1E-10))
 test_that(desc="beta noestim",
-          expect_equal( r_noestim$beta() , 0.123 ,tol=1E-10))
+          expect_equal( r_noestim$beta()[1] , 0.123 ,tol=1E-10))
 
 
 context("NuggetKriging")
 
-rnu_noestim <- NuggetKriging(y, X, "gauss", estim="none", parameters=list(theta= 0.1 ,sigma2= 0.01 ,beta= 0.123, nugget= 0.0456))
+rnu_noestim <- NuggetKriging(y, X, "gauss", optim="none", parameters=list(theta= matrix(0.1) ,sigma2= 0.01 ,beta= matrix(0.123), nugget= 0.0456))
+print(rnu_noestim)
 test_that(desc="theta noestim",
-          expect_equal( rnu_noestim$theta() , 0.1 ,tol=1E-10))
+          expect_equal( rnu_noestim$theta()[1] , 0.1 ,tol=1E-10))
 test_that(desc="sigma2 noestim",
           expect_equal( rnu_noestim$sigma2() , 0.01 ,tol=1E-10))
 test_that(desc="beta noestim",
-          expect_equal( rnu_noestim$beta() , 0.123 ,tol=1E-10))
+          expect_equal( rnu_noestim$beta()[1] , 0.123 ,tol=1E-10))
 test_that(desc="nugget noestim",
           expect_equal( rnu_noestim$nugget() , 0.0456 ,tol=1E-10))
 
 context("NoiseKriging")
 
-rno_noestim <- NoiseKriging(y, rep(0.05,nrow(X)) , X, "gauss", estim="none", parameters=list(theta= 0.1 ,sigma2= 0.01 ,beta= 0.123))
+rno_noestim <- NoiseKriging(y, rep(0.05,nrow(X)) , X, "gauss", optim="none", parameters=list(theta= matrix(0.1) ,sigma2= 0.01 ,beta= matrix(0.123)))
+print(rno_noestim)
 test_that(desc="theta noestim",
-          expect_equal( rno_noestim$theta() , 0.1 ,tol=1E-10))
+          expect_equal( rno_noestim$theta()[1] , 0.1 ,tol=1E-10))
 test_that(desc="sigma2 noestim",
           expect_equal( rno_noestim$sigma2() , 0.01 ,tol=1E-10))
 test_that(desc="beta noestim",
-          expect_equal( rno_noestim$beta() , 0.123 ,tol=1E-10))
+          expect_equal( rno_noestim$beta()[1] , 0.123 ,tol=1E-10))

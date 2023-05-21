@@ -42,7 +42,7 @@ Rcpp::List new_KrigingFit(arma::vec y,
     if (params.containsElementNamed("sigma2")) {
       _parameters.push_back(params["sigma2"], "sigma2");
       _parameters.push_back(true, "has_sigma2");
-      _parameters.push_back(!(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]) && optim!="none",
                             "is_sigma2_estim");
     } else {
       //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
@@ -54,7 +54,7 @@ Rcpp::List new_KrigingFit(arma::vec y,
     if (params.containsElementNamed("theta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
       _parameters.push_back(true, "has_theta");
-      _parameters.push_back(!(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]) && optim!="none",
                             "is_theta_estim");
     } else {
       // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
@@ -67,7 +67,7 @@ Rcpp::List new_KrigingFit(arma::vec y,
     if (params.containsElementNamed("beta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["beta"]), "beta");
       _parameters.push_back(true, "has_beta");
-      _parameters.push_back(!(params.containsElementNamed("is_beta_estim") && !params["is_beta_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_beta_estim") && !params["is_beta_estim"]) && optim!="none",
                             "is_beta_estim");
     } else {
       _parameters.push_back(Rcpp::NumericVector(0), "beta");
@@ -137,7 +137,7 @@ void kriging_fit(Rcpp::List k,
     if (params.containsElementNamed("sigma2")) {
       _parameters.push_back(params["sigma2"], "sigma2");
       _parameters.push_back(true, "has_sigma2");
-      _parameters.push_back(!(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]) && optim!="none",
                             "is_sigma2_estim");
     } else {
       //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
@@ -149,7 +149,7 @@ void kriging_fit(Rcpp::List k,
     if (params.containsElementNamed("theta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
       _parameters.push_back(true, "has_theta");
-      _parameters.push_back(!(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]) && optim!="none",
                             "is_theta_estim");
     } else {
       // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
@@ -162,7 +162,7 @@ void kriging_fit(Rcpp::List k,
     if (params.containsElementNamed("beta")) {
       _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["beta"]), "beta");
       _parameters.push_back(true, "has_beta");
-      _parameters.push_back(!(params.containsElementNamed("is_beta_estim") && !params["is_beta_estim"]),
+      _parameters.push_back(!(params.containsElementNamed("is_beta_estim") && !params["is_beta_estim"]) && optim!="none",
                             "is_beta_estim");
     } else {
       _parameters.push_back(Rcpp::NumericVector(0), "beta");
