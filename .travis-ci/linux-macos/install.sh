@@ -8,10 +8,12 @@ fi
 case "$(uname -s)" in
  Darwin)
    brew install gfortran
+   brew install hdf5
    ;;
 
  Linux)
-   sudo apt install gfortran 
+   sudo apt install gfortran
+   sudo apt install libhdf5-dev
    ;;
 
  *)

@@ -138,6 +138,28 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->summary(), "Model description");
 }
 
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  const auto filename = input.get<std::string>(1, "filename");
+  km->save(filename);
+}
+
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto filename = input.get<std::string>(0, "filename");
+  auto km = buildObject<Kriging>(Kriging::load(filename));
+  output.set(0, km, "new object reference");
+}
+
 void leaveOneOutFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

@@ -12,7 +12,7 @@ struct EmptyObject {};
 
 template <typename T, typename... Args>
 ObjectCollector::ref_t buildObject(Args&&... args) {
-  return ObjectCollector::registerObject(new T{args...});
+  return ObjectCollector::registerObject(new T{std::forward<Args>(args)...});
 }
 
 ObjectCollector::ref_t getObject(const mxArray* obj);

@@ -16,6 +16,8 @@
 #include "libKriging/Trend.hpp"
 #include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
+#include "libKriging/utils/hdf5utils.hpp"
+#include "libKriging/utils/utils.hpp"
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -922,4 +924,85 @@ LIBKRIGING_EXPORT std::string NoiseKriging::summary() const {
     oss << "    * optim: " << m_optim << "\n";
   }
   return oss.str();
+}
+
+void NoiseKriging::save(const std::string filename) const {
+  const auto appflag = arma::hdf5_opts::append;
+
+  uint32_t version = 1;
+  saveToHdf5(version, arma::hdf5_name(filename, "version", arma::hdf5_opts::none));
+  saveToHdf5(std::string("NoiseKriging"), arma::hdf5_name(filename, "content", appflag));
+
+  // Cov_pow & std::function embedded by make_Cov
+  saveToHdf5(m_covType, arma::hdf5_name(filename, "covType", appflag));
+  m_X.save(arma::hdf5_name(filename, "X", appflag));
+  m_centerX.save(arma::hdf5_name(filename, "centerX", appflag));
+  m_scaleX.save(arma::hdf5_name(filename, "scaleX", appflag));
+  m_y.save(arma::hdf5_name(filename, "y", appflag));
+  saveToHdf5(m_centerY, arma::hdf5_name(filename, "centerY", appflag));
+  saveToHdf5(m_scaleY, arma::hdf5_name(filename, "scaleY", appflag));
+  saveToHdf5(m_normalize, arma::hdf5_name(filename, "normalize", appflag));
+  m_noise.save(arma::hdf5_name(filename, "noise", appflag));
+
+  saveToHdf5(Trend::toString(m_regmodel), arma::hdf5_name(filename, "regmodel", appflag));
+  saveToHdf5(m_optim, arma::hdf5_name(filename, "optim", appflag));
+  saveToHdf5(m_objective, arma::hdf5_name(filename, "objective", appflag));
+  m_dX.save(arma::hdf5_name(filename, "dX", appflag));
+  m_F.save(arma::hdf5_name(filename, "F", appflag));
+  m_T.save(arma::hdf5_name(filename, "T", appflag));
+  m_M.save(arma::hdf5_name(filename, "M", appflag));
+  m_z.save(arma::hdf5_name(filename, "z", appflag));
+  m_beta.save(arma::hdf5_name(filename, "beta", appflag));
+  saveToHdf5(m_est_beta, arma::hdf5_name(filename, "est_beta", appflag));
+  m_theta.save(arma::hdf5_name(filename, "theta", appflag));
+  saveToHdf5(m_est_theta, arma::hdf5_name(filename, "est_theta", appflag));
+  saveToHdf5(m_sigma2, arma::hdf5_name(filename, "sigma2", appflag));
+  saveToHdf5(m_est_sigma2, arma::hdf5_name(filename, "est_sigma2", appflag));
+}
+
+NoiseKriging NoiseKriging::load(const std::string filename) {
+  uint32_t version;
+  loadFromHdf5(version, arma::hdf5_name(filename, "version"));
+  if (version != 1) {
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 1"));
+  }
+  std::string content;
+  loadFromHdf5(content, arma::hdf5_name(filename, "content"));
+  if (content != "NoiseKriging") {
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NoiseKriging'"));
+  }
+
+  std::string covType;
+  loadFromHdf5(covType, arma::hdf5_name(filename, "covType"));
+  NoiseKriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
+
+  kr.m_X.load(arma::hdf5_name(filename, "X"));
+  kr.m_centerX.load(arma::hdf5_name(filename, "centerX"));
+  kr.m_scaleX.load(arma::hdf5_name(filename, "scaleX"));
+  kr.m_y.load(arma::hdf5_name(filename, "y"));
+  loadFromHdf5(kr.m_centerY, arma::hdf5_name(filename, "centerY"));
+  loadFromHdf5(kr.m_scaleY, arma::hdf5_name(filename, "scaleY"));
+  loadFromHdf5(kr.m_normalize, arma::hdf5_name(filename, "normalize"));
+  kr.m_noise.load(arma::hdf5_name(filename, "noise"));
+
+  std::string model;
+  loadFromHdf5(model, arma::hdf5_name(filename, "regmodel"));
+  kr.m_regmodel = Trend::fromString(model);
+
+  loadFromHdf5(kr.m_optim, arma::hdf5_name(filename, "optim"));
+  loadFromHdf5(kr.m_objective, arma::hdf5_name(filename, "objective"));
+  kr.m_dX.load(arma::hdf5_name(filename, "dX"));
+  kr.m_F.load(arma::hdf5_name(filename, "F"));
+  kr.m_T.load(arma::hdf5_name(filename, "T"));
+  kr.m_M.load(arma::hdf5_name(filename, "M"));
+  kr.m_z.load(arma::hdf5_name(filename, "z"));
+  kr.m_beta.load(arma::hdf5_name(filename, "beta"));
+  loadFromHdf5(kr.m_est_beta, arma::hdf5_name(filename, "est_beta"));
+  kr.m_theta.load(arma::hdf5_name(filename, "theta"));
+  loadFromHdf5(kr.m_est_theta, arma::hdf5_name(filename, "est_theta"));
+  loadFromHdf5(kr.m_sigma2, arma::hdf5_name(filename, "sigma2"));
+  loadFromHdf5(kr.m_est_sigma2, arma::hdf5_name(filename, "est_sigma2"));
+
+  return kr;
 }

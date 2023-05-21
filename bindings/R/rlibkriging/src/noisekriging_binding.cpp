@@ -321,6 +321,17 @@ void noisekriging_update(Rcpp::List k, arma::vec y, arma::vec noise, arma::mat X
 }
 
 // [[Rcpp::export]]
+void noisekriging_save(Rcpp::List k, std::string filename) {
+  if (!k.inherits("NoiseKriging"))
+    Rcpp::stop("Input must be a NoiseKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+
+  return impl_ptr->save(filename);
+}
+
+// [[Rcpp::export]]
 Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool grad = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");

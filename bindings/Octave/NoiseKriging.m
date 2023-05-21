@@ -43,6 +43,10 @@ classdef NoiseKriging < handle
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::summary", obj.ref, varargin{:});
         end
 
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NoiseKriging::save", obj.ref, varargin{:});
+        end
+
         function varargout = logLikelihoodFun(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::logLikelihoodFun", obj.ref, varargin{:});
         end
@@ -138,6 +142,12 @@ classdef NoiseKriging < handle
         function varargout = is_sigma2_estim (obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::is_sigma2_estim ", obj.ref, varargin{:});
         end
+    end
 
+    methods (Static = true)
+        function obj = load(varargin)
+            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
+            obj.ref = mLibKriging("NoiseKriging::load", varargin{:});
+        end
     end
 end

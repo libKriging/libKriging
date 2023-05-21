@@ -16,8 +16,8 @@ LIBKRIGING_EXPORT void set_allocation_functions(void* (*allocator)(size_t), void
 LIBKRIGING_EXPORT void unset_allocation_functions();
 }  // namespace lkalloc
 
-//#define ARMA_ALIEN_MEM_ALLOC_FUNCTION lkalloc::malloc
-//#define ARMA_ALIEN_MEM_FREE_FUNCTION lkalloc::free
+// #define ARMA_ALIEN_MEM_ALLOC_FUNCTION lkalloc::malloc
+// #define ARMA_ALIEN_MEM_FREE_FUNCTION lkalloc::free
 #ifndef LIBKRIGING_ARMA_ALIEN_MEM_FUNCTIONS_SET
 #define LIBKRIGING_ARMA_ALIEN_MEM_FUNCTIONS_SET
 #define CARMA_ARMA_ALIEN_MEM_FUNCTIONS_SET  // to cheat on carma

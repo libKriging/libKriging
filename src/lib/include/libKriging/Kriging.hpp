@@ -28,7 +28,7 @@ struct KrigingParameters {
  */
 class Kriging {
   Kriging() = delete;
-  Kriging(const Kriging& other) = default;  // Should be specialized is non default copy constructor is required
+  Kriging(const Kriging& other) = default;  // Should be specialized if non default copy constructor is required
 
  public:
   using Parameters = KrigingParameters;
@@ -108,6 +108,8 @@ class Kriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
 
+  LIBKRIGING_EXPORT Kriging(Kriging&&) = default;
+
   LIBKRIGING_EXPORT Kriging(const arma::colvec& y,
                             const arma::mat& X,
                             const std::string& covType,
@@ -172,6 +174,16 @@ class Kriging {
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /** Dump current Kriging object into an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a new Kriging object from an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT static Kriging load(const std::string filename);
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP

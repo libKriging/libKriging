@@ -551,6 +551,72 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 }
 
 
+#' Save a NuggetKriging Model to a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NuggetKriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded NuggetKriging object.
+#'
+#' @method save NuggetKriging
+#' @export
+#' @aliases save,Kriging,Kriging-method
+#'
+#' @examples
+#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' points(X, y, col = "blue")
+#'
+#' k <- NuggetKriging(y, X, "matern3_2")
+#' print(k)
+#' save(k,"k.h5")
+save.NuggetKriging <- function(object, filename, ...) {
+
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+
+    nuggetkriging_save(object, filename)
+
+    invisible(NULL)
+}
+
+
+#' Load a NuggetKriging Model from a file storage
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NuggetKriging object.
+#' @param ... Not used.
+#'
+#' @return The loaded NuggetKriging object.
+#'
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + 0.1 * rnorm(nrow(X))
+#' points(X, y, col = "blue")
+#'
+#' k <- NuggetKriging(y, X, "matern3_2")
+#' print(k)
+#' save(k,"k.h5")
+#'
+#' print(load.NuggetKriging("k.h5"))
+load.NuggetKriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    return( nuggetkriging_load(filename) )
+}
+
+
 #' Compute Log-Likelihood of NuggetKriging Model
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}

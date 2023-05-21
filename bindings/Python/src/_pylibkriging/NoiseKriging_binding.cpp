@@ -110,6 +110,14 @@ std::string PyNoiseKriging::summary() const {
   return m_internal->summary();
 }
 
+void PyNoiseKriging::save(const std::string filename) const {
+  return m_internal->save(filename);
+}
+
+PyNoiseKriging PyNoiseKriging::load(const std::string filename) {
+  return PyNoiseKriging(std::make_unique<NoiseKriging>(NoiseKriging::load(filename)));
+}
+
 std::tuple<double, py::array_t<double>> PyNoiseKriging::logLikelihoodFun(const py::array_t<double>& theta_sigma2,
                                                                          const bool want_grad) {
   arma::vec vec_theta_sigma2 = carma::arr_to_col<double>(theta_sigma2);

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <libKriging/Kriging.hpp>
+#include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Trend.hpp>
 
 auto f = [](const arma::rowvec& row) {
@@ -48,6 +49,24 @@ TEST_CASE("workflow") {
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
     return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));
+  });
+}
+
+TEST_CASE("save & reload") {
+  prepare_and_run_bench([](const arma::colvec& y, const arma::mat& X, int) {
+    Kriging ok = Kriging("gauss");
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);  // FIXME no move
+    ok.save("dump.h5");
+
+    Kriging ok_reloaded = Kriging::load("dump.h5");
+    auto e = KrigingLoader::describe("dump.h5");
+    assert(e == KrigingLoader::KrigingType::Kriging);
+
+    const double theta = 0.5;
+    arma::vec theta_vec(X.n_cols);
+    theta_vec.fill(theta);
+    return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false));
   });
 }
 

@@ -103,6 +103,8 @@ class NoiseKriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NoiseKriging(const std::string& covType);
 
+  LIBKRIGING_EXPORT NoiseKriging(NoiseKriging&&) = default;
+
   LIBKRIGING_EXPORT NoiseKriging(const arma::colvec& y,
                                  const arma::colvec& noise,
                                  const arma::mat& X,
@@ -164,6 +166,16 @@ class NoiseKriging {
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::vec& newnoise, const arma::mat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /** Dump current NoiseKriging object into an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a new NoiseKriging object from an hdf5 file
+   * @param filename
+   */
+  LIBKRIGING_EXPORT static NoiseKriging load(const std::string filename);
 };
 
 #endif  // LIBKRIGING_NOISEKRIGING_HPP

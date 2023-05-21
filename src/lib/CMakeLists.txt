@@ -15,6 +15,7 @@ add_library(Kriging
         Kriging.cpp include/libKriging/Kriging.hpp
         NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
         NoiseKriging.cpp include/libKriging/NoiseKriging.hpp
+        KrigingLoader.cpp include/libKriging/KrigingLoader.hpp
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
@@ -22,6 +23,8 @@ add_library(Kriging
         include/libKriging/utils/LinearHashStorage.hpp
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
+        include/libKriging/utils/utils.hpp
+        utils/hdf5utils.cpp include/libKriging/utils/hdf5utils.hpp
         include/libKriging/version.hpp ${VERSION_FILE} )
 
 if (CXX_CLANG_TIDY)

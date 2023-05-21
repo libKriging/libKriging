@@ -43,6 +43,10 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::summary", obj.ref, varargin{:});
         end
 
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::save", obj.ref, varargin{:});
+        end
+
         function varargout = logLikelihoodFun(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::logLikelihoodFun", obj.ref, varargin{:});
         end
@@ -150,6 +154,12 @@ classdef NuggetKriging < handle
         function varargout = is_nugget_estim (obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::is_nugget_estim ", obj.ref, varargin{:});
         end
+    end
 
+    methods (Static = true)
+        function obj = load(varargin)
+            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
+            obj.ref = mLibKriging("NuggetKriging::load", varargin{:});
+        end
     end
 end

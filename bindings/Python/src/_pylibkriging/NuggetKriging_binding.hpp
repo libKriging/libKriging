@@ -61,6 +61,10 @@ class PyNuggetKriging {
 
   std::string summary() const;
 
+  void save(const std::string filename) const;
+
+  static PyNuggetKriging load(const std::string filename);
+
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta_alpha,
                                                            const bool want_grad);
 

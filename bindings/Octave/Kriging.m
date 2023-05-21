@@ -43,6 +43,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::summary", obj.ref, varargin{:});
         end
 
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::save", obj.ref, varargin{:});
+        end
+
         function varargout = leaveOneOutFun(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOutFun", obj.ref, varargin{:});
         end
@@ -151,5 +155,12 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::is_sigma2_estim ", obj.ref, varargin{:});
         end
 
+    end
+
+    methods (Static = true)
+        function obj = load(varargin)
+            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
+            obj.ref = mLibKriging("Kriging::load", varargin{:});
+        end
     end
 end
