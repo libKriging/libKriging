@@ -1,30 +1,9 @@
 import pylibkriging as lk
 import numpy as np
 import pytest
-
-# prefer pathlib over os.path when you can
-# https://towardsdatascience.com/dont-use-python-os-library-any-more-when-pathlib-can-do-141fefb6bdb5
-# https://docs.python.org/3/library/pathlib.html
-from pathlib import Path
-import sys
+from find_dir import find_reference_dir
 
 tolerance = 1e-12
-
-
-def find_dir():
-    path = Path.cwd()
-    found = False
-    # while (! is.null(path) and !found):
-    while not found:
-        testpath = path / ".git" / ".." / "tests" / "references"
-        if testpath.exists():
-            return testpath
-        else:
-            parent = path.parent
-            if parent == path:
-                print("Cannot find reference test directory", file=sys.stderr)
-                sys.exit(1)
-            path = parent
 
 
 def relative_error(x, y):
@@ -40,11 +19,11 @@ def relative_error(x, y):
 
 @pytest.fixture(scope="module", autouse=True)
 def check_find_dir():
-    print("Reference directory=", find_dir())
+    print("Reference directory=", find_reference_dir())
 
 
 def test_data1():
-    refpath = find_dir()
+    refpath = find_reference_dir()
     prefix = "data1-scal"
     filex = refpath / f"{prefix}-X.csv"
     filey = refpath / f"{prefix}-y.csv"
@@ -74,7 +53,7 @@ def test_data1():
 
 @pytest.mark.parametrize("i", np.arange(1, 11))
 def test_data2(i):
-    refpath = find_dir()
+    refpath = find_reference_dir()
     prefix = f"data2-grad-{i}"
     filex = refpath / f"{prefix}-X.csv"
     filey = refpath / f"{prefix}-y.csv"
@@ -97,7 +76,7 @@ def test_data2(i):
 
 @pytest.mark.parametrize("i", np.arange(1, 11))
 def test_data2_with_save_reload(i):
-    refpath = find_dir()
+    refpath = find_reference_dir()
     prefix = f"data2-grad-{i}"
     filex = refpath / f"{prefix}-X.csv"
     filey = refpath / f"{prefix}-y.csv"
