@@ -62,6 +62,7 @@ Rcpp::List anykriging_load(std::string filename) {
     case KrigingLoader::KrigingType::NoiseKriging:
       return noisekriging_load(filename);
       break;
+    default:
+      Rcpp::stop("Kriging object not identified by loader.");
   }
-  Rcpp::stop("Kriging object not identified by loader.");
 }
