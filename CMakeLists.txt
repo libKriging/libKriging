@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 # Avoid to export package (like armadillo) into ~/.cmake
 # This behaviour is required to submit package to CRAN
@@ -153,6 +153,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Can be locally overridden using set_target_properties + https://cmake.org/cmake/help/latest/prop_tgt/LANG_VISIBILITY_PRESET.html
 # set(CMAKE_CXX_VISIBILITY_PRESET hidden) # global setting is incompatible with armadillo => moved to Kriging target
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor the visibility properties for all target types
+set(CMAKE_POLICY_DEFAULT_CMP0074 NEW) # Allow to use <PackageName>_ROOT to help package finder
 
 #------------------------------------------------------
 
