@@ -27,6 +27,6 @@ LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 4.2)
 Imports: Rcpp (>= 0.12.11), methods, DiceKriging
 Suggests: testthat, RobustGaSP, utils, DiceDesign, foreach
-SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran
+SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran, HDF5
 URL: https://github.com/libKriging
 RoxygenNote: 7.2.1
