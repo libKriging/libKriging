@@ -154,8 +154,8 @@ The following variables can be set to guide the search for HDF5 libraries and in
   Set ``true`` to skip trying to find ``hdf5-config.cmake``.
 #]=======================================================================]
 
-include(${CMAKE_CURRENT_LIST_DIR}/SelectLibraryConfigurations.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
+include(${CMAKE_ROOT}/Modules/SelectLibraryConfigurations.cmake)
+include(${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake)
 
 # We haven't found HDF5 yet. Clear its state in case it is set in the parent
 # scope somewhere else. We can't rely on it because different components may
@@ -808,6 +808,9 @@ if( NOT HDF5_FOUND )
     set(_lib_suffixes hdf5)
     if(NOT HDF5_PREFER_PARALLEL)
       list(APPEND _lib_suffixes hdf5/serial)
+    endif()
+    if (WIN32)
+      list(APPEND _lib_suffixes lib/x64-ucrt)
     endif()
     if(HDF5_USE_STATIC_LIBRARIES)
       set(_inc_suffixes include/static)
