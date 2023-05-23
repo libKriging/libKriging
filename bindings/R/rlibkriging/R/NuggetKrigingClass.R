@@ -556,13 +556,14 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object An S3 NuggetKriging object.
+#' @param filename File name to save in.
 #' @param ... Not used.
 #'
 #' @return The loaded NuggetKriging object.
 #'
 #' @method save NuggetKriging
 #' @export
-#' @aliases save,Kriging,Kriging-method
+#' @aliases save,NuggetKriging,NuggetKriging-method
 #'
 #' @examples
 #' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
@@ -590,7 +591,7 @@ save.NuggetKriging <- function(object, filename, ...) {
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
-#' @param object An S3 NuggetKriging object.
+#' @param filename File name to load from.
 #' @param ... Not used.
 #'
 #' @return The loaded NuggetKriging object.

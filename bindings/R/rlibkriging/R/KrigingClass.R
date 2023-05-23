@@ -561,6 +561,7 @@ update.Kriging <- function(object, newy, newX, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object An S3 Kriging object.
+#' @param filename File name to save in.
 #' @param ... Not used.
 #'
 #' @return The loaded Kriging object.
@@ -593,7 +594,7 @@ save.Kriging <- function(object, filename, ...) {
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
-#' @param object An S3 Kriging object.
+#' @param filename File name to load from.
 #' @param ... Not used.
 #'
 #' @return The loaded Kriging object.

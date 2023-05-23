@@ -181,28 +181,29 @@ save <- function(object, ...) {
     UseMethod("save")
 }
 
-#' Load any Kriging Model from a file storage.
-#'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#'
-#' @param filename A file holding any Kriging object.
-#' @param ... Not used.
-#'
-#' @return The loaded "*"Kriging object.
-#'
-#' @export
-#' 
-#' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' set.seed(123)
-#' X <- as.matrix(runif(10))
-#' y <- f(X)
-#'
-#' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
-#' print(k)
-#' save(k,"k.h5")
-#'
-#' print(load("k.h5"))
+## *****************************************************************************
+##' Load any Kriging Model from a file storage.
+##'
+##' @author Yann Richet \email{yann.richet@irsn.fr}
+##'
+##' @param filename A file holding any Kriging object.
+##' @param ... Not used.
+##'
+##' @return The loaded "*"Kriging object.
+##'
+##' @export
+##' 
+##' @examples
+##' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+##' set.seed(123)
+##' X <- as.matrix(runif(10))
+##' y <- f(X)
+##'
+##' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
+##' print(k)
+##' save(k,"k.h5")
+##'
+##' print(load("k.h5"))
 load <- function(filename, ...) {
     if (!is.character(filename) ||
         endsWith(filename,"Rdata") ||
