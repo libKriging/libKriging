@@ -681,34 +681,35 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool is_beta_estim = parameters.is_beta_estim;
     if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
       if (m_normalize)
         beta /= scaleY;
+    } else {
+      is_beta_estim = true;  // force estim if no value given
     }
     double sigma2 = -1;
+    bool is_sigma2_estim = parameters.is_sigma2_estim;
     if (parameters.sigma2.has_value()) {
       sigma2 = parameters.sigma2.value()[0];  // otherwise sigma2 will be re-calculated using given theta
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
+    } else {
+      is_sigma2_estim = true;  // force estim if no value given
     }
     double nugget = -1;
+    bool is_nugget_estim = parameters.is_nugget_estim;
     if (parameters.nugget.has_value()) {
       nugget = parameters.nugget.value()[0];
       if (m_normalize)
         nugget /= (scaleY * scaleY);
+    } else {
+      is_nugget_estim = true;  // force estim if no value given
     }
 
-    NuggetKriging::OKModel okm_data{T,
-                                    M,
-                                    z,
-                                    beta,
-                                    parameters.is_beta_estim,
-                                    sigma2,
-                                    parameters.is_sigma2_estim,
-                                    nugget,
-                                    parameters.is_nugget_estim,
-                                    nugget + sigma2};
+    NuggetKriging::OKModel okm_data{
+        T, M, z, beta, is_beta_estim, sigma2, is_sigma2_estim, nugget, is_nugget_estim, nugget + sigma2};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
     gamma_tmp.head(d) = m_theta;
@@ -723,12 +724,24 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
-    m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.is_beta_estim;
-    m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = parameters.is_sigma2_estim;
-    m_nugget = okm_data.nugget;
-    m_est_nugget = parameters.is_nugget_estim;
+    m_est_beta = is_beta_estim;
+    if (m_est_beta) {
+      m_beta = std::move(okm_data.beta);
+    } else {
+      m_beta = beta;
+    }
+    m_est_sigma2 = is_sigma2_estim;
+    if (m_est_sigma2) {
+      m_sigma2 = okm_data.sigma2;
+    } else {
+      m_sigma2 = sigma2;
+    }
+    m_est_nugget = is_nugget_estim;
+    if (m_est_nugget) {
+      m_nugget = okm_data.nugget;
+    } else {
+      m_nugget = nugget;
+    }
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();

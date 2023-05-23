@@ -1024,7 +1024,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
                                + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
   }
 
-  if (optim == "none") {  // just keep given theta, no optimisation of ll
+  if (optim == "none") {  // just keep given theta, no optimisation of ll (but estim sigma2 & beta still possible)
     if (!parameters.theta.has_value())
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
@@ -1034,19 +1034,25 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool is_beta_estim = parameters.is_beta_estim;
     if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
       if (m_normalize)
         beta /= scaleY;
+    } else {
+      is_beta_estim = true;  // force estim if no value given
     }
     double sigma2 = -1;
+    bool is_sigma2_estim = parameters.is_sigma2_estim;
     if (parameters.sigma2.has_value()) {
       sigma2 = parameters.sigma2.value();  // otherwise sigma2 will be re-calculated using given theta
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
+    } else {
+      is_sigma2_estim = true;  // force estim if no value given
     }
 
-    Kriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim, sigma2, parameters.is_sigma2_estim};
+    Kriging::OKModel okm_data{T, M, z, beta, is_beta_estim, sigma2, is_sigma2_estim};
 
     arma::vec gamma_tmp = arma::vec(d);
     gamma_tmp = m_theta;
@@ -1059,10 +1065,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
-    m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.is_beta_estim;
-    m_sigma2 = okm_data.sigma2;
-    m_est_sigma2 = parameters.is_sigma2_estim;
+    m_est_beta = is_beta_estim;
+    if (m_est_beta) {
+      m_beta = std::move(okm_data.beta);
+    } else {
+      m_beta = beta;
+    }
+    m_est_sigma2 = is_sigma2_estim;
+    if (m_est_sigma2) {
+      m_sigma2 = okm_data.sigma2;
+    } else {
+      m_sigma2 = sigma2;
+    }
 
   } else {
     arma::vec theta_lower = Optim::theta_lower_factor * trans(max(m_X, 0) - min(m_X, 0));
@@ -1542,7 +1556,6 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
  * @return output is m*nsim matrix of simulations at Xp
  */
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& Xp) {
-  // Here nugget.sim = 1e-10 to avoid chol failures of Sigma_cond)
   arma::uword m = Xp.n_rows;
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;

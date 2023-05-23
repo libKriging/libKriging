@@ -375,13 +375,16 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     arma::mat M;
     arma::colvec z;
     arma::colvec beta;
+    bool is_beta_estim = parameters.is_beta_estim;
     if (parameters.beta.has_value()) {
       beta = parameters.beta.value();
       if (m_normalize)
         beta /= scaleY;
+    } else {
+      is_beta_estim = true;  // force estim if no value given
     }
 
-    NoiseKriging::OKModel okm_data{T, M, z, beta, parameters.is_beta_estim};
+    NoiseKriging::OKModel okm_data{T, M, z, beta, is_beta_estim};
 
     arma::vec gamma_tmp = arma::vec(d + 1);
     gamma_tmp.head(d) = m_theta;
@@ -396,8 +399,12 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
     m_T = std::move(okm_data.T);
     m_M = std::move(okm_data.M);
     m_z = std::move(okm_data.z);
-    m_beta = std::move(okm_data.beta);
-    m_est_beta = parameters.is_beta_estim;
+    m_est_beta = is_beta_estim;
+    if (m_est_beta) {
+      m_beta = std::move(okm_data.beta);
+    } else {
+      m_beta = beta;
+    }
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
