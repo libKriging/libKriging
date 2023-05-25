@@ -574,7 +574,9 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #'
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' print(k)
-#' save(k,"k.h5")
+#'
+#' outfile = tempfile("k.h5")
+#' save(k,outfile)
 save.NuggetKriging <- function(object, filename, ...) {
 
     if (length(L <- list(...)) > 0) warnOnDots(L)
@@ -607,9 +609,11 @@ save.NuggetKriging <- function(object, filename, ...) {
 #'
 #' k <- NuggetKriging(y, X, "matern3_2")
 #' print(k)
-#' save(k,"k.h5")
 #'
-#' print(load.NuggetKriging("k.h5"))
+#' outfile = tempfile("k.h5")
+#' save(k,outfile)
+#'
+#' print(load.NuggetKriging(outfile))
 load.NuggetKriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))

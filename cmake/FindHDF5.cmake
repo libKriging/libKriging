@@ -237,7 +237,7 @@ function(_HDF5_test_regular_compiler_C success version is_parallel)
       "  hid_t fid;\n"
       "  fid = H5Fcreate(\"foo.h5\",H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);\n"
       "  return 0;\n"
-      "}")
+      "}\n")
     try_compile(${success} ${scratch_directory} ${test_file}
       COPY_FILE ${scratch_directory}/compiler_has_h5_c
     )
@@ -1182,7 +1182,7 @@ if (HDF5_FIND_DEBUG)
           set (_target ${_prefix}hdf5${_hl}${_lang}${_suffix})
           if (TARGET  ${_target})
             message(STATUS "... ${_target}")
-          else()
+          else()cmake_hdf5_test.c
             #message(STATUS "... ${_target} does not exist")
           endif()
         endforeach()
