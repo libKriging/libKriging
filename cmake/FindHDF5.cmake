@@ -1182,7 +1182,7 @@ if (HDF5_FIND_DEBUG)
           set (_target ${_prefix}hdf5${_hl}${_lang}${_suffix})
           if (TARGET  ${_target})
             message(STATUS "... ${_target}")
-          else()cmake_hdf5_test.c
+          else()
             #message(STATUS "... ${_target} does not exist")
           endif()
         endforeach()

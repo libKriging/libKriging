@@ -583,7 +583,7 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
 #' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
 #' print(k)
 #'
-#' outfile = tempfile("k.h5")
+#' outfile = tempfile("k.h5") 
 #' save(k,outfile)
 save.NoiseKriging <- function(object, filename, ...) {
 
@@ -621,7 +621,7 @@ save.NoiseKriging <- function(object, filename, ...) {
 #' outfile = tempfile("k.h5")
 #' save(k,outfile)
 #'
-#' print(load.NoiseKriging(outfile))
+#' print(load.NoiseKriging(outfile)) 
 load.NoiseKriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
