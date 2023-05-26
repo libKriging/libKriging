@@ -116,7 +116,7 @@ PyNuggetKriging PyNuggetKriging::load(const std::string filename) {
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(const py::array_t<double>& theta_alpha,
                                                                           const bool want_grad) {
   arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_alpha, want_grad);
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_alpha, want_grad, false);
   return {llo, carma::col_to_arr(grad)};
 }
 
@@ -127,7 +127,7 @@ double PyNuggetKriging::logLikelihood() {
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py::array_t<double>& theta_alpha,
                                                                         const bool want_grad) {
   arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta_alpha, want_grad);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta_alpha, want_grad, false);
   return {lmp, carma::col_to_arr(grad)};
 }
 

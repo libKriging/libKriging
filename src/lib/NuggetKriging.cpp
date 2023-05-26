@@ -6,6 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/Bench.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -23,6 +24,7 @@
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <tuple>
 #include <vector>
+#include <map>
 
 /************************************************/
 /**      NuggetKriging implementation        **/
@@ -97,7 +99,8 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const NuggetKriging& other, Expli
 
 double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
                                      arma::vec* grad_out,
-                                     NuggetKriging::OKModel* okm_data) const {
+                                     NuggetKriging::OKModel* okm_data,
+                               std::map<std::string, double>* bench) const {
   // arma::cout << " theta, alpha: " << _theta_alpha.t() << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
@@ -123,6 +126,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   double _alpha = _theta_alpha.at(d);
   arma::vec _theta = _theta_alpha.head(d);
 
+  auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
@@ -130,22 +134,31 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
       R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _alpha;
     }
   }
+  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "M = F \\ T", t0);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
+  t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->is_beta_estim)
+  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+  if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
+  }  
   fd->z = Yt - fd->M * fd->beta;
+  t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   fd->var = arma::accu(fd->z % fd->z) / n;
+  t0 = Bench::toc(bench, "S2 = Acc(z * z) / n", t0);
   if (fd->is_nugget_estim) {
     fd->nugget = (1 - _alpha) * fd->var;
     if (fd->is_sigma2_estim)
@@ -156,6 +169,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   }
 
   double ll = -0.5 * (n * log(2 * M_PI * fd->var) + 2 * sum(log(fd->T.diag())) + n);
+  t0 = Bench::toc(bench, "ll = ...log(S2) + Sum(log(Td))...", t0);
   // arma::cout << " ll:" << ll << arma::endl;
 
   if (grad_out != nullptr) {
@@ -181,15 +195,19 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     //      logLik.derivative[k] <- term1 + term2
     //  }
 
+    t0 = Bench::tic();
     std::vector<arma::mat> gradsC(d);  // if (hess_out != nullptr)
     arma::vec term1 = arma::vec(d);    // if (hess_out != nullptr)
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "Li = I \\ T", t0);
     arma::mat Cinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
+    t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
+    t0 = Bench::toc(bench, "tT = Tt", t0);
     arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
-    arma::mat xx = x * x.t();
+    t0 = Bench::toc(bench, "x = z \\ tT", t0);
 
     arma::cube gradC = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
@@ -197,8 +215,10 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
         gradC.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
       }
     }
+    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
 
     for (arma::uword k = 0; k < d; k++) {
+      t0 = Bench::tic();
       arma::mat gradC_k = arma::mat(n, n);
       for (arma::uword i = 0; i < n; i++) {
         gradC_k.at(i, i) = 0;
@@ -206,12 +226,14 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
           gradC_k.at(i, j) = gradC_k.at(j, i) = gradC.slice(i).col(j)[k];
         }
       }
+      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
 
       // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
       term1.at(k)
           = as_scalar((trans(x) * gradC_k) * x) / fd->var;  //; //as_scalar((trans(x) * gradR_k) * x)/ sigma2_hat;
       double term2 = -arma::trace(Cinv * gradC_k);          //-arma::accu(Rinv % gradR_k_upper)
       (*grad_out).at(k) = (term1.at(k) + term2) / 2;
+      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
     }  // for (arma::uword k = 0; k < m_X.n_cols; k++)
 
     //  # partial derivative with respect to v = sigma^2 + delta^2
@@ -231,7 +253,8 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(const arma::vec& _theta_alpha,
-                                                                                const bool _grad) {
+                                                                                const bool _grad,
+                                                                                const bool _bench) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -243,11 +266,28 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
 
   double ll = -1;
   arma::vec grad;
-  if (_grad) {
-    grad = arma::vec(_theta_alpha.n_elem);
-    ll = _logLikelihood(_theta_alpha, &grad, &okm_data);
-  } else
-    ll = _logLikelihood(_theta_alpha, nullptr, &okm_data);
+
+  if (_bench) {
+    std::map<std::string, double> bench;
+    if (_grad) {
+      grad = arma::vec(_theta_alpha.n_elem);
+      ll = _logLikelihood(_theta_alpha, &grad, &okm_data, &bench);
+    } else
+      ll = _logLikelihood(_theta_alpha, nullptr, &okm_data, &bench);
+
+    size_t num = 0;
+    for (auto& kv : bench)
+      num = std::max(kv.first.size(), num);
+    for (auto& kv : bench)
+      arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+
+  } else {
+    if (_grad) {
+      grad = arma::vec(_theta_alpha.n_elem);
+      ll = _logLikelihood(_theta_alpha, &grad, &okm_data, nullptr);
+    } else
+      ll = _logLikelihood(_theta_alpha, nullptr, &okm_data, nullptr);
+  }
 
   return std::make_tuple(ll, std::move(grad));
 }
@@ -255,7 +295,8 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
 
 double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
                                    arma::vec* grad_out,
-                                   NuggetKriging::OKModel* okm_data) const {
+                                   NuggetKriging::OKModel* okm_data,
+                               std::map<std::string, double>* bench) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
   // In RobustGaSP:
@@ -311,6 +352,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   double _alpha = _theta_alpha.at(d);
   arma::vec _theta = _theta_alpha.head(d);
 
+  auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = 1;
@@ -318,9 +360,11 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
       R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _alpha;
     }
   }
+  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
 
   //  // Compute intermediate useful matrices
   //  fd->M = solve(fd->T, m_F, LinearAlgebra::solve_opts);
@@ -339,27 +383,41 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   arma::mat L = fd->T;
 
   fd->M = solve(L, X, LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "M = F \\ T", t0);
+
   arma::mat R_inv_X = solve(trans(L), fd->M, LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "RiF = Ri * F", t0);
+
   arma::mat Xt_R_inv_X = trans(X) * R_inv_X;  // Xt%*%R.inv%*%X
+  t0 = Bench::toc(bench, "FtRiF = Ft * RiF", t0);
 
   arma::mat LX = chol(Xt_R_inv_X, "lower");  //  retrieve factor LX  in the decomposition
+  t0 = Bench::toc(bench, "TF = Chol(FtRiF)", t0);
+
   arma::mat R_inv_X_Xt_R_inv_X_inv_Xt_R_inv
       = R_inv_X
         * (solve(trans(LX),
                  solve(LX, trans(R_inv_X), LinearAlgebra::default_solve_opts),
                  LinearAlgebra::default_solve_opts));  // compute  R_inv_X_Xt_R_inv_X_inv_Xt_R_inv through one forward
                                                        // and one backward solve
+  t0 = Bench::toc(bench, "RiFFtRiFiFtRi = RiF * RiFt \\ M \\ Mt", t0);
+
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
   if (fd->is_beta_estim) {
     arma::mat Q;
     arma::mat G;
     qr_econ(Q, G, fd->M);
+    t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
-    fd->z = Yt - fd->M * fd->beta;
+    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
+  t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);
+
   arma::mat S_2 = (yt_R_inv * m_y - trans(m_y) * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y);
+  t0 = Bench::toc(bench, "S2 = YtRi * y - yt * RiFFtRiFiFtRi * y", t0);
 
   fd->var = S_2(0, 0) / (n - d);
   if (fd->is_nugget_estim) {
@@ -372,8 +430,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   }
 
   double log_S_2 = log(S_2(0, 0));
-
   double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (m_X.n_rows - m_F.n_cols) / 2.0 * log_S_2;
+  t0 = Bench::toc(bench, "lml = -Sum(log(diag(T))) - Sum(log(diag(TF)))...", t0);
   // arma::cout << " log_marginal_lik:" << log_marginal_lik << arma::endl;
 
   // Default prior params
@@ -381,6 +439,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   double b = 1.0 / pow(m_X.n_rows, 1.0 / m_X.n_cols) * (a + 1.0);
 
   arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(m_X.n_rows, 1.0 / m_X.n_cols);
+  t0 = Bench::toc(bench, "CL = (max(X) - min(X)) / n^1/d", t0);
+
   double t = arma::accu(CL % pow(_theta, -1.0)) + fd->nugget;
   double log_approx_ref_prior = -b * t + a * log(t);
   // arma::cout << " log_approx_ref_prior:" << log_approx_ref_prior << arma::endl;
@@ -405,8 +465,10 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     //   Wb_ti=(L.transpose().triangularView<Upper>().solve(L.triangularView<Lower>().solve(dev_R_i))).transpose()-dev_R_i*R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
     //   ans[ti]=-0.5*Wb_ti.diagonal().sum()+(num_obs-q)/2.0*(output.transpose()*Wb_ti.transpose()*Q_output/S_2(0,0))(0,0);
     // }
+    t0 = Bench::tic();
     arma::vec ans = arma::ones(m_X.n_cols);
     arma::mat Q_output = trans(yt_R_inv) - R_inv_X_Xt_R_inv_X_inv_Xt_R_inv * m_y;
+    t0 = Bench::toc(bench, "Qo = YtRi - RiFFtRiFiFtRi * y", t0);
 
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
@@ -414,9 +476,11 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
         gradR.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
       }
     }
+    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
 
     arma::mat Wb_k;
     for (arma::uword k = 0; k < m_X.n_cols; k++) {
+      t0 = Bench::tic();
       arma::mat gradR_k = arma::mat(n, n);
       for (arma::uword i = 0; i < n; i++) {
         gradR_k.at(i, i) = 0;
@@ -424,12 +488,16 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
           gradR_k.at(i, j) = gradR_k.at(j, i) = gradR.slice(i).col(j)[k];
         }
       }
+      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
 
       Wb_k = trans(solve(
                  trans(L), solve(L, gradR_k, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
              - gradR_k * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
+      t0 = Bench::toc(bench, "Wb_k = gradR_k \\ T \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
+
       ans[k] = -0.5 * sum(Wb_k.diag())
                + (m_X.n_rows - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
+      t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
     }
     // arma::cout << " log_marginal_lik_deriv:" << -ans * pow(_theta,2) << arma::endl;
     // arma::cout << " log_approx_ref_prior_deriv:" <<  a*CL/t - b*CL << arma::endl;
@@ -454,7 +522,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(const arma::vec& _theta,
-                                                                              const bool _grad) {
+                                                                              const bool _grad,
+                                                                                     const bool _bench) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -466,11 +535,28 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(co
 
   double lmp = -1;
   arma::vec grad;
+
+    if (_bench) {
+    std::map<std::string, double> bench;
   if (_grad) {
     grad = arma::vec(_theta.n_elem);
-    lmp = _logMargPost(_theta, &grad, &okm_data);
+    lmp = _logMargPost(_theta, &grad, &okm_data, &bench);
   } else
-    lmp = _logMargPost(_theta, nullptr, &okm_data);
+    lmp = _logMargPost(_theta, nullptr, &okm_data, &bench);
+
+    size_t num = 0;
+    for (auto& kv : bench)
+      num = std::max(kv.first.size(), num);
+    for (auto& kv : bench)
+      arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+
+  } else {
+if (_grad) {
+    grad = arma::vec(_theta.n_elem);
+    lmp = _logMargPost(_theta, &grad, &okm_data, nullptr);
+  } else
+    lmp = _logMargPost(_theta, nullptr, &okm_data, nullptr);
+    }
 
   return std::make_tuple(lmp, std::move(grad));
 }
@@ -480,7 +566,7 @@ LIBKRIGING_EXPORT double NuggetKriging::logLikelihood() {
   arma::vec _theta_alpha = arma::vec(d + 1);
   _theta_alpha.head(d) = m_theta;
   _theta_alpha.at(d) = m_sigma2 / (m_sigma2 + m_nugget);
-  return std::get<0>(NuggetKriging::logLikelihoodFun(_theta_alpha, false));
+  return std::get<0>(NuggetKriging::logLikelihoodFun(_theta_alpha, false, false));
 }
 
 LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
@@ -488,7 +574,7 @@ LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
   arma::vec _theta_alpha = arma::vec(d + 1);
   _theta_alpha.head(d) = m_theta;
   _theta_alpha.at(d) = m_sigma2 / (m_sigma2 + m_nugget);
-  return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false));
+  return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false, false));
 }
 
 std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to = [](const arma::vec& _theta_alpha) {
@@ -545,7 +631,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
-        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
+        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > -ll: " << -ll << arma::endl;
         if (grad_out != nullptr) {
           *grad_out = -NuggetKriging::reparam_from_deriv(_theta_alpha, *grad_out);
@@ -568,7 +654,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
-        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data);
+        double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
@@ -586,7 +672,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
-        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
+        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
@@ -598,7 +684,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
-        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data);
+        double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;

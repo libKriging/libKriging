@@ -6,6 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/Bench.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -23,6 +24,7 @@
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <tuple>
 #include <vector>
+#include <map>
 
 /************************************************/
 /**      NoiseKriging implementation        **/
@@ -97,7 +99,8 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging& other, Explicit
 
 double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
                                     arma::vec* grad_out,
-                                    NoiseKriging::OKModel* okm_data) const {
+                                    NoiseKriging::OKModel* okm_data,
+                               std::map<std::string, double>* bench) const {
   // arma::cout << " theta, alpha: " << _theta_sigma2.t() << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam-1)])
@@ -127,6 +130,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   double _sigma2 = _theta_sigma2.at(d);
   arma::vec _theta = _theta_sigma2.head(d);
 
+  auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
   for (arma::uword i = 0; i < n; i++) {
     R.at(i, i) = _sigma2 + m_noise[i];
@@ -134,22 +138,31 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
       R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _sigma2;
     }
   }
+  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "M = F \\ T", t0);
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
+  t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  if (fd->is_beta_estim)
+  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+  if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
+  }
   fd->z = Yt - fd->M * fd->beta;
+  t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   double ll = -0.5 * (n * log(2 * M_PI) + 2 * sum(log(fd->T.diag())) + arma::accu(fd->z % fd->z));
+  t0 = Bench::toc(bench, "ll = ...log(S2) + Sum(log(Td))...", t0);
   // arma::cout << " ll:" << ll << arma::endl;
 
   if (grad_out != nullptr) {
@@ -175,14 +188,19 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     // 	logLik.derivative[k] <- -0.5*(term1 + term2) #/sigma2
     // }
 
+    t0 = Bench::tic();
     std::vector<arma::mat> gradsC(d);  // if (hess_out != nullptr)
     arma::vec term1 = arma::vec(d);    // if (hess_out != nullptr)
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "Li = I \\ T",t0);
     arma::mat Cinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
+    t0 = Bench::toc(bench, "Ri = Lit * Li",t0);
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
+    t0 = Bench::toc(bench, "tT = Tt", t0);
     arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "x = z \\ tT", t0);
 
     arma::cube gradC = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
@@ -190,8 +208,10 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
         gradC.slice(i).col(j) = R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
       }
     }
+    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
 
     for (arma::uword k = 0; k < d; k++) {
+      t0 = Bench::tic();
       arma::mat gradC_k = arma::mat(n, n);
       for (arma::uword i = 0; i < n; i++) {
         gradC_k.at(i, i) = 0;
@@ -199,10 +219,12 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
           gradC_k.at(i, j) = gradC_k.at(j, i) = gradC.slice(i).col(j)[k];
         }
       }
+      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
 
       term1.at(k) = as_scalar((trans(x) * gradC_k) * x);
       double term2 = -arma::trace(Cinv * gradC_k);
       (*grad_out).at(k) = (term1.at(k) + term2) / 2;
+      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
     }  // for (arma::uword k = 0; k < m_X.n_cols; k++)
 
     arma::mat dCdv = (R - arma::diagmat(m_noise)) / _sigma2;
@@ -216,23 +238,39 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> NoiseKriging::logLikelihoodFun(const arma::vec& _theta_sigma2,
-                                                                               const bool _grad) {
+                                                                               const bool _grad,
+                                                                               const bool _bench) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
   arma::colvec beta;
-  double sigma2{};
   arma::colvec noise{};
-  double var{};
   NoiseKriging::OKModel okm_data{T, M, z, beta, true};
 
   double ll = -1;
   arma::vec grad;
-  if (_grad) {
-    grad = arma::vec(_theta_sigma2.n_elem);
-    ll = _logLikelihood(_theta_sigma2, &grad, &okm_data);
-  } else
-    ll = _logLikelihood(_theta_sigma2, nullptr, &okm_data);
+
+  if (_bench) {
+    std::map<std::string, double> bench;
+    if (_grad) {
+      grad = arma::vec(_theta_sigma2.n_elem);
+      ll = _logLikelihood(_theta_sigma2, &grad, &okm_data, &bench);
+    } else
+      ll = _logLikelihood(_theta_sigma2, nullptr, &okm_data, &bench);
+
+    size_t num = 0;
+    for (auto& kv : bench)
+      num = std::max(kv.first.size(), num);
+    for (auto& kv : bench)
+      arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+
+  } else {
+    if (_grad) {
+      grad = arma::vec(_theta_sigma2.n_elem);
+      ll = _logLikelihood(_theta_sigma2, &grad, &okm_data, nullptr);
+    } else
+      ll = _logLikelihood(_theta_sigma2, nullptr, &okm_data, nullptr);
+  }
 
   return std::make_tuple(ll, std::move(grad));
 }
@@ -243,7 +281,7 @@ LIBKRIGING_EXPORT double NoiseKriging::logLikelihood() {
   arma::vec _theta_sigma2 = arma::vec(d + 1);
   _theta_sigma2.head(d) = m_theta;
   _theta_sigma2.at(d) = m_sigma2;
-  return std::get<0>(NoiseKriging::logLikelihoodFun(_theta_sigma2, false));
+  return std::get<0>(NoiseKriging::logLikelihoodFun(_theta_sigma2, false, false));
 }
 
 /** Fit the kriging object on (X,y):
@@ -276,7 +314,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_sigma2 = Optim::reparam_from(_gamma);
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_sigma2 << arma::endl;
-        double ll = this->_logLikelihood(_theta_sigma2, grad_out, okm_data);
+        double ll = this->_logLikelihood(_theta_sigma2, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
@@ -288,7 +326,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::colvec& y,
       fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::OKModel* okm_data) {
         const arma::vec _theta_sigma2 = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_sigma2 << arma::endl;
-        double ll = this->_logLikelihood(_theta_sigma2, grad_out, okm_data);
+        double ll = this->_logLikelihood(_theta_sigma2, grad_out, okm_data, nullptr);
         // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
         if (grad_out != nullptr) {
           // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;

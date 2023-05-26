@@ -112,7 +112,7 @@ PyKriging PyKriging::load(const std::string filename) {
 std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::array_t<double>& theta,
                                                                   const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, want_grad);
+  auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, want_grad, false);
   return {llo, carma::col_to_arr(grad)};
 }
 
@@ -123,7 +123,7 @@ double PyKriging::leaveOneOut() {
 std::tuple<double, py::array_t<double>, py::array_t<double>>
 PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool want_grad, const bool want_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad, hess] = m_internal->logLikelihoodFun(vec_theta, want_grad, want_hess);
+  auto [llo, grad, hess] = m_internal->logLikelihoodFun(vec_theta, want_grad, want_hess, false);
   return {
       llo,
       carma::col_to_arr(grad),
@@ -139,7 +139,7 @@ double PyKriging::logLikelihood() {
 std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::array_t<double>& theta,
                                                                   const bool want_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, want_grad);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, want_grad, false);
   return {lmp, carma::col_to_arr(grad)};
 }
 

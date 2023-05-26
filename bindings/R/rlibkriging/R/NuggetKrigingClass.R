@@ -630,6 +630,7 @@ load.NuggetKriging <- function(filename, ...) {
 #' @param theta_alpha A numeric vector of (positive) range parameters and variance over variance plus nugget at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
+#' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
 #' @return The log-Likelihood computed for given
@@ -666,7 +667,7 @@ load.NuggetKriging <- function(filename, ...) {
 #' contour(t,a,matrix(ncol=length(a),ll(expand.grid(t,a))),xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
-                                  grad = FALSE, ...) {
+                                  grad = FALSE, bench=FALSE, ...) {
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
@@ -678,7 +679,7 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                            ncol = ncol(theta_alpha)))
     for (i in 1:nrow(theta_alpha)) {
         ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
-                                    grad = isTRUE(grad))
+                                    grad = isTRUE(grad), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
@@ -727,6 +728,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
 #'     (w.r.t theta_alpha)?
+#' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
 #' @return The value of the log-marginal posterior computed for the
@@ -768,7 +770,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),
 #'  nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
-logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...) {
+logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, bench=FALSE, ...) {
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha,ncol=ncol(k$X)+1)
@@ -779,7 +781,7 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, ...)
                 logMargPostGrad = matrix(NA, nrow = nrow(theta_alpha),
                                          ncol = ncol(theta_alpha)))
     for (i in 1:nrow(theta_alpha)) {
-        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], grad = isTRUE(grad))
+        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], grad = isTRUE(grad), bench = isTRUE(bench))
         out$logMargPost[i] <- lmp$logMargPost
         if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }

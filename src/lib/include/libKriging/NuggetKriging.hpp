@@ -108,8 +108,10 @@ class NuggetKriging {
     double var;
   };
 
-  double _logLikelihood(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
-  double _logMargPost(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data) const;
+  double _logLikelihood(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data,
+                        std::map<std::string, double>* bench) const;
+  double _logMargPost(const arma::vec& _theta, arma::vec* grad_out, NuggetKriging::OKModel* okm_data,
+                        std::map<std::string, double>* bench) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NuggetKriging(const std::string& covType);
@@ -150,9 +152,11 @@ class NuggetKriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad,
+                                                                              bool bench);
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad,
+                                                                              bool bench);
 
   LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double logMargPost();
