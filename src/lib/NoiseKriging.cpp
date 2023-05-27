@@ -197,6 +197,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "Li = I \\ T",t0);
+    
     arma::mat Cinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
     t0 = Bench::toc(bench, "Ri = Lit * Li",t0);
 
