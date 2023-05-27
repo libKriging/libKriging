@@ -100,7 +100,7 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging& other, Explicit
 double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
                                     arma::vec* grad_out,
                                     NoiseKriging::OKModel* okm_data,
-                               std::map<std::string, double>* bench) const {
+                                    std::map<std::string, double>* bench) const {
   // arma::cout << " theta, alpha: " << _theta_sigma2.t() << arma::endl;
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
   //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam-1)])
@@ -147,7 +147,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "M = F \\ T", t0);
-  
+
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
@@ -196,10 +196,10 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     arma::vec term1 = arma::vec(d);    // if (hess_out != nullptr)
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "Li = I \\ T",t0);
-    
+    t0 = Bench::toc(bench, "Li = I \\ T", t0);
+
     arma::mat Cinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
-    t0 = Bench::toc(bench, "Ri = Lit * Li",t0);
+    t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     t0 = Bench::toc(bench, "tT = Tt", t0);

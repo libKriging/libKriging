@@ -103,10 +103,14 @@ class Kriging {
                         arma::mat* hess_out,
                         Kriging::OKModel* okm_data,
                         std::map<std::string, double>* bench) const;
-  double _leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data,
-                        std::map<std::string, double>* bench) const;
-  double _logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data,
-                        std::map<std::string, double>* bench) const;
+  double _leaveOneOut(const arma::vec& _theta,
+                      arma::vec* grad_out,
+                      Kriging::OKModel* okm_data,
+                      std::map<std::string, double>* bench) const;
+  double _logMargPost(const arma::vec& _theta,
+                      arma::vec* grad_out,
+                      Kriging::OKModel* okm_data,
+                      std::map<std::string, double>* bench) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
@@ -144,11 +148,9 @@ class Kriging {
                                                                               bool grad,
                                                                               bool hess,
                                                                               bool bench);
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool grad,
-                                                                              bool bench);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool grad, bool bench);
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad,
-                                                                              bool bench);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad, bool bench);
 
   LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double leaveOneOut();

@@ -144,28 +144,28 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
 
   arma::mat H;
-  if (hess_out != nullptr) { // H is not used otherwise...
+  if (hess_out != nullptr) {  // H is not used otherwise...
     H = Q * Q.t();
     t0 = Bench::toc(bench, "H = Q * tQ", t0);
   }
-  
+
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
   if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
-  
+
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
-  if (fd->is_sigma2_estim) { // means no sigma2 provided
+  if (fd->is_sigma2_estim) {  // means no sigma2 provided
     fd->sigma2 = arma::accu(fd->z % fd->z) / n;
     t0 = Bench::toc(bench, "S2 = Acc(z * z) / n", t0);
   }
   // arma::cout << " sigma2:" << fd->sigma2 << arma::endl;
-  
+
   double ll = -0.5 * (n * log(2 * M_PI * fd->sigma2) + 2 * sum(log(fd->T.diag())) + n);
   t0 = Bench::toc(bench, "ll = ...log(S2) + Sum(log(Td))...", t0);
   // arma::cout << " ll:" << ll << arma::endl;
@@ -196,9 +196,9 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     arma::vec terme1 = arma::vec(d);   // if (hess_out != nullptr)
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "Li = I \\ T",t0);
+    t0 = Bench::toc(bench, "Li = I \\ T", t0);
     arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
-    t0 = Bench::toc(bench, "Ri = Lit * Li",t0);
+    t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     t0 = Bench::toc(bench, "tT = Tt", t0);
@@ -329,13 +329,13 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoo
   arma::colvec beta;
   double sigma2{};
   Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
-  
+
   double ll = -1;
   arma::vec grad;
   arma::mat hess;
-  
+
   if (_bench) {
-    std::map<std::string, double> bench;  
+    std::map<std::string, double> bench;
     if (_grad || _hess) {
       grad = arma::vec(_theta.n_elem);
       if (!_hess) {
@@ -346,13 +346,13 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoo
       }
     } else
       ll = _logLikelihood(_theta, nullptr, nullptr, &okm_data, &bench);
-    
+
     size_t num = 0;
     for (auto& kv : bench)
-      num = std::max(kv.first.size(),num);
+      num = std::max(kv.first.size(), num);
     for (auto& kv : bench)
-      arma::cout << "| " << Bench::pad(kv.first, num,' ') << " | " << kv.second << " |" << arma::endl;
-  
+      arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+
   } else {
     if (_grad || _hess) {
       grad = arma::vec(_theta.n_elem);
@@ -380,7 +380,10 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
   return c;
 }
 
-double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data, std::map<std::string, double>* bench) const {
+double Kriging::_leaveOneOut(const arma::vec& _theta,
+                             arma::vec* grad_out,
+                             Kriging::OKModel* okm_data,
+                             std::map<std::string, double>* bench) const {
   // arma::cout << " theta: " << _theta << arma::endl;
   //' @ref https://github.com/DiceKrigingClub/DiceKriging/blob/master/R/leaveOneOutFun.R
   // model@covariance <- vect2covparam(model@covariance, param)
@@ -470,7 +473,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
-  if (fd->is_sigma2_estim) { // means no sigma2 provided
+  if (fd->is_sigma2_estim) {  // means no sigma2 provided
     fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
     t0 = Bench::toc(bench, "S2 = Mean(E * E * diag(Q))", t0);
   }
@@ -524,8 +527,9 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
   return loo;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const arma::vec& _theta, const bool _grad,
-                                                                                     const bool _bench) {
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const arma::vec& _theta,
+                                                                        const bool _grad,
+                                                                        const bool _bench) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;
@@ -563,8 +567,10 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const ar
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
 
-double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Kriging::OKModel* okm_data,
-                               std::map<std::string, double>* bench) const {
+double Kriging::_logMargPost(const arma::vec& _theta,
+                             arma::vec* grad_out,
+                             Kriging::OKModel* okm_data,
+                             std::map<std::string, double>* bench) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
   // In RobustGaSP:
@@ -684,8 +690,8 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
-  
-  fd->z = Yt - fd->M * fd->beta; // required for later predict
+
+  fd->z = Yt - fd->M * fd->beta;  // required for later predict
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
@@ -785,8 +791,9 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
   return (log_marginal_lik + log_approx_ref_prior);
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const arma::vec& _theta, const bool _grad,
-                                                                                     const bool _bench) {
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const arma::vec& _theta,
+                                                                        const bool _grad,
+                                                                        const bool _bench) {
   arma::mat T;
   arma::mat M;
   arma::colvec z;

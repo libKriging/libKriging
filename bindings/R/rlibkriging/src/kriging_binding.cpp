@@ -332,7 +332,11 @@ void kriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool grad = false, bool hess = false, bool bench = false) {
+Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
+                                    arma::vec theta,
+                                    bool grad = false,
+                                    bool hess = false,
+                                    bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");

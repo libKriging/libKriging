@@ -18,21 +18,22 @@ std::chrono::high_resolution_clock::time_point Bench::tic() {
 }
 
 std::chrono::high_resolution_clock::time_point Bench::toc(std::map<std::string, double>* bench,
-                                                   std::string what,
-                                                   std::chrono::high_resolution_clock::time_point t0) {
-  if (bench == nullptr) return t0;
+                                                          std::string what,
+                                                          std::chrono::high_resolution_clock::time_point t0) {
+  if (bench == nullptr)
+    return t0;
 
   const auto t = std::chrono::high_resolution_clock::now();
-  if ((*bench).count(what)>0)
+  if ((*bench).count(what) > 0)
     (*bench)[what] += (std::chrono::duration<double>(t - t0)).count() * 1000;
   else
     (*bench)[what] = (std::chrono::duration<double>(t - t0)).count() * 1000;
-  //arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+  // arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
   return t;
 }
 
 std::string Bench::pad(std::string str, const size_t num, const char paddingChar = ' ') {
-    if (num > str.size())
-        return str.insert(str.size(), num - str.size(), paddingChar);
-    return str;
+  if (num > str.size())
+    return str.insert(str.size(), num - str.size(), paddingChar);
+  return str;
 }
