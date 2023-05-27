@@ -143,6 +143,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "M = F \\ T", t0);
+  
   arma::mat Q;
   arma::mat G;
   qr_econ(Q, G, fd->M);
@@ -150,10 +151,12 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+
   if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
-  }  
+  }
+
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
@@ -206,6 +209,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     t0 = Bench::toc(bench, "tT = Tt", t0);
+
     arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "x = z \\ tT", t0);
 
@@ -404,6 +408,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
 
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+
   if (fd->is_beta_estim) {
     arma::mat Q;
     arma::mat G;
@@ -412,6 +417,9 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
+  
+  fd->z = Yt - fd->M * fd->beta; // required for later predict
+  t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
   t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);

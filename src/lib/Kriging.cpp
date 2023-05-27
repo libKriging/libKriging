@@ -155,6 +155,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
+  
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
@@ -201,6 +202,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
 
     arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
     t0 = Bench::toc(bench, "tT = Tt", t0);
+
     arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "x = z \\ tT", t0);
 
@@ -454,6 +456,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+
   if (fd->is_beta_estim) {
     // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
     arma::mat Q;
@@ -463,6 +466,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta, arma::vec* grad_out, Krigi
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
+
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
@@ -671,6 +675,7 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
 
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+
   if (fd->is_beta_estim) {
     arma::mat Q;
     arma::mat G;
@@ -679,6 +684,9 @@ double Kriging::_logMargPost(const arma::vec& _theta, arma::vec* grad_out, Krigi
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
+  
+  fd->z = Yt - fd->M * fd->beta; // required for later predict
+  t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   arma::mat yt_R_inv = trans(solve(trans(L), Yt, LinearAlgebra::default_solve_opts));
   t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);
