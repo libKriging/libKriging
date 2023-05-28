@@ -188,7 +188,7 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
   const bool want_grad = flag_output_compliance(input, 3, "want_grad", output, 1);
-  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta_alpha"), want_grad);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta_alpha"), want_grad, false);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
 }
@@ -211,7 +211,7 @@ void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
   const bool want_grad = flag_output_compliance(input, 2, "want_grad", output, 1);
-  auto [lmp, lmpgrad] = km->logMargPostFun(input.get<arma::vec>(1, "theta"), want_grad);
+  auto [lmp, lmpgrad] = km->logMargPostFun(input.get<arma::vec>(1, "theta"), want_grad, false);
   output.set(0, lmp, "lmp");                  // FIXME better name
   output.setOptional(1, lmpgrad, "lmpgrad");  // FIXME better name
 }

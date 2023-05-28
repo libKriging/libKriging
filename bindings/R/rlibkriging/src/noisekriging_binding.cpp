@@ -338,14 +338,14 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool grad = false) {
+Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool grad = false, bool bench = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_sigma2, grad);
+  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_sigma2, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {

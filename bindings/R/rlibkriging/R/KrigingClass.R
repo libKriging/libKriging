@@ -632,6 +632,7 @@ load.Kriging <- function(filename, ...) {
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
 #' @param hess Logical. Should the function return Hessian?
+#' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
 #' @return The log-Likelihood computed for given
@@ -656,7 +657,7 @@ load.Kriging <- function(filename, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  grad = FALSE, hess = FALSE, ...) {
+                                  grad = FALSE, hess = FALSE, bench=FALSE, ...) {
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
@@ -670,7 +671,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
                                                       ncol(theta))))
     for (i in 1:nrow(theta)) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    grad = isTRUE(grad), hess = isTRUE(hess))
+                                    grad = isTRUE(grad), hess = isTRUE(hess), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
         if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
@@ -727,7 +728,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #'
 #' @param grad Logical. Should the gradient (w.r.t. \code{theta}) be
 #'     returned?
-#'
+#' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
 #' @return The leave-One-Out value computed for the given vector
@@ -750,7 +751,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' t <-  seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, loo(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
+leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
@@ -761,7 +762,7 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, ...) {
                 leaveOneOutGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(grad))
+        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(grad), bench = isTRUE(bench))
         out$leaveOneOut[i] <- loo$leaveOneOut
         if (isTRUE(grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
     }
@@ -808,6 +809,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #'     which the function is to be evaluated.
 #' @param grad Logical. Should the function return the gradient
 #'     (w.r.t theta)?
+#' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
 #' @return The value of the log-marginal posterior computed for the
@@ -836,7 +838,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' t <- seq(from = 0.01, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
+logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
@@ -847,7 +849,7 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, ...) {
                 logMargPostGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        lmp <- kriging_logMargPostFun(object, theta[i, ], grad = isTRUE(grad))
+        lmp <- kriging_logMargPostFun(object, theta[i, ], grad = isTRUE(grad), bench = isTRUE(bench))
         out$logMargPost[i] <- lmp$logMargPost
         if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }

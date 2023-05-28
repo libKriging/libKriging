@@ -332,14 +332,18 @@ void kriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool grad = false, bool hess = false) {
+Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
+                                    arma::vec theta,
+                                    bool grad = false,
+                                    bool hess = false,
+                                    bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, grad, hess);
+  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, grad, hess, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {
@@ -364,14 +368,14 @@ double kriging_logLikelihood(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool grad = false) {
+Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, grad);
+  std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
   if (grad) {
@@ -393,14 +397,14 @@ double kriging_leaveOneOut(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = false) {
+Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad);
+  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   if (grad) {

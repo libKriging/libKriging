@@ -638,6 +638,7 @@ load.NoiseKriging <- function(filename, ...) {
 #' @param theta_sigma2 A numeric vector of (positive) range parameters and variance at
 #'     which the log-likelihood will be evaluated.
 #' @param grad Logical. Should the function return the gradient?
+#' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
 #' @return The log-Likelihood computed for given
@@ -673,7 +674,7 @@ load.NoiseKriging <- function(filename, ...) {
 #' contour(t,s2,matrix(ncol=length(s2),ll(expand.grid(t,s2))),xlab="theta",ylab="sigma2")
 #' points(k$theta(),k$sigma2(),col='blue')
 logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
-                                  grad = FALSE, ...) {
+                                  grad = FALSE, bench=FALSE, ...) {
     k <- noisekriging_model(object)
     if (is.data.frame(theta_sigma2)) theta_sigma2 = data.matrix(theta_sigma2)
     if (!is.matrix(theta_sigma2)) theta_sigma2 <- matrix(theta_sigma2, ncol = ncol(k$X)+1)
@@ -685,7 +686,7 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                            ncol = ncol(theta_sigma2)))
     for (i in 1:nrow(theta_sigma2)) {
         ll <- noisekriging_logLikelihoodFun(object, theta_sigma2[i, ],
-                                    grad = isTRUE(grad))
+                                    grad = isTRUE(grad), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
