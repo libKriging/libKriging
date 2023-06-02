@@ -382,6 +382,7 @@ arma::colvec DiagABA(const arma::mat& A, const arma::mat& B) {
 
 double Kriging::_leaveOneOut(const arma::vec& _theta,
                              arma::vec* grad_out,
+                             arma::mat* yhat_out,
                              Kriging::OKModel* okm_data,
                              std::map<std::string, double>* bench) const {
   // arma::cout << " theta: " << _theta << arma::endl;
@@ -454,6 +455,11 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   arma::colvec errorsLOO = sigma2LOO % Qy;
   t0 = Bench::toc(bench, "E = S2l * Qy", t0);
 
+  if (yhat_out != nullptr) {
+    (*yhat_out).col(0) = m_y - errorsLOO;
+    (*yhat_out).col(1) = arma::sqrt(sigma2LOO);
+  }
+
   double loo = arma::accu(errorsLOO % errorsLOO) / n;
   t0 = Bench::toc(bench, "loo = Acc(E * E) / n", t0);
 
@@ -462,11 +468,11 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   if (fd->is_beta_estim) {
     // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
-    arma::mat Q;
+    arma::mat Q_qr;
     arma::mat G;
-    arma::qr_econ(Q, G, fd->M);
+    arma::qr_econ(Q_qr, G, fd->M);
     t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
-    fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
+    fd->beta = solve(G, Q_qr.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
 
@@ -544,9 +550,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const ar
     std::map<std::string, double> bench;
     if (_grad) {
       grad = arma::vec(_theta.n_elem);
-      loo = _leaveOneOut(_theta, &grad, &okm_data, &bench);
+      loo = _leaveOneOut(_theta, &grad, nullptr, &okm_data, &bench);
     } else
-      loo = _leaveOneOut(_theta, nullptr, &okm_data, &bench);
+      loo = _leaveOneOut(_theta, nullptr, nullptr, &okm_data, &bench);
 
     size_t num = 0;
     for (auto& kv : bench)
@@ -557,12 +563,27 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const ar
   } else {
     if (_grad) {
       grad = arma::vec(_theta.n_elem);
-      loo = _leaveOneOut(_theta, &grad, &okm_data, nullptr);
+      loo = _leaveOneOut(_theta, &grad, nullptr, &okm_data, nullptr);
     } else
-      loo = _leaveOneOut(_theta, nullptr, &okm_data, nullptr);
+      loo = _leaveOneOut(_theta, nullptr, nullptr, &okm_data, nullptr);
   }
 
   return std::make_tuple(loo, std::move(grad));
+}
+
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const arma::vec& _theta) {
+  arma::mat T;
+  arma::mat M;
+  arma::colvec z;
+  arma::colvec beta;
+  double sigma2{};
+  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+
+  double loo = -1;
+  arma::mat yhat = arma::mat(_theta.n_elem, 2);
+  loo = _leaveOneOut(_theta, nullptr, &yhat, &okm_data, nullptr);
+
+  return std::make_tuple(std::move(yhat.col(0)), std::move(yhat.col(1)));
 }
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
@@ -1017,7 +1038,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
             // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
             const arma::vec _theta = Optim::reparam_from(_gamma);
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double loo = this->_leaveOneOut(_theta, grad_out, okm_data, nullptr);
+            double loo = this->_leaveOneOut(_theta, grad_out, nullptr, okm_data, nullptr);
             // DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
             if (grad_out != nullptr) {
               // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
@@ -1030,7 +1051,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::OKModel* okm_data) {
             const arma::vec _theta = _gamma;
             // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double loo = this->_leaveOneOut(_theta, grad_out, okm_data, nullptr);
+            double loo = this->_leaveOneOut(_theta, grad_out, nullptr, okm_data, nullptr);
             // DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
             // if (grad_out != nullptr) {
             //   if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;

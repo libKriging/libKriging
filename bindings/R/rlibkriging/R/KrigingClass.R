@@ -99,7 +99,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
+    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -768,6 +768,47 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
     }
     if (!isTRUE(grad)) out$leaveOneOutGrad <- NULL
     return(out)
+}
+
+#' Compute Leave-One-Out (LOO) vector error for an object with S3 class
+#' \code{"Kriging"} representing a kriging model.
+#'
+#' The returned value is the mean and stdev of \eqn{\hat{y}_{i,(-i)}}, the
+#' prediction of \eqn{y_i}{y[i]} based on the the observations \eqn{y_j}{y[j]}
+#' with \eqn{j \neq i}{j != i}.
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object A \code{Kriging} object.
+#' @param theta A numeric vector of range parameters at which the LOO
+#'     will be evaluated.
+#' @param ... Not used.
+#'
+#' @return The leave-One-Out vector computed for the given vector
+#'     \eqn{\boldsymbol{\theta}}{\theta} of correlation ranges.
+#'
+#' @method leaveOneOutVec Kriging
+#' @export
+#' @aliases leaveOneOutVec,Kriging,Kriging-method
+#'
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, kernel = "matern3_2", objective = "LOO", optim="BFGS")
+#' print(k)
+#'
+#' leaveOneOutVec(k, k$theta())
+leaveOneOutVec.Kriging <- function(object, theta, ...) {
+    k <- kriging_model(object)
+    if (!is.array(theta)) 
+        stop("Input theta must be 1-dimensional")
+    if (length(theta) != ncol(k$X))
+        stop("Input theta must have ", ncol(k$X), " values (instead of ",
+             length(theta),")")
+    return( kriging_leaveOneOutVec(object,theta) )
 }
 
 

@@ -51,6 +51,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOutFun", obj.ref, varargin{:});
         end
 
+        function varargout = leaveOneOutVec(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOutVec", obj.ref, varargin{:});
+        end
+
         function varargout = leaveOneOut(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::leaveOneOut", obj.ref, varargin{:});
         end

@@ -15,6 +15,7 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void leaveOneOutFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void leaveOneOutVec(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

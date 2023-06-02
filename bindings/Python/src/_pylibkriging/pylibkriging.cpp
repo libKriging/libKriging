@@ -132,6 +132,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
       .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
+      .def("leaveOneOutVec", &PyKriging::leaveOneOutVec)
       .def("logLikelihoodFun", &PyKriging::logLikelihoodFun)
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
