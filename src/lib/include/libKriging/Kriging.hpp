@@ -105,6 +105,7 @@ class Kriging {
                         std::map<std::string, double>* bench) const;
   double _leaveOneOut(const arma::vec& _theta,
                       arma::vec* grad_out,
+                      arma::mat* yhat_out,
                       Kriging::OKModel* okm_data,
                       std::map<std::string, double>* bench) const;
   double _logMargPost(const arma::vec& _theta,
@@ -155,6 +156,8 @@ class Kriging {
   LIBKRIGING_EXPORT double logLikelihood();
   LIBKRIGING_EXPORT double leaveOneOut();
   LIBKRIGING_EXPORT double logMargPost();
+
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output

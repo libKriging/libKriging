@@ -386,6 +386,22 @@ Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool grad = fal
 }
 
 // [[Rcpp::export]]
+Rcpp::List kriging_leaveOneOutVec(Rcpp::List k, arma::vec theta) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  std::tuple<arma::vec, arma::vec> yhat = impl_ptr->leaveOneOutVec(theta);
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(yhat));
+  ret.push_back(std::get<1>(yhat), "stdev");
+
+  return ret;
+}
+
+// [[Rcpp::export]]
 double kriging_leaveOneOut(Rcpp::List k) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

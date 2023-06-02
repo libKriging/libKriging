@@ -67,6 +67,8 @@ class PyKriging {
 
   std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, const bool want_grad);
 
+  std::tuple<py::array_t<double>, py::array_t<double>> leaveOneOutVec(const py::array_t<double>& theta);
+
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
                                                                                 const bool want_grad,
                                                                                 const bool want_hess);
