@@ -468,11 +468,11 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   if (fd->is_beta_estim) {
     // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
-    arma::mat Q;
+    arma::mat Q_qr;
     arma::mat G;
-    arma::qr_econ(Q, G, fd->M);
+    arma::qr_econ(Q_qr, G, fd->M);
     t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
-    fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
+    fd->beta = solve(G, Q_qr.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }
 
