@@ -116,7 +116,7 @@ std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::arra
   return {llo, carma::col_to_arr(grad)};
 }
 
-std::tuple< py::array_t<double>, py::array_t<double>> PyKriging::leaveOneOutVec(const py::array_t<double>& theta) {
+std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::leaveOneOutVec(const py::array_t<double>& theta) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [yhat_mean, yhat_sd] = m_internal->leaveOneOutVec(vec_theta);
   return {carma::col_to_arr(yhat_mean), carma::col_to_arr(yhat_sd)};

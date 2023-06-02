@@ -181,8 +181,8 @@ void leaveOneOutVec(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   auto [yhat_mean, yhat_sd] = km->leaveOneOutVec(input.get<arma::vec>(1, "theta"));
-  output.set(0, yhat_mean, "mean");                  // FIXME better name
-  output.set(1, yhat_sd, "stdev");  // FIXME better name
+  output.set(0, yhat_mean, "mean");  // FIXME better name
+  output.set(1, yhat_sd, "stdev");   // FIXME better name
 }
 
 void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
