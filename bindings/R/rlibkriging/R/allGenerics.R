@@ -53,6 +53,21 @@ leaveOneOutFun <- function(object, ...) {
 }
 
 ## *****************************************************************************
+##' Compute the leave-One-Out vector error of a model given in \code{object},
+##' at a different value of the parameters.
+##'
+##' @title Leave-One-Out vector
+##' 
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. range).
+##'
+##' @return The Leave-One-Out errors (mean and stdev) for each conditional point.
+##' @export
+leaveOneOutVec <- function(object, ...) {
+    UseMethod("leaveOneOutFun")
+}
+
+## *****************************************************************************
 ##' Compute the log-Likelihood of a model given in \code{object},
 ##' at a different value of the parameters.
 ##'
