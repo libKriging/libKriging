@@ -455,13 +455,19 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   arma::colvec errorsLOO = sigma2LOO % Qy;
   t0 = Bench::toc(bench, "E = S2l * Qy", t0);
 
+  double loo = arma::accu(errorsLOO % errorsLOO) / n;
+  t0 = Bench::toc(bench, "loo = Acc(E * E) / n", t0);
+
+  if (fd->is_sigma2_estim) {  // means no sigma2 provided
+    fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
+    t0 = Bench::toc(bench, "S2 = Mean(E * E * diag(Q))", t0);
+  }
+  // arma::cout << " sigma2:" << fd->sigma2 << arma::endl;
+
   if (yhat_out != nullptr) {
     (*yhat_out).col(0) = m_y - errorsLOO;
     (*yhat_out).col(1) = arma::sqrt(sigma2LOO);
   }
-
-  double loo = arma::accu(errorsLOO % errorsLOO) / n;
-  t0 = Bench::toc(bench, "loo = Acc(E * E) / n", t0);
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
@@ -478,12 +484,6 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   fd->z = Yt - fd->M * fd->beta;
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
-
-  if (fd->is_sigma2_estim) {  // means no sigma2 provided
-    fd->sigma2 = arma::mean(errorsLOO % errorsLOO % Q.diag());
-    t0 = Bench::toc(bench, "S2 = Mean(E * E * diag(Q))", t0);
-  }
-  // arma::cout << " sigma2:" << fd->sigma2 << arma::endl;
 
   if (grad_out != nullptr) {
     //' @ref https://github.com/cran/DiceKriging/blob/master/R/leaveOneOutGrad.R
@@ -575,15 +575,13 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const
   arma::mat T;
   arma::mat M;
   arma::colvec z;
-  arma::colvec beta;
-  double sigma2{};
-  Kriging::OKModel okm_data{T, M, z, beta, true, sigma2, true};
+  Kriging::OKModel okm_data{T, M, z, m_beta, false, m_sigma2, false};
 
   double loo = -1;
-  arma::mat yhat = arma::mat(_theta.n_elem, 2);
+  arma::mat yhat = arma::mat(m_y.n_elem, 2);
   loo = _leaveOneOut(_theta, nullptr, &yhat, &okm_data, nullptr);
 
-  return std::make_tuple(std::move(yhat.col(0)), std::move(yhat.col(1)));
+  return std::make_tuple(std::move(yhat.col(0)), std::move(yhat.col(1) * std::sqrt(m_sigma2)));
 }
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP

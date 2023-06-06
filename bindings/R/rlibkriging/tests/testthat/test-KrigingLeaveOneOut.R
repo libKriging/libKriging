@@ -1,6 +1,6 @@
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
 # kernel = "gauss"
-  context(paste0("Check LogLikelihood for kernel ",kernel))
+  context(paste0("Check leaveOneOut for kernel ",kernel))
   
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 plot(f)
@@ -41,3 +41,36 @@ test_that(desc="leaveOneOut Grad is the same that DiceKriging one",
 }
 
 
+
+context(paste0("Check leaveOneOutVec"))
+  
+f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+n <- 5
+set.seed(123)
+X <- as.matrix(runif(n))
+y = f(X)
+r <- Kriging(y, X, kernel="gauss", regmodel="linear")
+
+loo = list(mean=matrix(NA,n,1),stdev=matrix(NA,n,1))
+for (i in 1:n) {
+  ri <- Kriging(y[-i], X[-i,,drop=FALSE], kernel="gauss", regmodel="linear", optim="none", parameters=list(theta=r$theta(),sigma2=r$sigma2()))
+  predi = predict(ri,X[i])
+  loo$mean[i,1] = predi$mean
+  loo$stdev[i,1] = predi$stdev
+}
+
+loovec = r$leaveOneOutVec(r$theta())
+
+test_that(desc="leaveOneOut vector mean is equal to k-fold loo",
+          expect_equal(loovec$mean,loo$mean,tolerance= precision))
+test_that(desc="leaveOneOut vector stdev is equal to k-fold loo",
+          expect_equal(loovec$stdev,loo$stdev,tolerance= precision))
+
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), formula = as.formula("~."), 
+                    coef.var=r$sigma2(), coef.cov=r$theta()[1])
+loovec_km = DiceKriging::leaveOneOut.km(k,type="UK",trend.reestim=TRUE)
+
+test_that(desc="leaveOneOut vector mean is equal to DiceKriging one",
+          expect_equal(loovec_km$mean,loovec$mean[,1],tolerance= precision))
+test_that(desc="leaveOneOut vector stdev is equal to DiceKriging one",
+          expect_equal(loovec_km$sd,loovec$stdev[,1],tolerance= precision))

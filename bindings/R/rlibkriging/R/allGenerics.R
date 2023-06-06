@@ -64,7 +64,7 @@ leaveOneOutFun <- function(object, ...) {
 ##' @return The Leave-One-Out errors (mean and stdev) for each conditional point.
 ##' @export
 leaveOneOutVec <- function(object, ...) {
-    UseMethod("leaveOneOutFun")
+    UseMethod("leaveOneOutVec")
 }
 
 ## *****************************************************************************
@@ -216,9 +216,11 @@ save <- function(object, ...) {
 ##'
 ##' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
 ##' print(k)
-##' save(k,"k.h5")
+##' 
+##' outfile = tempfile("k.h5") 
+##' save(k,outfile)
 ##'
-##' print(load("k.h5"))
+##' print(load(outfile))
 load <- function(filename, ...) {
     if (!is.character(filename) ||
         endsWith(filename,"Rdata") ||

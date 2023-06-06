@@ -395,8 +395,10 @@ Rcpp::List kriging_leaveOneOutVec(Rcpp::List k, arma::vec theta) {
 
   std::tuple<arma::vec, arma::vec> yhat = impl_ptr->leaveOneOutVec(theta);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(yhat));
-  ret.push_back(std::get<1>(yhat), "stdev");
+  Rcpp::List ret = Rcpp::List::create(
+    Rcpp::Named("mean") = std::get<0>(yhat),
+    Rcpp::Named("stdev") = std::get<1>(yhat)
+  );
 
   return ret;
 }
