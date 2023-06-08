@@ -148,15 +148,14 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "M = F \\ T", t0);
 
-  arma::mat Q;
-  arma::mat G;
-  qr_econ(Q, G, fd->M);
-  t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
-
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = y \\ T", t0);
 
   if (fd->is_beta_estim) {
+    arma::mat Q;
+    arma::mat G;
+    qr_econ(Q, G, fd->M);
+    t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
   }

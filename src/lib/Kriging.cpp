@@ -160,13 +160,14 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   t0 = Bench::toc(bench, "z = Yt - M * B", t0);
 
   //' @ref https://github.com/cran/DiceKriging/blob/master/R/computeAuxVariables.R
+  double sigma2 = arma::accu(fd->z % fd->z) / n;
+  t0 = Bench::toc(bench, "S2 = Acc(z * z) / n", t0);
   if (fd->is_sigma2_estim) {  // means no sigma2 provided
-    fd->sigma2 = arma::accu(fd->z % fd->z) / n;
-    t0 = Bench::toc(bench, "S2 = Acc(z * z) / n", t0);
+    fd->sigma2 = sigma2;
   }
   // arma::cout << " sigma2:" << fd->sigma2 << arma::endl;
 
-  double ll = -0.5 * (n * log(2 * M_PI * fd->sigma2) + 2 * sum(log(fd->T.diag())) + n);
+  double ll = -0.5 * (n * log(2 * M_PI * sigma2) + 2 * sum(log(fd->T.diag())) + n);
   t0 = Bench::toc(bench, "ll = ...log(S2) + Sum(log(Td))...", t0);
   // arma::cout << " ll:" << ll << arma::endl;
 
@@ -723,16 +724,16 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     fd->sigma2 = S_2(0, 0) / (n - d);
 
   double log_S_2 = log(S_2(0, 0));
-  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (m_X.n_rows - m_F.n_cols) / 2.0 * log_S_2;
+  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (n - d) / 2.0 * log_S_2;
   t0 = Bench::toc(bench, "lml = -Sum(log(diag(T))) - Sum(log(diag(TF)))...", t0);
   // arma::cout << " log_marginal_lik:" << log_marginal_lik << arma::endl;
 
   // Default prior params
   double a = 0.2;
-  double b = 1.0 / pow(m_X.n_rows, 1.0 / m_X.n_cols) * (a + 1.0);
+  double b = 1.0 / pow(n, 1.0 / d) * (a + d);
   // t0 = Bench::toc("b             ", t0);
 
-  arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(m_X.n_rows, 1.0 / m_X.n_cols);
+  arma::vec CL = trans(max(m_X, 0) - min(m_X, 0)) / pow(n, 1.0 / d);
   t0 = Bench::toc(bench, "CL = (max(X) - min(X)) / n^1/d", t0);
 
   double t = arma::accu(CL % pow(_theta, -1.0));

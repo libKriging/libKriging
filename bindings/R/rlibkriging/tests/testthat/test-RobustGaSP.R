@@ -29,7 +29,7 @@ lmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
                                         a=0.2,
-                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2]),
+                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@input))[2]),
                                         kernel_type=rep(as.integer(3),ncol(X)),alpha=model@alpha
                                         )
                       y})}
@@ -70,7 +70,7 @@ dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
 #    print(RobustGaSP:::log_approx_ref_prior_deriv(param=(x),nugget=0, nugget_est=model@nugget.est, 
 #                                        CL=model@CL, 
 #                                        a=0.2,
-#                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2])))
+#                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@input))[2])))
 
 
                       #y=-logMargPostFun(r,matrix(unlist(x),ncol=2))$logMargPost
@@ -78,7 +78,7 @@ dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=1);
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
                                         a=0.2,
-                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2]),
+                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@input))[2]),
                                         kernel_type=rep(as.integer(3),ncol(X)),alpha=model@alpha
                                         )
                       y})}
@@ -211,7 +211,7 @@ lmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
                                         a=0.2,
-                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2]),
+                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@input))[2]),
                                         kernel_type=rep(as.integer(3),ncol(X)),alpha=model@alpha
                                         )
                       y})}
@@ -247,7 +247,7 @@ dlmp_rgasp = function(X, model=k) {if (!is.matrix(X)) X = matrix(X,ncol=2);
                                         R0=model@R0,X=model@X, zero_mean=model@zero_mean,output=model@output, 
                                         CL=model@CL, 
                                         a=0.2,
-                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@output))[2]),
+                                        b=1/(length(model@output))^{1/dim(as.matrix(model@input))[2]}*(0.2+dim(as.matrix(model@input))[2]),
                                         kernel_type=rep(as.integer(3),ncol(X)),alpha=model@alpha
                                         )
                       y})}
