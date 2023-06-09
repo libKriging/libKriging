@@ -1,5 +1,4 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+library(RobustGaSP)
 
 kernel_type = function(kernel) {
   if (kernel=="matern3_2") return("matern_3_2")
