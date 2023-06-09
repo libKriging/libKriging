@@ -1,5 +1,4 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+library(RobustGaSP)
 
 kernel_type = function(kernel) {
   if (kernel=="matern3_2") return("matern_3_2")
@@ -27,10 +26,14 @@ for (kernel in c("matern5_2","matern3_2")) {
 
   lmp = function(theta,nugget_est=FALSE) {
     #cat("theta: ",theta,"\n")
-    lml = RobustGaSP::log_marginal_lik(param=c(log(1/theta),k@nugget),nugget=k@nugget,nugget_est=nugget_est,
+    param = c(log(1/theta),k@nugget)
+    if (!nugget_est) param = param[-length(param)]
+    #cat("log_marginal_lik\n")
+    lml = RobustGaSP::log_marginal_lik(param=param,nugget=k@nugget,nugget_est=nugget_est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
     #cat("  lml: ",lml,"\n")
-    larp = RobustGaSP::log_approx_ref_prior(param=c(log(1/theta),k@nugget),nugget=k@nugget,nugget_est=nugget_est,
+    #cat("log_approx_ref_prior\n")
+    larp = RobustGaSP::log_approx_ref_prior(param=param,nugget=k@nugget,nugget_est=nugget_est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
     #cat("  larp: ",larp,"\n")
     return(lml+larp)
@@ -41,10 +44,14 @@ for (kernel in c("matern5_2","matern3_2")) {
 
   lmp_deriv = function(theta, nugget_est=FALSE) {
     #cat("theta: ",theta,"\n")
-    lml_d = RobustGaSP::log_marginal_lik_deriv(param=log(1/theta),nugget=k@nugget,nugget_est=nugget_est,
+    param = c(log(1/theta),k@nugget)
+    if (!nugget_est) param = param[-length(param)]
+    #cat("log_marginal_lik_deriv\n")
+    lml_d = RobustGaSP::log_marginal_lik_deriv(param=param,nugget=k@nugget,nugget_est=nugget_est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
     #cat("  lml_d: ",lml_d,"\n")
-    larp_d = RobustGaSP::log_approx_ref_prior_deriv(param=log(1/theta),nugget=k@nugget,nugget_est=nugget_est,
+    #cat("log_approx_ref_prior_deriv\n")
+    larp_d = RobustGaSP::log_approx_ref_prior_deriv(param=param,nugget=k@nugget,nugget_est=nugget_est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
     #cat("  larp_d: ",larp_d,"\n")
     return((lml_d + larp_d)* 1/theta * (-1/theta))
