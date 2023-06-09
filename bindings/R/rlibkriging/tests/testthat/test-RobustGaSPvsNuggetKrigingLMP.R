@@ -14,8 +14,6 @@ kernel_type_num = function(kernel) {
 for (kernel in c("matern5_2","matern3_2")) {
   context(paste0("Check Marginal Posterior for kernel ",kernel))
   
-  cat(paste0(kernel,"\n"))
-
   f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
   plot(f)
   n <- 15
@@ -24,19 +22,17 @@ for (kernel in c("matern5_2","matern3_2")) {
   y = f(X) + rnorm(n,0,0.1)
   points(X,y)
 
-  cat("rgasp\n")
-
   k = RobustGaSP::rgasp(design=X,response=y,kernel_type=kernel_type(kernel), nugget.est=TRUE)
 
   lmp = function(theta,nugget_est=FALSE) {
     #cat("theta: ",theta,"\n")
     param = c(log(1/theta),k@nugget)
     if (!nugget_est) param = param[-length(param)]
-    cat("log_marginal_lik\n")
+    //cat("log_marginal_lik\n")
     lml = RobustGaSP::log_marginal_lik(param=param,nugget=k@nugget,nugget_est=nugget_est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
     #cat("  lml: ",lml,"\n")
-    cat("log_approx_ref_prior\n")
+    //cat("log_approx_ref_prior\n")
     larp = RobustGaSP::log_approx_ref_prior(param=param,nugget=k@nugget,nugget_est=nugget_est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
     #cat("  larp: ",larp,"\n")
@@ -50,11 +46,11 @@ for (kernel in c("matern5_2","matern3_2")) {
     #cat("theta: ",theta,"\n")
     param = c(log(1/theta),k@nugget)
     if (!nugget_est) param = param[-length(param)]
-    cat("log_marginal_lik_deriv\n")
+    //cat("log_marginal_lik_deriv\n")
     lml_d = RobustGaSP::log_marginal_lik_deriv(param=param,nugget=k@nugget,nugget_est=nugget_est,
       R0=k@R0,X=k@X,zero_mean=k@zero_mean,output=k@output,kernel_type=kernel_type_num(kernel),alpha=k@alpha)
     #cat("  lml_d: ",lml_d,"\n")
-    cat("log_approx_ref_prior_deriv\n")
+    //cat("log_approx_ref_prior_deriv\n")
     larp_d = RobustGaSP::log_approx_ref_prior_deriv(param=param,nugget=k@nugget,nugget_est=nugget_est,
       CL=k@CL,a=0.2,b=1/(length(y))^{1/dim(as.matrix(X))[2]}*(0.2+dim(as.matrix(X))[2]))
     #cat("  larp_d: ",larp_d,"\n")
@@ -66,9 +62,6 @@ for (kernel in c("matern5_2","matern3_2")) {
   }
 
   library(rlibkriging)
-
-  cat("NuggetKriging\n")
-
   r <- NuggetKriging(y, X, kernel, objective="LMP")#, 
                      #optim="none", parameters=list(theta = matrix(1/k@beta_hat), nugget=k@nugget*k@sigma2_hat,sigma2=k@sigma2_hat))
   ## Should be equal:
@@ -80,9 +73,6 @@ for (kernel in c("matern5_2","matern3_2")) {
   # plot(Vectorize(ll2),col='red',add=T,xlim=c(0.01,2)) # FIXME fails with "error: chol(): decomposition failed"
   alpha = r$sigma2()/(r$sigma2()+r$nugget()) #1/(1+k@nugget) #r$sigma2()/(r$nugget()+r$sigma2())
   for (x in seq(0.01,2,,11)){
-      
-    cat("logMargPostFun\n")
-
     ll2x = logMargPostFun(r,c(x,alpha))$logMargPost
     gll2x = logMargPostFun(r,c(x,alpha),grad = T)$logMargPostGrad[1]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
