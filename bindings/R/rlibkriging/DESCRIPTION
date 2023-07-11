@@ -2,7 +2,7 @@ Package: rlibkriging
 Type: Package
 Title: Kriging Models using the 'libKriging' Library
 Version: 0.8-0
-Date: 2023-05-23
+Date: 2023-07-11
 Authors@R: 
     c(person(given = "Pascal",
              family = "Havé",
