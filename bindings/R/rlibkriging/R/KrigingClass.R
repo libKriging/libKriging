@@ -794,13 +794,34 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
-#' X <- as.matrix(runif(10))
+#' X <- as.matrix(c(0.0, 0.25, 0.5, 0.75, 1.0))
 #' y <- f(X)
 #'
-#' k <- Kriging(y, X, kernel = "matern3_2", objective = "LOO", optim="BFGS")
+#' k <- Kriging(y, X, kernel = "matern3_2")
 #' print(k)
 #'
-#' leaveOneOutVec(k, k$theta())
+#' x <- as.matrix(seq(0, 1, , 101))
+#' p <- predict(k, x, TRUE, FALSE)
+#' 
+#' plot(f)
+#' points(X, y)
+#' lines(x, p$mean, col = 'blue')
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' 
+#' # Compute leave-one-out (no range re-estimate) on 2nd point
+#' X_no2 = X[-2,,drop=FALSE]
+#' y_no2 = f(X_no2)
+#' k_no2 = Kriging(y_no2, X_no2, "matern3_2", optim = "none", parameters = list(theta = k$theta()))
+#' print(k_no2)
+#' 
+#' p_no2 <- predict(k_no2, x, TRUE, FALSE)
+#' lines(x, p_no2$mean, col = 'red')
+#' polygon(c(x, rev(x)), c(p_no2$mean - 2 * p_no2$stdev, rev(p_no2$mean + 2 * p_no2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
+#' 
+#' # Use leaveOneOutVec to get the same
+#' loov = k$leaveOneOutVec(matrix(k$theta()))
+#' points(X[2],loov$mean[2],col='red')
+#' lines(rep(X[2],2),loov$mean[2]+2*c(-loov$stdev[2],loov$stdev[2]),col='red')
 leaveOneOutVec.Kriging <- function(object, theta, ...) {
     k <- kriging_model(object)
     if (!is.array(theta)) 
