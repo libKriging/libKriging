@@ -806,7 +806,8 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #' plot(f)
 #' points(X, y)
 #' lines(x, p$mean, col = 'blue')
-#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), border = NA, col = rgb(0, 0, 1, 0.2))
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), b
+#'         order = NA, col = rgb(0, 0, 1, 0.2))
 #' 
 #' # Compute leave-one-out (no range re-estimate) on 2nd point
 #' X_no2 = X[-2,,drop=FALSE]
@@ -816,7 +817,8 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #' 
 #' p_no2 <- predict(k_no2, x, TRUE, FALSE)
 #' lines(x, p_no2$mean, col = 'red')
-#' polygon(c(x, rev(x)), c(p_no2$mean - 2 * p_no2$stdev, rev(p_no2$mean + 2 * p_no2$stdev)), border = NA, col = rgb(1, 0, 0, 0.2))
+#' polygon(c(x, rev(x)), c(p_no2$mean - 2 * p_no2$stdev, rev(p_no2$mean + 2 * p_no2$stdev)), 
+#'         border = NA, col = rgb(1, 0, 0, 0.2))
 #' 
 #' # Use leaveOneOutVec to get the same
 #' loov = k$leaveOneOutVec(matrix(k$theta()))
