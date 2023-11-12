@@ -1,1 +1,2 @@
 pytest
+setuptools # pkg_resources is no more available by default in Python 3.12
