@@ -52,21 +52,10 @@ case "$COMPILER" in
     ;;
 esac
 
-if [[ -z ${CMAKE_Fortran_COMPILER} ]]; then
-  CMAKE_Fortran_COMPILER="$(R CMD config FC | awk '{ print $1 }')"
-fi
-
-if [[ -z ${Fortran_LINK_FLAGS} ]]; then
-  Fortran_LINK_FLAGS="$(R CMD config FLIBS)"
-fi
-
-
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}
 cmake \
   -G "Unix Makefiles" \
-  -DCMAKE_Fortran_COMPILER="${CMAKE_Fortran_COMPILER}" \
-  -DFortran_LINK_FLAGS="${Fortran_LINK_FLAGS}" \
   -DCMAKE_BUILD_TYPE="${MODE}" \
   -DENABLE_COVERAGE="${ENABLE_COVERAGE}" \
   -DENABLE_MEMCHECK="${ENABLE_MEMCHECK}" \

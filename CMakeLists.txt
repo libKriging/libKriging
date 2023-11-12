@@ -174,12 +174,6 @@ include_directories(SYSTEM dependencies/armadillo-code/include)
 
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 
-if (NOT CMAKE_Fortran_COMPILER)
-    set(CMAKE_Fortran_COMPILER gfortran)
-endif()
-if (NOT Fortran_LINK_FLAGS)
-    set(Fortran_LINK_FLAGS "-lgfortran -lquadmath -lm")
-endif()
 set(ignoreUnusedVariable ${LBFGSB_SHOW_BUILD})
 message(STATUS "Compiling lbfgsb_cpp as an external library")
 

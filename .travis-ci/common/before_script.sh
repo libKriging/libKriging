@@ -25,25 +25,6 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     echo "------------------------------------"
 
-    if ( command -v gfortran >/dev/null 2>&1 ); then
-      echo "Fortran config: $(command -v gfortran)"
-      gfortran --version 2>&1 | sed 's/^/  /'
-    else
-      echo "No Fortran compiler command found"
-    fi
-    
-    echo "------------------------------------"
-
-    if ( R CMD config FC >/dev/null 2>&1 ); then
-      FC=$(R CMD config FC | awk '{ print $1 }')
-      echo "R Fortran config: ${FC}"
-      ${FC} --version 2>&1 | sed 's/^/  /'
-    else
-      echo "No R Fortran compiler command found"
-    fi
-
-    echo "------------------------------------"
-
     if ( command -v clang-format >/dev/null 2>&1 ); then
       echo "clang-format config: $(command -v clang-format)"
       clang-format --version 2>&1 | sed 's/^/  /'

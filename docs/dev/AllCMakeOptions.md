@@ -24,7 +24,5 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 | `PYTHON_PREFIX_PATH`         |        &lt;empty&gt;        | &lt;string&gt;                                      | overrides default python path detection           |
 | `Matlab_ROOT_DIR`            |        &lt;empty&gt;        | &lt;string&gt;                                      | locate Matlab root directory to help CMake finder |
 | `SANITIZE`                   |            `OFF`            | `OFF`, `THREAD`, `ADDRESS`, `LEAK`                  | Enable sanitize feature (is available)            |
-| `CMAKE_Fortran_COMPILER`     |         `gfortran`          | &lt;path&gt;                                        | Path to a fortran compiler                        |
-| `Fortran_LINK_FLAGS`         | `-lgfortran -lquadmath -lm` | &lt;string&gt;                                      | Flags for additional libs and search path         |
 | `LBFGSB_SHOW_BUILD`          |            `OFF`            | `ON`, `OFF`                                         | Show details of `lbfgsb_cpp` sub-build            |
 
