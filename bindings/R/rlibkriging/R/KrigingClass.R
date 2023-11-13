@@ -806,8 +806,8 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #' plot(f)
 #' points(X, y)
 #' lines(x, p$mean, col = 'blue')
-#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)), b
-#'         order = NA, col = rgb(0, 0, 1, 0.2))
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+#'         border = NA, col = rgb(0, 0, 1, 0.2))
 #' 
 #' # Compute leave-one-out (no range re-estimate) on 2nd point
 #' X_no2 = X[-2,,drop=FALSE]
