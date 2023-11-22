@@ -104,15 +104,13 @@ import pylibkriging as lk
 ```
 </details>
 
-## rlibkriging for R
+## [rlibkriging](https://github.com/libKriging/rlibkriging/)  for R
 
-Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
-(CRAN repo will come soon...)
+Download the archive from [libKriging releases](https://github.com/libKriging/rlibKriging/releases)
 
 ```R
 # in R
-install.packages("Rcpp")
-install.packages("https://github.com/libKriging/libKriging/releases/download/v0.5.1/rlibkriging_0.5.1_Linux-x86_64.tgz", repos=NULL)
+install.packages("https://github.com/libKriging/rlibkriging/releases/download/0.8-0.1/rlibkriging_0.8-0_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
