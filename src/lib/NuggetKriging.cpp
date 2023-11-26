@@ -513,7 +513,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     Wb_k = trans(
                solve(trans(L), solve(L, gradR_d, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
            - gradR_d * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
-    double ans_d = -0.5 * sum(Wb_k.diag()) + (n - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
+    double ans_d
+        = -0.5 * sum(Wb_k.diag()) + (n - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
 
     (*grad_out).at(d) = ans_d - (a / t - b) / pow(_alpha, 2.0);
 
