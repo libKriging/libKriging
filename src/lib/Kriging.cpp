@@ -721,10 +721,10 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   t0 = Bench::toc(bench, "S2 = YtRi * y - yt * RiFFtRiFiFtRi * y", t0);
 
   if (fd->is_sigma2_estim)  // means no sigma2 provided
-    fd->sigma2 = S_2(0, 0) / (n - d);
+    fd->sigma2 = S_2(0, 0) / (n - m_F.n_cols);
 
   double log_S_2 = log(S_2(0, 0));
-  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (n - d) / 2.0 * log_S_2;
+  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (n - m_F.n_cols) / 2.0 * log_S_2;
   t0 = Bench::toc(bench, "lml = -Sum(log(diag(T))) - Sum(log(diag(TF)))...", t0);
   // arma::cout << " log_marginal_lik:" << log_marginal_lik << arma::endl;
 

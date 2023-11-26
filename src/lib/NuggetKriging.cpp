@@ -426,15 +426,15 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   // arma::cout << " S_2:" << S_2 << arma::endl;
 
   if (fd->is_sigma2_estim)
-    fd->sigma2 = S_2(0, 0) / (n - d);
+    fd->sigma2 = S_2(0, 0) / (n - m_F.n_cols);
 
   if (fd->is_nugget_estim)
-    fd->nugget = S_2(0, 0) / (n - d) * (1 / _alpha - 1);
+    fd->nugget = S_2(0, 0) / (n - m_F.n_cols) * (1 / _alpha - 1);
 
-  fd->var = S_2(0, 0) / (n - d) / _alpha;
+  fd->var = S_2(0, 0) / (n - m_F.n_cols) / _alpha;
 
   double log_S_2 = log(S_2(0, 0));
-  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (n - d) / 2.0 * log_S_2;
+  double log_marginal_lik = -sum(log(L.diag())) - sum(log(LX.diag())) - (n - m_F.n_cols) / 2.0 * log_S_2;
   t0 = Bench::toc(bench, "lml = -Sum(log(diag(T))) - Sum(log(diag(TF)))...", t0);
   // arma::cout << " log_marginal_lik:" << log_marginal_lik << arma::endl;
 
@@ -501,7 +501,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
              - gradR_k * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
       t0 = Bench::toc(bench, "Wb_k = gradR_k \\ T \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
 
-      ans[k] = -0.5 * sum(Wb_k.diag()) + (n - d) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
+      ans[k] = -0.5 * sum(Wb_k.diag()) + (n - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
       t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
     }
     // arma::cout << " log_marginal_lik_deriv:" << -ans * pow(_theta,2) << arma::endl;
@@ -513,7 +513,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     Wb_k = trans(
                solve(trans(L), solve(L, gradR_d, LinearAlgebra::default_solve_opts), LinearAlgebra::default_solve_opts))
            - gradR_d * R_inv_X_Xt_R_inv_X_inv_Xt_R_inv;
-    double ans_d = -0.5 * sum(Wb_k.diag()) + (n - d) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
+    double ans_d = -0.5 * sum(Wb_k.diag()) + (n - m_F.n_cols) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
 
     (*grad_out).at(d) = ans_d - (a / t - b) / pow(_alpha, 2.0);
 
