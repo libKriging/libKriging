@@ -140,7 +140,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
-  // Sly turnaround for too long range : use shorter range penalized, and force gradient to point at shorer range
+  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
   if (Optim::quadfailover) if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
     // throw std::runtime_error("Covariance matrix is singular");
