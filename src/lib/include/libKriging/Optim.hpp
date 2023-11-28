@@ -46,6 +46,10 @@ class Optim {
   static double objective_rel_tolerance;
   LIBKRIGING_EXPORT static void set_objective_rel_tolerance(double objective_rel_tolerance_val);
   LIBKRIGING_EXPORT static double get_objective_rel_tolerance();
+
+  static bool quadfailover;
+  LIBKRIGING_EXPORT static void Optim::use_quadfailover(bool do_quadfailover);
+  LIBKRIGING_EXPORT static bool Optim::is_quadfailover();
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINLIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_OPTIM_HPPEARALGEBRA_HPP

@@ -133,7 +133,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
 
   // Sly turnaround for too long range : use shorter range penalized, and force gradient to point at shorer range
   // (assuming a Newton like method for wrapping optim)
-  if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Optim::quadfailover) (arma::rcond(R) < R.n_rows * arma::datum::eps) {
     // throw std::runtime_error("Covariance matrix is singular");
     // Try use midpoint of theta and
     // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -439,7 +439,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   // Sly turnaround for too long range : use shorter range penalized, and force gradient to point at shorer range
   // (assuming a Newton like method for wrapping optim)
-  if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Optim::quadfailover) if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
     // throw std::runtime_error("Covariance matrix is singular");
     // Try use midpoint of theta and
     // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -685,7 +685,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
 
   // Sly turnaround for too long range : use shorter range penalized, and force gradient to point at shorer range
   // (assuming a Newton like method for wrapping optim)
-  if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Optim::quadfailover) if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
     // throw std::runtime_error("Covariance matrix is singular");
     // Try use midpoint of theta and
     // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
