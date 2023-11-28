@@ -64,7 +64,9 @@ X <- matrix(runif(n*d),ncol=d)
 y <- f(X)
 r = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
+rlibkriging:::optim_use_quadfailover(FALSE) # disable quadfailover
 try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
+rlibkriging:::optim_use_quadfailover(TRUE) # enable quadfailover
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 

@@ -111,3 +111,17 @@ void optim_set_objective_rel_tolerance(double objective_rel_tolerance) {
   Rcpp::XPtr<Optim> impl_ptr(la);
   impl_ptr->set_objective_rel_tolerance(objective_rel_tolerance);
 }
+
+// [[Rcpp::export]]
+bool optim_is_quadfailover() {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  return impl_ptr->is_quadfailover();
+}
+
+// [[Rcpp::export]]
+void optim_use_quadfailover(bool quadfailover) {
+  Optim* la = new Optim();
+  Rcpp::XPtr<Optim> impl_ptr(la);
+  impl_ptr->use_quadfailover(quadfailover);
+}
