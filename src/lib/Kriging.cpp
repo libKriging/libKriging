@@ -131,6 +131,21 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
+  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
+  // (assuming a Newton like method for wrapping optim)
+  if (Optim::quadfailover)
+    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+      // throw std::runtime_error("Covariance matrix is singular");
+      // Try use midpoint of theta and
+      // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
+      double ll_2 = _logLikelihood(_theta / 2, grad_out, hess_out, okm_data, bench);
+      if (grad_out)
+        *grad_out *= 2;
+      if (hess_out)
+        *hess_out *= 4;
+      return ll_2 - log(2);  // emulates likelihood/2
+    }
+
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   t0 = Bench::toc(bench, "T = Chol(R)", t0);
@@ -423,6 +438,19 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
+  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
+  // (assuming a Newton like method for wrapping optim)
+  if (Optim::quadfailover)
+    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+      // throw std::runtime_error("Covariance matrix is singular");
+      // Try use midpoint of theta and
+      // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
+      double loo_2 = _leaveOneOut(_theta / 2, grad_out, yhat_out, okm_data, bench);
+      if (grad_out)
+        *grad_out *= 2;
+      return loo_2 + log(2);  // emulates likelihood/2
+    }
+
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);
   t0 = Bench::toc(bench, "T = Chol(R)", t0);
@@ -431,8 +459,12 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "M = F \\ T", t0);
 
-  arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
-  t0 = Bench::toc(bench, "Ri = inv(R)", t0);
+  // arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
+  // t0 = Bench::toc(bench, "Ri = inv(R)", t0);
+  arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
+  t0 = Bench::toc(bench, "Li = I \\ T", t0);
+  arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
+  t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
   arma::mat RinvF = Rinv * m_F;
   t0 = Bench::toc(bench, "RiF = Ri * F", t0);
@@ -652,6 +684,19 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     }
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
+
+  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
+  // (assuming a Newton like method for wrapping optim)
+  if (Optim::quadfailover)
+    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+      // throw std::runtime_error("Covariance matrix is singular");
+      // Try use midpoint of theta and
+      // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
+      double lmp_2 = _logMargPost(_theta / 2, grad_out, okm_data, bench);
+      if (grad_out)
+        *grad_out *= 2;
+      return lmp_2 - log(2);  // emulates likelihood/2
+    }
 
   // Cholesky decompostion of covariance matrix
   fd->T = LinearAlgebra::safe_chol_lower(R);
@@ -1570,7 +1615,7 @@ Kriging::predict(const arma::mat& Xp, bool withStd, bool withCov, bool withDeriv
     if (withDeriv) {
       arma::mat m = trans(F_p - trans(Tinv_pred) * m_M);
       arma::mat invMtM = inv_sympd(m_M.t() * m_M);
-      FinvMtM = (F_p - trans(Tinv_pred) * m_M) * inv_sympd(m_M.t() * m_M);
+      FinvMtM = (F_p - trans(Tinv_pred) * m_M) * invMtM;
     }
   }
 
