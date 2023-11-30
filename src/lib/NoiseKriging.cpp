@@ -147,7 +147,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-      double ll_2 = _logLikelihood(_theta / 2, grad_out, okm_data, bench);
+      double ll_2 = _logLikelihood(_theta_sigma2 / 2, grad_out, okm_data, bench);
       if (grad_out)
         *grad_out *= 2;
       return ll_2 - log(2);  // emulates likelihood/2

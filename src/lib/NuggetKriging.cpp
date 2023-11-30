@@ -143,7 +143,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-      double ll_2 = _logLikelihood(_theta / 2, grad_out, okm_data, bench);
+      double ll_2 = _logLikelihood(_theta_alpha / 2, grad_out, okm_data, bench);
       if (grad_out)
         *grad_out *= 2;
       return ll_2 - log(2);  // emulates likelihood/2
@@ -383,7 +383,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-      double lmp_2 = _logMargPost(_theta / 2, grad_out, okm_data, bench);
+      double lmp_2 = _logMargPost(_theta_alpha / 2, grad_out, okm_data, bench);
       if (grad_out)
         *grad_out *= 2;
       return lmp_2 - log(2);  // emulates likelihood/2
