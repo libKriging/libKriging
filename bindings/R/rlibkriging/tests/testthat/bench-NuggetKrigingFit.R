@@ -1,8 +1,5 @@
- pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
- install.packages(pack,repos=NULL)
- library(rlibkriging)
-
 library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 f <- function(X) apply(X, 1, function(x) rnorm(1,0,0.1)+sum(sin(2*pi*(x-.5)^2)))
 n <- 1000

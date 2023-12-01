@@ -20,9 +20,7 @@ for (x in xx){
   i <- i+1
 }
 
- pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
- install.packages(pack,repos=NULL)
- library(rlibkriging)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 r <- Kriging(y, X, "gauss")
 i <- 1
@@ -32,7 +30,7 @@ for (x in xx){
   i <- i+1
 }
 
-rlibkriging:::optim_use_quadfailover(FALSE)
+rlibkriging:::covariance_use_approx_singular(FALSE)
 
 r_nf <- Kriging(y, X, "gauss")
 i <- 1
@@ -42,7 +40,7 @@ for (x in xx){
   i <- i+1
 }
 
-rlibkriging:::optim_use_quadfailover(TRUE)
+rlibkriging:::covariance_use_approx_singular(TRUE)
 
 
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,3),k))(xx))

@@ -8,6 +8,7 @@ times.n = 10
 x = .5
 
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
+
 r <- Kriging(y, X, "gauss")
 for (j in 1:times.n) {
   invisible(logLikelihoodFun(r,rep(x,3),           bench=TRUE ))
