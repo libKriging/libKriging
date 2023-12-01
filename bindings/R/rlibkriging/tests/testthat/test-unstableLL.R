@@ -50,3 +50,4 @@ abline(h=k10$logLikelihood(), col='red')
 
 test_that(desc="LL / Fit: unstable LL fixed using rcond failover",
           expect_equal(k$theta(), k10$theta(), tol=1e-4))
+
