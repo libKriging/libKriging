@@ -142,8 +142,8 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
 
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
- if (Covariance::approx_singular) {
-    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+  if (Covariance::approx_singular) {
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
@@ -384,8 +384,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
 
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
- if (Covariance::approx_singular) {
-    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+  if (Covariance::approx_singular) {
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
@@ -395,7 +395,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
         *grad_out /= 2;
       return lmp_2 - log(2);  // emulates likelihood/2
     }
- }
+  }
 
   //  // Compute intermediate useful matrices
   //  fd->M = solve(fd->T, m_F, LinearAlgebra::solve_opts);

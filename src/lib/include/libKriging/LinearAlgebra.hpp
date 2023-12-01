@@ -19,7 +19,7 @@ class LinearAlgebra {
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
   static arma::mat safe_chol_lower(arma::mat X, int warn);
-  
+
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
 };

@@ -135,10 +135,10 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   t0 = Bench::toc(bench, "T = Chol(R)", t0);
 
-  // Sly turnaround for too long range: use proxy shorter range (penalized), and force gradient to point at shorter range
-  // (assuming a Newton like method for wrapping optim)
+  // Sly turnaround for too long range: use proxy shorter range (penalized), and force gradient to point at shorter
+  // range (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular) {
-    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
@@ -447,7 +447,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular) {
-    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
@@ -696,7 +696,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular) {
-    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and

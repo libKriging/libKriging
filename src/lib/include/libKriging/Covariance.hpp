@@ -7,8 +7,7 @@
 
 class Covariance {
  public:
-
-  static bool approx_singular; // will enable ll(theta) = ll(theta/2) if rcond(R)<eps (see Kriging.cpp/loglikelihood)
+  static bool approx_singular;  // will enable ll(theta) = ll(theta/2) if rcond(R)<eps (see Kriging.cpp/loglikelihood)
   LIBKRIGING_EXPORT static void use_approx_singular(bool do_approx_singular);
   LIBKRIGING_EXPORT static bool approx_singular_used();
 
