@@ -145,9 +145,9 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
       double ll_2 = _logLikelihood(_theta / 2, grad_out, hess_out, okm_data, bench);
       if (grad_out)
-        *grad_out *= 2;
+        *grad_out /= 2;
       if (hess_out)
-        *hess_out *= 4;
+        *hess_out /= 4;
       return ll_2 - log(2);  // emulates likelihood/2
     }
   }
@@ -454,7 +454,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
       double loo_2 = _leaveOneOut(_theta / 2, grad_out, yhat_out, okm_data, bench);
       if (grad_out)
-        *grad_out *= 2;
+        *grad_out /= 2;
       return loo_2 + log(2);  // emulates likelihood/2
     }
   }
@@ -703,7 +703,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
       double lmp_2 = _logMargPost(_theta / 2, grad_out, okm_data, bench);
       if (grad_out)
-        *grad_out *= 2;
+        *grad_out /= 2;
       return lmp_2 - log(2);  // emulates likelihood/2
     }
   }
