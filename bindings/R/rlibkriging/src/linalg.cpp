@@ -34,3 +34,10 @@ void linalg_set_chol_warning(bool warn) {
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   impl_ptr->set_chol_warning(warn);
 }
+
+// [[Rcpp::export]]
+double linalg_rcond_chol(arma::mat X) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->rcond_chol(X);
+}

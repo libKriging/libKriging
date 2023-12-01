@@ -20,7 +20,8 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
   static arma::mat safe_chol_lower(arma::mat X, int warn);
   
-  static double rcond_chol(arma::mat chol);
+  static double min_rcond;
+  LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
