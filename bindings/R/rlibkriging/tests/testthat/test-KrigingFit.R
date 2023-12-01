@@ -19,7 +19,7 @@ plot(ll,xlim=c(0.000001,10))
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
 
-theta_ref = optimize(ll,interval=c(0.001,10),maximum=T)$maximum
+theta_ref = optimize(ll,interval=c(0.001,2),maximum=T)$maximum
 abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')

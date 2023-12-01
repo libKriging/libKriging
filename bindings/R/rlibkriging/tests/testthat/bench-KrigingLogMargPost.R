@@ -40,9 +40,7 @@ for (x in xx){
   i <- i+1
 }
 
- pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
- install.packages(pack,repos=NULL)
- library(rlibkriging)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 r <- Kriging(y, X, "gauss")#"matern3_2")
 i <- 1

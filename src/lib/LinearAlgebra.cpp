@@ -37,7 +37,7 @@ int LinearAlgebra::max_inc_choldiag = 10;
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
 // computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
-arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
   arma::mat R = arma::mat(X.n_rows, X.n_cols);
   bool ok = arma::chol(R, X, "lower");
   if (!ok) {
@@ -57,4 +57,28 @@ arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
                    << arma::endl;
     return R;
   }
+}
+
+double LinearAlgebra::min_rcond = 1e-10;
+
+// Proxy to arma::rcond
+// @ref: N. J. Higham, "A survey of condition number estimation for triangular matrices," SIAM Review, vol. 29, no. 4,
+// pp. 575–596, Dec. 1987.
+LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
+  double m = chol.at(0, 0);
+  double M = chol.at(0, 0);
+  if (chol.n_rows > 1)
+    for (arma::uword i = 1; i < chol.n_rows; i++) {
+      if (chol.at(i, i) < m) {
+        m = chol.at(i, i);
+      } else if (chol.at(i, i) > M) {
+        M = chol.at(i, i);
+      }
+    }
+  double rcond = m / M;
+  rcond = rcond * rcond;
+  if (warn_chol)
+    if (rcond < (chol.n_rows * min_rcond))
+      arma::cout << "[WARNING] rcond " << rcond << " is below minimal value." << arma::endl;
+  return rcond;
 }
