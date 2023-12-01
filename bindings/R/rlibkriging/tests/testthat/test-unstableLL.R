@@ -29,14 +29,14 @@ abline(v=k$theta())
 abline(h=k$logLikelihood())
 
 rcond_R = function(theta) {
-    k_tmp <- Kriging(y, X, kernel="gauss", optim="BFGS",parameters=list(theta=matrix(theta)))
+    k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
     T=k_tmp$T()
     R = (T) %*% t(T)
     rlibkriging:::linalg_rcond_chol(T)
 }
 lines(.t, log(Vectorize(rcond_R)(.t)),col='orange')
 rcond = function(theta) {
-    k_tmp <- Kriging(y, X, kernel="gauss", optim="BFGS",parameters=list(theta=matrix(theta)))
+    k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
     T=k_tmp$T()
     R = (T) %*% t(T)
     Matrix::rcond(R)
