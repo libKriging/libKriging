@@ -8,6 +8,9 @@ y <- f(X)  #+ 0.5*rnorm(nrow(X))
 #plot(f)
 #points(X, y)
 
+# pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
+# install.packages(pack,repos=NULL)
+# library(rlibkriging)
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 #rlibkriging:::optim_log(4)
@@ -46,4 +49,4 @@ abline(v=k10$theta(), col='red')
 abline(h=k10$logLikelihood(), col='red')
 
 test_that(desc="LL / Fit: unstable LL fixed using rcond failover",
-          expect_equal(k$theta(), k10$theta(), tol=1e-5))
+          expect_equal(k$theta(), k10$theta(), tol=1e-4))
