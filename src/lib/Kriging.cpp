@@ -131,10 +131,15 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
-  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
+  // Cholesky decompostion of covariance matrix
+  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+
+  // Sly turnaround for too long range: use proxy shorter range (penalized), and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
-  if (Optim::quadfailover)
-    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Covariance::approx_singular) {
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    if (rcond_R < R.n_rows * arma::datum::eps) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -145,10 +150,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
         *hess_out *= 4;
       return ll_2 - log(2);  // emulates likelihood/2
     }
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+  }
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
@@ -438,10 +440,15 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
+  // Cholesky decompostion of covariance matrix
+  fd->T = LinearAlgebra::safe_chol_lower(R);
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
-  if (Optim::quadfailover)
-    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Covariance::approx_singular) {
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    if (rcond_R < R.n_rows * arma::datum::eps) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -450,10 +457,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
         *grad_out *= 2;
       return loo_2 + log(2);  // emulates likelihood/2
     }
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+  }
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
@@ -685,10 +689,15 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   }
   t0 = Bench::toc(bench, "R = Cov(dX)", t0);
 
+  // Cholesky decompostion of covariance matrix
+  fd->T = LinearAlgebra::safe_chol_lower(R);
+  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
-  if (Optim::quadfailover)
-    if (arma::rcond(R) < R.n_rows * arma::datum::eps) {
+  if (Covariance::approx_singular) {
+    double rcond_R = LinearAlgebra::rcond_chol(fd->T);// Proxy to arma::rcond(R)
+    if (rcond_R < R.n_rows * arma::datum::eps) {
       // throw std::runtime_error("Covariance matrix is singular");
       // Try use midpoint of theta and
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -697,10 +706,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
         *grad_out *= 2;
       return lmp_2 - log(2);  // emulates likelihood/2
     }
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+  }
 
   //  // Compute intermediate useful matrices
   //  fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);

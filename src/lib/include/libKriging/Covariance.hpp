@@ -7,6 +7,11 @@
 
 class Covariance {
  public:
+
+  static bool approx_singular; // will enable ll(theta) = ll(theta/2) if rcond(R)<eps (see Kriging.cpp/loglikelihood)
+  LIBKRIGING_EXPORT static void use_approx_singular(bool do_approx_singular);
+  LIBKRIGING_EXPORT static bool approx_singular_used();
+
   static std::function<double(const arma::vec&, const arma::vec&)> Cov_gauss;
 
   static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_gauss;
