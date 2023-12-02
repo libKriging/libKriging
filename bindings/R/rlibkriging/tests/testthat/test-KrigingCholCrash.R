@@ -71,7 +71,7 @@ rlibkriging:::covariance_use_approx_singular(TRUE) # enable failover
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 
 l=as.list(r)
-R = l$T %*% t(l$T) - 1E-10 * diag(nrow(X))
+R = l$T %*% t(l$T) - 1E-9 * diag(nrow(X))
 cholR=NULL
 try( cholR <- chol(R) ) # Must fail
 
