@@ -375,7 +375,13 @@ jobs:
         run: |
           GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
-        
+
+      - name: Install hub tools
+        shell: bash
+        run: |
+          # see https://github.com/actions/runner-images/issues/8362
+          sudo apt-get update && sudo apt-get install -y hub
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
