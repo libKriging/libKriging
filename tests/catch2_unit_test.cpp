@@ -5,7 +5,9 @@
 // More example in https://github.com/catchorg/Catch2/tree/master/examples
 
 TEST_CASE("Trival test", "[core]") {
-  SECTION("checking trivial test ok") { REQUIRE((2 == 2)); }
+  SECTION("checking trivial test ok") {
+    REQUIRE((2 == 2));
+  }
 }
 
 SCENARIO("vectors can be sized and resized", "[vector]") {

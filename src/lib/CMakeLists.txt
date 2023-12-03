@@ -25,7 +25,8 @@ add_library(Kriging
         include/libKriging/utils/ExplicitCopySpecifier.hpp
         include/libKriging/utils/utils.hpp
         utils/hdf5utils.cpp include/libKriging/utils/hdf5utils.hpp
-        include/libKriging/version.hpp ${VERSION_FILE} )
+        utils/jsonutils.cpp include/libKriging/utils/jsonutils.hpp
+        include/libKriging/version.hpp ${VERSION_FILE})
 
 if (CXX_CLANG_TIDY)
     set_target_properties(Kriging
@@ -33,7 +34,7 @@ if (CXX_CLANG_TIDY)
             CXX_CLANG_TIDY ${CXX_CLANG_TIDY})
 endif ()
 
-target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp)
+target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp taocpp-json) # maybe PRIVATE
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html
@@ -74,7 +75,7 @@ target_include_directories(Kriging
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        )
+)
 
 add_subdirectory(include)
 
@@ -82,18 +83,18 @@ add_subdirectory(include)
 include(GNUInstallDirs)
 # https://cmake.org/cmake/help/latest/command/install.html
 # https://pabloariasal.github.io/2018/02/19/its-time-to-do-cmake-right/
-install(TARGETS Kriging
+install(TARGETS Kriging taocpp-json
         EXPORT libKriging-export
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT devel
-        )
+)
 install(EXPORT libKriging-export
         FILE libKriging.cmake
         NAMESPACE libKriging::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
-        )
+)
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
-        )
+)
