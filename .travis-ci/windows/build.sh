@@ -44,6 +44,15 @@ cmake \
 
 if [[ "$BUILD_TEST" == "true" ]]; then
     cmake --build . --target ALL_BUILD --config "${MODE}"
+
+    if [[ "$DEBUG_CI" == "true" ]]; then
+      CTEST_FLAGS="--verbose --output-on-failure"
+      set -x
+    else
+      CTEST_FLAGS=--output-on-failure
+    fi
+    # Test on fresh build lib (before installation)
+    ctest -C "${MODE}" ${CTEST_FLAGS}
     # add library directory search PATH for executables
     export PATH=$PWD/src/lib/${MODE}:$PATH
 
