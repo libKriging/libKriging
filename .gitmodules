@@ -17,3 +17,6 @@
 [submodule "dependencies/lbfgsb_cpp"]
 	path = dependencies/lbfgsb_cpp
 	url = https://github.com/libKriging/lbfgsb_cpp.git
+[submodule "dependencies/json"]
+	path = dependencies/json
+	url = https://github.com/taocpp/json.git
