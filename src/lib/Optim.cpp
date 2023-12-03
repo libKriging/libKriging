@@ -98,13 +98,3 @@ LIBKRIGING_EXPORT void Optim::set_objective_rel_tolerance(double objective_rel_t
 LIBKRIGING_EXPORT double Optim::get_objective_rel_tolerance() {
   return Optim::objective_rel_tolerance;
 };
-
-bool Optim::quadfailover = true;
-
-LIBKRIGING_EXPORT void Optim::use_quadfailover(bool do_quadfailover) {
-  Optim::quadfailover = do_quadfailover;
-};
-
-LIBKRIGING_EXPORT bool Optim::is_quadfailover() {
-  return Optim::quadfailover;
-};

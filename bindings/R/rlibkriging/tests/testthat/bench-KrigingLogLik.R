@@ -45,9 +45,9 @@ rlibkriging:::covariance_use_approx_singular(TRUE)
 
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,3),k))(xx))
 points(xx,Vectorize(function(x)logLikelihoodFun(r,rep(x,3))$logLikelihood)(xx),col='red')
-rlibkriging:::optim_use_quadfailover(FALSE)
+rlibkriging:::covariance_use_approx_singular(FALSE)
 points(xx,Vectorize(function(x)logLikelihoodFun(r_nf,rep(x,3))$logLikelihood)(xx),col='orange')
-rlibkriging:::optim_use_quadfailover(TRUE)
+rlibkriging:::covariance_use_approx_singular(TRUE)
 
 plot(xx,log(times$R_ll),ylim=c(log(min(min(times$R_ll,na.rm = T),min(times$cpp_ll,na.rm = T))),log(max(max(times$R_ll,na.rm = T),max(times$cpp_ll,na.rm = T)))),xlab="x",ylab="log(user_time (s))", panel.first=grid())
 text(20,-1,"DiceKriging")
