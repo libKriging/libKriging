@@ -35,13 +35,13 @@ rcond_R = function(theta) {
     rlibkriging:::linalg_rcond_chol(T)
 }
 lines(.t, log(Vectorize(rcond_R)(.t)),col='orange')
-rcond = function(theta) {
-    k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
-    T=k_tmp$T()
-    R = (T) %*% t(T)
-    Matrix::rcond(R)
-}
-lines(.t, log(Vectorize(rcond)(.t)),col='orange')
+# rcond = function(theta) {
+#     k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
+#     T=k_tmp$T()
+#     R = (T) %*% t(T)
+#     Matrix::rcond(R)
+# }
+# lines(.t, log(Vectorize(rcond)(.t)),col='orange')
 
 k10 <- Kriging(y, X, kernel="gauss", optim="BFGS10")
 
