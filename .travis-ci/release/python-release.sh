@@ -32,14 +32,7 @@ case $ARCH in
   Darwin|MSYS_NT*|MINGW64_NT*)
     python3 ./bindings/Python/setup.py bdist_wheel
     pip install pylibkriging --no-index -f ./dist
-    pytest ./bindings/Python/tests/canary_test.py
-    pytest ./bindings/Python/tests/loading_test.py
-    pytest ./bindings/Python/tests/random_generator_test.py
-    pytest ./bindings/Python/tests/direct_binding_test.py
-    pytest ./bindings/Python/tests/one_side_carma_binding_test.py
-    pytest ./bindings/Python/tests/two_side_carma_binding_test.py
-    pytest ./bindings/Python/tests/PyLinearRegression_test.py
-    pytest ./bindings/Python/tests/PyKriging_parametric_test.py
+    pytest -s ./bindings/Python/tests/
     ;;
   *)
     echo "Unknown OS [$ARCH]"
