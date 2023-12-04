@@ -173,8 +173,6 @@ add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 
-add_subdirectory(dependencies/json)
-
 set(ignoreUnusedVariable ${LBFGSB_SHOW_BUILD})
 add_subdirectory(dependencies/lbfgsb_cpp)
 
@@ -700,7 +698,7 @@ ADD_CUSTOM_TARGET(install.lib
         ${CMAKE_COMMAND}
         -DBUILD_TYPE=${CMAKE_BUILD_TYPE}
         -P ${CMAKE_BINARY_DIR}/cmake_install.cmake)
-ADD_DEPENDENCIES(install.lib Kriging armadillo taocpp::json)
+ADD_DEPENDENCIES(install.lib Kriging armadillo)
 if (ENABLED_PYTHON_BINDING)
     ADD_DEPENDENCIES(install.lib _pylibkriging)
 endif()

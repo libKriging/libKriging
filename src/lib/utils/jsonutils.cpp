@@ -2,12 +2,13 @@
 
 #include <cstddef>
 
-#include <iostream>
 #include <vector>
 #include <cstring>
 #include <algorithm>
 
-#include <iostream>
+#include "libKriging/utils/nlohmann/json.hpp"
+
+#include "base64.h"
 
 bool isLittleEndian() {
     uint16_t number = 0x01;
@@ -17,11 +18,12 @@ bool isLittleEndian() {
 
 
 template<typename T>
-std::vector<uint8_t> serialize(const std::vector<T> &data) {
+std::vector<uint8_t> serialize(const T *data, const std::size_t size) {
     std::vector<uint8_t> result;
-    result.reserve(data.size() * sizeof(T));
+    result.reserve(size * sizeof(T));
 
-    for (const auto &value: data) {
+    for (std::size_t i = 0; i < size; ++i) {
+        const T value = data[i];
         // Use memcpy to copy the raw bytes of the value into the result vector
         uint8_t bytes[sizeof(T)];
         std::memcpy(bytes, &value, sizeof(T));
@@ -63,13 +65,11 @@ std::vector<T> deserialize(const std::vector<uint8_t> &data) {
 }
 
 
-tao::json::value to_value(const arma::rowvec &t) {
-    tao::binary_view vvv = tao::to_binary_view(reinterpret_cast<const std::byte *>(t.memptr()),
-                                               sizeof(double) * t.size());
-    auto x = tao::json::internal::base64(vvv);
-    return
-            {
-                    {"size",   t.size()},
-                    {"values", x}
-            };
+nlohmann::json to_json(const arma::rowvec &t) {
+    auto data = serialize(t.memptr(), t.size());
+    std::string base64_data = base64_encode(data.data(), data.size(), false);
+    return {
+            {"size",        t.size()},
+            {"base64_data", base64_data}
+    };
 }

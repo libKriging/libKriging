@@ -68,7 +68,7 @@ add_dependencies(all_test_binaries GetVersion)
 add_test(NAME GetVersion COMMAND GetVersion)
 
 add_executable(JsonTest demo/JsonTest.cpp)
-target_link_libraries(JsonTest LINK_PUBLIC Kriging taocpp::json)
+target_link_libraries(JsonTest LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries JsonTest)
 add_test(NAME JsonTest COMMAND JsonTest)
 
