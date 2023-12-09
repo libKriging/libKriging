@@ -166,22 +166,15 @@ option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for
 list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
 # Dependencies
-set(DETECT_HDF5 true CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
+set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
 set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
 set(BUILD_SMOKE_TEST OFF CACHE BOOL "armadillo smoke test") # no smoke tests: it fails due to custom memory guard in memory.hpp 
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
-
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
 
 set(ignoreUnusedVariable ${LBFGSB_SHOW_BUILD})
-message(STATUS "Compiling lbfgsb_cpp as an external library")
-
 add_subdirectory(dependencies/lbfgsb_cpp)
-#set(lbfgsb_INSTALL_DIR "${CMAKE_BINARY_DIR}/lbfgsb-installed")
-#set(lbfgsb_DIR "${lbfgsb_INSTALL_DIR}/lib/cmake/lbfgsb")
-#find_package(lbfgsb CONFIG REQUIRED)
-message(STATUS "Compilation of lbfgsb_cpp done")
 
 #------------------------------------------------------
 

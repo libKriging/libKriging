@@ -20,9 +20,9 @@ points(X)
 k <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(k)
 
-rlibkriging::save(k, filename="k.h5")
+rlibkriging::save(k, filename="k.json")
 
-k2 <- rlibkriging::load(filename="k.h5")
+k2 <- rlibkriging::load(filename="k.json")
 print(k2)
 
 test_that("Save/Load NuggetKriging", expect_true( print(k) == print(k2)))
@@ -30,9 +30,9 @@ test_that("Save/Load NuggetKriging", expect_true( print(k) == print(k2)))
 nuk <- NuggetKriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nuk)
 
-rlibkriging::save(nuk, filename="nuk.h5")
+rlibkriging::save(nuk, filename="nuk.json")
 
-nuk2 <- rlibkriging::load(filename="nuk.h5")
+nuk2 <- rlibkriging::load(filename="nuk.json")
 print(nuk2)
 
 test_that("Save/Load NuggetKriging", expect_true( print(nuk) == print(nuk2)))
@@ -40,9 +40,9 @@ test_that("Save/Load NuggetKriging", expect_true( print(nuk) == print(nuk2)))
 nok <- NoiseKriging(y, rep(0.1^2,nrow(X)), X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nok)
 
-rlibkriging::save(nok, filename="nok.h5")
+rlibkriging::save(nok, filename="nok.json")
 
-nok2 <- rlibkriging::load(filename="nok.h5")
+nok2 <- rlibkriging::load(filename="nok.json")
 print(nok2)
 
 test_that("Save/Load NoiseKriging", expect_true( print(nok) == print(nok2)))

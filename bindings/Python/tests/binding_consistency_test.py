@@ -111,8 +111,8 @@ def test_data2_with_save_reload(i):
     kernel = "gauss"
     r = lk.Kriging(y, X, kernel)  # use defaults: lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
 
-    r.save("test_data2_with_save_reload.h5");
-    r = lk.Kriging.load("test_data2_with_save_reload.h5");
+    r.save("test_data2_with_save_reload.json");
+    r = lk.Kriging.load("test_data2_with_save_reload.json");
 
     x = 0.3 * np.ones(np.shape(X)[1])
 

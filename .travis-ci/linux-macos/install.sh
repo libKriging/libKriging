@@ -7,11 +7,11 @@ fi
 
 case "$(uname -s)" in
  Darwin)
-   brew install hdf5
+   # brew install hdf5
    ;;
 
  Linux)
-   sudo apt install -y libhdf5-dev
+   # sudo apt install -y libhdf5-dev
    ;;
 
  *)

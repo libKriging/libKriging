@@ -72,6 +72,12 @@ jobs:
             os: windows-2019
             mode: Debug
             enable_python: on
+            python-version: 3.7
+          - name: "Windows Debug"
+            os: windows-2019
+            mode: Debug
+            enable_python: on
+            python-version: 3.9
           - name: "Octave Linux"
             os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release
@@ -113,6 +119,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: 'recursive'
+
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - uses: r-lib/actions/setup-r@v2
         with:

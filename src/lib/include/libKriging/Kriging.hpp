@@ -186,12 +186,12 @@ class Kriging {
 
   LIBKRIGING_EXPORT std::string summary() const;
 
-  /** Dump current Kriging object into an hdf5 file
+  /** Dump current Kriging object into an file
    * @param filename
    */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
-  /** Load a new Kriging object from an hdf5 file
+  /** Load a new Kriging object from an file
    * @param filename
    */
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);

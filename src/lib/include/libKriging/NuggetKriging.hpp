@@ -190,12 +190,12 @@ class NuggetKriging {
 
   LIBKRIGING_EXPORT std::string summary() const;
 
-  /** Dump current NuggetKriging object into an hdf5 file
+  /** Dump current NuggetKriging object into an file
    * @param filename
    */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
-  /** Load a new NuggetKriging object from an hdf5 file
+  /** Load a new NuggetKriging object from an file
    * @param filename
    */
   LIBKRIGING_EXPORT static NuggetKriging load(const std::string filename);

@@ -579,7 +579,7 @@ update.Kriging <- function(object, newy, newX, ...) {
 #' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
 #' print(k)
 #'
-#' outfile = tempfile("k.h5") 
+#' outfile = tempfile("k.json") 
 #' save(k,outfile)
 save.Kriging <- function(object, filename, ...) {
 
@@ -612,7 +612,7 @@ save.Kriging <- function(object, filename, ...) {
 #' k <- Kriging(y, X, kernel = "matern3_2", objective="LMP")
 #' print(k)
 #'
-#' outfile = tempfile("k.h5")
+#' outfile = tempfile("k.json")
 #' save(k,outfile)
 #'
 #' print(load.Kriging(outfile)) 
