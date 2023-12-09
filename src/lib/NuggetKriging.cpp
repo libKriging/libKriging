@@ -1507,8 +1507,8 @@ NuggetKriging NuggetKriging::load(const std::string filename) {
   kr.m_est_theta = j["est_theta"].template get<decltype(kr.m_est_theta)>();
   kr.m_sigma2 = j["sigma2"].template get<decltype(kr.m_sigma2)>();
   kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
-  kr.m_nugget = j["sigma2"].template get<decltype(kr.m_nugget)>();
-  kr.m_est_nugget = j["est_sigma2"].template get<decltype(kr.m_est_nugget)>();
+  kr.m_nugget = j["nugget"].template get<decltype(kr.m_nugget)>();
+  kr.m_est_nugget = j["est_nugget"].template get<decltype(kr.m_est_nugget)>();
 
   return kr;
 }
