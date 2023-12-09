@@ -128,6 +128,7 @@ def main():
   del opts.quiet
 
   commits, files = interpret_args(opts.args, dash_dash, opts.commit)
+
   if len(commits) > 1:
     if not opts.diff:
       die('--diff is required when two commits are given')
@@ -139,7 +140,8 @@ def main():
     ignored_files = set(changed_lines)
   filter_by_extension(changed_lines, opts.extensions.lower().split(','))
   if opts.exclude:
-    for filename in changed_lines.keys():
+    keys = [k for k in changed_lines.keys()]
+    for filename in keys:
       if re.match(opts.exclude, filename):
         del changed_lines[filename]
   if opts.verbose >= 1:

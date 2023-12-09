@@ -1,4 +1,4 @@
 {
   "DisableFormat": true,
-  "SortIncludes": "Never",
+  "SortIncludes": false,
 }

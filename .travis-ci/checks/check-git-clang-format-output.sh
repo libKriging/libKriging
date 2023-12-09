@@ -36,7 +36,7 @@ else
 fi
 
 
-output="$(.travis-ci/checks/git-clang-format --binary clang-format --commit "$BASE_COMMIT" --diff --exclude ^dependencies/)"
+output="$(.travis-ci/checks/git-clang-format --binary clang-format --commit "$BASE_COMMIT" --diff --exclude '^dependencies/|.*/nlohmann/.*')"
 if [ "$output" == "no modified files to format" ] || [ "$output" == "clang-format did not modify any files" ] ; then
   echo "clang-format passed."
   exit 0
