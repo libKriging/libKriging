@@ -1475,7 +1475,7 @@ NuggetKriging NuggetKriging::load(const std::string filename) {
     throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
   }
   std::string content = j["content"].template get<std::string>();
-  if (content != "Kriging") {
+  if (content != "NuggetKriging") {
     throw std::runtime_error(
         asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NuggetKriging'"));
   }
