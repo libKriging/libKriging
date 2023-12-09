@@ -87,8 +87,8 @@ for i = 1:10
         kernel = "gauss";
         k_m = Kriging(y, X, kernel) % use all default formal parameters
 
-        k_m.save("data2_with_save_reload.h5")
-        k_m2 = Kriging.load("data2_with_save_reload.h5")
+        k_m.save("data2_with_save_reload.json")
+        k_m2 = Kriging.load("data2_with_save_reload.json")
 
         s = size(X);
         x = 0.3 * ones(s(2), 1);

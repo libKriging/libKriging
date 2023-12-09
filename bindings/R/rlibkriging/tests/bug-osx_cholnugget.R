@@ -18,9 +18,9 @@ points(X)
 k <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(k)
 
-rlibkriging::save(k, filename="k.h5")
+rlibkriging::save(k, filename="k.json")
 
-k2 <- rlibkriging::load(filename="k.h5")
+k2 <- rlibkriging::load(filename="k.json")
 print(k2)
 
 t0 = matrix(c(0.41764678,0.48861303),ncol=2)
