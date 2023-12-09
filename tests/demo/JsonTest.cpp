@@ -6,16 +6,21 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 
 int main(int argc, char** argv) {
-  const int n = 2000;
-  arma::rowvec a(n, arma::fill::randn);
+  const int n = 200;
+
+  arma::rowvec a(rand() % n, arma::fill::randn);
+  arma::colvec b(rand() % n, arma::fill::randn);
+  arma::mat c(rand() % n, rand() % n, arma::fill::randn);
 
   nlohmann::json j;
 
   // add a number that is stored as double (note the implicit conversion of j to an object)
   j["pi"] = 3.141;
 
-  // add a Boolean that is stored as bool
-  j["happy"] = to_json(a);
+  // add armadillo object stored as base64 encoded data
+  j["rowvec"] = to_json(a);
+  j["colvec"] = to_json(b);
+  j["mat"] = to_json(c);
 
   // add a string that is stored as std::string
   j["name"] = "Niels";
@@ -41,10 +46,20 @@ int main(int argc, char** argv) {
 
   std::cout << data << std::endl;
 
-  std::cout << data["happy"] << std::endl;
-  arma::rowvec restored_a = rowvec_from_json(data["happy"]);
+  std::cout << data["rowvec"] << std::endl;
+  arma::rowvec restored_a = rowvec_from_json(data["rowvec"]);
+  bool a_success = arma::all(restored_a == a);
 
-  bool success = arma::all(restored_a == a);
+  std::cout << data["colvec"] << std::endl;
+  arma::colvec restored_b = colvec_from_json(data["colvec"]);
+  bool b_success = arma::all(restored_b == b);
+
+  std::cout << data["mat"] << std::endl;
+  arma::mat restored_c = mat_from_json(data["mat"]);
+  bool c_success = arma::all(arma::all(restored_c == c));
+
+  bool success = a_success && b_success && c_success;
+
   std::cout << "Perfect restoration: " << success << std::endl;
   return !success;
 }

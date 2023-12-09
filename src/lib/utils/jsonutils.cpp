@@ -66,13 +66,48 @@ std::vector<T> deserialize(const uint8_t* data, std::size_t size) {
 nlohmann::json to_json(const arma::rowvec& t) {
   auto data = serialize(t.memptr(), t.size());
   std::string base64_data = base64_encode(data.data(), data.size(), false);
-  return {{"size", t.size()}, {"base64_data", base64_data}};
+  return {{"type", "rowvec"}, {"size", t.size()}, {"base64_data", base64_data}};
+}
+
+nlohmann::json to_json(const arma::colvec& t) {
+  auto data = serialize(t.memptr(), t.size());
+  std::string base64_data = base64_encode(data.data(), data.size(), false);
+  return {{"type", "colvec"}, {"size", t.size()}, {"base64_data", base64_data}};
+}
+
+nlohmann::json to_json(const arma::mat& t) {
+  auto data = serialize(t.memptr(), t.size());
+  std::string base64_data = base64_encode(data.data(), data.size(), false);
+  return {{"type", "mat"}, {"n_rows", t.n_rows}, {"n_cols", t.n_cols}, {"base64_data", base64_data}};
 }
 
 arma::rowvec rowvec_from_json(const nlohmann::json& json_node) {
+  assert(json_node["type"] == "rowvec");
   std::size_t size = json_node["size"];
   std::string base64_data = json_node["base64_data"];
   const std::string data = base64_decode(base64_data);
-  std::vector<double> row_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-  return {row_data};
+  std::vector<double> raw_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  assert(raw_data.size() == size);
+  return {raw_data};
+}
+
+arma::colvec colvec_from_json(const nlohmann::json& json_node) {
+  assert(json_node["type"] == "colvec");
+  std::size_t size = json_node["size"];
+  std::string base64_data = json_node["base64_data"];
+  const std::string data = base64_decode(base64_data);
+  std::vector<double> raw_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  assert(raw_data.size() == size);
+  return {raw_data};
+}
+
+arma::mat mat_from_json(const nlohmann::json& json_node) {
+  assert(json_node["type"] == "mat");
+  arma::uword n_rows = json_node["n_rows"];
+  arma::uword n_cols = json_node["n_cols"];
+  std::string base64_data = json_node["base64_data"];
+  const std::string data = base64_decode(base64_data);
+  std::vector<double> raw_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  assert(raw_data.size() == n_cols * n_rows);
+  return {raw_data.data(), n_rows, n_cols};
 }
