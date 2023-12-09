@@ -24,7 +24,6 @@ add_library(Kriging
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
         include/libKriging/utils/utils.hpp
-        utils/hdf5utils.cpp include/libKriging/utils/hdf5utils.hpp
         utils/base64.cpp utils/base64.h
         utils/jsonutils.cpp include/libKriging/utils/jsonutils.hpp
         include/libKriging/version.hpp ${VERSION_FILE})

@@ -170,12 +170,12 @@ class NoiseKriging {
 
   LIBKRIGING_EXPORT std::string summary() const;
 
-  /** Dump current NoiseKriging object into an hdf5 file
+  /** Dump current NoiseKriging object into an file
    * @param filename
    */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
-  /** Load a new NoiseKriging object from an hdf5 file
+  /** Load a new NoiseKriging object from an file
    * @param filename
    */
   LIBKRIGING_EXPORT static NoiseKriging load(const std::string filename);

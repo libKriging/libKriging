@@ -18,7 +18,6 @@
 #include "libKriging/Trend.hpp"
 #include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
-#include "libKriging/utils/hdf5utils.hpp"
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
@@ -1431,172 +1430,85 @@ LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
 }
 
 void NuggetKriging::save(const std::string filename) const {
-  const bool use_hdf5 = false;
+  nlohmann::json j;
 
-  if (use_hdf5) {
-    const auto appflag = arma::hdf5_opts::append;
+  j["version"] = 2;
+  j["content"] = "NuggetKriging";
 
-    uint32_t version = 1;
-    saveToHdf5(version, arma::hdf5_name(filename, "version", arma::hdf5_opts::none));
-    saveToHdf5(std::string("NuggetKriging"), arma::hdf5_name(filename, "content", appflag));
+  // Cov_pow & std::function embedded by make_Cov
+  j["covType"] = m_covType;
+  j["X"] = to_json(m_X);
+  j["centerX"] = to_json(m_centerX);
+  j["scaleX"] = to_json(m_scaleX);
+  j["y"] = to_json(m_y);
+  j["centerY"] = m_centerY;
+  j["scaleY"] = m_scaleY;
+  j["normalize"] = m_normalize;
 
-    // Cov_pow & std::function embedded by make_Cov
-    saveToHdf5(m_covType, arma::hdf5_name(filename, "covType", appflag));
-    m_X.save(arma::hdf5_name(filename, "X", appflag));
-    m_centerX.save(arma::hdf5_name(filename, "centerX", appflag));
-    m_scaleX.save(arma::hdf5_name(filename, "scaleX", appflag));
-    m_y.save(arma::hdf5_name(filename, "y", appflag));
-    saveToHdf5(m_centerY, arma::hdf5_name(filename, "centerY", appflag));
-    saveToHdf5(m_scaleY, arma::hdf5_name(filename, "scaleY", appflag));
-    saveToHdf5(m_normalize, arma::hdf5_name(filename, "normalize", appflag));
+  j["regmodel"] = Trend::toString(m_regmodel);
+  j["optim"] = m_optim;
+  j["objective"] = m_objective;
+  j["dX"] = to_json(m_dX);
+  j["F"] = to_json(m_F);
+  j["T"] = to_json(m_T);
+  j["M"] = to_json(m_M);
+  j["z"] = to_json(m_z);
+  j["beta"] = to_json(m_beta);
+  j["est_beta"] = m_est_beta;
+  j["theta"] = to_json(m_theta);
+  j["est_theta"] = m_est_theta;
+  j["sigma2"] = m_sigma2;
+  j["est_sigma2"] = m_est_sigma2;
+  j["nugget"] = m_nugget;
+  j["est_nugget"] = m_est_nugget;
 
-    saveToHdf5(Trend::toString(m_regmodel), arma::hdf5_name(filename, "regmodel", appflag));
-    saveToHdf5(m_optim, arma::hdf5_name(filename, "optim", appflag));
-    saveToHdf5(m_objective, arma::hdf5_name(filename, "objective", appflag));
-    m_dX.save(arma::hdf5_name(filename, "dX", appflag));
-    m_F.save(arma::hdf5_name(filename, "F", appflag));
-    m_T.save(arma::hdf5_name(filename, "T", appflag));
-    m_M.save(arma::hdf5_name(filename, "M", appflag));
-    m_z.save(arma::hdf5_name(filename, "z", appflag));
-    m_beta.save(arma::hdf5_name(filename, "beta", appflag));
-    saveToHdf5(m_est_beta, arma::hdf5_name(filename, "est_beta", appflag));
-    m_theta.save(arma::hdf5_name(filename, "theta", appflag));
-    saveToHdf5(m_est_theta, arma::hdf5_name(filename, "est_theta", appflag));
-    saveToHdf5(m_sigma2, arma::hdf5_name(filename, "sigma2", appflag));
-    saveToHdf5(m_est_sigma2, arma::hdf5_name(filename, "est_sigma2", appflag));
-    saveToHdf5(m_nugget, arma::hdf5_name(filename, "nugget", appflag));
-    saveToHdf5(m_est_nugget, arma::hdf5_name(filename, "est_nugget", appflag));
-  } else {
-    nlohmann::json j;
-
-    j["version"] = 2;
-    j["content"] = "NuggetKriging";
-
-    // Cov_pow & std::function embedded by make_Cov
-    j["covType"] = m_covType;
-    j["X"] = to_json(m_X);
-    j["centerX"] = to_json(m_centerX);
-    j["scaleX"] = to_json(m_scaleX);
-    j["y"] = to_json(m_y);
-    j["centerY"] = m_centerY;
-    j["scaleY"] = m_scaleY;
-    j["normalize"] = m_normalize;
-
-    j["regmodel"] = Trend::toString(m_regmodel);
-    j["optim"] = m_optim;
-    j["objective"] = m_objective;
-    j["dX"] = to_json(m_dX);
-    j["F"] = to_json(m_F);
-    j["T"] = to_json(m_T);
-    j["M"] = to_json(m_M);
-    j["z"] = to_json(m_z);
-    j["beta"] = to_json(m_beta);
-    j["est_beta"] = m_est_beta;
-    j["theta"] = to_json(m_theta);
-    j["est_theta"] = m_est_theta;
-    j["sigma2"] = m_sigma2;
-    j["est_sigma2"] = m_est_sigma2;
-    j["nugget"] = m_nugget;
-    j["est_nugget"] = m_est_nugget;
-
-    std::ofstream f(filename);
-    f << std::setw(4) << j;
-  }
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
 }
 
 NuggetKriging NuggetKriging::load(const std::string filename) {
-  const bool use_hdf5 = false;
+  std::ifstream f(filename);
+  nlohmann::json j = nlohmann::json::parse(f);
 
-  if (use_hdf5) {
-    uint32_t version;
-    loadFromHdf5(version, arma::hdf5_name(filename, "version"));
-    if (version != 1) {
-      throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 1"));
-    }
-    std::string content;
-    loadFromHdf5(content, arma::hdf5_name(filename, "content"));
-    if (content != "NuggetKriging") {
-      throw std::runtime_error(
-          asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NuggetKriging'"));
-    }
-
-    std::string covType;
-    loadFromHdf5(covType, arma::hdf5_name(filename, "covType"));
-    NuggetKriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
-
-    kr.m_X.load(arma::hdf5_name(filename, "X"));
-    kr.m_centerX.load(arma::hdf5_name(filename, "centerX"));
-    kr.m_scaleX.load(arma::hdf5_name(filename, "scaleX"));
-    kr.m_y.load(arma::hdf5_name(filename, "y"));
-    loadFromHdf5(kr.m_centerY, arma::hdf5_name(filename, "centerY"));
-    loadFromHdf5(kr.m_scaleY, arma::hdf5_name(filename, "scaleY"));
-    loadFromHdf5(kr.m_normalize, arma::hdf5_name(filename, "normalize"));
-
-    std::string model;
-    loadFromHdf5(model, arma::hdf5_name(filename, "regmodel"));
-    kr.m_regmodel = Trend::fromString(model);
-
-    loadFromHdf5(kr.m_optim, arma::hdf5_name(filename, "optim"));
-    loadFromHdf5(kr.m_objective, arma::hdf5_name(filename, "objective"));
-    kr.m_dX.load(arma::hdf5_name(filename, "dX"));
-    kr.m_F.load(arma::hdf5_name(filename, "F"));
-    kr.m_T.load(arma::hdf5_name(filename, "T"));
-    kr.m_M.load(arma::hdf5_name(filename, "M"));
-    kr.m_z.load(arma::hdf5_name(filename, "z"));
-    kr.m_beta.load(arma::hdf5_name(filename, "beta"));
-    loadFromHdf5(kr.m_est_beta, arma::hdf5_name(filename, "est_beta"));
-    kr.m_theta.load(arma::hdf5_name(filename, "theta"));
-    loadFromHdf5(kr.m_est_theta, arma::hdf5_name(filename, "est_theta"));
-    loadFromHdf5(kr.m_sigma2, arma::hdf5_name(filename, "sigma2"));
-    loadFromHdf5(kr.m_est_sigma2, arma::hdf5_name(filename, "est_sigma2"));
-    loadFromHdf5(kr.m_nugget, arma::hdf5_name(filename, "nugget"));
-    loadFromHdf5(kr.m_est_nugget, arma::hdf5_name(filename, "est_nugget"));
-
-    return kr;
-  } else {
-    std::ifstream f(filename);
-    nlohmann::json j = nlohmann::json::parse(f);
-
-    uint32_t version = j["version"].template get<uint32_t>();
-    if (version != 2) {
-      throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
-    }
-    std::string content = j["content"].template get<std::string>();
-    if (content != "Kriging") {
-      throw std::runtime_error(
-          asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NuggetKriging'"));
-    }
-
-    std::string covType = j["covType"].template get<std::string>();
-    NuggetKriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
-
-    kr.m_X = mat_from_json(j["X"]);
-    kr.m_centerX = rowvec_from_json(j["centerX"]);
-    kr.m_scaleX = rowvec_from_json(j["scaleX"]);
-    kr.m_y = colvec_from_json(j["y"]);
-    kr.m_centerY = j["centerY"].template get<decltype(kr.m_centerY)>();
-    kr.m_scaleY = j["scaleY"].template get<decltype(kr.m_scaleY)>();
-    kr.m_normalize = j["normalize"].template get<decltype(kr.m_normalize)>();
-
-    std::string model = j["regmodel"].template get<std::string>();
-    kr.m_regmodel = Trend::fromString(model);
-
-    kr.m_optim = j["optim"].template get<decltype(kr.m_optim)>();
-    kr.m_objective = j["objective"].template get<decltype(kr.m_objective)>();
-    kr.m_dX = mat_from_json(j["dX"]);
-    kr.m_F = mat_from_json(j["F"]);
-    kr.m_T = mat_from_json(j["T"]);
-    kr.m_M = mat_from_json(j["M"]);
-    kr.m_z = colvec_from_json(j["z"]);
-    kr.m_beta = colvec_from_json(j["beta"]);
-    kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
-    kr.m_theta = colvec_from_json(j["theta"]);
-    kr.m_est_theta = j["est_theta"].template get<decltype(kr.m_est_theta)>();
-    kr.m_sigma2 = j["sigma2"].template get<decltype(kr.m_sigma2)>();
-    kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
-    kr.m_nugget = j["sigma2"].template get<decltype(kr.m_nugget)>();
-    kr.m_est_nugget = j["est_sigma2"].template get<decltype(kr.m_est_nugget)>();
-
-    return kr;
+  uint32_t version = j["version"].template get<uint32_t>();
+  if (version != 2) {
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
   }
+  std::string content = j["content"].template get<std::string>();
+  if (content != "Kriging") {
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NuggetKriging'"));
+  }
+
+  std::string covType = j["covType"].template get<std::string>();
+  NuggetKriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
+
+  kr.m_X = mat_from_json(j["X"]);
+  kr.m_centerX = rowvec_from_json(j["centerX"]);
+  kr.m_scaleX = rowvec_from_json(j["scaleX"]);
+  kr.m_y = colvec_from_json(j["y"]);
+  kr.m_centerY = j["centerY"].template get<decltype(kr.m_centerY)>();
+  kr.m_scaleY = j["scaleY"].template get<decltype(kr.m_scaleY)>();
+  kr.m_normalize = j["normalize"].template get<decltype(kr.m_normalize)>();
+
+  std::string model = j["regmodel"].template get<std::string>();
+  kr.m_regmodel = Trend::fromString(model);
+
+  kr.m_optim = j["optim"].template get<decltype(kr.m_optim)>();
+  kr.m_objective = j["objective"].template get<decltype(kr.m_objective)>();
+  kr.m_dX = mat_from_json(j["dX"]);
+  kr.m_F = mat_from_json(j["F"]);
+  kr.m_T = mat_from_json(j["T"]);
+  kr.m_M = mat_from_json(j["M"]);
+  kr.m_z = colvec_from_json(j["z"]);
+  kr.m_beta = colvec_from_json(j["beta"]);
+  kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
+  kr.m_theta = colvec_from_json(j["theta"]);
+  kr.m_est_theta = j["est_theta"].template get<decltype(kr.m_est_theta)>();
+  kr.m_sigma2 = j["sigma2"].template get<decltype(kr.m_sigma2)>();
+  kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
+  kr.m_nugget = j["sigma2"].template get<decltype(kr.m_nugget)>();
+  kr.m_est_nugget = j["est_sigma2"].template get<decltype(kr.m_est_nugget)>();
+
+  return kr;
 }
