@@ -6,7 +6,7 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 
 int main() {
-  const int n = 200;
+  const int n = 50;
 
   arma::rowvec a(rand() % n, arma::fill::randn);
   arma::colvec b(rand() % n, arma::fill::randn);
