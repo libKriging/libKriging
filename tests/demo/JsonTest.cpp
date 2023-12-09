@@ -5,7 +5,7 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
-int main(int argc, char** argv) {
+int main() {
   const int n = 200;
 
   arma::rowvec a(rand() % n, arma::fill::randn);

@@ -63,25 +63,25 @@ std::vector<T> deserialize(const uint8_t* data, std::size_t size) {
   return result;
 }
 
-nlohmann::json to_json(const arma::rowvec& t) {
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::rowvec& t) {
   auto data = serialize(t.memptr(), t.size());
   std::string base64_data = base64_encode(data.data(), data.size(), false);
   return {{"type", "rowvec"}, {"size", t.size()}, {"base64_data", base64_data}};
 }
 
-nlohmann::json to_json(const arma::colvec& t) {
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::colvec& t) {
   auto data = serialize(t.memptr(), t.size());
   std::string base64_data = base64_encode(data.data(), data.size(), false);
   return {{"type", "colvec"}, {"size", t.size()}, {"base64_data", base64_data}};
 }
 
-nlohmann::json to_json(const arma::mat& t) {
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::mat& t) {
   auto data = serialize(t.memptr(), t.size());
   std::string base64_data = base64_encode(data.data(), data.size(), false);
   return {{"type", "mat"}, {"n_rows", t.n_rows}, {"n_cols", t.n_cols}, {"base64_data", base64_data}};
 }
 
-arma::rowvec rowvec_from_json(const nlohmann::json& json_node) {
+LIBKRIGING_EXPORT arma::rowvec rowvec_from_json(const nlohmann::json& json_node) {
   assert(json_node["type"] == "rowvec");
   std::size_t size = json_node["size"];
   std::string base64_data = json_node["base64_data"];
@@ -91,7 +91,7 @@ arma::rowvec rowvec_from_json(const nlohmann::json& json_node) {
   return {raw_data};
 }
 
-arma::colvec colvec_from_json(const nlohmann::json& json_node) {
+LIBKRIGING_EXPORT arma::colvec colvec_from_json(const nlohmann::json& json_node) {
   assert(json_node["type"] == "colvec");
   std::size_t size = json_node["size"];
   std::string base64_data = json_node["base64_data"];
@@ -101,7 +101,7 @@ arma::colvec colvec_from_json(const nlohmann::json& json_node) {
   return {raw_data};
 }
 
-arma::mat mat_from_json(const nlohmann::json& json_node) {
+LIBKRIGING_EXPORT arma::mat mat_from_json(const nlohmann::json& json_node) {
   assert(json_node["type"] == "mat");
   arma::uword n_rows = json_node["n_rows"];
   arma::uword n_cols = json_node["n_cols"];

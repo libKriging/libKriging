@@ -4,12 +4,14 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
-nlohmann::json to_json(const arma::rowvec& t);
-nlohmann::json to_json(const arma::colvec& t);
-nlohmann::json to_json(const arma::mat& t);
+#include "libKriging/libKriging_exports.h"
 
-arma::rowvec rowvec_from_json(const nlohmann::json& data);
-arma::colvec colvec_from_json(const nlohmann::json& data);
-arma::mat mat_from_json(const nlohmann::json& data);
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::rowvec& t);
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::colvec& t);
+LIBKRIGING_EXPORT nlohmann::json to_json(const arma::mat& t);
+
+LIBKRIGING_EXPORT arma::rowvec rowvec_from_json(const nlohmann::json& data);
+LIBKRIGING_EXPORT arma::colvec colvec_from_json(const nlohmann::json& data);
+LIBKRIGING_EXPORT arma::mat mat_from_json(const nlohmann::json& data);
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_JSONUTILS_HPP
