@@ -24,7 +24,7 @@ function repair_wheel {
 
 
 # Install a system package required by our library
-yum install -y openblas-devel hdf5-devel
+yum install -y openblas-devel # hdf5-devel
 
 # Compile wheels
 for PYBIN in /opt/python/*-cp*/bin; do
