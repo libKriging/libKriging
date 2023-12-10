@@ -1,7 +1,7 @@
 Package: rlibkriging
 Type: Package
 Title: Kriging Models using the 'libKriging' Library
-Version: 0.8-2
+Version: 0.8-3
 Date: 2023-12-10
 Authors@R: 
     c(person(given = "Pascal",
