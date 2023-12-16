@@ -148,6 +148,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
+  if (arma::any(_theta > 2*arma::max(m_dX,1))) // try fix singular just for range exceeding domain wide
   if (Covariance::approx_singular) {
     double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
     if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
@@ -156,7 +157,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
       // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
       double ll_2 = _logLikelihood(_theta_sigma2 / 2, grad_out, okm_data, bench);
       if (grad_out)
-        *grad_out /= 2;
+        *grad_out = -arma::abs(*grad_out)/2;
       return ll_2 - log(2);  // emulates likelihood/2
     }
   }
