@@ -182,7 +182,7 @@ as.list.NoiseKriging <- function(x, ...) {
 #' k_km <- as.km(k)
 #' print(k_km)
 as.km.NoiseKriging <- function(x, .call = NULL, ...) {
-
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     ## loadDiceKriging()
     ## if (! "DiceKriging" %in% installed.packages())
     ##     stop("DiceKriging must be installed to use its wrapper from libKriging.")
@@ -270,7 +270,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 #' ## same thing
 #' k
 print.NoiseKriging <- function(x, ...) {
-    if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     p = noisekriging_summary(x)
     cat(p)
     invisible(p)
@@ -342,7 +342,7 @@ fit.NoiseKriging <- function(object, y, noise, X,
                     optim = c("BFGS", "none"),
                     objective = c("LL"),
                     parameters = NULL, ...) {
-
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
@@ -537,7 +537,6 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
 update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     if (is.data.frame(newX)) newX = data.matrix(newX)
@@ -586,7 +585,6 @@ update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
 #' outfile = tempfile("k.json") 
 #' save(k,outfile)
 save.NoiseKriging <- function(object, filename, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
@@ -675,6 +673,7 @@ load.NoiseKriging <- function(filename, ...) {
 #' points(k$theta(),k$sigma2(),col='blue')
 logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                   grad = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     if (is.data.frame(theta_sigma2)) theta_sigma2 = data.matrix(theta_sigma2)
     if (!is.matrix(theta_sigma2)) theta_sigma2 <- matrix(theta_sigma2, ncol = ncol(k$X)+1)
@@ -722,7 +721,8 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
 #'
 #' logLikelihood(k)
 logLikelihood.NoiseKriging <- function(object, ...) {
-  return(noisekriging_logLikelihood(object))
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    return(noisekriging_logLikelihood(object))
 }
 
 
@@ -750,5 +750,6 @@ logLikelihood.NoiseKriging <- function(object, ...) {
 #'
 #' print(copy(k))
 copy.NoiseKriging <- function(object, ...) {
-  return(noisekriging_copy(object))
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    return(noisekriging_copy(object))
 }

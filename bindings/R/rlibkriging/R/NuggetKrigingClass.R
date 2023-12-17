@@ -179,7 +179,7 @@ as.list.NuggetKriging <- function(x, ...) {
 #' k_km <- as.km(k)
 #' print(k_km)
 as.km.NuggetKriging <- function(x, .call = NULL, ...) {
-
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     ## loadDiceKriging()
     ## if (! "DiceKriging" %in% installed.packages())
     ##     stop("DiceKriging must be installed to use its wrapper from libKriging.")
@@ -267,7 +267,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 #' ## same thing
 #' k
 print.NuggetKriging <- function(x, ...) {
-    if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     p = nuggetkriging_summary(x)
     cat(p)
     invisible(p)
@@ -336,7 +336,7 @@ fit.NuggetKriging <- function(object, y, X,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LMP"),
                     parameters = NULL, ...) {
-
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
@@ -531,7 +531,6 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
 update.NuggetKriging <- function(object, newy, newX, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(newX)) newX = data.matrix(newX)
@@ -578,7 +577,6 @@ update.NuggetKriging <- function(object, newy, newX, ...) {
 #' outfile = tempfile("k.json") 
 #' save(k,outfile)
 save.NuggetKriging <- function(object, filename, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
@@ -668,6 +666,7 @@ load.NuggetKriging <- function(filename, ...) {
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                   grad = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha, ncol = ncol(k$X)+1)
@@ -715,7 +714,8 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 #'
 #' logLikelihood(k)
 logLikelihood.NuggetKriging <- function(object, ...) {
-  return(nuggetkriging_logLikelihood(object))
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    return(nuggetkriging_logLikelihood(object))
 }
 
 #' Compute the log-marginal posterior of a kriging model, using the
@@ -771,6 +771,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #'  nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
     if (!is.matrix(theta_alpha)) theta_alpha <- matrix(theta_alpha,ncol=ncol(k$X)+1)
@@ -815,7 +816,8 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, benc
 #'
 #' logMargPost(k)
 logMargPost.NuggetKriging <- function(object, ...) {
-  return(nuggetkriging_logMargPost(object))
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    return(nuggetkriging_logMargPost(object))
 }
 
 
@@ -843,5 +845,6 @@ logMargPost.NuggetKriging <- function(object, ...) {
 #'
 #' print(copy(k))
 copy.NuggetKriging <- function(object, ...) {
-  return(nuggetkriging_copy(object))
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    return(nuggetkriging_copy(object))
 }

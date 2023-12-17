@@ -182,7 +182,7 @@ as.list.Kriging <- function(x, ...) {
 #' k_km <- as.km(k)
 #' print(k_km)
 as.km.Kriging <- function(x, .call = NULL, ...) {
-
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     ## loadDiceKriging()
     ## if (! "DiceKriging" %in% installed.packages())
     ##     stop("DiceKriging must be installed to use its wrapper from libKriging.")
@@ -270,7 +270,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
 #' ## same thing
 #' k
 print.Kriging <- function(x, ...) {
-    if (length(list(...))>0) warning("Arguments ",paste0(names(list(...)),"=",list(...),collapse=",")," are ignored.")
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     p = kriging_summary(x)
     cat(p)
     invisible(p)
@@ -343,6 +343,7 @@ fit.Kriging <- function(object, y, X,
                     optim = c("BFGS", "Newton", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
 
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
@@ -537,7 +538,6 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
 update.Kriging <- function(object, newy, newX, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(newX)) newX = data.matrix(newX)
@@ -582,7 +582,6 @@ update.Kriging <- function(object, newy, newX, ...) {
 #' outfile = tempfile("k.json") 
 #' save(k,outfile)
 save.Kriging <- function(object, filename, ...) {
-
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
@@ -658,6 +657,7 @@ load.Kriging <- function(filename, ...) {
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
                                   grad = FALSE, hess = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(k$X))
@@ -708,6 +708,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
 #'
 #' logLikelihood(k)
 logLikelihood.Kriging <- function(object, ...) {
+  if (length(L <- list(...)) > 0) warnOnDots(L)
   return(kriging_logLikelihood(object))
 }
 
@@ -752,6 +753,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' plot(t, loo(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
 leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
@@ -825,6 +827,7 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #' points(X[2],loov$mean[2],col='red')
 #' lines(rep(X[2],2),loov$mean[2]+2*c(-loov$stdev[2],loov$stdev[2]),col='red')
 leaveOneOutVec.Kriging <- function(object, theta, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (!is.array(theta)) 
         stop("Input theta must be 1-dimensional")
@@ -860,6 +863,7 @@ leaveOneOutVec.Kriging <- function(object, theta, ...) {
 #'
 #' leaveOneOut(k)
 leaveOneOut.Kriging <- function(object, ...) {
+  if (length(L <- list(...)) > 0) warnOnDots(L)
   return(kriging_leaveOneOut(object))
 }
 
@@ -903,6 +907,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' plot(t, lmp(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
 logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta,ncol=ncol(k$X))
@@ -947,6 +952,7 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
 #'
 #' logMargPost(k)
 logMargPost.Kriging <- function(object, ...) {
+  if (length(L <- list(...)) > 0) warnOnDots(L)
   return(kriging_logMargPost(object))
 }
 
