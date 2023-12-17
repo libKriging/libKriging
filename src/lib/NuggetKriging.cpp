@@ -145,7 +145,10 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular)
-    if (arma::any(_theta > 2 * arma::max(m_dX, 1))) {     // try fix singular just for range exceeding domain wide
+    if (arma::any(_theta
+                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
+      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 0) <<
+      // arma::endl;
       double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
       if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
         // throw std::runtime_error("Covariance matrix is singular");
@@ -388,7 +391,10 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular)
-    if (arma::any(_theta > 2 * arma::max(m_dX, 1))) {     // try fix singular just for range exceeding domain wide
+    if (arma::any(_theta
+                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
+      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 0) <<
+      // arma::endl;
       double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
       if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
         // throw std::runtime_error("Covariance matrix is singular");
