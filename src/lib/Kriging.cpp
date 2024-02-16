@@ -124,19 +124,13 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   arma::uword d = m_X.n_cols;
 
   auto t0 = Bench::tic();
-  arma::mat R = arma::mat(n, n);
-  for (arma::uword i = 0; i < n; i++) {
-    R.at(i, i) = 1;
-    for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta);
-    }
-  }
-  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
-
+  arma::mat R = arma::mat(n,n);
+  if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+  } else 
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+  t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
+  
   // Sly turnaround for too long range: use proxy shorter range (penalized), and force gradient to point at shorter
   // range (assuming a Newton like method for wrapping optim)
   if (Covariance::approx_singular)
@@ -145,7 +139,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
       // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 1) <<
       // arma::endl;
       double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
+      if (rcond_R < n * LinearAlgebra::min_rcond) {
         // throw std::runtime_error("Covariance matrix is singular");
         // Try use midpoint of theta and
         // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -160,7 +154,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "M = F \\ T", t0);
+  t0 = Bench::toc(bench, "M = T \\ F", t0);
   arma::mat Q;
   arma::mat G;
   arma::qr_econ(Q, G, fd->M);
@@ -173,10 +167,10 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   }
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+  t0 = Bench::toc(bench, "Yt = T \\ y", t0);
   if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
+    t0 = Bench::toc(bench, "B = G \\ Qt * Yt", t0);
   }
 
   fd->z = Yt - fd->M * fd->beta;
@@ -220,7 +214,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     arma::vec terme1 = arma::vec(d);   // if (hess_out != nullptr)
 
     arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "Li = I \\ T", t0);
+    t0 = Bench::toc(bench, "Li = T ^-1", t0);
     arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
     t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
@@ -228,7 +222,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     t0 = Bench::toc(bench, "tT = Tt", t0);
 
     arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "x = z \\ tT", t0);
+    t0 = Bench::toc(bench, "x = tT \\ z", t0);
 
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
@@ -312,7 +306,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
             xl = xk;
           else
             xl = solve(fd->T, gradsR[l] * x, LinearAlgebra::default_solve_opts);
-          t0 = Bench::toc(bench, "xl = gradR_k[l] * x \\ T", t0);
+          t0 = Bench::toc(bench, "xl = T \\ gradR_k[l] * x", t0);
 
           // arma::cout << " hess_A:" << -xk.t() * H * xl / sigma2_hat << arma::endl;
           // arma::cout << " hess_B:" << -x.t() * (hessR_k_l - 2*aux) * x / sigma2_hat << arma::endl;
@@ -438,17 +432,11 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
-  for (arma::uword i = 0; i < n; i++) {
-    R.at(i, i) = 1;
-    for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta);
-    }
-  }
-  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+  if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+  } else 
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+  t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
 
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
@@ -458,7 +446,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
       // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 1) <<
       // arma::endl;
       double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
+      if (rcond_R < n * LinearAlgebra::min_rcond) {
         // throw std::runtime_error("Covariance matrix is singular");
         // Try use midpoint of theta and
         // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -471,12 +459,12 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "M = F \\ T", t0);
+  t0 = Bench::toc(bench, "M = T \\ F", t0);
 
   // arma::mat Rinv = inv_sympd(R);  // didn't find efficient chol2inv equivalent in armadillo
   // t0 = Bench::toc(bench, "Ri = inv(R)", t0);
   arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "Li = I \\ T", t0);
+  t0 = Bench::toc(bench, "Li = T \\ I", t0);
   arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
   t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
 
@@ -488,7 +476,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   t0 = Bench::toc(bench, "TM = Chol(Mt * M)", t0);
 
   arma::mat aux = solve(trans(TM), trans(RinvF), LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "aux = RiF \\ TMt", t0);
+  t0 = Bench::toc(bench, "aux = RiT \\ FMt", t0);
 
   arma::mat Q = Rinv - trans(aux) * aux;  // Can be optimized with a crossprod equivalent in armadillo ?
   t0 = Bench::toc(bench, "Q = Ri - auxt*aux", t0);
@@ -517,7 +505,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   }
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+  t0 = Bench::toc(bench, "Yt = T \\ y", t0);
 
   if (fd->is_beta_estim) {
     // fd->beta = solve(fd->M, Yt, LinearAlgebra::default_solve_opts);
@@ -526,7 +514,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
     arma::qr_econ(Q_qr, G, fd->M);
     t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
     fd->beta = solve(G, Q_qr.t() * Yt, LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
+    t0 = Bench::toc(bench, "B = G \\ Yt*Qt", t0);
   }
 
   fd->z = Yt - fd->M * fd->beta;
@@ -690,18 +678,12 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   arma::uword d = m_X.n_cols;
 
   auto t0 = Bench::tic();
-  arma::mat R = arma::mat(n, n);
-  for (arma::uword i = 0; i < n; i++) {
-    R.at(i, i) = 1;
-    for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta);
-    }
-  }
-  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
+  arma::mat R = arma::mat(n,n);
+  if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+  } else 
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+  t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
 
   // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
   // (assuming a Newton like method for wrapping optim)
@@ -711,7 +693,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
       // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 0) <<
       // arma::endl;
       double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
+      if (rcond_R < n * LinearAlgebra::min_rcond) {
         // throw std::runtime_error("Covariance matrix is singular");
         // Try use midpoint of theta and
         // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
@@ -745,7 +727,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   arma::mat L = fd->T;
 
   fd->M = solve(L, X, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "M = F \\ T", t0);
+  t0 = Bench::toc(bench, "M = T \\ F", t0);
 
   arma::mat R_inv_X = solve(trans(L), fd->M, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "RiF = Ri * F", t0);
@@ -765,7 +747,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   t0 = Bench::toc(bench, "RiFFtRiFiFtRi = RiF * RiFt \\ M \\ Mt", t0);
 
   arma::colvec Yt = solve(L, m_y, LinearAlgebra::default_solve_opts);
-  t0 = Bench::toc(bench, "Yt = y \\ T", t0);
+  t0 = Bench::toc(bench, "Yt = T \\ y", t0);
 
   if (fd->is_beta_estim) {
     arma::mat Q;
@@ -773,7 +755,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     arma::qr_econ(Q, G, fd->M);
     t0 = Bench::toc(bench, "Q,G = QR(M)", t0);
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "B = Qt * Yt \\ G", t0);
+    t0 = Bench::toc(bench, "B = G \\ Yt*Qt", t0);
   }
 
   fd->z = Yt - fd->M * fd->beta;  // required for later predict
@@ -1190,6 +1172,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
   }
 
   // Now we compute the distance matrix between points. Will be used to compute R(theta) later (e.g. when fitting)
+  // Note: m_dX is transposed compared to m_X
   m_dX = arma::zeros(d, n * n);
   for (arma::uword ij = 0; ij < m_dX.n_cols; ij++) {
     int i = (int)ij / n;
@@ -1835,13 +1818,16 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
 /** Add new conditional data points to previous (X,y)
  * @param newy is m length column vector of new output
  * @param newX is m*d matrix of new input
- * @param optim_method is an optimizer name from OptimLib, or 'none' to keep previously estimated parameters unchanged
- * @param optim_objective is 'loo' or 'loglik'. Ignored if optim_method=='none'.
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& newX) {
   if (newy.n_elem != newX.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(newX.n_rows) + "x"
                              + std::to_string(newX.n_cols) + "), y: (" + std::to_string(newy.n_elem) + ")");
+
+  if (newX.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
+                             + std::to_string(m_X.n_cols) + "), new X: (...x"
+                             + std::to_string(newX.n_cols) + ")");
 
   // rebuild starting parameters
   Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
@@ -1851,7 +1837,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
                         std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         this->m_est_beta};
   // re-fit
-  // TODO refit() method which will use Shurr forms to fast update matrix (R, ...)
   this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                             newy),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, newX),
@@ -1861,6 +1846,36 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& newy, const arma::mat& n
             m_objective,
             parameters);
 }
+
+LIBKRIGING_EXPORT void Kriging::update_nofit(const arma::vec& yupd, const arma::mat& Xupd) {
+  if (yupd.n_elem != Xupd.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(Xupd.n_rows) + "x"
+                             + std::to_string(Xupd.n_cols) + "), y: (" + std::to_string(yupd.n_elem) + ")");
+
+
+  if (Xupd.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
+                             + std::to_string(m_X.n_cols) + "), new X: (...x"
+                             + std::to_string(Xupd.n_cols) + ")");
+
+  // rebuild starting parameters
+  Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+                        this->m_est_sigma2,
+                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
+                        this->m_est_theta,
+                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
+                        this->m_est_beta};
+  // NO re-fit
+  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+                            yupd),  // de-normalize previous data according to suite unnormed new data
+            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, Xupd),
+            m_regmodel,
+            m_normalize,
+            "none", // do no optimize, stay on current theta
+            m_objective,
+            parameters);
+}
+
 
 LIBKRIGING_EXPORT std::string Kriging::summary() const {
   std::ostringstream oss;

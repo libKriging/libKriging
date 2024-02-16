@@ -184,6 +184,12 @@ class Kriging {
    */
   LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::mat& newX);
 
+  /** Add new conditional data points to previous (X,y)
+   * @param yupd is m length column vector of new output
+   * @param Xupd is m*d matrix of new input
+   */
+  LIBKRIGING_EXPORT void update_nofit(const arma::vec& yupd, const arma::mat& Xupd);
+
   LIBKRIGING_EXPORT std::string summary() const;
 
   /** Dump current Kriging object into an file

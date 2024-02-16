@@ -22,6 +22,18 @@ class LinearAlgebra {
 
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
+
+  LIBKRIGING_EXPORT static arma::mat cholCov(arma::mat* R,
+                                      const arma::mat& _dX,
+                                      const arma::vec& _theta,
+                                      std::function<double(const arma::vec&, const arma::vec&)> Cov);
+  LIBKRIGING_EXPORT static arma::mat update_cholCov(arma::mat* R,
+                                        const arma::mat& _dX,
+                                        const arma::vec& _theta, 
+                                        std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                        const arma::mat& Told);
+
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
