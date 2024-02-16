@@ -321,6 +321,22 @@ void kriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
 }
 
 // [[Rcpp::export]]
+void kriging_update_nofit(Rcpp::List k, arma::vec y, arma::mat X) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  impl_ptr->update_nofit(y, X);
+
+  // Rcpp::List obj;
+  // obj.attr("object") = impl_ptr;
+  // obj.attr("class") = "Kriging";
+  // return obj;
+}
+
+// [[Rcpp::export]]
 void kriging_save(Rcpp::List k, std::string filename) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

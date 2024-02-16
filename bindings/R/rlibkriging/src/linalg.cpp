@@ -41,3 +41,10 @@ double linalg_rcond_chol(arma::mat X) {
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->rcond_chol(X);
 }
+
+// [[Rcpp::export]]
+arma::mat linalg_chol_block(arma::mat C, arma::mat Loo, arma::mat Coo) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->chol_block(C, Loo, Coo);
+}

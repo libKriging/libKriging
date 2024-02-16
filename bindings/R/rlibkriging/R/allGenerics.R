@@ -182,6 +182,20 @@ fit <- function(object, ...) {
 }
 
 ## *****************************************************************************
+##' Update but no re-fit a model given in
+##' \code{object}.
+##'
+##' @title Fit model on data.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function
+##'
+##' @return No return value. Kriging object argument is modified.
+##' @export
+update_nofit <- function(object, ...) {
+    UseMethod("update_nofit")
+}
+## *****************************************************************************
 ##' Save a model given in
 ##' \code{object}.
 ##'

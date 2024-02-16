@@ -99,7 +99,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
+    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','update_nofit')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -552,6 +552,74 @@ update.Kriging <- function(object, newy, newX, ...) {
 
     ## Modify 'object' in the parent environment
     kriging_update(object, newy, newX)
+
+    invisible(NULL)
+}
+
+#' Update a \code{Kriging} model object with new points, but do NOT re-fit the model.
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object S3 Kriging object.
+#'
+#' @param newy Numeric vector of new responses (output).
+#'
+#' @param newX Numeric matrix of new input points.
+#'
+#' @param ... Ignored.
+#'
+#' @return No return value. Kriging object argument is modified.
+#'
+#' @section Caution: The method \emph{does not return the updated
+#'     object}, but instead changes the content of
+#'     \code{object}.
+#'
+#' @method update_nofit Kriging
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
+#' plot(f)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#' points(X, y, col = "blue")
+#'
+#' k <- Kriging(y, X, "matern3_2")
+#'
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p <- predict(k, x)
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+#'  border = NA, col = rgb(0, 0, 1, 0.2))
+#'
+#' newX <- as.matrix(runif(3))
+#' newy <- f(newX)
+#' points(newX, newy, col = "red")
+#'
+#' ## change the content of the object 'k'
+#' update_nofit(k, newy, newX)
+#'
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p2 <- predict(k, x)
+#' lines(x, p2$mean, col = "red")
+#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
+#'  border = NA, col = rgb(1, 0, 0, 0.2))
+update_nofit.Kriging <- function(object, newy, newX, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- kriging_model(object)
+    if (is.data.frame(newX)) newX = data.matrix(newX)
+    if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
+    if (is.data.frame(newy)) newy = data.matrix(newy)
+    if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
+    if (ncol(newX) != ncol(k$X))
+        stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
+             ncol(newX), ")")
+    if (nrow(newy) != nrow(newX))
+        stop("Objects 'newX' and 'newy' must have the same number of rows.")
+
+    ## Modify 'object' in the parent environment
+    kriging_update_nofit(object, newy, newX)
 
     invisible(NULL)
 }
