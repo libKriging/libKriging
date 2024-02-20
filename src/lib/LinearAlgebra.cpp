@@ -69,10 +69,11 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
   double M = chol.at(0, 0);
   if (chol.n_rows > 1)
     for (arma::uword i = 1; i < chol.n_rows; i++) {
-      if (chol.at(i, i) < m) {
-        m = chol.at(i, i);
-      } else if (chol.at(i, i) > M) {
-        M = chol.at(i, i);
+      double cii = chol.at(i, i);
+      if (cii < m) {
+        m = cii;
+      } else if (cii > M) {
+        M = cii;
       }
     }
   double rcond = m / M;
