@@ -1,3 +1,6 @@
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
+
 ## Changes by Yves remove the references to the packages as in 'rlibkriging::simulate',
 ## because simulate is not exported as such from rlibkriging
 

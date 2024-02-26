@@ -36,6 +36,13 @@ void linalg_set_chol_warning(bool warn) {
 }
 
 // [[Rcpp::export]]
+double linalg_rcond_approx_chol(arma::mat X) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->rcond_approx_chol(X);
+}
+
+// [[Rcpp::export]]
 double linalg_rcond_chol(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);

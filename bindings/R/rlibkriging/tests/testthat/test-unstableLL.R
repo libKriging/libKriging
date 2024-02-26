@@ -11,15 +11,30 @@ y <- f(X)  #+ 0.5*rnorm(nrow(X))
 # pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
 # install.packages(pack,repos=NULL)
 # library(rlibkriging)
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+# library(rlibkriging, lib.loc="bindings/R/Rlibs")
+# library(testthat)
+
+# bad init theta value
+rlibkriging:::covariance_use_approx_singular(FALSE)
+rlibkriging:::linalg_set_num_nugget(1e-15)
+# Build Kriging (https://libkriging.readthedocs.io/en/latest/math/KrigingModels.html)
+#rlibkriging:::optim_log(4)
+rlibkriging:::linalg_set_chol_warning(TRUE)
+k <- Kriging(y, X, kernel="gauss", optim="none", parameters= list(theta=matrix(9.0), sigma2=1e10))
+plot(f)
+points(X,y)
+#DiceView::sectionview(k,add=TRUE)
+xx=sort(c(seq(0,1,,101),X))
+lines(xx, k$predict(xx)$mean)
+
 
 # default setup
 rlibkriging:::covariance_use_approx_singular(TRUE)
-rlibkriging:::linalg_set_num_nugget(1e-10)
+rlibkriging:::linalg_set_num_nugget(1e-15)
 # Build Kriging (https://libkriging.readthedocs.io/en/latest/math/KrigingModels.html)
 #rlibkriging:::optim_log(4)
 k <- Kriging(y, X, kernel="gauss", optim="BFGS")
+#DiceView::sectionview(k,add=TRUE,col_surf='orange')
 
 # plots
 .t=seq(0,10,,101)
@@ -27,7 +42,7 @@ plot(.t, k$logLikelihoodFun(.t)$logLikelihood)
 for (t in .t) {
     arrows(
         t,     k$logLikelihoodFun(t)$logLikelihood,
-        t-0.21, k$logLikelihoodFun(t)$logLikelihood-0.21*k$logLikelihoodFun(t,grad=TRUE)$logLikelihoodGrad, 
+        t-0.2, k$logLikelihoodFun(t)$logLikelihood-0.2*k$logLikelihoodFun(t,grad=TRUE)$logLikelihoodGrad, 
         col='black')
 }
 rlibkriging:::covariance_use_approx_singular(FALSE)
@@ -38,26 +53,41 @@ for (t in .t) {
         t-0.21, k$logLikelihoodFun(t)$logLikelihood-0.21*k$logLikelihoodFun(t,grad=TRUE)$logLikelihoodGrad, 
         col='blue')
 }
-rlibkriging:::covariance_use_approx_singular(TRUE)
+#rlibkriging:::covariance_use_approx_singular(FALSE)
+#rlibkriging:::linalg_set_num_nugget(0)
 
 abline(v=k$theta())
 abline(h=k$logLikelihood())
 
+rcond_approx_R = function(theta) {
+    k_tmp = NULL
+    try(k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta))))
+    if (is.null(k_tmp)) return(NA)
+    T=k_tmp$T()
+    R = (T) %*% t(T)
+    rlibkriging:::linalg_rcond_approx_chol(T)
+}
+lines(.t, log(Vectorize(rcond_approx_R)(.t)),col='orange')
+abline(h=log(1e-10),col='orange')
 rcond_R = function(theta) {
-    k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
+    k_tmp = NULL
+    try(k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta))))
+    if (is.null(k_tmp)) return(NA)
     T=k_tmp$T()
     R = (T) %*% t(T)
     rlibkriging:::linalg_rcond_chol(T)
 }
 lines(.t, log(Vectorize(rcond_R)(.t)),col='red')
-abline(h=log(1e-10*nrow(X)),col='red')
-rcond = function(theta) {
-    k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta)))
-    T=k_tmp$T()
-    R = (T) %*% t(T)
-    1/kappa(R)
-}
-lines(.t, log(Vectorize(rcond)(.t)),col='orange')
+abline(h=log(1e-18),col='red')
+# rcond = function(theta) {
+#     k_tmp = NULL
+#     try(k_tmp <- Kriging(y, X, kernel="gauss", optim="none",parameters=list(theta=matrix(theta))))
+#     if (is.null(k_tmp)) return(NA)
+#     T=k_tmp$T()
+#     R = (T) %*% t(T)
+#     1/kappa(R,norm='2')
+# }
+# lines(.t, log(Vectorize(rcond)(.t)),col='pink')
 
 k10 <- Kriging(y, X, kernel="gauss", optim="BFGS10")
 
