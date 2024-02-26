@@ -22,6 +22,8 @@ class LinearAlgebra {
 
   static double min_rcond;
   LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
+  static double min_rcond_approx;
+  LIBKRIGING_EXPORT static double rcond_approx_chol(arma::mat chol);
 
   LIBKRIGING_EXPORT static arma::mat cholCov(arma::mat* R,
                                       const arma::mat& _dX,

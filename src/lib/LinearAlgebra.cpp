@@ -7,12 +7,13 @@
 #include "libKriging/LinearAlgebra.hpp"
 
 #include "libKriging/utils/lk_armadillo.hpp"
+#include "libKriging/Covariance.hpp"
 
 LIBKRIGING_EXPORT
 const arma::solve_opts::opts LinearAlgebra::default_solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
 
-double LinearAlgebra::num_nugget = 1E-10;
+double LinearAlgebra::num_nugget = 1E-15;
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_num_nugget(double nugget) {
   LinearAlgebra::num_nugget = nugget;
@@ -26,7 +27,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower(X, 0);
 }
 
-bool LinearAlgebra::warn_chol = false;
+bool LinearAlgebra::warn_chol = true;
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
   LinearAlgebra::warn_chol = warn;
@@ -40,31 +41,41 @@ int LinearAlgebra::max_inc_choldiag = 10;
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
   arma::mat L = arma::mat(X.n_rows, X.n_cols);
   bool ok = arma::chol(L, X, "lower");
-  if (!ok) {
+  if (!ok || (Covariance::approx_singular && ((LinearAlgebra::rcond_approx_chol(L) < LinearAlgebra::min_rcond_approx) && (LinearAlgebra::rcond_chol(L) < LinearAlgebra::min_rcond)))) {
     if (inc_cond > max_inc_choldiag) {
-      throw std::runtime_error("[ERROR] Exceed max numerical nugget added to force chol matrix");
+      throw std::runtime_error("[ERROR] Exceed max numerical nugget ("+std::to_string(inc_cond)+" x 1e"+std::to_string(log10(LinearAlgebra::num_nugget))+") added to force chol matrix");
     } else if (LinearAlgebra::num_nugget <= 0.0) {
-      throw std::runtime_error("[ERROR] Cannot add anumerical nugget which is not strictly positive: "
+      throw std::runtime_error("[ERROR] Cannot add numerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
       X.diag() += LinearAlgebra::num_nugget;  // inc diagonal
       return LinearAlgebra::safe_chol_lower(X, inc_cond + 1);
     }
   } else {
-    if (inc_cond > 0)
-      if (warn_chol)
-        arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition"
-                   << arma::endl;
+    if (warn_chol && (inc_cond > 0))
+      arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition"
+                 << arma::endl;
     return L;
   }
 }
 
-double LinearAlgebra::min_rcond = 1e-10;
+double LinearAlgebra::min_rcond = 1e-18;
+
+LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
+  double rcond = arma::rcond(chol);
+  rcond *= rcond;
+  if (warn_chol)
+    if (rcond < (chol.n_rows * min_rcond))
+      arma::cout << "[WARNING] rcond " << rcond << " is below minimal value." << arma::endl;
+  return rcond;
+}
+
+double LinearAlgebra::min_rcond_approx = 1e-10;
 
 // Proxy to arma::rcond
 // @ref: N. J. Higham, "A survey of condition number estimation for triangular matrices," SIAM Review, vol. 29, no. 4,
 // pp. 575–596, Dec. 1987.
-LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
+LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
   double m = chol.at(0, 0);
   double M = chol.at(0, 0);
   if (chol.n_rows > 1)
@@ -79,8 +90,8 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
   double rcond = m / M;
   rcond = rcond * rcond;
   if (warn_chol)
-    if (rcond < (chol.n_rows * min_rcond))
-      arma::cout << "[WARNING] rcond " << rcond << " is below minimal value." << arma::endl;
+    if (rcond < (chol.n_rows * min_rcond_approx))
+      arma::cout << "[WARNING] rcond_approx " << rcond << " is below minimal value." << arma::endl;
   return rcond;
 }
 

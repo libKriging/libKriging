@@ -131,30 +131,38 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
   t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
   
+  //arma::mat Tinv = arma::solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
+  //arma::mat Tinv = arma::inv(fd->T);
+  //t0 = Bench::toc(bench, "  Tinv = T \\ 1", t0);
+  
   // Sly turnaround for too long range: use proxy shorter range (penalized), and force gradient to point at shorter
   // range (assuming a Newton like method for wrapping optim)
-  if (Covariance::approx_singular)
-    if (arma::any(_theta
-                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
-      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 1) <<
-      // arma::endl;
-      double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < n * LinearAlgebra::min_rcond) {
-        // throw std::runtime_error("Covariance matrix is singular");
-        // Try use midpoint of theta and
-        // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-        double ll_2 = _logLikelihood(_theta / 2, grad_out, hess_out, okm_data, bench);
-        if (grad_out)
-          *grad_out = -arma::abs(*grad_out) / 2;
-        if (hess_out)
-          *hess_out = -arma::abs(*hess_out) / 4;
-        return ll_2 - log(2);  // emulates likelihood/2
-      }
-    }
+  //  if (Covariance::approx_singular)
+  //    if (arma::any(_theta > 2 * m_maxdX)) {  // try fix singular just for range exceeding domain wide
+  //      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 1) <<
+  //      // arma::endl;
+  //      double rcond_R = LinearAlgebra::rcond_approx_chol(fd->T);  // Fast but approx rcond(R)
+  //      if (rcond_R < LinearAlgebra::min_rcond_approx) {
+  //        rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Slow but almost exact rcond(R)
+  //        if (rcond_R < LinearAlgebra::min_rcond) {
+  //          // throw std::runtime_error("Covariance matrix is singular");
+  //          // Try use midpoint of theta and
+  //          arma::cout << "Covariance matrix is singular, try use midpoint of theta: " << _theta << "->" << _theta/2 << std::endl;
+  //          double ll_2 = _logLikelihood(_theta / 2, grad_out, hess_out, okm_data, bench);
+  //          if (grad_out)
+  //            *grad_out = -arma::abs(*grad_out) / 2;
+  //          if (hess_out)
+  //            *hess_out = -arma::abs(*hess_out) / 4;
+  //          return ll_2 - log(2);  // emulates likelihood/2
+  //        }
+  //      }
+  //    }
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "M = T \\ F", t0);
+  //fd->M = Tinv * m_F;
+  //t0 = Bench::toc(bench, "  M = T \\ F", t0);
   arma::mat Q;
   arma::mat G;
   arma::qr_econ(Q, G, fd->M);
@@ -168,6 +176,8 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
 
   arma::colvec Yt = solve(fd->T, m_y, LinearAlgebra::default_solve_opts);
   t0 = Bench::toc(bench, "Yt = T \\ y", t0);
+  //Yt = Tinv * m_y;
+  //t0 = Bench::toc(bench, "  Yt = T \\ y", t0);
   if (fd->is_beta_estim) {
     fd->beta = solve(G, Q.t() * Yt, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "B = G \\ Qt * Yt", t0);
@@ -213,16 +223,17 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     std::vector<arma::mat> gradsR(d);  // if (hess_out != nullptr)
     arma::vec terme1 = arma::vec(d);   // if (hess_out != nullptr)
 
-    arma::mat Linv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
-    t0 = Bench::toc(bench, "Li = T ^-1", t0);
-    arma::mat Rinv = (Linv.t() * Linv);  // Do NOT inv_sympd (slower): inv_sympd(R);
-    t0 = Bench::toc(bench, "Ri = Lit * Li", t0);
+    arma::mat Tinv = solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
+    t0 = Bench::toc(bench, "Ti = T ^-1", t0);
+    arma::mat Rinv = (Tinv.t() * Tinv);  // Do NOT inv_sympd (slower): inv_sympd(R);
+    t0 = Bench::toc(bench, "Ri = Tit * Ti", t0);
 
-    arma::mat tT = fd->T.t();  // trimatu(trans(fd->T));
-    t0 = Bench::toc(bench, "tT = Tt", t0);
-
-    arma::mat x = solve(tT, fd->z, LinearAlgebra::default_solve_opts);
+    arma::mat x = solve(fd->T.t(), fd->z, LinearAlgebra::default_solve_opts);
     t0 = Bench::toc(bench, "x = tT \\ z", t0);
+    //arma::mat tTinv = Tinv.t();
+    //t0 = Bench::toc(bench, "  tT = Tt", t0);
+    //x = tTinv * fd->z;
+    //t0 = Bench::toc(bench, "  x = tT \\ z", t0);
 
     arma::cube gradR = arma::cube(d, n, n);
     for (arma::uword i = 0; i < n; i++) {
@@ -300,12 +311,14 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
           // hessR_k_l = arma::symmatu(hessR_k_l);
           t0 = Bench::toc(bench, "hessR_k_l = ...", t0);
 
-          arma::mat xk = solve(fd->T, gradsR[k] * x, LinearAlgebra::default_solve_opts);
+          //arma::mat xk = solve(fd->T, gradsR[k] * x, LinearAlgebra::default_solve_opts);
+          arma::mat xk = Tinv * (gradsR[k] * x);
           arma::mat xl;
           if (k == l)
             xl = xk;
           else
-            xl = solve(fd->T, gradsR[l] * x, LinearAlgebra::default_solve_opts);
+            //xl = solve(fd->T, gradsR[l] * x, LinearAlgebra::default_solve_opts);
+            xl  = Tinv * (gradsR[l] * x);
           t0 = Bench::toc(bench, "xl = T \\ gradR_k[l] * x", t0);
 
           // arma::cout << " hess_A:" << -xk.t() * H * xl / sigma2_hat << arma::endl;
@@ -1182,6 +1195,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       m_dX.col(j * n + i) = m_dX.col(ij);
     }
   }
+  m_maxdX = arma::max(arma::abs(m_dX), 1);
 
   // Define regression matrix
   m_regmodel = regmodel;
@@ -1254,8 +1268,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
     }
 
   } else {
-    arma::vec theta_lower = Optim::theta_lower_factor * trans(max(m_X, 0) - min(m_X, 0));
-    arma::vec theta_upper = Optim::theta_upper_factor * trans(max(m_X, 0) - min(m_X, 0));
+    arma::vec theta_lower = Optim::theta_lower_factor * m_maxdX;
+    arma::vec theta_upper = Optim::theta_upper_factor * m_maxdX;
 
     if (Optim::variogram_bounds_heuristic) {
       arma::vec dy2 = arma::zeros(n * n);
@@ -1281,16 +1295,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
       // steepest_dX_mean);
       theta_lower = arma::min(theta_lower, theta_upper);
       theta_upper = arma::max(theta_lower, theta_upper);
-
-      // arma::vec steepest_dX = arma::abs(m_dX.col(arma::index_max(dy2dX_slope))); // worst slope dX point
-      // arma::cout << "steepest_dX:" << steepest_dX << arma::endl;
-      // dy2dX_slope.replace(-1.0, std::numeric_limits<double>::infinity()); // we are not interested in same points
-      // where dX=0, and dy=0 arma::vec smoothest_dX = arma::abs(m_dX.col(arma::index_min(dy2dX_slope))); // worst slope
-      // dX point arma::cout << "smoothest_dX:" << smoothest_dX << arma::endl; arma::vec weighted_mean_dX = (arma::mean(
-      // m_dX % trans(arma::repmat(dy2, 1, m_dX.n_rows)), 1)) / arma::sum(dy2); // weighted mean dX point arma::cout <<
-      // "weighted_mean_dX:" << weighted_mean_dX << arma::endl; theta_lower =
-      // arma::max(theta_lower,Optim::theta_lower_factor * steepest_dX); theta_upper =
-      // arma::min(theta_upper,Optim::theta_upper_factor * steepest_dX);
     }
     // arma::cout << "theta_lower:" << theta_lower << arma::endl;
     // arma::cout << "theta_upper:" << theta_upper << arma::endl;
@@ -1396,7 +1400,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
           double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower));
           double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper));
-          double sol_to_b = Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
+          double sol_to_b = std::min(sol_to_ub, sol_to_lb); //Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
           if ((retry < Optim::max_restart)                                 //&& (result.num_iters <= 2 * d)
               && ((sol_to_b < arma::datum::eps)                            // we fastly converged to one bound
                   || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {

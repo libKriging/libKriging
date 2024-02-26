@@ -68,6 +68,7 @@ class Kriging {
   std::string m_optim;
   std::string m_objective;
   arma::mat m_dX;
+  arma::colvec m_maxdX;
   arma::mat m_F;
   arma::mat m_T;
   arma::mat m_M;
