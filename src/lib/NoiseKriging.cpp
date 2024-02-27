@@ -134,36 +134,11 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
-  for (arma::uword i = 0; i < n; i++) {
-    R.at(i, i) = _sigma2 + m_noise[i];
-    for (arma::uword j = 0; j < i; j++) {
-      R.at(i, j) = R.at(j, i) = Cov(m_dX.col(i * n + j), _theta) * _sigma2;
-    }
-  }
-  t0 = Bench::toc(bench, "R = Cov(dX)", t0);
-
-  // Cholesky decompostion of covariance matrix
-  fd->T = LinearAlgebra::safe_chol_lower(R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
-  t0 = Bench::toc(bench, "T = Chol(R)", t0);
-
-  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
-  // (assuming a Newton like method for wrapping optim)
-  if (Covariance::approx_singular)
-    if (arma::any(_theta
-                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
-      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 0) <<
-      // arma::endl;
-      double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < R.n_rows * LinearAlgebra::min_rcond) {
-        // throw std::runtime_error("Covariance matrix is singular");
-        // Try use midpoint of theta and
-        // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-        double ll_2 = _logLikelihood(_theta_sigma2 / 2, grad_out, okm_data, bench);
-        if (grad_out)
-          *grad_out = -arma::abs(*grad_out) / 2;
-        return ll_2 - log(2);  // emulates likelihood/2
-      }
-    }
+  if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, _sigma2, _sigma2 + m_noise, m_T);
+  } else 
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov, _sigma2, _sigma2 + m_noise);
+  t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);

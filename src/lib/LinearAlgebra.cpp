@@ -27,13 +27,19 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower(X, 0);
 }
 
-bool LinearAlgebra::warn_chol = true;
+bool LinearAlgebra::warn_chol = false;
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
   LinearAlgebra::warn_chol = warn;
 };
 
-int LinearAlgebra::max_inc_choldiag = 10;
+bool LinearAlgebra::chol_rcond_check = false;
+
+LIBKRIGING_EXPORT void LinearAlgebra::check_chol_rcond(bool c) {
+  LinearAlgebra::chol_rcond_check = c;
+};
+
+int LinearAlgebra::max_inc_choldiag = 100;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
@@ -41,7 +47,7 @@ int LinearAlgebra::max_inc_choldiag = 10;
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
   arma::mat L = arma::mat(X.n_rows, X.n_cols);
   bool ok = arma::chol(L, X, "lower");
-  if (!ok || (Covariance::approx_singular && ((LinearAlgebra::rcond_approx_chol(L) < LinearAlgebra::min_rcond_approx) && (LinearAlgebra::rcond_chol(L) < LinearAlgebra::min_rcond)))) {
+  if (!ok || (LinearAlgebra::chol_rcond_check && ((LinearAlgebra::rcond_approx_chol(L) < LinearAlgebra::min_rcond_approx) && (LinearAlgebra::rcond_chol(L) < LinearAlgebra::min_rcond)))) {
     if (inc_cond > max_inc_choldiag) {
       throw std::runtime_error("[ERROR] Exceed max numerical nugget ("+std::to_string(inc_cond)+" x 1e"+std::to_string(log10(LinearAlgebra::num_nugget))+") added to force chol matrix");
     } else if (LinearAlgebra::num_nugget <= 0.0) {
@@ -97,13 +103,14 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R, 
 const arma::mat& _dX, const arma::vec& _theta, 
-std::function<double (const arma::vec &, const arma::vec &)> Cov) {
+std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+const double factor, const arma::vec diag) {
   arma::uword n = (*R).n_rows;
 
   for (arma::uword i = 0; i < n; i++) {
-    (*R).at(i, i) = 1;
+    (*R).at(i, i) = diag(i);
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
+      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
     }
   }
 
@@ -113,7 +120,8 @@ std::function<double (const arma::vec &, const arma::vec &)> Cov) {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat* R, 
 const arma::mat& _dX, const arma::vec& _theta, 
-std::function<double (const arma::vec &, const arma::vec &)> Cov,
+std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+const double factor, const arma::vec diag,
 const arma::mat& T_old) {
   arma::uword n_old = T_old.n_rows;
   arma::mat R_old = T_old * T_old.t(); // hope that does not cost too much... (we dont save previous R)
@@ -122,9 +130,9 @@ const arma::mat& T_old) {
 
   (*R).submat(0, 0, n_old-1, n_old-1) = R_old;
   for (arma::uword i = n_old; i < n; i++) {
-    (*R).at(i, i) = 1;
+    (*R).at(i, i) = diag(i);
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
+      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
     }
   }
 

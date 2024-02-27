@@ -16,6 +16,9 @@ class LinearAlgebra {
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);
 
+  static bool chol_rcond_check;
+  LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
+
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
   static arma::mat safe_chol_lower(arma::mat X, int warn);
@@ -28,11 +31,13 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat cholCov(arma::mat* R,
                                       const arma::mat& _dX,
                                       const arma::vec& _theta,
-                                      std::function<double(const arma::vec&, const arma::vec&)> Cov);
+                                      std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                      const double factor, const arma::vec diag);
   LIBKRIGING_EXPORT static arma::mat update_cholCov(arma::mat* R,
                                         const arma::mat& _dX,
                                         const arma::vec& _theta, 
                                         std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                        const double factor, const arma::vec diag,
                                         const arma::mat& Told);
 
   LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo);

@@ -126,9 +126,9 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n,n);
   if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
-    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n), m_T);
   } else 
-    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n));
   t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
   
   //arma::mat Tinv = arma::solve(fd->T, arma::eye(n, n), LinearAlgebra::default_solve_opts);
@@ -446,29 +446,10 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
   if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
-    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n), m_T);
   } else 
-    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n));
   t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
-
-  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
-  // (assuming a Newton like method for wrapping optim)
-  if (Covariance::approx_singular)
-    if (arma::any(_theta
-                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
-      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 1) <<
-      // arma::endl;
-      double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < n * LinearAlgebra::min_rcond) {
-        // throw std::runtime_error("Covariance matrix is singular");
-        // Try use midpoint of theta and
-        // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-        double loo_2 = _leaveOneOut(_theta / 2, grad_out, yhat_out, okm_data, bench);
-        if (grad_out)
-          *grad_out = arma::abs(*grad_out) / 2;
-        return loo_2 + log(2);  // emulates likelihood/2
-      }
-    }
 
   // Compute intermediate useful matrices
   fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
@@ -693,29 +674,10 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n,n);
   if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
-    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, m_T);
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n), m_T);
   } else 
-    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov);
+    fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov, 1, arma::ones(n));
   t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
-
-  // Sly turnaround for too long range: use shorter range penalized, and force gradient to point at shorter range
-  // (assuming a Newton like method for wrapping optim)
-  if (Covariance::approx_singular)
-    if (arma::any(_theta
-                  > 2 * arma::max(arma::abs(m_dX), 1))) {  // try fix singular just for range exceeding domain wide
-      // arma::cout << "[WARNING] theta " << _theta.t() << " exceeds max range " << 2 * arma::max(arma::abs(m_dX), 0) <<
-      // arma::endl;
-      double rcond_R = LinearAlgebra::rcond_chol(fd->T);  // Proxy to arma::rcond(R)
-      if (rcond_R < n * LinearAlgebra::min_rcond) {
-        // throw std::runtime_error("Covariance matrix is singular");
-        // Try use midpoint of theta and
-        // arma::cout << "Covariance matrix is singular, try use midpoint of theta" << std::endl;
-        double lmp_2 = _logMargPost(_theta / 2, grad_out, okm_data, bench);
-        if (grad_out)
-          *grad_out = -arma::abs(*grad_out) / 2;
-        return lmp_2 - log(2);  // emulates likelihood/2
-      }
-    }
 
   //  // Compute intermediate useful matrices
   //  fd->M = solve(fd->T, m_F, LinearAlgebra::default_solve_opts);
@@ -1376,6 +1338,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
         arma::ivec bounds_type{d, arma::fill::value(2)};  // means both upper & lower bounds
 
         int retry = 0;
+        double best_f_opt = std::numeric_limits<double>::infinity();
+        arma::vec best_gamma = gamma_tmp;
         while (retry <= Optim::max_restart) {
           arma::vec gamma_0 = gamma_tmp;
           auto result = optimizer.minimize(
@@ -1389,6 +1353,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
 
           if (Optim::log_level > 0) {
             arma::cout << "     iterations: " << result.num_iters << arma::endl;
+            arma::cout << "     status: " << result.task << arma::endl;
             if (Optim::reparametrize) {
               arma::cout << "     start_point: " << Optim::reparam_from(gamma_0).t() << " ";
               arma::cout << "     solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
@@ -1398,14 +1363,23 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
             }
           }
 
+          if (result.f_opt < best_f_opt) {
+            best_f_opt = result.f_opt;
+            best_gamma = gamma_tmp;
+          }
+
           double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower));
           double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper));
-          double sol_to_b = std::min(sol_to_ub, sol_to_lb); //Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
-          if ((retry < Optim::max_restart)                                 //&& (result.num_iters <= 2 * d)
-              && ((sol_to_b < arma::datum::eps)                            // we fastly converged to one bound
-                  || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
+          double sol_to_b = std::min(sol_to_ub, sol_to_lb); 
+          //Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
+          if ((retry < Optim::max_restart)
+              && (
+                (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // error in algorithm
+                || ((sol_to_b < arma::datum::eps) && (result.num_iters <= 2))  // we are stuck on a bound   
+                || (result.f_opt > best_f_opt) // maybe still better start point available
+              )) {
             gamma_tmp = (theta0.row(i).t() + theta_lower)
-                        / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
+                        / pow(2.0, retry + 1);  // so move starting point to middle-point
 
             if (Optim::reparametrize)
               gamma_tmp = Optim::reparam_to(gamma_tmp);
@@ -1421,21 +1395,21 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::colvec& y,
           }
         }
 
-        // this last call of fit_ofn is to ensure that T and z are up-to-date with solution found.
-        double min_ofn_tmp = fit_ofn(gamma_tmp, nullptr, nullptr, &okm_data);
+        // last call to ensure that T and z are up-to-date with solution.
+        double min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &okm_data);
 
         if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
           if (Optim::reparametrize)
-            arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp) << " ";
+            arma::cout << "  best solution: " << Optim::reparam_from(best_gamma) << " ";
           else
-            arma::cout << "  best solution: " << gamma_tmp << " ";
+            arma::cout << "  best solution: " << best_gamma << " ";
         }
 
         if (min_ofn_tmp < min_ofn) {
-          m_theta = gamma_tmp;
+          m_theta = best_gamma;
           if (Optim::reparametrize)
-            m_theta = Optim::reparam_from(gamma_tmp);
+            m_theta = Optim::reparam_from(best_gamma);
           m_est_theta = true;
           min_ofn = min_ofn_tmp;
           m_T = std::move(okm_data.T);
