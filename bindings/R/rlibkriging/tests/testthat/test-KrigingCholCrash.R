@@ -64,9 +64,9 @@ X <- matrix(runif(n*d),ncol=d)
 y <- f(X)
 r = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
-rlibkriging:::covariance_use_approx_singular(FALSE) # disable failover
+rlibkriging:::linalg_check_chol_rcond(FALSE) # disable failover
 try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
-rlibkriging:::covariance_use_approx_singular(TRUE) # enable failover
+rlibkriging:::linalg_check_chol_rcond(TRUE) # enable failover
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 

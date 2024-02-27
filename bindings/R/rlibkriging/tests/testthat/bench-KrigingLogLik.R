@@ -1,3 +1,4 @@
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
 library(testthat)
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
@@ -21,9 +22,7 @@ for (x in xx){
   i <- i+1
 }
 
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-
-rlibkriging:::covariance_use_approx_singular(TRUE)
+rlibkriging:::linalg_check_chol_rcond(TRUE)
 
 r = NULL # ensure stop if Kriging fails
 r <- Kriging(y, X, "gauss")
@@ -34,7 +33,7 @@ for (x in xx){
   i <- i+1
 }
 
-rlibkriging:::covariance_use_approx_singular(FALSE)
+rlibkriging:::linalg_check_chol_rcond(FALSE)
 
 r_nf <- Kriging(y, X, "gauss")
 i <- 1
@@ -44,15 +43,11 @@ for (x in xx){
   i <- i+1
 }
 
-rlibkriging:::covariance_use_approx_singular(TRUE)
-
-
 plot(xx,Vectorize(function(x)DiceKriging::logLikFun(rep(x,4),k))(xx))
-rlibkriging:::covariance_use_approx_singular(TRUE)
+rlibkriging:::linalg_check_chol_rcond(TRUE)
 points(xx,Vectorize(function(x)logLikelihoodFun(r,rep(x,4))$logLikelihood)(xx),col='red')
-rlibkriging:::covariance_use_approx_singular(FALSE)
+rlibkriging:::linalg_check_chol_rcond(FALSE)
 points(xx,Vectorize(function(x)logLikelihoodFun(r_nf,rep(x,4))$logLikelihood)(xx),col='orange')
-rlibkriging:::covariance_use_approx_singular(TRUE)
 
 # plot rcond
 y0 = min(Vectorize(function(x)logLikelihoodFun(r,rep(x,4))$logLikelihood)(xx))
@@ -90,3 +85,5 @@ plot(times$cpp_nf_ll,times$cpp_ll,main="times R/cpp",col='blue')
 abline(a = 0,b=1,col='red')
 abline(a = 0,b=2,col='orange')
 abline(a = 0,b=.5,col='orange')
+
+rlibkriging:::linalg_check_chol_rcond(FALSE)

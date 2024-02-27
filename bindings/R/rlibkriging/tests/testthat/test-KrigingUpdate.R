@@ -1,7 +1,7 @@
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
 library(testthat)
 
-rlibkriging:::covariance_use_approx_singular(FALSE)
+rlibkriging:::linalg_check_chol_rcond(FALSE)
 rlibkriging:::linalg_set_chol_warning(TRUE)
 rlibkriging:::linalg_set_num_nugget(1e-10)
 

@@ -61,8 +61,10 @@ library(DiceKriging)
 ## kriging model 1 : matern5_2 covariance structure, no trend, no nugget effect
 km1 <- DiceKriging::km(design = design.fact, response = y, covtype = "gauss",
           parinit = c(.5, 1), control = list(trace = FALSE))
+rlibkriging:::optim_log(3)
 KM1 <- rlibkriging::KM(design = design.fact, response = y, covtype = "gauss",
           parinit = c(.5, 1))
+rlibkriging:::optim_log(0)
 
 test_that("m1.logLikFun == as_m1.logLikFun",
           expect_true(DiceKriging::logLikFun(km1@covariance@range.val, km1) ==
