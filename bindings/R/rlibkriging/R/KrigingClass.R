@@ -99,7 +99,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','update_nofit')) {
+    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
