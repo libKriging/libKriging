@@ -41,6 +41,18 @@ class LinearAlgebra {
                                         const arma::mat& Told);
 
   LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo);
+
+  LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
+
+  LIBKRIGING_EXPORT static arma::mat rsolve(const arma::mat& A, const arma::mat& B);
+
+  LIBKRIGING_EXPORT static arma::mat crossprod(const arma::mat& A);
+
+  LIBKRIGING_EXPORT static arma::mat tcrossprod(const arma::mat& A);
+
+  LIBKRIGING_EXPORT static arma::mat diagcrossprod(const arma::mat& A);
+
+  LIBKRIGING_EXPORT static arma::colvec diagABA(const arma::mat& A, const arma::mat& B);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
