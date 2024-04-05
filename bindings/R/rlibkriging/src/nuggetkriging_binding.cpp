@@ -27,8 +27,8 @@ Rcpp::List new_NuggetKriging(std::string kernel) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List new_NuggetKrigingFit(arma::vec y,
-                                arma::mat X,
+Rcpp::List new_NuggetKrigingFit(arma::fvec y,
+                                arma::fmat X,
                                 std::string kernel,
                                 std::string regmodel = "constant",
                                 bool normalize = false,
@@ -122,13 +122,13 @@ Rcpp::List new_NuggetKrigingFit(arma::vec y,
       optim,
       objective,
       NuggetKriging::Parameters{
-          (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
+          (_parameters["has_nugget"]) ? make_optional0<arma::fvec>(_parameters["nugget"]) : std::nullopt,
           _parameters["is_nugget_estim"],
-          (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+          (_parameters["has_sigma2"]) ? make_optional0<arma::fvec>(_parameters["sigma2"]) : std::nullopt,
           _parameters["is_sigma2_estim"],
-          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+          (_parameters["has_theta"]) ? make_optional0<arma::fmat>(_parameters["theta"]) : std::nullopt,
           _parameters["is_theta_estim"],
-          (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+          (_parameters["has_beta"]) ? make_optional0<arma::fcolvec>(_parameters["beta"]) : std::nullopt,
           _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(ok);
@@ -141,8 +141,8 @@ Rcpp::List new_NuggetKrigingFit(arma::vec y,
 
 // [[Rcpp::export]]
 void nuggetkriging_fit(Rcpp::List k,
-                       arma::vec y,
-                       arma::mat X,
+                       arma::fvec y,
+                       arma::fmat X,
                        std::string regmodel = "constant",
                        bool normalize = false,
                        std::string optim = "BFGS",
@@ -239,13 +239,13 @@ void nuggetkriging_fit(Rcpp::List k,
                 optim,
                 objective,
                 NuggetKriging::Parameters{
-                    (_parameters["has_nugget"]) ? make_optional0<arma::vec>(_parameters["nugget"]) : std::nullopt,
+                    (_parameters["has_nugget"]) ? make_optional0<arma::fvec>(_parameters["nugget"]) : std::nullopt,
                     _parameters["is_nugget_estim"],
-                    (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+                    (_parameters["has_sigma2"]) ? make_optional0<arma::fvec>(_parameters["sigma2"]) : std::nullopt,
                     _parameters["is_sigma2_estim"],
-                    (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+                    (_parameters["has_theta"]) ? make_optional0<arma::fmat>(_parameters["theta"]) : std::nullopt,
                     _parameters["is_theta_estim"],
-                    (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+                    (_parameters["has_beta"]) ? make_optional0<arma::fcolvec>(_parameters["beta"]) : std::nullopt,
                     _parameters["is_beta_estim"]});
 }
 
@@ -312,7 +312,7 @@ std::string nuggetkriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false, bool deriv = false) {
+Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::fmat X, bool stdev = true, bool cov = false, bool deriv = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -337,7 +337,7 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, b
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
+arma::fmat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::fmat X) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -348,7 +348,7 @@ arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) 
 }
 
 // [[Rcpp::export]]
-void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
+void nuggetkriging_update(Rcpp::List k, arma::fvec y, arma::fmat X) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -375,14 +375,14 @@ void nuggetkriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_alpha, bool grad = false, bool bench = false) {
+Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::fvec theta_alpha, bool grad = false, bool bench = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_alpha, grad, bench);
+  std::tuple<double, arma::fvec> ll = impl_ptr->logLikelihoodFun(theta_alpha, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {
@@ -404,14 +404,14 @@ double nuggetkriging_logLikelihood(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = false, bool bench = false) {
+Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k, arma::fvec theta, bool grad = false, bool bench = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad, bench);
+  std::tuple<double, arma::fvec> lmp = impl_ptr->logMargPostFun(theta, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
   if (grad) {
@@ -462,7 +462,7 @@ std::string nuggetkriging_objective(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_X(Rcpp::List k) {
+arma::fmat nuggetkriging_X(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -471,7 +471,7 @@ arma::mat nuggetkriging_X(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_centerX(Rcpp::List k) {
+arma::fvec nuggetkriging_centerX(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -480,7 +480,7 @@ arma::vec nuggetkriging_centerX(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_scaleX(Rcpp::List k) {
+arma::fvec nuggetkriging_scaleX(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -489,7 +489,7 @@ arma::vec nuggetkriging_scaleX(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_y(Rcpp::List k) {
+arma::fvec nuggetkriging_y(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -534,7 +534,7 @@ std::string nuggetkriging_regmodel(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_F(Rcpp::List k) {
+arma::fmat nuggetkriging_F(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -543,7 +543,7 @@ arma::mat nuggetkriging_F(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_T(Rcpp::List k) {
+arma::fmat nuggetkriging_T(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -552,7 +552,7 @@ arma::mat nuggetkriging_T(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_M(Rcpp::List k) {
+arma::fmat nuggetkriging_M(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -561,7 +561,7 @@ arma::mat nuggetkriging_M(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_z(Rcpp::List k) {
+arma::fvec nuggetkriging_z(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -570,7 +570,7 @@ arma::vec nuggetkriging_z(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_beta(Rcpp::List k) {
+arma::fvec nuggetkriging_beta(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -588,7 +588,7 @@ bool nuggetkriging_is_beta_estim(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::vec nuggetkriging_theta(Rcpp::List k) {
+arma::fvec nuggetkriging_theta(Rcpp::List k) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");

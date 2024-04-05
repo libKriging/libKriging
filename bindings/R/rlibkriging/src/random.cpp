@@ -22,21 +22,21 @@ double random_randu() {
 }
 
 // [[Rcpp::export]]
-arma::vec random_randu_vec(unsigned int n) {
+arma::fvec random_randu_vec(unsigned int n) {
   Random* r = new Random();
   Rcpp::XPtr<Random> impl_ptr(r);
   return impl_ptr->randu_vec(n);
 }
 
 // [[Rcpp::export]]
-arma::mat random_randu_mat(unsigned int n, unsigned int d) {
+arma::fmat random_randu_mat(unsigned int n, unsigned int d) {
   Random* r = new Random();
   Rcpp::XPtr<Random> impl_ptr(r);
   return impl_ptr->randu_mat(n, d);
 }
 
 // [[Rcpp::export]]
-arma::mat random_randn_mat(unsigned int n, unsigned int d) {
+arma::fmat random_randn_mat(unsigned int n, unsigned int d) {
   Random* r = new Random();
   Rcpp::XPtr<Random> impl_ptr(r);
   return impl_ptr->randn_mat(n, d);
