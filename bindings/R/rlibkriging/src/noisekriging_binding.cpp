@@ -27,9 +27,9 @@ Rcpp::List new_NoiseKriging(std::string kernel) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List new_NoiseKrigingFit(arma::fvec y,
-                               arma::fvec noise,
-                               arma::fmat X,
+Rcpp::List new_NoiseKrigingFit(arma::vec y,
+                               arma::vec noise,
+                               arma::mat X,
                                std::string kernel,
                                std::string regmodel = "constant",
                                bool normalize = false,
@@ -106,11 +106,11 @@ Rcpp::List new_NoiseKrigingFit(arma::fvec y,
       optim,
       objective,
       NoiseKriging::Parameters{
-          (_parameters["has_sigma2"]) ? make_optional0<arma::fvec>(_parameters["sigma2"]) : std::nullopt,
+          (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
           _parameters["is_sigma2_estim"],
-          (_parameters["has_theta"]) ? make_optional0<arma::fmat>(_parameters["theta"]) : std::nullopt,
+          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
           _parameters["is_theta_estim"],
-          (_parameters["has_beta"]) ? make_optional0<arma::fcolvec>(_parameters["beta"]) : std::nullopt,
+          (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
           _parameters["is_beta_estim"]});
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(ok);
@@ -123,9 +123,9 @@ Rcpp::List new_NoiseKrigingFit(arma::fvec y,
 
 // [[Rcpp::export]]
 void noisekriging_fit(Rcpp::List k,
-                      arma::fvec y,
-                      arma::fvec noise,
-                      arma::fmat X,
+                      arma::vec y,
+                      arma::vec noise,
+                      arma::mat X,
                       std::string regmodel = "constant",
                       bool normalize = false,
                       std::string optim = "BFGS",
@@ -205,11 +205,11 @@ void noisekriging_fit(Rcpp::List k,
                 optim,
                 objective,
                 NoiseKriging::Parameters{
-                    (_parameters["has_sigma2"]) ? make_optional0<arma::fvec>(_parameters["sigma2"]) : std::nullopt,
+                    (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
                     _parameters["is_sigma2_estim"],
-                    (_parameters["has_theta"]) ? make_optional0<arma::fmat>(_parameters["theta"]) : std::nullopt,
+                    (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
                     _parameters["is_theta_estim"],
-                    (_parameters["has_beta"]) ? make_optional0<arma::fcolvec>(_parameters["beta"]) : std::nullopt,
+                    (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
                     _parameters["is_beta_estim"]});
 }
 
@@ -275,7 +275,7 @@ std::string noisekriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_predict(Rcpp::List k, arma::fmat X, bool stdev = true, bool cov = false, bool deriv = false) {
+Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false, bool deriv = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -300,7 +300,7 @@ Rcpp::List noisekriging_predict(Rcpp::List k, arma::fmat X, bool stdev = true, b
 }
 
 // [[Rcpp::export]]
-arma::fmat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::fmat X) {
+arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -311,7 +311,7 @@ arma::fmat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::fmat X)
 }
 
 // [[Rcpp::export]]
-void noisekriging_update(Rcpp::List k, arma::fvec y, arma::fvec noise, arma::fmat X) {
+void noisekriging_update(Rcpp::List k, arma::vec y, arma::vec noise, arma::mat X) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -338,14 +338,14 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::fvec theta_sigma2, bool grad = false, bool bench = false) {
+Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool grad = false, bool bench = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  std::tuple<double, arma::fvec> ll = impl_ptr->logLikelihoodFun(theta_sigma2, grad, bench);
+  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_sigma2, grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (grad) {
@@ -396,7 +396,7 @@ std::string noisekriging_objective(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fmat noisekriging_X(Rcpp::List k) {
+arma::mat noisekriging_X(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -405,7 +405,7 @@ arma::fmat noisekriging_X(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_centerX(Rcpp::List k) {
+arma::vec noisekriging_centerX(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -414,7 +414,7 @@ arma::fvec noisekriging_centerX(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_scaleX(Rcpp::List k) {
+arma::vec noisekriging_scaleX(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -423,7 +423,7 @@ arma::fvec noisekriging_scaleX(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_y(Rcpp::List k) {
+arma::vec noisekriging_y(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -432,7 +432,7 @@ arma::fvec noisekriging_y(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_noise(Rcpp::List k) {
+arma::vec noisekriging_noise(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -477,7 +477,7 @@ std::string noisekriging_regmodel(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fmat noisekriging_F(Rcpp::List k) {
+arma::mat noisekriging_F(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -486,7 +486,7 @@ arma::fmat noisekriging_F(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fmat noisekriging_T(Rcpp::List k) {
+arma::mat noisekriging_T(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -495,7 +495,7 @@ arma::fmat noisekriging_T(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fmat noisekriging_M(Rcpp::List k) {
+arma::mat noisekriging_M(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -504,7 +504,7 @@ arma::fmat noisekriging_M(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_z(Rcpp::List k) {
+arma::vec noisekriging_z(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -513,7 +513,7 @@ arma::fvec noisekriging_z(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_beta(Rcpp::List k) {
+arma::vec noisekriging_beta(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -531,7 +531,7 @@ bool noisekriging_is_beta_estim(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-arma::fvec noisekriging_theta(Rcpp::List k) {
+arma::vec noisekriging_theta(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");

@@ -29,7 +29,7 @@ void linalg_check_chol_rcond(bool cr) {
 }
 
 // [[Rcpp::export]]
-arma::fmat linalg_chol_safe(arma::fmat X) {
+arma::mat linalg_chol_safe(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->safe_chol_lower(X);
@@ -43,21 +43,21 @@ void linalg_set_chol_warning(bool warn) {
 }
 
 // [[Rcpp::export]]
-double linalg_rcond_approx_chol(arma::fmat X) {
+double linalg_rcond_approx_chol(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->rcond_approx_chol(X);
 }
 
 // [[Rcpp::export]]
-double linalg_rcond_chol(arma::fmat X) {
+double linalg_rcond_chol(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->rcond_chol(X);
 }
 
 // [[Rcpp::export]]
-arma::fmat linalg_chol_block(arma::fmat C, arma::fmat Loo, arma::fmat Coo) {
+arma::mat linalg_chol_block(arma::mat C, arma::mat Loo, arma::mat Coo) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->chol_block(C, Loo, Coo);

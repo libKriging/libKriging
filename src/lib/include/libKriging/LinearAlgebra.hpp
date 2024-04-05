@@ -9,9 +9,9 @@ class LinearAlgebra {
  public:
   static const arma::solve_opts::opts default_solve_opts;
 
-  static float num_nugget;
-  LIBKRIGING_EXPORT static void set_num_nugget(float nugget);
-  LIBKRIGING_EXPORT static float get_num_nugget();
+  static double num_nugget;
+  LIBKRIGING_EXPORT static void set_num_nugget(double nugget);
+  LIBKRIGING_EXPORT static double get_num_nugget();
 
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);
@@ -20,39 +20,39 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
 
   static int max_inc_choldiag;
-  LIBKRIGING_EXPORT static arma::fmat safe_chol_lower(arma::fmat X);
-  static arma::fmat safe_chol_lower(arma::fmat X, int warn);
+  LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);
+  static arma::mat safe_chol_lower(arma::mat X, int warn);
 
-  static float min_rcond;
-  LIBKRIGING_EXPORT static float rcond_chol(arma::fmat chol);
-  static float min_rcond_approx;
-  LIBKRIGING_EXPORT static float rcond_approx_chol(arma::fmat chol);
+  static double min_rcond;
+  LIBKRIGING_EXPORT static double rcond_chol(arma::mat chol);
+  static double min_rcond_approx;
+  LIBKRIGING_EXPORT static double rcond_approx_chol(arma::mat chol);
 
-  LIBKRIGING_EXPORT static arma::fmat cholCov(arma::fmat* R,
-                                      const arma::fmat& _dX,
-                                      const arma::fvec& _theta,
-                                      std::function<float(const arma::fvec&, const arma::fvec&)> Cov,
-                                      const float factor, const arma::fvec diag);
-  LIBKRIGING_EXPORT static arma::fmat update_cholCov(arma::fmat* R,
-                                        const arma::fmat& _dX,
-                                        const arma::fvec& _theta, 
-                                        std::function<float(const arma::fvec&, const arma::fvec&)> Cov,
-                                        const float factor, const arma::fvec diag,
-                                        const arma::fmat& Told);
+  LIBKRIGING_EXPORT static arma::mat cholCov(arma::mat* R,
+                                      const arma::mat& _dX,
+                                      const arma::vec& _theta,
+                                      std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                      const double factor, const arma::vec diag);
+  LIBKRIGING_EXPORT static arma::mat update_cholCov(arma::mat* R,
+                                        const arma::mat& _dX,
+                                        const arma::vec& _theta, 
+                                        std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                        const double factor, const arma::vec diag,
+                                        const arma::mat& Told);
 
-  LIBKRIGING_EXPORT static arma::fmat chol_block(const arma::fmat C, const arma::fmat Loo, const arma::fmat Coo);
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo);
 
-  LIBKRIGING_EXPORT static arma::fmat solve(const arma::fmat& A, const arma::fmat& B);
+  LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
 
-  LIBKRIGING_EXPORT static arma::fmat rsolve(const arma::fmat& A, const arma::fmat& B);
+  LIBKRIGING_EXPORT static arma::mat rsolve(const arma::mat& A, const arma::mat& B);
 
-  LIBKRIGING_EXPORT static arma::fmat crossprod(const arma::fmat& A);
+  LIBKRIGING_EXPORT static arma::mat crossprod(const arma::mat& A);
 
-  LIBKRIGING_EXPORT static arma::fmat tcrossprod(const arma::fmat& A);
+  LIBKRIGING_EXPORT static arma::mat tcrossprod(const arma::mat& A);
 
-  LIBKRIGING_EXPORT static arma::fmat diagcrossprod(const arma::fmat& A);
+  LIBKRIGING_EXPORT static arma::mat diagcrossprod(const arma::mat& A);
 
-  LIBKRIGING_EXPORT static arma::fcolvec diagABA(const arma::fmat& A, const arma::fmat& B);
+  LIBKRIGING_EXPORT static arma::colvec diagABA(const arma::mat& A, const arma::mat& B);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP

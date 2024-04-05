@@ -12,7 +12,7 @@ struct Trend {
   LIBKRIGING_EXPORT static RegressionModel fromString(const std::string& s);
   LIBKRIGING_EXPORT static std::string toString(const RegressionModel& m);
 
-  LIBKRIGING_EXPORT static arma::fmat regressionModelMatrix(const RegressionModel& regmodel, const arma::fmat& newXt);
+  LIBKRIGING_EXPORT static arma::mat regressionModelMatrix(const RegressionModel& regmodel, const arma::mat& newXt);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_TREND_HPP

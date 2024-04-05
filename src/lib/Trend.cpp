@@ -31,20 +31,20 @@ std::string Trend::toString(const Trend::RegressionModel& e) {
   return Trend::enum_RegressionModel_strings[static_cast<int>(e)];
 }
 
-arma::fmat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, const arma::fmat& newX) {
+arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, const arma::mat& newX) {
   arma::uword n = newX.n_rows;
   arma::uword d = newX.n_cols;
-  arma::fmat F;  // uses modern RTO to avoid returned object copy
+  arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
     case Trend::RegressionModel::Constant: {
       F.set_size(n, 1);
-      F = arma::fmat(n, 1, arma::fill::ones);
+      F = arma::mat(n, 1, arma::fill::ones);
       return F;
     } break;
 
     case Trend::RegressionModel::Linear: {
       F.set_size(n, 1 + d);
-      F.col(0) = arma::fmat(n, 1, arma::fill::ones);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       for (arma::uword i = 0; i < d; i++) {
         F.col(i + 1) = newX.col(i);
       }
@@ -53,7 +53,7 @@ arma::fmat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, 
 
     case Trend::RegressionModel::Interactive: {
       F.set_size(n, 1 + d + d * (d - 1) / 2);
-      F.col(0) = arma::fmat(n, 1, arma::fill::ones);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
         F.col(count) = newX.col(i);
@@ -68,7 +68,7 @@ arma::fmat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, 
 
     case Trend::RegressionModel::Quadratic: {
       F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
-      F.col(0) = arma::fmat(n, 1, arma::fill::ones);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
         F.col(count) = newX.col(i);

@@ -15,17 +15,17 @@ LIBKRIGING_EXPORT
 const arma::solve_opts::opts LinearAlgebra::default_solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx + arma::solve_opts::no_band + arma::solve_opts::no_sympd;
 
-float LinearAlgebra::num_nugget = 1E-10;
+double LinearAlgebra::num_nugget = 1E-10;
 
-LIBKRIGING_EXPORT void LinearAlgebra::set_num_nugget(float nugget) {
+LIBKRIGING_EXPORT void LinearAlgebra::set_num_nugget(double nugget) {
   LinearAlgebra::num_nugget = nugget;
 };
 
-LIBKRIGING_EXPORT float LinearAlgebra::get_num_nugget() {
+LIBKRIGING_EXPORT double LinearAlgebra::get_num_nugget() {
   return LinearAlgebra::num_nugget;
 };
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::safe_chol_lower(arma::fmat X) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower(X, 0);
 }
 
@@ -46,8 +46,8 @@ int LinearAlgebra::max_inc_choldiag = 10;
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
 // computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::safe_chol_lower(arma::fmat X, int inc_cond) {
-  arma::fmat L = arma::fmat(X.n_rows, X.n_cols, arma::fill::none);
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X, int inc_cond) {
+  arma::mat L = arma::mat(X.n_rows, X.n_cols, arma::fill::none);
   auto t0 = Bench::tic();
   bool ok = arma::chol(L, X, "lower");
   t0 = Bench::toc(nullptr, "        arma::chol" ,t0);
@@ -77,10 +77,10 @@ LIBKRIGING_EXPORT arma::fmat LinearAlgebra::safe_chol_lower(arma::fmat X, int in
   }
 }
 
-float LinearAlgebra::min_rcond = 1e-18;
+double LinearAlgebra::min_rcond = 1e-18;
 
-LIBKRIGING_EXPORT float LinearAlgebra::rcond_chol(arma::fmat chol) {
-  float rcond = arma::rcond(chol);
+LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
+  double rcond = arma::rcond(chol);
   rcond *= rcond;
   if (warn_chol)
     if (rcond < (chol.n_rows * min_rcond))
@@ -88,23 +88,23 @@ LIBKRIGING_EXPORT float LinearAlgebra::rcond_chol(arma::fmat chol) {
   return rcond;
 }
 
-float LinearAlgebra::min_rcond_approx = 1e-10;
+double LinearAlgebra::min_rcond_approx = 1e-10;
 // Proxy to arma::rcond
 // @ref: N. J. Higham, "A survey of condition number estimation for triangular matrices," SIAM Review, vol. 29, no. 4,
 // pp. 575–596, Dec. 1987.
-LIBKRIGING_EXPORT float LinearAlgebra::rcond_approx_chol(arma::fmat chol) {
-  float m = chol.at(0, 0);
-  float M = chol.at(0, 0);
+LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
+  double m = chol.at(0, 0);
+  double M = chol.at(0, 0);
   if (chol.n_rows > 1)
     for (arma::uword i = 1; i < chol.n_rows; i++) {
-      float cii = chol.at(i, i);
+      double cii = chol.at(i, i);
       if (cii < m) {
         m = cii;
       } else if (cii > M) {
         M = cii;
       }
     }
-  float rcond = m / M;
+  double rcond = m / M;
   rcond = rcond * rcond;
   if (warn_chol)
     if (rcond < (chol.n_rows * min_rcond_approx))
@@ -112,10 +112,10 @@ LIBKRIGING_EXPORT float LinearAlgebra::rcond_approx_chol(arma::fmat chol) {
   return rcond;
 }
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::cholCov(arma::fmat* R, 
-const arma::fmat& _dX, const arma::fvec& _theta, 
-std::function<float (const arma::fvec &, const arma::fvec &)> Cov, 
-const float factor, const arma::fvec diag) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R, 
+const arma::mat& _dX, const arma::vec& _theta, 
+std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+const double factor, const arma::vec diag) {
   arma::uword n = (*R).n_rows;
 
   auto t0 = Bench::tic();
@@ -129,10 +129,10 @@ const float factor, const arma::fvec diag) {
 
 // Slower:
   // std::vector<std::thread> col_threads(n);
-  // std::vector<arma::fcolvec> col_vecs(n);
+  // std::vector<arma::colvec> col_vecs(n);
   // for (arma::uword i = 0; i < n; i++) {
   //   col_threads[i] = std::thread([i, &col_vecs, _dX, _theta, Cov, factor, n](){
-  //     arma::fcolvec col_vecs_i = arma::fcolvec(n,arma::fill::none);
+  //     arma::colvec col_vecs_i = arma::colvec(n,arma::fill::none);
   //     for (arma::uword j = 0; j < n; j++) {
   //       col_vecs_i.at(j) = Cov(_dX.col(i * n + j), _theta) * factor;
   //     }
@@ -158,7 +158,7 @@ const float factor, const arma::fvec diag) {
 //  t0 = Bench::toc(nullptr, "    Cov (omp): " + std::to_string(n) + "/" + std::to_string(n),t0);
   
   if (diag.n_elem == 0) {
-    (*R).diag().ones();//(*R).diag() = arma::fvec(n, arma::fill::ones);
+    (*R).diag().ones();//(*R).diag() = arma::vec(n, arma::fill::ones);
   } else {
     (*R).diag() = diag;
   }
@@ -166,19 +166,19 @@ const float factor, const arma::fvec diag) {
 
   // Cholesky decompostion of covariance matrix
 
-  arma::fmat L = LinearAlgebra::safe_chol_lower(*R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
+  arma::mat L = LinearAlgebra::safe_chol_lower(*R);  // Do NOT trimatl T (slower because copy): trimatl(chol(R, "lower"));
   t0 = Bench::toc(nullptr, "    Chol",t0);
 
   return L;
 }
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::update_cholCov(arma::fmat* R, 
-const arma::fmat& _dX, const arma::fvec& _theta, 
-std::function<float (const arma::fvec &, const arma::fvec &)> Cov, 
-const float factor, const arma::fvec diag,
-const arma::fmat& T_old) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat* R, 
+const arma::mat& _dX, const arma::vec& _theta, 
+std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+const double factor, const arma::vec diag,
+const arma::mat& T_old) {
   arma::uword n_old = T_old.n_rows;
-  arma::fmat R_old = T_old * T_old.t(); // hope that does not cost too much... (we dont save previous R)
+  arma::mat R_old = T_old * T_old.t(); // hope that does not cost too much... (we dont save previous R)
 
   arma::uword n = (*R).n_rows;
 
@@ -196,7 +196,7 @@ const arma::fmat& T_old) {
   (*R).diag() = diag;
   t0 = Bench::toc(nullptr, "    Cov: diag",t0);
 
-  arma::fmat L = LinearAlgebra::chol_block(*R, T_old, R_old);
+  arma::mat L = LinearAlgebra::chol_block(*R, T_old, R_old);
   t0 = Bench::toc(nullptr, "    Chol Block",t0);
 
   return L;
@@ -210,56 +210,56 @@ const arma::fmat& T_old) {
 //   Lo,o is the cholesky root of Co,o (known)
 //   Lu,o = Cu,o Lo,o^-T
 //   Lu,u is the cholesky root of Cu,u - Lu,o Lu,o^T
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::chol_block(const arma::fmat C, const arma::fmat Loo, const arma::fmat Coo) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo) {
   arma::uword n = C.n_rows;
   arma::uword no = Coo.n_rows; // old size. n-1 if we just add one observation.  
 
   auto t0 = Bench::tic();
-  arma::fmat Cuo = C.submat(no, 0,  n-1, no-1);
+  arma::mat Cuo = C.submat(no, 0,  n-1, no-1);
   t0 = Bench::toc(nullptr, "        >Cuo",t0);
-  arma::fmat Cuu = C.submat(no, no, n-1, n-1);  
+  arma::mat Cuu = C.submat(no, no, n-1, n-1);  
   t0 = Bench::toc(nullptr, "        >Cuu",t0);
 
-  arma::fmat L = arma::fmat(n, n);
+  arma::mat L = arma::mat(n, n);
   L.submat( 0,  0,  no-1, no-1 ) = Loo;
   t0 = Bench::toc(nullptr, "        <Loo",t0);
-  arma::fmat Luo = Cuo * arma::solve( Loo, arma::eye<arma::fmat>(no, no) ).t(); // Lu,o = Cu,o Lo,o^-T
+  arma::mat Luo = Cuo * arma::solve( Loo, arma::eye<arma::mat>(no, no) ).t(); // Lu,o = Cu,o Lo,o^-T
   t0 = Bench::toc(nullptr, "        Luo = Cuo / Loo.t()",t0);
   L.submat( no, 0,  n-1,  no-1 ) = Luo;
   t0 = Bench::toc(nullptr, "        <Luo",t0);  
   L.submat( no, no, n-1,  n-1 ) = LinearAlgebra::safe_chol_lower( Cuu - Luo * Luo.t() ); // Lu,u = chol( Cu,u - Lu,o Lu,o^T )  
   t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
 
-  arma::fmat lowL = arma::trimatl(L);
+  arma::mat lowL = arma::trimatl(L);
   t0 = Bench::toc(nullptr, "        trimatl L",t0);
 
   return lowL;
 }
 
 // Solve A*X=B : X = A \ B
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::solve(const arma::fmat& A, const arma::fmat& B) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma::mat& B) {
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
 }
 
 // Solve X*A=B : X = B / A
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::rsolve(const arma::fmat& A, const arma::fmat& B) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
   return arma::solve(A.t(), B.t(), LinearAlgebra::default_solve_opts).t();
 }
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::crossprod(const arma::fmat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
   return A.t() * A;
 }
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::tcrossprod(const arma::fmat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat& A) {
   return A * A.t();
 }
 
-LIBKRIGING_EXPORT arma::fmat LinearAlgebra::diagcrossprod(const arma::fmat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::diagcrossprod(const arma::mat& A) {
   return arma::diagmat(arma::sum(arma::square(A), 1));   
 }
 
-LIBKRIGING_EXPORT arma::fcolvec LinearAlgebra::diagABA(const arma::fmat& A, const arma::fmat& B) {
-  arma::fmat D = trimatu(2 * B);
+LIBKRIGING_EXPORT arma::colvec LinearAlgebra::diagABA(const arma::mat& A, const arma::mat& B) {
+  arma::mat D = trimatu(2 * B);
   D.diag() = B.diag();
   D = (A * D) % A;
   return sum(D, 1);
