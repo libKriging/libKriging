@@ -15,11 +15,11 @@
 // error: default member initializer for 'is_sigma2_estim' needed within
 //    definition of enclosing class 'NoiseKriging' outside of member functions
 struct NoiseKrigingParameters {
-  std::optional<arma::vec> sigma2;
+  std::optional<arma::fvec> sigma2;
   bool is_sigma2_estim = true;
-  std::optional<arma::mat> theta;
+  std::optional<arma::fmat> theta;
   bool is_theta_estim = true;
-  std::optional<arma::colvec> beta;
+  std::optional<arma::fvec> beta;
   bool is_beta_estim = true;
 };
 
@@ -37,69 +37,69 @@ class NoiseKriging {
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
   [[nodiscard]] const std::string& optim() const { return m_optim; };
   [[nodiscard]] const std::string& objective() const { return m_objective; };
-  [[nodiscard]] const arma::mat& X() const { return m_X; };
-  [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
-  [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
-  [[nodiscard]] const arma::colvec& y() const { return m_y; };
-  [[nodiscard]] const double& centerY() const { return m_centerY; };
-  [[nodiscard]] const double& scaleY() const { return m_scaleY; };
+  [[nodiscard]] const arma::fmat& X() const { return m_X; };
+  [[nodiscard]] const arma::frowvec& centerX() const { return m_centerX; };
+  [[nodiscard]] const arma::frowvec& scaleX() const { return m_scaleX; };
+  [[nodiscard]] const arma::fvec& y() const { return m_y; };
+  [[nodiscard]] const float& centerY() const { return m_centerY; };
+  [[nodiscard]] const float& scaleY() const { return m_scaleY; };
   [[nodiscard]] const bool& normalize() const { return m_normalize; };
-  [[nodiscard]] const arma::colvec& noise() const { return m_noise; };
+  [[nodiscard]] const arma::fvec& noise() const { return m_noise; };
   [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
-  [[nodiscard]] const arma::mat& F() const { return m_F; };
-  [[nodiscard]] const arma::mat& T() const { return m_T; };
-  [[nodiscard]] const arma::mat& M() const { return m_M; };
-  [[nodiscard]] const arma::colvec& z() const { return m_z; };
-  [[nodiscard]] const arma::colvec& beta() const { return m_beta; };
+  [[nodiscard]] const arma::fmat& F() const { return m_F; };
+  [[nodiscard]] const arma::fmat& T() const { return m_T; };
+  [[nodiscard]] const arma::fmat& M() const { return m_M; };
+  [[nodiscard]] const arma::fvec& z() const { return m_z; };
+  [[nodiscard]] const arma::fvec& beta() const { return m_beta; };
   [[nodiscard]] const bool& is_beta_estim() const { return m_est_beta; };
-  [[nodiscard]] const arma::vec& theta() const { return m_theta; };
+  [[nodiscard]] const arma::fvec& theta() const { return m_theta; };
   [[nodiscard]] const bool& is_theta_estim() const { return m_est_theta; };
-  [[nodiscard]] const double& sigma2() const { return m_sigma2; };
+  [[nodiscard]] const float& sigma2() const { return m_sigma2; };
   [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
 
  private:
   std::string m_covType;
-  arma::mat m_X;
-  arma::rowvec m_centerX;
-  arma::rowvec m_scaleX;
-  arma::colvec m_y;
-  double m_centerY;
-  double m_scaleY;
+  arma::fmat m_X;
+  arma::frowvec m_centerX;
+  arma::frowvec m_scaleX;
+  arma::fvec m_y;
+  float m_centerY;
+  float m_scaleY;
   bool m_normalize;
-  arma::colvec m_noise;
+  arma::fvec m_noise;
   Trend::RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
-  arma::mat m_dX;
-  arma::mat m_F;
-  arma::mat m_T;
-  arma::mat m_M;
-  arma::colvec m_z;
-  arma::colvec m_beta;
+  arma::fmat m_dX;
+  arma::fmat m_F;
+  arma::fmat m_T;
+  arma::fmat m_M;
+  arma::fvec m_z;
+  arma::fvec m_beta;
   bool m_est_beta;
-  arma::vec m_theta;
+  arma::fvec m_theta;
   bool m_est_theta;
-  double m_sigma2;
+  float m_sigma2;
   bool m_est_sigma2;
-  std::function<double(const arma::vec&, const arma::vec&)> Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx;
-  double Cov_pow;  // power factor used in hessian
+  std::function<float(const arma::fvec&, const arma::fvec&)> Cov;
+  std::function<arma::fvec(const arma::fvec&, const arma::fvec&)> DlnCovDtheta;
+  std::function<arma::fvec(const arma::fvec&, const arma::fvec&)> DlnCovDx;
+  float Cov_pow;  // power factor used in hessian
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
 
  public:
   struct OKModel {
-    arma::mat T;
-    arma::mat M;
-    arma::colvec z;
-    arma::colvec beta;
+    arma::fmat T;
+    arma::fmat M;
+    arma::fvec z;
+    arma::fvec beta;
     bool is_beta_estim;
   };
 
-  double _logLikelihood(const arma::vec& _theta,
-                        arma::vec* grad_out,
+  float _logLikelihood(const arma::fvec& _theta,
+                        arma::fvec* grad_out,
                         NoiseKriging::OKModel* okm_data,
                         std::map<std::string, double>* bench) const;
 
@@ -108,9 +108,9 @@ class NoiseKriging {
 
   LIBKRIGING_EXPORT NoiseKriging(NoiseKriging&&) = default;
 
-  LIBKRIGING_EXPORT NoiseKriging(const arma::colvec& y,
-                                 const arma::colvec& noise,
-                                 const arma::mat& X,
+  LIBKRIGING_EXPORT NoiseKriging(const arma::fvec& y,
+                                 const arma::fvec& noise,
+                                 const arma::fmat& X,
                                  const std::string& covType,
                                  const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                  bool normalize = false,
@@ -129,18 +129,18 @@ class NoiseKriging {
    * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
    */
-  LIBKRIGING_EXPORT void fit(const arma::colvec& y,
-                             const arma::colvec& noise,
-                             const arma::mat& X,
+  LIBKRIGING_EXPORT void fit(const arma::fvec& y,
+                             const arma::fvec& noise,
+                             const arma::fmat& X,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const Parameters& parameters = Parameters{});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad, bool bench);
+  LIBKRIGING_EXPORT std::tuple<float, arma::fvec> logLikelihoodFun(const arma::fvec& theta, bool grad, bool bench);
 
-  LIBKRIGING_EXPORT double logLikelihood();
+  LIBKRIGING_EXPORT float logLikelihood();
 
   /** Compute the prediction for given points X'
    * @param Xp is m*d matrix of points where to predict output
@@ -148,7 +148,7 @@ class NoiseKriging {
    * @param cov is true if return also cov matrix between Xp
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
-  LIBKRIGING_EXPORT std::tuple<arma::colvec, arma::colvec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& Xp,
+  LIBKRIGING_EXPORT std::tuple<arma::fvec, arma::fvec, arma::fmat, arma::fmat, arma::fmat> predict(const arma::fmat& Xp,
                                                                                                     bool withStd,
                                                                                                     bool withCov,
                                                                                                     bool withDeriv);
@@ -159,14 +159,14 @@ class NoiseKriging {
    * @param seed random seed setup for sample simulations
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::fmat simulate(int nsim, int seed, const arma::fmat& Xp);
 
   /** Add new conditional data points to previous (X,y)
    * @param newy is m length column vector of new output
    * @param newnoise is m length column vector of new output variances
    * @param newX is m*d matrix of new input
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::vec& newnoise, const arma::mat& newX);
+  LIBKRIGING_EXPORT void update(const arma::fvec& newy, const arma::fvec& newnoise, const arma::fmat& newX);
 
   LIBKRIGING_EXPORT std::string summary() const;
 

@@ -23,28 +23,28 @@ void Random::init() {
   engine.seed(Random::seed);
 };
 
-LIBKRIGING_EXPORT std::function<double()> Random::randu = []() {
-  std::uniform_real_distribution<double> dist{};
+LIBKRIGING_EXPORT std::function<float()> Random::randu = []() {
+  std::uniform_real_distribution<float> dist{};
   return dist(engine);
 };
 
-LIBKRIGING_EXPORT std::function<arma::vec(const int)> Random::randu_vec = [](const int n) {
-  std::uniform_real_distribution<double> dist{};
-  arma::vec r(n, arma::fill::none);
+LIBKRIGING_EXPORT std::function<arma::fvec(const int)> Random::randu_vec = [](const int n) {
+  std::uniform_real_distribution<float> dist{};
+  arma::fvec r(n, arma::fill::none);
   r.imbue([&]() { return dist(engine); });
   return r;
 };
 
-LIBKRIGING_EXPORT std::function<arma::mat(const int, const int)> Random::randu_mat = [](const int n, const int m) {
-  std::uniform_real_distribution<double> dist{};
-  arma::mat r(n, m, arma::fill::none);
+LIBKRIGING_EXPORT std::function<arma::fmat(const int, const int)> Random::randu_mat = [](const int n, const int m) {
+  std::uniform_real_distribution<float> dist{};
+  arma::fmat r(n, m, arma::fill::none);
   r.imbue([&]() { return dist(engine); });
   return r;
 };
 
-LIBKRIGING_EXPORT std::function<arma::mat(const int, const int)> Random::randn_mat = [](const int n, const int m) {
-  std::normal_distribution<double> dist{};
-  arma::mat r(n, m, arma::fill::none);
+LIBKRIGING_EXPORT std::function<arma::fmat(const int, const int)> Random::randn_mat = [](const int n, const int m) {
+  std::normal_distribution<float> dist{};
+  arma::fmat r(n, m, arma::fill::none);
   r.imbue([&]() { return dist(engine); });
   return r;
 };

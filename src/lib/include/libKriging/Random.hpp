@@ -18,13 +18,13 @@ class Random {
 
   static void init();
 
-  LIBKRIGING_EXPORT static std::function<double()> randu;
+  LIBKRIGING_EXPORT static std::function<float()> randu;
 
-  LIBKRIGING_EXPORT static std::function<arma::vec(const int)> randu_vec;
+  LIBKRIGING_EXPORT static std::function<arma::fvec(const int)> randu_vec;
 
-  LIBKRIGING_EXPORT static std::function<arma::mat(const int, const int)> randu_mat;
+  LIBKRIGING_EXPORT static std::function<arma::fmat(const int, const int)> randu_mat;
 
-  LIBKRIGING_EXPORT static std::function<arma::mat(const int, const int)> randn_mat;
+  LIBKRIGING_EXPORT static std::function<arma::fmat(const int, const int)> randn_mat;
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_RANDOM_HPP
