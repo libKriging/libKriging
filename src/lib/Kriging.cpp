@@ -132,8 +132,11 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
   m.Estar = Q_qr.tail_cols(1) * R_qr.at(p,p);
   m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
 
-  m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
-  t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
+  if (m_est_beta) {
+    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
+    t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
+  } else
+    m.betahat = arma::vec(p, arma::fill::zeros);
 
   return m;
 }                               
@@ -151,12 +154,12 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
   arma::uword n = m_X.n_rows;
   double sigma2;
   double ll;
-  if (m_est_sigma2) {
+  if (m_est_sigma2) { // DiceKriging: model@case == "LLconcentration_beta_sigma2"
     sigma2 = m.SSEstar / n;
     ll = -0.5 * (n * log(2 * M_PI * sigma2) + 2 * arma::sum(log(m.L.diag())) + n);
-  } else {
+  } else { // DiceKriging: model@case == "LLconcentration_beta"
     sigma2 = m_sigma2;
-    ll = -0.5 * (n * log(2 * M_PI ) + 2 * arma::sum(log(m.L.diag())) + as_scalar(LinearAlgebra::crossprod(m.Estar))/sigma2);
+    ll = -0.5 * (n * log(2 * M_PI * sigma2) + 2 * arma::sum(log(m.L.diag())) + as_scalar(LinearAlgebra::crossprod(m.Estar))/sigma2);
   }
 
   if (grad_out != nullptr) {
@@ -617,43 +620,53 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     //   ans[ti]=-0.5*Wb_ti.diagonal().sum()+(num_obs-q)/2.0*(output.transpose()*Wb_ti.transpose()*Q_output/S_2(0,0))(0,0);
     // }
 
-    t0 = Bench::tic();
-    arma::vec ans = arma::vec(d,arma::fill::none);
-    arma::mat Q_output = trans(yt_Rinv) - Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y;
-    t0 = Bench::toc(bench, "Qo = YtRi - RiFFtRiFiFtRi * y", t0);
-
-    arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d,arma::fill::zeros);
-    for (arma::uword i = 0; i < n; i++) {
-      gradR.tube(i, i) = zeros;
-      for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradR.tube(j, i) = gradR.tube(i, j); 
+    if (m_est_sigma2) {
+      t0 = Bench::tic();
+      arma::vec ans = arma::vec(d,arma::fill::none);
+      arma::mat Q_output = trans(yt_Rinv) - Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y;
+      t0 = Bench::toc(bench, "Qo = YtRi - RiFFtRiFiFtRi * y", t0);
+  
+      arma::cube gradR = arma::cube(n, n, d, arma::fill::zeros);
+      //const arma::vec zeros = arma::vec(d,arma::fill::zeros);
+      for (arma::uword i = 0; i < n; i++) {
+        //gradR.tube(i, i) = zeros;
+        for (arma::uword j = 0; j < i; j++) {
+          gradR.tube(i, j) = m.R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          gradR.tube(j, i) = gradR.tube(i, j); 
+        }
+      }
+      t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+  
+      arma::mat Wb_k;
+      for (arma::uword k = 0; k < d; k++) {
+        t0 = Bench::tic();
+        arma::mat gradR_k = gradR.slice(k);
+        t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
+  
+        Wb_k = trans( LinearAlgebra::solve(
+                   trans(m.L),LinearAlgebra::solve(m.L, gradR_k)))
+               - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
+        t0 = Bench::toc(bench, "Wb_k = gradR_k \\ L \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
+  
+        ans[k] = -sum(Wb_k.diag()) / 2.0 + as_scalar(trans(m_y) * trans(Wb_k) * Q_output) / (2.0 * sigma2);
+        t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
+  
+      }
+      //arma::cout << " log_marginal_lik_deriv:" << ans << arma::endl;
+      //arma::cout << " log_approx_ref_prior_deriv:" <<  - (a * CL / t - b * CL) / pow(_theta, 2.0) << arma::endl;
+  
+      *grad_out = ans - (a * CL / t - b * CL) / square(_theta);
+      // t0 = Bench::toc(bench," grad_out     ", t0);
+      // arma::cout << " grad_out:" << *grad_out << arma::endl;
+    } else { // TODO: we do not have (yet) formula when sigma2 is fixed... :(
+      *grad_out = arma::vec(d, arma::fill::zeros);
+      double _eps = 1e-6;
+      for (arma::uword k = 0; k < d; k++) {
+        arma::vec theta_eps = _theta;
+        theta_eps[k] += _eps;
+        (*grad_out)[k] = (_logMargPost(theta_eps, nullptr, nullptr, nullptr) - (log_marginal_lik + log_approx_ref_prior))/_eps;
       }
     }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
-
-    arma::mat Wb_k;
-    for (arma::uword k = 0; k < d; k++) {
-      t0 = Bench::tic();
-      arma::mat gradR_k = gradR.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
-
-      Wb_k = trans(solve(
-                 trans(m.L),LinearAlgebra::solve(m.L, gradR_k)))
-             - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
-      t0 = Bench::toc(bench, "Wb_k = gradR_k \\ L \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
-
-      ans[k] = -0.5 * sum(Wb_k.diag())
-               + (n-p) / 2.0 * (trans(m_y) * trans(Wb_k) * Q_output / S_2(0, 0))[0];
-      t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
-    }
-    // arma::cout << " log_marginal_lik_deriv:" << ans << arma::endl;
-    // arma::cout << " log_approx_ref_prior_deriv:" <<  - (a * CL / t - b * CL) / pow(_theta, 2.0) << arma::endl;
-
-    *grad_out = ans - (a * CL / t - b * CL) / square(_theta);
-    // t0 = Bench::toc(bench," grad_out     ", t0);
-    // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
 
   // arma::cout << " lmp:" << (log_marginal_lik+log_approx_ref_prior) << arma::endl;
@@ -982,11 +995,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   // Define regression matrix
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
+  m_est_beta = (m_regmodel != Trend::RegressionModel::None);
+  if ((parameters.beta.has_value())) { // Then force beta to be fixed (not estimated, no variance)
+    m_est_beta = false;
+    m_beta = parameters.beta.value();
+    if (m_normalize)
+      m_beta /= scaleY;
+  }
 
   arma::mat theta0;
   if (parameters.theta.has_value()) {
     theta0 = parameters.theta.value();
-    if (parameters.theta.value().n_cols != d && parameters.theta.value().n_rows == d)
+    if ((parameters.theta.value().n_cols != d) && (parameters.theta.value().n_rows == d))
       theta0 = parameters.theta.value().t();
     if (m_normalize)
       theta0.each_row() /= scaleX;
@@ -1000,15 +1020,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
     m_theta = trans(theta0.row(0));
-    m_est_theta = false; 
-    // bool is_beta_estim = parameters.is_beta_estim;
-    // if (parameters.beta.has_value()) {
-    //   beta = parameters.beta.value();
-    //   if (m_normalize)
-    //     beta /= scaleY;
-    // } else {
-    //   is_beta_estim = true;  // force estim if no value given
-    // }
+    m_est_theta = false;
+
     double sigma2 = -1;
     m_est_sigma2 = parameters.is_sigma2_estim;
     if (parameters.sigma2.has_value()) {
@@ -1032,12 +1045,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
     m_z = std::move(m.Estar);
-    m_est_beta = true; //is_beta_estim;
-    //if (m_est_beta) {
+    if (m_est_beta) {
       m_beta = std::move(m.betahat);
-    //} else {
-    //  m_beta = beta;
-    //}
+    } // else m_beta is already defined and fixed
     if (m_est_sigma2) {
       m_sigma2 = m.SSEstar / (n);
     } else {
@@ -1127,13 +1137,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           arma::cout << "  start_point: " << theta0.row(i) << " ";
         }
 
-        //if (parameters.beta.has_value()) {
-        //  beta = parameters.beta.value();
-        //  if (m_normalize)
-        //    beta /= scaleY;
-        //}
         m_est_sigma2 = parameters.is_sigma2_estim;
-        if (!m_est_sigma2 && parameters.sigma2.has_value()) {
+        if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
           m_sigma2 = parameters.sigma2.value();
           if (m_normalize)
             m_sigma2 /= (scaleY * scaleY);
@@ -1155,7 +1160,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
         while (retry <= Optim::max_restart) {
           arma::vec gamma_0 = gamma_tmp;
-          /*auto result = nullptr; optimizer.minimize(
+          auto result = optimizer.minimize(
               [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                 return fit_ofn(vals_inp, &grad_out, nullptr, &m);
               },
@@ -1205,7 +1210,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             if (Optim::log_level > 1)
               result.print();
             break;
-          }*/
+          }
         }
 
         // last call to ensure that T and z are up-to-date with solution.
@@ -1231,12 +1236,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_circ = std::move(m.Rstar);
           m_star = std::move(m.Qstar);
           m_z = std::move(m.Estar);
-          m_est_beta = true; //is_beta_estim;
-          //if (m_est_beta) {
+          if (m_est_beta) {
             m_beta = std::move(m.betahat);
-          //} else {
-          //  m_beta = beta;
-          //}
+          } // else m_beta is already defined and fixed
           if (m_est_sigma2) {
             m_sigma2 = m.SSEstar / n;
           }
@@ -1292,13 +1294,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           arma::cout << "  start_point: " << theta0.row(i) << " ";
         }
 
-        //if (parameters.beta.has_value()) {
-        //  beta = parameters.beta.value();
-        //  if (m_normalize)
-        //    beta /= scaleY;
-        //}
         m_est_sigma2 = parameters.is_sigma2_estim;
-        if (!m_est_sigma2 && parameters.sigma2.has_value()) {
+        if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
           m_sigma2 = parameters.sigma2.value();
           if (m_normalize)
             m_sigma2 /= (scaleY * scaleY);
@@ -1335,12 +1332,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_circ = std::move(m.Rstar);
           m_star = std::move(m.Qstar);
           m_z = std::move(m.Estar);
-          m_est_beta = true; //is_beta_estim;
-          //if (m_est_beta) {
+          if (m_est_beta) {
             m_beta = std::move(m.betahat);
-          //} else {
-          //  m_beta = beta;
-          //}
+          } // else m_beta is already defined and fixed
           if (m_est_sigma2) {
             m_sigma2 = m.SSEstar / (n);
           }
@@ -1495,10 +1489,6 @@ if (withDeriv) {
       t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
       if (withStd) {
-        arma::cout << "Rstar_on:" << size(Rstar_on) << arma::endl;
-        arma::cout << "DF_n_i:" << size(DF_n_i) << arma::endl;
-        arma::cout << "W_i.t() * m_M:" << size(W_i.t() * m_M) << arma::endl;
-        arma::cout << "m_circ:" << size(m_circ) << arma::endl;
         double DEcirc_n_i = arma::as_scalar(LinearAlgebra::solve(m_circ, DF_n_i - W_i.t() * m_M));
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
@@ -1715,15 +1705,15 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
 void Kriging::save(const std::string filename) const {
   nlohmann::json j;
 
-  j["version"] = 3;
+  j["version"] = 2;
   j["content"] = "Kriging";
 
   // Cov_pow & std::function embedded by make_Cov
   j["covType"] = m_covType;
-  j["X"] = to_json(arma::conv_to<arma::mat>::from(m_X));
-  j["centerX"] = to_json(arma::conv_to<arma::rowvec>::from(m_centerX));
-  j["scaleX"] = to_json(arma::conv_to<arma::rowvec>::from(m_scaleX));
-  j["y"] = to_json(arma::conv_to<arma::colvec>::from(m_y));
+  j["X"] = to_json(m_X);
+  j["centerX"] = to_json(m_centerX);
+  j["scaleX"] = to_json(m_scaleX);
+  j["y"] = to_json(m_y);
   j["centerY"] = m_centerY;
   j["scaleY"] = m_scaleY;
   j["normalize"] = m_normalize;
@@ -1731,14 +1721,14 @@ void Kriging::save(const std::string filename) const {
   j["regmodel"] = Trend::toString(m_regmodel);
   j["optim"] = m_optim;
   j["objective"] = m_objective;
-  j["dX"] = to_json(arma::conv_to<arma::mat>::from(m_dX));
-  j["F"] = to_json(arma::conv_to<arma::mat>::from(m_F));
-  j["T"] = to_json(arma::conv_to<arma::mat>::from(m_T));
-  j["M"] = to_json(arma::conv_to<arma::mat>::from(m_M));
-  j["z"] = to_json(arma::conv_to<arma::mat>::from(m_z));
-  j["beta"] = to_json(arma::conv_to<arma::colvec>::from(m_beta));
+  j["dX"] = to_json(m_dX);
+  j["F"] = to_json(m_F);
+  j["T"] = to_json(m_T);
+  j["M"] = to_json(m_M);
+  j["z"] = to_json(m_z);
+  j["beta"] = to_json(m_beta);
   j["est_beta"] = m_est_beta;
-  j["theta"] = to_json(arma::conv_to<arma::colvec>::from(m_theta));
+  j["theta"] = to_json(m_theta);
   j["est_theta"] = m_est_theta;
   j["sigma2"] = m_sigma2;
   j["est_sigma2"] = m_est_sigma2;
@@ -1752,7 +1742,7 @@ Kriging Kriging::load(const std::string filename) {
   nlohmann::json j = nlohmann::json::parse(f);
 
   uint32_t version = j["version"].template get<uint32_t>();
-  if (version != 3) {
+  if (version != 2) {
     throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
   }
   std::string content = j["content"].template get<std::string>();
@@ -1764,10 +1754,10 @@ Kriging Kriging::load(const std::string filename) {
   std::string covType = j["covType"].template get<std::string>();
   Kriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
 
-  kr.m_X = arma::conv_to<arma::mat>::from(mat_from_json(j["X"]));
-  kr.m_centerX = arma::conv_to<arma::rowvec>::from(rowvec_from_json(j["centerX"]));
-  kr.m_scaleX = arma::conv_to<arma::rowvec>::from(rowvec_from_json(j["scaleX"]));
-  kr.m_y = arma::conv_to<arma::vec>::from(colvec_from_json(j["y"]));
+  kr.m_X = mat_from_json(j["X"]);
+  kr.m_centerX = rowvec_from_json(j["centerX"]);
+  kr.m_scaleX = rowvec_from_json(j["scaleX"]);
+  kr.m_y = colvec_from_json(j["y"]);
   kr.m_centerY = j["centerY"].template get<decltype(kr.m_centerY)>();
   kr.m_scaleY = j["scaleY"].template get<decltype(kr.m_scaleY)>();
   kr.m_normalize = j["normalize"].template get<decltype(kr.m_normalize)>();
@@ -1777,14 +1767,14 @@ Kriging Kriging::load(const std::string filename) {
 
   kr.m_optim = j["optim"].template get<decltype(kr.m_optim)>();
   kr.m_objective = j["objective"].template get<decltype(kr.m_objective)>();
-  kr.m_dX = arma::conv_to<arma::mat>::from(mat_from_json(j["dX"]));
-  kr.m_F = arma::conv_to<arma::mat>::from(mat_from_json(j["F"]));
-  kr.m_T = arma::conv_to<arma::mat>::from(mat_from_json(j["T"]));
-  kr.m_M = arma::conv_to<arma::mat>::from(mat_from_json(j["M"]));
-  kr.m_z = arma::conv_to<arma::vec>::from(colvec_from_json(j["z"]));
-  kr.m_beta = arma::conv_to<arma::vec>::from(colvec_from_json(j["beta"]));
+  kr.m_dX = mat_from_json(j["dX"]);
+  kr.m_F = mat_from_json(j["F"]);
+  kr.m_T = mat_from_json(j["T"]);
+  kr.m_M = mat_from_json(j["M"]);
+  kr.m_z = colvec_from_json(j["z"]);
+  kr.m_beta = colvec_from_json(j["beta"]);
   kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
-  kr.m_theta = arma::conv_to<arma::vec>::from(colvec_from_json(j["theta"]));
+  kr.m_theta = colvec_from_json(j["theta"]);
   kr.m_est_theta = j["est_theta"].template get<decltype(kr.m_est_theta)>();
   kr.m_sigma2 = j["sigma2"].template get<decltype(kr.m_sigma2)>();
   kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
