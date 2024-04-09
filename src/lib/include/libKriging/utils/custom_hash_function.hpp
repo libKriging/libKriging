@@ -57,7 +57,7 @@ template <>
 struct std::hash<Kriging::KModel*> {
   std::size_t operator()(const Kriging::KModel* s) const noexcept {
     if (s != nullptr) {
-      struct OKModel {
+      struct KModel {
     arma::mat R;
     arma::mat L;
     arma::mat Linv;
