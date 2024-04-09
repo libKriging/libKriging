@@ -77,7 +77,7 @@
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
                     objective = c("LL", "LOO", "LMP"),
@@ -338,7 +338,7 @@ print.Kriging <- function(x, ...) {
 #' fit(k,y,X)
 #' print(k)
 fit.Kriging <- function(object, y, X,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
                     objective = c("LL", "LOO", "LMP"),
