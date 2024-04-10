@@ -57,8 +57,8 @@ double linalg_rcond_chol(arma::mat X) {
 }
 
 // [[Rcpp::export]]
-arma::mat linalg_chol_block(arma::mat C, arma::mat Loo, arma::mat Coo) {
+arma::mat linalg_chol_block(arma::mat C, arma::mat Loo) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
-  return impl_ptr->chol_block(C, Loo, Coo);
+  return impl_ptr->chol_block(C, Loo);
 }

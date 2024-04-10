@@ -77,6 +77,7 @@ class Kriging {
   arma::vec m_maxdX;
   arma::mat m_F;
   arma::mat m_T; 
+  arma::mat m_R; // required for the "update" methods
   arma::mat m_M;
   arma::mat m_star;
   arma::mat m_circ;

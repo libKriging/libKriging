@@ -73,6 +73,7 @@ class NoiseKriging {
   arma::mat m_dX;
   arma::mat m_F;
   arma::mat m_T;
+  arma::mat m_R;
   arma::mat m_M;
   arma::vec m_z;
   arma::vec m_beta;

@@ -111,7 +111,7 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = (m_theta.size() == theta.size()) && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) { 
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, Cov, 1, Kriging::ones, m_T);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, Cov, 1, Kriging::ones, m_T, m_R);
   } else 
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, Cov, 1, Kriging::ones);
   t0 = Bench::toc(bench, "R = Cov(dX) & L = Chol(R)", t0);
@@ -996,12 +996,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
   m_est_beta = (m_regmodel != Trend::RegressionModel::None);
-  if ((parameters.beta.has_value())) { // Then force beta to be fixed (not estimated, no variance)
+  if ((parameters.beta.has_value()) && parameters.beta.value().n_elem>0) { // Then force beta to be fixed (not estimated, no variance)
     m_est_beta = false;
     m_beta = parameters.beta.value();
     if (m_normalize)
       m_beta /= scaleY;
-  }
+  } else m_est_beta = true;
 
   arma::mat theta0;
   if (parameters.theta.has_value()) {
@@ -1041,6 +1041,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     Kriging::KModel m = make_Model(m_theta,nullptr);
 
     m_T = std::move(m.L);
+    m_R = std::move(m.R);
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
@@ -1232,6 +1233,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           min_ofn = min_ofn_tmp;
 
           m_T = std::move(m.L);
+          m_R = std::move(m.R);
           m_M = std::move(m.Fstar);
           m_circ = std::move(m.Rstar);
           m_star = std::move(m.Qstar);
@@ -1328,6 +1330,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           min_ofn = min_ofn_tmp;
 
           m_T = std::move(m.L);
+          m_R = std::move(m.R);
           m_M = std::move(m.Fstar);
           m_circ = std::move(m.Rstar);
           m_star = std::move(m.Qstar);
@@ -1477,7 +1480,6 @@ if (withDeriv) {
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
       arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));  // just duplicate X_n.row(i) d times
-
       arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
                         - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
                        / (2 * h);
@@ -1489,20 +1491,20 @@ if (withDeriv) {
       t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
       if (withStd) {
-        double DEcirc_n_i = arma::as_scalar(LinearAlgebra::solve(m_circ, DF_n_i - W_i.t() * m_M));
+        arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
     }
     Dyhat_n *= m_scaleY;
-    Dysd2_n *= m_scaleY;
+    Dysd2_n *= m_sigma2 * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
                          std::move(arma::sqrt(ysd2_n)),
                          std::move(Sigma_n),
                          std::move(Dyhat_n),
-                         std::move(arma::sqrt(Dysd2_n)));
+                         std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d, arma::fill::ones))));
   /*if (withStd)
     if (withCov)
       return std::make_tuple(std::move(yhat_n), std::move(pred_stdev), std::move(pred_cov));
@@ -1609,12 +1611,21 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
                              + std::to_string(X_u.n_cols) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+  Parameters parameters;
+  if (m_est_beta)
+    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+                        this->m_est_sigma2,
+                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
+                        this->m_est_theta,
+                        std::make_optional(arma::ones<arma::vec>(0)),
+                        true};
+  else 
+    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
                         std::make_optional(trans(this->m_theta) % this->m_scaleX),
                         this->m_est_theta,
                         std::make_optional(trans(this->m_beta) * this->m_scaleY),
-                        this->m_est_beta};
+                        false};
 
   // re-fit
   this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
@@ -1724,6 +1735,7 @@ void Kriging::save(const std::string filename) const {
   j["dX"] = to_json(m_dX);
   j["F"] = to_json(m_F);
   j["T"] = to_json(m_T);
+  j["R"] = to_json(m_R);
   j["M"] = to_json(m_M);
   j["z"] = to_json(m_z);
   j["beta"] = to_json(m_beta);
@@ -1770,6 +1782,7 @@ Kriging Kriging::load(const std::string filename) {
   kr.m_dX = mat_from_json(j["dX"]);
   kr.m_F = mat_from_json(j["F"]);
   kr.m_T = mat_from_json(j["T"]);
+  kr.m_R = mat_from_json(j["R"]);
   kr.m_M = mat_from_json(j["M"]);
   kr.m_z = colvec_from_json(j["z"]);
   kr.m_beta = colvec_from_json(j["beta"]);

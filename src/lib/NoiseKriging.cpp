@@ -135,7 +135,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   auto t0 = Bench::tic();
   arma::mat R = arma::mat(n, n);
   if ((m_theta.size() == _theta.size()) && (_theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows) ) { // means that we want to recompute LL for same theta, for augmented Xy (using cholesky fast update).
-    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, _sigma2, _sigma2 + m_noise, m_T);
+    fd->T = LinearAlgebra::update_cholCov(&R, m_dX, _theta, Cov, _sigma2, _sigma2 + m_noise, m_T, m_R);
   } else 
     fd->T = LinearAlgebra::cholCov(&R, m_dX, _theta, Cov, _sigma2, _sigma2 + m_noise);
   t0 = Bench::toc(bench, "R = Cov(dX) & T = Chol(R)", t0);
@@ -575,13 +575,13 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       int retry = 0;
       while (retry <= Optim::max_restart) {
         arma::vec gamma_0 = gamma_tmp;
-        /*auto result = optimizer.minimize(
+        auto result = optimizer.minimize(
             [&okm_data, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
                 return fit_ofn(vals_inp, &grad_out, &okm_data);
               }, 
-              arma::conv_to<arma::vec>::from(gamma_tmp),
-              arma::conv_to<arma::vec>::from(gamma_lower).memptr(),
-              arma::conv_to<arma::vec>::from(gamma_upper).memptr(),
+              gamma_tmp,
+              gamma_lower.memptr(),
+              gamma_upper.memptr(),
             bounds_type.memptr());
 
         if (Optim::log_level > 0) {
@@ -622,7 +622,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
           if (Optim::log_level > 1)
             result.print();
           break;
-        }*/
+        }
       }
 
       // this last call also ensure that T and z are up-to-date with solution found.

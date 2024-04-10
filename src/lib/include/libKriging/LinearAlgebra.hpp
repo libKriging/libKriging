@@ -38,9 +38,9 @@ class LinearAlgebra {
                                         const arma::vec& _theta, 
                                         std::function<double(const arma::vec&, const arma::vec&)> Cov,
                                         const double factor, const arma::vec diag,
-                                        const arma::mat& Told);
+                                        const arma::mat& T_old, const arma::mat& R_old);
 
-  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo);
+  LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo);
 
   LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
 

@@ -122,9 +122,10 @@ const double factor, const arma::vec diag) {
   for (arma::uword i = 0; i < n; i++) {
     //(*R).at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
+      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
     }
   }
+  (*R) *= factor; // !!! requires that diag is setup after
   t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
 
 // Slower:
@@ -176,27 +177,30 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat* R,
 const arma::mat& _dX, const arma::vec& _theta, 
 std::function<double (const arma::vec &, const arma::vec &)> Cov, 
 const double factor, const arma::vec diag,
-const arma::mat& T_old) {
+const arma::mat& T_old, const arma::mat& R_old) {
   arma::uword n_old = T_old.n_rows;
-  arma::mat R_old = T_old * T_old.t(); // hope that does not cost too much... (we dont save previous R)
-
   arma::uword n = (*R).n_rows;
 
   auto t0 = Bench::tic();
-  (*R).submat(0, 0, n_old-1, n_old-1) = R_old;
-  t0 = Bench::toc(nullptr, "    Cov: copy old",t0);
+  (*R).submat(0, 0, n_old-1, n_old-1) = R_old; //T_old * T_old.t();// hope that does not cost too much... (we dont save previous R)
+  t0 = Bench::toc(nullptr, "    Cov: restore old",t0);
   for (arma::uword i = n_old; i < n; i++) {
-    (*R).at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
+      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
     }
     //t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
   }
+  (*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
   t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
-  (*R).diag() = diag;
+  
+  if (diag.n_elem == 0) {
+    (*R).diag().ones();//(*R).diag() = arma::vec(n, arma::fill::ones);
+  } else {
+    (*R).diag() = diag;
+  }
   t0 = Bench::toc(nullptr, "    Cov: diag",t0);
 
-  arma::mat L = LinearAlgebra::chol_block(*R, T_old, R_old);
+  arma::mat L = LinearAlgebra::chol_block(*R, T_old);
   t0 = Bench::toc(nullptr, "    Chol Block",t0);
 
   return L;
@@ -210,24 +214,28 @@ const arma::mat& T_old) {
 //   Lo,o is the cholesky root of Co,o (known)
 //   Lu,o = Cu,o Lo,o^-T
 //   Lu,u is the cholesky root of Cu,u - Lu,o Lu,o^T
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const arma::mat Loo, const arma::mat Coo) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const arma::mat Loo) {
   arma::uword n = C.n_rows;
-  arma::uword no = Coo.n_rows; // old size. n-1 if we just add one observation.  
+  arma::uword no = Loo.n_rows; // old size. n-1 if we just add one observation.  
 
   auto t0 = Bench::tic();
-  arma::mat Cuo = C.submat(no, 0,  n-1, no-1);
-  t0 = Bench::toc(nullptr, "        >Cuo",t0);
+  //arma::mat Cuo = C.submat(no, 0,  n-1, no-1);
+  //t0 = Bench::toc(nullptr, "        >Cuo",t0);  
+  arma::mat Cou = C.submat(0, no, no-1, n-1);
+  t0 = Bench::toc(nullptr, "        >Cou",t0);
   arma::mat Cuu = C.submat(no, no, n-1, n-1);  
   t0 = Bench::toc(nullptr, "        >Cuu",t0);
 
-  arma::mat L = arma::mat(n, n);
+  arma::mat L = arma::mat(n, n, arma::fill::none);
   L.submat( 0,  0,  no-1, no-1 ) = Loo;
   t0 = Bench::toc(nullptr, "        <Loo",t0);
-  arma::mat Luo = Cuo * arma::solve( Loo, arma::eye<arma::mat>(no, no) ).t(); // Lu,o = Cu,o Lo,o^-T
-  t0 = Bench::toc(nullptr, "        Luo = Cuo / Loo.t()",t0);
-  L.submat( no, 0,  n-1,  no-1 ) = Luo;
+  //arma::mat Luo = Cuo * arma::solve( Loo, arma::eye<arma::mat>(no, no) ).t(); // Lu,o = Cu,o Lo,o^-T
+  //t0 = Bench::toc(nullptr, "        Luo = Cuo / Loo.t()",t0);
+  arma::mat Lou = LinearAlgebra::solve(Loo, Cou);
+  t0 = Bench::toc(nullptr, "        Lou = Loo \\ Cou ",t0);
+  L.submat( no, 0,  n-1,  no-1 ) = Lou.t(); //Luo;
   t0 = Bench::toc(nullptr, "        <Luo",t0);  
-  L.submat( no, no, n-1,  n-1 ) = LinearAlgebra::safe_chol_lower( Cuu - Luo * Luo.t() ); // Lu,u = chol( Cu,u - Lu,o Lu,o^T )  
+  L.submat( no, no, n-1,  n-1 ) = LinearAlgebra::safe_chol_lower( Cuu - LinearAlgebra::crossprod(Lou));//Luo * Luo.t() ); // Lu,u = chol( Cu,u - Lu,o Lu,o^T )  
   t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
 
   arma::mat lowL = arma::trimatl(L);
@@ -247,11 +255,27 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
-  return A.t() * A;
+  //return A.t() * A;
+  arma::mat AtA = arma::mat(A.n_cols, A.n_cols, arma::fill::none);
+  for (arma::uword i = 0; i < A.n_cols; i++) {
+    for (arma::uword j = 0; j <= i; j++) {
+      AtA.at(i, j) = arma::dot(A.col(i), A.col(j));
+      AtA.at(j, i) = AtA.at(i, j);
+    }
+  }
+  return AtA;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat& A) {
-  return A * A.t();
+  //return A * A.t();
+  arma::mat AAt = arma::mat(A.n_rows, A.n_rows, arma::fill::none);
+  for (arma::uword i = 0; i < A.n_rows; i++) {
+    for (arma::uword j = 0; j <= i; j++) {
+      AAt.at(i, j) = arma::dot(A.row(i), A.row(j));
+      AAt.at(j, i) = AAt.at(i, j);
+    }
+  }
+  return AAt;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::diagcrossprod(const arma::mat& A) {
