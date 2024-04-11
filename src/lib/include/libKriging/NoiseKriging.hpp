@@ -58,6 +58,7 @@ class NoiseKriging {
   [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
 
  private:
+  // Main model data
   std::string m_covType;
   arma::mat m_X;
   arma::rowvec m_centerX;
@@ -70,11 +71,16 @@ class NoiseKriging {
   Trend::RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
+
+  // Auxiliary data
   arma::mat m_dX;
+  arma::vec m_maxdX;
   arma::mat m_F;
   arma::mat m_T;
-  arma::mat m_R;
+  arma::mat m_R; // required for the "update" methods
   arma::mat m_M;
+  arma::mat m_star;
+  arma::mat m_circ;
   arma::vec m_z;
   arma::vec m_beta;
   bool m_est_beta;
@@ -82,26 +88,33 @@ class NoiseKriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
+
   std::function<double(const arma::vec&, const arma::vec&)> Cov;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx;
-  double Cov_pow;  // power factor used in hessian
+  double Cov_pow;
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
 
  public:
-  struct OKModel {
-    arma::mat T;
-    arma::mat M;
-    arma::vec z;
-    arma::vec beta;
-    bool is_beta_estim;
+  struct KModel {
+    arma::mat R;
+    arma::mat L;
+    arma::mat Linv;
+    arma::mat Fstar;
+    arma::vec ystar;
+    arma::mat Rstar;
+    arma::mat Qstar;
+    arma::vec Estar;
+    double SSEstar ;
+    arma::vec betahat;
   };
+  NoiseKriging::KModel make_Model(const arma::vec& theta, const double sigma2, std::map<std::string, double>* bench) const;
 
   double _logLikelihood(const arma::vec& _theta,
                         arma::vec* grad_out,
-                        NoiseKriging::OKModel* okm_data,
+                        NoiseKriging::KModel* okm_data,
                         std::map<std::string, double>* bench) const;
 
   // at least, just call make_dist(kernel)
@@ -117,7 +130,7 @@ class NoiseKriging {
                                  bool normalize = false,
                                  const std::string& optim = "BFGS",
                                  const std::string& objective = "LL",
-                                 const Parameters& parameters = Parameters{});
+                                 const Parameters& parameters = {});
 
   LIBKRIGING_EXPORT NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier);
 
@@ -137,7 +150,7 @@ class NoiseKriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = Parameters{});
+                             const Parameters& parameters = {});
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad, bool bench);
 
@@ -158,16 +171,29 @@ class NoiseKriging {
    * @param Xp is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
    * @param seed random seed setup for sample simulations
+   * @param will_update store useful data for possible future update
    * @return output is m*nsim matrix of simulations at Xp
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& Xp);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& Xp); //, const bool will_update);
+  /** Assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous Xp
+   * @param yupd is m length column vector of new output
+   * @param Xupd is m*d matrix of new input
+   */
+  // LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& yupd, const arma::mat& Xupd);
 
   /** Add new conditional data points to previous (X,y)
-   * @param newy is m length column vector of new output
-   * @param newnoise is m length column vector of new output variances
-   * @param newX is m*d matrix of new input
+   * @param yupd is m length column vector of new output
+   * @param noiseupd is m length column vector of new output variances
+   * @param Xupd is m*d matrix of new input
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& newy, const arma::vec& newnoise, const arma::mat& newX);
+  LIBKRIGING_EXPORT void update(const arma::vec& yupd, const arma::vec& noiseupd, const arma::mat& Xupd);
+
+  /** Add new conditional data points to previous (X,y)
+   * @param yupd is m length column vector of new output
+   * @param noiseupd is m length column vector of new output variances
+   * @param Xupd is m*d matrix of new input
+   */
+  LIBKRIGING_EXPORT void assimilate(const arma::vec& yupd, const arma::vec& noiseupd, const arma::mat& Xupd);
 
   LIBKRIGING_EXPORT std::string summary() const;
 

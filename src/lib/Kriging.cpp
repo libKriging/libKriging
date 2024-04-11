@@ -84,8 +84,6 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::vec& y,
 
 LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
 
-// Objective function for fit : -logLikelihood
-
 arma::vec Kriging::ones = arma::ones<arma::vec>(0);
 
 Kriging::KModel Kriging::make_Model(const arma::vec& theta,
@@ -139,7 +137,9 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
     m.betahat = arma::vec(p, arma::fill::zeros);
 
   return m;
-}                               
+}
+
+// Objective function for fit : -logLikelihood
 
 double Kriging::_logLikelihood(const arma::vec& _theta,
                                arma::vec* grad_out,
@@ -147,11 +147,13 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
                                Kriging::KModel* model,
                                std::map<std::string, double>* bench) const {
   //arma::cout << " theta: " << _theta << arma::endl;
+
   Kriging::KModel m = make_Model(_theta, bench);
   if (model != nullptr)
     *model = m;
 
   arma::uword n = m_X.n_rows;
+
   double sigma2;
   double ll;
   if (m_est_sigma2) { // DiceKriging: model@case == "LLconcentration_beta_sigma2"
@@ -981,7 +983,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
   // Now we compute the distance matrix between points. Will be used to compute R(theta) later (e.g. when fitting)
   // Note: m_dX is transposed compared to m_X
-  m_dX = arma::mat(d, n * n, arma::fill::zeros);
+  m_dX = arma::mat(d, n * n, arma::fill::none);
   for (arma::uword ij = 0; ij < m_dX.n_cols; ij++) {
     int i = (int)ij / n;
     int j = ij % n;  // i,j <-> i*n+j
@@ -1038,7 +1040,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     //  gamma_tmp = Optim::reparam_to(m_theta);
     //}
 
-    Kriging::KModel m = make_Model(m_theta,nullptr);
+    Kriging::KModel m = make_Model(m_theta, nullptr);
 
     m_T = std::move(m.L);
     m_R = std::move(m.R);
@@ -1354,7 +1356,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  * @param X_n is n_n*d matrix of points where to predict output
  * @param std is true if return also stdev column vector
  * @param cov is true if return also cov matrix between X_n
- * @return output prediction: m means, [m standard deviations], [n_n*m full covariance matrix]
+ * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeriv) {
@@ -1403,14 +1405,14 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
-if (withStd) {
+  if (withStd) {
   ysd2_n = 1 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
   ysd2_n *= m_sigma2 * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
-}
+  }
 
-if (withCov) {
+  if (withCov) {
   // Compute the covariance matrix between new data points
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
@@ -1424,9 +1426,9 @@ if (withCov) {
   Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
   Sigma_n *= m_sigma2 * m_scaleY;
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
-}
+  }
 
-if (withDeriv) {
+  if (withDeriv) {
   //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
   //for (i in 1:n_n) {
   //  
@@ -1495,9 +1497,9 @@ if (withDeriv) {
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
-    }
-    Dyhat_n *= m_scaleY;
-    Dysd2_n *= m_sigma2 * m_scaleY;
+  }
+  Dyhat_n *= m_scaleY;
+  Dysd2_n *= m_sigma2 * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
@@ -1596,9 +1598,9 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   return y_n;
 }
 
-/** Add new conditional data points to previous (X,y)
- * @param y_u is m length column vector of new output
- * @param X_u is n_n*d matrix of new input
+/** Add new conditional data points to previous (X,y), then perform new fit.
+ * @param y_u is n_u length column vector of new output
+ * @param X_u is n_u*d matrix of new input
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
@@ -1638,6 +1640,10 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
             parameters);
 }
 
+/** Add new conditional data points to previous (X,y), do not perform new fit.
+ * @param y_u is n_u length column vector of new output
+ * @param X_u is n_u*d matrix of new input
+ */
 LIBKRIGING_EXPORT void Kriging::assimilate(const arma::vec& y_u, const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
@@ -1650,12 +1656,21 @@ LIBKRIGING_EXPORT void Kriging::assimilate(const arma::vec& y_u, const arma::mat
                              + std::to_string(X_u.n_cols) + ")");
 
   // rebuild starting parameters
-  Parameters parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+  Parameters parameters;
+  if (m_est_beta)
+    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+                        this->m_est_sigma2,
+                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
+                        this->m_est_theta,
+                        std::make_optional(arma::ones<arma::vec>(0)),
+                        true};
+  else 
+    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
                         std::make_optional(trans(this->m_theta) % this->m_scaleX),
                         this->m_est_theta,
                         std::make_optional(trans(this->m_beta) * this->m_scaleY),
-                        this->m_est_beta};
+                        false};
 
   // NO re-fit
   this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
@@ -1663,7 +1678,7 @@ LIBKRIGING_EXPORT void Kriging::assimilate(const arma::vec& y_u, const arma::mat
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
             m_regmodel,
             m_normalize,
-            "none", // do no optimize, stay on current theta
+            "none", // do no optimize: stay on current theta, so update_Chol will be used (faster than scratch chol)
             m_objective,
             parameters);
 }

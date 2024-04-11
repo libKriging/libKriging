@@ -190,7 +190,9 @@ const arma::mat& T_old, const arma::mat& R_old) {
     }
     //t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
   }
-  (*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
+  //(*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
+  (*R).submat(n_old, 0, n-1, n_old-1) *= factor;
+  (*R).submat(0, n_old, n-1, n-1) *= factor;
   t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
   
   if (diag.n_elem == 0) {
