@@ -206,7 +206,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     // }
 
     auto t0 = Bench::tic();
-    arma::vec terme1 = arma::vec(d);    // if (hess_out != nullptr)
+    arma::vec terme1 = arma::vec(d);
 
     if (m.Linv.memptr()==nullptr) {
       m.Linv =LinearAlgebra::solve(m.L, arma::mat(n, n,arma::fill::eye));
@@ -609,15 +609,21 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
         double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
         double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
-        double sol_to_b_theta
-            = Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
-        double sol_to_b_sigma2
-            = Optim::reparametrize ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
-                                   : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper bound
+        double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta); 
+            //= Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
+        double sol_to_lb_sigma2 = std::abs(gamma_tmp.at(d) - gamma_lower.at(d)); 
+        double sol_to_ub_sigma2 = std::abs(gamma_tmp.at(d) - gamma_upper.at(d)); 
+        double sol_to_b_sigma2 = std::min(sol_to_ub_sigma2, sol_to_lb_sigma2); 
+        //double sol_to_b_sigma2
+        //    = Optim::reparametrize ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
+        //                           : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper bound
         double sol_to_b = sol_to_b_theta < sol_to_b_sigma2 ? sol_to_b_theta : sol_to_b_sigma2;
         if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
-            && ((sol_to_b < arma::datum::eps)  // we fastly converged to one bound
-                || (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0))) {
+            && (
+              (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
+              || (sol_to_b < arma::datum::eps) && (result.num_iters <= 2) // we fastly converged to one bound
+              || (result.f_opt > best_f_opt)
+            )) {
           gamma_tmp.head(d)
               = (theta0.row(i).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point

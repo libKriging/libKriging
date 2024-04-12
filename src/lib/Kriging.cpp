@@ -608,7 +608,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     // ...
     // VectorXd ans=VectorXd::Ones(param_size);
     // ...
-    // MatrixXd Q_output= yt_Rinv.transpose()-m.Fstar_Xt_m.Fstar_inv_Xt_Rinv*output;
+    // MatrixXd Q_output= yt_Rinv.transpose()-Rinv_X_Xt_Rinv_X_inv_Xt_Rinv*output;
     // MatrixXd dev_R_i;
     // MatrixXd Wb_ti;
     // //allow different choices of kernels
@@ -618,7 +618,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
     //   if(kernel_type[ti]==3){
     //     dev_R_i=matern_5_2_deriv( R0[ti],R_ori,beta[ti]);  //now here I have R_ori instead of R
     //   }else {...}
-    //   Wb_ti=(L.transpose().triangularView<Upper>().solve(L.triangularView<Lower>().solve(dev_R_i))).transpose()-dev_R_i*m.Fstar_Xt_m.Fstar_inv_Xt_Rinv;
+    //   Wb_ti=(L.transpose().triangularView<Upper>().solve(L.triangularView<Lower>().solve(dev_R_i))).transpose()-dev_R_i*Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
     //   ans[ti]=-0.5*Wb_ti.diagonal().sum()+(num_obs-q)/2.0*(output.transpose()*Wb_ti.transpose()*Q_output/S_2(0,0))(0,0);
     // }
 
@@ -652,14 +652,12 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   
         ans[k] = -sum(Wb_k.diag()) / 2.0 + as_scalar(trans(m_y) * trans(Wb_k) * Q_output) / (2.0 * sigma2);
         t0 = Bench::toc(bench, "ans[k] = Sum(diag(Wb_k)) + yt * Wb_kt * Qo / S2...", t0);
-  
       }
       //arma::cout << " log_marginal_lik_deriv:" << ans << arma::endl;
       //arma::cout << " log_approx_ref_prior_deriv:" <<  - (a * CL / t - b * CL) / pow(_theta, 2.0) << arma::endl;
   
       *grad_out = ans - (a * CL / t - b * CL) / square(_theta);
       // t0 = Bench::toc(bench," grad_out     ", t0);
-      // arma::cout << " grad_out:" << *grad_out << arma::endl;
     } else { // TODO: we do not have (yet) formula when sigma2 is fixed... :(
       *grad_out = arma::vec(d, arma::fill::zeros);
       double _eps = 1e-6;
@@ -669,6 +667,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
         (*grad_out)[k] = (_logMargPost(theta_eps, nullptr, nullptr, nullptr) - (log_marginal_lik + log_approx_ref_prior))/_eps;
       }
     }
+    // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
 
   // arma::cout << " lmp:" << (log_marginal_lik+log_approx_ref_prior) << arma::endl;
@@ -983,7 +982,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
   // Now we compute the distance matrix between points. Will be used to compute R(theta) later (e.g. when fitting)
   // Note: m_dX is transposed compared to m_X
-  m_dX = arma::mat(d, n * n, arma::fill::none);
+  m_dX = arma::mat(d, n * n, arma::fill::zeros);
   for (arma::uword ij = 0; ij < m_dX.n_cols; ij++) {
     int i = (int)ij / n;
     int j = ij % n;  // i,j <-> i*n+j
@@ -1030,15 +1029,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       sigma2 = parameters.sigma2.value();  // otherwise sigma2 will be re-calculated using given theta
       if (m_normalize)
         sigma2 /= (scaleY * scaleY);
-    } else {
-      m_est_sigma2 = true;  // force estim if no value given
-    }
-
-    //arma::vec gamma_tmp = arma::vec(d);
-    //gamma_tmp = m_theta;
-    //if (Optim::reparametrize) {
-    //  gamma_tmp = Optim::reparam_to(m_theta);
-    //}
+    } else m_est_sigma2 = true;
 
     Kriging::KModel m = make_Model(m_theta, nullptr);
 
@@ -1052,7 +1043,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       m_beta = std::move(m.betahat);
     } // else m_beta is already defined and fixed
     if (m_est_sigma2) {
-      m_sigma2 = m.SSEstar / (n);
+      m_sigma2 = m.SSEstar / n;
     } else {
       m_sigma2 = sigma2;
     }
@@ -1386,7 +1377,11 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
-      R_on.at(i, j) = Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
+      arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+      if (arma::any(dij != 0))
+        R_on.at(i, j) = Cov(dij, m_theta);
+      else
+        R_on.at(i, j) = 1.0;
     }
   }
   t0 = Bench::toc(nullptr, "R_on       ", t0);
@@ -1547,7 +1542,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // Compute covariance between new data
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
-    R_nn.at(i, i) = 1;
+    R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
       R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
@@ -1555,7 +1550,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   t0 = Bench::toc(nullptr,"R_nn          ", t0);
 
   // Compute covariance between training data and new data to predict
-  arma::mat R_on(n_o, n_n);
+  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
       R_on.at(i, j) = Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
@@ -1622,7 +1617,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
                         std::make_optional(arma::ones<arma::vec>(0)),
                         true};
   else 
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+    parameters = Parameters{
+                        std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
                         std::make_optional(trans(this->m_theta) % this->m_scaleX),
                         this->m_est_theta,

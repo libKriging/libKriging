@@ -170,6 +170,7 @@ class Kriging {
                                                                               bool grad,
                                                                               bool hess,
                                                                               bool bench);
+
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool grad, bool bench);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool grad, bool bench);

@@ -77,8 +77,8 @@ struct std::hash<Kriging::KModel*> {
 };
 
 template <>
-struct std::hash<NuggetKriging::OKModel*> {
-  std::size_t operator()(const NuggetKriging::OKModel* s) const noexcept {
+struct std::hash<NuggetKriging::KModel*> {
+  std::size_t operator()(const NuggetKriging::KModel* s) const noexcept {
     if (s != nullptr) {
       struct OKModel {
         arma::mat T;
