@@ -380,7 +380,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
   // Now we compute the distance matrix between points. Will be used to compute R(theta) later (e.g. when fitting)
   // Note: m_dX is transposed compared to m_X
-  m_dX = arma::mat(d, n * n, arma::fill::none);
+  m_dX = arma::mat(d, n * n, arma::fill::zeros);
   for (arma::uword ij = 0; ij < m_dX.n_cols; ij++) {
     int i = (int)ij / n;
     int j = ij % n;  // i,j <-> i*n+j
@@ -740,7 +740,7 @@ NoiseKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wit
   if (withStd) {
   ysd2_n = m_sigma2 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-  ysd2_n *= m_scaleY;
+  ysd2_n *= m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
@@ -757,7 +757,7 @@ NoiseKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wit
   t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
   Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-  Sigma_n *= m_scaleY;
+  Sigma_n *= m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
@@ -832,7 +832,7 @@ NoiseKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wit
       }
   }
   Dyhat_n *= m_scaleY;
-  Dysd2_n *= m_scaleY;
+  Dysd2_n *= m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
@@ -880,7 +880,7 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim, const int see
   // Compute covariance between new data
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
-    R_nn.at(i, i) = 1;
+    R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
       R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
@@ -889,7 +889,7 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim, const int see
   t0 = Bench::toc(nullptr,"R_nn          ", t0);
 
   // Compute covariance between training data and new data to predict
-  arma::mat R_on(n_o, n_n);
+  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
       R_on.at(i, j) = Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);

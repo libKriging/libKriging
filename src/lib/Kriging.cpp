@@ -573,6 +573,9 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   arma::mat S_2 = (yt_Rinv * m_y - trans(m_y) * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y);
   t0 = Bench::toc(bench, "S2 = YtRi * y - yt * RiFFtRiFiFtRi * y", t0);
 
+arma::cout << " S2:" << S_2 << arma::endl;
+arma::cout << " SSEstar:" << m.SSEstar << arma::endl;
+
   double sigma2;
   if (m_est_sigma2) {
     sigma2 = S_2(0, 0) / (n - p);
@@ -1236,6 +1239,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           } // else m_beta is already defined and fixed
           if (m_est_sigma2) {
             m_sigma2 = m.SSEstar / n;
+            if (m_objective.compare("LMP") == 0) {
+              m_sigma2 = m.SSEstar / (n - m_F.n_cols);
+            }
           }
         }
       }
@@ -1332,7 +1338,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             m_beta = std::move(m.betahat);
           } // else m_beta is already defined and fixed
           if (m_est_sigma2) {
-            m_sigma2 = m.SSEstar / (n);
+            m_sigma2 = m.SSEstar / n;
+            if (m_objective.compare("LMP") == 0) {
+              m_sigma2 = m.SSEstar / (n - m_F.n_cols);
+            }
           }
         }
       }
@@ -1370,6 +1379,8 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   Xn_n.each_row() -= m_centerX;
   Xn_n.each_row() /= m_scaleX;
 
+  double sigma2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2) : 1.0);
+
   arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
   Xn_n = trans(Xn_n);
 
@@ -1403,7 +1414,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   if (withStd) {
   ysd2_n = 1 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-  ysd2_n *= m_sigma2 * m_scaleY;
+  ysd2_n *= sigma2 * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
@@ -1419,7 +1430,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
   Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-  Sigma_n *= m_sigma2 * m_scaleY;
+  Sigma_n *= sigma2 * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
@@ -1494,7 +1505,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
       }
   }
   Dyhat_n *= m_scaleY;
-  Dysd2_n *= m_sigma2 * m_scaleY;
+  Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),

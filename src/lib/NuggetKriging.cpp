@@ -1047,6 +1047,9 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         double var = as_scalar(LinearAlgebra::crossprod(m_z)) / n;
         if (m_est_sigma2) {
           m_sigma2 = m_alpha * var;
+          if (m_objective.compare("LMP") == 0) {
+            m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+          }
         }
         if (m_est_nugget) {
           m_nugget = (1 - m_alpha) * var;
@@ -1087,6 +1090,8 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
   Xn_n.each_row() -= m_centerX;
   Xn_n.each_row() /= m_scaleX;
 
+  double sigma2 = m_sigma2 * (m_objective.compare("LMP") == 0 ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2) : 1.0);
+
   arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
   Xn_n = trans(Xn_n);
 
@@ -1122,7 +1127,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
   if (withStd) {
   ysd2_n = 1 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-  ysd2_n *= m_sigma2 / m_alpha * m_scaleY;
+  ysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
@@ -1139,7 +1144,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
   t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
   Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-  Sigma_n *= m_sigma2 / m_alpha * m_scaleY;
+  Sigma_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
@@ -1214,7 +1219,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
       }
   }
   Dyhat_n *= m_scaleY;
-  Dysd2_n *= m_sigma2 / m_alpha * m_scaleY;
+  Dysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
