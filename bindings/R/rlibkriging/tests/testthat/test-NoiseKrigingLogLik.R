@@ -1,8 +1,10 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
 
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
 #rlibkriging:::optim_log(3)
 #kernel="exp"
 
@@ -24,10 +26,10 @@ tmax=1
     envx = new.env()
     llx = DiceKriging::logLikFun(c(x1,x2),k,envx)
     gllx = DiceKriging::logLikGrad(c(x1,x2),k,envx)
-    arrows(x1,x2,x1+0.1*gllx[1],x2+.01*gllx[2])
+    arrows(x1,x2,x1+0.01*gllx[1],x2+0.01*gllx[2])
   }}
   
-  library(rlibkriging)
+  #library(rlibkriging)
   r <- NoiseKriging(y,noise=rep(0.1^2,nrow(X)), X, kernel)
   ll_r = function(theta_sigma2) logLikelihoodFun(r,theta_sigma2)$logLikelihood
   x=seq(tmin,tmax,,51)
@@ -37,7 +39,7 @@ tmax=1
     envx = new.env()
     llx = logLikelihoodFun(r,c(x1,x2))$logLikelihood
     gllx = logLikelihoodFun(r,c(x1,x2),grad = T)$logLikelihoodGrad
-    arrows(x1,x2,x1+0.1*gllx[1],x2+.01*gllx[2])
+    arrows(x1,x2,x1+.01*gllx[1],x2+.01*gllx[2])
   }}
   
 

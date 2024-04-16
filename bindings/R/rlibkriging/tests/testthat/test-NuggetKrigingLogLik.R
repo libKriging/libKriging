@@ -1,4 +1,7 @@
-kernel="gauss"
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+#kernel="gauss"
+
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   context(paste0("Check LogLikelihood for kernel ",kernel))
   
@@ -21,7 +24,7 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
     arrows(x,llx,x+.1,llx+.1*gllx)
   }
   
-  library(rlibkriging)
+  #library(rlibkriging)
   r <- NuggetKriging(y, X, kernel, parameters=list(nugget=0,is_nugget_estim=TRUE))
   ll2_theta = function(theta) logLikelihoodFun(r,c(theta,alpha0))$logLikelihood
   # second arg is alpha=1 for nugget=0

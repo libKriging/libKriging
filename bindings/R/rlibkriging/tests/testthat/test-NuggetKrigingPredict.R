@@ -1,3 +1,7 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+#kernel="gauss"
+
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   context(paste0("Check predict 1D for kernel ",kernel))
 
@@ -9,7 +13,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   y = f(X)
   #points(X,y)
   k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
-  library(rlibkriging)
+  #library(rlibkriging)
   r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE, is_theta_estim=FALSE,
@@ -41,7 +45,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   
   plot(f)
   points(X,y)
-  x=seq(0,1,,101)
+  x=sort(c(seq(0,1,,101),X))
   lines(x,predict(r,x)$mean,lty=2)
   polygon(
       c(x,rev(x)),

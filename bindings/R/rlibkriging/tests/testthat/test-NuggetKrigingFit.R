@@ -1,3 +1,6 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 context("Fit: 1D")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
@@ -8,7 +11,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS20")
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-1d.Rdata")

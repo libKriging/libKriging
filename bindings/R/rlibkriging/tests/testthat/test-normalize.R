@@ -1,3 +1,6 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 n <- 5
 set.seed(123)
@@ -6,9 +9,6 @@ X10 = 10*X
 
 y = f(X)
 y50 = 50*y
-
-library(rlibkriging)
-
 
 context("no normalize")
 

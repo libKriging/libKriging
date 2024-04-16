@@ -1,3 +1,6 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
   prod(sin(2*pi*( x * (seq(0,1,l=1+length(x))[-1])^2 )))
@@ -14,20 +17,20 @@ points(X)
 
 r <- NoiseKriging(y, noise=rep(0.1^2,nrow(X)), X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2),sigma2=1))
 l= as.list(r)
-# ll = function(X) {
-#   logLikelihoodFun(r,X,grad=F)$logLikelihood
-# }
-# contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
-# gll = function(X) {
-#   logLikelihoodFun(r,X,grad=T)$logLikelihoodGrad
-# }
-# for (ix in 1:21) {
-# for (iy in 1:21) {
-#   xx = c(ix/21,iy/21)
-#   g = gll(xx)
-#   arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
-# }
-# }
+#ll = function(X) {
+#  logLikelihoodFun(r,X,grad=F)$logLikelihood
+#}
+#contour(x,x,matrix(ll(cbind(as.matrix(expand.grid(x,x)), r$sigma2())),nrow=length(x)),nlevels = 30)
+#gll = function(X) {
+#  logLikelihoodFun(r,X,grad=T)$logLikelihoodGrad
+#}
+#for (ix in 1:21) {
+#for (iy in 1:21) {
+#  xx = c(ix/21,iy/21)
+#  g = gll(xx)
+#  arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
+#}
+#}
 
 context("noise / print")
 
@@ -40,6 +43,12 @@ ll = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,c(theta,l$
 t=seq(0.01,2,,51)
 contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2])
+
+for (.t1 in t) for (.t2 in t) {
+  llg = logLikelihoodFun(r,c(.t1,.t2,l$sigma2),grad=T)$logLikelihoodGrad
+  arrows(.t1,.t2, .t1+0.001*llg[1],.t2+0.001*llg[2],col='red') 
+}
+
 # logLikelihoodFun(r,t(as.list(r)$theta))
 
 test_that("noise / logLikelihoodFun returned",
@@ -99,26 +108,26 @@ contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 points(X2,col='red')
 
-#r20 <- Kriging(c(y,y2), rbind(X,X2),"gauss")
-#ll = function(X) {
-#  logLikelihoodFun(r20,X,grad=F)$logLikelihood
-#}
-#contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
-#gll = function(X) {
-#  logLikelihoodFun(r20,X,grad=T)$logLikelihoodGrad
-#}
-#for (ix in 1:21) {
-#for (iy in 1:21) {
-#  xx = c(ix/21,iy/21)
-#  g = gll(xx)
-#  arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
-#}
-#}
+r20 <- NoiseKriging(c(y,y2), c(y-f(X),y2-f(X2))^2,rbind(X,X2),"gauss")
+ll = function(X) {
+  logLikelihoodFun(r20,X,grad=F)$logLikelihood
+}
+contour(x,x,matrix(ll(cbind(as.matrix(expand.grid(x,x)),r$sigma2())),nrow=length(x)),nlevels = 30)
+gll = function(X) {
+  logLikelihoodFun(r20,X,grad=T)$logLikelihoodGrad
+}
+for (ix in 1:21) {
+for (iy in 1:21) {
+  xx = c(ix/21,iy/21,r$sigma2())
+  g = gll(xx)
+  arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
+}
+}
 
 
 
 t=seq(0.01,2,,51)
-contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
+contour(t,t,matrix(ll(cbind(as.matrix(expand.grid(t,t)),r$sigma2())),nrow=length(t)),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 
 #cat("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!","\n")

@@ -1,10 +1,13 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 context("LinearAlgebra")
 
 # pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
 # install.packages(pack,repos=NULL)
 # library(rlibkriging)
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 
 #######################################################################
 
@@ -73,7 +76,7 @@ rlibkriging:::linalg_set_num_nugget(1e-15) # default setup
 
 #######################################################################
 
-n = 100
+n = 1000
 R = matrix(rnorm(n*n),n,n)
 R = t(R) %*% R
 
@@ -83,4 +86,4 @@ Roo = R[1:no,1:no]
 Too = t(chol(Roo))
 
 test_that(desc="Full chol equals incremented chol by block",
-          expect_equal(t(chol(R)), rlibkriging:::linalg_chol_block(R,Too,Roo), tol=1e-9))
+          expect_equal(t(chol(R)), rlibkriging:::linalg_chol_block(R,Too), tol=1e-9))

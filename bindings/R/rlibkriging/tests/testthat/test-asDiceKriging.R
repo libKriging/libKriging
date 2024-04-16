@@ -18,7 +18,7 @@ d <- ncol(X)
 km1 <- DiceKriging::km(design = X, response = y, covtype = "gauss",
          formula = ~1, estim.method = "LOO",
          parinit = c(.15), control = list(trace = FALSE))
-library(rlibkriging)
+#library(rlibkriging)
 KM1 <- rlibkriging::KM(design = X, response = y, covtype = "gauss",
           formula = ~1, estim.method = "LOO",
           parinit = c(.15))
@@ -30,7 +30,7 @@ test_that("m1.leaveOneOutFun == KM1.leaveOneOutFun",
 test_that("m1.argmax(loo) == KM1.argmax(loo)", 
           expect_equal(km1@covariance@range.val,
                        KM1@covariance@range.val,
-                       tol = 0.1))
+                       tol = 0.001))
 
 plot(Vectorize(function(.t) DiceKriging::leaveOneOutFun(param = as.numeric(.t), model = km1)))
 abline(v = km1@covariance@range.val)
@@ -73,7 +73,7 @@ test_that("m1.logLikFun == as_m1.logLikFun",
 test_that("m1.argmax(logLig) == as_m1.argmax(logLig)", 
           expect_equal(km1@covariance@range.val,
                        KM1@covariance@range.val,
-                       tol = 0.1))
+                       tol = 0.01))
 
 ll <- function(Theta){
     apply(Theta, 1,
@@ -161,8 +161,10 @@ covtype <- "gauss"
 
 km2 <<- DiceKriging::km(formula = formula,design = design,
                         response = response, covtype = covtype,
-                        ##coef.cov = 0.5, coef.var=0.5, coef.trend = 0.5, 
+                        coef.cov = 0.5, coef.var=0.5, coef.trend = 0.5, 
                         control = list(trace=F))
+km2@method <- "LL"
+km2@case <- "LLconcentration_beta"
 
 ## XXXY Here a warning is thrown
 suppressWarnings(KM2 <<- rlibkriging::KM(formula = formula,design = design,

@@ -88,8 +88,19 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #for (i in 1:10)
   #    lines(x,simulate(r,x=x,seed=i),col='grey')
   
-  .x = seq(0.1,0.9,,11)
+  .x = seq(0.1,0.9,,101)
   p_allx = predict(r,.x,stdev=TRUE, cov=FALSE, deriv=TRUE)
+
+  # plot(.x,p_allx$mean)
+  # for (i in 1:length(.x)) 
+  #   arrows(.x[i],p_allx$mean[i], .x[i]+0.1, p_allx$mean[i]+0.1*p_allx$mean_deriv[i])
+  # 
+  # plot(.x,p_allx$stdev)
+  # for (i in 1:length(.x))
+  #   arrows(.x[i],     p_allx$stdev[i], 
+  #          .x[i]+0.1, p_allx$stdev[i]+0.1*p_allx$stdev_deriv[i])
+  # 
+
   for (i in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = .x[i]

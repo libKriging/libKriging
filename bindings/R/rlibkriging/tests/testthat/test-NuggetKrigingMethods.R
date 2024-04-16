@@ -1,3 +1,6 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
   prod(sin(2*pi*( x * (seq(0,1,l=1+length(x))[-1])^2 )))
@@ -19,7 +22,7 @@ l= as.list(r)
 # }
 # contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 # gll = function(X) {
-#   logLikelihoodFun(r,X,grad=T)$logLikelihoodGrad
+#   logLikelihoodFun(r,X,grad=TRUE)$logLikelihoodGrad
 # }
 # for (ix in 1:21) {
 # for (iy in 1:21) {
@@ -45,12 +48,12 @@ points(as.list(r)$theta[1],as.list(r)$theta[2])
 test_that("nugget / logLikelihoodFun returned",
           expect_equal(names(logLikelihoodFun(r,runif(d+1))),c("logLikelihood")))
 test_that("nugget / logLikelihoodFun logLikelihoodGrad returned",
-          expect_equal(names(logLikelihoodFun(r,runif(d+1),grad=T)),c("logLikelihood","logLikelihoodGrad")))
+          expect_equal(names(logLikelihoodFun(r,runif(d+1),grad=TRUE)),c("logLikelihood","logLikelihoodGrad")))
 
 test_that("nugget / logLikelihoodFun dim",
           expect_equal(dim(logLikelihoodFun(r,rbind(runif(d+1),runif(d+1)))$logLikelihood),c(2,1)))
 test_that("nugget / logLikelihoodGrad dim",
-          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d+1),runif(d+1)),grad=T)$logLikelihoodGrad),c(2,d+1)))
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d+1),runif(d+1)),grad=TRUE)$logLikelihoodGrad),c(2,d+1)))
 
 
 context("nugget / predict")
@@ -60,14 +63,14 @@ test_that("nugget / predict mean stdev returned",
 test_that("nugget / predict mean returned",
           expect_equal(names(predict(r,runif(d),stdev=F)),c("mean")))
 test_that("nugget / predict mean stdev cov returned",
-          expect_equal(names(predict(r,runif(d),cov=T)),c("mean","stdev","cov")))
+          expect_equal(names(predict(r,runif(d),cov=TRUE)),c("mean","stdev","cov")))
 
 test_that("nugget / predict mean dim",
           expect_equal(dim(predict(r,rbind(runif(d),runif(d)))$mean),c(2,1)))
 test_that("nugget / predict stdev dim",
           expect_equal(dim(predict(r,rbind(runif(d),runif(d)))$stdev),c(2,1)))
 test_that("nugget / predict cov dim",
-          expect_equal(dim(predict(r,rbind(runif(d),runif(d)),cov=T)$cov),c(2,2)))
+          expect_equal(dim(predict(r,rbind(runif(d),runif(d)),cov=TRUE)$cov),c(2,2)))
 
 
 context("nugget / simulate")
@@ -103,7 +106,7 @@ points(X2,col='red')
 #}
 #contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 #gll = function(X) {
-#  logLikelihoodFun(r20,X,grad=T)$logLikelihoodGrad
+#  logLikelihoodFun(r20,X,grad=TRUE)$logLikelihoodGrad
 #}
 #for (ix in 1:21) {
 #for (iy in 1:21) {
@@ -128,14 +131,14 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 set.seed(1234)
 r2 <- NuggetKriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2),nugget=0,sigma2=1))
 ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r2,c(theta,as.list(r2)$sigma2/(as.list(r2)$sigma2+as.list(r2)$nugget)))$logLikelihood)}
-contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
+contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=TRUE,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red',pch=20)
 
 p2 = capture.output(print(r2))
 
 update(object=r,y2,X2)
 llu = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,  c(theta,as.list(r2)$sigma2/(as.list(r2)$sigma2+as.list(r2)$nugget)) )$logLikelihood)}
-contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='blue')
+contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=TRUE,col='blue')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='blue',pch=20)
 
 pu = capture.output(print(r))
