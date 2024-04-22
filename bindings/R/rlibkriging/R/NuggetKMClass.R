@@ -199,17 +199,17 @@ NuggetKM <- function(formula = ~1, design, response,
     
     parameters <- list()
     if (!is.null(coef.var))
-        parameters <- c(parameters, list(sigma2 = coef.var))
+        parameters <- c(parameters, list(sigma2 = coef.var, is_sigma2_estim=FALSE))
     if (!is.null(coef.cov)) {
         parameters <- c(parameters,
-                        list(theta = matrix(coef.cov, ncol = ncol(design))))
+                        list(theta = matrix(coef.cov, ncol = ncol(design)), is_theta_estim=FALSE))
         optim.method <- "none"
         ## XXXY 
         warning("Since 'coef.cov' is provided 'optim.method' is set to ",
                 "\"none\"")
     }  
     if (!is.null(coef.trend)) {
-        parameters <- c(parameters, list(beta = matrix(coef.trend)))
+        parameters <- c(parameters, list(beta = matrix(coef.trend), is_beta_estim=FALSE))
     }
     if (!is.null(parinit)) {
         parameters <- c(parameters,

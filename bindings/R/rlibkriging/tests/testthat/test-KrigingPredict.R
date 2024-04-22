@@ -1,4 +1,7 @@
-context("Check predict args (T,F) are consistent")
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
+context("Check predict args (T,FALSE) are consistent")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 plot(f)
@@ -16,22 +19,22 @@ pred_def_mean = r$predict(x)$mean
 pred_def_sd = r$predict(x)$stdev
 lines(x,pred_def_mean,col='blue')
 
-pred_TFF_mean = r$predict(x,T,F,F)$mean
-pred_TFF_sd = r$predict(x,T,F,F)$stdev
+pred_TFF_mean = r$predict(x,TRUE,FALSE,FALSE)$mean
+pred_TFF_sd = r$predict(x,TRUE,FALSE,FALSE)$stdev
 lines(x,pred_TFF_mean,col='red')
-test_that(desc="predict(.,T,F,F) is is the same that default one", 
+test_that(desc="predict(.,TRUE,FALSE,FALSE) is is the same that default one", 
           expect_equal(pred_TFF_mean,pred_def_mean))
 
-pred_TTF_mean = r$predict(x,T,T,F)$mean
-pred_TTF_sd = r$predict(x,T,T,F)$stdev
+pred_TTF_mean = r$predict(x,TRUE,TRUE,FALSE)$mean
+pred_TTF_sd = r$predict(x,TRUE,TRUE,FALSE)$stdev
 lines(x,pred_TTF_mean,col='red')
-test_that(desc="predict(.,T,T,F) is is the same that default one", 
+test_that(desc="predict(.,TRUE,TRUE,FALSE) is is the same that default one", 
           expect_equal(pred_TTF_mean,pred_def_mean))
 
-pred_TTT_mean = r$predict(x,T,T,T)$mean
-pred_TTT_sd = r$predict(x,T,T,T)$stdev
+pred_TTT_mean = r$predict(x,TRUE,TRUE,TRUE)$mean
+pred_TTT_sd = r$predict(x,TRUE,TRUE,TRUE)$stdev
 lines(x,pred_TTT_mean,col='red')
-test_that(desc="predict(.,T,T,T) is is the same that default one", 
+test_that(desc="predict(.,TRUE,TRUE,TRUE) is is the same that default one", 
           expect_equal(pred_TTT_mean,pred_def_mean))
 
 

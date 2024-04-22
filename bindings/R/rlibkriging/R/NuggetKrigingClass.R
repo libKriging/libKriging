@@ -211,7 +211,14 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 
     model@case <- "LLconcentration_beta_v_alpha"
 
-    model@known.param <- "None"
+    isTrend = !m$is_beta_estim
+    isCov = !m$is_theta_estim
+    isVar = !m$is_sigma2_estim
+    if (isCov) {
+        known.covparam <- "All"
+    } else {
+        known.covparam <- "None"
+    }
     model@param.estim <- NA
     model@method <- m$objective
     model@optim.method <- m$optim
@@ -230,7 +237,17 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
     covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel,
                       sd2 = m$sigma2, var.names = names(data),
                       nugget = m$nugget, nugget.flag = TRUE, nugget.estim = TRUE,
-                      known.covparam = "")
+                      known.covparam = known.covparam)
+
+    if (isTrend && isCov && isVar) {
+        model@known.param <- "All"
+    } else if ((isTrend) && ((!isCov) || (!isVar))) {
+        model@known.param <- "Trend"
+    } else if ((!isTrend) && isCov && isVar) {
+        model@known.param <- "CovAndVar"
+    } else {    # In the other cases: All parameters are estimated (at this stage)
+        model@known.param <- "None"
+    }
 
     covStruct@range.names <- "theta"
     covStruct@paramset.n <- as.integer(1)

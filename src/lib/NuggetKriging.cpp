@@ -791,10 +791,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
-    m_z = std::move(m.Estar);
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
-    } // else m_beta is already defined and fixed
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta = parameters.beta.value(); already done above
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
     if (m_est_sigma2) {
       m_sigma2 = m.SSEstar / n;
     } else {
@@ -1039,10 +1042,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         m_M = std::move(m.Fstar);
         m_circ = std::move(m.Rstar);
         m_star = std::move(m.Qstar);
-        m_z = std::move(m.Estar);
         if (m_est_beta) {
           m_beta = std::move(m.betahat);
-        } // else m_beta is already defined and fixed
+          m_z = std::move(m.Estar);
+        } else {
+          // m_beta = parameters.beta.value(); already done above
+          m_z = std::move(m.ystar) - m_M * m_beta;
+        }
         double m_alpha = best_theta_alpha.at(d);
         double var = as_scalar(LinearAlgebra::crossprod(m_z)) / n;
         if (m_est_sigma2) {

@@ -133,8 +133,9 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
   if (m_est_beta) {
     m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
-  } else
-    m.betahat = arma::vec(p, arma::fill::zeros);
+  } else {
+    m.betahat = arma::vec(p, arma::fill::zeros); // whatever: not used
+  }
 
   return m;
 }
@@ -1041,10 +1042,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
-    m_z = std::move(m.Estar);
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
-    } // else m_beta is already defined and fixed
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta = parameters.beta.value(); already done above
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
     if (m_est_sigma2) {
       m_sigma2 = m.SSEstar / n;
     } else {
@@ -1233,10 +1237,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_M = std::move(m.Fstar);
           m_circ = std::move(m.Rstar);
           m_star = std::move(m.Qstar);
-          m_z = std::move(m.Estar);
           if (m_est_beta) {
             m_beta = std::move(m.betahat);
-          } // else m_beta is already defined and fixed
+            m_z = std::move(m.Estar);
+          }  else {
+            // m_beta = parameters.beta.value(); already done above
+            m_z = std::move(m.ystar) - m_M * m_beta;
+          }
           if (m_est_sigma2) {
             m_sigma2 = m.SSEstar / n;
             if (m_objective.compare("LMP") == 0) {
@@ -1336,7 +1343,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_z = std::move(m.Estar);
           if (m_est_beta) {
             m_beta = std::move(m.betahat);
-          } // else m_beta is already defined and fixed
+            m_z = std::move(m.Estar);
+          }  else {
+            // m_beta = parameters.beta.value(); already done above
+            m_z = std::move(m.ystar) - m_M * m_beta;
+          }
           if (m_est_sigma2) {
             m_sigma2 = m.SSEstar / n;
             if (m_objective.compare("LMP") == 0) {
@@ -1367,7 +1378,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
     throw std::runtime_error("Predict locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
                              + std::to_string(d));
 
-  arma::vec yhat_n(n_n);
+  arma::vec yhat_n = arma::vec(n_n,arma::fill::none);
   arma::vec ysd2_n = arma::vec(n_n,arma::fill::zeros);
   arma::mat Sigma_n = arma::mat(n_n, n_n,arma::fill::zeros);
   arma::mat Dyhat_n = arma::mat(n_n, d,arma::fill::zeros);

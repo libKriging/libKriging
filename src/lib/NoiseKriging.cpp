@@ -443,10 +443,13 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
-    m_z = std::move(m.Estar);
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
-    } // else m_beta is already defined and fixed
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta = parameters.beta.value(); already done above
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
 
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
@@ -666,10 +669,13 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         m_M = std::move(m.Fstar);
         m_circ = std::move(m.Rstar);
         m_star = std::move(m.Qstar);
-        m_z = std::move(m.Estar);
         if (m_est_beta) {
           m_beta = std::move(m.betahat);
-        } // else m_beta is already defined and fixed
+          m_z = std::move(m.Estar);
+        } else {
+          // m_beta = parameters.beta.value(); already done above
+          m_z = std::move(m.ystar) - m_M * m_beta;
+        }
         if (m_est_sigma2) {
           m_sigma2 = best_gamma.at(d);
           if (Optim::reparametrize)
