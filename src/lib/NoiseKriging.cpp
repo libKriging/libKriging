@@ -208,7 +208,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);
 
-    if (m.Linv.memptr()==nullptr) {
+    if ((m.Linv.memptr()==nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
       m.Linv =LinearAlgebra::solve(m.L, arma::mat(n, n,arma::fill::eye));
       t0 = Bench::toc(bench, "L ^-1", t0);
     }
