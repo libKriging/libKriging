@@ -97,7 +97,9 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "NuggetKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
+    for (f in c('as.km','as.list','copy','fit',
+    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'predict','print','show','simulate','update','assimilate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -863,5 +865,19 @@ logMargPost.NuggetKriging <- function(object, ...) {
 #' print(copy(k))
 copy.NuggetKriging <- function(object, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    return(nuggetkriging_copy(object))
+    nk = nuggetkriging_copy(object)
+    class(nk) <- "NuggetKriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in c('as.km','as.list','copy','fit','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() kriging_", d, "(nk)"
+            )))
+    }
+    nk
 }

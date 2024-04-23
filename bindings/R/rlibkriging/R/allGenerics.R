@@ -152,6 +152,21 @@ logMargPost <- function(object, ...) {
 }
 
 ## *****************************************************************************
+##' Update previous simulate of a model given in
+##' \code{object}.
+##'
+##' @title Update simulation of model on data.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function
+##'
+##' @return Updated simulation of model output.
+##' @export
+update_simulate <- function(object, ...) {
+    UseMethod("update_simulate")
+}
+
+## *****************************************************************************
 ##' Duplicate a model given in
 ##' \code{object}.
 ##'

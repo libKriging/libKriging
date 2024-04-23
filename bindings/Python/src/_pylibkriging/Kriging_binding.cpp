@@ -85,9 +85,9 @@ PyKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov, boo
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp) {
-  arma::mat mat_X = carma::arr_to_mat_view<double>(Xp);
-  auto result = m_internal->simulate(nsim, seed, mat_X);
+py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool willUpdate) {
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+  auto result = m_internal->simulate(nsim, seed, mat_X, willUpdate);
   return carma::mat_to_arr(result, true);
 }
 
