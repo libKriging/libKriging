@@ -1,3 +1,5 @@
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 n <- 200
 set.seed(123)
@@ -6,8 +8,6 @@ y <- f(X)
 
 times.n = 10
 x = .5
-
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 r = NULL
 r <- Kriging(y, X, "gauss")

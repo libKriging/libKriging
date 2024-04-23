@@ -1,3 +1,4 @@
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
 library(testthat)
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
@@ -39,8 +40,6 @@ for (x in xx){
   times$R_gll[i]=system.time(for (j in 1:times.n) gllx <- lmp_deriv(rep(x,3)))
   i <- i+1
 }
-
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
 
 r <- Kriging(y, X, "gauss")#"matern3_2")
 i <- 1
