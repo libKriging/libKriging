@@ -94,7 +94,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in c('as.km','as.list','copy','fit',
     'leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','print','show','simulate','update','assimilate', 'update_simulate')) {
+    'predict','print','show','simulate','update', 'update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -536,6 +536,7 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 #' @param object S3 Kriging object.
 #' @param y_u Numeric vector of new responses (output).
 #' @param X_u Numeric matrix of new input points.
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is FALSE).
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -578,7 +579,7 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, X_u, ...) {
+update.Kriging <- function(object, y_u, X_u, refit=FALSE,...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
@@ -592,72 +593,7 @@ update.Kriging <- function(object, y_u, X_u, ...) {
         stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    kriging_update(object, y_u, X_u)
-
-    invisible(NULL)
-}
-
-#' Update a \code{Kriging} model object with new points, but do NOT re-fit the model.
-#'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
-#'
-#' @param object S3 Kriging object.
-#' @param y_u Numeric vector of new responses (output).
-#' @param X_u Numeric matrix of new input points.
-#' @param ... Ignored.
-#'
-#' @return No return value. Kriging object argument is modified.
-#'
-#' @section Caution: The method \emph{does not return the updated
-#'     object}, but instead changes the content of
-#'     \code{object}.
-#'
-#' @method update_nofit Kriging
-#' @export
-#'
-#' @examples
-#' f <- function(x) 1- 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x)*x^5 + 0.7)
-#' plot(f)
-#' set.seed(123)
-#' X <- as.matrix(runif(10))
-#' y <- f(X)
-#' points(X, y, col = "blue")
-#'
-#' k <- Kriging(y, X, "matern3_2")
-#'
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p <- predict(k, x)
-#' lines(x, p$mean, col = "blue")
-#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
-#'  border = NA, col = rgb(0, 0, 1, 0.2))
-#'
-#' X_u <- as.matrix(runif(3))
-#' y_u <- f(X_u)
-#' points(X_u, y_u, col = "red")
-#'
-#' ## change the content of the object 'k'
-#' update_nofit(k, y_u, X_u)
-#'
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p2 <- predict(k, x)
-#' lines(x, p2$mean, col = "red")
-#' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
-#'  border = NA, col = rgb(1, 0, 0, 0.2))
-update_nofit.Kriging <- function(object, y_u, X_u, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- kriging_model(object)
-    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
-    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
-    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
-    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
-    if (ncol(X_u) != ncol(k$X))
-        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
-             ncol(X_u), ")")
-    if (nrow(y_u) != nrow(X_u))
-        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
-
-    ## Modify 'object' in the parent environment
-    kriging_update_nofit(object, y_u, X_u)
+    kriging_update(object, y_u, X_u, refit)
 
     invisible(NULL)
 }
@@ -1091,7 +1027,9 @@ copy.Kriging <- function(object, ...) {
   nk = kriging_copy(object)
   class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
+    for (f in c('as.km','as.list','copy','fit',
+    'leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))

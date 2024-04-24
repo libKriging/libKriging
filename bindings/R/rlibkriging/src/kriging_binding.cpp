@@ -294,7 +294,7 @@ Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool co
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate) {
+arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -316,30 +316,14 @@ arma::mat kriging_update_simulate(Rcpp::List k, arma::vec y, arma::mat X) {
 }
 
 // [[Rcpp::export]]
-void kriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
+void kriging_update(Rcpp::List k, arma::vec y, arma::mat X,bool refit = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  impl_ptr->update(y, X);
-
-  // Rcpp::List obj;
-  // obj.attr("object") = impl_ptr;
-  // obj.attr("class") = "Kriging";
-  // return obj;
-}
-
-// [[Rcpp::export]]
-void kriging_assimilate(Rcpp::List k, arma::vec y, arma::mat X) {
-  if (!k.inherits("Kriging"))
-    Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = k.attr("object");
-
-  Rcpp::XPtr<Kriging> impl_ptr(impl);
-
-  impl_ptr->assimilate(y, X);
+  impl_ptr->update(y, X, refit);
 
   // Rcpp::List obj;
   // obj.attr("object") = impl_ptr;

@@ -122,10 +122,10 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{3}};
+                 RequiresArg::Exactly{4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  km->update(input.get<arma::vec>(1, "new y"), input.get<arma::mat>(2, "new X"));
+  km->update(input.get<arma::vec>(1, "new y"), input.get<arma::mat>(2, "new X"),input.get<bool>(4, "refit"));
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
