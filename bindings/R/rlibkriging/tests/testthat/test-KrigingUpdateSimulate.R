@@ -15,6 +15,7 @@ lk <- Kriging(y = matrix(y_o, ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
+              #normalize = TRUE,
               parameters = list(theta = matrix(0.1)))
 
 ## Predict & simulate
@@ -90,13 +91,36 @@ i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
 y_u = f(X_u)
 
-ls = lk$simulate(100, 123, X_n, will_update=TRUE)
+ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus = lk$update_simulate(y_u, X_u)
 
 lu = copy(lk)
 lu$update(y_u, X_u)
-lsu = lu$simulate(100, 123, X_n)
+lsu = lu$simulate(1000, 123, X_n)
+
+plot(f)
+points(X_o,y_o,pch=20)
+points(X_u,y_u,col='red',pch=20)
+for (i in 1:ncol(lus)) {
+    lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
+    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+}
+
+for (i in 1:length(X_n)) {
+    dsu=density(lsu[i,])
+    dus=density(lus[i,])
+    polygon(
+        X_n[i] + dsu$y/100,
+        dsu$x,
+        col=rgb(0,0,1,0.2),border=NA)
+    polygon(
+        X_n[i] + dus$y/100,
+        dus$x,
+        col=rgb(1,0,0,0.2),border=NA)
+    #test_that(desc="updated,simulated sample follows simulated,updated distribution",
+    #    expect_true(ks.test(lus[i,],lsu[i,])$p.value < 0.05))
+}
 
 for (i in 1:length(X_n)) {
     test_that(desc="updated,simulated sample follows simulated,updated distribution",

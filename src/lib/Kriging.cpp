@@ -1693,6 +1693,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   bool use_lastsimup = arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
   if (! use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
+    lastsimup_y_u = y_u;
   
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
