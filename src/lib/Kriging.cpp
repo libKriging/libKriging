@@ -1785,18 +1785,15 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
     t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);
   }
 
-arma::cout << "lastsim_y_n: " << arma::size(lastsim_y_n) << arma::endl;
-arma::cout << "lastsimup_Wtild_nKu: " << arma::size(lastsimup_Wtild_nKu) << arma::endl;
-arma::cout << "repmat(y_u: " << arma::size(arma::repmat(y_u,1,lastsim_nsim)) << arma::endl;
-arma::cout << "lastsimup_y_u: " << arma::size(lastsimup_y_u) << arma::endl;
   return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u,1,lastsim_nsim) - lastsimup_y_u);  
 }
 
 /** Add new conditional data points to previous (X,y), then perform new fit.
  * @param y_u is n_u length column vector of new output
  * @param X_u is n_u*d matrix of new input
+ * @param refit is true if we want to re-fit the model
  */
-LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u) {
+LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -1808,14 +1805,15 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
   // rebuild starting parameters
   Parameters parameters;
-  if (m_est_beta)
+  if (refit) {// re-fit
+    if (m_est_beta)
     parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
                         std::make_optional(trans(this->m_theta) % this->m_scaleX),
                         this->m_est_theta,
                         std::make_optional(arma::ones<arma::vec>(0)),
                         true};
-  else 
+    else 
     parameters = Parameters{
                         std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                         this->m_est_sigma2,
@@ -1823,9 +1821,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
                         this->m_est_theta,
                         std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         false};
-
-  // re-fit
-  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                             y_u),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
             m_regmodel,
@@ -1833,49 +1829,23 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
             m_optim,
             m_objective,
             parameters);
-}
-
-/** Add new conditional data points to previous (X,y), do not perform new fit.
- * @param y_u is n_u length column vector of new output
- * @param X_u is n_u*d matrix of new input
- */
-LIBKRIGING_EXPORT void Kriging::assimilate(const arma::vec& y_u, const arma::mat& X_u) {
-  if (y_u.n_elem != X_u.n_rows)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
-                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
-
-
-  if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
-                             + std::to_string(m_X.n_cols) + "), new X: (...x"
-                             + std::to_string(X_u.n_cols) + ")");
-
-  // rebuild starting parameters
-  Parameters parameters;
-  if (m_est_beta)
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(arma::ones<arma::vec>(0)),
-                        true};
-  else 
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
+  } else {// just update
+    parameters = Parameters{
+                        std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
+                        false,
+                        std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
+                        false,
+                        std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
                         false};
-
-  // NO re-fit
-  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                             y_u),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
             m_regmodel,
             m_normalize,
-            "none", // do no optimize: stay on current theta, so update_Chol will be used (faster than scratch chol)
+            "none",
             m_objective,
             parameters);
+  }
 }
 
 LIBKRIGING_EXPORT std::string Kriging::summary() const {

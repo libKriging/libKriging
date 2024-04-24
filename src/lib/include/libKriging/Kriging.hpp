@@ -229,14 +229,9 @@ class Kriging {
   /** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
+   * @param refit is true if re-fit the model after data update
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u);
-
-  /** Add new conditional data points to previous (X,y)
-   * @param y_u is m length column vector of new output
-   * @param X_u is m*d matrix of new input
-   */
-  LIBKRIGING_EXPORT void assimilate(const arma::vec& y_u, const arma::mat& X_u);
+  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit);
 
   LIBKRIGING_EXPORT std::string summary() const;
 
