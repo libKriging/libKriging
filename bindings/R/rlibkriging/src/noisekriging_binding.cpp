@@ -300,25 +300,36 @@ Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bo
 }
 
 // [[Rcpp::export]]
-arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
+arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim, seed, X);
+  return impl_ptr->simulate(nsim, seed, X, willUpdate);
 }
 
 // [[Rcpp::export]]
-void noisekriging_update(Rcpp::List k, arma::vec y, arma::vec noise, arma::mat X) {
+arma::mat noisekriging_update_simulate(Rcpp::List k, arma::vec y, arma::vec noise, arma::mat X) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  impl_ptr->update(y, noise, X);
+  return impl_ptr->update_simulate(y, noise, X);
+}
+
+// [[Rcpp::export]]
+void noisekriging_update(Rcpp::List k, arma::vec y, arma::vec noise, arma::mat X, bool refit = true) {
+  if (!k.inherits("NoiseKriging"))
+    Rcpp::stop("Input must be a NoiseKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+
+  impl_ptr->update(y, noise, X, refit);
 
   // Rcpp::List obj;
   // obj.attr("object") = impl_ptr;

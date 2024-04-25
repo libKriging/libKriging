@@ -316,7 +316,7 @@ arma::mat kriging_update_simulate(Rcpp::List k, arma::vec y, arma::mat X) {
 }
 
 // [[Rcpp::export]]
-void kriging_update(Rcpp::List k, arma::vec y, arma::mat X,bool refit = false) {
+void kriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool refit = true) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");

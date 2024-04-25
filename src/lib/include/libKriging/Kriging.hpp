@@ -218,9 +218,9 @@ class Kriging {
    * @param willUpdate store useful data for possible future update
    * @return output is m*nsim matrix of simulations at X_n
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool willUpdate);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool willUpdate = false);
 
-  /** Assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
+  /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
    */
@@ -231,7 +231,7 @@ class Kriging {
    * @param X_u is m*d matrix of new input
    * @param refit is true if re-fit the model after data update
    */
-  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit);
+  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit = true);
 
   LIBKRIGING_EXPORT std::string summary() const;
 

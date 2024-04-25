@@ -144,7 +144,7 @@ points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red',pch=20)
 
 p2 = capture.output(print(r2))
 
-update(object=r,y2,newnoise=rep(0.1^2,nrow(X2)),X2)
+update(object=r,y2,rep(0.1^2,nrow(X2)),X2)
 llu = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r,  c(theta,as.list(r2)$sigma2) )$logLikelihood)}
 contour(t,t,matrix(llu(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='blue')
 points(as.list(r)$theta[1],as.list(r)$theta[2],col='blue',pch=20)

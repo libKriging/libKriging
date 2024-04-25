@@ -92,8 +92,9 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit',
-    'leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    for (f in c('as.km','as.list','copy','fit','save',
+    'leaveOneOut','leaveOneOutFun','leaveOneOutVec',
+    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update', 'update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
@@ -149,10 +150,8 @@ as.list.Kriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param x An object with S3 class \code{"Kriging"}.
-#'
 #' @param .call Force the \code{call} slot to be filled in the
 #'     returned \code{km} object.
-#'
 #' @param ... Not used.
 #'
 #' @return An object of having the S4 class \code{"KM"} which extends
@@ -301,17 +300,12 @@ print.Kriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 Kriging object.
-#'
 #' @param y Numeric vector of response values.
-#'
 #' @param X Numeric matrix of input design.
-#'
 #' @param regmodel Universal Kriging linear trend.
-#'
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"},
 #'     \code{"Newton"} and \code{"none"}, the later simply keeping
@@ -319,19 +313,16 @@ print.Kriging <- function(x, ...) {
 #'     \code{"BFGS"} uses the gradient of the objective. The method
 #'     \code{"Newton"} uses both the gradient and the Hessian of the
 #'     objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares and \code{"LMP"} for the Log-Marginal Posterior.
-#'
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
 #'     variance and for the range parameters. If \code{theta} is a
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
-#'
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -579,7 +570,7 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, X_u, refit=FALSE,...) {
+update.Kriging <- function(object, y_u, X_u, refit=TRUE,...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
@@ -1027,7 +1018,7 @@ copy.Kriging <- function(object, ...) {
   nk = kriging_copy(object)
   class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit',
+    for (f in c('as.km','as.list','copy','fit','save',
     'leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(

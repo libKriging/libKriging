@@ -847,8 +847,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
-  std::function<double(const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data)>
-      fit_ofn;
+  std::function<double(const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
@@ -1604,6 +1603,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   Random::reset_seed(seed);
   y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
+  // Un-normalize simulations
   y_n = m_centerY + m_scaleY * y_n;
 
   if (willUpdate) {
@@ -1647,7 +1647,6 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // Un-normalize simulations
   return y_n;
 }
-
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
@@ -1693,7 +1692,6 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   bool use_lastsimup = arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
   if (! use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
-    lastsimup_y_u = y_u;
   
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);

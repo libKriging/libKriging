@@ -16,30 +16,22 @@
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param y Numeric vector of response values.
-#'
 #' @param noise Numeric vector of response variances.
-#'
 #' @param X Numeric matrix of input design.
-#'
 #' @param kernel Character defining the covariance model:
 #'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
-#'
 #' @param regmodel Universal NoiseKriging linear trend.
-#'
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"},
 #'     the later simply keeping
 #'     the values given in \code{parameters}. The method
 #'     \code{"BFGS"} uses the gradient of the objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood.
-#'
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -78,7 +70,7 @@
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
                     objective = c("LL"),
@@ -100,9 +92,9 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit',
-    'logLikelihood','logLikelihoodFun','predict',
-    'print','show','simulate','update','assimilate')) {
+    for (f in c('as.km','as.list','copy','fit','save',
+    'logLikelihood','logLikelihoodFun',
+    'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -157,10 +149,8 @@ as.list.NoiseKriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param x An object with S3 class \code{"NoiseKriging"}.
-#'
 #' @param .call Force the \code{call} slot to be filled in the
 #'     returned \code{km} object.
-#'
 #' @param ... Not used.
 #'
 #' @return An object of having the S4 class \code{"KM"} which extends
@@ -171,6 +161,7 @@ as.list.NoiseKriging <- function(x, ...) {
 #' @importFrom stats model.matrix
 #' @export
 #' @method as.km NoiseKriging
+#' @aliases as.km,NoiseKriging,NoiseKriging-method
 #'
 #' @examples
 #'f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -305,36 +296,27 @@ print.NoiseKriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 NoiseKriging object.
-#'
 #' @param y Numeric vector of response values.
-#'
 #' @param noise Numeric vector of response variances.
-#'
 #' @param X Numeric matrix of input design.
-#'
 #' @param regmodel Universal NoiseKriging linear trend.
-#'
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"},
 #'     the later simply keeping
 #'     the values given in \code{parameters}. The method
 #'     \code{"BFGS"} uses the gradient of the objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood.
-#'
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
 #'     variance and for the range parameters. If \code{theta} is a
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
-#'
 #' @param ... Ignored.
 #'
 #' @return No return value. NoiseKriging object argument is modified.
@@ -356,7 +338,7 @@ print.NoiseKriging <- function(x, ...) {
 #' fit(k,y,noise=(X/10)^2,X)
 #' print(k)
 fit.NoiseKriging <- function(object, y, noise, X,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
                     objective = c("LL"),
@@ -387,18 +369,13 @@ fit.NoiseKriging <- function(object, y, noise, X,
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 NoiseKriging object.
-#'
 #' @param x Input points where the prediction must be computed.
-#'
 #' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#'
 #' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#'
 #' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
-#'
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -468,6 +445,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #'     \pkg{Octave} interfaces to \pkg{libKriging}.
 #'
 #'
+#' @importFrom stats runif
 #' @method simulate NoiseKriging
 #' @export
 #'
@@ -487,7 +465,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
+simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)
@@ -497,22 +475,54 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x))
+    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, willUpdate = will_update))
 }
 
+#' Update previous simulation of a \code{NoiseKriging} model object.
+#'
+#' This method draws paths of the stochastic process conditional on the values at the input points used in the
+#' fit, plus the new input points and their values given as argument (knonw as 'update' points).
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object S3 NoiseKriging object.
+#' @param y_u Numeric vector of new responses (output).
+#' @param noise_u Numeric vector of new noise variances (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param ... Ignored.
+#'
+#' @return a matrix with \code{length(x)} rows and \code{nsim}
+#'     columns containing the simulated paths at the inputs points
+#'     given in \code{x}.
+#'
+#' @method update_simulate NoiseKriging
+#' @export
+update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- noisekriging_model(object)
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
+
+    ## Modify 'object' in the parent environment
+    return(noisekriging_update_simulate(object, y_u, noise_u, X_u))
+}
 
 #' Update a \code{NoiseKriging} model object with new points
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 NoiseKriging object.
-#'
-#' @param newy Numeric vector of new responses (output).
-#'
-#' @param newnoise Numeric vector of new noise variances (output).
-#'
-#' @param newX Numeric matrix of new input points.
-#'
+#' @param y_u Numeric vector of new responses (output).
+#' @param noise_u Numeric vector of new noise variances (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is FALSE).
 #' @param ... Ignored.
 #'
 #' @return No return value. NoiseKriging object argument is modified.
@@ -543,36 +553,36 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
 #'
-#' newX <- as.matrix(runif(3))
-#' newy <- f(newX) + 0.1 * rnorm(nrow(newX))
-#' points(newX, newy, col = "red")
+#' X_u <- as.matrix(runif(3))
+#' y_u <- f(X_u) + 0.1 * rnorm(nrow(X_u))
+#' points(X_u, y_u, col = "red")
 #'
 #' ## change the content of the object 'k'
-#' update(k, newy, rep(0.1^2,3), newX)
+#' update(k, y_u, rep(0.1^2,3), X_u)
 #'
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.NoiseKriging <- function(object, newy, newnoise, newX, ...) {
+update.NoiseKriging <- function(object, y_u, noise_u, X_u, refit=TRUE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
-    if (is.data.frame(newX)) newX = data.matrix(newX)
-    if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
-    if (is.data.frame(newy)) newy = data.matrix(newy)
-    if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
-    if (!is.matrix(newnoise)) newnoise <- matrix(newnoise, ncol = ncol(k$y))
-    if (ncol(newX) != ncol(k$X))
-        stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
-             ncol(newX), ")")
-    if (nrow(newy) != nrow(newX))
-        stop("Objects 'newX' and 'newy' must have the same number of rows.")
-    if (nrow(newnoise) != nrow(newX))
-        stop("Objects 'newnoise' and 'newy' must have the same number of rows.")
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (!is.matrix(noise_u)) noise_u <- matrix(noise_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
+    if (nrow(noise_u) != nrow(X_u))
+        stop("Objects 'noise_u' and 'y_u' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    noisekriging_update(object, newy, newnoise, newX)
+    noisekriging_update(object, y_u, noise_u, X_u, refit)
 
     invisible(NULL)
 }
@@ -744,7 +754,6 @@ logLikelihood.NoiseKriging <- function(object, ...) {
     return(noisekriging_logLikelihood(object))
 }
 
-
 #' Duplicate a NoiseKriging Model
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
@@ -773,7 +782,9 @@ copy.NoiseKriging <- function(object, ...) {
     nk = noisekriging_copy(object)
     class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','logLikelihood','logLikelihoodFun','predict','print','show','simulate','update','assimilate')) {
+    for (f in c('as.km','as.list','copy','fit','save',
+    'logLikelihood','logLikelihoodFun',
+    'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))

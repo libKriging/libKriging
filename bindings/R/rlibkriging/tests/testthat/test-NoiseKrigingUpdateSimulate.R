@@ -7,49 +7,61 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-y_o <- f(X_o)
-points(X_o, y_o)
+noise = 0.05^2
+y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
+points(X_o, y_o,pch=16)
 
-lk <- Kriging(y = matrix(y_o, ncol = 1),
+lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
+              noise = matrix(rep(noise, n), ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1)))
+              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
 
-## Predict & simulate
+
+
+
+## Ckeck consistency bw predict & simulate
 
 lp = lk$predict(seq(0,1,,21)) # libK predict
 lines(seq(0,1,,21),lp$mean,col='red')
 polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
 ls = lk$simulate(100, 123, seq(0,1,,21)) # libK simulate
-for (i in 1:min(100,ncol(ls))) {
+for (i in 1:100) {
     lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }
 
 for (i in 1:21) {
-    if (lp$stdev[i,] > 1e-3) # otherwise means that density is ~ dirac, so don't test
+    m = lp$mean[i,]
+    s = lp$stdev[i,]
     test_that(desc="simulate sample follows predictive distribution",
-        expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
+        expect_true(ks.test(ls[i,],"pnorm",mean=m,sd=s)$p.value  > 0.01))
 }
 
-## Update
+
+
+
+## Check consistency when update
 
 X_u = c(.4,.6)
-y_u = f(X_u)
+y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
+noise_u = rep(noise, length(X_u))
 
 # new Kriging model from scratch
-l2 = Kriging(y = matrix(c(y_o,y_u),ncol=1),
+l2 = NoiseKriging(y = matrix(c(y_o,y_u),ncol=1),
+                noise = matrix(c(rep(noise,n),noise_u),ncol=1),
              X = matrix(c(X_o,X_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1)))
+              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
 
 lu = copy(lk)
-update(lu, y_u,X_u)
+lu$update(y_u, noise_u, X_u)
+
 
 ## Update, predict & simulate
 
@@ -72,31 +84,40 @@ for (i in 1:100) {
 
 for (i in 1:21) {
     #test_that(desc="simulate sample follows predictive distribution",
-    #    expect_true(ks.test(ls2[i,],lsu[i,])$p.value > 0.01))
+    #    expect_true(ks.test(ls2[i,],lsu[i,])$p.value  > 0.01))
 
     # random gen is the same so we expect strict equality of samples !
     test_that(desc="simulate sample are the same",
         expect_true(all.equal(ls2[i,],lsu[i,])))
 }
 
+
+
 ## Update simulate
 
 X_n = seq(0,1,,21)
 i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
-y_u = f(X_u)
+y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
+noise_u = rep(noise, length(X_u))
 
-ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
+ls = lk$simulate(100, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
-lus = lk$update_simulate(y_u, X_u)
+lus = lk$update_simulate(y_u, noise_u, X_u)
 
 lu = copy(lk)
-lu$update(y_u, matrix(X_u,ncol=1), refit=FALSE)
-lsu = lu$simulate(1000, 123, X_n)
+lu$update(y_u, noise_u, matrix(X_u,ncol=1), refit=FALSE)
+lsu = lu$simulate(100, 123, X_n)
 
 plot(f)
-points(X_o,y_o,pch=20)
-points(X_u,y_u,col='red',pch=20)
+points(X_o,y_o,pch=16)
+for (i in 1:length(X_o)) {
+    lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
+}
+points(X_u,y_u,col='red',pch=16)
+for (i in 1:length(X_u)) {
+    lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(noise),y_u[i]-2*sqrt(noise)),col='red',lwd=4)
+}
 for (i in 1:ncol(lus)) {
     lines(seq(0,1,,21),ls[,i],col=rgb(0,0,0,.1),lwd=4)
     lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
@@ -145,26 +166,27 @@ n <- 100
 d <- 2
 
 X_o <- matrix(runif(n*d),ncol=d) #seq(from = 0, to = 1, length.out = n)
-y_o <- f(X_o)
+y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 #points(X_o, y_o)
 
-lk <- Kriging(y = y_o,
+lk <- NoiseKriging(y = y_o,
+              noise = rep(noise,n),
               X = X_o,
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(rep(0.1,d))))
+              parameters = list(theta = matrix(rep(0.1,d)), sigma2 = 0.1^2))
 
 ## Predict & simulate
 
-X_n = matrix(runif(100),ncol=2) #seq(0,1,,)
+X_n = matrix(runif(100),ncol=d) #seq(0,1,,)
 
 lp = lk$predict(X_n) # libK predict
 #lines(seq(0,1,,21),lp$mean,col='red')
 #polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(100, 123, X_n) # libK simulate
+ls = lk$simulate(1000, 123, X_n) # libK simulate
 #for (i in 1:100) {
 #    lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
 #}
@@ -172,9 +194,8 @@ ls = lk$simulate(100, 123, X_n) # libK simulate
 for (i in 1:nrow(X_n)) {
     m = lp$mean[i,]
     s = lp$stdev[i,]
-    if (s > 1e-2) # otherwise means that density is ~ dirac, so don't test
     test_that(desc="simulate sample follows predictive distribution",
-        expect_true(ks.test(ls[i,],"pnorm",mean=m,sd=s)$p.value > 0.01))
+        expect_gt(ks.test(ls[i,],"pnorm",mean=m,sd=s)$p.value, 0.01))
 }
 
 ### Update
@@ -218,9 +239,9 @@ for (i in 1:nrow(X_n)) {
 #    mu = lpu$mean[i,]
 #    su = lpu$stdev[i,]
 #    test_that(desc="simulate sample follows predictive distribution",
-#        expect_true(ks.test(ls2[i,] - m2,"rnorm",mean=m2,sd=s2)$p.value  > 0.01))
+#        expect_true(ks.test(ls2[i,] - m2,"pnorm",mean=m2,sd=s2)$p.value  > 0.01))
 #    test_that(desc="simulate sample follows predictive distribution",
-#        expect_true(ks.test(lsu[i,] - mu,"rnorm",mean=mu,sd=su)$p.value  > 0.01))
+#        expect_true(ks.test(lsu[i,] - mu,"pnorm",mean=mu,sd=su)$p.value  > 0.01))
 #}
 #
 #
@@ -229,17 +250,20 @@ for (i in 1:nrow(X_n)) {
 
 i_u = c(9,13,25,43,42,35,24)
 X_u = X_n[i_u,]# c(.4,.6)
-y_u = f(X_u)
+y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(noise))
 
 ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus = NULL
-lus = lk$update_simulate(y_u, X_u)
+lus = lk$update_simulate(y_u, rep(noise,length(y_u)), X_u)
 
 lu = copy(lk)
-lu$update(matrix(y_u,ncol=1), X_u, refit=FALSE)
+lu$update(matrix(y_u,ncol=1), rep(noise,length(y_u)), X_u, refit=FALSE)
 lsu = NULL
 lsu = lu$simulate(1000, 123, X_n)
+
+lk$save("/tmp/lk.json")
+lu$save("/tmp/lu.json")
 
 #plot(f)
 #points(X_o,y_o,pch=20)
@@ -264,16 +288,12 @@ lsu = lu$simulate(1000, 123, X_n)
 #    #    expect_true(ks.test(lus[i,],lsu[i,])$p.value  > 0.01))
 #}
 
-for (i in 1:nrow(X_n)) {
-    if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
 
-    if (ks.test(lus[i,],lsu[i,])$p.value < 0.01)
-    png("~/test.png",800,800)
+
+for (i in 1:nrow(X_n)) {
     plot(density(lsu[i,]))
     lines(density(lus[i,]),col='red')
-    dev.off()
-
-    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",sd(lsu[i,]),",",sd(lus[i,])),
+    if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
+    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution: ",i,"\n",print(lk),"\n",print(lu)),
         expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 0.01))
-    }
 }

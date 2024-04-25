@@ -97,7 +97,7 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                       parameters = parameters)
     class(nk) <- "NuggetKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit',
+    for (f in c('as.km','as.list','copy','fit','save',
     'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update','assimilate')) {
         eval(parse(text=paste0(
@@ -868,7 +868,7 @@ copy.NuggetKriging <- function(object, ...) {
     nk = nuggetkriging_copy(object)
     class(nk) <- "NuggetKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
+    for (f in c('as.km','as.list','copy','fit','save','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
