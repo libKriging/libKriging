@@ -57,7 +57,7 @@ class PyNuggetKriging {
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
 
-  void update(const py::array_t<double>& newy, const py::array_t<double>& newX);
+  void update(const py::array_t<double>& newy, const py::array_t<double>& newX, const bool refit);
 
   std::string summary() const;
 
