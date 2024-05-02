@@ -134,8 +134,9 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta, const do
   if (m_est_beta) {
     m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
-  } else
-    m.betahat = arma::vec(p, arma::fill::zeros);
+  } else {
+    m.betahat = arma::vec(p, arma::fill::zeros); // whatever: not used
+  }
 
   return m;
 }
@@ -148,22 +149,6 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
                                      NuggetKriging::KModel* model,
                                      std::map<std::string, double>* bench) const {
   // arma::cout << " theta, alpha: " << _theta_alpha.t() << arma::endl;
-  //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikFun.R
-  //   model@covariance <- vect2covparam(model@covariance, param[1:(nparam - 1)])
-  //   model@covariance@sd2 <- 1
-  //   model@covariance@nugget <- 0
-  //   alpha <- param[nparam]
-  //
-  //   aux <- covMatrix(model@covariance, model@X)
-  //   R0 <- aux[[1]] - diag(aux[[2]])
-  //   R <- alpha * R0 + (1 - alpha) * diag(model@n)
-  //
-  //   T <- chol(R)
-  //   x <- backsolve(t(T), model@y, upper.tri = FALSE)
-  //   M <- backsolve(t(T), model@F, upper.tri = FALSE)
-  //   z <- compute.z(x=x, M=M, beta=beta)
-  //   v <- compute.sigma2.hat(z)
-  //   logLik <- -0.5 * (model@n * log(2 * pi * v) + 2*sum(log(diag(T))) + model@n)
 
   arma::uword d = m_X.n_cols;
   double _alpha = _theta_alpha.at(d);
@@ -204,28 +189,6 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   double ll = -0.5 * (n * log(2 * M_PI * (_sigma2 + _nugget)) + 2 * sum(log(m.L.diag())) + n);
 
   if (grad_out != nullptr) {
-    //' @ref https://github.com/cran/DiceKriging/blob/master/R/logLikGrad.R
-    //  logLik.derivative <- matrix(0,nparam,1)
-    //  x <- backsolve(T, z) # x := T^(-1)*z
-    //  Cinv <- chol2inv(T) # Invert R from given T
-
-    //  Cinv.upper <- Cinv[upper.tri(Cinv)]
-    //  xx <- x %*% t(x)
-    //  xx.upper <- xx[upper.tri(xx)]
-    //
-    //  # partial derivative with respect to parameters except sigma^2
-    //  for (k in 1:(nparam - 1)) {
-    //      gradC.k <- covMatrixDerivative(model@covariance, X = model@X, C0 = R0, k = k)
-    //      gradC.k <- alpha * gradC.k
-    //      gradC.k.upper <- gradC.k[upper.tri(gradC.k)]
-    //
-    //      term1 <- sum(xx.upper * gradC.k.upper) / v
-    //      # economic computation of - t(x)%*%gradC.k%*%x / v
-    //      term2 <- -sum(Cinv.upper * gradC.k.upper)
-    //      # economic computation of trace(Cinv%*%gradC.k)
-    //      logLik.derivative[k] <- term1 + term2
-    //  }
-
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);
 
@@ -1131,7 +1094,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (withStd) {
-  ysd2_n = 1 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
+  ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
   ysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
@@ -1249,9 +1212,10 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
  * @param nsim is number of simulations to draw
+ * @param willUpdate is true if we want to keep simulations data for future update
  * @return output is n_n*nsim matrix of simulations at X_n
  */
-LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int seed, const arma::mat& X_n) {
+LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int seed, const arma::mat& X_n, const bool willUpdate) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1278,9 +1242,10 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < n_n; i++) {
     //R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta) * m_alpha;
+      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);// * m_alpha;
     }
   }
+  R_nn *= m_alpha;
   R_nn.diag().ones();
   t0 = Bench::toc(nullptr,"R_nn          ", t0);
 
@@ -1308,7 +1273,8 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
 
-  arma::mat Sigma_nKo = (R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n));
+  arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
+  arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
 
   arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
@@ -1322,27 +1288,209 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   // Un-normalize simulations
   y_n = m_centerY + m_scaleY * y_n;
 
-//  if (will_update) {
-//    sim_yp = yp;
-//    sim_Xn_n = Xn_n;
-//    sim_seed = seed;
-//    sim_n = nsim;
-//  }
+  if (willUpdate) {
+    lastsimup_Xn_u.clear(); // force reset to force update_simulate consider new data
+    lastsim_y_n = y_n;
   
+    lastsim_Xn_n = Xn_n;
+    lastsim_seed = seed;
+    lastsim_nsim = nsim;
+
+    lastsim_R_nn = R_nn;
+    lastsim_F_n = F_n;
+
+    lastsim_L_oCn = Rstar_on;
+    lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
+    t0 = Bench::toc(nullptr,"L_nCn     ", t0);
+
+    lastsim_L_on = arma::join_rows(
+          arma::join_cols(m_T, lastsim_L_oCn.t()),
+          arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
+
+
+    arma::mat Linv_on = LinearAlgebra::solve(lastsim_L_on, arma::mat(n_o+n_n, n_o+n_n,arma::fill::eye));
+    t0 = Bench::toc(nullptr,"Linv_on     ", t0);
+    lastsim_Rinv_on = Linv_on.t() * Linv_on;
+    t0 = Bench::toc(nullptr,"Rinv_on     ", t0);
+
+    lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
+    lastsim_Fstar_on = LinearAlgebra::solve(lastsim_L_on, lastsim_F_on);
+    t0 = Bench::toc(nullptr,"Fstar_on     ", t0);
+    arma::mat Q_Fstar_on;
+    arma::qr(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
+    lastsim_Fcirc_on = LinearAlgebra::rsolve(lastsim_circ_on, lastsim_F_on);
+    t0 = Bench::toc(nullptr,"Fcirc_on     ", t0);
+
+    lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
+    t0 = Bench::toc(nullptr,"Fhat_nKo     ", t0);
+    lastsim_Ecirc_nKo = LinearAlgebra::rsolve(m_circ, F_n - lastsim_Fhat_nKo);
+    t0 = Bench::toc(nullptr,"Ecirc_nKo     ", t0);
+  }
+
+  // Un-normalize simulations
   return y_n;
 }
 
-/** Add new conditional data points to previous (X,y), then perform new fit.
- * @param y_u is n_u length column vector of new output
- * @param X_u is n_u*d matrix of new input
- */
-LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::mat& X_u) {
+LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
 
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
+                             + std::to_string(m_X.n_cols) + "), new X: (...x"
+                             + std::to_string(X_u.n_cols) + ")");
+
+  if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
+    throw std::runtime_error("No previous simulation data available");
+
+  if (lastsim_Xn_n.n_rows != X_u.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
+                             + std::to_string(X_u.n_cols) + "), last sim X: (...x"
+                             + std::to_string(lastsim_Xn_n.n_rows) + ")");
+
+  arma::uword n_n = lastsim_Xn_n.n_cols;
+  arma::uword n_o = m_X.n_rows;
+  arma::uword d = m_X.n_cols;
+  arma::mat Xn_o = trans(m_X);  // already normalized if needed
+  arma::mat Xn_n = lastsim_Xn_n; // already normalized 
+
+  arma::uword n_on = n_o + n_n;
+  //arma::mat Xn_on = arma::join_cols(Xn_o, Xn_n);
+  arma::mat F_on = arma::join_cols(m_F, lastsim_F_n);
+
+  arma::uword n_u = X_u.n_rows;
+  // Normalize X_u
+  arma::mat Xn_u = X_u;
+  Xn_u.each_row() -= m_centerX;
+  Xn_u.each_row() /= m_scaleX;
+
+  // Define regression matrix
+  arma::mat F_u = Trend::regressionModelMatrix(m_regmodel, Xn_u);
+
+  auto t0 = Bench::tic();
+  Xn_u = trans(Xn_u);
+  t0 = Bench::toc(nullptr,"Xn_u.t()      ", t0);
+
+  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
+  if (! use_lastsimup) {
+    lastsimup_Xn_u = Xn_u;
+  
+    double m_alpha = m_sigma2 / (m_sigma2 + m_nugget);
+
+    // Compute covariance between updated data
+    lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
+    for (arma::uword i = 0; i < n_u; i++) {
+      //lastsimup_R_uu.at(i, i) = 1.0;
+      for (arma::uword j = 0; j < i; j++) {
+        lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
+      }
+    }
+    lastsimup_R_uu *= m_alpha;
+    lastsimup_R_uu.diag().ones();
+    t0 = Bench::toc(nullptr,"R_uu          ", t0);
+  
+    // Compute covariance between updated/old data
+    lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
+    for (arma::uword i = 0; i < n_u; i++) {
+      for (arma::uword j = 0; j < n_o; j++) {
+        lastsimup_R_uo.at(i, j) = Cov((Xn_u.col(i) - Xn_o.col(j)), m_theta);
+      }
+    }
+    lastsimup_R_uo *= m_alpha;
+    t0 = Bench::toc(nullptr,"R_uo          ", t0);
+  
+    // Compute covariance between updated/new data
+    lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
+    for (arma::uword i = 0; i < n_u; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        lastsimup_R_un.at(i, j) = Cov((Xn_u.col(i) - Xn_n.col(j)), m_theta);
+      }
+    }
+    lastsimup_R_un *= m_alpha;
+    t0 = Bench::toc(nullptr,"R_un          ", t0);
+  }
+
+  // ======================================================================
+  // FOXY step #1 Extend the simulation to the design 'X_u' IF
+  // NECESSARY. Remind that the simulation number j is
+  // conditional on the given 'y_o' and on 'y_n = Y_sim[ , j]'
+  //
+  // CAUTION. To avoid unnecessary re-computations we here use
+  // auxiliary variables that where computed in the creation of
+  // the KM0 step AND later in the simulation. The first ones are
+  // in 'theKM0$Extra' and the second ones are in 'Ex'
+  //
+  // In indices 'C' means comma and 'K' means pipe '|'
+  //
+  // ======================================================================
+
+  if (!use_lastsimup) {
+    arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
+    arma::mat Rstar_onCu = LinearAlgebra::solve(lastsim_L_on, R_onCu);
+    t0 = Bench::toc(nullptr,"Rstar_onCu          ", t0);
+
+    arma::mat Ecirc_uKon = LinearAlgebra::rsolve(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
+    t0 = Bench::toc(nullptr,"Ecirc_uKon          ", t0);
+  
+    arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
+    t0 = Bench::toc(nullptr,"Sigma_uKon          ", t0);
+
+    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
+    t0 = Bench::toc(nullptr,"LSigma_uKon          ", t0);
+  
+    arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
+    t0 = Bench::toc(nullptr,"W_uCon          ", t0);
+
+    arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
+    arma::mat M_u = arma::repmat(m_u,1,lastsim_nsim) +  W_uCon.tail_cols(n_n) * lastsim_y_n;
+    
+    Random::reset_seed(lastsim_seed);
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim);// * std::sqrt(m_sigma2);    
+    t0 = Bench::toc(nullptr,"y_u          ", t0);
+  }
+
+  // ======================================================================
+  // FOXY step #2   Update the simulated paths on 'X_n'
+  // ======================================================================
+
+  if (!use_lastsimup) {
+    arma::mat Rstar_ou = LinearAlgebra::solve(m_T, lastsimup_R_uo.t());
+    t0 = Bench::toc(nullptr,"Rstar_ou          ", t0);
+
+    arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ,F_u - Fhat_uKo);
+    t0 = Bench::toc(nullptr,"Ecirc_uKo          ", t0);
+
+    arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
+    t0 = Bench::toc(nullptr,"Rtild_uCu          ", t0);
+    
+    arma::mat Rtild_nCu = lastsimup_R_un.t() - lastsim_L_oCn.t() * Rstar_ou + lastsim_Ecirc_nKo * Ecirc_uKo.t(); 
+    t0 = Bench::toc(nullptr,"Rtild_nCu          ", t0);
+
+    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu.t()).t();
+    t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);
+  }
+
+  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u,1,lastsim_nsim) - lastsimup_y_u);  
+}
+/** Add new conditional data points to previous (X,y), then perform new fit.
+ * @param y_u is n_u length column vector of new output
+ * @param X_u is n_u*d matrix of new input
+ * @param refit is true if we want to re-fit the model
+ */
+LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
+                             + std::to_string(m_X.n_cols) + "), new X: (...x"
+                             + std::to_string(X_u.n_cols) + ")");
   // rebuild starting parameters
   Parameters parameters;
+  if (refit) {// re-fit
   if (m_est_beta)
     parameters = Parameters{
                         std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
@@ -1363,8 +1511,6 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
                         this->m_est_theta,
                         std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         false};
-  // re-fit
-
   this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                             y_u),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
@@ -1373,49 +1519,25 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
             m_optim,
             m_objective,
             parameters);
-}
-
-/** Add new conditional data points to previous (X,y), do not perform new fit.
- * @param y_u is n_u length column vector of new output
- * @param X_u is n_u*d matrix of new input
- */
-LIBKRIGING_EXPORT void NuggetKriging::assimilate(const arma::vec& y_u, const arma::mat& X_u) {
-  if (y_u.n_elem != X_u.n_rows)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
-                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
-
-  // rebuild starting parameters
-  Parameters parameters;
-  if (m_est_beta)
+  } else {// just update
     parameters = Parameters{
                         std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_nugget,
+                        false,
                         std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_sigma2,
+                        false,
                         std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
+                        false,
                         std::make_optional(arma::ones<arma::vec>(0)),
-                        true};
-  else 
-    parameters = Parameters{
-                        std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_nugget,
-                        std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
                         false};
-
-  // NO re-fit
   this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                             y_u),  // de-normalize previous data according to suite unnormed new data
             arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
             m_regmodel,
             m_normalize,
-            "none", // do no optimize: stay on current theta, so update_Chol will be used (faster than scratch chol)
+            "none",
             m_objective,
             parameters);
+  }
 }
 
 LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
@@ -1482,15 +1604,18 @@ void NuggetKriging::save(const std::string filename) const {
   j["centerY"] = m_centerY;
   j["scaleY"] = m_scaleY;
   j["normalize"] = m_normalize;
-
   j["regmodel"] = Trend::toString(m_regmodel);
   j["optim"] = m_optim;
   j["objective"] = m_objective;
+  // Auxiliary data
   j["dX"] = to_json(m_dX);
+  j["maxdX"] = to_json(m_maxdX);
   j["F"] = to_json(m_F);
   j["T"] = to_json(m_T);
   j["R"] = to_json(m_R);
   j["M"] = to_json(m_M);
+  j["star"] = to_json(m_star);
+  j["circ"] = to_json(m_circ);
   j["z"] = to_json(m_z);
   j["beta"] = to_json(m_beta);
   j["est_beta"] = m_est_beta;
@@ -1535,11 +1660,15 @@ NuggetKriging NuggetKriging::load(const std::string filename) {
 
   kr.m_optim = j["optim"].template get<decltype(kr.m_optim)>();
   kr.m_objective = j["objective"].template get<decltype(kr.m_objective)>();
+  // Auxiliary data
   kr.m_dX = mat_from_json(j["dX"]);
+  kr.m_maxdX = colvec_from_json(j["maxdX"]);
   kr.m_F = mat_from_json(j["F"]);
   kr.m_T = mat_from_json(j["T"]);
   kr.m_R = mat_from_json(j["R"]);
   kr.m_M = mat_from_json(j["M"]);
+  kr.m_star = mat_from_json(j["star"]);
+  kr.m_circ = mat_from_json(j["circ"]);
   kr.m_z = colvec_from_json(j["z"]);
   kr.m_beta = colvec_from_json(j["beta"]);
   kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();

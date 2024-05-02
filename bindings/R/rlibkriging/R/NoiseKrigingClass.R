@@ -3,8 +3,27 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
-
-
+#' Shortcut to provide functions to the S3 class "NoiseKriging"
+#' @param nk A pointer to a C++ object of class "NoiseKriging"
+#' @return An object of class "NoiseKriging" with methods to access and manipulate the data
+classNoiseKriging <- function(nk) {
+    class(nk) <- "NoiseKriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in c('as.km','as.list','copy','fit','save',
+    'logLikelihood','logLikelihoodFun',
+    'predict','print','show','simulate','update','update_simulate')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() noisekriging_", d, "(nk)"
+            )))
+    }
+    nk
+}
 
 #' Create an object with S3 class \code{"NoiseKriging"} using
 #' the \pkg{libKriging} library.
@@ -90,22 +109,7 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                       optim = optim,
                       objective = objective,
                       parameters = parameters)
-    class(nk) <- "NoiseKriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
-    'logLikelihood','logLikelihoodFun',
-    'predict','print','show','simulate','update','update_simulate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() noisekriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classNoiseKriging(nk))
 }
 
 
@@ -432,6 +436,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
+#' @param will_update Compute useful data for future update_simulate call
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{length(x)} rows and \code{nsim}
@@ -560,7 +565,8 @@ update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
 #' ## change the content of the object 'k'
 #' update(k, y_u, rep(0.1^2,3), X_u)
 #'
-#' x <- seq(from = 0, to = 1, length.out = 101)
+#' ## include design points to see interpolation
+#' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101)))
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
@@ -653,7 +659,7 @@ load.NoiseKriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
-    return( noisekriging_load(filename) )
+    return(classNoiseKriging(noisekriging_load(filename)))
 }
 
 
@@ -675,6 +681,7 @@ load.NoiseKriging <- function(filename, ...) {
 #' @export
 #' @aliases logLikelihoodFun,NoiseKriging,NoiseKriging-method
 #'
+#' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 #' set.seed(123)
 #' X <- as.matrix(runif(10))
@@ -779,21 +786,5 @@ logLikelihood.NoiseKriging <- function(object, ...) {
 #' print(copy(k))
 copy.NoiseKriging <- function(object, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    nk = noisekriging_copy(object)
-    class(nk) <- "NoiseKriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
-    'logLikelihood','logLikelihoodFun',
-    'predict','print','show','simulate','update','update_simulate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','noise','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() kriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classNoiseKriging(noisekriging_copy(object)))
 }

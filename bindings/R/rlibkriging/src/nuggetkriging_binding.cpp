@@ -337,25 +337,36 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, b
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X) {
+arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim, seed, X);
+  return impl_ptr->simulate(nsim, seed, X, willUpdate);
 }
 
 // [[Rcpp::export]]
-void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X) {
+arma::mat nuggetkriging_update_simulate(Rcpp::List k, arma::vec y, arma::mat X) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  impl_ptr->update(y, X);
+  return impl_ptr->update_simulate(y, X);
+}
+
+// [[Rcpp::export]]
+void nuggetkriging_update(Rcpp::List k, arma::vec y, arma::mat X, bool refit = true) {
+  if (!k.inherits("NuggetKriging"))
+    Rcpp::stop("Input must be a NuggetKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
+
+  impl_ptr->update(y, X, refit);
 
   // Rcpp::List obj;
   // obj.attr("object") = impl_ptr;

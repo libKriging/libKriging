@@ -1,5 +1,5 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -8,7 +8,7 @@ plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
 y_o <- f(X_o)
-points(X_o, y_o)
+points(X_o, y_o,pch=16)
 
 lk <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
@@ -18,7 +18,7 @@ lk <- Kriging(y = matrix(y_o, ncol = 1),
               #normalize = TRUE,
               parameters = list(theta = matrix(0.1)))
 
-## Predict & simulate
+## Ckeck consistency bw predict & simulate
 
 lp = lk$predict(seq(0,1,,21)) # libK predict
 lines(seq(0,1,,21),lp$mean,col='red')
@@ -35,7 +35,7 @@ for (i in 1:21) {
         expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
 }
 
-## Update
+## Check consistency when update
 
 X_u = c(.4,.6)
 y_u = f(X_u)
@@ -49,7 +49,7 @@ l2 = Kriging(y = matrix(c(y_o,y_u),ncol=1),
               parameters = list(theta = matrix(0.1)))
 
 lu = copy(lk)
-update(lu, y_u,X_u)
+lu$update(y_u,X_u)
 
 ## Update, predict & simulate
 
@@ -88,15 +88,17 @@ y_u = f(X_u)
 
 ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
+lus = NULL
 lus = lk$update_simulate(y_u, X_u)
 
 lu = copy(lk)
 lu$update(y_u, matrix(X_u,ncol=1), refit=FALSE)
+lsu = NULL
 lsu = lu$simulate(1000, 123, X_n)
 
 plot(f)
-points(X_o,y_o,pch=20)
-points(X_u,y_u,col='red',pch=20)
+points(X_o,y_o,pch=16)
+points(X_u,y_u,col='red',pch=16)
 for (i in 1:ncol(lus)) {
     lines(seq(0,1,,21),ls[,i],col=rgb(0,0,0,.1),lwd=4)
     lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
@@ -119,7 +121,8 @@ for (i in 1:length(X_n)) {
 }
 
 for (i in 1:length(X_n)) {
-    plot(density(lsu[i,]))
+    plot(density(ls[i,]))
+    lines(density(lsu[i,]),col='orange')
     lines(density(lus[i,]),col='red')
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc="updated,simulated sample follows simulated,updated distribution",
@@ -144,11 +147,12 @@ f <- function(X) apply(X, 1,
 n <- 100
 d <- 2
 
+set.seed(1234)
 X_o <- matrix(runif(n*d),ncol=d) #seq(from = 0, to = 1, length.out = n)
 y_o <- f(X_o)
 #points(X_o, y_o)
 
-lk <- Kriging(y = y_o,
+lkd <- Kriging(y = y_o,
               X = X_o,
               kernel = "gauss",
               regmodel = "linear",
@@ -157,24 +161,23 @@ lk <- Kriging(y = y_o,
               parameters = list(theta = matrix(rep(0.1,d))))
 
 ## Predict & simulate
+X_n = matrix(runif(100),ncol=d) #seq(0,1,,)
 
-X_n = matrix(runif(100),ncol=2) #seq(0,1,,)
-
-lp = lk$predict(X_n) # libK predict
+lpd = lkd$predict(X_n) # libK predict
 #lines(seq(0,1,,21),lp$mean,col='red')
 #polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(100, 123, X_n) # libK simulate
+lsd = lkd$simulate(1000, 123, X_n) # libK simulate
 #for (i in 1:100) {
 #    lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
 #}
 
 for (i in 1:nrow(X_n)) {
-    m = lp$mean[i,]
-    s = lp$stdev[i,]
+    m = lpd$mean[i,]
+    s = lpd$stdev[i,]
     if (s > 1e-2) # otherwise means that density is ~ dirac, so don't test
     test_that(desc="simulate sample follows predictive distribution",
-        expect_true(ks.test(ls[i,],"pnorm",mean=m,sd=s)$p.value > 0.01))
+        expect_true(ks.test(lsd[i,],"pnorm",mean=m,sd=s)$p.value > 0.01))
 }
 
 ### Update
@@ -218,9 +221,9 @@ for (i in 1:nrow(X_n)) {
 #    mu = lpu$mean[i,]
 #    su = lpu$stdev[i,]
 #    test_that(desc="simulate sample follows predictive distribution",
-#        expect_true(ks.test(ls2[i,] - m2,"rnorm",mean=m2,sd=s2)$p.value  > 0.01))
+#        expect_true(ks.test(ls2[i,] - m2,"pnorm",mean=m2,sd=s2)$p.value  > 0.01))
 #    test_that(desc="simulate sample follows predictive distribution",
-#        expect_true(ks.test(lsu[i,] - mu,"rnorm",mean=mu,sd=su)$p.value  > 0.01))
+#        expect_true(ks.test(lsu[i,] - mu,"pnorm",mean=mu,sd=su)$p.value  > 0.01))
 #}
 #
 #
@@ -228,18 +231,25 @@ for (i in 1:nrow(X_n)) {
 ## Update simulate
 
 i_u = c(9,13,25,43,42,35,24)
-X_u = X_n[i_u,]# c(.4,.6)
+X_u = X_n[i_u,,drop=FALSE]# c(.4,.6)
 y_u = f(X_u)
 
-ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
-#y_u = rs[i_u,1] # force matching 1st sim
-lus = NULL
-lus = lk$update_simulate(y_u, X_u)
+X_n = rbind(X_u+1e-2,X_n) # add some noise to avoid degenerate cases
 
-lu = copy(lk)
-lu$update(matrix(y_u,ncol=1), X_u, refit=FALSE)
-lsu = NULL
-lsu = lu$simulate(1000, 123, X_n)
+#lkd0 = rlibkriging:::load.Kriging("/tmp/lkd.json")
+lsd = lkd$simulate(1000, 123, X_n, will_update=TRUE)
+#y_u = rs[i_u,1] # force matching 1st sim
+lusd = NULL
+lusd = lkd$update_simulate(y_u, X_u)
+
+lud = copy(lkd)
+lud$update(matrix(y_u,ncol=1), X_u, refit=FALSE)
+#lud0 = rlibkriging:::load.Kriging("/tmp/lud.json")
+lsud = NULL
+lsud = lud$simulate(1000, 123, X_n)
+
+#lkd$save("/tmp/lkd.json")
+#lud$save("/tmp/lud.json")
 
 #plot(f)
 #points(X_o,y_o,pch=20)
@@ -265,15 +275,11 @@ lsu = lu$simulate(1000, 123, X_n)
 #}
 
 for (i in 1:nrow(X_n)) {
-    if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
-
-    if (ks.test(lus[i,],lsu[i,])$p.value < 0.01)
-    png("~/test.png",800,800)
-    plot(density(lsu[i,]))
-    lines(density(lus[i,]),col='red')
-    dev.off()
-
-    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",sd(lsu[i,]),",",sd(lus[i,])),
-        expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 0.01))
+    plot(density(lsd[i,]))
+    lines(density(lsud[i,]),col='orange')
+    lines(density(lusd[i,]),col='red')
+    if (sd(lsud[i,])>1e-3 && sd(lusd[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
+    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",sd(lsud[i,]),",",sd(lusd[i,])),
+        expect_gt(ks.test(lusd[i,],lsud[i,])$p.value, 0.01))
     }
 }

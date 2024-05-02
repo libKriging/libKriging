@@ -3,6 +3,28 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
+#' Shortcut to provide functions to the S3 class "Kriging"
+#' @param nk A pointer to a C++ object of class "Kriging"
+#' @return An object of class "Kriging" with methods to access and manipulate the data
+classKriging <- function(nk) {
+    class(nk) <- "Kriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in c('as.km','as.list','copy','fit','save',
+    'leaveOneOut','leaveOneOutFun','leaveOneOutVec',
+    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'predict','print','show','simulate','update', 'update_simulate')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() kriging_", d, "(nk)"
+            )))
+    }
+    nk
+}
 
 #' Create an object with S3 class \code{"Kriging"} using
 #' the \pkg{libKriging} library.
@@ -90,23 +112,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       optim = optim,
                       objective = objective,
                       parameters = parameters)
-    class(nk) <- "Kriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
-    'leaveOneOut','leaveOneOutFun','leaveOneOutVec',
-    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','print','show','simulate','update', 'update_simulate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() kriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classKriging(nk))
 }
 
 
@@ -652,7 +658,7 @@ load.Kriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
-    return( kriging_load(filename) )
+    return(classKriging( kriging_load(filename)))
 }
 
 #' Compute Log-Likelihood of Kriging Model
@@ -1015,21 +1021,5 @@ logMargPost.Kriging <- function(object, ...) {
 #' print(copy(k))
 copy.Kriging <- function(object, ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
-  nk = kriging_copy(object)
-  class(nk) <- "Kriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
-    'leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','print','show','simulate','update','update_simulate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() kriging_", d, "(nk)"
-            )))
-    }
-    nk
+  return(classKriging(kriging_copy(object)))
 }

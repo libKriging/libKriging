@@ -3,8 +3,27 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
-
-
+#' Shortcut to provide functions to the S3 class "NuggetKriging"
+#' @param nk A pointer to a C++ object of class "NuggetKriging"
+#' @return An object of class "NuggetKriging" with methods to access and manipulate the data
+classNuggetKriging <-function(nk) {
+    class(nk) <- "NuggetKriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in c('as.km','as.list','copy','fit','save',
+    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'predict','print','show','simulate','update','update_simulate')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() nuggetkriging_", d, "(nk)"
+            )))
+    }
+    nk
+}
 
 #' Create an object with S3 class \code{"NuggetKriging"} using
 #' the \pkg{libKriging} library.
@@ -16,28 +35,21 @@
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param y Numeric vector of response values.
-#'
 #' @param X Numeric matrix of input design.
-#'
 #' @param kernel Character defining the covariance model:
 #'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
-#'
 #' @param regmodel Universal NuggetKriging linear trend.
-#'
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"},
 #'     the later simply keeping
 #'     the values given in \code{parameters}. The method
 #'     \code{"BFGS"} uses the gradient of the objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood and \code{"LMP"} for the Log-Marginal Posterior.
-#'
 #' @param parameters Initial values for the hyper-parameters. When provided this
 #'     must be named list with some elements \code{"sigma2"}, \code{"theta"}, \code{"nugget"}
 #'     containing the initial value(s) for the variance, range and nugget
@@ -95,22 +107,7 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                       optim = optim,
                       objective = objective,
                       parameters = parameters)
-    class(nk) <- "NuggetKriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
-    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','print','show','simulate','update','assimilate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() nuggetkriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classNuggetKriging(nk))
 }
 
 
@@ -154,10 +151,8 @@ as.list.NuggetKriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param x An object with S3 class \code{"NuggetKriging"}.
-#'
 #' @param .call Force the \code{call} slot to be filled in the
 #'     returned \code{km} object.
-#'
 #' @param ... Not used.
 #'
 #' @return An object of having the S4 class \code{"KM"} which extends
@@ -312,13 +307,11 @@ print.NuggetKriging <- function(x, ...) {
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and \code{"none"},
 #'     the later simply keeping
 #'     the values given in \code{parameters}. The method
 #'     \code{"BFGS"} uses the gradient of the objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood and \code{"LMP"} for the Log-Marginal Posterior.
@@ -381,18 +374,13 @@ fit.NuggetKriging <- function(object, y, X,
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 NuggetKriging object.
-#'
 #' @param x Input points where the prediction must be computed.
-#'
 #' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#'
 #' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#'
 #' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
-#'
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -449,6 +437,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
+#' @param will_update Compute useful data for future update_simulate call
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{length(x)} rows and \code{nsim}
@@ -462,6 +451,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #'     \pkg{Octave} interfaces to \pkg{libKriging}.
 #'
 #'
+#' @importFrom stats runif
 #' @method simulate NuggetKriging
 #' @export
 #'
@@ -481,7 +471,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
+simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)
@@ -491,20 +481,52 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x))
+    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, willUpdate = will_update))
 }
 
+#' Update previous simulation of a \code{NuggetKriging} model object.
+#'
+#' This method draws paths of the stochastic process conditional on the values at the input points used in the
+#' fit, plus the new input points and their values given as argument (knonw as 'update' points).
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object S3 NuggetKriging object.
+#' @param y_u Numeric vector of new responses (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param ... Ignored.
+#'
+#' @return a matrix with \code{length(x)} rows and \code{nsim}
+#'     columns containing the simulated paths at the inputs points
+#'     given in \code{x}.
+#'
+#' @method update_simulate NuggetKriging
+#' @export
+update_simulate.NuggetKriging <- function(object, y_u, X_u, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- nuggetkriging_model(object)
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
+
+    ## Modify 'object' in the parent environment
+    return(nuggetkriging_update_simulate(object, y_u, X_u))
+}
 
 #' Update a \code{NuggetKriging} model object with new points
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 NuggetKriging object.
-#'
-#' @param newy Numeric vector of new responses (output).
-#'
-#' @param newX Numeric matrix of new input points.
-#'
+#' @param y_u Numeric vector of new responses (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is FALSE).
 #' @param ... Ignored.
 #'
 #' @return No return value. NuggetKriging object argument is modified.
@@ -536,12 +558,12 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
 #'
-#' newX <- as.matrix(runif(3))
-#' newy <- f(newX) + 0.1 * rnorm(nrow(newX))
-#' points(newX, newy, col = "red")
+#' X_u <- as.matrix(runif(3))
+#' y_u <- f(X_u) + 0.1 * rnorm(nrow(X_u))
+#' points(X_u, y_u, col = "red")
 #'
 #' ## change the content of the object 'k'
-#' update(k, newy, newX)
+#' update(k, y_u, X_u)
 #'
 #' ## include design points to see interpolation
 #' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101)))
@@ -549,21 +571,21 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.NuggetKriging <- function(object, newy, newX, ...) {
+update.NuggetKriging <- function(object, y_u, X_u, refit=TRUE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
-    if (is.data.frame(newX)) newX = data.matrix(newX)
-    if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
-    if (is.data.frame(newy)) newy = data.matrix(newy)
-    if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
-    if (ncol(newX) != ncol(k$X))
-        stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
-             ncol(newX), ")")
-    if (nrow(newy) != nrow(newX))
-        stop("Objects 'newX' and 'newy' must have the same number of rows.")
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    nuggetkriging_update(object, newy, newX)
+    nuggetkriging_update(object, y_u, X_u, refit)
 
     invisible(NULL)
 }
@@ -635,7 +657,7 @@ load.NuggetKriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
-    return( nuggetkriging_load(filename) )
+    return(classNuggetKriging(nuggetkriging_load(filename)))
 }
 
 
@@ -865,19 +887,5 @@ logMargPost.NuggetKriging <- function(object, ...) {
 #' print(copy(k))
 copy.NuggetKriging <- function(object, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    nk = nuggetkriging_copy(object)
-    class(nk) <- "NuggetKriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update','assimilate')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','nugget','is_nugget_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() kriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classNuggetKriging(nuggetkriging_copy(object)))
 }

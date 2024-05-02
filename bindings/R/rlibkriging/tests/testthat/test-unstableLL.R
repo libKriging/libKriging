@@ -1,8 +1,8 @@
 # pack=list.files(file.path("bindings","R"),pattern = ".tar.gz",full.names = T)
 # install.packages(pack,repos=NULL)
 # library(rlibkriging)
- library(rlibkriging, lib.loc="bindings/R/Rlibs")
- library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
  
  context("Fit: unstable LL (long range with 1D Gauss kernel)")
 
@@ -30,6 +30,7 @@ lines(xx, k$predict(xx)$mean)
 
 # Build Kriging (https://libkriging.readthedocs.io/en/latest/math/KrigingModels.html)
 #rlibkriging:::optim_log(4)
+rlibkriging:::linalg_check_chol_rcond(TRUE)
 k <- Kriging(y, X, kernel="gauss", optim="BFGS")
 #DiceView::sectionview(k,add=TRUE,col_surf='orange')
 

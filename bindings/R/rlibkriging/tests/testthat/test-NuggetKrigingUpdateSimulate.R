@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -7,18 +7,18 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-noise = 0.05^2
-y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
+nugget = 0.05^2
+set.seed(1234)
+y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o,pch=16)
 
-lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
-              noise = matrix(rep(noise, n), ncol = 1),
+lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.5^2))
 
 
 
@@ -46,20 +46,18 @@ for (i in 1:21) {
 ## Check consistency when update
 
 X_u = c(.4,.6)
-y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
-noise_u = rep(noise, length(X_u))
+y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
 # new Kriging model from scratch
-l2 = NoiseKriging(y = matrix(c(y_o,y_u),ncol=1),
-                noise = matrix(c(rep(noise,n),noise_u),ncol=1),
+l2 = NuggetKriging(y = matrix(c(y_o,y_u),ncol=1),
              X = matrix(c(X_o,X_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.5^2))
 
 lu = copy(lk)
-lu$update(y_u, noise_u, X_u)
+lu$update(y_u, X_u)
 
 
 ## Update, predict & simulate
@@ -97,32 +95,33 @@ for (i in 1:21) {
 X_n = seq(0,1,,21)
 i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
-y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
-noise_u = rep(noise, length(X_u))
+y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
-ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
+X_n = sort(c(X_u+1e-2,X_n)) # add some nugget to avoid degenerate cases
+
+ls = lk$simulate(100, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus=NULL
-lus = lk$update_simulate(y_u, noise_u, X_u)
+lus = lk$update_simulate(y_u,  X_u)
 
 lu = copy(lk)
-lu$update(y_u, noise_u, matrix(X_u,ncol=1), refit=FALSE)
+lu$update(y_u,  matrix(X_u,ncol=1), refit=FALSE)
 lsu=NULL
-lsu = lu$simulate(1000, 123, X_n)
+lsu = lu$simulate(100, 123, X_n)
 
 plot(f)
 points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
-    lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
+    lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(nugget),y_o[i]-2*sqrt(nugget)),col='black',lwd=4)
 }
 points(X_u,y_u,col='red',pch=16)
 for (i in 1:length(X_u)) {
-    lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(noise),y_u[i]-2*sqrt(noise)),col='red',lwd=4)
+    lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(nugget),y_u[i]-2*sqrt(nugget)),col='red',lwd=4)
 }
 for (i in 1:ncol(lus)) {
-    lines(seq(0,1,,21),ls[,i],col=rgb(0,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+    lines(X_n,ls[,i],col=rgb(0,0,0,.1),lwd=4)
+    lines(X_n,lus[,i],col=rgb(1,0,0,.1),lwd=4)
+    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 }
 
 for (i in 1:length(X_n)) {
@@ -174,17 +173,16 @@ d <- 2
 
 set.seed(1234)
 X_o <- matrix(runif(n*d),ncol=d) #seq(from = 0, to = 1, length.out = n)
-y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
+y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
 #points(X_o, y_o)
 
-lkd <- NoiseKriging(y = y_o,
-              noise = rep(noise,n),
+lkd <- NuggetKriging(y = y_o,
               X = X_o,
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(rep(0.1,d)), sigma2 = 0.1^2))
+              parameters = list(theta = matrix(rep(0.1,d))^2, nugget=nugget, sigma2=0.5^2))
 
 ## Predict & simulate
 
@@ -259,18 +257,18 @@ for (i in 1:nrow(X_n)) {
 
 i_u = c(9,13,25,43,42,35,24)
 X_u = X_n[i_u,,drop=FALSE]# c(.4,.6)
-y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(noise))
+y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(nugget))
 
-X_n = rbind(X_u+1e-2,X_n) # add some noise to avoid degenerate cases
+X_n = rbind(X_u+1e-2,X_n) # add some nugget to avoid degenerate cases
 
-#lk = rlibkriging:::load.NoiseKriging("/tmp/lk.json")
+#lk = rlibkriging:::load.NuggetKriging("/tmp/lk.json")
 lsd = lkd$simulate(1000, 123, X_n, will_update=TRUE)
 lusd = NULL
-lusd = lkd$update_simulate(y_u, rep(noise,length(y_u)), X_u)
+lusd = lkd$update_simulate(y_u, X_u)
 
 lud = copy(lkd)
-lud$update(matrix(y_u,ncol=1), rep(noise,length(y_u)), X_u, refit=FALSE)
-#lu = rlibkriging:::load.NoiseKriging("/tmp/lu.json")
+lud$update(matrix(y_u,ncol=1), X_u, refit=FALSE)
+#lu = rlibkriging:::load.NuggetKriging("/tmp/lu.json")
 lsud = NULL
 lsud = lud$simulate(1000, 123, X_n)
 

@@ -46,8 +46,8 @@ points(as.list(r)$theta[1],as.list(r)$theta[2])
 
 for (.t1 in t) for (.t2 in t) {
   llg = logLikelihoodFun(r,c(.t1,.t2,l$sigma2),grad=T)$logLikelihoodGrad
-  if (llg[1] == 0 && llg[2] == 0) next
-    arrows(.t1,.t2, .t1+0.001*llg[1],.t2+0.001*llg[2],col='red') 
+  if (sum(llg[1:2]^2)<0.01) next
+  arrows(.t1,.t2, .t1+0.001*llg[1],.t2+0.001*llg[2],col='red') 
 }
 
 # logLikelihoodFun(r,t(as.list(r)$theta))

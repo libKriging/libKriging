@@ -1607,6 +1607,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   y_n = m_centerY + m_scaleY * y_n;
 
   if (willUpdate) {
+    lastsimup_Xn_u.clear(); // force reset to force update_simulate consider new data
     lastsim_y_n = y_n;
 
     lastsim_Xn_n = Xn_n;
@@ -1689,18 +1690,19 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   Xn_u = trans(Xn_u);
   t0 = Bench::toc(nullptr,"Xn_u.t()      ", t0);
 
-  bool use_lastsimup = arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
+  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
   if (! use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
   
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
-      lastsimup_R_uu.at(i, i) = 1.0;
+      //lastsimup_R_uu.at(i, i) = 1.0;
       for (arma::uword j = 0; j < i; j++) {
         lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
       }
     }
+    lastsimup_R_uu.diag().ones();
     t0 = Bench::toc(nullptr,"R_uu          ", t0);
   
     // Compute covariance between updated/old data
@@ -1906,15 +1908,18 @@ void Kriging::save(const std::string filename) const {
   j["centerY"] = m_centerY;
   j["scaleY"] = m_scaleY;
   j["normalize"] = m_normalize;
-
   j["regmodel"] = Trend::toString(m_regmodel);
   j["optim"] = m_optim;
   j["objective"] = m_objective;
+  // Auxiliary data
   j["dX"] = to_json(m_dX);
+  j["maxdX"] = to_json(m_maxdX);
   j["F"] = to_json(m_F);
   j["T"] = to_json(m_T);
   j["R"] = to_json(m_R);
   j["M"] = to_json(m_M);
+  j["star"] = to_json(m_star);
+  j["circ"] = to_json(m_circ);
   j["z"] = to_json(m_z);
   j["beta"] = to_json(m_beta);
   j["est_beta"] = m_est_beta;
@@ -1957,11 +1962,15 @@ Kriging Kriging::load(const std::string filename) {
 
   kr.m_optim = j["optim"].template get<decltype(kr.m_optim)>();
   kr.m_objective = j["objective"].template get<decltype(kr.m_objective)>();
+  // Auxiliary data
   kr.m_dX = mat_from_json(j["dX"]);
+  kr.m_maxdX = colvec_from_json(j["maxdX"]);
   kr.m_F = mat_from_json(j["F"]);
   kr.m_T = mat_from_json(j["T"]);
   kr.m_R = mat_from_json(j["R"]);
   kr.m_M = mat_from_json(j["M"]);
+  kr.m_star = mat_from_json(j["star"]);
+  kr.m_circ = mat_from_json(j["circ"]);
   kr.m_z = colvec_from_json(j["z"]);
   kr.m_beta = colvec_from_json(j["beta"]);
   kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
