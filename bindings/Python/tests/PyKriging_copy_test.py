@@ -18,11 +18,13 @@ def test_copied_kriging_returns_same_result():
 
     x = np.arange(0, 1, 1 / 99)
 
-    p1 = rl1.predict(x, True, False, True)
+    p1 = rl1.predict(x, True, True, True)
     p1 = {"mean": p1[0], "stdev": p1[1], "cov": p1[2], "mean_deriv": p1[3], "stdev_deriv": p1[4]}
+    p1["stdev_deriv"] = p1["stdev_deriv"][p1["stdev_deriv"] != 'nan'] # not derivable at design points
 
-    p2 = rl2.predict(x, True, False, True)
+    p2 = rl2.predict(x, True, True, True)
     p2 = {"mean": p2[0], "stdev": p2[1], "cov": p2[2], "mean_deriv": p2[3], "stdev_deriv": p2[4]}
+    p2["stdev_deriv"] = p2["stdev_deriv"][p1["stdev_deriv"] != 'nan'] # not derivable at design points
 
     assert np.array_equal(p1["mean"], p2["mean"])
     assert np.array_equal(p1["stdev"], p2["stdev"])
@@ -49,7 +51,7 @@ def test_copied_and_changed_kriging_returns_different_result():
     p1 = rl1.predict(x, True, False, False)
     p1 = {"mean": p1[0], "stdev": p1[1], "cov": p1[2], "mean_deriv": p1[3], "stdev_deriv": p1[4]}
 
-    rl2.update([0.6], [f(0.6)], True)
+    rl2.update([f(0.6)], [0.6], True)
     p2 = rl2.predict(x, True, False, False)
     p2 = {"mean": p2[0], "stdev": p2[1], "cov": p2[2], "mean_deriv": p2[3], "stdev_deriv": p2[4]}
 
