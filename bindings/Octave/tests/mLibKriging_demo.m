@@ -36,7 +36,7 @@ catch
 end
 % close(h);
 
-s = k_m.simulate(int32(10),int32(123), x, False);
+s = k_m.simulate(int32(10),int32(123), x, false);
 
 if (isOctave)
     h = figure(2, 'Visible','off'); % no display
@@ -61,5 +61,5 @@ end
 Xn = [0.3;0.4];
 yn = f(Xn);
 disp(k_m.summary());
-k_m.update(yn, Xn, True)
+k_m.update(yn, Xn, true)
 disp(k_m.summary());
