@@ -13,7 +13,7 @@ disp(k_m.summary());
 
 % session
 x = reshape(0:(1/99):1,100,1);
-[p_mean, p_stdev] = k_m.predict(x, true, false);
+[p_mean, p_stdev] = k_m.predict(x, true, false, false);
 if (isOctave)
     h = figure(1, 'Visible','off'); % no display
 else
