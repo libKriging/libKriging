@@ -8,7 +8,7 @@ def test_copied_kriging_returns_same_result():
     f = lambda x: (1 - 1 / 2 * (np.sin(12 * x) / (1 + x) + 2 * np.cos(7 * x) * x ** 5 + 0.7))
     y = [f(xi) for xi in X]
 
-    rl1 = lk.Kriging(y, X, "gauss", parameters={'sigma2': 1, 'is_theta_estim': False})
+    rl1 = lk.Kriging(y, X, "gauss", parameters={'sigma2': 1, 'is_theta_estim': True})
     print(rl1.summary())
 
     rl2 = rl1.copy()  # true copy not reference copy
