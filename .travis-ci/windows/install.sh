@@ -15,8 +15,8 @@ if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
 fi
 
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
-	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-	pushd ${HOME}/Downloads 
+	curl -s -o ${HOME}/tmp/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+	pushd ${HOME}/tmp 
 	"${BASEDIR}"/install_conda.bat
 	popd
 fi
