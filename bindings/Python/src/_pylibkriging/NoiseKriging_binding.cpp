@@ -91,9 +91,9 @@ PyNoiseKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp) {
+py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp, const bool willUpdate) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(Xp);
-  auto result = m_internal->simulate(nsim, seed, mat_X);
+  auto result = m_internal->simulate(nsim, seed, mat_X, willUpdate);
   return carma::mat_to_arr(result, true);
 }
 

@@ -58,7 +58,7 @@ class PyNoiseKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
+  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp, const bool willUpdate);
 
   void update(const py::array_t<double>& newy, const py::array_t<double>& newnoise, const py::array_t<double>& newX, const bool refit);
 
