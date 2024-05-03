@@ -18,10 +18,10 @@ def test_copied_kriging_returns_same_result():
 
     x = np.arange(0, 1, 1 / 99)
 
-    p1 = rl1.predict(x, True, False, False)
+    p1 = rl1.predict(x, True, False, True)
     p1 = {"mean": p1[0], "stdev": p1[1], "cov": p1[2], "mean_deriv": p1[3], "stdev_deriv": p1[4]}
 
-    p2 = rl2.predict(x, True, False, False)
+    p2 = rl2.predict(x, True, False, True)
     p2 = {"mean": p2[0], "stdev": p2[1], "cov": p2[2], "mean_deriv": p2[3], "stdev_deriv": p2[4]}
 
     assert np.array_equal(p1["mean"], p2["mean"])
