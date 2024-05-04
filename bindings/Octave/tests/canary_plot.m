@@ -7,12 +7,16 @@ y = f(X);
 
 % session
 x = reshape(0:(1/99):1,100,1);
-if (isOctave)
-    h = figure(1, 'Visible','off'); % no display
+if (exist('GITHUB_ACTION'))
+    disp('in GITHUB_ACTION: skip plotting');
 else
-    h = figure(1);       
-    h.Visible = 'off'; % no display
+    if (isOctave)
+        h = figure(1, 'Visible','off'); % no display
+    else
+        h = figure(1);       
+        h.Visible = 'off'; % no display
+    end
+    hold on;
+    plot(x,f(x));
+    scatter(X,f(X));
 end
-hold on;
-plot(x,f(x));
-scatter(X,f(X));
