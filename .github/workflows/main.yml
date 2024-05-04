@@ -129,7 +129,13 @@ jobs:
         with:
           r-version: '4.2'
           rtools-version: '42'
-        if: matrix.enable_R == 'on'
+        if: matrix.enable_R == 'Windows'
+
+      - name: install miniconda for Windows
+        run: |
+          reticulate::install_miniconda()
+        shell: Rscript {0}
+        if: runner.os == 'on'
 
       - name: Define local variables
         shell: bash
