@@ -81,6 +81,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("predict", &LinearRegression::predict);
 
   py::enum_<Trend::RegressionModel>(m, "RegressionModel")
+      .value("None", Trend::RegressionModel::None)
       .value("Constant", Trend::RegressionModel::Constant)
       .value("Linear", Trend::RegressionModel::Linear)
       .value("Interactive", Trend::RegressionModel::Interactive)
