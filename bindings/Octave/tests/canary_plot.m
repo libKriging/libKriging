@@ -7,7 +7,7 @@ y = f(X);
 
 % session
 x = reshape(0:(1/99):1,100,1);
-if (exist('GITHUB_ACTION'))
+if (length(getenv("GITHUB_ACTION"))>0)
     disp('in GITHUB_ACTION: skip plotting');
 else
     if (isOctave)

@@ -14,7 +14,7 @@ disp(k_m.summary());
 % session
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false, false);
-if (exist('GITHUB_ACTION'))
+if (length(getenv("GITHUB_ACTION"))>0)
     disp('in GITHUB_ACTION: skip plotting');
 else
     if (isOctave)
@@ -42,7 +42,7 @@ end
 
 s = k_m.simulate(int32(10),int32(123), x, false);
 
-if (exist('GITHUB_ACTION'))
+if (length(getenv("GITHUB_ACTION"))>0)
     disp('in GITHUB_ACTION: skip plotting');
 else
     if (isOctave)
