@@ -146,7 +146,7 @@ class NoiseKriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NoiseKriging(const std::string& covType);
 
-  LIBKRIGING_EXPORT NoiseKriging(NoiseKriging&&) = default;
+  NoiseKriging(NoiseKriging&&) = default;
 
   LIBKRIGING_EXPORT NoiseKriging(const arma::vec& y,
                                  const arma::vec& noise,
