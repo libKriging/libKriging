@@ -120,7 +120,7 @@ class NuggetKriging {
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT NuggetKriging(const std::string& covType);
 
-  LIBKRIGING_EXPORT NuggetKriging(NuggetKriging&&) = default;
+  NuggetKriging(NuggetKriging&&) = default;
 
   LIBKRIGING_EXPORT NuggetKriging(const arma::colvec& y,
                                   const arma::mat& X,
