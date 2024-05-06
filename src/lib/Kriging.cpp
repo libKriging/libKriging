@@ -574,9 +574,6 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   arma::mat S_2 = (yt_Rinv * m_y - trans(m_y) * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y);
   t0 = Bench::toc(bench, "S2 = YtRi * y - yt * RiFFtRiFiFtRi * y", t0);
 
-arma::cout << " S2:" << S_2 << arma::endl;
-arma::cout << " SSEstar:" << m.SSEstar << arma::endl;
-
   double sigma2;
   if (m_est_sigma2) {
     sigma2 = S_2(0, 0) / (n - p);
