@@ -118,10 +118,10 @@ points(X_u,y_u,col='red',pch=16)
 for (i in 1:length(X_u)) {
     lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(nugget),y_u[i]-2*sqrt(nugget)),col='red',lwd=4)
 }
-for (i in 1:ncol(lus)) {
-    lines(X_n,ls[,i],col=rgb(0,0,0,.1),lwd=4)
-    lines(X_n,lus[,i],col=rgb(1,0,0,.1),lwd=4)
-    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+for (j in 1:min(100,ncol(lus))) {
+    lines(X_n,ls[,j],col=rgb(0,0,0,.1),lwd=4)
+    lines(X_n,lus[,j],col=rgb(1,0,0,.1),lwd=4)
+    lines(X_n,lsu[,j],col=rgb(0,0,1,.1),lwd=4)
 }
 
 for (i in 1:length(X_n)) {
@@ -149,7 +149,7 @@ for (i in 1:length(X_n)) {
     lines(density(lsu[i,]),col='orange')
     lines(density(lus[i,]),col='red')
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("updated,simulated sample (~N(",mean(lus[,i]),",",sd(lus[,i]),")) follows simulated,updated sample (~N(",mean(lsu[,i]),",",sd(lsu[,i]),")) at ",X_n[i]),
+    test_that(desc=paste0("updated,simulated sample (~N(",mean(lus[i,]),",",sd(lus[i,]),")) follows simulated,updated sample (~N(",mean(lsu[i,]),",",sd(lsu[i,]),")) at ",X_n[i]),
         expect_true(ks.test(lus[i,],lsu[i,])$p.value > 1e-5))
 }
 

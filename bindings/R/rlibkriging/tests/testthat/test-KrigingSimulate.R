@@ -46,7 +46,7 @@ for (i in 1:min(100,ncol(ls))) {
 }
 
 ds = simulate(dk, nsim = ncol(ls), newdata = data.frame(X = X_n), type="UK", checkNames=FALSE, 
-cond=TRUE, nugget.sim = 1e-9)
+cond=TRUE, nugget.sim = 1e-10)
 for (i in 1:min(100,nrow(ds))) {
     lines(X_n,ds[i,],col=rgb(0,0,1,.1),lwd=4)
 }
