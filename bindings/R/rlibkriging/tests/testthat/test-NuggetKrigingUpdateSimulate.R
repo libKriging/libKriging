@@ -99,7 +99,7 @@ y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
 X_n = sort(c(X_u+1e-2,X_n)) # add some nugget to avoid degenerate cases
 
-ls = lk$simulate(100, 123, X_n, will_update=TRUE)
+ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus=NULL
 lus = lk$update_simulate(y_u,  X_u)
@@ -107,7 +107,7 @@ lus = lk$update_simulate(y_u,  X_u)
 lu = copy(lk)
 lu$update(y_u,  matrix(X_u,ncol=1), refit=FALSE)
 lsu=NULL
-lsu = lu$simulate(100, 123, X_n)
+lsu = lu$simulate(1000, 123, X_n)
 
 plot(f)
 points(X_o,y_o,pch=16)

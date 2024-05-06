@@ -59,12 +59,12 @@ for (i in 1:length(X_n)) {
 
 for (i in 1:length(X_n)) {
     if (lp$stdev[i,] > 1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("libKriging simulate sample ( ~N(",mean(ls[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",lp$mean[i],",",lp$sd[i],") ) at ",X_n[i]),
+    test_that(desc=paste0("libKriging simulate sample ( ~N(",mean(ls[i,]),",",sd(ls[i,]),") ) follows predictive distribution ( =N(",lp$mean[i,],",",lp$stdev[i,],") ) at ",X_n[i]),
         expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
 }
 
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[,i]),",",sd(ds[,i]),") ) matching at ",X_n[i]),
+    test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[i,]),",",sd(ds[i,]),") ) matching at ",X_n[i]),
         expect_true(ks.test(ds[,i], ls[i,])$p.value  > 0.01))
 }
