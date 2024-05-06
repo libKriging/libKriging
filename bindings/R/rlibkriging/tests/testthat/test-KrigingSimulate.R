@@ -1,5 +1,5 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -66,5 +66,6 @@ for (i in 1:length(X_n)) {
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[i,]),",",sd(ds[i,]),") ) matching at ",X_n[i]),
-        expect_true(ks.test(ds[,i], ls[i,])$p.value  > 0.01))
+        expect_true(ks.test(ds[,i], ls[i,])$p.value > 0.01))
+        print(ks.test(ds[,i], ls[i,])$p.value)
 }
