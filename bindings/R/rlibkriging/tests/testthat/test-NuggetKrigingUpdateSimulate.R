@@ -7,7 +7,7 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-nugget = 0.05^2
+nugget = 0.1^2
 set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o,pch=16)
@@ -97,7 +97,7 @@ i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
 y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
-X_n = sort(c(X_u+1e-2,X_n)) # add some nugget to avoid degenerate cases
+X_n = sort(c(X_u+1e-3,X_n)) # add some nugget to avoid degenerate cases
 
 ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
@@ -129,15 +129,15 @@ for (i in 1:length(X_n)) {
     dsu=density(lsu[i,])
     dus=density(lus[i,])
     polygon(
-        X_n[i] + ds$y/100,
+        X_n[i] + ds$y/50,
         ds$x,
         col=rgb(0,0,0,0.2),border=NA)
     polygon(
-        X_n[i] + dsu$y/100,
+        X_n[i] + dsu$y/50,
         dsu$x,
         col=rgb(1,0.5,0,0.2),border=NA)
     polygon(
-        X_n[i] + dus$y/100,
+        X_n[i] + dus$y/50,
         dus$x,
         col=rgb(1,0,0,0.2),border=NA)
     #test_that(desc="updated,simulated sample follows simulated,updated distribution",

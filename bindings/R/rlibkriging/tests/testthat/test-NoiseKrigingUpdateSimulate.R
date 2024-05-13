@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -7,7 +7,8 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-noise = 0.05^2
+noise = 0.1^2
+set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o,pch=16)
 
@@ -18,10 +19,15 @@ lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
+              parameters = list(theta = matrix(0.1), sigma2 = 0.001))
 
-
-
+#lk_nn = Kriging(y = matrix(y_o, ncol = 1),
+              X = matrix(X_o, ncol = 1),
+              kernel = "gauss",
+              regmodel = "linear",
+              optim = "none",
+              #normalize = TRUE,
+#              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
 
 ## Ckeck consistency bw predict & simulate
 
@@ -29,7 +35,7 @@ lp = lk$predict(seq(0,1,,21)) # libK predict
 lines(seq(0,1,,21),lp$mean,col='red')
 polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(100, 123, seq(0,1,,21)) # libK simulate
+ls = lk$simulate(1000, 123, seq(0,1,,21)) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
     lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }
@@ -47,7 +53,7 @@ for (i in 1:21) {
 
 X_u = c(.4,.6)
 y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
-noise_u = rep(noise, length(X_u))
+noise_u = rep(0, length(X_u)) #rep(noise, length(X_u))
 
 # new Kriging model from scratch
 l2 = NoiseKriging(y = matrix(c(y_o,y_u),ncol=1),
@@ -56,7 +62,7 @@ l2 = NoiseKriging(y = matrix(c(y_o,y_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
+              parameters = list(theta = matrix(0.1), sigma2 = 0.001))
 
 lu = copy(lk)
 lu$update(y_u, noise_u, X_u)
@@ -74,8 +80,8 @@ polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*
 lines(seq(0,1,,21),lpu$mean,col='blue')
 polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 
-ls2 = l2$simulate(100, 123, seq(0,1,,21))
-lsu = lu$simulate(100, 123, seq(0,1,,21))
+ls2 = l2$simulate(1000, 123, seq(0,1,,21))
+lsu = lu$simulate(1000, 123, seq(0,1,,21))
 for (i in 1:100) {
     lines(seq(0,1,,21),ls2[,i],col=rgb(1,0,0,.1),lwd=4)
     lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
@@ -105,6 +111,10 @@ ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 lus=NULL
 lus = lk$update_simulate(y_u, noise_u, X_u)
 
+#ls_nn = lk_nn$simulate(10, 123, X_n, will_update=TRUE)
+#lus_nn=NULL
+#lus_nn = lk_nn$update_simulate(y_u, X_u)
+
 lu = copy(lk)
 lu$update(y_u, noise_u, matrix(X_u,ncol=1), refit=FALSE)
 lsu=NULL
@@ -122,7 +132,7 @@ for (i in 1:length(X_u)) {
 for (i in 1:ncol(lus)) {
     lines(seq(0,1,,21),ls[,i],col=rgb(0,0,0,.1),lwd=4)
     lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+    lines(seq(0,1,,21),lsu[,i],col=rgb(1,0.5,0,.1),lwd=4)
 }
 
 for (i in 1:length(X_n)) {
@@ -146,12 +156,12 @@ for (i in 1:length(X_n)) {
 }
 
 for (i in 1:length(X_n)) {
-    plot(density(ls[i,]))
+    plot(density(ls[i,]),xlim=range(c(ls[i,],lsu[i,],lus[i,])))
     lines(density(lsu[i,]),col='orange')
     lines(density(lus[i,]),col='red')
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc="updated,simulated sample follows simulated,updated distribution",
-        expect_true(ks.test(lus[i,],lsu[i,])$p.value > 1e-5))
+        expect_true(ks.test(lus[i,],lsu[i,])$p.value > 0.01))
 }
 
 
@@ -301,7 +311,7 @@ lsud = lud$simulate(1000, 123, X_n)
 #}
 
 for (i in 1:nrow(X_n)) {
-    plot(density(lsd[i,]),xlim=c(0,1))
+    plot(density(lsd[i,]),xlim=c(-1,1))
     lines(density(lsud[i,]),col='orange')
     lines(density(lusd[i,]),col='red')
     if (sd(lsud[i,])>1e-3 && sd(lusd[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test

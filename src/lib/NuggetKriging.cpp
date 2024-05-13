@@ -1254,15 +1254,15 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
       arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-      if (arma::any(dij != 0))
-        R_on.at(i, j) = Cov(dij, m_theta) * m_alpha;
-      else
+      if (dij.is_zero(arma::datum::eps))
         R_on.at(i, j) = 1.0;
+      else
+        R_on.at(i, j) = Cov(dij, m_theta) * m_alpha;
     }
   }
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
-  arma::mat Rstar_on =LinearAlgebra::solve(m_T, R_on);
+  arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
   t0 = Bench::toc(nullptr,"Rstar_on   ", t0);
 
   arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
@@ -1274,6 +1274,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
 
   arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
+  //arma::cout << "[NuK] SigmaNoTrend_nKo:" << SigmaNoTrend_nKo << arma::endl;
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
 
@@ -1372,7 +1373,8 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
   Xn_u = trans(Xn_u);
   t0 = Bench::toc(nullptr,"Xn_u.t()      ", t0);
 
-  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
+  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && 
+                       (lastsimup_Xn_u-Xn_u).is_zero(arma::datum::eps);
   if (! use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
   
@@ -1404,10 +1406,13 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
-        lastsimup_R_un.at(i, j) = Cov((Xn_u.col(i) - Xn_n.col(j)), m_theta);
+        arma::vec dij = Xn_u.col(i) - Xn_n.col(j);
+        if (dij.is_zero(arma::datum::eps))
+          lastsimup_R_un.at(i, j) = 1.0;
+        else
+          lastsimup_R_un.at(i, j) = Cov(dij, m_theta) * m_alpha;
       }
     }
-    lastsimup_R_un *= m_alpha;
     t0 = Bench::toc(nullptr,"R_un          ", t0);
   }
 
@@ -1429,12 +1434,19 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
     arma::mat Rstar_onCu = LinearAlgebra::solve(lastsim_L_on, R_onCu);
     t0 = Bench::toc(nullptr,"Rstar_onCu          ", t0);
+    //arma::cout << "[NuK] Rstar_onCu: " << Rstar_onCu << arma::endl;
+    //arma::cout << "[NuK] lastsim_Fstar_on: " << lastsim_Fstar_on << arma::endl;
+    //arma::cout << "[NuK] F_u: " << F_u << arma::endl;
+
+    //arma::cout << "[NuK] lastsim_circ_on: " << lastsim_circ_on << arma::endl;
 
     arma::mat Ecirc_uKon = LinearAlgebra::rsolve(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
     t0 = Bench::toc(nullptr,"Ecirc_uKon          ", t0);
-  
+    //arma::cout << "[NuK] Ecirc_uKon: " << Ecirc_uKon << arma::endl;
+
     arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
     t0 = Bench::toc(nullptr,"Sigma_uKon          ", t0);
+    //arma::cout << "[NuK] Sigma_uKon: " << Sigma_uKon << arma::endl;
 
     arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
     t0 = Bench::toc(nullptr,"LSigma_uKon          ", t0);
@@ -1448,6 +1460,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     Random::reset_seed(lastsim_seed);
     lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim);// * std::sqrt(m_sigma2);    
     t0 = Bench::toc(nullptr,"y_u          ", t0);
+    //arma::cout << "[NuK] y_u: " << lastsimup_y_u << arma::endl;
   }
 
   // ======================================================================
@@ -1464,11 +1477,13 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
     t0 = Bench::toc(nullptr,"Rtild_uCu          ", t0);
+    arma::cout << "[NuK] Rtild_uCu: " << Rtild_uCu << arma::endl;
     
-    arma::mat Rtild_nCu = lastsimup_R_un.t() - lastsim_L_oCn.t() * Rstar_ou + lastsim_Ecirc_nKo * Ecirc_uKo.t(); 
+    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t(); 
     t0 = Bench::toc(nullptr,"Rtild_nCu          ", t0);
+    arma::cout << "[NuK] Rtild_nCu: " << Rtild_nCu << arma::endl;
 
-    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu.t()).t();
+    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
     t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);
   }
 

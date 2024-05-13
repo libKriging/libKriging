@@ -1561,11 +1561,12 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   // Compute covariance between new data
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
-    R_nn.at(i, i) = 1.0;
+    //R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
       R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
+  R_nn.diag().ones();
   t0 = Bench::toc(nullptr,"R_nn          ", t0);
 
   // Compute covariance between training data and new data to predict
@@ -1774,11 +1775,11 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
     t0 = Bench::toc(nullptr,"Rtild_uCu          ", t0);
-    
-    arma::mat Rtild_nCu = lastsimup_R_un.t() - lastsim_L_oCn.t() * Rstar_ou + lastsim_Ecirc_nKo * Ecirc_uKo.t(); 
+
+    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t(); 
     t0 = Bench::toc(nullptr,"Rtild_nCu          ", t0);
 
-    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu.t()).t();
+    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
     t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);
   }
 

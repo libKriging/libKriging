@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -24,7 +24,7 @@ lp = lk$predict(seq(0,1,,21)) # libK predict
 lines(seq(0,1,,21),lp$mean,col='red')
 polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(100, 123, seq(0,1,,21)) # libK simulate
+ls = lk$simulate(1000, 123, seq(0,1,,21)) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
     lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }
@@ -63,8 +63,8 @@ polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*
 lines(seq(0,1,,21),lpu$mean,col='blue')
 polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 
-ls2 = l2$simulate(100, 123, seq(0,1,,21))
-lsu = lu$simulate(100, 123, seq(0,1,,21))
+ls2 = l2$simulate(1000, 123, seq(0,1,,21))
+lsu = lu$simulate(1000, 123, seq(0,1,,21))
 for (i in 1:100) {
     lines(seq(0,1,,21),ls2[,i],col=rgb(1,0,0,.1),lwd=4)
     lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
@@ -85,6 +85,8 @@ X_n = seq(0,1,,21)
 i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
 y_u = f(X_u)
+
+X_n = c(X_u+1e-2,X_n) # add some noise to avoid degenerate cases
 
 ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim

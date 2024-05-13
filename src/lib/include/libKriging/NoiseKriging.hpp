@@ -109,6 +109,7 @@ class NoiseKriging {
 
   // Updated simulation stored data
   arma::mat lastsimup_Xn_u;
+  arma::mat lastsimup_noise_u;
   arma::mat lastsimup_y_u;
   arma::mat lastsimup_Wtild_nKu;
   arma::mat lastsimup_R_uo;
