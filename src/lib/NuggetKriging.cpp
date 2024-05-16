@@ -1207,7 +1207,6 @@ NuggetKriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool wi
     return std::make_tuple(std::move(yhat_n), nullptr, nullptr);*/
 }
 
-
 /** Draw sample trajectories of kriging at given points X'
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator

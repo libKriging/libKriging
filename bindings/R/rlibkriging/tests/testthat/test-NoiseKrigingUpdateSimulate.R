@@ -21,13 +21,13 @@ lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
               #normalize = TRUE,
               parameters = list(theta = matrix(0.1), sigma2 = 0.001))
 
-#lk_nn = Kriging(y = matrix(y_o, ncol = 1),
+lk_nn = Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-#              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
+              parameters = list(theta = matrix(0.1), sigma2 = 0.01))
 
 ## Ckeck consistency bw predict & simulate
 
