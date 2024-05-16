@@ -128,7 +128,7 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-noise = 0.01 #0.0000001^2
+noise = 0.001 #0.0000001^2
 sigma2 = 0.1
 set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
@@ -154,10 +154,10 @@ lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
 
 
 test_that("Consistency between Noise(0)Kriging and Kriging", {
-    expect_equal(lk_nu$T(), lk_no$T()/sqrt(sigma2))
-    expect_equal(lk_nu$M(), lk_no$M()*sqrt(sigma2))
+    expect_equal(lk_nu$T(), lk_no$T()/sqrt(noise+sigma2))
+    expect_equal(lk_nu$M(), lk_no$M()*sqrt(noise+sigma2))
     expect_equal(lk_nu$beta(), lk_no$beta())
-    expect_equal(lk_nu$z(), lk_no$z()*sqrt(sigma2))
+    expect_equal(lk_nu$z(), lk_no$z()*sqrt(noise+sigma2))
 })
 
 
@@ -174,7 +174,7 @@ points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
 }
-for (i in 1:ncol(ls)) {
+for (i in 1:ncol(ls_nu)) {
     lines(X_n,ls_nu[,i],col=rgb(1,0.5,0,.51),lwd=4,lty=2)
     lines(X_n,ls_no[,i],col=rgb(1,0,0.5,.51),lwd=4,lty=2)
 }
@@ -205,7 +205,7 @@ points(X_u,y_u,col='red',pch=16)
 for (i in 1:length(X_u)) {
     lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(noise),y_u[i]-2*sqrt(noise)),col='red',lwd=4)
 }
-for (i in 1:ncol(lus)) {
+for (i in 1:ncol(lus_nu)) {
     lines(X_n,lus_nu[,i],col=rgb(1,0.5,0,.51),lwd=4,lty=2)
     lines(X_n,lus_no[,i],col=rgb(1,0,0.5,.51),lwd=4,lty=2)
 }

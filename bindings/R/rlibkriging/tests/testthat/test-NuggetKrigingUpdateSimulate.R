@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -7,7 +7,7 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-nugget = 0.1^2
+nugget = 0.01
 set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o,pch=16)
@@ -18,23 +18,31 @@ lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.5^2))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.1))
 
 
+X_n = unique(sort(c(X_o,seq(0,1,,51))))
 
+lk_nn = Kriging(y = matrix(y_o, ncol = 1),
+              X = matrix(X_o, ncol = 1),
+              kernel = "gauss",
+              regmodel = "linear",
+              optim = "none",
+              #normalize = TRUE,
+              parameters = list(theta = matrix(0.1), sigma2 = 0.1))
 
 ## Ckeck consistency bw predict & simulate
 
-lp = lk$predict(seq(0,1,,21)) # libK predict
-lines(seq(0,1,,21),lp$mean,col='red')
-polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
+lp = lk$predict(X_n) # libK predict
+lines(X_n,lp$mean,col='red')
+polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(100, 123, seq(0,1,,21)) # libK simulate
+ls = lk$simulate(1000, 123, X_n) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
-    lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
+    lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }
 
-for (i in 1:21) {
+for (i in 1:length(X_n)) {
     if (lp$stdev[i,] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc="simulate sample follows predictive distribution",
         expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
@@ -54,7 +62,7 @@ l2 = NuggetKriging(y = matrix(c(y_o,y_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.5^2))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2 = 0.1))
 
 lu = copy(lk)
 lu$update(y_u, X_u)
@@ -62,37 +70,36 @@ lu$update(y_u, X_u)
 
 ## Update, predict & simulate
 
-lp2 = l2$predict(seq(0,1,,21))
-lpu = lu$predict(seq(0,1,,21))
+lp2 = l2$predict(X_n)
+lpu = lu$predict(X_n)
 
 plot(f)
 points(X_o,y_o)
-lines(seq(0,1,,21),lp2$mean,col='red')
-polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
-lines(seq(0,1,,21),lpu$mean,col='blue')
-polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
+lines(X_n,lp2$mean,col='red')
+polygon(c(X_n,rev(X_n)),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
+lines(X_n,lpu$mean,col='blue')
+polygon(c(X_n,rev(X_n)),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 
-ls2 = l2$simulate(100, 123, seq(0,1,,21))
-lsu = lu$simulate(100, 123, seq(0,1,,21))
+ls2 = l2$simulate(1000, 123, X_n)
+lsu = lu$simulate(1000, 123, X_n)
 for (i in 1:100) {
-    lines(seq(0,1,,21),ls2[,i],col=rgb(1,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+    lines(X_n,ls2[,i],col=rgb(1,0,0,.1),lwd=4)
+    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 }
 
-for (i in 1:21) {
+for (i in 1:length(X_n)) {
     #test_that(desc="simulate sample follows predictive distribution",
     #    expect_true(ks.test(ls2[i,],lsu[i,])$p.value  > 0.01))
 
     # random gen is the same so we expect strict equality of samples !
     test_that(desc="simulate sample are the same",
-        expect_true(all.equal(ls2[i,],lsu[i,])))
+        expect_equal(ls2[i,],lsu[i,],tolerance=1e-7))
 }
 
 
 
 ## Update simulate
 
-X_n = seq(0,1,,21)
 i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
 y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
@@ -121,7 +128,7 @@ for (i in 1:length(X_u)) {
 for (j in 1:min(100,ncol(lus))) {
     lines(X_n,ls[,j],col=rgb(0,0,0,.1),lwd=4)
     lines(X_n,lus[,j],col=rgb(1,0,0,.1),lwd=4)
-    lines(X_n,lsu[,j],col=rgb(0,0,1,.1),lwd=4)
+    lines(X_n,lsu[,j],col=rgb(1,0.5,0,.1),lwd=4)
 }
 
 for (i in 1:length(X_n)) {
@@ -145,12 +152,12 @@ for (i in 1:length(X_n)) {
 }
 
 for (i in 1:length(X_n)) {
-    plot(density(ls[i,]))
+    plot(density(ls[i,]),xlim=range(c(ls[i,],lsu[i,],lus[i,])))
     lines(density(lsu[i,]),col='orange')
     lines(density(lus[i,]),col='red')
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("updated,simulated sample (~N(",mean(lus[i,]),",",sd(lus[i,]),")) follows simulated,updated sample (~N(",mean(lsu[i,]),",",sd(lsu[i,]),")) at ",X_n[i]),
-        expect_true(ks.test(lus[i,],lsu[i,])$p.value > 1e-5))
+    test_that(desc="updated,simulated sample follows simulated,updated distribution",
+        expect_true(ks.test(lus[i,],lsu[i,])$p.value > 0.01))
 }
 
 
@@ -182,19 +189,19 @@ lkd <- NuggetKriging(y = y_o,
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(rep(0.1,d))^2, nugget=nugget, sigma2=0.5^2))
+              parameters = list(theta = matrix(rep(0.1,d))^2, nugget=nugget, sigma2=0.1^2))
 
 ## Predict & simulate
 
 X_n = matrix(runif(100),ncol=d) #seq(0,1,,)
 
 lpd = lkd$predict(X_n) # libK predict
-#lines(seq(0,1,,21),lp$mean,col='red')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
+#lines(X_n,lp$mean,col='red')
+#polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
 lsd = lkd$simulate(1000, 123, X_n) # libK simulate
 #for (i in 1:100) {
-#    lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 #}
 
 for (i in 1:nrow(X_n)) {
@@ -223,24 +230,24 @@ for (i in 1:nrow(X_n)) {
 #
 ### Update, predict & simulate
 #
-#lp2 = l2$predict(seq(0,1,,21))
-#lpu = lu$predict(seq(0,1,,21))
+#lp2 = l2$predict(X_n)
+#lpu = lu$predict(X_n)
 #
 #plot(f)
 #points(X_o,y_o)
-#lines(seq(0,1,,21),lp2$mean,col='red')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
-#lines(seq(0,1,,21),lpu$mean,col='blue')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
+#lines(X_n,lp2$mean,col='red')
+#polygon(c(X_n,rev(X_n)),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
+#lines(X_n,lpu$mean,col='blue')
+#polygon(c(X_n,rev(X_n)),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 #
-#ls2 = l2$simulate(100, 123, seq(0,1,,21))
-#lsu = lu$simulate(100, 123, seq(0,1,,21))
+#ls2 = l2$simulate(100, 123, X_n)
+#lsu = lu$simulate(100, 123, X_n)
 #for (i in 1:100) {
-#    lines(seq(0,1,,21),ls2[,i],col=rgb(1,0,0,.1),lwd=4)
-#    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+#    lines(X_n,ls2[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 #}
 #
-#for (i in 1:21) {
+#for (i in 1:length(X_n)) {
 #    m2 = lp2$mean[i,]
 #    s2 = lp2$stdev[i,]
 #    mu = lpu$mean[i,]
@@ -279,11 +286,11 @@ lsud = lud$simulate(1000, 123, X_n)
 #points(X_o,y_o,pch=20)
 #points(X_u,y_u,col='red',pch=20)
 #for (i in 1:ncol(lus)) {
-#    lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
-#    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+#    lines(X_n,lus[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 #}
 #
-#for (i in 1:length(X_n)) {
+#for (i in 1:1:length(X_n)) {
 #    dsu=density(lsu[i,])
 #    dus=density(lus[i,])
 #    polygon(
@@ -304,6 +311,6 @@ for (i in 1:nrow(X_n)) {
     lines(density(lusd[i,]),col='red')
     if (sd(lsud[i,])>1e-3 && sd(lusd[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",sd(lsud[i,]),",",sd(lusd[i,])),
-        expect_gt(ks.test(lusd[i,],lsud[i,])$p.value, 1e-7)) # just check that it is not clearly wrong
+        expect_gt(ks.test(lusd[i,],lsud[i,])$p.value, 0.01)) # just check that it is not clearly wrong
     }
 }

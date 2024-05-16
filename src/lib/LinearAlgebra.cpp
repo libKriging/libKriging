@@ -29,7 +29,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower(arma::mat X) {
   return LinearAlgebra::safe_chol_lower(X, 0);
 }
 
-bool LinearAlgebra::warn_chol = true;
+bool LinearAlgebra::warn_chol = false;
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
   LinearAlgebra::warn_chol = warn;

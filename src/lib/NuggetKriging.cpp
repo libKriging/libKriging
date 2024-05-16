@@ -1476,11 +1476,11 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
     t0 = Bench::toc(nullptr,"Rtild_uCu          ", t0);
-    arma::cout << "[NuK] Rtild_uCu: " << Rtild_uCu << arma::endl;
+    //arma::cout << "[NuK] Rtild_uCu: " << Rtild_uCu << arma::endl;
     
     arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t(); 
     t0 = Bench::toc(nullptr,"Rtild_nCu          ", t0);
-    arma::cout << "[NuK] Rtild_nCu: " << Rtild_nCu << arma::endl;
+    //arma::cout << "[NuK] Rtild_nCu: " << Rtild_nCu << arma::endl;
 
     lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
     t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);

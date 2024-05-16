@@ -86,7 +86,7 @@ i_u = c(9,13)
 X_u = X_n[i_u]# c(.4,.6)
 y_u = f(X_u)
 
-X_n = c(X_u+1e-2,X_n) # add some noise to avoid degenerate cases
+X_n = sort(c(X_u+1e-2,X_n)) # add some noise to avoid degenerate cases
 
 ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
@@ -102,9 +102,9 @@ plot(f)
 points(X_o,y_o,pch=16)
 points(X_u,y_u,col='red',pch=16)
 for (i in 1:ncol(lus)) {
-    lines(seq(0,1,,21),ls[,i],col=rgb(0,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
-    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+    lines(X_n,ls[,i],col=rgb(0,0,0,.1),lwd=4)
+    lines(X_n,lus[,i],col=rgb(1,0,0,.1),lwd=4)
+    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 }
 
 for (i in 1:length(X_n)) {
