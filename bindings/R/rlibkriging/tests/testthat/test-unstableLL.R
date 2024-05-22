@@ -3,8 +3,10 @@
 # library(rlibkriging)
 #library(rlibkriging, lib.loc="bindings/R/Rlibs")
 #library(testthat)
- 
- context("Fit: unstable LL (long range with 1D Gauss kernel)")
+default_rcond_checked = rlibkriging:::linalg_chol_rcond_checked()
+default_num_nugget = rlibkriging:::linalg_get_num_nugget()
+
+context("Fit: unstable LL (long range with 1D Gauss kernel)")
 
 # 1D function, small design, but not stationary
 X <- as.matrix(c(0.0, 0.25, 0.33, 0.45, 0.5, 0.75, 1.0))
@@ -96,3 +98,6 @@ abline(h=k10$logLikelihood(), col='red')
 test_that(desc=paste0("LL / Fit: unstable LL fixed using rcond failover (linalg_get_num_nugget:", rlibkriging:::linalg_get_num_nugget(), ")"),
           expect_equal(k$theta(), k10$theta(), tol=1e-4))
 
+
+rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
+rlibkriging:::linalg_set_num_nugget(default_num_nugget)

@@ -1241,7 +1241,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   for (arma::uword i = 0; i < n_n; i++) {
     //R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);// * m_alpha;
+      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
   R_nn *= m_alpha;
@@ -1273,17 +1273,16 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
 
   arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
-  //arma::cout << "[NuK] SigmaNoTrend_nKo:" << SigmaNoTrend_nKo << arma::endl;
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
 
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo / m_alpha);
   t0 = Bench::toc(nullptr,"LSigma_nKo     ", t0);
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
   Random::reset_seed(seed);
-  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2 / m_alpha);
+  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
   // Un-normalize simulations
   y_n = m_centerY + m_scaleY * y_n;
@@ -1372,13 +1371,13 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
   Xn_u = trans(Xn_u);
   t0 = Bench::toc(nullptr,"Xn_u.t()      ", t0);
 
+  double m_alpha = m_sigma2 / (m_sigma2 + m_nugget);
+
   bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && 
                        (lastsimup_Xn_u-Xn_u).is_zero(arma::datum::eps);
   if (! use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
   
-    double m_alpha = m_sigma2 / (m_sigma2 + m_nugget);
-
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
@@ -1457,7 +1456,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     arma::mat M_u = arma::repmat(m_u,1,lastsim_nsim) +  W_uCon.tail_cols(n_n) * lastsim_y_n;
     
     Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim);// * std::sqrt(m_sigma2);    
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);    
     t0 = Bench::toc(nullptr,"y_u          ", t0);
     //arma::cout << "[NuK] y_u: " << lastsimup_y_u << arma::endl;
   }

@@ -41,6 +41,10 @@ LIBKRIGING_EXPORT void LinearAlgebra::check_chol_rcond(bool c) {
   LinearAlgebra::chol_rcond_check = c;
 };
 
+LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_checked() {
+  return LinearAlgebra::chol_rcond_check;
+};
+
 int LinearAlgebra::max_inc_choldiag = 10;
 
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate

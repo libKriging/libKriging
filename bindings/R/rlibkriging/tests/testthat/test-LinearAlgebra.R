@@ -1,5 +1,7 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+default_rcond_checked = rlibkriging:::linalg_chol_rcond_checked()
+default_num_nugget = rlibkriging:::linalg_get_num_nugget()
 
 context("LinearAlgebra")
 
@@ -87,3 +89,6 @@ Too = t(chol(Roo))
 
 test_that(desc="Full chol equals incremented chol by block",
           expect_equal(t(chol(R)), rlibkriging:::linalg_chol_block(R,Too), tol=1e-9))
+
+rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)
+rlibkriging:::linalg_set_num_nugget(default_num_nugget)

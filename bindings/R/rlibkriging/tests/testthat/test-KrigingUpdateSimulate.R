@@ -16,7 +16,7 @@ lk <- Kriging(y = matrix(y_o, ncol = 1),
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1)))
+              parameters = list(theta = matrix(0.1), sigma2=0.001))
 
 ## Ckeck consistency bw predict & simulate
 
@@ -46,7 +46,7 @@ l2 = Kriging(y = matrix(c(y_o,y_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1)))
+              parameters = list(theta = matrix(0.1), sigma2=0.001))
 
 lu = copy(lk)
 lu$update(y_u,X_u)

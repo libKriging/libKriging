@@ -1757,7 +1757,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
     arma::mat M_u = arma::repmat(m_u,1,lastsim_nsim) +  W_uCon.tail_cols(n_n) * lastsim_y_n;
     
     Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim);// * std::sqrt(m_sigma2);    
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);    
     t0 = Bench::toc(nullptr,"y_u          ", t0);
   }
 

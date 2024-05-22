@@ -18,6 +18,7 @@ class LinearAlgebra {
 
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
+  LIBKRIGING_EXPORT bool chol_rcond_checked();
 
   static int max_inc_choldiag;
   LIBKRIGING_EXPORT static arma::mat safe_chol_lower(arma::mat X);

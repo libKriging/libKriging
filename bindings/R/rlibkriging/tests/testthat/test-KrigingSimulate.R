@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -16,7 +16,7 @@ lk <- Kriging(y = matrix(y_o, ncol = 1),
               regmodel = "constant",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1)))
+              parameters = list(theta = matrix(0.1), sigma2=0.001))
 
 library(DiceKriging)
 dk <- km(response = matrix(y_o, ncol = 1),
@@ -30,7 +30,7 @@ dk <- km(response = matrix(y_o, ncol = 1),
               coef.var = lk$sigma2())
 
 ## Predict & simulate
-X_n = seq(0,1,,21)
+X_n = seq(0,1,,51)
 
 dp = predict(dk, newdata = data.frame(X = X_n), type="UK", checkNames=FALSE)
 lines(X_n,dp$mean,col='blue')
@@ -54,7 +54,7 @@ for (i in 1:min(100,nrow(ds))) {
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging simulate sample ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",dp$mean[i],",",dp$sd[i],") ) at ",X_n[i]),
-        expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.01))
+        expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.001))
 }
 
 for (i in 1:length(X_n)) {

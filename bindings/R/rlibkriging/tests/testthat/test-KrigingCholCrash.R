@@ -1,6 +1,8 @@
+default_nugget = rlibkriging:::linalg_get_num_nugget()
+default_rcond_checked = rlibkriging:::linalg_chol_rcond_checked()
+
 rlibkriging:::linalg_set_num_nugget(1E-10)
 rlibkriging:::linalg_set_chol_warning(TRUE)
-default_nugget = rlibkriging:::linalg_get_num_nugget()
 
 #############################################################
 
@@ -127,3 +129,4 @@ test_that(desc="Kriging fit mith and without num nugget are identical",
 expect_true(all(capture.output(print(r_nonugget)) == capture.output(print(r)))))
 
 rlibkriging:::linalg_set_num_nugget(default_nugget)
+rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)

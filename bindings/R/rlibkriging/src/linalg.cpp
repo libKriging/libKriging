@@ -29,6 +29,13 @@ void linalg_check_chol_rcond(bool cr) {
 }
 
 // [[Rcpp::export]]
+bool linalg_chol_rcond_checked() {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->chol_rcond_checked();
+}
+
+// [[Rcpp::export]]
 arma::mat linalg_chol_safe(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
