@@ -62,9 +62,9 @@ X_n = seq(0,1,,51)
 ls = lk$simulate(1000, 123, X_n, will_update=FALSE)
 #y_u = rs[i_u,1] # force matching 1st sim
 
-ls_no = lk_no$simulate(1000, 123, X_n, will_update=FALSE)
+ls_no = lk_no$simulate(1000, 123, X_n, with_noise=NULL, will_update=FALSE)
 
-ls_nu = lk_nu$simulate(1000, 123, X_n, will_update=FALSE)
+ls_nu = lk_nu$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=FALSE)
 
 plot(f)
 points(X_o,y_o,pch=16)

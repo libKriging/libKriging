@@ -74,10 +74,10 @@ void PyKriging::fit(const py::array_t<double>& y,
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv) {
+PyKriging::predict(const py::array_t<double>& X, bool with_std, bool with_cov, bool with_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, withStd, withCov, withDeriv);
+      = m_internal->predict(mat_X, with_std, with_cov, with_deriv);
   return std::make_tuple(carma::col_to_arr(y_predict, true),
                          carma::col_to_arr(y_stderr, true),
                          carma::mat_to_arr(y_cov, true),
@@ -85,9 +85,9 @@ PyKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov, boo
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool willUpdate) {
+py::array_t<double> PyKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool will_update) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, seed, mat_X, willUpdate);
+  auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
   return carma::mat_to_arr(result, true);
 }
 

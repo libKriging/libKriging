@@ -100,7 +100,7 @@ class NuggetKriging {
   arma::mat lastsim_y_n;
   int lastsim_nsim;
   int lastsim_seed;
-  bool lastsim_withNugget;
+  bool lastsim_with_nugget;
   arma::mat lastsim_F_n;
   arma::mat lastsim_R_nn;
   arma::mat lastsim_L_oCn;
@@ -122,10 +122,10 @@ class NuggetKriging {
   arma::mat lastsimup_R_un;
   arma::mat lastsimup_R_uu;
 
-  std::function<double(const arma::vec&, const arma::vec&)> Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx;
-  double Cov_pow;
+  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
+  double _Cov_pow;
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -177,7 +177,7 @@ class NuggetKriging {
   static double alpha_lower;
   static double alpha_upper;
 
-  LIBKRIGING_EXPORT arma::mat covFun(const arma::mat& X1, const arma::mat& X2);
+  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -204,25 +204,25 @@ class NuggetKriging {
 
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
-   * @param withStd is true if return also stdev column vector
-   * @param withCov is true if return also cov matrix between X_n
-   * @param withderiv is true if return also derivative at X_n
+   * @param with_std is true if return also stdev column vector
+   * @param with_cov is true if return also cov matrix between X_n
+   * @param with_deriv is true if return also derivative at X_n
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
-                                                                                                    bool withStd,
-                                                                                                    bool withCov,
-                                                                                                    bool withDeriv);
+                                                                                                    bool with_std,
+                                                                                                    bool with_cov,
+                                                                                                    bool with_deriv);
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param nsim is number of simulations to draw
    * @param seed random seed setup for simulations
    * @param X_n is m*d matrix of points where to simulate output
-   * @param withNugget is true if include also nugget effect
-   * @param willUpdate store useful data for possible future update
+   * @param with_nugget is true if include also nugget effect
+   * @param will_update store useful data for possible future update
    * @return output is m*nsim matrix of simulations at X_n
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool withNugget, const bool willUpdate = false);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool with_nugget, const bool will_update = false);
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output

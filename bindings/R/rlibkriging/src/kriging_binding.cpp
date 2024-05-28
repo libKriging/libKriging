@@ -269,7 +269,7 @@ std::string kriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false, bool deriv = false) {
+Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool with_std = true, bool with_cov = false, bool with_deriv = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -294,14 +294,14 @@ Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool co
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate = false) {
+arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool will_update = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim, seed, X, willUpdate);
+  return impl_ptr->simulate(nsim, seed, X, will_update);
 }
 
 // [[Rcpp::export]]
@@ -343,7 +343,7 @@ void kriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_covFun(Rcpp::List k,
+arma::mat kriging_covMat(Rcpp::List k,
                           arma::mat X1,
                           arma::mat X2) {
   if (!k.inherits("Kriging"))
@@ -352,7 +352,7 @@ arma::mat kriging_covFun(Rcpp::List k,
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->covFun(X1,X2);
+  return impl_ptr->covMat(X1,X2);
 }
 
 // [[Rcpp::export]]

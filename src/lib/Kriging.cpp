@@ -36,32 +36,32 @@
 void Kriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
-    Cov = Covariance::Cov_gauss;
-    DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
-    DlnCovDx = Covariance::DlnCovDx_gauss;
-    Cov_pow = 2;
+    _Cov = Covariance::Cov_gauss;
+    _DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
+    _DlnCovDx = Covariance::DlnCovDx_gauss;
+    _Cov_pow = 2;
   } else if (covType.compare("exp") == 0) {
-    Cov = Covariance::Cov_exp;
-    DlnCovDtheta = Covariance::DlnCovDtheta_exp;
-    DlnCovDx = Covariance::DlnCovDx_exp;
-    Cov_pow = 1;
+    _Cov = Covariance::Cov_exp;
+    _DlnCovDtheta = Covariance::DlnCovDtheta_exp;
+    _DlnCovDx = Covariance::DlnCovDx_exp;
+    _Cov_pow = 1;
   } else if (covType.compare("matern3_2") == 0) {
-    Cov = Covariance::Cov_matern32;
-    DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
-    DlnCovDx = Covariance::DlnCovDx_matern32;
-    Cov_pow = 1.5;
+    _Cov = Covariance::Cov_matern32;
+    _DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
+    _DlnCovDx = Covariance::DlnCovDx_matern32;
+    _Cov_pow = 1.5;
   } else if (covType.compare("matern5_2") == 0) {
-    Cov = Covariance::Cov_matern52;
-    DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
-    DlnCovDx = Covariance::DlnCovDx_matern52;
-    Cov_pow = 2.5;
+    _Cov = Covariance::Cov_matern52;
+    _DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
+    _DlnCovDx = Covariance::DlnCovDx_matern52;
+    _Cov_pow = 2.5;
   } else
     throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
-LIBKRIGING_EXPORT arma::mat Kriging::covFun(const arma::mat& X1, const arma::mat& X2) {
+LIBKRIGING_EXPORT arma::mat Kriging::covMat(const arma::mat& X1, const arma::mat& X2) {
   arma::mat Xn1 = X1;
   arma::mat Xn2 = X2;
   Xn1.each_row() -= m_centerX;
@@ -72,10 +72,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::covFun(const arma::mat& X1, const arma::mat
   arma::mat R = arma::mat(X1.n_rows, X2.n_rows, arma::fill::none);
   for (arma::uword i = 0; i < Xn1.n_rows; i++) {
     for (arma::uword j = 0; j < Xn2.n_rows; j++) {
-      R.at(i, j) = R.at(j, i) = Cov((Xn1.row(i)- Xn2.row(j)).t(), m_theta);
+      R.at(i, j) = _Cov((Xn1.row(i)- Xn2.row(j)).t(), m_theta);
     }
   }
-  return R;
+  return R * m_sigma2;
 }
 
 // at least, just call make_Cov(kernel)
@@ -126,10 +126,10 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta,
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = (m_theta.size() == theta.size()) && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) { 
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, Cov, 1, Kriging::ones, m_T, m_R);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, 1, Kriging::ones, m_T, m_R);
   } else 
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, Cov, 1, Kriging::ones);
-  t0 = Bench::toc(bench, "R = Cov(dX) & L = Chol(R)", t0);
+    m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, 1, Kriging::ones);
+  t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
   // Compute intermediate useful matrices
   arma::mat Fystar = LinearAlgebra::solve(m.L, arma::join_rows(m_F, m_y));
@@ -205,7 +205,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     for (arma::uword i = 0; i < n; i++) {
       gradR.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
         gradR.tube(j, i) = gradR.tube(i, j); 
       }
     }
@@ -258,7 +258,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
               hessR_k_l.at(i, i) = 0;
               for (arma::uword j = 0; j < i; j++) {
                 double dln_k = gradR_k.at(i,j);
-                hessR_k_l.at(i, j) = hessR_k_l.at(j, i) = dln_k * (dln_k / m.R.at(i, j) - (Cov_pow + 1) / _theta.at(k));
+                hessR_k_l.at(i, j) = hessR_k_l.at(j, i) = dln_k * (dln_k / m.R.at(i, j) - (_Cov_pow + 1) / _theta.at(k));
                 // !! NO: it just work for exp type kernels. Matern MUST have a special treatment !!!
               }
             }
@@ -432,7 +432,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
     for (arma::uword i = 0; i < n; i++) {
       gradR.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
         gradR.tube(j, i) = gradR.tube(i, j); 
       }
     }
@@ -651,7 +651,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
       for (arma::uword i = 0; i < n; i++) {
         //gradR.tube(i, i) = zeros;
         for (arma::uword j = 0; j < i; j++) {
-          gradR.tube(i, j) = m.R.at(i, j) * DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
           gradR.tube(j, i) = gradR.tube(i, j); 
         }
       }
@@ -1378,13 +1378,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
 /** Compute the prediction for given points X'
  * @param X_n is n_n*d matrix of points where to predict output
- * @param withStd is true if return also stdev column vector
- * @param withCov is true if return also cov matrix between X_n
- * @param withDeriv is true if return also derivative of prediction wrt x
+ * @param with_std is true if return also stdev column vector
+ * @param with_cov is true if return also cov matrix between X_n
+ * @param with_deriv is true if return also derivative of prediction wrt x
  * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
-Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeriv) {
+Kriging::predict(const arma::mat& X_n, bool with_std, bool with_cov, bool with_deriv) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1417,7 +1417,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
       if (dij.is_zero(arma::datum::eps))
         R_on.at(i, j) = 1.0;
       else
-        R_on.at(i, j) = Cov(dij, m_theta);
+        R_on.at(i, j) = _Cov(dij, m_theta);
     }
   }
   t0 = Bench::toc(nullptr, "R_on       ", t0);
@@ -1436,20 +1436,20 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
-  if (withStd) {
+  if (with_std) {
   ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
   ysd2_n *= sigma2 * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
-  if (withCov) {
+  if (with_cov) {
   // Compute the covariance matrix between new data points
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
     //R_nn.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+      R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
   R_nn.diag().ones();
@@ -1460,7 +1460,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
-  if (withDeriv) {
+  if (with_deriv) {
   //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
   //for (i in 1:n_n) {
   //  
@@ -1509,7 +1509,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   for (arma::uword i = 0; i < n_n; i++) {  // for each predict point... should be parallel ?
       arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
       for (arma::uword j = 0; j < n_o; j++) {
-        DR_on_i.row(j) = R_on.at(j, i) * trans(DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
+        DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
@@ -1524,7 +1524,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
       Dyhat_n.row(i) = trans(DF_n_i * m_beta + trans(W_i) * m_z);
       t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
-      if (withStd) {
+      if (with_std) {
         arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
@@ -1539,12 +1539,12 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
                          std::move(Sigma_n),
                          std::move(Dyhat_n),
                          std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d, arma::fill::ones))));
-  /*if (withStd)
-    if (withCov)
+  /*if (with_std)
+    if (with_cov)
       return std::make_tuple(std::move(yhat_n), std::move(pred_stdev), std::move(pred_cov));
     else
       return std::make_tuple(std::move(yhat_n), std::move(pred_stdev), nullptr);
-  else if (withCov)
+  else if (with_cov)
     return std::make_tuple(std::move(yhat_n), std::move(pred_cov), nullptr);
   else
     return std::make_tuple(std::move(yhat_n), nullptr, nullptr);*/
@@ -1554,10 +1554,10 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
  * @param nsim is number of simulations to draw
- * @param willUpdate is true if we want to keep simulations data for future update
+ * @param will_update is true if we want to keep simulations data for future update
  * @return output is n_n*nsim matrix of simulations at X_n
  */
-LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& X_n, const bool willUpdate) {
+LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, const arma::mat& X_n, const bool will_update) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1582,7 +1582,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   for (arma::uword i = 0; i < n_n; i++) {
     //R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+      R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
   R_nn.diag().ones();
@@ -1592,14 +1592,14 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
-      R_on.at(i, j) = Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
+      R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
     }
   }
   t0 = Bench::toc(nullptr,"R_on        ", t0);
 
   arma::mat Rstar_on =LinearAlgebra::solve(m_T, R_on);
   t0 = Bench::toc(nullptr,"Rstar_on   ", t0);
-  arma::cout << "Rstar_on:" << Rstar_on << arma::endl;
+  //arma::cout << "Rstar_on:" << Rstar_on << arma::endl;
 
   arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
   t0 = Bench::toc(nullptr,"yhat_n        ", t0);
@@ -1608,17 +1608,17 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat E_n = F_n - Fhat_n;
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
-  arma::cout << "eig(R_nn):" << arma::eig_sym(R_nn) << arma::endl;
+  //arma::cout << "eig(R_nn):" << arma::eig_sym(R_nn) << arma::endl;
 
-arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::endl;
+//arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::endl;
 
   arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
-  arma::cout << "eig(SigmaNoTrend_nKo):" << arma::eig_sym(SigmaNoTrend_nKo) << arma::endl;
+  //arma::cout << "eig(SigmaNoTrend_nKo):" << arma::eig_sym(SigmaNoTrend_nKo) << arma::endl;
 
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
 
-  arma::cout << "eig(Sigma_nKo):" << arma::eig_sym(Sigma_nKo) << arma::endl;
+  //arma::cout << "eig(Sigma_nKo):" << arma::eig_sym(Sigma_nKo) << arma::endl;
 
   arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
   t0 = Bench::toc(nullptr,"LSigma_nKo     ", t0);
@@ -1631,7 +1631,7 @@ arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::en
   // Un-normalize simulations
   y_n = m_centerY + m_scaleY * y_n;
 
-  if (willUpdate) {
+  if (will_update) {
     lastsimup_Xn_u.clear(); // force reset to force update_simulate consider new data
     lastsim_y_n = y_n;
 
@@ -1674,8 +1674,8 @@ arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::en
   return y_n;
 }
 
-LIBKRIGING_EXPORT arma::mat Kriging::rand(const int nsim, const int seed, const arma::mat& X_n, const bool willUpdate) {
-  return simulate(nsim, seed, X_n, willUpdate);
+LIBKRIGING_EXPORT arma::mat Kriging::rand(const int nsim, const int seed, const arma::mat& X_n, const bool will_update) {
+  return simulate(nsim, seed, X_n, will_update);
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
@@ -1728,7 +1728,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
     for (arma::uword i = 0; i < n_u; i++) {
       //lastsimup_R_uu.at(i, i) = 1.0;
       for (arma::uword j = 0; j < i; j++) {
-        lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
+        lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = _Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
       }
     }
     lastsimup_R_uu.diag().ones();
@@ -1738,7 +1738,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
     lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
       for (arma::uword j = 0; j < n_o; j++) {
-        lastsimup_R_uo.at(i, j) = Cov((Xn_u.col(i) - Xn_o.col(j)), m_theta);
+        lastsimup_R_uo.at(i, j) = _Cov((Xn_u.col(i) - Xn_o.col(j)), m_theta);
       }
     }
     t0 = Bench::toc(nullptr,"R_uo          ", t0);
@@ -1747,7 +1747,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
-        lastsimup_R_un.at(i, j) = Cov((Xn_u.col(i) - Xn_n.col(j)), m_theta);
+        lastsimup_R_un.at(i, j) = _Cov((Xn_u.col(i) - Xn_n.col(j)), m_theta);
       }
     }
     t0 = Bench::toc(nullptr,"R_un          ", t0);
@@ -1932,7 +1932,7 @@ void Kriging::save(const std::string filename) const {
   j["version"] = 2;
   j["content"] = "Kriging";
 
-  // Cov_pow & std::function embedded by make_Cov
+  // _Cov_pow & std::function embedded by make_Cov
   j["covType"] = m_covType;
   j["X"] = to_json(m_X);
   j["centerX"] = to_json(m_centerX);
@@ -1980,7 +1980,7 @@ Kriging Kriging::load(const std::string filename) {
   }
 
   std::string covType = j["covType"].template get<std::string>();
-  Kriging kr(covType);  // Cov_pow & std::function embedded by make_Cov
+  Kriging kr(covType);  // _Cov_pow & std::function embedded by make_Cov
 
   kr.m_X = mat_from_json(j["X"]);
   kr.m_centerX = rowvec_from_json(j["centerX"]);

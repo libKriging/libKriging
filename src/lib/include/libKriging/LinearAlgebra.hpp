@@ -32,12 +32,12 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat cholCov(arma::mat* R,
                                       const arma::mat& _dX,
                                       const arma::vec& _theta,
-                                      std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                      std::function<double(const arma::vec&, const arma::vec&)> _Cov,
                                       const double factor, const arma::vec diag);
   LIBKRIGING_EXPORT static arma::mat update_cholCov(arma::mat* R,
                                         const arma::mat& _dX,
                                         const arma::vec& _theta, 
-                                        std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                        std::function<double(const arma::vec&, const arma::vec&)> _Cov,
                                         const double factor, const arma::vec diag,
                                         const arma::mat& T_old, const arma::mat& R_old);
 

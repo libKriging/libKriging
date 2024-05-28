@@ -10,7 +10,7 @@ classKriging <- function(nk) {
     class(nk) <- "Kriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in c('as.km','as.list','copy','fit','save',
-    'covFun','leaveOneOut','leaveOneOutFun','leaveOneOutVec',
+    'covMat','leaveOneOut','leaveOneOutFun','leaveOneOutVec',
     'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update', 'update_simulate')) {
         eval(parse(text=paste0(
@@ -488,7 +488,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALS
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(kriging_simulate(object, nsim = nsim, seed = seed, X = x, willUpdate = will_update))
+    return(kriging_simulate(object, nsim = nsim, seed = seed, X = x, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{Kriging} model object.
@@ -673,9 +673,9 @@ load.Kriging <- function(filename, ...) {
 #' 
 #' @return A matrix of the covariance matrix of the Kriging model.
 #' 
-#' @method covFun Kriging
+#' @method covMat Kriging
 #' @export
-#' @aliases covFun,Kriging,Kriging-method
+#' @aliases covMat,Kriging,Kriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -688,8 +688,8 @@ load.Kriging <- function(filename, ...) {
 #' x1 = runif(10)
 #' x2 = runif(10)
 #' 
-#' covFun(k, x1, x2)
-covFun.Kriging <- function(object, x1, x2, ...) {
+#' covMat(k, x1, x2)
+covMat.Kriging <- function(object, x1, x2, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(x1)) x1 = data.matrix(x1)
@@ -702,7 +702,7 @@ covFun.Kriging <- function(object, x1, x2, ...) {
     if (ncol(x2) != ncol(k$X))
         stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
              ncol(x2), ")")
-    return(kriging_covFun(object, x1, x2))
+    return(kriging_covMat(object, x1, x2))
 }
 
 #' Compute Log-Likelihood of Kriging Model

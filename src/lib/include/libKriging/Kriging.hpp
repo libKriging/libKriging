@@ -115,10 +115,10 @@ class Kriging {
   arma::mat lastsimup_R_un;
   arma::mat lastsimup_R_uu;
 
-  std::function<double(const arma::vec&, const arma::vec&)> Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx;
-  double Cov_pow;
+  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
+  double _Cov_pow;
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
@@ -169,7 +169,7 @@ class Kriging {
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
-  LIBKRIGING_EXPORT arma::mat covFun(const arma::mat& X1, const arma::mat& X2);
+  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -204,15 +204,15 @@ class Kriging {
 
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
-   * @param withStd is true if return also stdev column vector
-   * @param withCov is true if return also cov matrix between X_n
-   * @param withderiv is true if return also derivative at X_n
+   * @param with_std is true if return also stdev column vector
+   * @param with_cov is true if return also cov matrix between X_n
+   * @param with_deriv is true if return also derivative at X_n
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
-                                                                                                    bool withStd,
-                                                                                                    bool withCov,
-                                                                                                    bool withDeriv);
+                                                                                                    bool with_std,
+                                                                                                    bool with_cov,
+                                                                                                    bool with_deriv);
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output

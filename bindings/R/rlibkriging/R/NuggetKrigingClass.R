@@ -10,7 +10,7 @@ classNuggetKriging <-function(nk) {
     class(nk) <- "NuggetKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in c('as.km','as.list','copy','fit','save',
-    'covFun','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'covMat','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
@@ -481,7 +481,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget 
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, withNugget = with_nugget, willUpdate = will_update))
+    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, with_nugget = with_nugget, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{NuggetKriging} model object.
@@ -671,9 +671,9 @@ load.NuggetKriging <- function(filename, ...) {
 #' 
 #' @return A matrix of the covariance matrix of the NuggetKriging model.
 #' 
-#' @method covFun NuggetKriging
+#' @method covMat NuggetKriging
 #' @export
-#' @aliases covFun,NuggetKriging,NuggetKriging-method
+#' @aliases covMat,NuggetKriging,NuggetKriging-method
 #' 
 #' @examples
 #' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -686,8 +686,8 @@ load.NuggetKriging <- function(filename, ...) {
 #' x1 = runif(10)
 #' x2 = runif(10)
 #' 
-#' covFun(k, x1, x2)
-covFun.NuggetKriging <- function(object, x1, x2, ...) {
+#' covMat(k, x1, x2)
+covMat.NuggetKriging <- function(object, x1, x2, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(x1)) x1 = data.matrix(x1)
@@ -700,7 +700,7 @@ covFun.NuggetKriging <- function(object, x1, x2, ...) {
     if (ncol(x2) != ncol(k$X))
         stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
              ncol(x2), ")")
-    return(nuggetkriging_covFun(object, x1, x2))
+    return(nuggetkriging_covMat(object, x1, x2))
 }
 
 #' Compute Log-Likelihood of NuggetKriging Model

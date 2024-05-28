@@ -43,7 +43,7 @@ lines(X_n,lp$mean,col='red')
 polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
 ls = NULL
-ls = lk$simulate(1000, 123, X_n) # libK simulate
+ls = lk$simulate(1000, 123, X_n, with_noise=NULL) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
     lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }
@@ -88,8 +88,8 @@ polygon(c(X_n,rev(X_n)),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rg
 lines(X_n,lpu$mean,col='blue')
 polygon(c(X_n,rev(X_n)),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 
-ls2 = l2$simulate(1000, 123, X_n)
-lsu = lu$simulate(1000, 123, X_n)
+ls2 = l2$simulate(1000, 123, X_n, with_noise=NULL)
+lsu = lu$simulate(1000, 123, X_n, with_noise=NULL)
 for (i in 1:100) {
     lines(X_n,ls2[,i],col=rgb(1,0,0,.1),lwd=4)
     lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
@@ -115,7 +115,7 @@ noise_u = rep(noise, length(X_u))
 
 X_n = sort(c(X_u+1e-3,X_n)) # add some nugget to avoid degenerate cases
 
-ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
+ls = lk$simulate(1000, 123, X_n, with_noise=NULL, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus=NULL
 lus = lk$update_simulate(y_u, noise_u, X_u)
@@ -127,7 +127,7 @@ lus = lk$update_simulate(y_u, noise_u, X_u)
 lu = copy(lk)
 lu$update(y_u, noise_u, matrix(X_u,ncol=1), refit=TRUE) # refit=TRUE will update beta (required to match l2)
 lsu=NULL
-lsu = lu$simulate(1000, 123, X_n)
+lsu = lu$simulate(1000, 123, X_n, with_noise=NULL)
 
 plot(f)
 points(X_o,y_o,pch=16)

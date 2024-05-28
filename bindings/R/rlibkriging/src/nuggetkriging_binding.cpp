@@ -312,7 +312,7 @@ std::string nuggetkriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bool cov = false, bool deriv = false) {
+Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool with_std = true, bool with_cov = false, bool with_deriv = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -337,14 +337,14 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, b
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool withNugget, bool willUpdate = false) {
+arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool with_nugget, bool will_update = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim, seed, X, withNugget, willUpdate);
+  return impl_ptr->simulate(nsim, seed, X, with_nugget, will_update);
 }
 
 // [[Rcpp::export]]
@@ -386,7 +386,7 @@ void nuggetkriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_covFun(Rcpp::List k,
+arma::mat nuggetkriging_covMat(Rcpp::List k,
                           arma::mat X1,
                           arma::mat X2) {
   if (!k.inherits("NuggetKriging"))
@@ -395,7 +395,7 @@ arma::mat nuggetkriging_covFun(Rcpp::List k,
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  return impl_ptr->covFun(X1,X2);
+  return impl_ptr->covMat(X1,X2);
 }
 
 // [[Rcpp::export]]

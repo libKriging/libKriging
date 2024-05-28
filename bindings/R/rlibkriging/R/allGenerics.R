@@ -28,8 +28,8 @@ as.km <- function(x, ...) {
 }
 
 ## True generic
-setGeneric(name = "covFun",
-           def = function(object, ...) standardGeneric("covFun"))
+setGeneric(name = "covMat",
+           def = function(object, ...) standardGeneric("covMat"))
 
 ## *****************************************************************************
 ##' Compute the covariance matrix of a model given in \code{object},
@@ -42,8 +42,8 @@ setGeneric(name = "covFun",
 ##'
 ##' @return The covariance matrix.
 ##' @export
-covFun <- function(object, ...) {
-    UseMethod("covFun")
+covMat <- function(object, ...) {
+    UseMethod("covMat")
 }
 
 

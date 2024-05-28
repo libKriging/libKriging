@@ -83,20 +83,20 @@ test_that("noise / predict cov dim",
 context("noise / simulate")
 
 test_that("noise / simulate dim",
-          expect_equal(dim(simulate(r,x=rbind(runif(d),runif(d)))),c(2,1)))
+          expect_equal(dim(simulate(r,x=rbind(runif(d),runif(d)), with_noise=NULL)),c(2,1)))
 test_that("noise / simulate nsim dim",
-          expect_equal(dim(simulate(r,x=rbind(runif(d),runif(d)),nsim=10)),c(2,10)))
+          expect_equal(dim(simulate(r,x=rbind(runif(d),runif(d)),nsim=10, with_noise=NULL)),c(2,10)))
 
 expect_not_equal = function(x,y,...)
   expect_false(isTRUE(all.equal(x, y)))
 test_that("noise / simulate mean X",
-          expect_not_equal(mean(simulate(r,nsim = 100, x=X[1,]+0.00005)),y[1],tolerance = 0.01))
+          expect_not_equal(mean(simulate(r,nsim = 100, x=X[1,]+0.00005, with_noise=NULL)),y[1],tolerance = 0.01))
 set.seed(12345)
 x = runif(d)
 test_that("noise / simulate mean",
-          expect_equal(mean(simulate(r,nsim = 100, x=x)),predict(r,x)$mean[1],tolerance = 0.01))
+          expect_equal(mean(simulate(r,nsim = 100, x=x, with_noise=NULL)),predict(r,x)$mean[1],tolerance = 0.01))
 test_that("noise / simulate sd",
-          expect_equal(sd(simulate(r,nsim = 100, x=x)),predict(r,x)$stdev[1],tolerance = 0.01))
+          expect_equal(sd(simulate(r,nsim = 100, x=x, with_noise=NULL)),predict(r,x)$stdev[1],tolerance = 0.01))
 
 
 context("noise / update")

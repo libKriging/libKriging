@@ -118,7 +118,7 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R, 
 const arma::mat& _dX, const arma::vec& _theta, 
-std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+std::function<double (const arma::vec &, const arma::vec &)> _Cov, 
 const double factor, const arma::vec diag) {
   arma::uword n = (*R).n_rows;
 
@@ -126,48 +126,48 @@ const double factor, const arma::vec diag) {
   for (arma::uword i = 0; i < n; i++) {
     //(*R).at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
+      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
     }
   }
   (*R) *= factor; // !!! requires that diag is setup after
-  //t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
+  //t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
 
 // Slower:
   // std::vector<std::thread> col_threads(n);
   // std::vector<arma::colvec> col_vecs(n);
   // for (arma::uword i = 0; i < n; i++) {
-  //   col_threads[i] = std::thread([i, &col_vecs, _dX, _theta, Cov, factor, n](){
+  //   col_threads[i] = std::thread([i, &col_vecs, _dX, _theta, _Cov, factor, n](){
   //     arma::colvec col_vecs_i = arma::colvec(n,arma::fill::none);
   //     for (arma::uword j = 0; j < n; j++) {
-  //       col_vecs_i.at(j) = Cov(_dX.col(i * n + j), _theta) * factor;
+  //       col_vecs_i.at(j) = _Cov(_dX.col(i * n + j), _theta) * factor;
   //     }
   //     col_vecs[i] = col_vecs_i;
   //   });
-  //   //(*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
-  //   ////t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
+  //   //(*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta) * factor;
+  //   ////t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
   // }
   // for (arma::uword i = 0; i < n; i++) {
   //   col_threads[i].join();
   //   (*R).col(i) = col_vecs[i];
   // }
-  // //t0 = Bench::toc(nullptr, "    Cov (threads): " + std::to_string(n) + "/" + std::to_string(n),t0);
+  // //t0 = Bench::toc(nullptr, "    _Cov (threads): " + std::to_string(n) + "/" + std::to_string(n),t0);
 
 // Same speed:
 //#pragma omp parallel for shared(*R) 
 //  for (arma::uword i = 0; i < n; i++) {
 //    (*R).at(i, i) = 1.0;
 //    for (arma::uword j = 0; j < i; j++) {
-//      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta) * factor;
+//      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta) * factor;
 //    }
 //  }
-//  //t0 = Bench::toc(nullptr, "    Cov (omp): " + std::to_string(n) + "/" + std::to_string(n),t0);
+//  //t0 = Bench::toc(nullptr, "    _Cov (omp): " + std::to_string(n) + "/" + std::to_string(n),t0);
   
   if (diag.n_elem == 0) {
     (*R).diag().ones();//(*R).diag() = arma::vec(n, arma::fill::ones);
   } else {
     (*R).diag() = diag;
   }
-  //t0 = Bench::toc(nullptr, "    Cov: diag",t0);
+  //t0 = Bench::toc(nullptr, "    _Cov: diag",t0);
 
   // Cholesky decompostion of covariance matrix
 
@@ -179,7 +179,7 @@ const double factor, const arma::vec diag) {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat* R, 
 const arma::mat& _dX, const arma::vec& _theta, 
-std::function<double (const arma::vec &, const arma::vec &)> Cov, 
+std::function<double (const arma::vec &, const arma::vec &)> _Cov, 
 const double factor, const arma::vec diag,
 const arma::mat& T_old, const arma::mat& R_old) {
   arma::uword n_old = T_old.n_rows;
@@ -187,24 +187,24 @@ const arma::mat& T_old, const arma::mat& R_old) {
 
   //auto t0 = Bench::tic();
   (*R).submat(0, 0, n_old-1, n_old-1) = R_old; //T_old * T_old.t();// hope that does not cost too much... (we dont save previous R)
-  //t0 = Bench::toc(nullptr, "    Cov: restore old",t0);
+  //t0 = Bench::toc(nullptr, "    _Cov: restore old",t0);
   for (arma::uword i = n_old; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      (*R).at(i, j) = (*R).at(j, i) = Cov(_dX.col(i * n + j), _theta);
+      (*R).at(i, j) = (*R).at(j, i) = _Cov(_dX.col(i * n + j), _theta);
     }
-    ////t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
+    ////t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(i) + "/" + std::to_string(n),t0);
   }
   //(*R).submat(n_old, n_old, n-1, n-1) *= factor; // !!! requires that diag is setup after
   (*R).submat(n_old, 0, n-1, n_old-1) *= factor;
   (*R).submat(0, n_old, n-1, n-1) *= factor;
-  //t0 = Bench::toc(nullptr, "    Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
+  //t0 = Bench::toc(nullptr, "    _Cov: " + std::to_string(n) + "/" + std::to_string(n),t0);
   
   if (diag.n_elem == 0) {
     (*R).diag().ones();//(*R).diag() = arma::vec(n, arma::fill::ones);
   } else {
     (*R).diag() = diag;
   }
-  //t0 = Bench::toc(nullptr, "    Cov: diag",t0);
+  //t0 = Bench::toc(nullptr, "    _Cov: diag",t0);
 
   arma::mat L = LinearAlgebra::chol_block(*R, T_old);
   //t0 = Bench::toc(nullptr, "    Chol Block",t0);

@@ -16,7 +16,7 @@
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
-//' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
+//' @ref https://github.com/cran/DiceKriging/blob/master/src/covMats.c
 // Covariance function on normalized data
 
 std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_gauss
