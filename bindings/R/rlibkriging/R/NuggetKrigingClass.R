@@ -10,7 +10,7 @@ classNuggetKriging <-function(nk) {
     class(nk) <- "NuggetKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in c('as.km','as.list','copy','fit','save',
-    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'covFun','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
     'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
@@ -471,7 +471,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE,  ...) {
+simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget = FALSE, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)
@@ -481,7 +481,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, will_update 
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, willUpdate = will_update))
+    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, withNugget = with_nugget, willUpdate = will_update))
 }
 
 #' Update previous simulation of a \code{NuggetKriging} model object.
@@ -660,6 +660,48 @@ load.NuggetKriging <- function(filename, ...) {
     return(classNuggetKriging(nuggetkriging_load(filename)))
 }
 
+#' Compute Covariance Matrix of NuggetKriging Model
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NuggetKriging object.
+#' @param x1 Numeric matrix of input points.
+#' @param x2 Numeric matrix of input points.
+#' @param ... Not used.
+#' 
+#' @return A matrix of the covariance matrix of the NuggetKriging model.
+#' 
+#' @method covFun NuggetKriging
+#' @export
+#' @aliases covFun,NuggetKriging,NuggetKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- NuggetKriging(y, X, kernel = "gauss")
+#' 
+#' x1 = runif(10)
+#' x2 = runif(10)
+#' 
+#' covFun(k, x1, x2)
+covFun.NuggetKriging <- function(object, x1, x2, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- nuggetkriging_model(object)
+    if (is.data.frame(x1)) x1 = data.matrix(x1)
+    if (is.data.frame(x2)) x2 = data.matrix(x2)
+    if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(k$X))
+    if (!is.matrix(x2)) x2 = matrix(x2, ncol = ncol(k$X))
+    if (ncol(x1) != ncol(k$X))
+        stop("Input x1 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x1), ")")
+    if (ncol(x2) != ncol(k$X))
+        stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x2), ")")
+    return(nuggetkriging_covFun(object, x1, x2))
+}
 
 #' Compute Log-Likelihood of NuggetKriging Model
 #'

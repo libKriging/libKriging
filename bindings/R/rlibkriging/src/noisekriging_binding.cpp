@@ -300,14 +300,14 @@ Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X, bool stdev = true, bo
 }
 
 // [[Rcpp::export]]
-arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, bool willUpdate = false) {
+arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X, arma::vec noise, bool willUpdate = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  return impl_ptr->simulate(nsim, seed, X, willUpdate);
+  return impl_ptr->simulate(nsim, seed, X, noise, willUpdate);
 }
 
 // [[Rcpp::export]]
@@ -346,6 +346,19 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
   return impl_ptr->save(filename);
+}
+
+// [[Rcpp::export]]
+arma::mat noisekriging_covFun(Rcpp::List k,
+                          arma::mat X1,
+                          arma::mat X2) {
+  if (!k.inherits("NoiseKriging"))
+    Rcpp::stop("Input must be a NoiseKriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+
+  return impl_ptr->covFun(X1,X2);
 }
 
 // [[Rcpp::export]]

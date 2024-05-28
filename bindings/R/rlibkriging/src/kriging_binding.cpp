@@ -343,6 +343,19 @@ void kriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
+arma::mat kriging_covFun(Rcpp::List k,
+                          arma::mat X1,
+                          arma::mat X2) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  return impl_ptr->covFun(X1,X2);
+}
+
+// [[Rcpp::export]]
 Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
                                     arma::vec theta,
                                     bool grad = false,

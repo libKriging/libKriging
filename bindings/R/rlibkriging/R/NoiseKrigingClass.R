@@ -10,7 +10,7 @@ classNoiseKriging <- function(nk) {
     class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
     for (f in c('as.km','as.list','copy','fit','save',
-    'logLikelihood','logLikelihoodFun',
+    'covFun','logLikelihood','logLikelihoodFun',
     'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
@@ -470,7 +470,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE,  ...) {
+simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, noise = NULL, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)
@@ -478,9 +478,9 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, will_update =
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x),")")
-    ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, willUpdate = will_update))
+    if (is.null(noise)) noise = rep(0, nrow(x))
+    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, noise, willUpdate = will_update))
 }
 
 #' Update previous simulation of a \code{NoiseKriging} model object.
@@ -662,6 +662,48 @@ load.NoiseKriging <- function(filename, ...) {
     return(classNoiseKriging(noisekriging_load(filename)))
 }
 
+#' Compute Covariance Matrix of NoiseKriging Model
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 NoiseKriging object.
+#' @param x1 Numeric matrix of input points.
+#' @param x2 Numeric matrix of input points.
+#' @param ... Not used.
+#' 
+#' @return A matrix of the covariance matrix of the NoiseKriging model.
+#' 
+#' @method covFun NoiseKriging
+#' @export
+#' @aliases covFun,NoiseKriging,NoiseKriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X) + X/10 * rnorm(nrow(X))
+#'
+#' k <- NoiseKriging(y, (X/10)^2, X, "matern3_2")
+#' 
+#' x1 = runif(10)
+#' x2 = runif(10)
+#' 
+#' covFun(k, x1, x2)
+covFun.NoiseKriging <- function(object, x1, x2, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- kriging_model(object)
+    if (is.data.frame(x1)) x1 = data.matrix(x1)
+    if (is.data.frame(x2)) x2 = data.matrix(x2)
+    if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(k$X))
+    if (!is.matrix(x2)) x2 = matrix(x2, ncol = ncol(k$X))
+    if (ncol(x1) != ncol(k$X))
+        stop("Input x1 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x1), ")")
+    if (ncol(x2) != ncol(k$X))
+        stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x2), ")")
+    return(noisekriging_covFun(object, x1, x2))
+}
 
 #' Compute Log-Likelihood of NoiseKriging Model
 #'

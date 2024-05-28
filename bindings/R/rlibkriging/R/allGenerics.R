@@ -8,16 +8,6 @@
 ##
 ## ****************************************************************************
 
-## True generic
-setGeneric(name = "logLikelihoodFun",
-           def = function(object, ...) standardGeneric("logLikelihoodFun"))
-
-setGeneric(name = "logMargPostFun",
-           def = function(object, ...) standardGeneric("logMargPostFun"))
-
-setGeneric(name = "leaveOneOutFun",
-           def = function(object, ...) standardGeneric("leaveOneOutFun"))
-
 ## *****************************************************************************
 ##' Coerce an object into an object with S4 class \code{"km"} from the
 ##' \pkg{DiceKriging} package.
@@ -36,6 +26,35 @@ setGeneric(name = "leaveOneOutFun",
 as.km <- function(x, ...) {
     UseMethod("as.km")
 }
+
+## True generic
+setGeneric(name = "covFun",
+           def = function(object, ...) standardGeneric("covFun"))
+
+## *****************************************************************************
+##' Compute the covariance matrix of a model given in \code{object},
+##' between given set of points.
+##'
+##' @title covariance function
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. points, range).
+##'
+##' @return The covariance matrix.
+##' @export
+covFun <- function(object, ...) {
+    UseMethod("covFun")
+}
+
+
+setGeneric(name = "logLikelihoodFun",
+           def = function(object, ...) standardGeneric("logLikelihoodFun"))
+
+setGeneric(name = "logMargPostFun",
+           def = function(object, ...) standardGeneric("logMargPostFun"))
+
+setGeneric(name = "leaveOneOutFun",
+           def = function(object, ...) standardGeneric("leaveOneOutFun"))
 
 ## *****************************************************************************
 ##' Compute the leave-One-Out error of a model given in \code{object},
