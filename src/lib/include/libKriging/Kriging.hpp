@@ -169,6 +169,8 @@ class Kriging {
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
+  LIBKRIGING_EXPORT arma::mat covFun(const arma::mat& X1, const arma::mat& X2);
+
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param X is n*d matrix of input
@@ -202,8 +204,9 @@ class Kriging {
 
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
-   * @param std is true if return also stdev column vector
-   * @param cov is true if return also cov matrix between X_n
+   * @param withStd is true if return also stdev column vector
+   * @param withCov is true if return also cov matrix between X_n
+   * @param withderiv is true if return also derivative at X_n
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
@@ -211,20 +214,37 @@ class Kriging {
                                                                                                     bool withCov,
                                                                                                     bool withDeriv);
 
-  /** Draw sample trajectories of kriging at given points X'
+  /** Draw observed trajectories of kriging at given points X_n
+   * @param X_n is m*d matrix of points where to simulate output
+   * @param nsim is number of simulations to draw
+   * @param seed random seed setup for simulations
+   * @param will_update store useful data for possible future update
+   * @return output is m*nsim matrix of simulations at X_n
+   */
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update = false);
+
+  /** Draw sampled trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
    * @param seed random seed setup for sample simulations
-   * @param willUpdate store useful data for possible future update
+   * @param will_update store useful data for possible future update
    * @return output is m*nsim matrix of simulations at X_n
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool willUpdate = false);
+  LIBKRIGING_EXPORT arma::mat rand(const int nsim, const int seed, const arma::mat& X_n, const bool will_update);
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
+   * @return output is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
+
+  /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-sample to previous X_n
+   * @param y_u is m length column vector of new output
+   * @param X_u is m*d matrix of new input
+   * @return output is m*nsim matrix of simulations at X_n
+   */
+  LIBKRIGING_EXPORT arma::mat update_rand(const arma::vec& y_u, const arma::mat& X_u);
 
   /** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output

@@ -61,6 +61,23 @@ void Kriging::make_Cov(const std::string& covType) {
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
+LIBKRIGING_EXPORT arma::mat Kriging::covFun(const arma::mat& X1, const arma::mat& X2) {
+  arma::mat Xn1 = X1;
+  arma::mat Xn2 = X2;
+  Xn1.each_row() -= m_centerX;
+  Xn1.each_row() /= m_scaleX;
+  Xn2.each_row() -= m_centerX;
+  Xn2.each_row() /= m_scaleX;
+
+  arma::mat R = arma::mat(X1.n_rows, X2.n_rows, arma::fill::none);
+  for (arma::uword i = 0; i < Xn1.n_rows; i++) {
+    for (arma::uword j = 0; j < Xn2.n_rows; j++) {
+      R.at(i, j) = R.at(j, i) = Cov((Xn1.row(i)- Xn2.row(j)).t(), m_theta);
+    }
+  }
+  return R;
+}
+
 // at least, just call make_Cov(kernel)
 LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType) {
   make_Cov(covType);
@@ -1361,8 +1378,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
 /** Compute the prediction for given points X'
  * @param X_n is n_n*d matrix of points where to predict output
- * @param std is true if return also stdev column vector
- * @param cov is true if return also cov matrix between X_n
+ * @param withStd is true if return also stdev column vector
+ * @param withCov is true if return also cov matrix between X_n
+ * @param withDeriv is true if return also derivative of prediction wrt x
  * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
@@ -1396,10 +1414,10 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
       arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-      if (arma::any(dij != 0))
-        R_on.at(i, j) = Cov(dij, m_theta);
-      else
+      if (dij.is_zero(arma::datum::eps))
         R_on.at(i, j) = 1.0;
+      else
+        R_on.at(i, j) = Cov(dij, m_theta);
     }
   }
   t0 = Bench::toc(nullptr, "R_on       ", t0);
@@ -1419,7 +1437,7 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (withStd) {
-  ysd2_n = 1 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
+  ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
   ysd2_n *= sigma2 * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
@@ -1429,11 +1447,12 @@ Kriging::predict(const arma::mat& X_n, bool withStd, bool withCov, bool withDeri
   // Compute the covariance matrix between new data points
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
-    R_nn.at(i, i) = 1;
+    //R_nn.at(i, i) = 1;
     for (arma::uword j = 0; j < i; j++) {
       R_nn.at(i, j) = R_nn.at(j, i) = Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
+  R_nn.diag().ones();
   t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
   Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
@@ -1580,6 +1599,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
 
   arma::mat Rstar_on =LinearAlgebra::solve(m_T, R_on);
   t0 = Bench::toc(nullptr,"Rstar_on   ", t0);
+  arma::cout << "Rstar_on:" << Rstar_on << arma::endl;
 
   arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
   t0 = Bench::toc(nullptr,"yhat_n        ", t0);
@@ -1588,10 +1608,17 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
   arma::mat E_n = F_n - Fhat_n;
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
+  arma::cout << "eig(R_nn):" << arma::eig_sym(R_nn) << arma::endl;
+
+arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::endl;
 
   arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
+  arma::cout << "eig(SigmaNoTrend_nKo):" << arma::eig_sym(SigmaNoTrend_nKo) << arma::endl;
+
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
+
+  arma::cout << "eig(Sigma_nKo):" << arma::eig_sym(Sigma_nKo) << arma::endl;
 
   arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
   t0 = Bench::toc(nullptr,"LSigma_nKo     ", t0);
@@ -1645,6 +1672,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim, const int seed, co
 
   // Un-normalize simulations
   return y_n;
+}
+
+LIBKRIGING_EXPORT arma::mat Kriging::rand(const int nsim, const int seed, const arma::mat& X_n, const bool willUpdate) {
+  return simulate(nsim, seed, X_n, willUpdate);
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
@@ -1784,6 +1815,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   }
 
   return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u,1,lastsim_nsim) - lastsimup_y_u);  
+}
+
+LIBKRIGING_EXPORT arma::mat Kriging::update_rand(const arma::vec& y_u, const arma::mat& X_u) {
+  return update_simulate(y_u, X_u);
 }
 
 /** Add new conditional data points to previous (X,y), then perform new fit.

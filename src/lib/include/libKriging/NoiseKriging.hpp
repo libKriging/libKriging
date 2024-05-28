@@ -92,6 +92,7 @@ class NoiseKriging {
   // Simulation stored data
   arma::mat lastsim_Xn_n;
   arma::mat lastsim_y_n;
+  arma::vec lastsim_noise_n;
   int lastsim_nsim;
   int lastsim_seed;
   arma::mat lastsim_F_n;
@@ -161,6 +162,8 @@ class NoiseKriging {
 
   LIBKRIGING_EXPORT NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier);
 
+  LIBKRIGING_EXPORT arma::mat covFun(const arma::mat& X1, const arma::mat& X2);
+
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
    * @param noise is n length column vector of output variances
@@ -184,32 +187,36 @@ class NoiseKriging {
   LIBKRIGING_EXPORT double logLikelihood();
 
   /** Compute the prediction for given points X'
-   * @param Xp is m*d matrix of points where to predict output
-   * @param std is true if return also stdev column vector
-   * @param cov is true if return also cov matrix between Xp
+   * @param X_n is m*d matrix of points where to predict output
+   * @param withStd is true if return also stdev column vector
+   * @param withCov is true if return also cov matrix between X_n
+   * @param withderiv is true if return also derivative at X_n
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& Xp,
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
                                                                                                     bool withStd,
                                                                                                     bool withCov,
                                                                                                     bool withDeriv);
 
-  /** Draw sample trajectories of kriging at given points X'
-   * @param X_n is m*d matrix of points where to simulate output
+  /** Draw observed trajectories of kriging at given points X_n
    * @param nsim is number of simulations to draw
-   * @param seed random seed setup for sample simulations
+   * @param seed random seed setup for simulations
+   * @param X_n is m*d matrix of points where to simulate output
+   * @param noise_n is m length column vector of output variances
    * @param willUpdate store useful data for possible future update
    * @return output is m*nsim matrix of simulations at X_n
    */
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool willUpdate = false);
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const arma::vec& noise_n, const bool willUpdate = false);
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
+   * @param noise_u is m length column vector of new output variances
    * @param X_u is m*d matrix of new input
+   * @return output is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::vec& noise_u, const arma::mat& X_u);
 
-  /** Add new conditional data points to previous (X,y)
+/** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output
    * @param noise_u is m length column vector of new output variances
    * @param X_u is m*d matrix of new input
