@@ -115,11 +115,11 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Range{2, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* km = input.getObjectFromRef<NoiseKriging>(0, "NoiseKriging reference");
-  const bool with_std = flag_output_compliance(input, 2, "with_std", output, 1);
+  const bool with_stdev = flag_output_compliance(input, 2, "with_stdev", output, 1);
   const bool with_cov = flag_output_compliance(input, 3, "with_cov", output, 2);
   const bool with_deriv = flag_output_compliance(input, 4, "with_deriv", output, 3);
   auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m]
-      = km->predict(input.get<arma::mat>(1, "matrix"), with_std, with_cov, with_deriv);
+      = km->predict(input.get<arma::mat>(1, "matrix"), with_stdev, with_cov, with_deriv);
   output.set(0, y_pred, "predicted response");
   output.setOptional(1, stderr_v, "stderr vector");
   output.setOptional(2, cov_m, "cov matrix");

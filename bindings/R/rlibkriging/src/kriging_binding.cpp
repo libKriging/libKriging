@@ -269,23 +269,23 @@ std::string kriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool with_std = true, bool with_cov = false, bool with_deriv = false) {
+Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool with_stdev = true, bool with_cov = false, bool with_deriv = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  auto pred = impl_ptr->predict(X, stdev, cov, deriv);
+  auto pred = impl_ptr->predict(X, with_stdev, with_cov, with_deriv);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
-  if (stdev) {
+  if (with_stdev) {
     ret.push_back(std::get<1>(pred), "stdev");
   }
-  if (cov) {
+  if (with_cov) {
     ret.push_back(std::get<2>(pred), "cov");
   }
-  if (deriv) {
+  if (with_deriv) {
     ret.push_back(std::get<3>(pred), "mean_deriv");
     ret.push_back(std::get<4>(pred), "stdev_deriv");
   }
@@ -358,8 +358,8 @@ arma::mat kriging_covMat(Rcpp::List k,
 // [[Rcpp::export]]
 Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
                                     arma::vec theta,
-                                    bool grad = false,
-                                    bool hess = false,
+                                    bool with_grad = false,
+                                    bool with_hess = false,
                                     bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
@@ -392,7 +392,7 @@ double kriging_logLikelihood(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool grad = false, bool bench = false) {
+Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool with_grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -437,7 +437,7 @@ double kriging_leaveOneOut(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool grad = false, bool bench = false) {
+Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool with_grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
