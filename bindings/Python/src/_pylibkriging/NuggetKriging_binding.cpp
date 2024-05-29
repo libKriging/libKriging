@@ -81,7 +81,7 @@ std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::ar
 PyNuggetKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X_n, return_stdev, return_cov, return_deriv);
+      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(y_predict, true),
                          carma::col_to_arr(y_stderr, true),
                          carma::mat_to_arr(y_cov, true),
