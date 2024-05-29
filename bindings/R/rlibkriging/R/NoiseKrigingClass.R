@@ -77,7 +77,7 @@ classNoiseKriging <- function(nk) {
 #' print(k)
 #'
 #' x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
-#' p <- predict(k,x = x, stdev = TRUE, cov = FALSE)
+#' p <- predict(k,x = x, return_stdev = TRUE, return_cov = FALSE)
 #'
 #' plot(f)
 #' points(X, y)
@@ -567,7 +567,7 @@ update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
 #' update(k, y_u, rep(0.1^2,3), X_u)
 #'
 #' ## include design points to see interpolation
-#' x <- sort(c(X,newX,seq(from = 0, to = 1, length.out = 101)))
+#' x <- sort(c(X,X_n,seq(from = 0, to = 1, length.out = 101)))
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),

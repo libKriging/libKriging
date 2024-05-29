@@ -312,14 +312,14 @@ std::string nuggetkriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
+Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  auto pred = impl_ptr->predict(X, return_stdev, return_cov, return_deriv);
+  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   if (return_stdev) {

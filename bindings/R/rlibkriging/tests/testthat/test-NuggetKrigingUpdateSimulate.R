@@ -164,7 +164,7 @@ for (i in 1:length(X_n)) {
     lines(density(lus[i,]),col='red')
     #if (all(abs(X_n[i]-X_u)>1e-2))
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_n[i]," ",
+    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_u[i]," ",
     mean(lus[i,]),",",sd(lus[i,])," != ",mean(lsu[i,]),",",sd(lsu[i,])),
         expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 1e-10)) # just check that it is not clearly wrong
 }

@@ -364,17 +364,17 @@ for (i in 1:length(logn)) {
   X <- matrix(runif(n*d),ncol=d)
   y <- f(X)
   
-  newX = matrix(runif(100*d),ncol=d)
+  X_n = matrix(runif(100*d),ncol=d)
   
   k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
   times$R[i] = system.time(
-    try({for (t in 1:N) p <- DiceKriging::predict(k,newdata = newX, type="UK",cov.compute = FALSE,checkNames=FALSE)})
+    try({for (t in 1:N) p <- DiceKriging::predict(k,newdata = X_n, type="UK",cov.compute = FALSE,checkNames=FALSE)})
   )[1]
 
   r <- Kriging(y, X,"gauss", "constant", FALSE,"BFGS", "LL",
                parameters=list(sigma2=k@covariance@sd2,theta=matrix(k@parinit,ncol=d)))
   times$cpp[i] = system.time(
-    try({for (t in 1:N) p2 <- predict(r,newX,TRUE,FALSE)}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) p2 <- predict(r,X_n,TRUE,FALSE)}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (max(abs(p$mean-p2$mean))>1E-3) warning("predict is not identical bw C++/R")
@@ -398,17 +398,17 @@ for (i in 1:length(logn)) {
   X <- matrix(runif(n*d),ncol=d)
   y <- f(X)
   
-  newX = matrix(runif(100*d),ncol=d)
+  X_n = matrix(runif(100*d),ncol=d)
   
   k <- DiceKriging::km(design=X, response=y, covtype = "gauss", control=list(trace=F))
   times$R[i] = system.time(
-    try({for (t in 1:N) s <- DiceKriging::simulate(k,newdata = newX, nsim=10,checkNames=FALSE,cond=TRUE)})
+    try({for (t in 1:N) s <- DiceKriging::simulate(k,newdata = X_n, nsim=10,checkNames=FALSE,cond=TRUE)})
   )[1]
 
   r <- Kriging(y, X,"gauss", "constant", FALSE,"BFGS", "LL",
                parameters=list(sigma2=k@covariance@sd2,theta=matrix(k@parinit,ncol=d)))
   times$cpp[i] = system.time(
-    try({for (t in 1:N) s2 <- simulate(r,10,seed=123,newX)}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) s2 <- simulate(r,10,seed=123,X_n)}) # Loop should be done inside c++, not from R...
   )[1]
   
   # Cannot check, because random generator are not the same. if (abs(p$mean-p2$mean)>1E-3) warning("predict is not identical bw C++/R")

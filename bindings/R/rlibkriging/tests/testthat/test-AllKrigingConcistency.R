@@ -303,7 +303,7 @@ for (i in 1:length(X_n)) {
     lines(density(lus_nu[i,]),col='red')
     if (all(abs(X_n[i]-X_o)>0)) # means we are not on design points (where nuggetK is deterministic, while noiseK is not)
     if (sd(lus_no[i,])>1e-3 && sd(lus_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("nugget & noise updated simulate are consistent at x=",X_n[i]," ",
+    test_that(desc=paste0("nugget & noise updated simulate are consistent at x=",X_u[i]," ",
     mean(lus_no[i,]),",",sd(lus_no[i,])," != ",mean(lus_nu[i,]),",",sd(lus_nu[i,])),
         expect_gt(ks.test(lus_no[i,],lus_nu[i,])$p.value, 1e-7)) # just check that it is not clearly wrong
 }

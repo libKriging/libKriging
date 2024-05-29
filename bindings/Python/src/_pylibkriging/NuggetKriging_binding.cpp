@@ -78,10 +78,10 @@ void PyNuggetKriging::fit(const py::array_t<double>& y,
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyNuggetKriging::predict(const py::array_t<double>& X, bool return_stdev, bool return_cov, bool return_deriv) {
+PyNuggetKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
+      = m_internal->predict(mat_X_n, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(y_predict, true),
                          carma::col_to_arr(y_stderr, true),
                          carma::mat_to_arr(y_cov, true),
@@ -89,15 +89,15 @@ PyNuggetKriging::predict(const py::array_t<double>& X, bool return_stdev, bool r
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp, const bool will_update) {
-  arma::mat mat_X = carma::arr_to_mat_view<double>(Xp);
-  auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
+py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool with_nugget, const bool will_update) {
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+  auto result = m_internal->simulate(nsim, seed, mat_X, with_nugget, will_update);
   return carma::mat_to_arr(result, true);
 }
 
-void PyNuggetKriging::update(const py::array_t<double>& newy, const py::array_t<double>& newX, const bool refit) {
-  arma::mat mat_y = carma::arr_to_col<double>(newy);
-  arma::mat mat_X = carma::arr_to_mat<double>(newX);
+void PyNuggetKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit) {
+  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
   m_internal->update(mat_y, mat_X,refit);
 }
 
@@ -114,9 +114,9 @@ PyNuggetKriging PyNuggetKriging::load(const std::string filename) {
 }
 
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logLikelihoodFun(const py::array_t<double>& theta_alpha,
-                                                                          const bool want_grad) {
+                                                                          const bool return_grad) {
   arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_alpha, want_grad, false);
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_alpha, return_grad, false);
   return {llo, carma::col_to_arr(grad)};
 }
 
@@ -125,9 +125,9 @@ double PyNuggetKriging::logLikelihood() {
 }
 
 std::tuple<double, py::array_t<double>> PyNuggetKriging::logMargPostFun(const py::array_t<double>& theta_alpha,
-                                                                        const bool want_grad) {
+                                                                        const bool return_grad) {
   arma::vec vec_theta_alpha = carma::arr_to_col<double>(theta_alpha);
-  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta_alpha, want_grad, false);
+  auto [lmp, grad] = m_internal->logMargPostFun(vec_theta_alpha, return_grad, false);
   return {lmp, carma::col_to_arr(grad)};
 }
 

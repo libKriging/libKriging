@@ -53,11 +53,11 @@ class PyNuggetKriging {
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-  predict(const py::array_t<double>& X, bool return_stdev, bool return_cov, bool return_deriv);
+  predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp, const bool will_update);
+  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool with_nugget, const bool will_update);
 
-  void update(const py::array_t<double>& newy, const py::array_t<double>& newX, const bool refit);
+  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit);
 
   std::string summary() const;
 
@@ -66,9 +66,9 @@ class PyNuggetKriging {
   static PyNuggetKriging load(const std::string filename);
 
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta_alpha,
-                                                           const bool want_grad);
+                                                           const bool return_grad);
 
-  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta_alpha, const bool want_grad);
+  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta_alpha, const bool return_grad);
 
   double logLikelihood();
   double logMargPost();

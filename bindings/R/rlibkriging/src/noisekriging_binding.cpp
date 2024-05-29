@@ -275,14 +275,14 @@ std::string noisekriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
+Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  auto pred = impl_ptr->predict(X, return_stdev, return_cov, return_deriv);
+  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   if (return_stdev) {

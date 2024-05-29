@@ -80,7 +80,7 @@ classKriging <- function(nk) {
 #' print(k)
 #'
 #' x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
-#' p <- predict(k, x = x, stdev = TRUE, cov = FALSE)
+#' p <- predict(k, x = x, return_stdev = TRUE, return_cov = FALSE)
 #'
 #' plot(f)
 #' points(X, y)
