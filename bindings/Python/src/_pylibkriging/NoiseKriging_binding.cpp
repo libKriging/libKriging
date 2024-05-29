@@ -107,6 +107,15 @@ void PyNoiseKriging::update(const py::array_t<double>& y_u,
   m_internal->update(mat_y, mat_noise, mat_X, refit);
 }
 
+void PyNoiseKriging::update_simulate(const py::array_t<double>& y_u,
+                            const py::array_t<double>& noise_u,
+                            const py::array_t<double>& X_u) {
+  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_noise = carma::arr_to_col<double>(noise_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
+  m_internal->update_simulate(mat_y, mat_noise, mat_X);
+}
+
 std::string PyNoiseKriging::summary() const {
   return m_internal->summary();
 }

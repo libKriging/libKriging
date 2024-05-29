@@ -101,6 +101,12 @@ void PyNuggetKriging::update(const py::array_t<double>& y_u, const py::array_t<d
   m_internal->update(mat_y, mat_X,refit);
 }
 
+void PyNuggetKriging::update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
+  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
+  m_internal->update_simulate(mat_y, mat_X);
+}
+
 std::string PyNuggetKriging::summary() const {
   return m_internal->summary();
 }

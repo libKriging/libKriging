@@ -85,6 +85,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::update"_hash:
       return KrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::update_simulate"_hash:
+      return KrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::summary"_hash:
       return KrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::save"_hash:
@@ -163,6 +165,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::update"_hash:
       return NuggetKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::update_simulate"_hash:
+      return NuggetKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::summary"_hash:
       return NuggetKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::save"_hash:
@@ -239,6 +243,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NoiseKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::update"_hash:
       return NoiseKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::update_simulate"_hash:
+      return NoiseKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::summary"_hash:
       return NoiseKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::save"_hash:

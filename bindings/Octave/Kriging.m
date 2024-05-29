@@ -39,6 +39,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::update", obj.ref, varargin{:});
         end
 
+        function varargout = update_simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::update_simulate", obj.ref, varargin{:});
+        end
+
         function varargout = summary(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::summary", obj.ref, varargin{:});
         end
