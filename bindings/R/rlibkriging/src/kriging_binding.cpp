@@ -269,23 +269,23 @@ std::string kriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool with_stdev = true, bool with_cov = false, bool with_deriv = false) {
+Rcpp::List kriging_predict(Rcpp::List k, arma::mat X, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  auto pred = impl_ptr->predict(X, with_stdev, with_cov, with_deriv);
+  auto pred = impl_ptr->predict(X, return_stdev, return_cov, return_deriv);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
-  if (with_stdev) {
+  if (return_stdev) {
     ret.push_back(std::get<1>(pred), "stdev");
   }
-  if (with_cov) {
+  if (return_cov) {
     ret.push_back(std::get<2>(pred), "cov");
   }
-  if (with_deriv) {
+  if (return_deriv) {
     ret.push_back(std::get<3>(pred), "mean_deriv");
     ret.push_back(std::get<4>(pred), "stdev_deriv");
   }
@@ -358,8 +358,8 @@ arma::mat kriging_covMat(Rcpp::List k,
 // [[Rcpp::export]]
 Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
                                     arma::vec theta,
-                                    bool with_grad = false,
-                                    bool with_hess = false,
+                                    bool return_grad = false,
+                                    bool return_hess = false,
                                     bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
@@ -367,13 +367,13 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, grad, hess, bench);
+  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, return_grad, return_hess, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
-  if (grad) {
+  if (return_grad) {
     ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
   }
-  if (hess) {
+  if (return_hess) {
     ret.push_back(std::get<2>(ll), "logLikelihoodHess");
   }
 
@@ -392,17 +392,17 @@ double kriging_logLikelihood(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool with_grad = false, bool bench = false) {
+Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool return_grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, grad, bench);
+  std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, return_grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("leaveOneOut") = std::get<0>(loo));
-  if (grad) {
+  if (return_grad) {
     ret.push_back(std::get<1>(loo), "leaveOneOutGrad");
   }
 
@@ -437,17 +437,17 @@ double kriging_leaveOneOut(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool with_grad = false, bool bench = false) {
+Rcpp::List kriging_logMargPostFun(Rcpp::List k, arma::vec theta, bool return_grad = false, bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, grad, bench);
+  std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta, return_grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logMargPost") = std::get<0>(lmp));
-  if (grad) {
+  if (return_grad) {
     ret.push_back(std::get<1>(lmp), "logMargPostGrad");
   }
 

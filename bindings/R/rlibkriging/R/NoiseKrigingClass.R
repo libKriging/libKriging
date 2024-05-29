@@ -374,11 +374,11 @@ fit.NoiseKriging <- function(object, y, noise, X,
 #'
 #' @param object S3 NoiseKriging object.
 #' @param x Input points where the prediction must be computed.
-#' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
+#' @param return_cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
 #' @param ... Ignored.
 #'
@@ -411,7 +411,7 @@ fit.NoiseKriging <- function(object, y, noise, X,
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
-predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
+predict.NoiseKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     ## manage the data frame case. Ideally we should then warn
@@ -420,7 +420,7 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(noisekriging_predict(object, x, stdev, cov, deriv))
+    return(noisekriging_predict(object, x, return_stdev, return_cov, return_deriv))
 }
 
 
@@ -436,7 +436,8 @@ predict.NoiseKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = F
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
-#' @param will_update Compute useful data for future update_simulate call
+#' @param with_noise Set to array of values if wish to add the noise in the simulation.
+#' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{length(x)} rows and \code{nsim}
@@ -479,8 +480,8 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, with_noise = 
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x),")")
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    if (is.null(with_noise)) with_noise = rep(0, nrow(x))
-    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, with_noise, will_update = will_update))
+    if (is.null(with_noise) || isFALSE(with_noise)) with_noise = rep(0, nrow(x))
+    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, with_noise = with_noise, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{NoiseKriging} model object.
@@ -712,7 +713,7 @@ covMat.NoiseKriging <- function(object, x1, x2, ...) {
 #' @param object An S3 NoiseKriging object.
 #' @param theta_sigma2 A numeric vector of (positive) range parameters and variance at
 #'     which the log-likelihood will be evaluated.
-#' @param grad Logical. Should the function return the gradient?
+#' @param return_grad Logical. Should the function return the gradient?
 #' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
@@ -750,7 +751,7 @@ covMat.NoiseKriging <- function(object, x1, x2, ...) {
 #' contour(t,s2,matrix(ncol=length(s2),ll(expand.grid(t,s2))),xlab="theta",ylab="sigma2")
 #' points(k$theta(),k$sigma2(),col='blue')
 logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
-                                  grad = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- noisekriging_model(object)
     if (is.data.frame(theta_sigma2)) theta_sigma2 = data.matrix(theta_sigma2)
@@ -763,11 +764,11 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                            ncol = ncol(theta_sigma2)))
     for (i in 1:nrow(theta_sigma2)) {
         ll <- noisekriging_logLikelihoodFun(object, theta_sigma2[i, ],
-                                    grad = isTRUE(grad), bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
-        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
-    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
 
     return(out)
 }

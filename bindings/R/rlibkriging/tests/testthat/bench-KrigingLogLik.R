@@ -29,7 +29,7 @@ r <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
   times$cpp_ll[i]=system.time(for (j in 1:times.n) ll2x <- logLikelihoodFun(r,rep(x,4)))
-  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- logLikelihoodFun(r,rep(x,4),grad=T))
+  times$cpp_gll[i]=system.time(for (j in 1:times.n) gll2x <- logLikelihoodFun(r,rep(x,4),return_grad=T))
   i <- i+1
 }
 
@@ -39,7 +39,7 @@ r_nf <- Kriging(y, X, "gauss")
 i <- 1
 for (x in xx){
   times$cpp_nf_ll[i]=system.time(for (j in 1:times.n) ll2x_f <- logLikelihoodFun(r_nf,rep(x,4)))
-  times$cpp_nf_gll[i]=system.time(for (j in 1:times.n) gll2x_f <- logLikelihoodFun(r_nf,rep(x,4),grad=T))
+  times$cpp_nf_gll[i]=system.time(for (j in 1:times.n) gll2x_f <- logLikelihoodFun(r_nf,rep(x,4),return_grad=T))
   i <- i+1
 }
 

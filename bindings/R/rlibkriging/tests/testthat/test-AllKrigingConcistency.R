@@ -220,7 +220,7 @@ points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
 }
-for (i in 1:min(10,ncol(ls_nu))) {
+for (i in 1:min(100,ncol(ls_nu))) {
     lines(X_n,ls_nu[,i],col=rgb(1,0.5,0,.51),lwd=4,lty=2)
     lines(X_n,ls_no[,i],col=rgb(1,0,0.5,.51),lwd=4,lty=2)
 }

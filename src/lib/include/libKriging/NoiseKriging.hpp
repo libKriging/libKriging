@@ -182,21 +182,21 @@ class NoiseKriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = {});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool with_grad, bool bench);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool return_grad, bool bench);
 
   LIBKRIGING_EXPORT double logLikelihood();
 
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
-   * @param with_stdev is true if return also stdev column vector
-   * @param with_cov is true if return also cov matrix between X_n
-   * @param with_deriv is true if return also derivative at X_n
+   * @param return_stdev is true if return also stdev column vector
+   * @param return_cov is true if return also cov matrix between X_n
+   * @param return_deriv is true if return also derivative at X_n
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
-                                                                                                    bool with_stdev,
-                                                                                                    bool with_cov,
-                                                                                                    bool with_deriv);
+                                                                                                    bool return_stdev,
+                                                                                                    bool return_cov,
+                                                                                                    bool return_deriv);
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param nsim is number of simulations to draw

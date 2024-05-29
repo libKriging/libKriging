@@ -67,7 +67,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #    lines(x,simulate(r,x=x,seed=i),col='grey')
   
   .x = seq(0.1,0.9,,11)
-  p_allx = predict(r,.x,TRUE, cov=FALSE, deriv=TRUE)
+  p_allx = predict(r,.x,TRUE, cov=FALSE, return_deriv=TRUE)
   for (i in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = .x[i]
@@ -101,7 +101,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
                                   (f.deltax - t(t(W)%*%u) ))
     kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
                        
-    p = predict(r,.x[i],TRUE, cov=FALSE, deriv=TRUE)
+    p = predict(r,.x[i],TRUE, cov=FALSE, return_deriv=TRUE)
   
     test_that(desc=paste0("vect pred mean deriv is ok:\n ",paste0(collapse=",",p_allx$mean_deriv[i]),"\n ",paste0(collapse=",",p$mean_deriv)),
              expect_equal(array(p_allx$mean_deriv[i]),array(p$mean_deriv),tol = precision))

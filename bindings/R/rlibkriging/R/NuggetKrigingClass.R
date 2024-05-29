@@ -375,11 +375,11 @@ fit.NuggetKriging <- function(object, y, X,
 #'
 #' @param object S3 NuggetKriging object.
 #' @param x Input points where the prediction must be computed.
-#' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
+#' @param return_cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
 #' @param ... Ignored.
 #'
@@ -413,7 +413,7 @@ fit.NuggetKriging <- function(object, y, X,
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
-predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
+predict.NuggetKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     ## manage the data frame case. Ideally we should then warn
@@ -422,7 +422,7 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(nuggetkriging_predict(object, x, stdev, cov, deriv))
+    return(nuggetkriging_predict(object, x, return_stdev, return_cov, return_deriv))
 }
 
 #' Simulation from a \code{NuggetKriging} model object.
@@ -437,7 +437,8 @@ predict.NuggetKriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = 
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
-#' @param will_update Compute useful data for future update_simulate call
+#' @param with_nugget Set to TRUE if wish to add the nugget in the simulation.
+#' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{length(x)} rows and \code{nsim}
@@ -710,7 +711,7 @@ covMat.NuggetKriging <- function(object, x1, x2, ...) {
 #' @param object An S3 NuggetKriging object.
 #' @param theta_alpha A numeric vector of (positive) range parameters and variance over variance plus nugget at
 #'     which the log-likelihood will be evaluated.
-#' @param grad Logical. Should the function return the gradient?
+#' @param return_grad Logical. Should the function return the gradient?
 #' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
 #'
@@ -748,7 +749,7 @@ covMat.NuggetKriging <- function(object, x1, x2, ...) {
 #' contour(t,a,matrix(ncol=length(a),ll(expand.grid(t,a))),xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
 logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
-                                  grad = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
@@ -761,11 +762,11 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
                                            ncol = ncol(theta_alpha)))
     for (i in 1:nrow(theta_alpha)) {
         ll <- nuggetkriging_logLikelihoodFun(object, theta_alpha[i, ],
-                                    grad = isTRUE(grad), bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
-        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
-    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
 
     return(out)
 }
@@ -809,7 +810,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' @param object S3 NuggetKriging object.
 #' @param theta_alpha Numeric vector of correlation range and variance over variance plus nugget parameters at
 #'     which the function is to be evaluated.
-#' @param grad Logical. Should the function return the gradient
+#' @param return_grad Logical. Should the function return the gradient
 #'     (w.r.t theta_alpha)?
 #' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
@@ -853,7 +854,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' contour(t,a,matrix(ncol=length(t),lmp(expand.grid(t,a))),
 #'  nlevels=50,xlab="theta",ylab="sigma2/(sigma2+nugget)")
 #' points(k$theta(),k$sigma2()/(k$sigma2()+k$nugget()),col='blue')
-logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, bench=FALSE, ...) {
+logMargPostFun.NuggetKriging <- function(object, theta_alpha, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(theta_alpha)) theta_alpha = data.matrix(theta_alpha)
@@ -865,11 +866,11 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, grad = FALSE, benc
                 logMargPostGrad = matrix(NA, nrow = nrow(theta_alpha),
                                          ncol = ncol(theta_alpha)))
     for (i in 1:nrow(theta_alpha)) {
-        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], grad = isTRUE(grad), bench = isTRUE(bench))
+        lmp <- nuggetkriging_logMargPostFun(object, theta_alpha[i, ], return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logMargPost[i] <- lmp$logMargPost
-        if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
+        if (isTRUE(return_grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }
-    if (!isTRUE(grad)) out$logMargPostGrad <- NULL
+    if (!isTRUE(return_grad)) out$logMargPostGrad <- NULL
     return(out)
 }
 

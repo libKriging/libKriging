@@ -38,7 +38,7 @@ tmax=1
   for (x2 in seq(tmin,tmax,,11)){
     envx = new.env()
     llx = logLikelihoodFun(r,c(x1,x2))$logLikelihood
-    gllx = logLikelihoodFun(r,c(x1,x2),grad = T)$logLikelihoodGrad
+    gllx = logLikelihoodFun(r,c(x1,x2),return_grad = T)$logLikelihoodGrad
     arrows(x1,x2,x1+.01*gllx[1],x2+.01*gllx[2])
   }}
   
@@ -50,6 +50,6 @@ tmax=1
             expect_equal(logLikelihoodFun(r,x)$logLikelihood,DiceKriging::logLikFun(x,k,xenv),tolerance = precision))
   
   test_that(desc="logLik Grad is the same that DiceKriging one", 
-            expect_equal(logLikelihoodFun(r,x,grad=T)$logLikelihoodGrad,t(DiceKriging::logLikGrad(x,k,xenv)),tolerance= precision))
+            expect_equal(logLikelihoodFun(r,x,return_grad=T)$logLikelihoodGrad,t(DiceKriging::logLikGrad(x,k,xenv)),tolerance= precision))
 }
 

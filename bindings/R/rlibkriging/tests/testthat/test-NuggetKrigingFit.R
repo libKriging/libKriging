@@ -27,7 +27,7 @@ plot(ll_a,xlim=c(0.001,1))
 for (a in seq(0.01,1,,21)){
   envx = new.env()
   ll2x = logLikelihoodFun(r,c(k@covariance@range.val,a))$logLikelihood
-  gll2x = logLikelihoodFun(r,c(k@covariance@range.val,a),grad = T)$logLikelihoodGrad[,2]
+  gll2x = logLikelihoodFun(r,c(k@covariance@range.val,a),return_grad = T)$logLikelihoodGrad[,2]
   arrows(a,ll2x,a+.1,ll2x+.1*gll2x,col='red')
 }
 abline(v=alpha_k,col='blue')

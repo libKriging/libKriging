@@ -26,7 +26,7 @@ precision = 0.01
   for (x in seq(0.01,1,,11)){
     envx = new.env()
     ll2x = logMargPostFun(r,c(x,alpha0))$logMargPost[1]
-    gll2x = logMargPostFun(r,c(x,alpha0),grad = T)$logMargPostGrad[,1]
+    gll2x = logMargPostFun(r,c(x,alpha0),return_grad = T)$logMargPostGrad[,1]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 
     ll2x_eps = logMargPostFun(r,c(x+eps,alpha0))$logMargPost[1]
@@ -40,7 +40,7 @@ precision = 0.01
   for (x in seq(0.01,0.99,,11)){
     envx = new.env()
     ll2x = logMargPostFun(r,c(theta0,x))$logMargPost[1]
-    gll2x = logMargPostFun(r,c(theta0,x),grad = T)$logMargPostGrad[,2]
+    gll2x = logMargPostFun(r,c(theta0,x),return_grad = T)$logMargPostGrad[,2]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 
     ll2x_eps = logMargPostFun(r,c(theta0,x+eps))$logMargPost[1]

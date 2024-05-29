@@ -278,7 +278,7 @@ y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(nugget))
 X_n = rbind(X_u+1e-2,X_n) # add some nugget to avoid degenerate cases
 
 #lk = rlibkriging:::load.NuggetKriging("/tmp/lk.json")
-lsd = lkd$simulate(1000, 123, X_n, will_update=TRUE)
+lsd = lkd$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=TRUE)
 lusd = NULL
 lusd = lkd$update_simulate(y_u, X_u)
 

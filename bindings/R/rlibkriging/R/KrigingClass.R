@@ -383,11 +383,11 @@ fit.Kriging <- function(object, y, X,
 #'
 #' @param object S3 Kriging object.
 #' @param x Input points where the prediction must be computed.
-#' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
+#' @param return_cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
 #' @param ... Ignored.
 #'
@@ -420,7 +420,7 @@ fit.Kriging <- function(object, y, X,
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
-predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
+predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     ## manage the data frame case. Ideally we should then warn
@@ -429,7 +429,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(kriging_predict(object, x, stdev, cov, deriv))
+    return(kriging_predict(object, x, return_stdev, return_cov, return_deriv))
 }
 
 
@@ -445,6 +445,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
+#' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{length(x)} rows and \code{nsim}
@@ -712,8 +713,8 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' @param object An S3 Kriging object.
 #' @param theta A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
-#' @param grad Logical. Should the function return the gradient?
-#' @param hess Logical. Should the function return Hessian?
+#' @param return_grad Logical. Should the function return the gradient?
+#' @param return_hess Logical. Should the function return Hessian?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
@@ -739,7 +740,7 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  grad = FALSE, hess = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -754,13 +755,13 @@ logLikelihoodFun.Kriging <- function(object, theta,
                                                       ncol(theta))))
     for (i in 1:nrow(theta)) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    grad = isTRUE(grad), hess = isTRUE(hess), bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad), return_hess = isTRUE(return_hess), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
-        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-        if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
+        if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
-    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
-    if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
+    if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }
@@ -810,7 +811,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' @param theta A numeric vector of range parameters at which the LOO
 #'     will be evaluated.
 #'
-#' @param grad Logical. Should the gradient (w.r.t. \code{theta}) be
+#' @param return_grad Logical. Should the gradient (w.r.t. \code{theta}) be
 #'     returned?
 #' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
@@ -835,7 +836,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' t <-  seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, loo(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -847,11 +848,11 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
                 leaveOneOutGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(grad), bench = isTRUE(bench))
+        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(return_grad), bench = isTRUE(bench))
         out$leaveOneOut[i] <- loo$leaveOneOut
-        if (isTRUE(grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
+        if (isTRUE(return_grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
     }
-    if (!isTRUE(grad)) out$leaveOneOutGrad <- NULL
+    if (!isTRUE(return_grad)) out$leaveOneOutGrad <- NULL
     return(out)
 }
 
@@ -958,7 +959,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' @param object S3 Kriging object.
 #' @param theta Numeric vector of correlation range parameters at
 #'     which the function is to be evaluated.
-#' @param grad Logical. Should the function return the gradient
+#' @param return_grad Logical. Should the function return the gradient
 #'     (w.r.t theta)?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
@@ -989,7 +990,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' t <- seq(from = 0.01, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -1001,11 +1002,11 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
                 logMargPostGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        lmp <- kriging_logMargPostFun(object, theta[i, ], grad = isTRUE(grad), bench = isTRUE(bench))
+        lmp <- kriging_logMargPostFun(object, theta[i, ], return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logMargPost[i] <- lmp$logMargPost
-        if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
+        if (isTRUE(return_grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }
-    if (!isTRUE(grad)) out$logMargPostGrad <- NULL
+    if (!isTRUE(return_grad)) out$logMargPostGrad <- NULL
     return(out)
 }
 

@@ -74,10 +74,10 @@ void PyKriging::fit(const py::array_t<double>& y,
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyKriging::predict(const py::array_t<double>& X, bool with_stdev, bool with_cov, bool with_deriv) {
+PyKriging::predict(const py::array_t<double>& X, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, with_stdev, with_cov, with_deriv);
+      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(y_predict, true),
                          carma::col_to_arr(y_stderr, true),
                          carma::mat_to_arr(y_cov, true),

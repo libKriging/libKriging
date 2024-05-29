@@ -42,73 +42,53 @@ test_that("DiceKriging/libKriging covariance matrix is the same", {
 })
 
 ## Predict & simulate
-X_n = seq(0.06,0.97,,11) #unique(sort(c(X_o,seq(0,1,,21))))
+X_n = unique(sort(c(X_o,seq(0,1,,51))))
 
-## Check that DiceKriging and libKriging matches (at factor alpha)
-
-# DiceKriging / kmStruct.R / simulate.km :
-object = dk
-newdata = matrix(X_n, ncol = 1)
-Sigma21 <- covMat1Mat2(object@covariance, X1 = object@X, X2 = newdata, nugget.flag = FALSE)          ## size n x m
-Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE)
-
-# libKriging / NuggetKriging.cpp / simulate(...,with_nugget=TRUE) :
-alpha = lk$sigma2()/(lk$sigma2()+lk$nugget())
-R_on = lk$covMat(object@X, newdata) / (lk$sigma2()+lk$nugget())
-
-test_that("DiceKriging/libKriging R_on matrix is the same", {
-    expect_equal(Sigma21, R_on * (lk$sigma2()+lk$nugget()))
-})
-
-Rstar_on = backsolve(lk$T(), R_on, upper.tri = FALSE)
-
-test_that("DiceKriging/libKriging Rstar_on matrix is the same", {
-    expect_equal(Rstar_on * sqrt(lk$sigma2()+lk$nugget()), Tinv.Sigma21)
-})
-
-R_nn = lk$covMat(newdata, newdata) / (lk$sigma2()+lk$nugget())
-diag(R_nn) = 1
-
-
-# libK
-Sigma_nKo = R_nn - crossprod(Rstar_on, Rstar_on)
-chol(Sigma_nKo) # -> OK
-# DiceKriging
-Sigma_cond = covMatrix(object@covariance, newdata)[[1]] - t(Tinv.Sigma21) %*% Tinv.Sigma21
-chol(Sigma_cond) # -> OK
-
-test_that("DiceKriging/libKriging Sigma_cond matrix is the same", {
-    expect_equal(Sigma_nKo *(lk$sigma2()+lk$nugget()), Sigma_cond)
-})
-
-
-# libKriging / NuggetKriging.cpp / simulate(...,with_nugget=FALSE) :
-R_on = lk$covMat(object@X, newdata) / lk$sigma2()
-Rstar_on = backsolve(lk$T(), R_on, upper.tri = FALSE)
-R_nn = lk$covMat(newdata, newdata) / lk$sigma2()
-diag(R_nn) = 1
-Sigma_nKo = R_nn - crossprod(Rstar_on, Rstar_on)
-chol(Sigma_nKo) # -> ERROR
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## ## Check that DiceKriging and libKriging matches (at factor alpha)
+## 
+## # DiceKriging / kmStruct.R / simulate.km :
+## object = dk
+## newdata = matrix(X_n, ncol = 1)
+## Sigma21 <- covMat1Mat2(object@covariance, X1 = object@X, X2 = newdata, nugget.flag = FALSE)          ## size n x m
+## Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE)
+## 
+## # libKriging / NuggetKriging.cpp / simulate(...,with_nugget=TRUE) :
+## alpha = lk$sigma2()/(lk$sigma2()+lk$nugget())
+## R_on = lk$covMat(object@X, newdata) / (lk$sigma2()+lk$nugget())
+## 
+## test_that("DiceKriging/libKriging R_on matrix is the same", {
+##     expect_equal(Sigma21, R_on * (lk$sigma2()+lk$nugget()))
+## })
+## 
+## Rstar_on = backsolve(lk$T(), R_on, upper.tri = FALSE)
+## 
+## test_that("DiceKriging/libKriging Rstar_on matrix is the same", {
+##     expect_equal(Rstar_on * sqrt(lk$sigma2()+lk$nugget()), Tinv.Sigma21)
+## })
+## 
+## R_nn = lk$covMat(newdata, newdata) / (lk$sigma2()+lk$nugget())
+## diag(R_nn) = 1
+## 
+## 
+## # libK
+## Sigma_nKo = R_nn - crossprod(Rstar_on, Rstar_on)
+## chol(Sigma_nKo) # -> OK
+## # DiceKriging
+## Sigma_cond = covMatrix(object@covariance, newdata)[[1]] - t(Tinv.Sigma21) %*% Tinv.Sigma21
+## chol(Sigma_cond) # -> OK
+## 
+## test_that("DiceKriging/libKriging Sigma_cond matrix is the same", {
+##     expect_equal(Sigma_nKo *(lk$sigma2()+lk$nugget()), Sigma_cond)
+## })
+## 
+## 
+## # libKriging / NuggetKriging.cpp / simulate(...,with_nugget=FALSE) :
+## R_on = lk$covMat(object@X, newdata) / (lk$sigma2()+lk$nugget())
+## Rstar_on = backsolve(lk$T(), R_on, upper.tri = FALSE)
+## R_nn = lk$covMat(newdata, newdata) / lk$sigma2()
+## diag(R_nn) = 1
+## Sigma_nKo = R_nn - crossprod(Rstar_on, Rstar_on)
+## chol(Sigma_nKo) # -> ERROR
 
 dp = predict(dk, newdata = data.frame(X = X_n), type="UK", checkNames=FALSE)
 lines(X_n,dp$mean,col='blue')

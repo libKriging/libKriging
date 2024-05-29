@@ -43,7 +43,7 @@ plot(.t, k$logLikelihoodFun(.t)$logLikelihood)
 for (t in .t) {
     arrows(
         t,     k$logLikelihoodFun(t)$logLikelihood,
-        t-0.2, k$logLikelihoodFun(t)$logLikelihood-0.2*k$logLikelihoodFun(t,grad=TRUE)$logLikelihoodGrad, 
+        t-0.2, k$logLikelihoodFun(t)$logLikelihood-0.2*k$logLikelihoodFun(t,return_grad=TRUE)$logLikelihoodGrad, 
         col='black')
 }
 rlibkriging:::linalg_check_chol_rcond(FALSE)
@@ -51,7 +51,7 @@ lines(.t, k$logLikelihoodFun(.t)$logLikelihood,col='blue')
 for (t in .t) {
     arrows(
         t,     k$logLikelihoodFun(t)$logLikelihood,
-        t-0.21, k$logLikelihoodFun(t)$logLikelihood-0.21*k$logLikelihoodFun(t,grad=TRUE)$logLikelihoodGrad, 
+        t-0.21, k$logLikelihoodFun(t)$logLikelihood-0.21*k$logLikelihoodFun(t,return_grad=TRUE)$logLikelihoodGrad, 
         col='blue')
 }
 #rlibkriging:::covariance_use_approx_singular(FALSE)

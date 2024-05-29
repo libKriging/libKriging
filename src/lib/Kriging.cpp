@@ -1378,13 +1378,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
 /** Compute the prediction for given points X'
  * @param X_n is n_n*d matrix of points where to predict output
- * @param with_stdev is true if return also stdev column vector
- * @param with_cov is true if return also cov matrix between X_n
- * @param with_deriv is true if return also derivative of prediction wrt x
+ * @param return_stdev is true if return also stdev column vector
+ * @param return_cov is true if return also cov matrix between X_n
+ * @param return_deriv is true if return also derivative of prediction wrt x
  * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
-Kriging::predict(const arma::mat& X_n, bool with_stdev, bool with_cov, bool with_deriv) {
+Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1436,14 +1436,14 @@ Kriging::predict(const arma::mat& X_n, bool with_stdev, bool with_cov, bool with
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
-  if (with_stdev) {
+  if (return_stdev) {
   ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
   ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
   ysd2_n *= sigma2 * m_scaleY * m_scaleY;
   t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
-  if (with_cov) {
+  if (return_cov) {
   // Compute the covariance matrix between new data points
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
@@ -1460,7 +1460,7 @@ Kriging::predict(const arma::mat& X_n, bool with_stdev, bool with_cov, bool with
   t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
-  if (with_deriv) {
+  if (return_deriv) {
   //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
   //for (i in 1:n_n) {
   //  
@@ -1524,7 +1524,7 @@ Kriging::predict(const arma::mat& X_n, bool with_stdev, bool with_cov, bool with
       Dyhat_n.row(i) = trans(DF_n_i * m_beta + trans(W_i) * m_z);
       t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
-      if (with_stdev) {
+      if (return_stdev) {
         arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
@@ -1539,12 +1539,12 @@ Kriging::predict(const arma::mat& X_n, bool with_stdev, bool with_cov, bool with
                          std::move(Sigma_n),
                          std::move(Dyhat_n),
                          std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d, arma::fill::ones))));
-  /*if (with_stdev)
-    if (with_cov)
+  /*if (return_stdev)
+    if (return_cov)
       return std::make_tuple(std::move(yhat_n), std::move(pred_stdev), std::move(pred_cov));
     else
       return std::make_tuple(std::move(yhat_n), std::move(pred_stdev), nullptr);
-  else if (with_cov)
+  else if (return_cov)
     return std::make_tuple(std::move(yhat_n), std::move(pred_cov), nullptr);
   else
     return std::make_tuple(std::move(yhat_n), nullptr, nullptr);*/
