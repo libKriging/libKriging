@@ -104,7 +104,7 @@ for (i in 1:length(X_n)) {
     if (sd(ls_no[i,])>1e-3 && sd(ls_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",
     mean(ls_no[i,]),",",sd(ls_no[i,])," != ",mean(ls_nu[i,]),",",sd(ls_nu[i,])),
-        expect_gt(ks.test(ls_no[i,],ls_nu[i,])$p.value, 0.01)) # just check that it is not clearly wrong
+        expect_gt(suppressWarnings(ks.test(ls_no[i,],ls_nu[i,])$p.value), 0.01)) # just check that it is not clearly wrong
 }
 
 
