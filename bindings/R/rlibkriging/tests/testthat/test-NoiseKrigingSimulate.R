@@ -35,7 +35,7 @@ dk <- km(response = matrix(y_o, ncol = 1),
               coef.var = lk$sigma2())
 
 ## Predict & simulate
-X_n = seq(0,1,,31)
+X_n = seq(0,1,,31) #sort(unique(c(X_o,seq(0,1,,31))))
 
 dp = predict(dk, newdata = data.frame(X = X_n), type="UK", checkNames=FALSE)
 lines(X_n,dp$mean,col='blue')

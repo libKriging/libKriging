@@ -265,7 +265,7 @@ predict.NuggetKM <- function(object, newdata, type = "UK",
     if (type != "UK") stop("'type != UK' unsupported.")
     
     y.predict <- predict.NuggetKriging(object@NuggetKriging, x = newdata,
-                                 stdev = se.compute, cov = cov.compute)
+                                 return_stdev = se.compute, return_cov = cov.compute)
     
     output.list <- list()
     ## output.list$trend <- y.predict.trend

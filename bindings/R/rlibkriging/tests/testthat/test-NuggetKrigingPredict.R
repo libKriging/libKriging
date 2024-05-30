@@ -5,6 +5,11 @@
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   context(paste0("Check predict 1D for kernel ",kernel))
 
+library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+rlibkriging:::optim_log(3)
+kernel="exp"
+
   f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
   #plot(f)
   n <- 5
@@ -21,7 +26,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   # m = as.list(r)
   
   ntest <- 100
-  Xtest <- as.matrix(runif(ntest))
+  Xtest <- as.matrix(c(X,runif(ntest)))
   ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE,checkNames=F)
   Yktest <- ptest$mean
   sktest <- ptest$sd
@@ -52,12 +57,12 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
       c(predict(r,x)$mean-predict(r,x)$stdev,
         predict(r,rev(x))$mean+predict(r,rev(x))$stdev),
         col=rgb(0,0,0,.1),border=NA)
-  #
-  #for (i in 1:10)
-  #    lines(x,simulate(r,x=x,seed=i),col='grey')
+  
+  for (i in 1:10)
+      lines(x,simulate(r,x=x,seed=i, with_nugget=TRUE),col='grey')
   
   .x = seq(0.1,0.9,,11)
-  p_allx = predict(r,.x,TRUE, cov=FALSE, return_deriv=TRUE)
+  p_allx = predict(r,.x,TRUE, return_cov=FALSE, return_deriv=TRUE)
   for (i in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = .x[i]
@@ -91,7 +96,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
                                   (f.deltax - t(t(W)%*%u) ))
     kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
                        
-    p = predict(r,.x[i],TRUE, cov=FALSE, return_deriv=TRUE)
+    p = predict(r,.x[i],TRUE, return_cov=FALSE, return_deriv=TRUE)
   
     test_that(desc=paste0("vect pred mean deriv is ok:\n ",paste0(collapse=",",p_allx$mean_deriv[i]),"\n ",paste0(collapse=",",p$mean_deriv)),
              expect_equal(array(p_allx$mean_deriv[i]),array(p$mean_deriv),tol = precision))
