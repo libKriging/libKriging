@@ -1273,14 +1273,15 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
-      arma::mat dij = Xn_o.col(i) - Xn_n.col(j);
-      if (with_nugget && dij.is_zero(arma::datum::eps))
-        R_on.at(i, j) = 1.0;
-      else
-        R_on.at(i, j) = _Cov(dij, m_theta) * m_alpha;
+      //arma::mat dij = Xn_o.col(i) - Xn_n.col(j);
+      //if (with_nugget && dij.is_zero(arma::datum::eps))
+      //  R_on.at(i, j) = 1.0;
+      //else
+      //  R_on.at(i, j) = _Cov(dij, m_theta) * m_alpha;
+      R_on.at(i, j) = _Cov(Xn_o.col(i) - Xn_n.col(j), m_theta);
     }
   }
-  //R_on *= m_alpha;
+  R_on *= m_alpha;
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
