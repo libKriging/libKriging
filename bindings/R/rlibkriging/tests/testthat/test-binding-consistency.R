@@ -57,8 +57,8 @@ y = as.matrix(read.table(file = filey, header = FALSE, sep = ',')) # a matrix, n
 kernel <- "gauss"
 r <- Kriging(y, X, kernel)
 x <- 0.3 # extracted from 'for (x in seq(0.01,1,,11))' 
-llo = rlibkriging::leaveOneOutFun(r, x, grad = TRUE)
-loglik = rlibkriging::logLikelihoodFun(r, x, grad = TRUE)
+llo = rlibkriging::leaveOneOutFun(r, x, return_grad = TRUE)
+loglik = rlibkriging::logLikelihoodFun(r, x, return_grad = TRUE)
 
 for (n in names(llo)) {
   filer <- file.path(refpath, sprintf("%s-result-%s.csv", prefix, n))
@@ -102,7 +102,7 @@ for (i in 1:length(logn)) {
 
   kernel <- "gauss"
   r <- Kriging(y, X, kernel)
-  loglik = rlibkriging::logLikelihoodFun(r, x, grad = TRUE) # TODO needs also Hessian ?
+  loglik = rlibkriging::logLikelihoodFun(r, x, return_grad = TRUE) # TODO needs also Hessian ?
   for (n in names(loglik)) {
     filer <- file.path(refpath, sprintf("%s-%i-result-%s.csv", prefix, i, n))
     if (do_write) {

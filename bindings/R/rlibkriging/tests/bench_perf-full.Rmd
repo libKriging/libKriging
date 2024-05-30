@@ -112,7 +112,7 @@ for (i in 1:length(logn)) {
              theta=matrix(k@covariance@range.val,ncol=d)))
   times$cpp[i] = system.time(
     # try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
-    try({for (t in 1:N) gll2x <- logLikelihoodFun(r,rep(theta,ncol(X)),grad=T)$logLikelihoodGrad}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) gll2x <- logLikelihoodFun(r,rep(theta,ncol(X)),return_grad=T)$logLikelihoodGrad}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (max(abs((gllx-t(gll2x))/gllx))>1E-3) warning("grad LL is not identical bw C++/R")
@@ -187,7 +187,7 @@ for (i in 1:length(logn)) {
              theta=matrix(k@covariance@range.val,ncol=d)))
   times$cpp[i] = system.time(
     # try({gll2x <- bench_LogLikGrad(N,r,rep(theta,ncol(X)))})
-    try({for (t in 1:N) gll2x <- leaveOneOutFun(r,rep(theta,ncol(X)),grad=T)$leaveOneOutGrad}) # Loop should be done inside c++, not from R...
+    try({for (t in 1:N) gll2x <- leaveOneOutFun(r,rep(theta,ncol(X)),return_grad=T)$leaveOneOutGrad}) # Loop should be done inside c++, not from R...
   )[1]
   
   if (max(abs((gllx-t(gll2x))/gllx))>1E-3) warning("grad LOO is not identical bw C++/R")
@@ -232,7 +232,7 @@ for (i in 1:length(logn)) {
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta),grad=T)$logLikelihoodGrad
+  gll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta),return_grad=T)$logLikelihoodGrad
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
@@ -283,7 +283,7 @@ for (i in 1:length(logn)) {
   e <- new.env()
   ll_R <- DiceKriging::leaveOneOutFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- leaveOneOutFun(r, t(as.list(r)$theta),grad=T)$leaveOneOutGrad
+  gll_cpp <- leaveOneOutFun(r, t(as.list(r)$theta),return_grad=T)$leaveOneOutGrad
   gll_R <- DiceKriging::leaveOneOutGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::leaveOneOutFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)
@@ -333,7 +333,7 @@ for (i in 1:length(logn)) {
   e <- new.env()
   ll_R <- DiceKriging::logLikFun(k@covariance@range.val, k, e)
   
-  gll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta),grad=T)$logLikelihoodGrad
+  gll_cpp <- logLikelihoodFun(r, t(as.list(r)$theta),return_grad=T)$logLikelihoodGrad
   gll_R <- DiceKriging::logLikGrad(k@covariance@range.val, k, e)
   
   if (abs(ll_cpp - DiceKriging::logLikFun(param=as.numeric(as.list(r)$theta),model=k))/ll_cpp>.1)

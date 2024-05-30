@@ -63,13 +63,13 @@ for (i in 1:10) {
 # #e$R
 # DiceKriging::logLikGrad(param=0.1,model=dk,e)
 # #lk$logLikelihoodFun(0.1)$logLikelihood
-# lk$logLikelihoodFun(0.1,grad=TRUE)$logLikelihoodGrad
+# lk$logLikelihoodFun(0.1,return_grad=TRUE)$logLikelihoodGrad
 
 #### LogLikelihood
 
 ll <- function(theta) lk$logLikelihoodFun(theta)$logLikelihood
   ll_dk <- Vectorize(function(theta) DiceKriging::logLikFun(param=c(theta,if(lk$is_sigma2_estim())NULL else lk$sigma2()),model=dk))
-gll <- function(theta) lk$logLikelihoodFun(theta,grad=TRUE)$logLikelihoodGrad
+gll <- function(theta) lk$logLikelihoodFun(theta,return_grad=TRUE)$logLikelihoodGrad
 gll_approx <- function(theta) (ll(theta+0.001)-ll(theta))/0.001    
   gll_dk <- Vectorize(function(theta) {
        e <- new.env()
@@ -88,7 +88,7 @@ for (.t in t) {
 }
 
 if (lk$kernel() == "gauss") { #: do not work for matern*
-hll = function(theta) lk$logLikelihoodFun(theta, hess=TRUE)$logLikelihoodHess
+hll = function(theta) lk$logLikelihoodFun(theta, return_hess=TRUE)$logLikelihoodHess
 hll_approx = function(theta) (gll(theta+0.000001)-gll(theta))/0.000001
 plot(t, hll(t), type = 'l',col='red')
 lines(t, hll_approx(t), col = 'blue')
@@ -100,7 +100,7 @@ lines(t, hll_approx(t), col = 'blue')
 
 loo <- function(theta) lk$leaveOneOutFun(theta)$leaveOneOut
   loo_dk <- Vectorize(function(theta) DiceKriging::leaveOneOutFun(param=c(theta,if(lk$is_sigma2_estim())NULL else lk$sigma2()),model=dk))
-gloo <- function(theta) lk$leaveOneOutFun(theta,grad=TRUE)$leaveOneOutGrad
+gloo <- function(theta) lk$leaveOneOutFun(theta,return_grad=TRUE)$leaveOneOutGrad
 gloo_approx <- function(theta) (loo(theta+0.001)-loo(theta))/0.001    
   gloo_dk <- Vectorize(function(theta) {
       e <- new.env()
@@ -154,7 +154,7 @@ for (.t in t) {
 
 lmp <- function(theta) lk$logMargPostFun(theta)$logMargPost
   lmp_rgasp(0.5)-lmp(0.5)
-glmp <- function(theta) lk$logMargPostFun(theta,grad=TRUE)$logMargPostGrad
+glmp <- function(theta) lk$logMargPostFun(theta,return_grad=TRUE)$logMargPostGrad
   glmp_rgasp(0.5)-glmp(0.5)
 
 glmp_approx <- function(theta) (lmp(theta+0.001)-lmp(theta))/0.001
