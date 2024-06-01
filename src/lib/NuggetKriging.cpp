@@ -1105,108 +1105,108 @@ NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov,
   // Un-normalize predictor
   yhat_n = m_centerY + m_scaleY * yhat_n;
 
-  arma::mat  Fhat_n = trans(Rstar_on) * m_M;
+  arma::mat Fhat_n = trans(Rstar_on) * m_M;
   arma::mat E_n = F_n - Fhat_n;
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (return_stdev) {
-  ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
-  ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-  ysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
-  t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
+    ysd2_n = 1.0 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
+    ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
+    ysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
+    t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
   if (return_cov) {
-  // Compute the covariance matrix between new data points
-  arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_n; i++) {
-    //R_nn.at(i, i) = 1;
-    for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+    // Compute the covariance matrix between new data points
+    arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
+    for (arma::uword i = 0; i < n_n; i++) {
+      //R_nn.at(i, i) = 1;
+      for (arma::uword j = 0; j < i; j++) {
+        R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+      }
     }
-  }
-  R_nn *= m_alpha;
-  R_nn.diag().ones();
-  t0 = Bench::toc(nullptr, "R_nn       ", t0);
+    R_nn *= m_alpha;
+    R_nn.diag().ones();
+    t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
-  Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-  Sigma_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
-  t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
+    Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
+    Sigma_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
+    t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
   if (return_deriv) {
-  //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
-  //for (i in 1:n_n) {
-  //  
-  //  ## =================================================================
-  //  ## 'DF_n_i' and 'DR_on_i' are matrices with
-  //  ## dimension c(n_n, d)
-  //  ## =================================================================
-  //  
-  //  DF_n_i <- trend.deltax(x = XNew[i, ], model = object)
-  //  KOldNewi <- as.vector(KOldNew[ , i])
-  //  DR_on_i <- covVector.dx(x = as.vector(XNew[i, ]),
-  //                              X = X,
-  //                              object = object@covariance,
-  //                              c = KOldNewi)
-  //  
-  //  KOldNewStarDer[ , i, i, ] <-
-  //      backsolve(L, DR_on_i, upper.tri = FALSE)
-  //  
-  //  ## Gradient of the kriging trend and mean
-  //  muNewHatDer[i, i, ] <- crossprod(DF_n_i, betaHat)
-  //  ## dim in product c(d, n) and NULL(length d)
-  //  mean_nHatDer[i, i, ] <- muNewHatDer[i, i, ] +
-  //      crossprod(KOldNewStarDer[ , i, i,  ], zStar) 
-  //  ## dim in product c(d, n) and NULL(length n)
-  //  s2Der[i, i,  ] <-
-  //      - 2 * crossprod(KOldNewStarDer[ , i, i, ],
-  //                      drop(KOldNewStar[ , i]))
-  //  
-  //  ## dim in product c(d, n) and c(n, p)
-  //  
-  //  if (type == "UK") {
-  //      ENewDagDer[i, i, , ] <-
-  //          backsolve(t(RStar),
-  //                    DF_n_i -
-  //                    t(crossprod(KOldNewStarDer[ , i, i, ], FStar)),
-  //                    upper.tri = FALSE)
-  //      ## dim in product NULL (length p) and c(p, d) because of 'drop'
-  //      s2Der[i, i, ] <- s2Der[i, i, ] + 2 * drop(ENewDagT[ , i]) %*%
-  //          drop(ENewDagDer[i, i, , ])
-  //  }
-  // numerical derivative step : value is sensitive only for non linear trends. Otherwise, it gives exact results.
-  const double h = 1.0E-5; 
-  arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
+    //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
+    //for (i in 1:n_n) {
+    //  
+    //  ## =================================================================
+    //  ## 'DF_n_i' and 'DR_on_i' are matrices with
+    //  ## dimension c(n_n, d)
+    //  ## =================================================================
+    //  
+    //  DF_n_i <- trend.deltax(x = XNew[i, ], model = object)
+    //  KOldNewi <- as.vector(KOldNew[ , i])
+    //  DR_on_i <- covVector.dx(x = as.vector(XNew[i, ]),
+    //                              X = X,
+    //                              object = object@covariance,
+    //                              c = KOldNewi)
+    //  
+    //  KOldNewStarDer[ , i, i, ] <-
+    //      backsolve(L, DR_on_i, upper.tri = FALSE)
+    //  
+    //  ## Gradient of the kriging trend and mean
+    //  muNewHatDer[i, i, ] <- crossprod(DF_n_i, betaHat)
+    //  ## dim in product c(d, n) and NULL(length d)
+    //  mean_nHatDer[i, i, ] <- muNewHatDer[i, i, ] +
+    //      crossprod(KOldNewStarDer[ , i, i,  ], zStar) 
+    //  ## dim in product c(d, n) and NULL(length n)
+    //  s2Der[i, i,  ] <-
+    //      - 2 * crossprod(KOldNewStarDer[ , i, i, ],
+    //                      drop(KOldNewStar[ , i]))
+    //  
+    //  ## dim in product c(d, n) and c(n, p)
+    //  
+    //  if (type == "UK") {
+    //      ENewDagDer[i, i, , ] <-
+    //          backsolve(t(RStar),
+    //                    DF_n_i -
+    //                    t(crossprod(KOldNewStarDer[ , i, i, ], FStar)),
+    //                    upper.tri = FALSE)
+    //      ## dim in product NULL (length p) and c(p, d) because of 'drop'
+    //      s2Der[i, i, ] <- s2Der[i, i, ] + 2 * drop(ENewDagT[ , i]) %*%
+    //          drop(ENewDagDer[i, i, , ])
+    //  }
+    // numerical derivative step : value is sensitive only for non linear trends. Otherwise, it gives exact results.
+    const double h = 1.0E-5; 
+    arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
 
-  // Compute the derivatives of the covariance and trend functions
-  for (arma::uword i = 0; i < n_n; i++) {  // for each predict point... should be parallel ?
-      arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
-      for (arma::uword j = 0; j < n_o; j++) {
-        DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
-      }
-      t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
+    // Compute the derivatives of the covariance and trend functions
+    for (arma::uword i = 0; i < n_n; i++) {  // for each predict point... should be parallel ?
+        arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
+        for (arma::uword j = 0; j < n_o; j++) {
+          DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
+        }
+        t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
-      arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));  // just duplicate X_n.row(i) d times
-      arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
-                        - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
-                       / (2 * h);
-      t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
+        arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));  // just duplicate X_n.row(i) d times
+        arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
+                          - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
+                         / (2 * h);
+        t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
 
-      arma::mat W_i = LinearAlgebra::solve(m_T, DR_on_i);
-      t0 = Bench::toc(nullptr, "W_i        ", t0);
-      Dyhat_n.row(i) = trans(DF_n_i * m_beta + trans(W_i) * m_z);
-      t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
+        arma::mat W_i = LinearAlgebra::solve(m_T, DR_on_i);
+        t0 = Bench::toc(nullptr, "W_i        ", t0);
+        Dyhat_n.row(i) = trans(DF_n_i * m_beta + trans(W_i) * m_z);
+        t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
-      if (return_stdev) {
-        arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
-        Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
-        t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
-      }
-  }
-  Dyhat_n *= m_scaleY;
-  Dysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
+        if (return_stdev) {
+          arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
+          Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
+          t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
+        }
+    }
+    Dyhat_n *= m_scaleY;
+    Dysd2_n *= sigma2 / m_alpha * m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
@@ -1273,15 +1273,15 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_o; i++) {
     for (arma::uword j = 0; j < n_n; j++) {
-      //arma::mat dij = Xn_o.col(i) - Xn_n.col(j);
-      //if (with_nugget && dij.is_zero(arma::datum::eps))
-      //  R_on.at(i, j) = 1.0;
-      //else
-      //  R_on.at(i, j) = _Cov(dij, m_theta) * m_alpha;
-      R_on.at(i, j) = _Cov(Xn_o.col(i) - Xn_n.col(j), m_theta);
+      arma::mat dij = Xn_o.col(i) - Xn_n.col(j);
+      if (with_nugget && dij.is_zero(arma::datum::eps))
+        R_on.at(i, j) = 1.0;
+      else
+        R_on.at(i, j) = _Cov(dij, m_theta) * m_alpha;
+      //R_on.at(i, j) = _Cov(Xn_o.col(i) - Xn_n.col(j), m_theta);
     }
   }
-  R_on *= m_alpha;
+  //R_on *= m_alpha;
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
@@ -1314,7 +1314,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
   Random::reset_seed(seed);
-  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2 + m_nugget);
+  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2 / alpha);
 
   // Un-normalize simulations
   y_n = m_centerY + m_scaleY * y_n;
@@ -1439,11 +1439,12 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
-        arma::vec dij = Xn_u.col(i) - Xn_n.col(j);
-        if (lastsim_with_nugget && dij.is_zero(arma::datum::eps))
-          lastsimup_R_un.at(i, j) = 1.0;
-        else
-          lastsimup_R_un.at(i, j) = _Cov(dij, m_theta) * m_alpha;
+        //arma::vec dij = Xn_u.col(i) - Xn_n.col(j);
+        //if (lastsim_with_nugget && dij.is_zero(arma::datum::eps))
+        //  lastsimup_R_un.at(i, j) = 1.0;
+        //else
+        //  lastsimup_R_un.at(i, j) = _Cov(dij, m_theta) * m_alpha;
+        lastsimup_R_un.at(i, j) = _Cov(Xn_u.col(i) - Xn_n.col(j), m_theta) * m_alpha;
       }
     }
     t0 = Bench::toc(nullptr,"R_un          ", t0);
@@ -1484,7 +1485,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     arma::mat M_u = arma::repmat(m_u,1,lastsim_nsim) +  W_uCon.tail_cols(n_n) * lastsim_y_n;
     
     Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2 + m_nugget);    
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2 / alpha);    
     t0 = Bench::toc(nullptr,"y_u          ", t0);
   }
 
@@ -1497,7 +1498,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
     t0 = Bench::toc(nullptr,"Rstar_ou          ", t0);
 
     arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ,F_u - Fhat_uKo);
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ, F_u - Fhat_uKo);
     t0 = Bench::toc(nullptr,"Ecirc_uKo          ", t0);
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();

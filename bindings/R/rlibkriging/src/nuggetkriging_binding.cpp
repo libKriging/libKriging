@@ -337,7 +337,7 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev 
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool with_nugget, bool will_update = false) {
+arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool with_nugget = true, bool will_update = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");

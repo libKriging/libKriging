@@ -98,7 +98,7 @@ lp = lk$predict(X_n) # libK predict
 lines(X_n,lp$mean,col='red')
 polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(1000, 123, X_n, with_nugget=FALSE) # libK simulate
+ls = lk$simulate(1000, 123, X_n, with_nugget=TRUE) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
     lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }

@@ -437,7 +437,7 @@ predict.NuggetKriging <- function(object, x, return_stdev = TRUE, return_cov = F
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
-#' @param with_nugget Set to TRUE if wish to add the nugget in the simulation.
+#' @param with_nugget Set to FALSE if wish to remove the nugget in the simulation.
 #' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
@@ -472,7 +472,7 @@ predict.NuggetKriging <- function(object, x, return_stdev = TRUE, return_cov = F
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget = FALSE, will_update = FALSE,  ...) {
+simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget = TRUE, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- nuggetkriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)

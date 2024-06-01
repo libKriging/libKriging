@@ -113,7 +113,7 @@ for (i in 1:length(X_n)) {
 
 X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n)) # add some nugget to avoid degenerate cases
 
-ls = lk$simulate(1000, 123, X_n, will_update=TRUE)
+ls = lk$simulate(1000, 123, X_n, with_nugget = TRUE, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus=NULL
 lus = lk$update_simulate(y_u,  X_u)
@@ -121,9 +121,9 @@ lus = lk$update_simulate(y_u,  X_u)
 lu = copy(lk)
 lu$update(y_u, X_u, refit=TRUE) # refit=TRUE will update beta (required to match l2)
 lsu=NULL
-lsu = lu$simulate(1000, 123, X_n)
+lsu = lu$simulate(1000, 123, X_n, with_nugget = TRUE)
 
-plot(f,xlim=c(0.2,0.5))
+plot(f,xlim=c(0.55,0.65), ylim=c(0.2,0.55))
 points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(nugget),y_o[i]-2*sqrt(nugget)),col='black',lwd=4)
@@ -164,7 +164,7 @@ for (i in 1:length(X_n)) {
     lines(density(lus[i,]),col='red')
     #if (all(abs(X_n[i]-X_u)>1e-2))
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_u[i]," ",
+    test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_n[i]," ",
     mean(lus[i,]),",",sd(lus[i,])," != ",mean(lsu[i,]),",",sd(lsu[i,])),
         expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 1e-10)) # just check that it is not clearly wrong
 }
@@ -278,7 +278,7 @@ y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(nugget))
 X_n = rbind(X_u+1e-2,X_n) # add some nugget to avoid degenerate cases
 
 #lk = rlibkriging:::load.NuggetKriging("/tmp/lk.json")
-lsd = lkd$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=TRUE)
+lsd = lkd$simulate(1000, 123, X_n, with_nugget=TRUE, will_update=TRUE)
 lusd = NULL
 lusd = lkd$update_simulate(y_u, X_u)
 
