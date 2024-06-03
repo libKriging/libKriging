@@ -1421,7 +1421,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
         lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = _Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
       }
     }
-    lastsimup_R_uu *= m_alpha;
+    lastsimup_R_uu *= alpha;
     lastsimup_R_uu.diag().ones();
     t0 = Bench::toc(nullptr,"R_uu          ", t0);
   
@@ -1432,19 +1432,19 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
         lastsimup_R_uo.at(i, j) = _Cov((Xn_u.col(i) - Xn_o.col(j)), m_theta);
       }
     }
-    lastsimup_R_uo *= m_alpha;
+    lastsimup_R_uo *= alpha;
     t0 = Bench::toc(nullptr,"R_uo          ", t0);
   
     // Compute covariance between updated/new data
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
-        //arma::vec dij = Xn_u.col(i) - Xn_n.col(j);
-        //if (lastsim_with_nugget && dij.is_zero(arma::datum::eps))
-        //  lastsimup_R_un.at(i, j) = 1.0;
-        //else
-        //  lastsimup_R_un.at(i, j) = _Cov(dij, m_theta) * m_alpha;
-        lastsimup_R_un.at(i, j) = _Cov(Xn_u.col(i) - Xn_n.col(j), m_theta) * m_alpha;
+        arma::vec dij = Xn_u.col(i) - Xn_n.col(j);
+        if (lastsim_with_nugget && dij.is_zero(arma::datum::eps))
+          lastsimup_R_un.at(i, j) = 1.0;
+        else
+          lastsimup_R_un.at(i, j) = _Cov(dij, m_theta) * alpha;
+        //lastsimup_R_un.at(i, j) = _Cov(Xn_u.col(i) - Xn_n.col(j), m_theta) * m_alpha;
       }
     }
     t0 = Bench::toc(nullptr,"R_un          ", t0);

@@ -1,10 +1,10 @@
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
 library(testthat)
-rlibkriging:::linalg_set_chol_warning(TRUE)
-default_rcond_check = rlibkriging:::linalg_chol_rcond_checked()
-rlibkriging:::linalg_check_chol_rcond(FALSE)
-default_num_nugget = rlibkriging:::linalg_get_num_nugget()
-rlibkriging:::linalg_set_num_nugget(1e-15) # lowest nugget to avoid numerical inequalities bw simulates
+#rlibkriging:::linalg_set_chol_warning(TRUE)
+#default_rcond_check = rlibkriging:::linalg_chol_rcond_checked()
+#rlibkriging:::linalg_check_chol_rcond(FALSE)
+#default_num_nugget = rlibkriging:::linalg_get_num_nugget()
+#rlibkriging:::linalg_set_num_nugget(1e-15) # lowest nugget to avoid numerical inequalities bw simulates
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -14,7 +14,7 @@ n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
 nugget = 0.01
 set.seed(1234)
-y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
+y_o <- f(X_o) #+ rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o,pch=16)
 
 lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
@@ -23,10 +23,9 @@ lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.1))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.09))
 
-
-X_n = unique(sort(c(X_o,seq(0,1,,11))))
+X_n = unique(sort(c(X_o,seq(0,1,,61))))
 
 # lk_nn = Kriging(y = matrix(y_o, ncol = 1),
 #               X = matrix(X_o, ncol = 1),
@@ -34,7 +33,7 @@ X_n = unique(sort(c(X_o,seq(0,1,,11))))
 #               regmodel = "linear",
 #               optim = "none",
 #               #normalize = TRUE,
-#               parameters = list(theta = matrix(0.1), sigma2 = 0.1))
+#               parameters = list(theta = matrix(0.1), sigma2 = 0.09))
 
 ## Ckeck consistency bw predict & simulate
 
@@ -61,7 +60,7 @@ for (i in 1:length(X_n)) {
 ## Check consistency when update
 
 X_u = c(.4,.6)
-y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
+y_u = f(X_u) #+ rnorm(length(X_u), sd = sqrt(nugget))
 
 # new Kriging model from scratch
 l2 = NuggetKriging(y = matrix(c(y_o,y_u),ncol=1),
@@ -69,7 +68,7 @@ l2 = NuggetKriging(y = matrix(c(y_o,y_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
-              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2 = 0.1))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2 = 0.09))
 
 lu = copy(lk)
 lu$update(y_u, X_u, refit=TRUE) # refit=TRUE will update beta (required to match l2)
@@ -111,7 +110,7 @@ for (i in 1:length(X_n)) {
 #X_u = X_n[i_u]# c(.4,.6)
 #y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
-X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n)) # add some nugget to avoid degenerate cases
+X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n))
 
 ls = lk$simulate(1000, 123, X_n, with_nugget = TRUE, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
@@ -123,7 +122,7 @@ lu$update(y_u, X_u, refit=TRUE) # refit=TRUE will update beta (required to match
 lsu=NULL
 lsu = lu$simulate(1000, 123, X_n, with_nugget = TRUE)
 
-plot(f,xlim=c(0.55,0.65), ylim=c(0.2,0.55))
+plot(f)
 points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(nugget),y_o[i]-2*sqrt(nugget)),col='black',lwd=4)
@@ -132,10 +131,10 @@ points(X_u,y_u,col='red',pch=16)
 for (i in 1:length(X_u)) {
     lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(nugget),y_u[i]-2*sqrt(nugget)),col='red',lwd=4)
 }
-for (j in 1:min(100,ncol(lus))) {
-    lines(X_n,ls[,j],col=rgb(0,0,0,.1),lwd=4)
-    lines(X_n,lus[,j],col=rgb(1,0,0,.1),lwd=4)
-    lines(X_n,lsu[,j],col=rgb(1,0.5,0,.1),lwd=4)
+for (j in 1:min(10,ncol(lus))) {
+    lines(X_n,ls[,j])
+    lines(X_n,lus[,j],col='orange',lwd=3)
+    lines(X_n,lsu[,j],col='red')
 }
 
 for (i in 1:length(X_n)) {
@@ -166,7 +165,7 @@ for (i in 1:length(X_n)) {
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_n[i]," ",
     mean(lus[i,]),",",sd(lus[i,])," != ",mean(lsu[i,]),",",sd(lsu[i,])),
-        expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 1e-10)) # just check that it is not clearly wrong
+        expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 0.01)) # just check that it is not clearly wrong
 }
 
 
@@ -324,5 +323,5 @@ for (i in 1:nrow(X_n)) {
     }
 }
 
-rlibkriging:::linalg_check_chol_rcond(default_rcond_check)
-rlibkriging:::linalg_set_num_nugget(default_num_nugget)
+#rlibkriging:::linalg_check_chol_rcond(default_rcond_check)
+#rlibkriging:::linalg_set_num_nugget(default_num_nugget)

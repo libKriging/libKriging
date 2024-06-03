@@ -1,10 +1,10 @@
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
 library(testthat)
-rlibkriging:::linalg_set_chol_warning(TRUE)
-default_rcond_check = rlibkriging:::linalg_chol_rcond_checked()
-rlibkriging:::linalg_check_chol_rcond(FALSE)
-default_num_nugget = rlibkriging:::linalg_get_num_nugget()
-rlibkriging:::linalg_set_num_nugget(1e-15) # lowest nugget to avoid numerical inequalities bw simulates
+#rlibkriging:::linalg_set_chol_warning(TRUE)
+#default_rcond_check = rlibkriging:::linalg_chol_rcond_checked()
+#rlibkriging:::linalg_check_chol_rcond(FALSE)
+#default_num_nugget = rlibkriging:::linalg_get_num_nugget()
+#rlibkriging:::linalg_set_num_nugget(1e-15) # lowest nugget to avoid numerical inequalities bw simulates
 
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
@@ -329,5 +329,5 @@ for (i in 1:nrow(X_n)) {
     }
 }
 
-rlibkriging:::linalg_check_chol_rcond(default_rcond_check)
-rlibkriging:::linalg_set_num_nugget(default_num_nugget)
+#rlibkriging:::linalg_check_chol_rcond(default_rcond_check)
+#rlibkriging:::linalg_set_num_nugget(default_num_nugget)
