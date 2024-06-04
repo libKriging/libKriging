@@ -15,10 +15,10 @@ set.seed(1234)
 X <- matrix(runif(n*d),ncol=d)
 y <- f(X)+rnorm(1000,0,0.1)
 r = NULL
-try( r <- NuggetKriging(y, X, "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), beta = matrix(0.01), nugget=0.1^2, sigma2=0.5^2)) )
+try( r <- NuggetKriging(y, X, "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), beta = matrix(0.01), nugget=0.1^2, sigma2=0.09)) )
 
 no = floor(n*0.7)
-try( ro <- NuggetKriging(y[1:no], X[1:no,], "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), beta = matrix(0.01), nugget=0.1^2, sigma2=0.5^2)) )
+try( ro <- NuggetKriging(y[1:no], X[1:no,], "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), beta = matrix(0.01), nugget=0.1^2, sigma2=0.09)) )
 # update with new points, compute LL but no fit (since optim=none)
 ro$update(y[(no+1):n],X[(no+1):n,], refit=TRUE)
 

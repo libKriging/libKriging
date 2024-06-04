@@ -17,7 +17,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   X <- as.matrix(runif(n))
   y = f(X)
   #points(X,y)
-  k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0.1,nugget.estim = FALSE)
+  k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0.01,nugget.estim = FALSE)
   #library(rlibkriging)
   r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,

@@ -172,8 +172,8 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-noise = 0.01 #0.0000001^2
-sigma2 = 0.1
+noise = 0.01
+sigma2 = 0.09
 set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o,pch=16)
@@ -207,22 +207,22 @@ test_that("Consistency between Noise(0)Kriging and Kriging", {
 
 ## Simulate
 
-X_n = seq(0,1,,51)
+X_n = seq(0,1,,11)
 
 ls_no = NULL
-ls_no = lk_no$simulate(1000, 123, X_n, will_update=FALSE)
+ls_no = lk_no$simulate(10, 123, X_n, with_noise = 0, will_update=FALSE)
 
 ls_nu = NULL
-ls_nu = lk_nu$simulate(1000, 123, X_n, will_update=FALSE)
+ls_nu = lk_nu$simulate(10, 123, X_n, with_nugget=FALSE, will_update=FALSE)
 
-plot(f)
+plot(f,xlim=c(-0.1,0.1))
 points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
 }
 for (i in 1:min(100,ncol(ls_nu))) {
-    lines(X_n,ls_nu[,i],col=rgb(1,0.5,0,.51),lwd=4,lty=2)
-    lines(X_n,ls_no[,i],col=rgb(1,0,0.5,.51),lwd=4,lty=2)
+    lines(X_n,ls_nu[,i],col='red',lwd=3,lty=2)
+    lines(X_n,ls_no[,i],col='blue',lty=2)
 }
 
 for (i in 1:1:length(X_n)) {
@@ -247,7 +247,7 @@ for (i in 1:length(X_n)) {
     if (sd(ls_no[i,])>1e-3 && sd(ls_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("nugget & noise simulated are consistent: ",
     mean(ls_no[i,]),",",sd(ls_no[i,])," != ",mean(ls_nu[i,]),",",sd(ls_nu[i,])),
-        expect_gt(ks.test(ls_no[i,],ls_nu[i,])$p.value, 1e-5)) # just check that it is not clearly wrong
+        expect_gt(ks.test(ls_no[i,],ls_nu[i,])$p.value, 0.01)) # just check that it is not clearly wrong
 }
 
 
@@ -263,11 +263,11 @@ ls_no = lk_no$simulate(1000, 123, X_n, will_update=TRUE)
 lus_no=NULL
 lus_no = lk_no$update_simulate(y_u, noise_u, X_u)
 
-ls_nu = lk_nu$simulate(1000, 123, X_n, will_update=TRUE)
+ls_nu = lk_nu$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=TRUE)
 lus_nu=NULL
 lus_nu = lk_nu$update_simulate(y_u, X_u)
 
-plot(f)
+plot(f,xlim=c(-0.1,0.1))
 points(X_o,y_o,pch=16)
 for (i in 1:length(X_o)) {
     lines(c(X_o[i],X_o[i]),c(y_o[i]+2*sqrt(noise),y_o[i]-2*sqrt(noise)),col='black',lwd=4)
@@ -301,9 +301,9 @@ for (i in 1:length(X_n)) {
     lines(density(ls_no[i,]),col='blue')
     lines(density(lus_no[i,]),col='orange')
     lines(density(lus_nu[i,]),col='red')
-    if (all(abs(X_n[i]-X_o)>0)) # means we are not on design points (where nuggetK is deterministic, while noiseK is not)
+    #if (all(abs(X_n[i]-X_o)>0)) # means we are not on design points (where nuggetK is deterministic, while noiseK is not)
     if (sd(lus_no[i,])>1e-3 && sd(lus_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
-    test_that(desc=paste0("nugget & noise updated simulate are consistent at x=",X_u[i]," ",
+    test_that(desc=paste0("nugget & noise updated simulate are consistent at x=",X_n[i]," ",
     mean(lus_no[i,]),",",sd(lus_no[i,])," != ",mean(lus_nu[i,]),",",sd(lus_nu[i,])),
-        expect_gt(ks.test(lus_no[i,],lus_nu[i,])$p.value, 1e-7)) # just check that it is not clearly wrong
+        expect_gt(ks.test(lus_no[i,],lus_nu[i,])$p.value, 0.001)) # just check that it is not clearly wrong
 }

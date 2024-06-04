@@ -19,7 +19,7 @@ lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
               regmodel = "constant",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), sigma2=0.5^2))
+              parameters = list(theta = matrix(0.1), sigma2=0.09))
 
 library(DiceKriging)
 dk <- km(response = matrix(y_o, ncol = 1),
@@ -56,7 +56,6 @@ for (i in 1:min(100,nrow(ds))) {
     lines(X_n,ds[i,],col=rgb(0,0,1,.1),lwd=4)
 }
 
-# Failing : DiceKriging is not consistent bw simulate and predict
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging simulate sample ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",dp$mean[i],",",dp$sd[i],") ) at ",X_n[i]),
@@ -69,13 +68,11 @@ for (i in 1:length(X_n)) {
         expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
 }
 
-# Do not compare with DiceKriging, as it is not consistent bw simulate and predict
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) {# otherwise means that density is ~ dirac, so don't test
     plot(density(ds[,i]))
     lines(density(ls[i,]),col='red')
     test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[i,]),",",sd(ls[i,]),") ) matching at ",X_n[i]),
         expect_true(ks.test(ds[,i], ls[i,])$p.value > 0.01))
-        print(ks.test(ds[,i], ls[i,])$p.value)
     }
 }

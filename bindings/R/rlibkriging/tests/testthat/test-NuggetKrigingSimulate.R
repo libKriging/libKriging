@@ -7,7 +7,7 @@ f <- function(x) {
 plot(f)
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
-nugget = 0.1^2
+nugget = 0.01
 set.seed(1234)
 y_o <- f(X_o) #+ rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o)
@@ -18,7 +18,7 @@ lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
               regmodel = "constant",
               optim = "none",
               #normalize = TRUE,
-              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.5^2))
+              parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.09))
 
 library(DiceKriging)
 dk <- km(response = matrix(y_o, ncol = 1),
@@ -112,7 +112,7 @@ for (i in 1:min(100,nrow(ds))) {
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging simulate sample ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",dp$mean[i],",",dp$sd[i],") ) at ",X_n[i]),
-        expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.001))
+        expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.01))
 }
 
 for (i in 1:length(X_n)) {
@@ -124,6 +124,5 @@ for (i in 1:length(X_n)) {
 for (i in 1:length(X_n)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[i,]),",",sd(ls[i,]),") ) matching at ",X_n[i]),
-        expect_true(ks.test(ds[,i], ls[i,])$p.value > 0.001))
-        print(ks.test(ds[,i], ls[i,])$p.value)
+        expect_true(ks.test(ds[,i], ls[i,])$p.value > 0.01))
 }
