@@ -39,7 +39,8 @@ classKriging <- function(nk) {
 #' @param X Numeric matrix of input design.
 #' @param kernel Character defining the covariance model:
 #'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
-#' @param regmodel Universal Kriging linear trend.
+#' @param regmodel Universal Kriging linear trend: \code{"constant"}, 
+#'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
@@ -47,7 +48,8 @@ classKriging <- function(nk) {
 #'     hyper-parameters. Possible values are: \code{"BFGS"},
 #'     \code{"Newton"} and \code{"none"}, the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
+#'     \code{"BFGS"} uses the gradient of the objective 
+#'     (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
 #'     \code{"Newton"} uses both the gradient and the Hessian of the
 #'     objective.
 #' @param objective Character giving the objective function to
@@ -308,7 +310,8 @@ print.Kriging <- function(x, ...) {
 #' @param object S3 Kriging object.
 #' @param y Numeric vector of response values.
 #' @param X Numeric matrix of input design.
-#' @param regmodel Universal Kriging linear trend.
+#' @param regmodel Universal Kriging linear trend: \code{"constant"}, 
+#'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
@@ -316,7 +319,7 @@ print.Kriging <- function(x, ...) {
 #'     hyper-parameters. Possible values are: \code{"BFGS"},
 #'     \code{"Newton"} and \code{"none"}, the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
+#'     \code{"BFGS"} uses the gradient of the objective (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
 #'     \code{"Newton"} uses both the gradient and the Hessian of the
 #'     objective.
 #' @param objective Character giving the objective function to
@@ -448,7 +451,7 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
-#' @return a matrix with \code{length(x)} rows and \code{nsim}
+#' @return a matrix with \code{nrow(x)} rows and \code{nsim}
 #'     columns containing the simulated paths at the inputs points
 #'     given in \code{x}.
 #'
@@ -504,12 +507,39 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALS
 #' @param X_u Numeric matrix of new input points.
 #' @param ... Ignored.
 #'
-#' @return a matrix with \code{length(x)} rows and \code{nsim}
+#' @return a matrix with \code{nrow(x)} rows and \code{nsim}
 #'     columns containing the simulated paths at the inputs points
 #'     given in \code{x}.
 #'
 #' @method update_simulate Kriging
 #' @export
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' plot(f)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#' points(X, y, col = "blue")
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' 
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' s <- k$simulate(nsim = 3, x = x, will_update = TRUE)
+#' 
+#' lines(x, s[ , 1], col = "blue")
+#' lines(x, s[ , 2], col = "blue")
+#' lines(x, s[ , 3], col = "blue")
+#' 
+#' X_u <- as.matrix(runif(3))
+#' y_u <- f(X_u)
+#' points(X_u, y_u, col = "red")
+#' 
+#' su <- k$update_simulate(y_u, X_u)
+#' 
+#' lines(x, su[ , 1], col = "blue", lty=2)
+#' lines(x, su[ , 2], col = "blue", lty=2)
+#' lines(x, su[ , 3], col = "blue", lty=2)
 update_simulate.Kriging <- function(object, y_u, X_u, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
