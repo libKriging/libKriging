@@ -166,7 +166,7 @@ option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for
 list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
 # Dependencies
-set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
+# No more HDF5: set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
 set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
 set(BUILD_SMOKE_TEST OFF CACHE BOOL "armadillo smoke test") # no smoke tests: it fails due to custom memory guard in memory.hpp 
 add_subdirectory(dependencies/armadillo-code)
