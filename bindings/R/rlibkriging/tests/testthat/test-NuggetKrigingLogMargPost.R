@@ -1,5 +1,5 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 kernel="gauss"
 
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {

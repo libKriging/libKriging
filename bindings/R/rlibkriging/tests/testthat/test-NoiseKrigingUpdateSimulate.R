@@ -1,5 +1,5 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 #rlibkriging:::linalg_set_chol_warning(TRUE)
 #default_rcond_check = rlibkriging:::linalg_chol_rcond_checked()
 #rlibkriging:::linalg_check_chol_rcond(FALSE)
