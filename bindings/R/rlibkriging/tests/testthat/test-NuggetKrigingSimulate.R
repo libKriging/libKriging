@@ -4,7 +4,7 @@ library(testthat)
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 }
-plot(f)
+plot(f, xlim = c(-1, 2), ylim = c(0, 1))
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
 nugget = 0.01
@@ -42,7 +42,7 @@ test_that("DiceKriging/libKriging covariance matrix is the same", {
 })
 
 ## Predict & simulate
-X_n = unique(sort(c(X_o,seq(0,1,,51))))
+X_n = unique(sort(c(X_o,seq(-1,2,,51))))
 
 ## ## Check that DiceKriging and libKriging matches (at factor alpha)
 ## 
@@ -109,7 +109,8 @@ for (i in 1:min(100,nrow(ds))) {
     lines(X_n,ds[i,],col=rgb(0,0,1,.1),lwd=4)
 }
 
-for (i in 1:length(X_n)) {
+# DiceKriging is not working for far X_n / X_o
+for (i in which(X_n >= 0 & X_n <= 1)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging simulate sample ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",dp$mean[i],",",dp$sd[i],") ) at ",X_n[i]),
         expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.01))

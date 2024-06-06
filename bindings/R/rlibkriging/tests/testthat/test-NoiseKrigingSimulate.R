@@ -4,7 +4,7 @@ library(testthat)
 f <- function(x) {
     1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 }
-plot(f)
+plot(f, xlim = c(-1, 2), ylim = c(0, 1))
 n <- 5
 X_o <- seq(from = 0, to = 1, length.out = n)
 noise = 0.2^2
@@ -35,7 +35,7 @@ dk <- km(response = matrix(y_o, ncol = 1),
               coef.var = lk$sigma2())
 
 ## Predict & simulate
-X_n = seq(0,1,,31) #sort(unique(c(X_o,seq(0,1,,31))))
+X_n = seq(-1,2,,31) #sort(unique(c(X_o,seq(0,1,,31))))
 
 dp = predict(dk, newdata = data.frame(X = X_n), type="UK", checkNames=FALSE)
 lines(X_n,dp$mean,col='blue')
@@ -56,7 +56,8 @@ for (i in 1:min(100,nrow(ds))) {
     lines(X_n,ds[i,],col=rgb(0,0,1,.1),lwd=4)
 }
 
-for (i in 1:length(X_n)) {
+# DiceKriging is not working for far X_n / X_o
+for (i in which(X_n >= 0 & X_n <= 1)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging simulate sample ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") ) follows predictive distribution ( =N(",dp$mean[i],",",dp$sd[i],") ) at ",X_n[i]),
         expect_true(ks.test(ds[,i], "pnorm", mean = dp$mean[i],sd = dp$sd[i])$p.value > 0.01))
@@ -68,7 +69,8 @@ for (i in 1:length(X_n)) {
         expect_true(ks.test(ls[i,], "pnorm", mean = lp$mean[i,],sd = lp$stdev[i,])$p.value > 0.01))
 }
 
-for (i in 1:length(X_n)) {
+# DiceKriging is not working for far X_n / X_o
+for (i in which(X_n >= 0 & X_n <= 1)) {
     if (dp$sd[i] > 1e-3) {# otherwise means that density is ~ dirac, so don't test
     plot(density(ds[,i]))
     lines(density(ls[i,]),col='red')
