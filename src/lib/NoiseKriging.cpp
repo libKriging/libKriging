@@ -219,7 +219,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
     if (m_est_sigma2) {
       arma::mat dCdv = (m.R - arma::diagmat(m_noise)) / _sigma2;
-      double _terme1 = -as_scalar((trans(x) * dCdv) * x);  // ?????
+      double _terme1 = -as_scalar((trans(x) * dCdv) * x);
       double _terme2 = arma::accu(arma::dot(Cinv, dCdv));
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
     } else (*grad_out).at(d) = 0; // if sigma2 is defined & fixed by user

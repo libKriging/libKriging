@@ -28,6 +28,21 @@ abline(v=theta_ref,col='black')
 abline(v=as.list(r)$theta,col='red')
 abline(v=k@covariance@range.val,col='blue')
 
+theta = k@covariance@range.val
+ll_s2 = Vectorize(function(s2) r$logLikelihoodFun(c(theta,s2))$logLikelihood)
+plot(ll_s2,xlim=c(0.001,.1),lwd=5)
+llk_s2 = Vectorize(function(s2) {DiceKriging::logLikFun(model=k,c(theta,s2))})
+curve(llk_s2, add=TRUE, col='blue', lwd=3)
+for (s2 in seq(0.001,.1,,21)){
+  envx = new.env()
+  ll2x = r$logLikelihoodFun(c(theta,s2))$logLikelihood
+  gll2x = r$logLikelihoodFun(c(theta,s2),return_grad = T)$logLikelihoodGrad[,2]
+  arrows(s2,ll2x,s2+.1,ll2x+.1*gll2x,col='red')
+}
+abline(v=alpha_k,col='blue')
+abline(v=alpha_r,col='red')
+
+
 test_that(desc="Noise / Fit: 1D / fit of theta by DiceKriging is right",
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
 

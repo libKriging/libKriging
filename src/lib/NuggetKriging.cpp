@@ -173,8 +173,8 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   // * alpha = sigma2 / (nugget + sigma2)
   // * sigma2 = nugget * alpha / (1-alpha)
   // * nugget = sigma2 * (1-alpha) / alpha
-  double _sigma2;
-  double _nugget;
+  double _sigma2 = m_sigma2;
+  double _nugget = m_nugget;
   if (m_est_sigma2) {
     if (m_est_nugget) {
       // nothing to do now: use alpha as input, compute var = sigma2 + nugget later and then sigma2 and nugget
@@ -203,7 +203,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     _nugget = (1-_alpha) * var;
   }
 
-  double ll = -0.5 * (n * log(2 * M_PI * (_sigma2 + _nugget)) + 2 * sum(log(m.L.diag())) + n);
+  double ll = -0.5 * (n * log(2 * M_PI * _sigma2 / _alpha) + 2 * sum(log(m.L.diag())) + as_scalar(LinearAlgebra::crossprod(m.Estar)) * (_alpha / _sigma2));
 
   if (grad_out != nullptr) {
     auto t0 = Bench::tic();
@@ -249,13 +249,20 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     //  term2 <- sum(Cinv * dCdv) # economic computation of trace(Cinv%*%C0)
     //  logLik.derivative[nparam] <- -0.5 * (term1 + term2) # /sigma2
 
-    if (m_est_sigma2 || m_est_nugget) {
+    if (m_est_sigma2 && m_est_nugget) {
       arma::mat dRdv = m.R / _alpha;
       dRdv.diag().zeros();
       double _terme1 = -as_scalar((trans(x) * dRdv) * x) / (_sigma2 + _nugget);
       double _terme2 = arma::accu(arma::dot(Rinv, dRdv));
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
-    } else (*grad_out).at(d) = 0; // if sigma2 and nugget are defined & fixed by user
+    } else if (m_est_sigma2 && !m_est_nugget) {
+      arma::mat dRdv = m.R / _alpha;
+      dRdv.diag().ones();
+      double _terme1 = -as_scalar((trans(x) * dRdv) * x) / ((_sigma2 + _nugget) * (_sigma2 + _nugget));
+      double _terme2 = arma::accu(arma::dot(Rinv / (_sigma2+ _nugget), dRdv)) ;
+      (*grad_out).at(d) = -0.5 * (_terme1 + _terme2) * _nugget/(1-_alpha)/(1-_alpha);
+    } else // we do not support explicitely the case where nugget is estimated and sigma2 is fixed 
+      (*grad_out).at(d) = 0; // if sigma2 and nugget are defined & fixed by user
 
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }

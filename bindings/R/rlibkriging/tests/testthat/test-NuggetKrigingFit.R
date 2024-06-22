@@ -1,5 +1,5 @@
-#library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(testthat)
+library(rlibkriging, lib.loc="bindings/R/Rlibs")
+library(testthat)
 
 context("Fit: 1D")
 
@@ -23,8 +23,10 @@ test_that(desc="Nugget / Fit: 1D / fit of alpha by DiceKriging is same that libK
           expect_equal(alpha_k,alpha_r, tol= 1e-4))
 
 ll_a = Vectorize(function(a) logLikelihoodFun(r,c(k@covariance@range.val,a))$logLikelihood)
-plot(ll_a,xlim=c(0.001,1))
-for (a in seq(0.01,1,,21)){
+plot(ll_a,xlim=c(0.001,1),lwd=3)
+llk_a = Vectorize(function(a) DiceKriging::logLikFun(model=k,c(k@covariance@range.val,a)))
+curve(llk_a, add=TRUE, col='blue')
+for (a in seq(0.01,0.99,,21)){
   envx = new.env()
   ll2x = logLikelihoodFun(r,c(k@covariance@range.val,a))$logLikelihood
   gll2x = logLikelihoodFun(r,c(k@covariance@range.val,a),return_grad = T)$logLikelihoodGrad[,2]
@@ -35,6 +37,96 @@ abline(v=alpha_r,col='red')
 
 ll_t = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_k))$logLikelihood)
 plot(ll_t,xlim=c(0.001,1))
+#ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_r))$logLikelihood)
+#plot(ll_,xlim=c(0.001,1))
+
+theta_ref = optimize(ll_t,interval=c(0.001,1),maximum=T)$maximum
+abline(v=theta_ref,col='black')
+abline(v=as.list(r)$theta,col='red')
+abline(v=k@covariance@range.val,col='blue')
+
+test_that(desc="Nugget / Fit: 1D / fit of theta by DiceKriging is right",
+          expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))
+
+test_that(desc="Nugget / Fit: 1D / fit of theta by libKriging is right",
+          expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
+
+# see joint ll over theta & alpha
+# ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
+# apply(X,1,
+#      function(x) {
+#        y=-logLikelihoodFun(r,c(unlist(x)))$logLikelihood
+#        #print(y);
+#        y})}
+# x=seq(0.01,0.99,,51)
+# without reparam: 
+# contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 50)
+# abline(v=(theta_ref),col='black')
+# abline(v=(as.list(r)$theta),col='red')
+# abline(v=(k@covariance@range.val),col='blue')
+# abline(h=(alpha_k),col='blue')
+# abline(h=(alpha_r),col='red')
+# with reparam:
+# contour(log(x),-log(1-x),matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 50)
+# abline(v=log(theta_ref),col='black')
+# abline(v=log(as.list(r)$theta),col='red')
+# abline(v=log(k@covariance@range.val),col='blue')
+# abline(h=-log(1-alpha_k),col='blue')
+# abline(h=-log(1-alpha_r),col='red')
+
+#############################################################
+
+context("Fit: 1D, nugget preset")
+
+f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
+n <- 5
+set.seed(123)
+X <- as.matrix(runif(n))
+y = f(X)
+nu=0.1
+k = NULL
+r = NULL
+k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=FALSE, nugget = nu,optim.method='BFGS',multistart = 20)
+#equivalent to NoiseKriging, not NuggetKriging: 
+rr <- NoiseKriging(y, rep(0.1,nrow(y)), X, "gauss", optim = "BFGS20")
+r <- NuggetKriging(y, X, "gauss", optim = "BFGS20", parameters=list(nugget=nu, is_nugget_estim=FALSE ))
+l = as.list(r)
+
+# save(list=ls(),file="fit-nuggetpreset-1d.Rdata")
+
+alpha_k = k@covariance@sd2/(k@covariance@sd2+k@covariance@nugget)
+alpha_r = as.list(r)$sigma2/(as.list(r)$sigma2+as.list(r)$nugget)
+test_that(desc="Nugget / Fit: 1D / fit of alpha by DiceKriging is same that libKriging",
+          expect_equal(alpha_k,alpha_r, tol= 1e-4))
+
+theta=k@covariance@range.val #r$theta()
+ll_a = Vectorize(function(a) r$logLikelihoodFun(c(theta,a))$logLikelihood)
+plot(ll_a,xlim=c(0.1,1),lwd=3)
+llk_a = Vectorize(function(a) {s2 = nu*a/(1-a); DiceKriging::logLikFun(model=k,c(theta,s2))})
+curve(llk_a, add=TRUE, col='blue',xlim=c(0.1,0.999))
+for (a in seq(0.01,0.99,,21)){
+  ll2x = r$logLikelihoodFun(c(theta,a))$logLikelihood
+  gll2x = r$logLikelihoodFun(c(theta,a),return_grad = T)$logLikelihoodGrad[,2]  
+  arrows(a,ll2x,a+.1,ll2x+.1*gll2x,col='red', lwd=5)
+
+  envx = new.env()
+  
+  s2 = nu*a/(1-a)
+  ll2x_k = DiceKriging::logLikFun(c(theta,s2),k, envir=envx)
+  gll2x_k = DiceKriging::logLikGrad(c(theta,s2),k, envir=envx)[2] * nu/(1-a)^2 # chain rule
+  arrows(a,ll2x_k,a+.1,ll2x_k+.1*gll2x_k,col='blue',lwd=3)
+
+  ll2x = rr$logLikelihoodFun(c(theta,s2))$logLikelihood
+  gll2x = rr$logLikelihoodFun(c(theta,s2),return_grad = T)$logLikelihoodGrad[,2]* nu/(1-a)^2
+  arrows(a,ll2x,a+.1,ll2x+.1*gll2x,col='green')
+}
+abline(v=alpha_k,col='blue')
+abline(v=alpha_r,col='red')
+
+ll_t = Vectorize(function(x) r$logLikelihoodFun(c(x,alpha_k))$logLikelihood)
+plot(ll_t,xlim=c(0.001,1))
+llk_t = Vectorize(function(x) DiceKriging::logLikFun(model=k,c(x,alpha_k)))
+curve(llk_t, add=TRUE, col='blue')
 #ll = Vectorize(function(x) logLikelihoodFun(r,c(x,alpha_r))$logLikelihood)
 #plot(ll_,xlim=c(0.001,1))
 
