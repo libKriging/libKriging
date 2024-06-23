@@ -1037,15 +1037,22 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
           m_z = std::move(m.ystar) - m_M * m_beta;
         }
         double m_alpha = best_theta_alpha.at(d);
-        double var = as_scalar(LinearAlgebra::crossprod(m_z)) / n;
         if (m_est_sigma2) {
-          m_sigma2 = m_alpha * var;
-          if (m_objective.compare("LMP") == 0) {
-            m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+          if (m_est_nugget) {
+            m_sigma2 = m_alpha * as_scalar(LinearAlgebra::crossprod(m_z)) / n;
+            if (m_objective.compare("LMP") == 0) {
+              m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+            }
+            m_nugget = m_sigma2/m_alpha - m_sigma2;
+          } else {
+            m_sigma2 = m_nugget * m_alpha / (1 - m_alpha);
           }
-        }
-        if (m_est_nugget) {
-          m_nugget = (1 - m_alpha) * var;
+        } else {
+          if (m_est_nugget) {
+            m_nugget = m_sigma2 * (1-m_alpha) / m_alpha;
+          } else {
+            // don't care about alpha
+          }
         }
       }
     }

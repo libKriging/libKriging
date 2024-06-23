@@ -54,7 +54,7 @@ rcond_approx_chol = function(X) {
     rlibkriging:::linalg_rcond_approx_chol(chol(X))
 }
 rcond = function(X) {
-    1/kappa(X, norm='2')
+    1/kappa(X, norm='1')
 }
 
 set.seed(123)

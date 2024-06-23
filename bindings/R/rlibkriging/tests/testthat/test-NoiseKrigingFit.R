@@ -39,9 +39,6 @@ for (s2 in seq(0.001,.1,,21)){
   gll2x = r$logLikelihoodFun(c(theta,s2),return_grad = T)$logLikelihoodGrad[,2]
   arrows(s2,ll2x,s2+.1,ll2x+.1*gll2x,col='red')
 }
-abline(v=alpha_k,col='blue')
-abline(v=alpha_r,col='red')
-
 
 test_that(desc="Noise / Fit: 1D / fit of theta by DiceKriging is right",
           expect_equal(theta_ref, k@covariance@range.val, tol= 1e-3))

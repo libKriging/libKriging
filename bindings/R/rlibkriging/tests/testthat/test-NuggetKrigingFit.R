@@ -1,5 +1,5 @@
-library(rlibkriging, lib.loc="bindings/R/Rlibs")
-library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 
 context("Fit: 1D")
 
@@ -142,12 +142,12 @@ test_that(desc="Nugget / Fit: 1D / fit of theta by libKriging is right",
           expect_equal(array(theta_ref), array(as.list(r)$theta), tol= 0.01))
 
 # see joint ll over theta & alpha
-ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
-apply(X,1,
-     function(x) {
-       y=-logLikelihoodFun(r,c(unlist(x)))$logLikelihood
-       #print(y);
-       y})}
+# ll = function(X) {if (!is.matrix(X)) X = matrix(X,ncol=2);
+# apply(X,1,
+#      function(x) {
+#        y=-logLikelihoodFun(r,c(unlist(x)))$logLikelihood
+#        #print(y);
+#        y})}
 # x=seq(0.01,0.99,,51)
 # without reparam: 
 # contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 50)
