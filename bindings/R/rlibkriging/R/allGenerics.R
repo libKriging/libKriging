@@ -268,11 +268,18 @@ load <- function(filename, ...) {
         #stop("'filename' must be a string")
     else {
         if (length(L <- list(...)) > 0) warnOnDots(L)
-        k = NULL
-        base::try(k <- anykriging_load(filename))
-        if (is.null(k))
+        k_class = NULL
+        base::try(k_class <- class_saved(filename))
+        if (is.null(k_class))
             return(base::load(file=filename,...))
         else
-            return(k)
+            if (k_class=="Kriging")
+                return(load.Kriging(filename))
+            else if (k_class=="NuggetKriging")
+                return(load.NuggetKriging(filename))
+            else if (k_class=="NoiseKriging")
+                return(load.NoiseKriging(filename))
+            else 
+                stop("Unknown Kriging class: ",k_class)
     }
 }
