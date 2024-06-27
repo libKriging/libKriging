@@ -9,6 +9,8 @@
 #include "libKriging/utils/LinearHashStorage.hpp"
 #include "libKriging/utils/cache_details.hpp"
 
+#include "libKriging/utils/lk_armadillo.hpp"
+
 #define LIBKRIGING_CACHE_ANALYSE  // Use timers to measure part of the cache processing
 #define LIBKRIGING_CACHE_VERIFY
 
@@ -89,7 +91,15 @@ class CacheFunction<Callable, std::function<R(Args...)>, Contexts...> : public C
     ++m_cache_hit[arg_key];
     ANALYSE(diffAndUpdateTimer(t));
     if (is_new) {
-      finder->second = m_callable(std::forward<Args>(args)...);
+      try {
+        finder->second = m_callable(std::forward<Args>(args)...);
+      } catch (const std::runtime_error& error) {
+        //if (grad_out != nullptr) {
+        //  *grad_out = arma::vec(_gamma.n_elem, arma::fill::zeros);
+        //}      
+        arma::cout << "[WARNING] Catched error " << error.what() << ": return -Inf." << arma::endl;
+        finder->second = -arma::datum::inf;
+      }
       ANALYSE(m_eval_timer += diffAndUpdateTimer(t));
     } else {
 #ifdef LIBKRIGING_CACHE_VERIFY

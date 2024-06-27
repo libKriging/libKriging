@@ -8,7 +8,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Bench.hpp"
-//#include "libKriging//*CacheFunction*/.hpp"
+#include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/NuggetKriging.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -609,7 +609,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
@@ -634,7 +634,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         return -ll;
       });
     } else {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data, nullptr);
@@ -650,7 +650,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
@@ -664,7 +664,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         return -lmp;
       });
     } else {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data, nullptr);

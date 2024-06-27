@@ -8,7 +8,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Bench.hpp"
-//#include "libKriging//*CacheFunction*/.hpp"
+#include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/NoiseKriging.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -293,7 +293,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_sigma2 = Optim::reparam_from(_gamma);
@@ -307,7 +307,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         return -ll;
       });
     } else {
-      fit_ofn = /*CacheFunction*/([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
         const arma::vec _theta_sigma2 = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_sigma2 << arma::endl;
         double ll = this->_logLikelihood(_theta_sigma2, grad_out, km_data, nullptr);
