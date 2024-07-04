@@ -454,22 +454,24 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     // arma::cout << "theta_lower:" << theta_lower << arma::endl;
     // arma::cout << "theta_upper:" << theta_upper << arma::endl;
 
-    // FIXME parameters.has needs to implemtented (no use case in current code)
-    if (!parameters.theta.has_value()) {  // no theta given, so draw 10 random uniform starting values
-      int multistart = 1;
-      try {
-        multistart = std::stoi(optim.substr(4));
-      } catch (std::invalid_argument&) {
-        // let multistart = 1
+    int multistart = 1;
+    try {
+      multistart = std::stoi(optim.substr(4));
+    } catch (std::invalid_argument&) {
+      // let multistart = 1
+    }
+
+    theta0 = arma::repmat(trans(theta_lower), multistart, 1)
+             + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+    // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+    //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+
+    if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
+      arma::mat theta0_tmp = parameters.theta.value();
+      if (m_normalize) {
+        theta0_tmp.each_row() /= scaleX;
       }
-      theta0 = arma::repmat(trans(theta_lower), multistart, 1)
-               + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
-    } else {  // just use given theta(s) as starting values for multi-bfgs
-      theta0 = arma::mat(parameters.theta.value());
-      if (m_normalize)
-        theta0.each_row() /= scaleX;
+      theta0 = arma::join_cols(theta0, theta0_tmp);
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -503,9 +505,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
     double min_ofn = std::numeric_limits<double>::infinity();
 
-    for (arma::uword i = 0; i < theta0.n_rows; i++) {
+    for (arma::uword i = 0; i < multistart; i++) {
       arma::vec gamma_tmp = arma::vec(d + 1);
-      gamma_tmp.head(d) = theta0.row(i).t();
+      gamma_tmp.head(d) = theta0.row(i % multistart).t();
       gamma_tmp.at(d) = sigma20[i % sigma20.n_elem];
       if (Optim::reparametrize) {
         gamma_tmp = Optim::reparam_to(gamma_tmp);
@@ -525,7 +527,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         arma::cout << "                " << sigma2_lower << arma::endl;
         arma::cout << "  upper_bounds: " << theta_upper.t() << "";
         arma::cout << "                " << sigma2_upper << arma::endl;
-        arma::cout << "  start_point: " << theta0.row(i) << "";
+        arma::cout << "  start_point: " << theta0.row(i % multistart) << "";
         arma::cout << "               " << sigma20[i % sigma20.n_elem] << arma::endl;
       }
 
@@ -548,7 +550,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       int retry = 0;
       double best_f_opt = std::numeric_limits<double>::infinity();
       arma::vec best_gamma = gamma_tmp;
-      NoiseKriging::KModel m = make_Model(theta0.row(i).t(), sigma20[i % sigma20.n_elem], nullptr);
+      NoiseKriging::KModel m = make_Model(theta0.row(i % multistart).t(), sigma20[i % sigma20.n_elem], nullptr);
 
       while (retry <= Optim::max_restart) {
         arma::vec gamma_0 = gamma_tmp;
@@ -596,7 +598,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
               || (result.f_opt > best_f_opt)
             )) {
           gamma_tmp.head(d)
-              = (theta0.row(i).t() + theta_lower)
+              = (theta0.row(i % multistart).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
           gamma_tmp.at(d) = sigma20[i % sigma20.n_elem];
 

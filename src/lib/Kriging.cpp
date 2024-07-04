@@ -1103,22 +1103,23 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     if (optim.rfind("BFGS", 0) == 0) {
       Random::init();
 
-      // FIXME parameters.has needs to implemtented (no use case in current code)
-      if (!parameters.theta.has_value()) {  // no theta given, so draw 10 random uniform starting values
-        int multistart = 1;
-        try {
-          multistart = std::stoi(optim.substr(4));
-        } catch (std::invalid_argument&) {
-          // let multistart = 1
-        }
-        theta0 = arma::repmat(trans(theta_lower), multistart, 1)
-                 + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-        // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
-        //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
-      } else {  // just use given theta(s) as starting values for multi-bfgs
-        theta0 = arma::mat(parameters.theta.value());
+      int multistart = 1;
+      try {
+        multistart = std::stoi(optim.substr(4));
+      } catch (std::invalid_argument&) {
+        // let multistart = 1
+      }
+
+      theta0 = arma::repmat(trans(theta_lower), multistart, 1)
+               + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+
+      if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
+        arma::mat theta0_tmp = arma::mat(parameters.theta.value());
         if (m_normalize)
-          theta0.each_row() /= scaleX;
+          theta0_tmp.each_row() /= scaleX;
+        theta0 = arma::join_cols(theta0, theta0_tmp);
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 
@@ -1131,10 +1132,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
       double min_ofn = std::numeric_limits<double>::infinity();
 
-      for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-        arma::vec gamma_tmp = theta0.row(i).t();
+      for (arma::uword i = 0; i < multistart; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+        arma::vec gamma_tmp = theta0.row(i % multistart).t();
         if (Optim::reparametrize)
-          gamma_tmp = Optim::reparam_to(theta0.row(i).t());
+          gamma_tmp = Optim::reparam_to(theta0.row(i % multistart).t());
 
         gamma_lower = arma::min(gamma_tmp, gamma_lower);
         gamma_upper = arma::max(gamma_tmp, gamma_upper);
@@ -1148,7 +1149,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           arma::cout << "  normalize: " << m_normalize << arma::endl;
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
-          arma::cout << "  start_point: " << theta0.row(i) << " ";
+          arma::cout << "  start_point: " << theta0.row(i % multistart) << " ";
         }
 
         m_est_sigma2 = parameters.is_sigma2_estim;
@@ -1170,7 +1171,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         int retry = 0;
         double best_f_opt = std::numeric_limits<double>::infinity();
         arma::vec best_gamma = gamma_tmp;
-        Kriging::KModel m = make_Model(theta0.row(i).t(),nullptr);
+        Kriging::KModel m = make_Model(theta0.row(i % multistart).t(),nullptr);
 
         while (retry <= Optim::max_restart) {
           arma::vec gamma_0 = gamma_tmp;
@@ -1210,7 +1211,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                 || ((sol_to_b < arma::datum::eps) && (result.num_iters <= 2))  // we are stuck on a bound   
                 || (result.f_opt > best_f_opt) // maybe still better start point available
               )) {
-            gamma_tmp = (theta0.row(i).t() + theta_lower)
+            gamma_tmp = (theta0.row(i % multistart).t() + theta_lower)
                         / pow(2.0, retry + 1);  // so move starting point to middle-point
 
             if (Optim::reparametrize)
@@ -1268,23 +1269,24 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     } else if (optim.rfind("Newton", 0) == 0) {
       Random::init();
 
-      // FIXME parameters.has needs to implemtented (no use case in current code)
-      if (!parameters.theta.has_value()) {  // no theta given, so draw 10 random uniform starting values
-        int multistart = 1;
-        try {
-          multistart = std::stoi(optim.substr(4));
-        } catch (std::invalid_argument&) {
-          // let multistart = 1
-        }
-        theta0 = arma::repmat(trans(theta_lower), multistart, 1)
-                 + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-      } else {  // just use given theta(s) as starting values for multi-bfgs
-        theta0 = arma::mat(parameters.theta.value());
-        if (m_normalize)
-          theta0.each_row() /= scaleX;
+      int multistart = 1;
+      try {
+        multistart = std::stoi(optim.substr(6));
+      } catch (std::invalid_argument&) {
+        // let multistart = 1
       }
 
-      // arma::cout << "theta0:" << theta0 << arma::endl;
+      theta0 = arma::repmat(trans(theta_lower), multistart, 1)
+               + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+      // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
+      //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
+
+      if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
+        arma::mat theta0_tmp = arma::mat(parameters.theta.value());
+        if (m_normalize)
+          theta0_tmp.each_row() /= scaleX;
+        theta0 = arma::join_cols(theta0, theta0_tmp);
+      }      // arma::cout << "theta0:" << theta0 << arma::endl;
 
       arma::vec gamma_lower = theta_lower;
       arma::vec gamma_upper = theta_upper;
@@ -1295,10 +1297,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
       double min_ofn = std::numeric_limits<double>::infinity();
 
-      for (arma::uword i = 0; i < theta0.n_rows; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-        arma::vec gamma_tmp = theta0.row(i).t();
+      for (arma::uword i = 0; i < multistart; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
+        arma::vec gamma_tmp = theta0.row(i % multistart).t();
         if (Optim::reparametrize)
-          gamma_tmp = Optim::reparam_to(theta0.row(i).t());
+          gamma_tmp = Optim::reparam_to(theta0.row(i % multistart).t());
 
         gamma_lower = arma::min(gamma_tmp, gamma_lower);
         gamma_upper = arma::max(gamma_tmp, gamma_upper);
@@ -1312,7 +1314,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           arma::cout << "  normalize: " << m_normalize << arma::endl;
           arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
           arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
-          arma::cout << "  start_point: " << theta0.row(i) << " ";
+          arma::cout << "  start_point: " << theta0.row(i % multistart) << " ";
         }
 
         m_est_sigma2 = parameters.is_sigma2_estim;
@@ -1324,7 +1326,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_est_sigma2 = true;  // force estim if no value given
         }        
 
-        Kriging::KModel m = make_Model(theta0.row(i).t(),nullptr);
+        Kriging::KModel m = make_Model(theta0.row(i % multistart).t(),nullptr);
         double min_ofn_tmp = optim_newton(
             [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec* grad_out, arma::mat* hess_out) -> double {
               return fit_ofn(vals_inp, grad_out, hess_out, &m);
