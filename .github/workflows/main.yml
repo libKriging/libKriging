@@ -60,20 +60,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Linux Debug"
+          - name: "Python Linux Debug"
             os: ubuntu-20.04
             mode: Debug
             enable_python: on
-          - name: "macOS Debug"
+          - name: "Python macOS Debug"
             os: macOS-12
             mode: Debug
             enable_python: on
-          - name: "Windows Debug"
+          - name: "Python (3.7) Windows Debug"
             os: windows-2019
             mode: Debug
             enable_python: on
             python-version: 3.7
-          - name: "Windows Debug"
+          - name: "Python (3.9) Windows Debug"
             os: windows-2019
             mode: Debug
             enable_python: on
@@ -81,7 +81,7 @@ jobs:
           - name: "Octave Linux"
             os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release
-            enable_python: on
+            enable_python: off
             enable_octave: on
             force_update: on
           - name: "Octave macOS"
