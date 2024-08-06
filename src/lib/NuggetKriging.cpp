@@ -843,11 +843,13 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
     if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
+      multistart = std::max(multistart, (int)parameters.theta.value().n_rows);
       arma::mat theta0_tmp = parameters.theta.value();
       if (m_normalize) {
         theta0_tmp.each_row() /= scaleX;
       }
-      theta0 = arma::join_cols(theta0, theta0_tmp);
+      theta0 = arma::join_cols(theta0_tmp, theta0); // append random starting points to given ones
+      theta0.resize(multistart, theta0.n_cols); // keep only multistart first rows
     }
     // arma::cout << "theta0:" << theta0 << arma::endl;
 

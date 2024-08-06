@@ -140,8 +140,10 @@ apply(X,1,
         #print(y);
         y})}
 #DiceView::contourview(ll,xlim=c(0.1,2),ylim=c(0.1,2))
-x=seq(0.1,2,,51)
-contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
+x=seq(0.01,10,,51)
+contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),xlim=c(0,1),ylim=c(0,10),nlevels = 30)
+points(r$theta()[1],r$theta()[2],col='red', pch=20)
+points(k@covariance@range.val[1],k@covariance@range.val[2],col='blue',pch=20)
 
 theta_ref = optim(par=matrix(c(.2,.5),ncol=2),ll,lower=c(0.1,0.1),upper=c(2,2),method="L-BFGS-B")$par
 points(theta_ref,col='black')

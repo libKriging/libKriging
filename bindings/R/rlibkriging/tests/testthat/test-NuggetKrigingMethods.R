@@ -80,14 +80,17 @@ test_that("nugget / simulate dim",
 test_that("nugget / simulate nsim dim",
           expect_equal(dim(simulate(r,x=rbind(runif(d),runif(d)),nsim=10)),c(2,10)))
 
+# offset is not legitimate because nugget kriging is interpolating
+#test_that("nugget / simulate mean X",
+#          expect_equal(mean(simulate(r,nsim = 100, x=X[1,]+0.00005)),y[1],tolerance = 0.01))
 test_that("nugget / simulate mean X",
-          expect_equal(mean(simulate(r,nsim = 100, x=X[1,]+0.00005)),y[1],tolerance = 0.01))
+          expect_equal(mean(simulate(r,nsim = 100, x=X[1,])),y[1],tolerance = 0.01))
 set.seed(12345)
 x = runif(d)
 test_that("nugget / simulate mean",
-          expect_equal(mean(simulate(r,nsim = 100, x=x)),predict(r,x)$mean[1],tolerance = 0.01))
+          expect_equal(mean(simulate(r,nsim = 10000, x=x)),predict(r,x)$mean[1],tolerance = 0.01))
 test_that("nugget / simulate sd",
-          expect_equal(sd(simulate(r,nsim = 100, x=x)),predict(r,x)$stdev[1],tolerance = 0.01))
+          expect_equal(sd(simulate(r,nsim = 10000, x=x)),predict(r,x)$stdev[1],tolerance = 0.01))
 
 
 context("nugget / update")
@@ -118,8 +121,8 @@ points(X2,col='red')
 
 
 
-t=seq(0.01,2,,51)
-contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30)
+t=seq(0.01,10,,51)
+contour(t,t,matrix(ll(as.matrix(expand.grid(t,t))),nrow=length(t)),xlim=c(0,10),ylim=c(0,1),nlevels = 30)
 points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 
 #cat("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!","\n")
