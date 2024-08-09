@@ -28,7 +28,7 @@ std::optional<T> get_entry(const py::dict& dict, std::string_view key) {
       return opt_val;
     } else {
       throw std::invalid_argument(
-          formatString("entry '", key, "' exits but cannot satisfy required type '", CastSupportedType<T>::name, "'"));
+          formatString("entry '", key, "' exists but cannot satisfy required type '", CastSupportedType<T>::name, "'"));
     }
   } else {
     return std::nullopt;
