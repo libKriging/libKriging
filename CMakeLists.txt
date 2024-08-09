@@ -483,8 +483,15 @@ if (PythonInterp_FOUND)
     set(HAS_PYTHON_REQUIREMENT true)
     set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter found: ${PYTHON_EXECUTABLE}")
     set(INDENTATION "   ")
-    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import sys; print(sys.version_info.minor)"
+                    OUTPUT_VARIABLE PYTHON_VERSION_MINOR) 
+    if (PYTHON_VERSION_MINOR LESS 11)
+        execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
                     RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
+    else()
+        execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements_12.py --pretty --indent=${INDENTATION} requirements.txt
+                    RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
+    endif()
     if (NOT PYTHON_IMPORT_RETCODE EQUAL "0")
         set(HAS_PYTHON_REQUIREMENT false)
     endif()
