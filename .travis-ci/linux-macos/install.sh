@@ -51,7 +51,7 @@ if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   case "$(uname -s)" in
    Darwin)
      # using brew in .travis-ci.yml is too slow or fails with "update: true"
-     brew install octave
+     brew install octave gnuplot
      ;;
 
    Linux)
