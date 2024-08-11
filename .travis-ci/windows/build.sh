@@ -19,10 +19,6 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
-if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-    cd "${TRAVIS_BUILD_DIR}"
-fi
-
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 
