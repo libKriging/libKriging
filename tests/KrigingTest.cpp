@@ -60,8 +60,7 @@ TEST_CASE("save & reload") {
     ok.save("dump.json");
 
     Kriging ok_reloaded = Kriging::load("dump.json");
-    auto e = KrigingLoader::describe("dump.json");
-    assert(e == KrigingLoader::KrigingType::Kriging);
+    assert(KrigingLoader::describe("dump.json") == KrigingLoader::KrigingType::Kriging);
 
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
