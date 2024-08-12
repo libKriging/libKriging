@@ -27,9 +27,11 @@ function repair_wheel {
 yum install -y openblas-devel # hdf5-devel
 
 # Compile wheels
-for PYBIN in /opt/python/*-cp*/bin; do
-    if [ "${PYBIN}" == "/opt/python/cp35-cp35m/bin" ]; then continue; fi
-    if [ "${PYBIN}" == "/opt/python/cp312-cp312/bin" ]; then continue; fi
+for PYVER in cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+    echo "------------------------------------------"
+    echo "Building pyquantlib for Python ${PYVER}"
+    echo "------------------------------------------"
+    PYBIN=/opt/python/${PYVER}/bin
     "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/requirements.txt # not for Windows
     "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/dev-requirements.txt # not for Windows
     "${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/setup.py bdist_wheel
@@ -41,9 +43,11 @@ for whl in "${ROOT_DIR}"/dist/*.whl; do
 done
 
 # Install packages and test
-for PYBIN in /opt/python/*-cp*/bin; do
-    if [ "${PYBIN}" == "/opt/python/cp35-cp35m/bin" ]; then continue; fi
-    if [ "${PYBIN}" == "/opt/python/cp312-cp312/bin" ]; then continue; fi
+for PYVER in cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+    echo "-----------------------------------------"
+    echo "Testing pyquantlib for Python ${PYVER}"
+    echo "-----------------------------------------"
+    PYBIN=/opt/python/${PYVER}/bin
     "${PYBIN}/pip" install pylibkriging --no-index -f "${ROOT_DIR}"/dist
     (cd "${ROOT_DIR}"; "${PYBIN}/pytest" "${ROOT_DIR}"/bindings/Python/tests)
 done
