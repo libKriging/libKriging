@@ -85,7 +85,7 @@ jobs:
             enable_octave: on
             force_update: on
           - name: "Octave macOS"
-            os: macOS-12
+            os: macOS-14
             mode: Release
             enable_python: off
             enable_octave: on
@@ -107,7 +107,7 @@ jobs:
             mode: Release
             enable_R: on
           - name: "R macOS"
-            os: macOS-12
+            os: macOS-14
             mode: Release
             enable_R: on
           - name: "R Windows"
