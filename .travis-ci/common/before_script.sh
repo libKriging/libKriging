@@ -4,6 +4,10 @@ set -eo pipefail
 if [[ "$DEBUG_CI" == "true" ]]; then
     echo "------------------------------------"
 
+    echo "$(uname -o) system running on $(uname -m) processors"
+
+    echo "------------------------------------"
+
     BASEDIR=$(dirname "$0")
     if [ -e "${BASEDIR}"/../${BUILD_NAME}/loadenv.sh ]; then
       set -x
