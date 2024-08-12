@@ -1024,8 +1024,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   arma::mat theta0;
   if (parameters.theta.has_value()) {
     theta0 = parameters.theta.value();
-    if ((parameters.theta.value().n_cols != d) && (parameters.theta.value().n_rows == d))
-      theta0 = parameters.theta.value().t();
+    if ((theta0.n_cols != d) && (theta0.n_rows == d))
+      theta0 = theta0.t();
     if (m_normalize)
       theta0.each_row() /= scaleX;
     if (theta0.n_cols != d)
@@ -1110,18 +1110,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         // let multistart = 1
       }
 
-      theta0 = arma::repmat(trans(theta_lower), multistart, 1)
+      arma::mat theta0_rand = arma::repmat(trans(theta_lower), multistart, 1)
                + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
       // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
       if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
-        multistart = std::max(multistart, (int)parameters.theta.value().n_rows);
-        arma::mat theta0_tmp = arma::mat(parameters.theta.value());
-        if (m_normalize)
-          theta0_tmp.each_row() /= scaleX;
-        theta0 = arma::join_cols(theta0_tmp, theta0); // append random starting points to given ones
+        multistart = std::max(multistart, (int)theta0.n_rows);
+        theta0 = arma::join_cols(theta0, theta0_rand); // append random starting points to given ones
         theta0.resize(multistart, theta0.n_cols); // keep only multistart first rows
+      } else {
+        theta0 = theta0_rand;
       }
       // arma::cout << "theta0:" << theta0 << arma::endl;
 

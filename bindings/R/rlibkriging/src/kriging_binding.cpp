@@ -53,7 +53,11 @@ Rcpp::List new_KrigingFit(arma::vec y,
       _parameters.push_back(true, "is_sigma2_estim");
     }
     if (params.containsElementNamed("theta")) {
-      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(params["theta"]), "theta");
+      Rcpp::NumericVector theta = Rcpp::as<Rcpp::NumericVector>(params["theta"]);
+      if (!theta.hasAttribute("dim")) {
+        theta.attr("dim") = Rcpp::Dimension(1, theta.length());
+      }
+      _parameters.push_back(Rcpp::as<Rcpp::NumericMatrix>(theta), "theta");
       _parameters.push_back(true, "has_theta");
       _parameters.push_back(
           !(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]) && optim != "none",
