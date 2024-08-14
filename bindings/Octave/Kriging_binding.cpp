@@ -177,8 +177,8 @@ void leaveOneOutVec(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{2}};
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   auto [yhat_mean, yhat_sd] = km->leaveOneOutVec(input.get<arma::vec>(1, "theta"));
   output.set(0, yhat_mean, "mean");  // FIXME better name

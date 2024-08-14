@@ -83,21 +83,19 @@ LIBKRIGING_EXPORT nlohmann::json to_json(const arma::mat& t) {
 
 LIBKRIGING_EXPORT arma::rowvec rowvec_from_json(const nlohmann::json& json_node) {
   assert(json_node["type"] == "rowvec");
-  std::size_t size = json_node["size"];
   std::string base64_data = json_node["base64_data"];
   const std::string data = base64_decode(base64_data);
   std::vector<double> raw_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-  assert(raw_data.size() == size);
+  assert(raw_data.size() == json_node["size"]);
   return {raw_data};
 }
 
 LIBKRIGING_EXPORT arma::colvec colvec_from_json(const nlohmann::json& json_node) {
   assert(json_node["type"] == "colvec");
-  std::size_t size = json_node["size"];
   std::string base64_data = json_node["base64_data"];
   const std::string data = base64_decode(base64_data);
   std::vector<double> raw_data = deserialize<double>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-  assert(raw_data.size() == size);
+  assert(raw_data.size() == json_node["size"]);
   return {raw_data};
 }
 

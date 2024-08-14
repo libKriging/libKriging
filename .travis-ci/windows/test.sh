@@ -22,8 +22,6 @@ fi
 cd ${BUILD_DIR:-build}
 
 # Cleanup compiled libs to check right path finding
-rm -fr src/lib
-# add library directory search PATH for executables
-export PATH=$PWD/installed/bin:$PATH
+rm -fr src bindings
 
 ctest -C "${MODE}" ${CTEST_FLAGS}

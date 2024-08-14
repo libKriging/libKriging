@@ -17,5 +17,10 @@ if ( ! command -v cmake >/dev/null 2>&1 ); then
   export PATH="$CMAKE_DIR":$PATH
 fi
 
-# add OpenBLAS DLL library path
-export PATH=$HOME/Miniconda3/Library/bin:$PATH
+# add OpenBLAS & cie DLL libraries to search path for CMake
+export PATH=${HOME}/Miniconda3/Library/bin:$PATH
+
+# Manage in __init__.py the loading of extra dlls
+# (not loaded by default from PATH since Python ≥3.8)
+# An alternative could be to reuse PATH either in LIBKRIGING_DLL_PATH or __init__.py.
+export LIBKRIGING_DLL_PATH=${HOME}/Miniconda3/Library/bin

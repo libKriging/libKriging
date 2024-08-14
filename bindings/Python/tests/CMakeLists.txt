@@ -28,7 +28,7 @@ macro(add_python_test)
         set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONMALLOC=malloc")
     else ()
         add_test(NAME ${TEST_NAME}
-                COMMAND ${PYTHON_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
+                 COMMAND ${PYTHON_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
     endif ()
 
     if (ARGS_WILL_FAIL)

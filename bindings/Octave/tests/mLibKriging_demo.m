@@ -11,6 +11,9 @@ y = f(X);
 k_m = Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", Params("is_sigma2_estim", true))
 disp(k_m.summary());
 
+% if you get "no graphics toolkits are available!"
+ % check available graphics package with `available_graphics_toolkits`
+
 % session
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false);
@@ -44,6 +47,7 @@ else
     h = figure(1);       
     h.Visible = 'off'; % no display
 end
+
 hold on;
 plot(x,f(x));
 scatter(X,f(X));

@@ -8,7 +8,13 @@ else
   CTEST_FLAGS=--output-on-failure
 fi
 
-cd ${BUILD_DIR:-build}
+ROOT_DIR=$(git rev-parse --show-toplevel)
+if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
+  echo "Loading virtual environment from ${ROOT_DIR}/venv"
+  . "${ROOT_DIR}"/venv/bin/activate
+fi
+
+cd "${BUILD_DIR:-build}"
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     cmake --build . --target coverage --config "${MODE}"
