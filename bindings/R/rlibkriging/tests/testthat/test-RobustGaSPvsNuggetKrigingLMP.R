@@ -66,21 +66,21 @@ for (kernel in c("matern5_2","matern3_2")) {
                      #optim="none", parameters=list(theta = matrix(1/k@beta_hat), nugget=k@nugget*k@sigma2_hat,sigma2=k@sigma2_hat))
   ## Should be equal:
   #lmp(1.0); lmp_deriv(1.0);
-  #logMargPostFun(r,1.0,grad = T)
+  #logMargPostFun(r,1.0,return_grad = T)
   #lmp(0.1); lmp_deriv(0.1);
-  #logMargPostFun(r,0.1,grad = T)
+  #logMargPostFun(r,0.1,return_grad = T)
   #ll2 = function(theta) logMargPostFun(r,theta)$logMargPost
   # plot(Vectorize(ll2),col='red',add=T,xlim=c(0.01,2)) # FIXME fails with "error: chol(): decomposition failed"
   alpha = r$sigma2()/(r$sigma2()+r$nugget()) #1/(1+k@nugget) #r$sigma2()/(r$nugget()+r$sigma2())
   for (x in seq(0.01,2,,11)){
     ll2x = logMargPostFun(r,c(x,alpha))$logMargPost
-    gll2x = logMargPostFun(r,c(x,alpha),grad = T)$logMargPostGrad[1]
+    gll2x = logMargPostFun(r,c(x,alpha),return_grad = T)$logMargPostGrad[1]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
   }
   
 #lmp_deriv(c(k@beta_hat,k@nugget), TRUE)
-#logMargPostFun(r,c(1/k@beta_hat,1/(1+k@nugget)),grad = T)
-#logMargPostFun(r,c(r$theta(),r$sigma2()/(r$sigma2()+r$nugget())),grad = T)
+#logMargPostFun(r,c(1/k@beta_hat,1/(1+k@nugget)),return_grad = T)
+#logMargPostFun(r,c(r$theta(),r$sigma2()/(r$sigma2()+r$nugget())),return_grad = T)
 
   precision <- 1e-4  # the following tests should work with it, since the computations are analytical
   x=.5
@@ -88,5 +88,5 @@ for (kernel in c("matern5_2","matern3_2")) {
             expect_equal(logMargPostFun(r,c(x,1/(1+k@nugget)))$logMargPost[1],lmp(x),tolerance = precision))
   
   test_that(desc="logMargPost Grad is the same that RobustGaSP one", 
-            expect_equal(logMargPostFun(r,c(x,1/(1+k@nugget)),grad = T)$logMargPostGrad[1],lmp_deriv(x),tolerance= precision))
+            expect_equal(logMargPostFun(r,c(x,1/(1+k@nugget)),return_grad = T)$logMargPostGrad[1],lmp_deriv(x),tolerance= precision))
 }

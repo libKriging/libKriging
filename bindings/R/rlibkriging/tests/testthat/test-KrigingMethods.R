@@ -15,11 +15,11 @@ points(X)
 r <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 
 # ll = function(X) {
-#   logLikelihoodFun(r,X,grad=F)$logLikelihood
+#   logLikelihoodFun(r,X,return_grad=F)$logLikelihood
 # }
 # contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 # gll = function(X) {
-#   logLikelihoodFun(r,X,grad=T)$logLikelihoodGrad
+#   logLikelihoodFun(r,X,return_grad=T)$logLikelihoodGrad
 # }
 # for (ix in 1:21) {
 # for (iy in 1:21) {
@@ -45,16 +45,16 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 test_that("logLikelihoodFun returned",
           expect_equal(names(logLikelihoodFun(r,runif(d))),c("logLikelihood")))
 test_that("logLikelihoodFun logLikelihoodGrad returned",
-          expect_equal(names(logLikelihoodFun(r,runif(d),grad=T)),c("logLikelihood","logLikelihoodGrad")))
+          expect_equal(names(logLikelihoodFun(r,runif(d),return_grad=T)),c("logLikelihood","logLikelihoodGrad")))
 test_that("logLikelihoodFun logLikelihoodGrad logLikelihoodHess returned",
-          expect_equal(names(logLikelihoodFun(r,runif(d),grad=T,hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
+          expect_equal(names(logLikelihoodFun(r,runif(d),return_grad=T,return_hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
 
 test_that("logLikelihoodFun dim",
           expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)))$logLikelihood),c(2,1)))
 test_that("logLikelihoodGrad dim",
-          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),grad=T)$logLikelihoodGrad),c(2,d)))
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),return_grad=T)$logLikelihoodGrad),c(2,d)))
 test_that("logLikelihoodHess dim",
-          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),grad=T,hess=T)$logLikelihoodHess),c(2,d,d)))
+          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),return_grad=T,return_hess=T)$logLikelihoodHess),c(2,d,d)))
 
 
 context("leaveOneOut")
@@ -68,12 +68,12 @@ points(as.list(r)$theta[1],as.list(r)$theta[2])
 test_that("leaveOneOut returned",
           expect_equal(names(leaveOneOutFun(r,runif(d))),c("leaveOneOut")))
 test_that("leaveOneOut leaveOneOutGrad returned",
-          expect_equal(names(leaveOneOutFun(r,runif(d),grad=T)),c("leaveOneOut","leaveOneOutGrad")))
+          expect_equal(names(leaveOneOutFun(r,runif(d),return_grad=T)),c("leaveOneOut","leaveOneOutGrad")))
 
 test_that("leaveOneOut dim",
           expect_equal(dim(leaveOneOutFun(r,rbind(runif(d),runif(d)))$leaveOneOut),c(2,1)))
 test_that("leaveOneOutGrad dim",
-          expect_equal(dim(leaveOneOutFun(r,rbind(runif(d),runif(d)),grad=T)$leaveOneOutGrad),c(2,d)))
+          expect_equal(dim(leaveOneOutFun(r,rbind(runif(d),runif(d)),return_grad=T)$leaveOneOutGrad),c(2,d)))
 
 
 context("predict")
@@ -81,16 +81,16 @@ context("predict")
 test_that("predict mean stdev returned",
           expect_equal(names(predict(r,runif(d))),c("mean","stdev")))
 test_that("predict mean returned",
-          expect_equal(names(predict(r,runif(d),stdev=F)),c("mean")))
+          expect_equal(names(predict(r,runif(d),return_stdev=F)),c("mean")))
 test_that("predict mean stdev cov returned",
-          expect_equal(names(predict(r,runif(d),cov=T)),c("mean","stdev","cov")))
+          expect_equal(names(predict(r,runif(d),return_cov=T)),c("mean","stdev","cov")))
 
 test_that("predict mean dim",
           expect_equal(dim(predict(r,rbind(runif(d),runif(d)))$mean),c(2,1)))
 test_that("predict stdev dim",
           expect_equal(dim(predict(r,rbind(runif(d),runif(d)))$stdev),c(2,1)))
 test_that("predict cov dim",
-          expect_equal(dim(predict(r,rbind(runif(d),runif(d)),cov=T)$cov),c(2,2)))
+          expect_equal(dim(predict(r,rbind(runif(d),runif(d)),return_cov=T)$cov),c(2,2)))
 
 
 context("simulate")
@@ -122,11 +122,11 @@ points(X2,col='red')
 
 #r20 <- Kriging(c(y,y2), rbind(X,X2),"gauss")
 #ll = function(X) {
-#  logLikelihoodFun(r20,X,grad=F)$logLikelihood
+#  logLikelihoodFun(r20,X,return_grad=F)$logLikelihood
 #}
 #contour(x,x,matrix(ll(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 #gll = function(X) {
-#  logLikelihoodFun(r20,X,grad=T)$logLikelihoodGrad
+#  logLikelihoodFun(r20,X,return_grad=T)$logLikelihoodGrad
 #}
 #for (ix in 1:21) {
 #for (iy in 1:21) {

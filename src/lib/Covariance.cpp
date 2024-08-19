@@ -12,21 +12,11 @@
 #include <tuple>
 #include <vector>
 
-bool Covariance::approx_singular = true;
-
-LIBKRIGING_EXPORT void Covariance::use_approx_singular(bool do_approx_singular) {
-  Covariance::approx_singular = do_approx_singular;
-};
-
-LIBKRIGING_EXPORT bool Covariance::approx_singular_used() {
-  return Covariance::approx_singular;
-};
-
 //' @ref: https://github.com/psbiomech/dace-toolbox-source/blob/master/dace.pdf
 //'  (where CovMatrix<-R, Ft<-M, C<-T, rho<-z)
 //' @ref: https://github.com/cran/DiceKriging/blob/master/R/kmEstimate.R (same variables names)
 
-//' @ref https://github.com/cran/DiceKriging/blob/master/src/CovFuns.c
+//' @ref https://github.com/cran/DiceKriging/blob/master/src/covMats.c
 // Covariance function on normalized data
 
 std::function<double(const arma::vec&, const arma::vec&)> Covariance::Cov_gauss

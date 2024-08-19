@@ -6,6 +6,7 @@ d = {
     'bool': True,
     'int': 3,
     'float': 3.14,
+    'float64': np.float64(3.1415),
     'str': 'string',
     'badcolvec': np.array([[1, 2, 3, 4]]),
     'colvec1D': np.array([1, 2, 3, 4]),
@@ -28,6 +29,10 @@ def test_check_int_in_dict():
 @pytest.debug_only
 def test_check_float_in_dict():
     assert lk.check_dict_entry(d, "float", "float")
+
+@pytest.debug_only
+def test_check_float_in_dict():
+    assert lk.check_dict_entry(d, "float64", "float64")
 
 
 @pytest.debug_only

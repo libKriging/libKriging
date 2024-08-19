@@ -199,17 +199,17 @@ NuggetKM <- function(formula = ~1, design, response,
     
     parameters <- list()
     if (!is.null(coef.var))
-        parameters <- c(parameters, list(sigma2 = coef.var))
+        parameters <- c(parameters, list(sigma2 = coef.var, is_sigma2_estim=FALSE))
     if (!is.null(coef.cov)) {
         parameters <- c(parameters,
-                        list(theta = matrix(coef.cov, ncol = ncol(design))))
+                        list(theta = matrix(coef.cov, ncol = ncol(design)), is_theta_estim=FALSE))
         optim.method <- "none"
         ## XXXY 
         warning("Since 'coef.cov' is provided 'optim.method' is set to ",
                 "\"none\"")
     }  
     if (!is.null(coef.trend)) {
-        parameters <- c(parameters, list(beta = matrix(coef.trend)))
+        parameters <- c(parameters, list(beta = matrix(coef.trend), is_beta_estim=FALSE))
     }
     if (!is.null(parinit)) {
         parameters <- c(parameters,
@@ -265,7 +265,7 @@ predict.NuggetKM <- function(object, newdata, type = "UK",
     if (type != "UK") stop("'type != UK' unsupported.")
     
     y.predict <- predict.NuggetKriging(object@NuggetKriging, x = newdata,
-                                 stdev = se.compute, cov = cov.compute)
+                                 return_stdev = se.compute, return_cov = cov.compute)
     
     output.list <- list()
     ## output.list$trend <- y.predict.trend

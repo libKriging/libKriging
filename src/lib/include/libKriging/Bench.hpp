@@ -8,6 +8,7 @@
 
 class Bench {
  public:
+  static const bool NO_BENCH = true;
   static std::chrono::high_resolution_clock::time_point tic();
   static std::chrono::high_resolution_clock::time_point toc(std::map<std::string, double>* bench,
                                                             std::string what,

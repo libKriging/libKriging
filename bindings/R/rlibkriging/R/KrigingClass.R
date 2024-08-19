@@ -3,6 +3,28 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
+#' Shortcut to provide functions to the S3 class "Kriging"
+#' @param nk A pointer to a C++ object of class "Kriging"
+#' @return An object of class "Kriging" with methods to access and manipulate the data
+classKriging <- function(nk) {
+    class(nk) <- "Kriging"
+    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
+    for (f in c('as.km','as.list','copy','fit','save',
+    'covMat','leaveOneOut','leaveOneOutFun','leaveOneOutVec',
+    'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
+    'predict','print','show','simulate','update', 'update_simulate')) {
+        eval(parse(text=paste0(
+            "nk$", f, " <- function(...) ", f, "(nk,...)"
+            )))
+    }
+    # This will allow to access kriging data/props using `k$d()`
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
+        eval(parse(text=paste0(
+            "nk$", d, " <- function() kriging_", d, "(nk)"
+            )))
+    }
+    nk
+}
 
 #' Create an object with S3 class \code{"Kriging"} using
 #' the \pkg{libKriging} library.
@@ -14,31 +36,26 @@
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param y Numeric vector of response values.
-#'
 #' @param X Numeric matrix of input design.
-#'
 #' @param kernel Character defining the covariance model:
 #'     \code{"exp"}, \code{"gauss"}, \code{"matern3_2"}, \code{"matern5_2"}.
-#'
-#' @param regmodel Universal Kriging linear trend.
-#'
+#' @param regmodel Universal Kriging linear trend: \code{"constant"}, 
+#'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"},
 #'     \code{"Newton"} and \code{"none"}, the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
+#'     \code{"BFGS"} uses the gradient of the objective 
+#'     (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
 #'     \code{"Newton"} uses both the gradient and the Hessian of the
 #'     objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares and \code{"LMP"} for the Log-Marginal Posterior.
-#'
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -65,7 +82,7 @@
 #' print(k)
 #'
 #' x <- as.matrix(seq(from = 0, to = 1, length.out = 101))
-#' p <- predict(k, x = x, stdev = TRUE, cov = FALSE)
+#' p <- predict(k, x = x, return_stdev = TRUE, return_cov = FALSE)
 #'
 #' plot(f)
 #' points(X, y)
@@ -77,7 +94,7 @@
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
                     objective = c("LL", "LOO", "LMP"),
@@ -97,20 +114,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       optim = optim,
                       objective = objective,
                       parameters = parameters)
-    class(nk) <- "Kriging"
-    # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','leaveOneOut','leaveOneOutFun','leaveOneOutVec','logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun','predict','print','show','simulate','update')) {
-        eval(parse(text=paste0(
-            "nk$", f, " <- function(...) ", f, "(nk,...)"
-            )))
-    }
-    # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
-        eval(parse(text=paste0(
-            "nk$", d, " <- function() kriging_", d, "(nk)"
-            )))
-    }
-    nk
+    return(classKriging(nk))
 }
 
 
@@ -154,10 +158,8 @@ as.list.Kriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param x An object with S3 class \code{"Kriging"}.
-#'
 #' @param .call Force the \code{call} slot to be filled in the
 #'     returned \code{km} object.
-#'
 #' @param ... Not used.
 #'
 #' @return An object of having the S4 class \code{"KM"} which extends
@@ -212,9 +214,19 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
     model@noise.flag <- FALSE
     model@noise.var <- 0
 
-    model@case <- "LLconcentration_beta_sigma2"
+    if (m$is_sigma2_estim)
+      model@case <- "LLconcentration_beta_sigma2"
+    else 
+      model@case <- "LLconcentration_beta"
 
-    model@known.param <- "None"
+    isTrend = !m$is_beta_estim
+    isCov = !m$is_theta_estim
+    isVar = !m$is_sigma2_estim
+    if (isCov) {
+        known.covparam <- "All"
+    } else {
+        known.covparam <- "None"
+    }
     model@param.estim <- NA
     model@method <- m$objective
     model@optim.method <- m$optim
@@ -233,7 +245,17 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
     covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel,
                       sd2 = m$sigma2, var.names = names(data),
                       nugget = 0, nugget.flag = FALSE, nugget.estim = FALSE,
-                      known.covparam = "")
+                      known.covparam = known.covparam)
+
+    if (isTrend && isCov && isVar) {
+        model@known.param <- "All"
+    } else if ((isTrend) && ((!isCov) || (!isVar))) {
+        model@known.param <- "Trend"
+    } else if ((!isTrend) && isCov && isVar) {
+        model@known.param <- "CovAndVar"
+    } else {    # In the other cases: All parameters are estimated (at this stage)
+        model@known.param <- "None"
+    }
 
     covStruct@range.names <- "theta"
     covStruct@paramset.n <- as.integer(1)
@@ -286,37 +308,30 @@ print.Kriging <- function(x, ...) {
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 Kriging object.
-#'
 #' @param y Numeric vector of response values.
-#'
 #' @param X Numeric matrix of input design.
-#'
-#' @param regmodel Universal Kriging linear trend.
-#'
+#' @param regmodel Universal Kriging linear trend: \code{"constant"}, 
+#'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
-#'
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"},
 #'     \code{"Newton"} and \code{"none"}, the later simply keeping
 #'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective. The method
+#'     \code{"BFGS"} uses the gradient of the objective (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
 #'     \code{"Newton"} uses both the gradient and the Hessian of the
 #'     objective.
-#'
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares and \code{"LMP"} for the Log-Marginal Posterior.
-#'
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
 #'     variance and for the range parameters. If \code{theta} is a
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
-#'
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -338,7 +353,7 @@ print.Kriging <- function(x, ...) {
 #' fit(k,y,X)
 #' print(k)
 fit.Kriging <- function(object, y, X,
-                    regmodel = c("constant", "linear", "interactive"),
+                    regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
                     objective = c("LL", "LOO", "LMP"),
@@ -370,18 +385,13 @@ fit.Kriging <- function(object, y, X,
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 Kriging object.
-#'
 #' @param x Input points where the prediction must be computed.
-#'
-#' @param stdev \code{Logical}. If \code{TRUE} the standard deviation
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
 #'     is returned.
-#'
-#' @param cov \code{Logical}. If \code{TRUE} the covariance matrix of
+#' @param return_cov \code{Logical}. If \code{TRUE} the covariance matrix of
 #'     the predictions is returned.
-#'
-#' @param deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
+#' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
-#'
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -413,7 +423,7 @@ fit.Kriging <- function(object, y, X,
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
-predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE, ...) {
+predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     ## manage the data frame case. Ideally we should then warn
@@ -422,7 +432,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
     if (ncol(x) != ncol(k$X))
         stop("Input x must have ", ncol(k$X), " columns (instead of ",
              ncol(x), ")")
-    return(kriging_predict(object, x, stdev, cov, deriv))
+    return(kriging_predict(object, x, return_stdev, return_cov, return_deriv))
 }
 
 
@@ -438,9 +448,10 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
+#' @param will_update Set to TRUE if wish to use update_simulate(...) later.
 #' @param ... Ignored.
 #'
-#' @return a matrix with \code{length(x)} rows and \code{nsim}
+#' @return a matrix with \code{nrow(x)} rows and \code{nsim}
 #'     columns containing the simulated paths at the inputs points
 #'     given in \code{x}.
 #'
@@ -471,7 +482,7 @@ predict.Kriging <- function(object, x, stdev = TRUE, cov = FALSE, deriv = FALSE,
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
+simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(x)) x = data.matrix(x)
@@ -481,20 +492,79 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(kriging_simulate(object, nsim = nsim, seed = seed, X = x))
+    return(kriging_simulate(object, nsim = nsim, seed = seed, X = x, will_update = will_update))
 }
 
+#' Update previous simulation of a \code{Kriging} model object.
+#'
+#' This method draws paths of the stochastic process conditional on the values at the input points used in the
+#' fit, plus the new input points and their values given as argument (knonw as 'update' points).
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object S3 Kriging object.
+#' @param y_u Numeric vector of new responses (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param ... Ignored.
+#'
+#' @return a matrix with \code{nrow(x)} rows and \code{nsim}
+#'     columns containing the simulated paths at the inputs points
+#'     given in \code{x}.
+#'
+#' @method update_simulate Kriging
+#' @export
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' plot(f)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#' points(X, y, col = "blue")
+#' 
+#' k <- Kriging(y, X, kernel = "matern3_2")
+#' 
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' s <- k$simulate(nsim = 3, x = x, will_update = TRUE)
+#' 
+#' lines(x, s[ , 1], col = "blue")
+#' lines(x, s[ , 2], col = "blue")
+#' lines(x, s[ , 3], col = "blue")
+#' 
+#' X_u <- as.matrix(runif(3))
+#' y_u <- f(X_u)
+#' points(X_u, y_u, col = "red")
+#' 
+#' su <- k$update_simulate(y_u, X_u)
+#' 
+#' lines(x, su[ , 1], col = "blue", lty=2)
+#' lines(x, su[ , 2], col = "blue", lty=2)
+#' lines(x, su[ , 3], col = "blue", lty=2)
+update_simulate.Kriging <- function(object, y_u, X_u, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- kriging_model(object)
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
+
+    ## Modify 'object' in the parent environment
+    return(kriging_update_simulate(object, y_u, X_u))
+}
 
 #' Update a \code{Kriging} model object with new points
 #'
 #' @author Yann Richet \email{yann.richet@irsn.fr}
 #'
 #' @param object S3 Kriging object.
-#'
-#' @param newy Numeric vector of new responses (output).
-#'
-#' @param newX Numeric matrix of new input points.
-#'
+#' @param y_u Numeric vector of new responses (output).
+#' @param X_u Numeric matrix of new input points.
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is FALSE).
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -525,33 +595,33 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x,  ...) {
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
 #'
-#' newX <- as.matrix(runif(3))
-#' newy <- f(newX)
-#' points(newX, newy, col = "red")
+#' X_u <- as.matrix(runif(3))
+#' y_u <- f(X_u)
+#' points(X_u, y_u, col = "red")
 #'
 #' ## change the content of the object 'k'
-#' update(k, newy, newX)
+#' update(k, y_u, X_u)
 #'
 #' x <- seq(from = 0, to = 1, length.out = 101)
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, newy, newX, ...) {
+update.Kriging <- function(object, y_u, X_u, refit=TRUE,...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
-    if (is.data.frame(newX)) newX = data.matrix(newX)
-    if (!is.matrix(newX)) newX <- matrix(newX, ncol = ncol(k$X))
-    if (is.data.frame(newy)) newy = data.matrix(newy)
-    if (!is.matrix(newy)) newy <- matrix(newy, ncol = ncol(k$y))
-    if (ncol(newX) != ncol(k$X))
-        stop("Object 'newX' must have ", ncol(k$X), " columns (instead of ",
-             ncol(newX), ")")
-    if (nrow(newy) != nrow(newX))
-        stop("Objects 'newX' and 'newy' must have the same number of rows.")
+    if (is.data.frame(X_u)) X_u = data.matrix(X_u)
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (is.data.frame(y_u)) y_u = data.matrix(y_u)
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
+    if (ncol(X_u) != ncol(k$X))
+        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
+             ncol(X_u), ")")
+    if (nrow(y_u) != nrow(X_u))
+        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
 
     ## Modify 'object' in the parent environment
-    kriging_update(object, newy, newX)
+    kriging_update(object, y_u, X_u, refit)
 
     invisible(NULL)
 }
@@ -619,7 +689,51 @@ load.Kriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
         stop("'filename' must be a string")
-    return( kriging_load(filename) )
+    return(classKriging( kriging_load(filename)))
+}
+
+#' Compute Covariance Matrix of Kriging Model
+#'
+#' @author Yann Richet \email{yann.richet@irsn.fr}
+#'
+#' @param object An S3 Kriging object.
+#' @param x1 Numeric matrix of input points.
+#' @param x2 Numeric matrix of input points.
+#' @param theta A numeric vector of (positive) range parameters.
+#' @param ... Not used.
+#' 
+#' @return A matrix of the covariance matrix of the Kriging model.
+#' 
+#' @method covMat Kriging
+#' @export
+#' @aliases covMat,Kriging,Kriging-method
+#' 
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, kernel = "gauss")
+#' 
+#' x1 = runif(10)
+#' x2 = runif(10)
+#' 
+#' covMat(k, x1, x2)
+covMat.Kriging <- function(object, x1, x2, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    k <- kriging_model(object)
+    if (is.data.frame(x1)) x1 = data.matrix(x1)
+    if (is.data.frame(x2)) x2 = data.matrix(x2)
+    if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(k$X))
+    if (!is.matrix(x2)) x2 = matrix(x2, ncol = ncol(k$X))
+    if (ncol(x1) != ncol(k$X))
+        stop("Input x1 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x1), ")")
+    if (ncol(x2) != ncol(k$X))
+        stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
+             ncol(x2), ")")
+    return(kriging_covMat(object, x1, x2))
 }
 
 #' Compute Log-Likelihood of Kriging Model
@@ -629,8 +743,8 @@ load.Kriging <- function(filename, ...) {
 #' @param object An S3 Kriging object.
 #' @param theta A numeric vector of (positive) range parameters at
 #'     which the log-likelihood will be evaluated.
-#' @param grad Logical. Should the function return the gradient?
-#' @param hess Logical. Should the function return Hessian?
+#' @param return_grad Logical. Should the function return the gradient?
+#' @param return_hess Logical. Should the function return Hessian?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
 #'
@@ -656,7 +770,7 @@ load.Kriging <- function(filename, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  grad = FALSE, hess = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -671,13 +785,13 @@ logLikelihoodFun.Kriging <- function(object, theta,
                                                       ncol(theta))))
     for (i in 1:nrow(theta)) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    grad = isTRUE(grad), hess = isTRUE(hess), bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad), return_hess = isTRUE(return_hess), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
-        if (isTRUE(grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-        if (isTRUE(hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
+        if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
-    if (!isTRUE(grad)) out$logLikelihoodGrad <- NULL
-    if (!isTRUE(hess)) out$logLikelihoodHess <- NULL
+    if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }
@@ -727,7 +841,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' @param theta A numeric vector of range parameters at which the LOO
 #'     will be evaluated.
 #'
-#' @param grad Logical. Should the gradient (w.r.t. \code{theta}) be
+#' @param return_grad Logical. Should the gradient (w.r.t. \code{theta}) be
 #'     returned?
 #' @param bench Logical. Should the function display benchmarking output
 #' @param ... Not used.
@@ -752,7 +866,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' t <-  seq(from = 0.001, to = 2, length.out = 101)
 #' plot(t, loo(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -764,11 +878,11 @@ leaveOneOutFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
                 leaveOneOutGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(grad), bench = isTRUE(bench))
+        loo <- kriging_leaveOneOutFun(object,theta[i,], isTRUE(return_grad), bench = isTRUE(bench))
         out$leaveOneOut[i] <- loo$leaveOneOut
-        if (isTRUE(grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
+        if (isTRUE(return_grad)) out$leaveOneOutGrad[i, ] <- loo$leaveOneOutGrad
     }
-    if (!isTRUE(grad)) out$leaveOneOutGrad <- NULL
+    if (!isTRUE(return_grad)) out$leaveOneOutGrad <- NULL
     return(out)
 }
 
@@ -875,7 +989,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' @param object S3 Kriging object.
 #' @param theta Numeric vector of correlation range parameters at
 #'     which the function is to be evaluated.
-#' @param grad Logical. Should the function return the gradient
+#' @param return_grad Logical. Should the function return the gradient
 #'     (w.r.t theta)?
 #' @param bench Logical. Should the function display benchmarking output?
 #' @param ... Not used.
@@ -906,7 +1020,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' t <- seq(from = 0.01, to = 2, length.out = 101)
 #' plot(t, lmp(t), type = "l")
 #' abline(v = k$theta(), col = "blue")
-logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...) {
+logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     k <- kriging_model(object)
     if (is.data.frame(theta)) theta = data.matrix(theta)
@@ -918,11 +1032,11 @@ logMargPostFun.Kriging <- function(object, theta, grad = FALSE, bench=FALSE, ...
                 logMargPostGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
     for (i in 1:nrow(theta)) {
-        lmp <- kriging_logMargPostFun(object, theta[i, ], grad = isTRUE(grad), bench = isTRUE(bench))
+        lmp <- kriging_logMargPostFun(object, theta[i, ], return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logMargPost[i] <- lmp$logMargPost
-        if (isTRUE(grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
+        if (isTRUE(return_grad)) out$logMargPostGrad[i, ] <- lmp$logMargPostGrad
     }
-    if (!isTRUE(grad)) out$logMargPostGrad <- NULL
+    if (!isTRUE(return_grad)) out$logMargPostGrad <- NULL
     return(out)
 }
 
@@ -982,5 +1096,5 @@ logMargPost.Kriging <- function(object, ...) {
 #' print(copy(k))
 copy.Kriging <- function(object, ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
-  return(kriging_copy(object))
+  return(classKriging(kriging_copy(object)))
 }

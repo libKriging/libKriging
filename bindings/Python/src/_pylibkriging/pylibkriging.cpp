@@ -81,6 +81,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("predict", &LinearRegression::predict);
 
   py::enum_<Trend::RegressionModel>(m, "RegressionModel")
+      .value("None", Trend::RegressionModel::None)
       .value("Constant", Trend::RegressionModel::Constant)
       .value("Linear", Trend::RegressionModel::Linear)
       .value("Interactive", Trend::RegressionModel::Interactive)
@@ -128,6 +129,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("predict", &PyKriging::predict)
       .def("simulate", &PyKriging::simulate)
       .def("update", &PyKriging::update)
+      .def("update_simulate", &PyKriging::update_simulate)
       .def("summary", &PyKriging::summary)
       .def("save", &PyKriging::save)
       .def_static("load", &PyKriging::load)
@@ -189,6 +191,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("predict", &PyNuggetKriging::predict)
       .def("simulate", &PyNuggetKriging::simulate)
       .def("update", &PyNuggetKriging::update)
+      .def("update_simulate", &PyNuggetKriging::update_simulate)
       .def("summary", &PyNuggetKriging::summary)
       .def("save", &PyNuggetKriging::save)
       .def_static("load", &PyNuggetKriging::load)
@@ -252,6 +255,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("predict", &PyNoiseKriging::predict)
       .def("simulate", &PyNoiseKriging::simulate)
       .def("update", &PyNoiseKriging::update)
+      .def("update_simulate", &PyNoiseKriging::update_simulate)
       .def("summary", &PyNoiseKriging::summary)
       .def("save", &PyNoiseKriging::save)
       .def_static("load", &PyNoiseKriging::load)

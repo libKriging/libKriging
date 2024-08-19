@@ -34,3 +34,10 @@ arma::mat random_randu_mat(unsigned int n, unsigned int d) {
   Rcpp::XPtr<Random> impl_ptr(r);
   return impl_ptr->randu_mat(n, d);
 }
+
+// [[Rcpp::export]]
+arma::mat random_randn_mat(unsigned int n, unsigned int d) {
+  Random* r = new Random();
+  Rcpp::XPtr<Random> impl_ptr(r);
+  return impl_ptr->randn_mat(n, d);
+}

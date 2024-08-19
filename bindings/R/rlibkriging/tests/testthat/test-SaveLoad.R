@@ -1,7 +1,5 @@
-library(testthat)
-
 #library(rlibkriging, lib.loc="bindings/R/Rlibs")
-#library(rlibkriging)
+#library(testthat)
 
 # f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))
 f <- function(X) apply(X, 1, function(x)
@@ -20,6 +18,7 @@ points(X)
 k <- Kriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(k)
 
+unlink("k.json")
 rlibkriging::save(k, filename="k.json")
 
 k2 <- rlibkriging::load(filename="k.json")
@@ -30,6 +29,7 @@ test_that("Save/Load NuggetKriging", expect_true( print(k) == print(k2)))
 nuk <- NuggetKriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nuk)
 
+unlink("nuk.json")
 rlibkriging::save(nuk, filename="nuk.json")
 
 nuk2 <- rlibkriging::load(filename="nuk.json")
@@ -40,6 +40,7 @@ test_that("Save/Load NuggetKriging", expect_true( print(nuk) == print(nuk2)))
 nok <- NoiseKriging(y, rep(0.1^2,nrow(X)), X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nok)
 
+unlink("nok.json")
 rlibkriging::save(nok, filename="nok.json")
 
 nok2 <- rlibkriging::load(filename="nok.json")

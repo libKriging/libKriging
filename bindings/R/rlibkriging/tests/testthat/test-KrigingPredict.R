@@ -1,4 +1,7 @@
-context("Check predict args (T,F) are consistent")
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
+context("Check predict args (T,FALSE) are consistent")
 
 f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
 plot(f)
@@ -16,22 +19,22 @@ pred_def_mean = r$predict(x)$mean
 pred_def_sd = r$predict(x)$stdev
 lines(x,pred_def_mean,col='blue')
 
-pred_TFF_mean = r$predict(x,T,F,F)$mean
-pred_TFF_sd = r$predict(x,T,F,F)$stdev
+pred_TFF_mean = r$predict(x,TRUE,FALSE,FALSE)$mean
+pred_TFF_sd = r$predict(x,TRUE,FALSE,FALSE)$stdev
 lines(x,pred_TFF_mean,col='red')
-test_that(desc="predict(.,T,F,F) is is the same that default one", 
+test_that(desc="predict(.,TRUE,FALSE,FALSE) is is the same that default one", 
           expect_equal(pred_TFF_mean,pred_def_mean))
 
-pred_TTF_mean = r$predict(x,T,T,F)$mean
-pred_TTF_sd = r$predict(x,T,T,F)$stdev
+pred_TTF_mean = r$predict(x,TRUE,TRUE,FALSE)$mean
+pred_TTF_sd = r$predict(x,TRUE,TRUE,FALSE)$stdev
 lines(x,pred_TTF_mean,col='red')
-test_that(desc="predict(.,T,T,F) is is the same that default one", 
+test_that(desc="predict(.,TRUE,TRUE,FALSE) is is the same that default one", 
           expect_equal(pred_TTF_mean,pred_def_mean))
 
-pred_TTT_mean = r$predict(x,T,T,T)$mean
-pred_TTT_sd = r$predict(x,T,T,T)$stdev
+pred_TTT_mean = r$predict(x,TRUE,TRUE,TRUE)$mean
+pred_TTT_sd = r$predict(x,TRUE,TRUE,TRUE)$stdev
 lines(x,pred_TTT_mean,col='red')
-test_that(desc="predict(.,T,T,T) is is the same that default one", 
+test_that(desc="predict(.,TRUE,TRUE,TRUE) is is the same that default one", 
           expect_equal(pred_TTT_mean,pred_def_mean))
 
 
@@ -88,8 +91,19 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #for (i in 1:10)
   #    lines(x,simulate(r,x=x,seed=i),col='grey')
   
-  .x = seq(0.1,0.9,,11)
-  p_allx = predict(r,.x,stdev=TRUE, cov=FALSE, deriv=TRUE)
+  .x = seq(0.1,0.9,,101)
+  p_allx = predict(r,.x,return_stdev=TRUE, return_cov=FALSE, return_deriv=TRUE)
+
+  # plot(.x,p_allx$mean)
+  # for (i in 1:length(.x)) 
+  #   arrows(.x[i],p_allx$mean[i], .x[i]+0.1, p_allx$mean[i]+0.1*p_allx$mean_deriv[i])
+  # 
+  # plot(.x,p_allx$stdev)
+  # for (i in 1:length(.x))
+  #   arrows(.x[i],     p_allx$stdev[i], 
+  #          .x[i]+0.1, p_allx$stdev[i]+0.1*p_allx$stdev_deriv[i])
+  # 
+
   for (i in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = .x[i]
@@ -123,7 +137,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
                                   (f.deltax - t(t(W)%*%u) ))
     kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
                        
-    p = predict(r,.x[i],stdev=TRUE, cov=FALSE, deriv=TRUE)
+    p = predict(r,.x[i],return_stdev=TRUE, return_cov=FALSE, return_deriv=TRUE)
   
     test_that(desc=paste0("vect pred mean deriv is ok:\n ",paste0(collapse=",",p_allx$mean_deriv[i]),"\n ",paste0(collapse=",",p$mean_deriv)),
              expect_equal(array(p_allx$mean_deriv[i]),array(p$mean_deriv),tol = precision))
@@ -191,7 +205,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
             expect_equal(cktest,c(Ytest$cov) ,tol = precision))
   
   .x = seq(0.1,0.9,,5)
-  p_allx = predict(r,expand.grid(.x,.x), stdev=TRUE, cov=FALSE, deriv=TRUE)
+  p_allx = predict(r,expand.grid(.x,.x), return_stdev=TRUE, return_cov=FALSE, return_deriv=TRUE)
   for (i in 1:length(.x)) { for (j in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = matrix(c(.x[i],.x[j]),ncol=2) # just check diagonal points
@@ -225,7 +239,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
                                   (f.deltax - t(t(W)%*%u) ))
     kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
                        
-    p = predict(r,c(.x[i],.x[j]),TRUE, cov=FALSE, deriv=TRUE)
+    p = predict(r,c(.x[i],.x[j]),TRUE, return_cov=FALSE, return_deriv=TRUE)
   
     test_that(desc=paste0("vect pred mean deriv is ok:\n ",paste0(collapse=",",p_allx$mean_deriv[(j-1)*length(.x)+i,]),"\n ",paste0(collapse=",",p$mean_deriv)),
              expect_equal(array(p_allx$mean_deriv[(j-1)*length(.x)+i,]),array(p$mean_deriv),tol = precision))

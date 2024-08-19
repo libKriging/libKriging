@@ -51,16 +51,16 @@ Rcpp::List nuggetkriging_load(std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List anykriging_load(std::string filename) {
+std::string class_saved(std::string filename) {
   switch (KrigingLoader::describe(filename)) {
     case KrigingLoader::KrigingType::Kriging:
-      return kriging_load(filename);
+      return "Kriging";
       break;
     case KrigingLoader::KrigingType::NuggetKriging:
-      return nuggetkriging_load(filename);
+      return "NuggetKriging";
       break;
     case KrigingLoader::KrigingType::NoiseKriging:
-      return noisekriging_load(filename);
+      return "NoiseKriging";
       break;
     case KrigingLoader::KrigingType::Unknown:
       Rcpp::stop("Kriging object type unknown.");

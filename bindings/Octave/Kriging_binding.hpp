@@ -11,6 +11,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

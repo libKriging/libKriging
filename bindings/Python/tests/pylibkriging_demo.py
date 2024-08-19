@@ -7,7 +7,7 @@ def test_kriging():
     y = [f(xi) for xi in X]
 
     import pylibkriging as lk
-    k_py = lk.Kriging(y, X, "gauss", parameters={'sigma2': 1, 'is_theta_estim': False})
+    k_py = lk.Kriging(y, X, "gauss", parameters={'sigma2': np.float64(1), 'is_theta_estim': False})
     print(k_py.summary())
 
     x = np.arange(0, 1, 1 / 99)
@@ -30,7 +30,7 @@ def test_kriging():
     except ModuleNotFoundError:
         print("Cannot load matplotlib")
 
-    s = k_py.simulate(10, 123, x)
+    s = k_py.simulate(10, 123, x, False)
 
     try:
         import matplotlib.pyplot as pyplot
@@ -47,7 +47,7 @@ def test_kriging():
     Xn = np.array([0.3, 0.4])
     yn = [f(xi) for xi in Xn]
     print(k_py.summary())
-    k_py.update(yn, Xn)
+    k_py.update(yn, Xn, True)
     print(k_py.summary())
 
 

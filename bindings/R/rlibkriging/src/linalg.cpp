@@ -22,6 +22,20 @@ void linalg_set_num_nugget(double nugget) {
 }
 
 // [[Rcpp::export]]
+void linalg_check_chol_rcond(bool cr) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  impl_ptr->check_chol_rcond(cr);
+}
+
+// [[Rcpp::export]]
+bool linalg_chol_rcond_checked() {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->chol_rcond_checked();
+}
+
+// [[Rcpp::export]]
 arma::mat linalg_chol_safe(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
@@ -36,8 +50,22 @@ void linalg_set_chol_warning(bool warn) {
 }
 
 // [[Rcpp::export]]
+double linalg_rcond_approx_chol(arma::mat X) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->rcond_approx_chol(X);
+}
+
+// [[Rcpp::export]]
 double linalg_rcond_chol(arma::mat X) {
   LinearAlgebra* la = new LinearAlgebra();
   Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
   return impl_ptr->rcond_chol(X);
+}
+
+// [[Rcpp::export]]
+arma::mat linalg_chol_block(arma::mat C, arma::mat Loo) {
+  LinearAlgebra* la = new LinearAlgebra();
+  Rcpp::XPtr<LinearAlgebra> impl_ptr(la);
+  return impl_ptr->chol_block(C, Loo);
 }

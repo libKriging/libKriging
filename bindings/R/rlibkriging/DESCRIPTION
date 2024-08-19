@@ -1,8 +1,8 @@
 Package: rlibkriging
 Type: Package
 Title: Kriging Models using the 'libKriging' Library
-Version: 0.8-3
-Date: 2023-12-10
+Version: 0.9-0
+Date: 2024-06-05
 Authors@R: 
     c(person(given = "Pascal",
              family = "Havé",
@@ -27,6 +27,6 @@ LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 4.2)
 Imports: Rcpp (>= 0.12.11), methods, DiceKriging
 Suggests: testthat, RobustGaSP, utils, DiceDesign, foreach
-SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran, HDF5
+SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran
 URL: https://github.com/libKriging
-RoxygenNote: 7.2.1
+RoxygenNote: 7.3.1

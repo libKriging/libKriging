@@ -36,8 +36,8 @@ hll = function(theta,eps=0.0001) {
 library(rlibkriging)
 r <- Kriging(y, X, kernel)
 ll_C = function(theta) logLikelihoodFun(r,theta)$logLikelihood[1]
-gll_C = function(theta) t(logLikelihoodFun(r,theta,grad=T)$logLikelihoodGrad)
-hll_C = function(theta) logLikelihoodFun(r,theta,hess=T)$logLikelihoodHess[,,]
+gll_C = function(theta) t(logLikelihoodFun(r,theta,return_grad=T)$logLikelihoodGrad)
+hll_C = function(theta) logLikelihoodFun(r,theta,return_hess=T)$logLikelihoodHess[,,]
 
 
 x=runif(d)

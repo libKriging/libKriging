@@ -68,12 +68,12 @@ jobs:
             os: macOS-14
             mode: Debug
             enable_python: on
-          - name: "Windows Debug"
+          - name: "Python (3.7) Windows Debug"
             os: windows-2019
             mode: Debug
             enable_python: on
             python-version: 3.7
-          - name: "Windows Debug"
+          - name: "Python (3.9) Windows Debug"
             os: windows-2019
             mode: Debug
             enable_python: on
@@ -81,7 +81,7 @@ jobs:
           - name: "Octave Linux"
             os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release
-            enable_python: on
+            enable_python: off
             enable_octave: on
             force_update: on
           - name: "Octave macOS"
@@ -127,9 +127,15 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.2'
-          rtools-version: '42'
+          r-version: 'release'
+          rtools-version: '' # Default Rtools version, matching the R version
         if: matrix.enable_R == 'on'
+
+      - name: install miniconda for Windows
+        run: |
+          reticulate::install_miniconda()
+        shell: Rscript {0}
+        if: runner.os == 'on'
 
       - name: Define local variables
         shell: bash

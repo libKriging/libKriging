@@ -26,7 +26,7 @@ ll2 = function(theta) leaveOneOutFun(r,theta)$leaveOneOut[1]
 for (x in seq(0.01,1,,11)){
   envx = new.env()
   ll2x = leaveOneOutFun(r,x)$leaveOneOut[1]
-  gll2x = leaveOneOutFun(r,x,grad=T)$leaveOneOutGrad
+  gll2x = leaveOneOutFun(r,x,return_grad=T)$leaveOneOutGrad
   arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 }
 
@@ -37,7 +37,7 @@ test_that(desc="leaveOneOut is the same that DiceKriging one",
          expect_equal(leaveOneOutFun(r,x)$leaveOneOut[1],DiceKriging::leaveOneOutFun(x,k,xenv),tolerance = precision))
 
 test_that(desc="leaveOneOut Grad is the same that DiceKriging one",
-          expect_equal(leaveOneOutFun(r,x,grad=T)$leaveOneOutGrad,DiceKriging::leaveOneOutGrad(x,k,xenv),tolerance= precision))
+          expect_equal(leaveOneOutFun(r,x,return_grad=T)$leaveOneOutGrad,DiceKriging::leaveOneOutGrad(x,k,xenv),tolerance= precision))
 }
 
 

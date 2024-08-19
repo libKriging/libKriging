@@ -29,6 +29,8 @@ bool check_dict_entry(const py::dict& dict, std::string_view name, std::string_v
       return check_dict_entryT<int>(dict, name);
     case "float"_hash:
       return check_dict_entryT<double>(dict, name);
+    case "float64"_hash:
+      return check_dict_entryT<double>(dict, name);
     case "str"_hash:
       return check_dict_entryT<std::string>(dict, name);
     case "vec"_hash:

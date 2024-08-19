@@ -1,5 +1,14 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+#kernel="gauss"
+
 for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   context(paste0("Check predict 1D for kernel ",kernel))
+
+#library(testthat)
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#rlibkriging:::optim_log(3)
+#kernel="gauss"
 
   f = function(x) 1-1/2*(sin(12*x)/(1+x)+2*cos(7*x)*x^5+0.7)
   #plot(f)
@@ -8,8 +17,8 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   X <- as.matrix(runif(n))
   y = f(X)
   #points(X,y)
-  k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0,nugget.estim = TRUE)
-  library(rlibkriging)
+  k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0.01,nugget.estim = FALSE)
+  #library(rlibkriging)
   r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE, is_theta_estim=FALSE,
@@ -17,7 +26,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   # m = as.list(r)
   
   ntest <- 100
-  Xtest <- as.matrix(runif(ntest))
+  Xtest <- as.matrix(c(X,runif(ntest)))
   ptest <- DiceKriging::predict(k,Xtest,type="UK",cov.compute = TRUE,checkNames=F)
   Yktest <- ptest$mean
   sktest <- ptest$sd
@@ -39,21 +48,38 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   test_that(desc="pred cov is the same that DiceKriging one", 
             expect_equal(cktest,c(Ytest$cov) ,tol = precision))
   
-  plot(f)
-  points(X,y)
-  x=seq(0,1,,101)
-  lines(x,predict(r,x)$mean,lty=2)
-  polygon(
-      c(x,rev(x)),
-      c(predict(r,x)$mean-predict(r,x)$stdev,
-        predict(r,rev(x))$mean+predict(r,rev(x))$stdev),
-        col=rgb(0,0,0,.1),border=NA)
-  #
-  #for (i in 1:10)
-  #    lines(x,simulate(r,x=x,seed=i),col='grey')
-  
+#  plot(f,xlim=c(X[1]-0.05,X[1]+0.05), ylim=c(Ytest$mean[1]-0.5105,Ytest$mean[1]+0.5105))  
+#  points(X,y)
+#  x=sort(c(seq(0,1,,101),X))
+#  lines(x,predict(r,x)$mean,lty=2)
+#  polygon(
+#      c(x,rev(x)),
+#      c(predict(r,x)$mean-predict(r,x)$stdev,
+#        predict(r,rev(x))$mean+predict(r,rev(x))$stdev),
+#        col=rgb(0,0,0,.1),border=NA)
+#  
+#  s_wn = matrix(NA,length(x),100)
+#  s_won = matrix(NA,length(x),ncol(s_wn))
+#  for (i in 1:ncol(s_wn)) {
+#    s_wn[,i] = simulate(r,x=x,seed=i, with_nugget=TRUE)
+#    s_won[,i] = simulate(r,x=x,seed=i, with_nugget=FALSE)
+#      lines(x,s_wn[,i],col=rgb(1,0,0,0.2))
+#      lines(x,s_won[,i],col=rgb(0,0,1,0.2))
+#  }
+#
+#  j = which(x==X[1])-3
+#  abline(v=x[j])
+#
+#  .x = seq(0.1,0.9,,51)
+#  plot(.x,
+#    dnorm(.x,
+#      mean=predict(r,x[j],TRUE, return_cov=FALSE)$mean,
+#      sd=predict(r,x[j],TRUE, return_cov=FALSE)$stdev),type='l')
+#  lines(density(s_wn[j,]),col='red')
+#  lines(density(s_won[j,]),col='blue')
+
   .x = seq(0.1,0.9,,11)
-  p_allx = predict(r,.x,TRUE, cov=FALSE, deriv=TRUE)
+  p_allx = predict(r,.x,TRUE, return_cov=FALSE, return_deriv=TRUE)
   for (i in 1:length(.x)) {
     # ref from DiceOptim::EI.grad
     newdata = .x[i]
@@ -87,7 +113,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
                                   (f.deltax - t(t(W)%*%u) ))
     kriging.sd.grad <- kriging.sd2.grad / (2*kriging.sd)
                        
-    p = predict(r,.x[i],TRUE, cov=FALSE, deriv=TRUE)
+    p = predict(r,.x[i],TRUE, return_cov=FALSE, return_deriv=TRUE)
   
     test_that(desc=paste0("vect pred mean deriv is ok:\n ",paste0(collapse=",",p_allx$mean_deriv[i]),"\n ",paste0(collapse=",",p$mean_deriv)),
              expect_equal(array(p_allx$mean_deriv[i]),array(p$mean_deriv),tol = precision))

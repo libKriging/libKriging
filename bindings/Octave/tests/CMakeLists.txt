@@ -2,6 +2,7 @@ add_executable(manage_test_crash manage_test_crash.c)
 
 add_mex_test(NAME success FILENAME dummy_succeededtest.m)
 add_mex_test(NAME failure FILENAME dummy_failingtest.m WILL_FAIL)
+add_mex_test(NAME canary_plot FILENAME canary_plot.m)
 add_mex_test(NAME mLibKriging-Demo FILENAME mLibKriging_demo.m)
 add_mex_test(NAME mLibKriging-BadUsage FILENAME mLibKriging_failingtest.m WILL_FAIL)
 add_mex_test(NAME LinearRegression-Simple FILENAME LinearRegression_simpletest.m)

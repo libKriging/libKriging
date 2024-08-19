@@ -1,5 +1,4 @@
 library(rlibkriging, lib.loc="bindings/R/Rlibs")
-
 library(testthat)
 
 f <- function(X) apply(X, 1, function(x) prod(sin((x-.5)^2)))

@@ -1,3 +1,6 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
+
 library(RobustGaSP)
 
 context("RobustGaSP / Fit: 1D")

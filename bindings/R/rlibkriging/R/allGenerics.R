@@ -8,16 +8,6 @@
 ##
 ## ****************************************************************************
 
-## True generic
-setGeneric(name = "logLikelihoodFun",
-           def = function(object, ...) standardGeneric("logLikelihoodFun"))
-
-setGeneric(name = "logMargPostFun",
-           def = function(object, ...) standardGeneric("logMargPostFun"))
-
-setGeneric(name = "leaveOneOutFun",
-           def = function(object, ...) standardGeneric("leaveOneOutFun"))
-
 ## *****************************************************************************
 ##' Coerce an object into an object with S4 class \code{"km"} from the
 ##' \pkg{DiceKriging} package.
@@ -36,6 +26,35 @@ setGeneric(name = "leaveOneOutFun",
 as.km <- function(x, ...) {
     UseMethod("as.km")
 }
+
+## True generic
+setGeneric(name = "covMat",
+           def = function(object, ...) standardGeneric("covMat"))
+
+## *****************************************************************************
+##' Compute the covariance matrix of a model given in \code{object},
+##' between given set of points.
+##'
+##' @title covariance function
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. points, range).
+##'
+##' @return The covariance matrix.
+##' @export
+covMat <- function(object, ...) {
+    UseMethod("covMat")
+}
+
+
+setGeneric(name = "logLikelihoodFun",
+           def = function(object, ...) standardGeneric("logLikelihoodFun"))
+
+setGeneric(name = "logMargPostFun",
+           def = function(object, ...) standardGeneric("logMargPostFun"))
+
+setGeneric(name = "leaveOneOutFun",
+           def = function(object, ...) standardGeneric("leaveOneOutFun"))
 
 ## *****************************************************************************
 ##' Compute the leave-One-Out error of a model given in \code{object},
@@ -152,6 +171,21 @@ logMargPost <- function(object, ...) {
 }
 
 ## *****************************************************************************
+##' Update previous simulate of a model given in
+##' \code{object}.
+##'
+##' @title Update simulation of model on data.
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function
+##'
+##' @return Updated simulation of model output.
+##' @export
+update_simulate <- function(object, ...) {
+    UseMethod("update_simulate")
+}
+
+## *****************************************************************************
 ##' Duplicate a model given in
 ##' \code{object}.
 ##'
@@ -180,6 +214,7 @@ copy <- function(object, ...) {
 fit <- function(object, ...) {
     UseMethod("fit")
 }
+
 
 ## *****************************************************************************
 ##' Save a model given in
@@ -233,11 +268,18 @@ load <- function(filename, ...) {
         #stop("'filename' must be a string")
     else {
         if (length(L <- list(...)) > 0) warnOnDots(L)
-        k = NULL
-        base::try(k <- anykriging_load(filename))
-        if (is.null(k))
+        k_class = NULL
+        base::try(k_class <- class_saved(filename))
+        if (is.null(k_class))
             return(base::load(file=filename,...))
         else
-            return(k)
+            if (k_class=="Kriging")
+                return(load.Kriging(filename))
+            else if (k_class=="NuggetKriging")
+                return(load.NuggetKriging(filename))
+            else if (k_class=="NoiseKriging")
+                return(load.NoiseKriging(filename))
+            else 
+                stop("Unknown Kriging class: ",k_class)
     }
 }

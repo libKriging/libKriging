@@ -53,11 +53,13 @@ class PyKriging {
   // - https://docs.python.org/3/library/collections.html#namedtuple-factory-function-for-tuples-with-named-fields
   // - https://github.com/pybind/pybind11/issues/1244
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-  predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv);
+  predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& Xp);
+  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool will_update);
 
-  void update(const py::array_t<double>& newy, const py::array_t<double>& newX);
+  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit);
+
+  void update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
 
   std::string summary() const;
 
@@ -65,15 +67,15 @@ class PyKriging {
 
   static PyKriging load(const std::string filename);
 
-  std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, const bool want_grad);
+  std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, const bool return_grad);
 
   std::tuple<py::array_t<double>, py::array_t<double>> leaveOneOutVec(const py::array_t<double>& theta);
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
-                                                                                const bool want_grad,
+                                                                                const bool return_grad,
                                                                                 const bool want_hess);
 
-  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool want_grad);
+  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
 
   double logLikelihood();
   double leaveOneOut();
