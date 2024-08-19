@@ -58,11 +58,20 @@ class PyNoiseKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const py::array_t<double>& with_noise, const bool will_update);
+  py::array_t<double> simulate(const int nsim,
+                               const int seed,
+                               const py::array_t<double>& X_n,
+                               const py::array_t<double>& with_noise,
+                               const bool will_update);
 
-  void update(const py::array_t<double>& y_u, const py::array_t<double>& noise_u, const py::array_t<double>& X_u, const bool refit);
+  void update(const py::array_t<double>& y_u,
+              const py::array_t<double>& noise_u,
+              const py::array_t<double>& X_u,
+              const bool refit);
 
-  void update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& noise_u, const py::array_t<double>& X_u);
+  void update_simulate(const py::array_t<double>& y_u,
+                       const py::array_t<double>& noise_u,
+                       const py::array_t<double>& X_u);
 
   std::string summary() const;
 

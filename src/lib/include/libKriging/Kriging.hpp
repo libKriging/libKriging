@@ -71,13 +71,12 @@ class Kriging {
   std::string m_optim;
   std::string m_objective;
 
-
   // Auxiliary data
   arma::mat m_dX;
   arma::vec m_maxdX;
   arma::mat m_F;
-  arma::mat m_T; 
-  arma::mat m_R; // required for the "update" methods
+  arma::mat m_T;
+  arma::mat m_R;  // required for the "update" methods
   arma::mat m_M;
   arma::mat m_star;
   arma::mat m_circ;
@@ -133,7 +132,7 @@ class Kriging {
     arma::mat Rstar;
     arma::mat Qstar;
     arma::vec Estar;
-    double SSEstar ;
+    double SSEstar;
     arma::vec betahat;
   };
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
@@ -210,9 +209,9 @@ class Kriging {
    * @return output prediction: m means, [m standard deviations], [m*m full covariance matrix]
    */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
-                                                                                                    bool return_stdev,
-                                                                                                    bool return_cov,
-                                                                                                    bool return_deriv);
+                                                                                              bool return_stdev,
+                                                                                              bool return_cov,
+                                                                                              bool return_deriv);
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output

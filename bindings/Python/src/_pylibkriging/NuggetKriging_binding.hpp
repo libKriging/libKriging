@@ -55,7 +55,11 @@ class PyNuggetKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool with_nugget, const bool will_update);
+  py::array_t<double> simulate(const int nsim,
+                               const int seed,
+                               const py::array_t<double>& X_n,
+                               const bool with_nugget,
+                               const bool will_update);
 
   void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit);
 
@@ -70,7 +74,8 @@ class PyNuggetKriging {
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta_alpha,
                                                            const bool return_grad);
 
-  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta_alpha, const bool return_grad);
+  std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta_alpha,
+                                                         const bool return_grad);
 
   double logLikelihood();
   double logMargPost();

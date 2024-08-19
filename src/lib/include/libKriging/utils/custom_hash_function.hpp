@@ -58,16 +58,16 @@ struct std::hash<Kriging::KModel*> {
   std::size_t operator()(const Kriging::KModel* s) const noexcept {
     if (s != nullptr) {
       struct KModel {
-    arma::mat R;
-    arma::mat L;
-    arma::mat Linv;
-    arma::mat Fstar;
-    arma::colvec ystar;
-    arma::mat Rstar;
-    arma::mat Qstar;
-    arma::colvec Estar;
-    double SSEstar ;
-    arma::colvec betahat;
+        arma::mat R;
+        arma::mat L;
+        arma::mat Linv;
+        arma::mat Fstar;
+        arma::colvec ystar;
+        arma::mat Rstar;
+        arma::mat Qstar;
+        arma::colvec Estar;
+        double SSEstar;
+        arma::colvec betahat;
       };
 
       //      return std::hash<arma::mat>{}(*s);

@@ -89,7 +89,11 @@ PyNuggetKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const bool with_nugget, const bool will_update) {
+py::array_t<double> PyNuggetKriging::simulate(const int nsim,
+                                              const int seed,
+                                              const py::array_t<double>& X_n,
+                                              const bool with_nugget,
+                                              const bool will_update) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto result = m_internal->simulate(nsim, seed, mat_X, with_nugget, will_update);
   return carma::mat_to_arr(result, true);
@@ -98,7 +102,7 @@ py::array_t<double> PyNuggetKriging::simulate(const int nsim, const int seed, co
 void PyNuggetKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit) {
   arma::mat mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
-  m_internal->update(mat_y, mat_X,refit);
+  m_internal->update(mat_y, mat_X, refit);
 }
 
 void PyNuggetKriging::update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {

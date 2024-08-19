@@ -25,12 +25,11 @@ std::chrono::high_resolution_clock::time_point Bench::toc(std::map<std::string, 
 
   const auto t = std::chrono::high_resolution_clock::now();
   if (bench == nullptr)
-    arma::cout << Bench::pad(what,50,' ') << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+    arma::cout << Bench::pad(what, 50, ' ') << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+  else if ((*bench).count(what) > 0)
+    (*bench)[what] += (std::chrono::duration<double>(t - t0)).count() * 1000;
   else
-    if ((*bench).count(what) > 0)
-      (*bench)[what] += (std::chrono::duration<double>(t - t0)).count() * 1000;
-    else
-      (*bench)[what] = (std::chrono::duration<double>(t - t0)).count() * 1000;
+    (*bench)[what] = (std::chrono::duration<double>(t - t0)).count() * 1000;
 
   return t;
 }

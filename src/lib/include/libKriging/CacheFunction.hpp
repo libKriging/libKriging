@@ -94,9 +94,9 @@ class CacheFunction<Callable, std::function<R(Args...)>, Contexts...> : public C
       try {
         finder->second = m_callable(std::forward<Args>(args)...);
       } catch (const std::runtime_error& error) {
-        //if (grad_out != nullptr) {
-        //  *grad_out = arma::vec(_gamma.n_elem, arma::fill::zeros);
-        //}      
+        // if (grad_out != nullptr) {
+        //   *grad_out = arma::vec(_gamma.n_elem, arma::fill::zeros);
+        // }
         arma::cout << "[WARNING] Catched error " << error.what() << ": return -Inf." << arma::endl;
         finder->second = -arma::datum::inf;
       }

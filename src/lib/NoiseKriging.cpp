@@ -10,9 +10,9 @@
 #include "libKriging/Bench.hpp"
 #include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
-#include "libKriging/NoiseKriging.hpp"
 #include "libKriging/KrigingException.hpp"
 #include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/NoiseKriging.hpp"
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
@@ -33,7 +33,7 @@
 /************************************************/
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
-void NoiseKriging::make_Cov(const std::string &covType) {
+void NoiseKriging::make_Cov(const std::string& covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
     _Cov = Covariance::Cov_gauss;
@@ -61,7 +61,7 @@ void NoiseKriging::make_Cov(const std::string &covType) {
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
-LIBKRIGING_EXPORT arma::mat NoiseKriging::covMat(const arma::mat &X1, const arma::mat &X2) {
+LIBKRIGING_EXPORT arma::mat NoiseKriging::covMat(const arma::mat& X1, const arma::mat& X2) {
   arma::mat Xn1 = X1;
   arma::mat Xn2 = X2;
   Xn1.each_row() -= m_centerX;
@@ -72,26 +72,26 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::covMat(const arma::mat &X1, const arma
   arma::mat R = arma::mat(X1.n_rows, X2.n_rows, arma::fill::none);
   for (arma::uword i = 0; i < Xn1.n_rows; i++) {
     for (arma::uword j = 0; j < Xn2.n_rows; j++) {
-      R.at(i, j) = _Cov((Xn1.row(i)- Xn2.row(j)).t(), m_theta);
+      R.at(i, j) = _Cov((Xn1.row(i) - Xn2.row(j)).t(), m_theta);
     }
   }
   return R * m_sigma2;
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const std::string &covType) {
+LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const std::string& covType) {
   make_Cov(covType);
 }
 
-LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::vec &y,
-                                             const arma::vec &noise,
-                                             const arma::mat &X,
-                                             const std::string &covType,
-                                             const Trend::RegressionModel &regmodel,
+LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::vec& y,
+                                             const arma::vec& noise,
+                                             const arma::mat& X,
+                                             const std::string& covType,
+                                             const Trend::RegressionModel& regmodel,
                                              bool normalize,
-                                             const std::string &optim,
-                                             const std::string &objective,
-                                             const Parameters &parameters) {
+                                             const std::string& optim,
+                                             const std::string& objective,
+                                             const Parameters& parameters) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
@@ -100,33 +100,35 @@ LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const arma::vec &y,
   fit(y, noise, X, regmodel, normalize, optim, objective, parameters);
 }
 
-LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging &other, ExplicitCopySpecifier) : NoiseKriging{other} {}
+LIBKRIGING_EXPORT NoiseKriging::NoiseKriging(const NoiseKriging& other, ExplicitCopySpecifier) : NoiseKriging{other} {}
 
-NoiseKriging::KModel NoiseKriging::make_Model(const arma::vec &theta, const double sigma2,
-                               std::map<std::string, double>* bench) const {
-    arma::mat R;
-    arma::mat L;
-    arma::mat Linv;
-    arma::mat Fstar;
-    arma::vec ystar;
-    arma::mat Rstar;
-    arma::mat Qstar;
-    arma::vec Estar;
-    double SSEstar{};
-    arma::vec betahat;
-    NoiseKriging::KModel m { R, L, Linv, Fstar, ystar, Rstar,Qstar, Estar, SSEstar , betahat };
-    
+NoiseKriging::KModel NoiseKriging::make_Model(const arma::vec& theta,
+                                              const double sigma2,
+                                              std::map<std::string, double>* bench) const {
+  arma::mat R;
+  arma::mat L;
+  arma::mat Linv;
+  arma::mat Fstar;
+  arma::vec ystar;
+  arma::mat Rstar;
+  arma::mat Qstar;
+  arma::vec Estar;
+  double SSEstar{};
+  arma::vec betahat;
+  NoiseKriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
+
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;
   arma::uword p = m_F.n_cols;
 
   auto t0 = Bench::tic();
-  m.R = arma::mat(n,n, arma::fill::none);
+  m.R = arma::mat(n, n, arma::fill::none);
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
-  bool update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
-  if (update) { 
+  bool update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
+                && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
+  if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise, m_T, m_R);
-  } else 
+  } else
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise);
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
@@ -143,30 +145,30 @@ NoiseKriging::KModel NoiseKriging::make_Model(const arma::vec &theta, const doub
 
   m.Rstar = R_qr.head_cols(p);
   m.Qstar = Q_qr.head_cols(p);
-  m.Estar = Q_qr.tail_cols(1) * R_qr.at(p,p);
+  m.Estar = Q_qr.tail_cols(1) * R_qr.at(p, p);
   m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
 
   if (m_est_beta) {
     m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
   } else {
-    m.betahat = arma::vec(p, arma::fill::zeros); // whatever: not used
+    m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
   }
 
   return m;
-}  
+}
 
 // Objective function for fit : -logLikelihood
 
-double NoiseKriging::_logLikelihood(const arma::vec &_theta_sigma2,
-                                    arma::vec *grad_out,
-                                    NoiseKriging::KModel *model,
+double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
+                                    arma::vec* grad_out,
+                                    NoiseKriging::KModel* model,
                                     std::map<std::string, double>* bench) const {
   // arma::cout << " theta, sigma2: " << _theta_sigma2.t() << arma::endl;
 
   arma::uword d = m_X.n_cols;
   double _sigma2 = _theta_sigma2.at(d);
-  if (!m_est_sigma2) { // Force sigma2 to fixed value, if defined
+  if (!m_est_sigma2) {  // Force sigma2 to fixed value, if defined
     _sigma2 = m_sigma2;
   }
   arma::vec _theta = _theta_sigma2.head(d);
@@ -184,8 +186,8 @@ double NoiseKriging::_logLikelihood(const arma::vec &_theta_sigma2,
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);
 
-    if ((m.Linv.memptr()==nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
-      m.Linv =LinearAlgebra::solve(m.L, arma::mat(n, n,arma::fill::eye));
+    if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
+      m.Linv = LinearAlgebra::solve(m.L, arma::mat(n, n, arma::fill::eye));
       t0 = Bench::toc(bench, "L ^-1", t0);
     }
 
@@ -196,12 +198,12 @@ double NoiseKriging::_logLikelihood(const arma::vec &_theta_sigma2,
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
     arma::cube gradC = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d,arma::fill::zeros);
+    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
     for (arma::uword i = 0; i < n; i++) {
       gradC.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
         gradC.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradC.tube(j, i) = gradC.tube(i, j); 
+        gradC.tube(j, i) = gradC.tube(i, j);
       }
     }
     t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
@@ -222,14 +224,15 @@ double NoiseKriging::_logLikelihood(const arma::vec &_theta_sigma2,
       double _terme1 = -as_scalar((trans(x) * dCdv) * x);
       double _terme2 = arma::accu(arma::dot(Cinv, dCdv));
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
-    } else (*grad_out).at(d) = 0; // if sigma2 is defined & fixed by user
+    } else
+      (*grad_out).at(d) = 0;  // if sigma2 is defined & fixed by user
 
     // arma::cout << " grad_out:" << *grad_out << arma::endl;
   }
   return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> NoiseKriging::logLikelihoodFun(const arma::vec &_theta_sigma2,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> NoiseKriging::logLikelihoodFun(const arma::vec& _theta_sigma2,
                                                                                const bool _grad,
                                                                                const bool _bench) {
   double ll = -1;
@@ -244,9 +247,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NoiseKriging::logLikelihoodFun(c
       ll = _logLikelihood(_theta_sigma2, nullptr, nullptr, &bench);
 
     size_t num = 0;
-    for (auto &kv : bench)
+    for (auto& kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto &kv : bench)
+    for (auto& kv : bench)
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
 
   } else {
@@ -277,23 +280,23 @@ LIBKRIGING_EXPORT double NoiseKriging::logLikelihood() {
  * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
-LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
-                                         const arma::vec &noise,
-                                         const arma::mat &X,
-                                         const Trend::RegressionModel &regmodel,
+LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
+                                         const arma::vec& noise,
+                                         const arma::mat& X,
+                                         const Trend::RegressionModel& regmodel,
                                          bool normalize,
-                                         const std::string &optim,
-                                         const std::string &objective,
-                                         const Parameters &parameters) {
+                                         const std::string& optim,
+                                         const std::string& objective,
+                                         const Parameters& parameters) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
-  std::function<double(const arma::vec &_gamma, arma::vec *grad_out, NoiseKriging::KModel *km_data)> fit_ofn;
+  std::function<double(const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NoiseKriging::KModel *km_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_sigma2 = Optim::reparam_from(_gamma);
@@ -307,7 +310,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
         return -ll;
       });
     } else {
-      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NoiseKriging::KModel *km_data) {
+      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NoiseKriging::KModel* km_data) {
         const arma::vec _theta_sigma2 = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_sigma2 << arma::endl;
         double ll = this->_logLikelihood(_theta_sigma2, grad_out, km_data, nullptr);
@@ -371,12 +374,14 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
   m_est_beta = (m_regmodel != Trend::RegressionModel::None);
-  if ((parameters.beta.has_value()) && parameters.beta.value().n_elem>0) { // Then force beta to be fixed (not estimated, no variance)
+  if ((parameters.beta.has_value())
+      && parameters.beta.value().n_elem > 0) {  // Then force beta to be fixed (not estimated, no variance)
     m_est_beta = false;
     m_beta = parameters.beta.value();
     if (m_normalize)
       m_beta /= scaleY;
-  } else m_est_beta = true;
+  } else
+    m_est_beta = true;
 
   arma::mat theta0;
   if (parameters.theta.has_value()) {
@@ -425,7 +430,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
     arma::vec theta_lower = Optim::theta_lower_factor * m_maxdX;
     arma::vec theta_upper = Optim::theta_upper_factor * m_maxdX;
 
-    arma::vec dy2 = arma::vec(n * n,arma::fill::zeros);
+    arma::vec dy2 = arma::vec(n * n, arma::fill::zeros);
     for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
       int i = (int)ij / n;
       int j = ij % n;  // i,j <-> i*n+j
@@ -461,15 +466,16 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
       // let multistart = 1
     }
 
-    arma::mat theta0_rand = arma::repmat(trans(theta_lower), multistart, 1)
-             + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
+    arma::mat theta0_rand
+        = arma::repmat(trans(theta_lower), multistart, 1)
+          + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
     // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
     //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
     if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
       multistart = std::max(multistart, (int)theta0.n_rows);
-      theta0 = arma::join_cols(theta0, theta0_rand); // append random starting points to given ones
-      theta0.resize(multistart, theta0.n_cols); // keep only multistart first rows
+      theta0 = arma::join_cols(theta0, theta0_rand);  // append random starting points to given ones
+      theta0.resize(multistart, theta0.n_cols);       // keep only multistart first rows
     } else {
       theta0 = theta0_rand;
     }
@@ -555,12 +561,12 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
       while (retry <= Optim::max_restart) {
         arma::vec gamma_0 = gamma_tmp;
         auto result = optimizer.minimize(
-            [&m, &fit_ofn](const arma::vec &vals_inp, arma::vec &grad_out) -> double {
-                return fit_ofn(vals_inp, &grad_out, &m);
-              }, 
-              gamma_tmp,
-              gamma_lower.memptr(),
-              gamma_upper.memptr(),
+            [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+              return fit_ofn(vals_inp, &grad_out, &m);
+            },
+            gamma_tmp,
+            gamma_lower.memptr(),
+            gamma_upper.memptr(),
             bounds_type.memptr());
 
         if (Optim::log_level > 0) {
@@ -582,21 +588,20 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
 
         double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
         double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
-        double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta); 
-            //= Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
-        double sol_to_lb_sigma2 = std::abs(gamma_tmp.at(d) - gamma_lower.at(d)); 
-        double sol_to_ub_sigma2 = std::abs(gamma_tmp.at(d) - gamma_upper.at(d)); 
-        double sol_to_b_sigma2 = std::min(sol_to_ub_sigma2, sol_to_lb_sigma2); 
-        //double sol_to_b_sigma2
-        //    = Optim::reparametrize ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
-        //                           : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper bound
+        double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta);
+        //= Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;  // just consider theta lower bound
+        double sol_to_lb_sigma2 = std::abs(gamma_tmp.at(d) - gamma_lower.at(d));
+        double sol_to_ub_sigma2 = std::abs(gamma_tmp.at(d) - gamma_upper.at(d));
+        double sol_to_b_sigma2 = std::min(sol_to_ub_sigma2, sol_to_lb_sigma2);
+        // double sol_to_b_sigma2
+        //     = Optim::reparametrize ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
+        //                            : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));  // just consider sigma2 upper
+        //                            bound
         double sol_to_b = sol_to_b_theta < sol_to_b_sigma2 ? sol_to_b_theta : sol_to_b_sigma2;
-        if ((retry < Optim::max_restart)       //&& (result.num_iters <= 2 * d)
-            && (
-              (result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
-              || (sol_to_b < arma::datum::eps) && (result.num_iters <= 2) // we fastly converged to one bound
-              || (result.f_opt > best_f_opt)
-            )) {
+        if ((retry < Optim::max_restart)  //&& (result.num_iters <= 2 * d)
+            && ((result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
+                || (sol_to_b < arma::datum::eps) && (result.num_iters <= 2)  // we fastly converged to one bound
+                || (result.f_opt > best_f_opt))) {
           gamma_tmp.head(d)
               = (theta0.row(i % multistart).t() + theta_lower)
                 / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
@@ -667,7 +672,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec &y,
  * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
-NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -676,10 +681,10 @@ NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, 
                              + std::to_string(d));
 
   arma::vec yhat_n(n_n);
-  arma::vec ysd2_n = arma::vec(n_n,arma::fill::zeros);
-  arma::mat Sigma_n = arma::mat(n_n, n_n,arma::fill::zeros);
-  arma::mat Dyhat_n = arma::mat(n_n, d,arma::fill::zeros);
-  arma::mat Dysd2_n = arma::mat(n_n, d,arma::fill::zeros);
+  arma::vec ysd2_n = arma::vec(n_n, arma::fill::zeros);
+  arma::mat Sigma_n = arma::mat(n_n, n_n, arma::fill::zeros);
+  arma::mat Dyhat_n = arma::mat(n_n, d, arma::fill::zeros);
+  arma::mat Dysd2_n = arma::mat(n_n, d, arma::fill::zeros);
 
   arma::mat Xn_o = trans(m_X);  // already normalized if needed
   arma::mat Xn_n = X_n;
@@ -700,7 +705,7 @@ NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, 
   R_on *= m_sigma2;
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
-  arma::mat Rstar_on =LinearAlgebra::solve(m_T, R_on);
+  arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
   t0 = Bench::toc(nullptr, "Rstar_on   ", t0);
 
   yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
@@ -709,93 +714,94 @@ NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, 
   // Un-normalize predictor
   yhat_n = m_centerY + m_scaleY * yhat_n;
 
-  arma::mat  Fhat_n = trans(Rstar_on) * m_M;
+  arma::mat Fhat_n = trans(Rstar_on) * m_M;
   arma::mat E_n = F_n - Fhat_n;
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (return_stdev) {
-  ysd2_n = m_sigma2 - sum(Rstar_on % Rstar_on,0).as_col() +  sum(Ecirc_n % Ecirc_n, 1).as_col();
-  ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-  ysd2_n *= m_scaleY * m_scaleY;
-  t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
+    ysd2_n = m_sigma2 - sum(Rstar_on % Rstar_on, 0).as_col() + sum(Ecirc_n % Ecirc_n, 1).as_col();
+    ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
+    ysd2_n *= m_scaleY * m_scaleY;
+    t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
   if (return_cov) {
-  // Compute the covariance matrix between new data points
-  arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_n; i++) {
-    //R_nn.at(i, i) = 1;
-    for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+    // Compute the covariance matrix between new data points
+    arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
+    for (arma::uword i = 0; i < n_n; i++) {
+      // R_nn.at(i, i) = 1;
+      for (arma::uword j = 0; j < i; j++) {
+        R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
+      }
     }
-  }
-  R_nn.diag().ones();
-  R_nn *= m_sigma2;
-  t0 = Bench::toc(nullptr, "R_nn       ", t0);
+    R_nn.diag().ones();
+    R_nn *= m_sigma2;
+    t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
-  Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-  Sigma_n *= m_scaleY * m_scaleY;
-  t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
+    Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
+    Sigma_n *= m_scaleY * m_scaleY;
+    t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
   if (return_deriv) {
-  //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
-  //for (i in 1:n_n) {
-  //  
-  //  ## =================================================================
-  //  ## 'DF_n_i' and 'DR_on_i' are matrices with
-  //  ## dimension c(n_n, d)
-  //  ## =================================================================
-  //  
-  //  DF_n_i <- trend.deltax(x = XNew[i, ], model = object)
-  //  KOldNewi <- as.vector(KOldNew[ , i])
-  //  DR_on_i <- covVector.dx(x = as.vector(XNew[i, ]),
-  //                              X = X,
-  //                              object = object@covariance,
-  //                              c = KOldNewi)
-  //  
-  //  KOldNewStarDer[ , i, i, ] <-
-  //      backsolve(L, DR_on_i, upper.tri = FALSE)
-  //  
-  //  ## Gradient of the kriging trend and mean
-  //  muNewHatDer[i, i, ] <- crossprod(DF_n_i, betaHat)
-  //  ## dim in product c(d, n) and NULL(length d)
-  //  mean_nHatDer[i, i, ] <- muNewHatDer[i, i, ] +
-  //      crossprod(KOldNewStarDer[ , i, i,  ], zStar) 
-  //  ## dim in product c(d, n) and NULL(length n)
-  //  s2Der[i, i,  ] <-
-  //      - 2 * crossprod(KOldNewStarDer[ , i, i, ],
-  //                      drop(KOldNewStar[ , i]))
-  //  
-  //  ## dim in product c(d, n) and c(n, p)
-  //  
-  //  if (type == "UK") {
-  //      ENewDagDer[i, i, , ] <-
-  //          backsolve(t(RStar),
-  //                    DF_n_i -
-  //                    t(crossprod(KOldNewStarDer[ , i, i, ], FStar)),
-  //                    upper.tri = FALSE)
-  //      ## dim in product NULL (length p) and c(p, d) because of 'drop'
-  //      s2Der[i, i, ] <- s2Der[i, i, ] + 2 * drop(ENewDagT[ , i]) %*%
-  //          drop(ENewDagDer[i, i, , ])
-  //  }
-  // numerical derivative step : value is sensitive only for non linear trends. Otherwise, it gives exact results.
-  const double h = 1.0E-5; 
-  arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
+    //// https://github.com/libKriging/dolka/blob/bb1dbf0656117756165bdcff0bf5e0a1f963fbef/R/kmStuff.R#L322C1-L363C10
+    // for (i in 1:n_n) {
+    //
+    //   ## =================================================================
+    //   ## 'DF_n_i' and 'DR_on_i' are matrices with
+    //   ## dimension c(n_n, d)
+    //   ## =================================================================
+    //
+    //   DF_n_i <- trend.deltax(x = XNew[i, ], model = object)
+    //   KOldNewi <- as.vector(KOldNew[ , i])
+    //   DR_on_i <- covVector.dx(x = as.vector(XNew[i, ]),
+    //                               X = X,
+    //                               object = object@covariance,
+    //                               c = KOldNewi)
+    //
+    //   KOldNewStarDer[ , i, i, ] <-
+    //       backsolve(L, DR_on_i, upper.tri = FALSE)
+    //
+    //   ## Gradient of the kriging trend and mean
+    //   muNewHatDer[i, i, ] <- crossprod(DF_n_i, betaHat)
+    //   ## dim in product c(d, n) and NULL(length d)
+    //   mean_nHatDer[i, i, ] <- muNewHatDer[i, i, ] +
+    //       crossprod(KOldNewStarDer[ , i, i,  ], zStar)
+    //   ## dim in product c(d, n) and NULL(length n)
+    //   s2Der[i, i,  ] <-
+    //       - 2 * crossprod(KOldNewStarDer[ , i, i, ],
+    //                       drop(KOldNewStar[ , i]))
+    //
+    //   ## dim in product c(d, n) and c(n, p)
+    //
+    //   if (type == "UK") {
+    //       ENewDagDer[i, i, , ] <-
+    //           backsolve(t(RStar),
+    //                     DF_n_i -
+    //                     t(crossprod(KOldNewStarDer[ , i, i, ], FStar)),
+    //                     upper.tri = FALSE)
+    //       ## dim in product NULL (length p) and c(p, d) because of 'drop'
+    //       s2Der[i, i, ] <- s2Der[i, i, ] + 2 * drop(ENewDagT[ , i]) %*%
+    //           drop(ENewDagDer[i, i, , ])
+    //   }
+    //  numerical derivative step : value is sensitive only for non linear trends. Otherwise, it gives exact results.
+    const double h = 1.0E-5;
+    arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
 
-  // Compute the derivatives of the covariance and trend functions
-  for (arma::uword i = 0; i < n_n; i++) {  // for each predict point... should be parallel ?
+    // Compute the derivatives of the covariance and trend functions
+    for (arma::uword i = 0; i < n_n; i++) {  // for each predict point... should be parallel ?
       arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
       for (arma::uword j = 0; j < n_o; j++) {
         DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
-      arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));  // just duplicate X_n.row(i) d times
+      arma::mat tXn_n_repd_i
+          = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));  // just duplicate X_n.row(i) d times
       arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
-                        - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
-                       / (2 * h);
+                          - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
+                         / (2 * h);
       t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
 
       arma::mat W_i = LinearAlgebra::solve(m_T, DR_on_i);
@@ -808,9 +814,9 @@ NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, 
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
-  }
-  Dyhat_n *= m_scaleY;
-  Dysd2_n *= m_scaleY * m_scaleY;
+    }
+    Dyhat_n *= m_scaleY;
+    Dysd2_n *= m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
@@ -837,7 +843,11 @@ NoiseKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, 
  * @param will_update is true if we want to keep simulations data for future update
  * @return output is n_n*nsim matrix of simulations at X_n
  */
-LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim, const int seed, const arma::mat &X_n, const arma::vec &with_noise, const bool will_update) {
+LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim,
+                                                   const int seed,
+                                                   const arma::mat& X_n,
+                                                   const arma::vec& with_noise,
+                                                   const bool will_update) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -845,9 +855,9 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim, const int see
     throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
                              + std::to_string(d));
 
-if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
-    throw std::runtime_error("Noise vector should have same length as X_n: " + std::to_string(with_noise.n_elem) + " instead of "
-                             + std::to_string(n_n) + " (or 0 if no noise)");
+  if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
+    throw std::runtime_error("Noise vector should have same length as X_n: " + std::to_string(with_noise.n_elem)
+                             + " instead of " + std::to_string(n_n) + " (or 0 if no noise)");
 
   arma::mat Xn_o = trans(m_X);  // already normalized if needed
   arma::mat Xn_n = X_n;
@@ -864,14 +874,14 @@ if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
   // Compute covariance between new data
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
   for (arma::uword i = 0; i < n_n; i++) {
-    //R_nn.at(i, i) = 1.0;
+    // R_nn.at(i, i) = 1.0;
     for (arma::uword j = 0; j < i; j++) {
       R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
     }
   }
-  R_nn.diag().ones(); // replaces R_nn.at(i, i) = 1.0;
+  R_nn.diag().ones();  // replaces R_nn.at(i, i) = 1.0;
   R_nn *= m_sigma2;
-  t0 = Bench::toc(nullptr,"R_nn          ", t0);
+  t0 = Bench::toc(nullptr, "R_nn          ", t0);
 
   // Compute covariance between training data and new data to predict
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
@@ -881,25 +891,26 @@ if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     }
   }
   R_on *= m_sigma2;
-  t0 = Bench::toc(nullptr,"R_on        ", t0);
+  t0 = Bench::toc(nullptr, "R_on        ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
-  t0 = Bench::toc(nullptr,"Rstar_on   ", t0);
+  t0 = Bench::toc(nullptr, "Rstar_on   ", t0);
 
   arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
-  t0 = Bench::toc(nullptr,"yhat_n        ", t0);
+  t0 = Bench::toc(nullptr, "yhat_n        ", t0);
 
   arma::mat Fhat_n = trans(Rstar_on) * m_M;
   arma::mat E_n = F_n - Fhat_n;
   arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
-  t0 = Bench::toc(nullptr,"Ecirc_n       ", t0);
+  t0 = Bench::toc(nullptr, "Ecirc_n       ", t0);
 
-  arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on ;
+  arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on;
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
-  t0 = Bench::toc(nullptr,"Sigma_nKo     ", t0);
+  t0 = Bench::toc(nullptr, "Sigma_nKo     ", t0);
 
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo / m_sigma2); // normalization to keep same diag inc (+=1e-10) than other Kriging 
-  t0 = Bench::toc(nullptr,"LSigma_nKo     ", t0);
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(
+      Sigma_nKo / m_sigma2);  // normalization to keep same diag inc (+=1e-10) than other Kriging
+  t0 = Bench::toc(nullptr, "LSigma_nKo     ", t0);
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
@@ -910,10 +921,10 @@ if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
   y_n = m_centerY + m_scaleY * y_n;
 
   if (will_update) {
-    lastsimup_Xn_u.clear(); // force reset to force update_simulate consider new data
+    lastsimup_Xn_u.clear();  // force reset to force update_simulate consider new data
     lastsim_y_n = y_n;
     lastsim_with_noise = with_noise;
-  
+
     lastsim_Xn_n = Xn_n;
     lastsim_seed = seed;
     lastsim_nsim = nsim;
@@ -923,30 +934,28 @@ if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
 
     lastsim_L_oCn = Rstar_on;
     lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
-    t0 = Bench::toc(nullptr,"L_nCn     ", t0);
+    t0 = Bench::toc(nullptr, "L_nCn     ", t0);
 
-    lastsim_L_on = arma::join_rows(
-          arma::join_cols(m_T, lastsim_L_oCn.t()),
-          arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
+    lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
+                                   arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
 
-
-    arma::mat Linv_on = LinearAlgebra::solve(lastsim_L_on, arma::mat(n_o+n_n, n_o+n_n,arma::fill::eye));
-    t0 = Bench::toc(nullptr,"Linv_on     ", t0);
+    arma::mat Linv_on = LinearAlgebra::solve(lastsim_L_on, arma::mat(n_o + n_n, n_o + n_n, arma::fill::eye));
+    t0 = Bench::toc(nullptr, "Linv_on     ", t0);
     lastsim_Rinv_on = Linv_on.t() * Linv_on;
-    t0 = Bench::toc(nullptr,"Rinv_on     ", t0);
+    t0 = Bench::toc(nullptr, "Rinv_on     ", t0);
 
     lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
     lastsim_Fstar_on = LinearAlgebra::solve(lastsim_L_on, lastsim_F_on);
-    t0 = Bench::toc(nullptr,"Fstar_on     ", t0);
+    t0 = Bench::toc(nullptr, "Fstar_on     ", t0);
     arma::mat Q_Fstar_on;
     arma::qr(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
     lastsim_Fcirc_on = LinearAlgebra::rsolve(lastsim_circ_on, lastsim_F_on);
-    t0 = Bench::toc(nullptr,"Fcirc_on     ", t0);
+    t0 = Bench::toc(nullptr, "Fcirc_on     ", t0);
 
     lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
-    t0 = Bench::toc(nullptr,"Fhat_nKo     ", t0);
+    t0 = Bench::toc(nullptr, "Fhat_nKo     ", t0);
     lastsim_Ecirc_nKo = LinearAlgebra::rsolve(m_circ, F_n - lastsim_Fhat_nKo);
-    t0 = Bench::toc(nullptr,"Ecirc_nKo     ", t0);
+    t0 = Bench::toc(nullptr, "Ecirc_nKo     ", t0);
   }
 
   // Add noise
@@ -961,36 +970,36 @@ if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
   return y_n + eps;
 }
 
-LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, const arma::vec &noise_u, const arma::mat &X_u) {
+LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec& y_u,
+                                                          const arma::vec& noise_u,
+                                                          const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
 
   if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
-                             + std::to_string(m_X.n_cols) + "), new X: (...x"
-                             + std::to_string(X_u.n_cols) + ")");
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   if (noise_u.n_elem != X_u.n_rows)
-    throw std::runtime_error("Noise vector should have same length as X_u: " + std::to_string(noise_u.n_elem) + " instead of "
-                             + std::to_string(X_u.n_rows));
+    throw std::runtime_error("Noise vector should have same length as X_u: " + std::to_string(noise_u.n_elem)
+                             + " instead of " + std::to_string(X_u.n_rows));
 
   if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
     throw std::runtime_error("No previous simulation data available");
 
   if (lastsim_Xn_n.n_rows != X_u.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
-                             + std::to_string(X_u.n_cols) + "), last sim X: (...x"
-                             + std::to_string(lastsim_Xn_n.n_rows) + ")");
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(X_u.n_cols)
+                             + "), last sim X: (...x" + std::to_string(lastsim_Xn_n.n_rows) + ")");
 
   arma::uword n_n = lastsim_Xn_n.n_cols;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
-  arma::mat Xn_o = trans(m_X);  // already normalized if needed
-  arma::mat Xn_n = lastsim_Xn_n; // already normalized 
+  arma::mat Xn_o = trans(m_X);    // already normalized if needed
+  arma::mat Xn_n = lastsim_Xn_n;  // already normalized
 
   arma::uword n_on = n_o + n_n;
-  //arma::mat Xn_on = arma::join_cols(Xn_o, Xn_n);
+  // arma::mat Xn_on = arma::join_cols(Xn_o, Xn_n);
   arma::mat F_on = arma::join_cols(m_F, lastsim_F_n);
 
   arma::uword n_u = X_u.n_rows;
@@ -1004,27 +1013,25 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
 
   auto t0 = Bench::tic();
   Xn_u = trans(Xn_u);
-  t0 = Bench::toc(nullptr,"Xn_u.t()      ", t0);
+  t0 = Bench::toc(nullptr, "Xn_u.t()      ", t0);
 
-  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && 
-                        (lastsimup_Xn_u-Xn_u).is_zero(arma::datum::eps) &&
-                      (!lastsimup_noise_u.is_empty()) && 
-                        (lastsimup_noise_u-noise_u).is_zero(arma::datum::eps);
-  if (! use_lastsimup) {
+  bool use_lastsimup = (!lastsimup_Xn_u.is_empty()) && (lastsimup_Xn_u - Xn_u).is_zero(arma::datum::eps)
+                       && (!lastsimup_noise_u.is_empty()) && (lastsimup_noise_u - noise_u).is_zero(arma::datum::eps);
+  if (!use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
-  
+
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
-      //lastsimup_R_uu.at(i, i) = 1.0;
+      // lastsimup_R_uu.at(i, i) = 1.0;
       for (arma::uword j = 0; j < i; j++) {
         lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = _Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
       }
     }
     lastsimup_R_uu *= m_sigma2;
     lastsimup_R_uu.diag() = m_sigma2 + noise_u;
-    t0 = Bench::toc(nullptr,"R_uu          ", t0);
-  
+    t0 = Bench::toc(nullptr, "R_uu          ", t0);
+
     // Compute covariance between updated/old data
     lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
@@ -1033,8 +1040,8 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
       }
     }
     lastsimup_R_uo *= m_sigma2;
-    t0 = Bench::toc(nullptr,"R_uo          ", t0);
-  
+    t0 = Bench::toc(nullptr, "R_uo          ", t0);
+
     // Compute covariance between updated/new data
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
     for (arma::uword i = 0; i < n_u; i++) {
@@ -1043,7 +1050,7 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
       }
     }
     lastsimup_R_un *= m_sigma2;
-    t0 = Bench::toc(nullptr,"R_un          ", t0);
+    t0 = Bench::toc(nullptr, "R_un          ", t0);
   }
 
   // ======================================================================
@@ -1063,26 +1070,28 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
   if (!use_lastsimup) {
     arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
     arma::mat Rstar_onCu = LinearAlgebra::solve(lastsim_L_on, R_onCu);
-    t0 = Bench::toc(nullptr,"Rstar_onCu          ", t0);
+    t0 = Bench::toc(nullptr, "Rstar_onCu          ", t0);
 
-    arma::mat Ecirc_uKon = LinearAlgebra::rsolve(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on ) * std::sqrt(m_sigma2);
-    t0 = Bench::toc(nullptr,"Ecirc_uKon          ", t0);
+    arma::mat Ecirc_uKon
+        = LinearAlgebra::rsolve(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on) * std::sqrt(m_sigma2);
+    t0 = Bench::toc(nullptr, "Ecirc_uKon          ", t0);
 
     arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
-    t0 = Bench::toc(nullptr,"Sigma_uKon          ", t0);
+    t0 = Bench::toc(nullptr, "Sigma_uKon          ", t0);
 
-    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon / m_sigma2); // normalization to keep same diag inc (+=1e-10) than other Kriging
-    t0 = Bench::toc(nullptr,"LSigma_uKon          ", t0);
-  
+    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(
+        Sigma_uKon / m_sigma2);  // normalization to keep same diag inc (+=1e-10) than other Kriging
+    t0 = Bench::toc(nullptr, "LSigma_uKon          ", t0);
+
     arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
-    t0 = Bench::toc(nullptr,"W_uCon          ", t0);
+    t0 = Bench::toc(nullptr, "W_uCon          ", t0);
 
     arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
-    arma::mat M_u = arma::repmat(m_u,1,lastsim_nsim) +  W_uCon.tail_cols(n_n) * lastsim_y_n;
-    
+    arma::mat M_u = arma::repmat(m_u, 1, lastsim_nsim) + W_uCon.tail_cols(n_n) * lastsim_y_n;
+
     Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);    
-    t0 = Bench::toc(nullptr,"y_u          ", t0);
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);
+    t0 = Bench::toc(nullptr, "y_u          ", t0);
   }
 
   // ======================================================================
@@ -1091,20 +1100,20 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
 
   if (!use_lastsimup) {
     arma::mat Rstar_ou = LinearAlgebra::solve(m_T, lastsimup_R_uo.t());
-    t0 = Bench::toc(nullptr,"Rstar_ou          ", t0);
+    t0 = Bench::toc(nullptr, "Rstar_ou          ", t0);
 
     arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ,F_u - Fhat_uKo);
-    t0 = Bench::toc(nullptr,"Ecirc_uKo          ", t0);
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ, F_u - Fhat_uKo);
+    t0 = Bench::toc(nullptr, "Ecirc_uKo          ", t0);
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
-    t0 = Bench::toc(nullptr,"Rtild_uCu          ", t0);
+    t0 = Bench::toc(nullptr, "Rtild_uCu          ", t0);
 
-    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t(); 
-    t0 = Bench::toc(nullptr,"Rtild_nCu          ", t0);
+    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
+    t0 = Bench::toc(nullptr, "Rtild_nCu          ", t0);
 
     lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
-    t0 = Bench::toc(nullptr,"Wtild_nKu          ", t0);
+    t0 = Bench::toc(nullptr, "Wtild_nKu          ", t0);
   }
 
   // Add noise
@@ -1116,8 +1125,7 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
     eps = eps % Random::randn_mat(n_n, lastsim_nsim);
   }
 
-  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u,1,lastsim_nsim) - lastsimup_y_u) 
-                     + eps;
+  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u) + eps;
 }
 
 /** Add new conditional data points to previous (X,y), then perform new fit.
@@ -1126,71 +1134,76 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec &y_u, 
  * @param X_u is n_u*d matrix of new input
  * @param refit is true if we want to re-fit the model
  */
-LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec &y_u, const arma::vec &noise_u, const arma::mat &X_u, const bool refit) {
+LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
+                                            const arma::vec& noise_u,
+                                            const arma::mat& X_u,
+                                            const bool refit) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
 
   if (noise_u.n_elem != y_u.n_elem)
-    throw std::runtime_error("Dimension of new data should be the same:\n noise: (" + std::to_string(noise_u.n_elem) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+    throw std::runtime_error("Dimension of new data should be the same:\n noise: (" + std::to_string(noise_u.n_elem)
+                             + "), y: (" + std::to_string(y_u.n_elem) + ")");
 
   if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x"
-                             + std::to_string(m_X.n_cols) + "), new X: (...x"
-                             + std::to_string(X_u.n_cols) + ")");
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   // rebuild starting parameters
   Parameters parameters;
-  if (refit) {// re-fit
+  if (refit) {  // re-fit
     if (m_est_beta)
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(arma::ones<arma::vec>(0)),
-                        true};
-    else 
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
-                        this->m_est_sigma2,
-                        std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                        this->m_est_theta,
-                        std::make_optional(trans(this->m_beta) * this->m_scaleY),
-                        false};
-  this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                            y_u),  // de-normalize previous data according to suite unnormed new data
-            arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
-                            noise_u),  // de-normalize previous data according to suite unnormed new data
-            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-            m_regmodel,
-            m_normalize,
-            m_optim,
-            m_objective,
-            parameters);
-  } else {// just update
-    parameters = Parameters{
-                        std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
-                        false,
-                        std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
-                        false,
-                        std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
-                        false};
+      parameters
+          = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
+                       this->m_est_sigma2,
+                       std::make_optional(trans(this->m_theta) % this->m_scaleX),
+                       this->m_est_theta,
+                       std::make_optional(arma::ones<arma::vec>(0)),
+                       true};
+    else
+      parameters
+          = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
+                       this->m_est_sigma2,
+                       std::make_optional(trans(this->m_theta) % this->m_scaleX),
+                       this->m_est_theta,
+                       std::make_optional(trans(this->m_beta) * this->m_scaleY),
+                       false};
     this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                            y_u),  // de-normalize previous data according to suite unnormed new data
-            arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
-                            noise_u),  // de-normalize previous data according to suite unnormed new data
-            arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-            m_regmodel,
-            m_normalize,
-            "none",
-            m_objective,
-            parameters);
+                              y_u),  // de-normalize previous data according to suite unnormed new data
+              arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
+                              noise_u),  // de-normalize previous data according to suite unnormed new data
+              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
+              m_regmodel,
+              m_normalize,
+              m_optim,
+              m_objective,
+              parameters);
+  } else {  // just update
+    parameters
+        = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
+                     false,
+                     std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
+                     false,
+                     std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
+                     false};
+    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
+                              y_u),  // de-normalize previous data according to suite unnormed new data
+              arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
+                              noise_u),  // de-normalize previous data according to suite unnormed new data
+              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
+              m_regmodel,
+              m_normalize,
+              "none",
+              m_objective,
+              parameters);
   }
 }
 
 LIBKRIGING_EXPORT std::string NoiseKriging::summary() const {
   std::ostringstream oss;
-  auto vec_printer = [&oss](const arma::vec &v) {
-    v.for_each([&oss, i = 0](const arma::vec::elem_type &val) mutable {
+  auto vec_printer = [&oss](const arma::vec& v) {
+    v.for_each([&oss, i = 0](const arma::vec::elem_type& val) mutable {
       if (i++ > 0)
         oss << ", ";
       oss << val;
@@ -1211,7 +1224,7 @@ LIBKRIGING_EXPORT std::string NoiseKriging::summary() const {
         oss << ",";
     }
     oss << " -> " << m_y.n_elem << "x[" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
-    oss << "  * noise: " << m_noise.n_elem << "x[" << arma::min(m_noise) << "," << arma::max(m_noise) << "]\n"; 
+    oss << "  * noise: " << m_noise.n_elem << "x[" << arma::min(m_noise) << "," << arma::max(m_noise) << "]\n";
     oss << "* trend " << Trend::toString(m_regmodel);
     oss << ((m_est_beta) ? " (est.): " : ": ");
     vec_printer(m_beta);

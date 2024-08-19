@@ -134,7 +134,11 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
-  auto result = km->simulate(input.get<int>(1, "nsim"), input.get<int>(2, "seed"), input.get<arma::mat>(3, "X_n"), input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"));
+  auto result = km->simulate(input.get<int>(1, "nsim"),
+                             input.get<int>(2, "seed"),
+                             input.get<arma::mat>(3, "X_n"),
+                             input.get<bool>(4, "with_nugget"),
+                             input.get<bool>(5, "will_update"));
   output.set(0, result, "simulated response");
 }
 
@@ -145,7 +149,7 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
-  km->update(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"),input.get<bool>(3, "refit"));
+  km->update(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"), input.get<bool>(3, "refit"));
 }
 
 void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

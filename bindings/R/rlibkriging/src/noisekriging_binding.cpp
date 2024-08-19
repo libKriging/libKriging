@@ -279,7 +279,11 @@ std::string noisekriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
+Rcpp::List noisekriging_predict(Rcpp::List k,
+                                arma::mat X_n,
+                                bool return_stdev = true,
+                                bool return_cov = false,
+                                bool return_deriv = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -304,7 +308,12 @@ Rcpp::List noisekriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev =
 }
 
 // [[Rcpp::export]]
-arma::mat noisekriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, arma::vec with_noise, bool will_update = false) {
+arma::mat noisekriging_simulate(Rcpp::List k,
+                                int nsim,
+                                int seed,
+                                arma::mat X_n,
+                                arma::vec with_noise,
+                                bool will_update = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
@@ -353,20 +362,21 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-arma::mat noisekriging_covMat(Rcpp::List k,
-                          arma::mat X1,
-                          arma::mat X2) {
+arma::mat noisekriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  return impl_ptr->covMat(X1,X2);
+  return impl_ptr->covMat(X1, X2);
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_sigma2, bool return_grad = false, bool bench = false) {
+Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k,
+                                         arma::vec theta_sigma2,
+                                         bool return_grad = false,
+                                         bool bench = false) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");

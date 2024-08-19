@@ -316,7 +316,11 @@ std::string nuggetkriging_summary(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev = true, bool return_cov = false, bool return_deriv = false) {
+Rcpp::List nuggetkriging_predict(Rcpp::List k,
+                                 arma::mat X_n,
+                                 bool return_stdev = true,
+                                 bool return_cov = false,
+                                 bool return_deriv = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -341,7 +345,12 @@ Rcpp::List nuggetkriging_predict(Rcpp::List k, arma::mat X_n, bool return_stdev 
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool with_nugget = true, bool will_update = false) {
+arma::mat nuggetkriging_simulate(Rcpp::List k,
+                                 int nsim,
+                                 int seed,
+                                 arma::mat X_n,
+                                 bool with_nugget = true,
+                                 bool will_update = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
@@ -390,20 +399,21 @@ void nuggetkriging_save(Rcpp::List k, std::string filename) {
 }
 
 // [[Rcpp::export]]
-arma::mat nuggetkriging_covMat(Rcpp::List k,
-                          arma::mat X1,
-                          arma::mat X2) {
+arma::mat nuggetkriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  return impl_ptr->covMat(X1,X2);
+  return impl_ptr->covMat(X1, X2);
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k, arma::vec theta_alpha, bool return_grad = false, bool bench = false) {
+Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k,
+                                          arma::vec theta_alpha,
+                                          bool return_grad = false,
+                                          bool bench = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");

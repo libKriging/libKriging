@@ -91,7 +91,11 @@ PyNoiseKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool 
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n, const py::array_t<double>& with_noise, const bool will_update) {
+py::array_t<double> PyNoiseKriging::simulate(const int nsim,
+                                             const int seed,
+                                             const py::array_t<double>& X_n,
+                                             const py::array_t<double>& with_noise,
+                                             const bool will_update) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   arma::mat mat_noise = carma::arr_to_col_view<double>(with_noise);
   auto result = m_internal->simulate(nsim, seed, mat_X, mat_noise, will_update);
@@ -101,7 +105,7 @@ py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, con
 void PyNoiseKriging::update(const py::array_t<double>& y_u,
                             const py::array_t<double>& noise_u,
                             const py::array_t<double>& X_u,
-                             const bool refit) {
+                            const bool refit) {
   arma::mat mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_noise = carma::arr_to_col<double>(noise_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
@@ -109,8 +113,8 @@ void PyNoiseKriging::update(const py::array_t<double>& y_u,
 }
 
 void PyNoiseKriging::update_simulate(const py::array_t<double>& y_u,
-                            const py::array_t<double>& noise_u,
-                            const py::array_t<double>& X_u) {
+                                     const py::array_t<double>& noise_u,
+                                     const py::array_t<double>& X_u) {
   arma::mat mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_noise = carma::arr_to_col<double>(noise_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
