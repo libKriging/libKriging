@@ -4,6 +4,10 @@ set -eo pipefail
 if [[ "$DEBUG_CI" == "true" ]]; then
     echo "------------------------------------"
 
+    echo "$(uname -o) system running on $(uname -m) processors"
+
+    echo "------------------------------------"
+
     BASEDIR=$(dirname "$0")
     if [ -e "${BASEDIR}"/../${BUILD_NAME}/loadenv.sh ]; then
       set -x
@@ -79,6 +83,12 @@ if [[ "$DEBUG_CI" == "true" ]]; then
     echo "------------------------------------"
 
     # Python3 is named python in Windows, but we add a symlink
+    ROOT_DIR=$(git rev-parse --show-toplevel)
+    if [[ -f "${ROOT_DIR}"/venv/bin/activate ]]; then
+      echo "Loading virtual environment from ${ROOT_DIR}/venv"
+      . "${ROOT_DIR}"/venv/bin/activate
+    fi
+
     if ( command -v python3 >/dev/null 2>&1 ); then
       echo "Python3 config: $(command -v python3)"
       {

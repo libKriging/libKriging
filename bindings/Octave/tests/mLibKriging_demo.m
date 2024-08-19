@@ -11,6 +11,9 @@ y = f(X);
 k_m = Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", Params("is_sigma2_estim", true))
 disp(k_m.summary());
 
+% if you get "no graphics toolkits are available!"
+ % check available graphics package with `available_graphics_toolkits`
+
 % session
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false, false);
@@ -45,25 +48,21 @@ s = k_m.simulate(int32(10),int32(123), x, false);
 if (length(getenv("GITHUB_ACTION"))>0)
     disp('in GITHUB_ACTION: skip plotting');
 else
-    if (isOctave)
-        h = figure(2, 'Visible','off'); % no display
-    else
-        h = figure(1);       
-        h.Visible = 'off'; % no display
-    end
-    hold on;
-    plot(x,f(x));
-    scatter(X,f(X));
-    for i=1:10
-       plot(x,s(:,i),'b');
-    end
-    hold off;
-    try
-        saveas(h, 'mplot2.png'); % plot to file
-    catch
-        fprintf("Cannot export plot\n")
-    end
-    % close(h);
+    h = figure(1);       
+    h.Visible = 'off'; % no display
+end
+
+hold on;
+plot(x,f(x));
+scatter(X,f(X));
+for i=1:10
+   plot(x,s(:,i),'b');
+end
+hold off;
+try
+    saveas(h, 'mplot2.png'); % plot to file
+catch
+    fprintf("Cannot export plot\n")
 end
 
 Xn = [0.3;0.4];

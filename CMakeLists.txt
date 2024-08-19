@@ -58,7 +58,7 @@ option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
 
-set(PYBIND11_PYTHON_VERSION 3.6)
+set(PYBIND11_PYTHON_VERSION 3.7)
 
 #------------------------------------------------------
 # Check options
@@ -166,7 +166,7 @@ option(EXTRA_SYSTEM_LIBRARY_PATH "Path to add to default system library path for
 list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 
 # Dependencies
-# No more HDF5: set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
+set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
 set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
 set(BUILD_SMOKE_TEST OFF CACHE BOOL "armadillo smoke test") # no smoke tests: it fails due to custom memory guard in memory.hpp 
 add_subdirectory(dependencies/armadillo-code)
@@ -483,15 +483,8 @@ if (PythonInterp_FOUND)
     set(HAS_PYTHON_REQUIREMENT true)
     set(PYTHON_REQUIREMENT_INFO "\tpython3 interpreter found: ${PYTHON_EXECUTABLE}")
     set(INDENTATION "   ")
-    execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import sys; print(sys.version_info.minor)"
-                    OUTPUT_VARIABLE PYTHON_VERSION_MINOR) 
-    if (PYTHON_VERSION_MINOR LESS 11)
-        execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
-                    RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
-    else()
-        execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements_12.py --pretty --indent=${INDENTATION} requirements.txt
-                    RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
-    endif()
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${LIBKRIGING_SOURCE_DIR}/bindings/Python/check_requirements.py --pretty --indent=${INDENTATION} requirements.txt dev-requirements.txt
+                RESULT_VARIABLE PYTHON_IMPORT_RETCODE)
     if (NOT PYTHON_IMPORT_RETCODE EQUAL "0")
         set(HAS_PYTHON_REQUIREMENT false)
     endif()

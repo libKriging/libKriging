@@ -15,9 +15,10 @@ if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
 fi
 
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
-  # alternatively, use reticulate::install_miniconda() in R
-	curl -s -o ${HOME}/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-	pushd ${HOME}/Downloads
+  # --insecure option provides a workaround to:
+  #   error setting certificate verify locations:  CAfile: /usr/ssl/certs/ca-bundle.crt CApath: none
+	curl --insecure -s -o "${HOME}"/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+	pushd "${HOME}"/Downloads
 	"${BASEDIR}"/install_conda.bat
 	popd
 fi

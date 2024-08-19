@@ -9,11 +9,6 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
-# Default configuration when used out of travis-ci
-if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-    cd "${TRAVIS_BUILD_DIR}"
-fi
-
 # MacOS + Shared : OK
 # MacOS + Static : there is a bug with dependant libs not found
 # Linux + Shared : OK

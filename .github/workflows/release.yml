@@ -104,8 +104,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-2019, macOS-12 ]
+        os: [ windows-2019, macOS-14 ]
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          - os: macOS-14
+            python-version: 3.7
         include:
           - os: ubuntu-20.04
             # all versions done in one script wrapper
@@ -190,7 +193,7 @@ jobs:
 #            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
 #            force_update: on
 #          - name: "Octave macOS"
-#            os: macOS-12
+#            os: macOS-14
 #          - name: "Octave Windows"
 #            os: windows-2019
 #
@@ -277,7 +280,7 @@ jobs:
 #          - name: "R Linux"
 #            os: ubuntu-20.04
 #          - name: "R macOS"
-#            os: macOS-12
+#            os: macOS-14
 #          - name: "R Windows"
 #            os: windows-2019
 #

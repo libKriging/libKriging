@@ -19,10 +19,6 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
-if [[ -n ${TRAVIS_BUILD_DIR:+x} ]]; then
-    cd "${TRAVIS_BUILD_DIR}"
-fi
-
 # OpenBLAS installation
 export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 
@@ -51,10 +47,9 @@ if [[ "$BUILD_TEST" == "true" ]]; then
     else
       CTEST_FLAGS=--output-on-failure
     fi
+
     # Test on fresh build lib (before installation)
     ctest -C "${MODE}" ${CTEST_FLAGS}
-    # add library directory search PATH for executables
-    export PATH=$PWD/src/lib/${MODE}:$PATH
 
     cmake --build . --target install --config "${MODE}"
 else

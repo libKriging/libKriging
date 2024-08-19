@@ -64,8 +64,8 @@ def main():
         package_data={'pylibkriging': []},
         # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
         data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
-        python_requires='>=3.6',
-        # install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment 
+        python_requires='>=3.7',
+        install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment
         zip_safe=False,
     )
 
