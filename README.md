@@ -6,32 +6,32 @@
 Table of contents
 
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
-    - [pylibkriging for Python](#pylibkriging-for-python)
-    - [rlibkriging for R](#rlibkriging-for-r)
-    - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
-    - [Expected demo results](#expected-demo-results)
-    - [Tested installation](#tested-installation)
+  - [pylibkriging for Python](#pylibkriging-for-python)
+  - [rlibkriging  for R](#rlibkriging--for-r)
+  - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
+  - [Expected demo results](#expected-demo-results)
+  - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
-    - [Requirements (more details)](#requirements-more-details)
-    - [Get the code](#get-the-code)
-    - [Helper scripts for CI](#helper-scripts-for-ci)
-    - [Compilation and tests *manually*](#compilation-and-tests-manually)
-        - [Preamble](#preamble)
-        - [Compilation for Linux and macOS](#compilation-for-linux-and-macos)
-        - [Compilation for Windows 64bits with Visual Studio](#compilation-for-windows-64bits-with-visual-studio)
-        - [Compilation for Linux/Mac/Windows using R toolchain](#compilation-for-linuxmacwindows-using-r-toolchain)
-    - [Deployment](#deployment)
-        - [For Linux and macOS](#for-linux-and-macos)
-        - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
-    - [Assisted compilation and installation](#assisted-compilation-and-installation)
-        - [Using `pip install` from GitHub](#using-pip-install-from-github)
+  - [Requirements (more details)](#requirements-more-details)
+  - [Get the code](#get-the-code)
+  - [Helper scripts for CI](#helper-scripts-for-ci)
+  - [Compilation and tests *manually*](#compilation-and-tests-manually)
+    - [Preamble](#preamble)
+    - [Compilation for Linux and macOS](#compilation-for-linux-and-macos)
+    - [Compilation for Windows 64bits with Visual Studio](#compilation-for-windows-64bits-with-visual-studio)
+    - [Compilation for Linux/Mac/Windows using R toolchain](#compilation-for-linuxmacwindows-using-r-toolchain)
+  - [Deployment](#deployment)
+    - [For Linux and macOS](#for-linux-and-macos)
+    - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
+  - [Assisted compilation and installation](#assisted-compilation-and-installation)
+    - [Using `pip install` from GitHub](#using-pip-install-from-github)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation from pre-built packages
 
-For the most common target {Python, R, Octave} x {Linux, macOS, Windows} x { x86-64 }, you can
-use [released binaries](https://github.com/libKriging/libKriging/releases).
+For the most common target {Python, R, Octave, Matlab} x {Linux, macOS, Windows} x { x86-64, ARM }, you can
+use [released binaries](https://github.com/libKriging/libKriging/releases), or R CRAN or Python PyPI.
 
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
@@ -39,10 +39,10 @@ use [released binaries](https://github.com/libKriging/libKriging/releases).
 pip3 install pylibkriging
 ```
 
-or for pre-release packages (according to your OS and Python version)
+or for pre-release packages (according to your OS and Python version, see https://github.com/libKriging/libKriging/releases)
 
 ```shell
-pip3 install https://github.com/libKriging/libKriging/releases/download/v0.5.0-alpha/pylibkriging-0.5.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pip3 install https://github.com/libKriging/libKriging/releases/download/v0.9.0/pylibkriging-0.9.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
 **Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
@@ -106,11 +106,16 @@ import pylibkriging as lk
 
 ## [rlibkriging](https://github.com/libKriging/rlibkriging/)  for R
 
-Download the archive from [libKriging releases](https://github.com/libKriging/rlibKriging/releases)
+From R:
+```r
+install.packages('rlibkriging')
+```
+
+Or using the archive from [libKriging releases](https://github.com/libKriging/rlibKriging/releases)
 
 ```R
 # in R
-install.packages("https://github.com/libKriging/rlibkriging/releases/download/0.8-0.1/rlibkriging_0.8-0_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
+install.packages("https://github.com/libKriging/rlibkriging/releases/download/0.9-0/rlibkriging_0.9-0_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
@@ -147,13 +152,13 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 
 ## mlibkriging for Octave and MATLAB
 
-⚠️ Matlab binary package are done on request (GitHub Action does not support all required Operating Systems)
+⚠️ Matlab/Windows binary packages are done on request (GitHub Action does not support all required Operating Systems)
 
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 
 ```shell
 # example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.5.1/mLibKriging_0.5.1_Linux-x86_64.tgz
+curl -LO https://github.com/libKriging/libKriging/releases/download/v0.9.0/mLibKriging_0.9.0_Linux-x86_64.tgz
 ```
 
 Then
@@ -217,20 +222,18 @@ Using the previous linked examples (in Python, R, Octave or Matlab), you should 
 
 ## Tested installation
 
-with libKriging 0.6.0
+with libKriging 0.9
 
 <!-- ✔ ⌛️ ✘ -->
 
-|        | Linux Ubuntu:20                             | macOS 11 & 12 (x86-64)                      | macOS 12 (ARM)                               | Windows 10                                 |
-|:-------|:--------------------------------------------|:--------------------------------------------|:---------------------------------------------|:-------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.6-3.10 | <span style="color:green">✔</span> 3.9**     | <span style="color:green">✔</span> 3.6-3.9 |
-| R      | <span style="color:green">✔</span> 4.2      | <span style="color:green">✔</span> 4.2      | <span style="color:orange"><b>?</b></span>** | <span style="color:green">✔</span> 4.2     |
-| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">7.1</span>**       | <span style="color:green">✔</span> 6.2     |
-| Matlab | <span style="color:green">️✔</span> R2022a  | <span style="color:green">✔</span> R2022**  | <span style="color:red">✘</span> R2022       | <span style="color:green">✔</span> R2022** |
+|        | Linux Ubuntu:22                             | macOS 14 (x86-64 & ARM)                     | Windows 10                                  |
+|:-------|:--------------------------------------------|:--------------------------------------------|:--------------------------------------------|
+| Python | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 |
+| R      | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  |
+| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 8.3      |
+| Matlab | <span style="color:green">️✔</span> R2022a   | <span style="color:green">✔</span> R2022*   | <span style="color:green">✔</span> R2022*   |
 
-* \* : requires extra DLLs. See [python installation](#pylibkriging-for-python)
-
-* ** : no pre-built package nor CI
+* \* : no pre-built package or CI
 
 * <span style="color:orange"><b>?</b></span> : requires manual verification (not updated since previous release)
 
@@ -242,17 +245,17 @@ with libKriging 0.6.0
 
 * C++ Compiler with C++17 support
 
-* Linear algebra packages providing blas and lapack functions.
+* Linear algebra packages providing Blas and Lapack functions.
 
-  You can use standard blas and lapack, OpenBlas, MKL.
+  You can use standard Blas and Lapack, OpenBlas or MKL.
 
-* Python ≥ 3.6 (optional)
+* Python ≥ 3.7 (optional)
 
 * Octave ≥ 6.0 (optional)
 
 * Matlab ≥ R2021 (optional)
 
-* R ≥ 3.6 (optional)
+* R ≥ 4.0 (optional)
 
 ## Get the code
 
