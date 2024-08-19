@@ -33,7 +33,7 @@
 /************************************************/
 
 // This will create the dist(xi,xj) function above. Need to parse "covType".
-void NuggetKriging::make_Cov(const std::string& covType) {
+void NuggetKriging::make_Cov(const std::string &covType) {
   m_covType = covType;
   if (covType.compare("gauss") == 0) {
     _Cov = Covariance::Cov_gauss;
@@ -61,7 +61,7 @@ void NuggetKriging::make_Cov(const std::string& covType) {
   // arma::cout << "make_Cov done." << arma::endl;
 }
 
-LIBKRIGING_EXPORT arma::mat NuggetKriging::covMat(const arma::mat& X1, const arma::mat& X2) {
+LIBKRIGING_EXPORT arma::mat NuggetKriging::covMat(const arma::mat &X1, const arma::mat &X2) {
   arma::mat Xn1 = X1;
   arma::mat Xn2 = X2;
   Xn1.each_row() -= m_centerX;
@@ -79,18 +79,18 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::covMat(const arma::mat& X1, const arm
 }
 
 // at least, just call make_Cov(kernel)
-LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const std::string& covType) {
+LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const std::string &covType) {
   make_Cov(covType);
 }
 
-LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::vec& y,
-                                               const arma::mat& X,
-                                               const std::string& covType,
-                                               const Trend::RegressionModel& regmodel,
+LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::vec &y,
+                                               const arma::mat &X,
+                                               const std::string &covType,
+                                               const Trend::RegressionModel &regmodel,
                                                bool normalize,
-                                               const std::string& optim,
-                                               const std::string& objective,
-                                               const Parameters& parameters) {
+                                               const std::string &optim,
+                                               const std::string &objective,
+                                               const Parameters &parameters) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
@@ -99,12 +99,12 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const arma::vec& y,
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
 
-LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const NuggetKriging& other, ExplicitCopySpecifier)
+LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const NuggetKriging &other, ExplicitCopySpecifier)
     : NuggetKriging{other} {}
 
 arma::vec NuggetKriging::ones = arma::ones<arma::vec>(0);
 
-NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta, const double alpha,
+NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec &theta, const double alpha,
                                std::map<std::string, double>* bench) const {
     arma::mat R;
     arma::mat L;
@@ -161,9 +161,9 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta, const do
 
 // Objective function for fit : -logLikelihood
 
-double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
-                                     arma::vec* grad_out,
-                                     NuggetKriging::KModel* model,
+double NuggetKriging::_logLikelihood(const arma::vec &_theta_alpha,
+                                     arma::vec *grad_out,
+                                     NuggetKriging::KModel *model,
                                      std::map<std::string, double>* bench) const {
   // arma::cout << " theta, alpha: " << _theta_alpha.t() << arma::endl;
 
@@ -269,7 +269,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(const arma::vec& _theta_alpha,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(const arma::vec &_theta_alpha,
                                                                                 const bool _grad,
                                                                                 const bool _bench) {
   double ll = -1;
@@ -284,9 +284,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
       ll = _logLikelihood(_theta_alpha, nullptr, nullptr, &bench);
 
     size_t num = 0;
-    for (auto& kv : bench)
+    for (auto &kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto& kv : bench)
+    for (auto &kv : bench)
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
 
   } else {
@@ -302,9 +302,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
 
-double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
-                                   arma::vec* grad_out,
-                                   NuggetKriging::KModel* model,
+double NuggetKriging::_logMargPost(const arma::vec &_theta_alpha,
+                                   arma::vec *grad_out,
+                                   NuggetKriging::KModel *model,
                                    std::map<std::string, double>* bench) const {
   // arma::cout << " theta: " << _theta << arma::endl;
 
@@ -513,7 +513,7 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   return (log_marginal_lik + log_approx_ref_prior);
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(const arma::vec& _theta_alpha,
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(const arma::vec &_theta_alpha,
                                                                               const bool _grad,
                                                                               const bool _bench) {
   double lmp = -1;
@@ -528,9 +528,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(co
       lmp = _logMargPost(_theta_alpha, nullptr, nullptr, &bench);
 
     size_t num = 0;
-    for (auto& kv : bench)
+    for (auto &kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto& kv : bench)
+    for (auto &kv : bench)
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
 
   } else {
@@ -560,14 +560,14 @@ LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
   return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false, false));
 }
 
-std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to = [](const arma::vec& _theta_alpha) {
+std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to = [](const arma::vec &_theta_alpha) {
   arma::vec _theta_malpha = _theta_alpha;
   const arma::uword d = _theta_alpha.n_elem - 1;
   _theta_malpha.at(d) = 1 + alpha_lower - _theta_malpha.at(d);
   return Optim::reparam_to(_theta_malpha);
 };
 
-std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from = [](const arma::vec& _gamma) {
+std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from = [](const arma::vec &_gamma) {
   arma::vec _theta_alpha = Optim::reparam_from(_gamma);
   const arma::uword d = _theta_alpha.n_elem - 1;
   _theta_alpha.at(d) = 1 + alpha_lower - _theta_alpha.at(d);
@@ -575,7 +575,7 @@ std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from = [](cons
 };
 
 std::function<arma::vec(const arma::vec&, const arma::vec&)> NuggetKriging::reparam_from_deriv
-    = [](const arma::vec& _theta_alpha, const arma::vec& _grad) {
+    = [](const arma::vec &_theta_alpha, const arma::vec &_grad) {
         arma::vec D_theta_alpha = arma::conv_to<arma::vec>::from(-_grad % _theta_alpha);
         const arma::uword d = D_theta_alpha.n_elem - 1;
         D_theta_alpha.at(d) = (1 + alpha_lower - _theta_alpha.at(d)) * _grad.at(d);
@@ -594,22 +594,22 @@ double NuggetKriging::alpha_lower = 1E-3;
  * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
-LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
-                                          const arma::mat& X,
-                                          const Trend::RegressionModel& regmodel,
+LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec &y,
+                                          const arma::mat &X,
+                                          const Trend::RegressionModel &regmodel,
                                           bool normalize,
-                                          const std::string& optim,
-                                          const std::string& objective,
-                                          const Parameters& parameters) {
+                                          const std::string &optim,
+                                          const std::string &objective,
+                                          const Parameters &parameters) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
-  std::function<double(const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data)> fit_ofn;
+  std::function<double(const arma::vec &_gamma, arma::vec *grad_out, NuggetKriging::KModel *okm_data)> fit_ofn;
   m_optim = optim;
   m_objective = objective;
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NuggetKriging::KModel *okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
@@ -634,7 +634,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         return -ll;
       });
     } else {
-      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NuggetKriging::KModel *okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double ll = this->_logLikelihood(_theta_alpha, grad_out, okm_data, nullptr);
@@ -650,7 +650,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NuggetKriging::KModel *okm_data) {
         // Change variable for opt: . -> 1/exp(.)
         // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
         const arma::vec _theta_alpha = NuggetKriging::reparam_from(_gamma);
@@ -664,7 +664,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         return -lmp;
       });
     } else {
-      fit_ofn = CacheFunction([this](const arma::vec& _gamma, arma::vec* grad_out, NuggetKriging::KModel* okm_data) {
+      fit_ofn = CacheFunction([this](const arma::vec &_gamma, arma::vec *grad_out, NuggetKriging::KModel *okm_data) {
         const arma::vec _theta_alpha = _gamma;
         // DEBUG: if (Optim::log_level>3) arma::cout << "> theta_alpha: " << _theta_alpha << arma::endl;
         double lmp = this->_logMargPost(_theta_alpha, grad_out, okm_data, nullptr);
@@ -945,7 +945,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       while (retry <= Optim::max_restart) {
         arma::vec gamma_0 = gamma_tmp;
         auto result = optimizer.minimize(
-            [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+            [&m, &fit_ofn](const arma::vec &vals_inp, arma::vec &grad_out) -> double {
                 return fit_ofn(vals_inp, &grad_out, &m);
               }, 
               gamma_tmp,
@@ -1072,7 +1072,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
  * @return output prediction: n_n means, [n_n standard deviations], [n_n*n_n full covariance matrix]
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
-NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+NuggetKriging::predict(const arma::mat &X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1249,7 +1249,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov,
  * @param will_update is true if we want to keep simulations data for future update
  * @return output is n_n*nsim matrix of simulations at X_n
  */
-LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int seed, const arma::mat& X_n, const bool with_nugget, const bool will_update) {
+LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int seed, const arma::mat &X_n, const bool with_nugget, const bool will_update) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;
@@ -1370,7 +1370,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim, const int se
   return y_n;
 }
 
-LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec &y_u, const arma::mat &X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -1525,7 +1525,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u,
  * @param X_u is n_u*d matrix of new input
  * @param refit is true if we want to re-fit the model
  */
-LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec &y_u, const arma::mat &X_u, const bool refit) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -1588,8 +1588,8 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
 
 LIBKRIGING_EXPORT std::string NuggetKriging::summary() const {
   std::ostringstream oss;
-  auto vec_printer = [&oss](const arma::vec& v) {
-    v.for_each([&oss, i = 0](const arma::vec::elem_type& val) mutable {
+  auto vec_printer = [&oss](const arma::vec &v) {
+    v.for_each([&oss, i = 0](const arma::vec::elem_type &val) mutable {
       if (i++ > 0)
         oss << ", ";
       oss << val;

@@ -13,7 +13,7 @@
 
 const char* const Trend::enum_RegressionModel_strings[] = {"none", "constant", "linear", "interactive", "quadratic"};
 
-Trend::RegressionModel Trend::fromString(const std::string& value) {
+Trend::RegressionModel Trend::fromString(const std::string &value) {
   static auto begin = std::begin(Trend::enum_RegressionModel_strings);
   static auto end = std::end(Trend::enum_RegressionModel_strings);
 
@@ -26,12 +26,12 @@ Trend::RegressionModel Trend::fromString(const std::string& value) {
   }
 }
 
-std::string Trend::toString(const Trend::RegressionModel& e) {
+std::string Trend::toString(const Trend::RegressionModel &e) {
   assert(static_cast<std::size_t>(e) < sizeof(Trend::enum_RegressionModel_strings));
   return Trend::enum_RegressionModel_strings[static_cast<int>(e)];
 }
 
-arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, const arma::mat& newX) {
+arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel &regmodel, const arma::mat &newX) {
   arma::uword n = newX.n_rows;
   arma::uword d = newX.n_cols;
   arma::mat F;  // uses modern RTO to avoid returned object copy

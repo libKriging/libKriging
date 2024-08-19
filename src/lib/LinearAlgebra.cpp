@@ -116,8 +116,8 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
   return rcond;
 }
 
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat* R, 
-const arma::mat& _dX, const arma::vec& _theta, 
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::cholCov(arma::mat *R, 
+const arma::mat &_dX, const arma::vec &_theta, 
 std::function<double (const arma::vec &, const arma::vec &)> _Cov, 
 const double factor, const arma::vec diag) {
   arma::uword n = (*R).n_rows;
@@ -177,11 +177,11 @@ const double factor, const arma::vec diag) {
   return L;
 }
 
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat* R, 
-const arma::mat& _dX, const arma::vec& _theta, 
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::update_cholCov(arma::mat *R, 
+const arma::mat &_dX, const arma::vec &_theta, 
 std::function<double (const arma::vec &, const arma::vec &)> _Cov, 
 const double factor, const arma::vec diag,
-const arma::mat& T_old, const arma::mat& R_old) {
+const arma::mat &T_old, const arma::mat &R_old) {
   arma::uword n_old = T_old.n_rows;
   arma::uword n = (*R).n_rows;
 
@@ -251,16 +251,16 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
 }
 
 // Solve A*X=B : X = A \ B
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma::mat& B) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat &A, const arma::mat &B) {
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
 }
 
 // Solve X*A=B : X = B / A
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat &A, const arma::mat &B) {
   return arma::solve(A.t(), B.t(), LinearAlgebra::default_solve_opts).t();
 }
 
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat &A) {
   //return A.t() * A;
   arma::mat AtA = arma::mat(A.n_cols, A.n_cols, arma::fill::none);
   for (arma::uword i = 0; i < A.n_cols; i++) {
@@ -272,7 +272,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
   return AtA;
 }
 
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat &A) {
   //return A * A.t();
   arma::mat AAt = arma::mat(A.n_rows, A.n_rows, arma::fill::none);
   for (arma::uword i = 0; i < A.n_rows; i++) {
@@ -284,11 +284,11 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat& A) {
   return AAt;
 }
 
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::diagcrossprod(const arma::mat& A) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::diagcrossprod(const arma::mat &A) {
   return arma::diagmat(arma::sum(arma::square(A), 1));   
 }
 
-LIBKRIGING_EXPORT arma::colvec LinearAlgebra::diagABA(const arma::mat& A, const arma::mat& B) {
+LIBKRIGING_EXPORT arma::colvec LinearAlgebra::diagABA(const arma::mat &A, const arma::mat &B) {
   arma::mat D = trimatu(2 * B);
   D.diag() = B.diag();
   D = (A * D) % A;

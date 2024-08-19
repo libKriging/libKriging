@@ -13,8 +13,8 @@ struct err_fn_data {
   arma::mat X;
 };
 
-double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) {
-  err_fn_data* d = fn_data;
+double err_fn(const arma::vec &coef, arma::vec *grad_out, err_fn_data *fn_data) {
+  err_fn_data *d = fn_data;
 
   arma::vec y_est = d->X * coef;
 
@@ -44,7 +44,7 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) 
 
 LIBKRIGING_EXPORT
 // returned object should hold error state instead of void
-void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
+void LinearRegressionOptim::fit(const arma::vec &y, const arma::mat &X) {
   arma::uword n = X.n_rows;
   arma::uword k = X.n_cols;
 
@@ -68,8 +68,8 @@ void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
 
   err_fn_data fn_data{y, X};
   auto result
-      = optimizer.minimize([&fn_data](const arma::vec& vals_inp,
-                                      arma::vec& grad_out) -> double { return err_fn(vals_inp, &grad_out, &fn_data); },
+      = optimizer.minimize([&fn_data](const arma::vec &vals_inp,
+                                      arma::vec &grad_out) -> double { return err_fn(vals_inp, &grad_out, &fn_data); },
                            m_coef,
                            gamma_lower.memptr(),
                            gamma_upper.memptr(),
@@ -81,7 +81,7 @@ void LinearRegressionOptim::fit(const arma::vec& y, const arma::mat& X) {
   m_stderrest = arma::sqrt(m_sig2 * arma::diagvec(arma::inv(arma::trans(X) * X)));
 }
 
-std::tuple<arma::colvec, arma::colvec> LinearRegressionOptim::predict(const arma::mat& X) {
+std::tuple<arma::colvec, arma::colvec> LinearRegressionOptim::predict(const arma::mat &X) {
   // should test that X.n_cols == fit.X.n_cols
   // int n = X.n_rows;
   // int k = X.n_cols;
