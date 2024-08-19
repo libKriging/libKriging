@@ -39,6 +39,10 @@ classdef NoiseKriging < handle
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::update", obj.ref, varargin{:});
         end
 
+        function varargout = update_simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NoiseKriging::update_simulate", obj.ref, varargin{:});
+        end
+
         function varargout = summary(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::summary", obj.ref, varargin{:});
         end

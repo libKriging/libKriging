@@ -1,6 +1,8 @@
+default_nugget = rlibkriging:::linalg_get_num_nugget()
+default_rcond_checked = rlibkriging:::linalg_chol_rcond_checked()
+
 rlibkriging:::linalg_set_num_nugget(1E-10)
 rlibkriging:::linalg_set_chol_warning(TRUE)
-default_nugget = rlibkriging:::linalg_get_num_nugget()
 
 #############################################################
 
@@ -64,9 +66,9 @@ X <- matrix(runif(n*d),ncol=d)
 y <- f(X)
 r = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
-rlibkriging:::covariance_use_approx_singular(FALSE) # disable failover
+rlibkriging:::linalg_check_chol_rcond(FALSE) # disable failover
 try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
-rlibkriging:::covariance_use_approx_singular(TRUE) # enable failover
+rlibkriging:::linalg_check_chol_rcond(TRUE) # enable failover
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 
@@ -127,3 +129,4 @@ test_that(desc="Kriging fit mith and without num nugget are identical",
 expect_true(all(capture.output(print(r_nonugget)) == capture.output(print(r)))))
 
 rlibkriging:::linalg_set_num_nugget(default_nugget)
+rlibkriging:::linalg_check_chol_rcond(default_rcond_checked)

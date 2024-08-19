@@ -22,7 +22,9 @@ checkNewTheta <- function(object, theta) {
 
 ## XXXY use 'identical' with formula objects seesm cleaner
 formula2regmodel = function(form) {
-    if (format(form) == "~1")
+    if (format(form) == "~0")
+        return("none")
+    else if (format(form) == "~1")
         return("constant")
     else if (format(form) == "~.")
         return("linear")
@@ -33,7 +35,9 @@ formula2regmodel = function(form) {
 
 
 regmodel2formula = function(regmodel) {
-  if (regmodel == "constant")
+  if (regmodel == "none")
+    return(~0)
+  else if (regmodel == "constant")
     return(~1)
   else if (regmodel == "linear")
     return(~.)

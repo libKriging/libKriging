@@ -20,15 +20,17 @@ std::chrono::high_resolution_clock::time_point Bench::tic() {
 std::chrono::high_resolution_clock::time_point Bench::toc(std::map<std::string, double>* bench,
                                                           std::string what,
                                                           std::chrono::high_resolution_clock::time_point t0) {
-  if (bench == nullptr)
+  if (Bench::NO_BENCH && (bench == nullptr))
     return t0;
 
   const auto t = std::chrono::high_resolution_clock::now();
-  if ((*bench).count(what) > 0)
+  if (bench == nullptr)
+    arma::cout << Bench::pad(what, 50, ' ') << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+  else if ((*bench).count(what) > 0)
     (*bench)[what] += (std::chrono::duration<double>(t - t0)).count() * 1000;
   else
     (*bench)[what] = (std::chrono::duration<double>(t - t0)).count() * 1000;
-  // arma::cout << what << ":     " << (std::chrono::duration<double>(t - t0)).count() * 1000 << arma::endl;
+
   return t;
 }
 

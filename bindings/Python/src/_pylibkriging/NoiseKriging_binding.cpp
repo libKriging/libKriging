@@ -80,10 +80,10 @@ void PyNoiseKriging::fit(const py::array_t<double>& y,
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyNoiseKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov, bool withDeriv) {
-  arma::mat mat_X = carma::arr_to_mat_view<double>(X);
+PyNoiseKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, withStd, withCov, withDeriv);
+      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(y_predict, true),
                          carma::col_to_arr(y_stderr, true),
                          carma::mat_to_arr(y_cov, true),
@@ -91,19 +91,34 @@ PyNoiseKriging::predict(const py::array_t<double>& X, bool withStd, bool withCov
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-py::array_t<double> PyNoiseKriging::simulate(const int nsim, const int seed, const py::array_t<double>& Xp) {
-  arma::mat mat_X = carma::arr_to_mat_view<double>(Xp);
-  auto result = m_internal->simulate(nsim, seed, mat_X);
+py::array_t<double> PyNoiseKriging::simulate(const int nsim,
+                                             const int seed,
+                                             const py::array_t<double>& X_n,
+                                             const py::array_t<double>& with_noise,
+                                             const bool will_update) {
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+  arma::mat mat_noise = carma::arr_to_col_view<double>(with_noise);
+  auto result = m_internal->simulate(nsim, seed, mat_X, mat_noise, will_update);
   return carma::mat_to_arr(result, true);
 }
 
-void PyNoiseKriging::update(const py::array_t<double>& newy,
-                            const py::array_t<double>& newnoise,
-                            const py::array_t<double>& newX) {
-  arma::mat mat_y = carma::arr_to_col<double>(newy);
-  arma::mat mat_noise = carma::arr_to_col<double>(newnoise);
-  arma::mat mat_X = carma::arr_to_mat<double>(newX);
-  m_internal->update(mat_y, mat_noise, mat_X);
+void PyNoiseKriging::update(const py::array_t<double>& y_u,
+                            const py::array_t<double>& noise_u,
+                            const py::array_t<double>& X_u,
+                            const bool refit) {
+  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_noise = carma::arr_to_col<double>(noise_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
+  m_internal->update(mat_y, mat_noise, mat_X, refit);
+}
+
+void PyNoiseKriging::update_simulate(const py::array_t<double>& y_u,
+                                     const py::array_t<double>& noise_u,
+                                     const py::array_t<double>& X_u) {
+  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_noise = carma::arr_to_col<double>(noise_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
+  m_internal->update_simulate(mat_y, mat_noise, mat_X);
 }
 
 std::string PyNoiseKriging::summary() const {
@@ -119,9 +134,9 @@ PyNoiseKriging PyNoiseKriging::load(const std::string filename) {
 }
 
 std::tuple<double, py::array_t<double>> PyNoiseKriging::logLikelihoodFun(const py::array_t<double>& theta_sigma2,
-                                                                         const bool want_grad) {
+                                                                         const bool return_grad) {
   arma::vec vec_theta_sigma2 = carma::arr_to_col<double>(theta_sigma2);
-  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_sigma2, want_grad, false);
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta_sigma2, return_grad, false);
   return {llo, carma::col_to_arr(grad)};
 }
 

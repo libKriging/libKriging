@@ -1,4 +1,7 @@
+#library(rlibkriging, lib.loc="bindings/R/Rlibs")
+#library(testthat)
 kernel="gauss"
+
 for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   context(paste0("Check logMargPost for kernel ",kernel))
   
@@ -10,7 +13,7 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   y = f(X)
   points(X,y)
   
-  library(rlibkriging)
+  #library(rlibkriging)
   r <- NuggetKriging(y, X, kernel, objective="LMP", parameters=list(nugget=0,is_nugget_estim=TRUE))
   
 eps = 0.00001 # used for comparison bw computed grad and num grad
@@ -23,7 +26,7 @@ precision = 0.01
   for (x in seq(0.01,1,,11)){
     envx = new.env()
     ll2x = logMargPostFun(r,c(x,alpha0))$logMargPost[1]
-    gll2x = logMargPostFun(r,c(x,alpha0),grad = T)$logMargPostGrad[,1]
+    gll2x = logMargPostFun(r,c(x,alpha0),return_grad = T)$logMargPostGrad[,1]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 
     ll2x_eps = logMargPostFun(r,c(x+eps,alpha0))$logMargPost[1]
@@ -37,7 +40,7 @@ precision = 0.01
   for (x in seq(0.01,0.99,,11)){
     envx = new.env()
     ll2x = logMargPostFun(r,c(theta0,x))$logMargPost[1]
-    gll2x = logMargPostFun(r,c(theta0,x),grad = T)$logMargPostGrad[,2]
+    gll2x = logMargPostFun(r,c(theta0,x),return_grad = T)$logMargPostGrad[,2]
     arrows(x,ll2x,x+.1,ll2x+.1*gll2x,col='red')
 
     ll2x_eps = logMargPostFun(r,c(theta0,x+eps))$logMargPost[1]

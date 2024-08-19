@@ -11,7 +11,7 @@
 
 #include <cassert>
 
-const char* const Trend::enum_RegressionModel_strings[] = {"constant", "linear", "interactive", "quadratic"};
+const char* const Trend::enum_RegressionModel_strings[] = {"none", "constant", "linear", "interactive", "quadratic"};
 
 Trend::RegressionModel Trend::fromString(const std::string& value) {
   static auto begin = std::begin(Trend::enum_RegressionModel_strings);
@@ -36,15 +36,21 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, c
   arma::uword d = newX.n_cols;
   arma::mat F;  // uses modern RTO to avoid returned object copy
   switch (regmodel) {
+    case Trend::RegressionModel::None: {
+      F.set_size(n, 0);
+      F = arma::mat(n, 0, arma::fill::ones);
+      return F;
+    } break;
+
     case Trend::RegressionModel::Constant: {
       F.set_size(n, 1);
-      F = arma::ones(n, 1);
+      F = arma::mat(n, 1, arma::fill::ones);
       return F;
     } break;
 
     case Trend::RegressionModel::Linear: {
       F.set_size(n, 1 + d);
-      F.col(0) = arma::ones(n, 1);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       for (arma::uword i = 0; i < d; i++) {
         F.col(i + 1) = newX.col(i);
       }
@@ -53,7 +59,7 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, c
 
     case Trend::RegressionModel::Interactive: {
       F.set_size(n, 1 + d + d * (d - 1) / 2);
-      F.col(0) = arma::ones(n, 1);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
         F.col(count) = newX.col(i);
@@ -68,7 +74,7 @@ arma::mat Trend::regressionModelMatrix(const Trend::RegressionModel& regmodel, c
 
     case Trend::RegressionModel::Quadratic: {
       F.set_size(n, 1 + 2 * d + d * (d - 1) / 2);
-      F.col(0) = arma::ones(n, 1);
+      F.col(0) = arma::mat(n, 1, arma::fill::ones);
       arma::uword count = 1;
       for (arma::uword i = 0; i < d; i++) {
         F.col(count) = newX.col(i);

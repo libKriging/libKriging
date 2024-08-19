@@ -54,17 +54,20 @@ struct std::hash<arma::mat*> {
 };
 
 template <>
-struct std::hash<Kriging::OKModel*> {
-  std::size_t operator()(const Kriging::OKModel* s) const noexcept {
+struct std::hash<Kriging::KModel*> {
+  std::size_t operator()(const Kriging::KModel* s) const noexcept {
     if (s != nullptr) {
-      struct OKModel {
-        arma::mat T;
-        arma::mat M;
-        arma::colvec z;
-        arma::colvec beta;
-        bool is_beta_estim;
-        double sigma2;
-        bool is_sigma2_estim;
+      struct KModel {
+        arma::mat R;
+        arma::mat L;
+        arma::mat Linv;
+        arma::mat Fstar;
+        arma::colvec ystar;
+        arma::mat Rstar;
+        arma::mat Qstar;
+        arma::colvec Estar;
+        double SSEstar;
+        arma::colvec betahat;
       };
 
       //      return std::hash<arma::mat>{}(*s);
@@ -74,8 +77,8 @@ struct std::hash<Kriging::OKModel*> {
 };
 
 template <>
-struct std::hash<NuggetKriging::OKModel*> {
-  std::size_t operator()(const NuggetKriging::OKModel* s) const noexcept {
+struct std::hash<NuggetKriging::KModel*> {
+  std::size_t operator()(const NuggetKriging::KModel* s) const noexcept {
     if (s != nullptr) {
       struct OKModel {
         arma::mat T;

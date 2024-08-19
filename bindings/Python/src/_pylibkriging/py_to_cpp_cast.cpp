@@ -1,6 +1,7 @@
 #include "py_to_cpp_cast.hpp"
 
 #include <carma>
+#include <iostream>
 
 template <>
 std::optional<bool> to_cpp_cast<bool>(py::handle obj) {
@@ -29,7 +30,10 @@ std::optional<double> to_cpp_cast<double>(py::handle obj) {
     return std::make_optional<double>(obj.cast<int>());
   } else if (py_type_name == "<class 'float'>") {
     return std::make_optional<double>(obj.cast<double>());
+  } else if (py_type_name == "<class 'numpy.float64'>") {
+    return std::make_optional<double>(obj.cast<double>());
   } else {
+    std::cout << "unknown py_type_name: " << py_type_name << std::endl;
     return std::nullopt;
   }
 }

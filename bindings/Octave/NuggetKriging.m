@@ -39,6 +39,10 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::update", obj.ref, varargin{:});
         end
 
+        function varargout = update_simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::update_simulate", obj.ref, varargin{:});
+        end
+
         function varargout = summary(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::summary", obj.ref, varargin{:});
         end
