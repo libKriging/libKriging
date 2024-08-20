@@ -484,7 +484,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget 
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X = x, with_nugget = with_nugget, will_update = will_update))
+    return(nuggetkriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_nugget = with_nugget, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{NuggetKriging} model object.

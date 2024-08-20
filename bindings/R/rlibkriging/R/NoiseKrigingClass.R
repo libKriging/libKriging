@@ -484,7 +484,7 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, with_noise = 
              ncol(x),")")
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
     if (is.null(with_noise) || isFALSE(with_noise)) with_noise = rep(0, nrow(x))
-    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X = x, with_noise = with_noise, will_update = will_update))
+    return(noisekriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_noise = with_noise, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{NoiseKriging} model object.
@@ -722,7 +722,7 @@ load.NoiseKriging <- function(filename, ...) {
 #' covMat(k, x1, x2)
 covMat.NoiseKriging <- function(object, x1, x2, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- kriging_model(object)
+    k <- noisekriging_model(object)
     if (is.data.frame(x1)) x1 = data.matrix(x1)
     if (is.data.frame(x2)) x2 = data.matrix(x2)
     if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(k$X))

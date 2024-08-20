@@ -492,7 +492,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALS
              ncol(x),")")
     ## XXXY
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(kriging_simulate(object, nsim = nsim, seed = seed, X = x, will_update = will_update))
+    return(kriging_simulate(object, nsim = nsim, seed = seed, X_n = x, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{Kriging} model object.
@@ -699,7 +699,6 @@ load.Kriging <- function(filename, ...) {
 #' @param object An S3 Kriging object.
 #' @param x1 Numeric matrix of input points.
 #' @param x2 Numeric matrix of input points.
-#' @param theta A numeric vector of (positive) range parameters.
 #' @param ... Not used.
 #' 
 #' @return A matrix of the covariance matrix of the Kriging model.

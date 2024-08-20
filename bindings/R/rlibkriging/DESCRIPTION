@@ -4,15 +4,15 @@ Title: Kriging Models using the 'libKriging' Library
 Version: 0.9-0
 Date: 2024-06-05
 Authors@R: 
-    c(person(given = "Pascal",
-             family = "Havé",
-             role = c("aut"),
-             email = "hpwxf@haveneer.com"),
-      person(given = "Yann",
+    c(person(given = "Yann",
              family = "Richet",
              role = c("aut","cre"),
              email = "yann.richet@irsn.fr",
              comment = c(ORCID = "0000-0002-5677-8458")),
+      person(given = "Pascal",
+             family = "Havé",
+             role = c("aut"),
+             email = "hpwxf@haveneer.com"),
       person(given = "Yves",
              family = "Deville",
              role = c("aut"),
