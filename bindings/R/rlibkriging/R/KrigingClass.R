@@ -602,7 +602,8 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 #' ## change the content of the object 'k'
 #' update(k, y_u, X_u)
 #'
-#' x <- seq(from = 0, to = 1, length.out = 101)
+#' ## include design points to see interpolation
+#' x <- sort(c(X,X_u,seq(from = 0, to = 1, length.out = 101)))
 #' p2 <- predict(k, x)
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
