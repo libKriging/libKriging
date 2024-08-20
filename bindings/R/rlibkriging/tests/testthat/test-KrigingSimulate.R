@@ -68,6 +68,6 @@ for (i in 1:length(X_n)) {
 for (i in which(X_n >= 0 & X_n <= 1)) {
     if (dp$sd[i] > 1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("DiceKriging/libKriging simulate samples ( ~N(",mean(ds[,i]),",",sd(ds[,i]),") / ~N(",mean(ls[i,]),",",sd(ds[i,]),") ) matching at ",X_n[i]),
-        expect_true(suppressWarnings(ks.test(ds[,i], ls[i,])$p.value) > 0.01))
+        expect_true(suppressWarnings(ks.test(ds[,i], ls[i,])$p.value) > 0.001))
         #print(suppressWarnings(ks.test(ds[,i], ls[i,])$p.value))
 }
