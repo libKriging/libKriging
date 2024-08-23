@@ -165,7 +165,7 @@ for (i in 1:length(X_n)) {
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_n[i]," ",
     mean(lus[i,]),",",sd(lus[i,])," != ",mean(lsu[i,]),",",sd(lsu[i,])),
-        expect_gt(ks.test(lus[i,],lsu[i,])$p.value, 0.01)) # just check that it is not clearly wrong
+        expect_true(ks.test(lus[i,],lsu[i,])$p.value > 0.01)) # just check that it is not clearly wrong
 }
 
 
@@ -319,7 +319,7 @@ for (i in 1:nrow(X_n)) {
     lines(density(lusd[i,]),col='red')
     if (sd(lsud[i,])>1e-3 && sd(lusd[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",mean(lusd[i,]),",",sd(lusd[i,])," != ",mean(lsud[i,]),",",sd(lsud[i,])),
-        expect_gt(ks.test(lusd[i,],lsud[i,])$p.value, 0.01)) # just check that it is not clearly wrong
+        expect_true(ks.test(lusd[i,],lsud[i,])$p.value > 0.01)) # just check that it is not clearly wrong
     }
 }
 
