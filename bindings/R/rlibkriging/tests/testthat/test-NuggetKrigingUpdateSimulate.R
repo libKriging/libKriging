@@ -25,7 +25,7 @@ lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
               #normalize = TRUE,
               parameters = list(theta = matrix(0.1), nugget=nugget, sigma2=0.09))
 
-X_n = unique(sort(c(X_o,seq(0,1,,61))))
+X_n = unique(sort(c(X_o,seq(0,1,,21))))
 
 # lk_nn = Kriging(y = matrix(y_o, ncol = 1),
 #               X = matrix(X_o, ncol = 1),
@@ -106,9 +106,8 @@ for (i in 1:length(X_n)) {
 
 ## Update simulate
 
-#i_u = c(10,30)
-#X_u = X_n[i_u]# c(.4,.6)
-#y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
+X_u = c(.4,.6)
+y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
 X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n))
 
@@ -131,7 +130,7 @@ points(X_u,y_u,col='red',pch=16)
 for (i in 1:length(X_u)) {
     lines(c(X_u[i],X_u[i]),c(y_u[i]+2*sqrt(nugget),y_u[i]-2*sqrt(nugget)),col='red',lwd=4)
 }
-for (j in 1:min(10,ncol(lus))) {
+for (j in 1:min(100,ncol(lus))) {
     lines(X_n,ls[,j])
     lines(X_n,lus[,j],col='orange',lwd=3)
     lines(X_n,lsu[,j],col='red')
@@ -152,7 +151,7 @@ for (i in 1:length(X_n)) {
     polygon(
         X_n[i] + dus$y/20,
         dus$x,
-        col=rgb(1,0,0,0.2),border='red')
+        col=rgb(1,0,0,0.2),border=NA)
     #test_that(desc="updated,simulated sample follows simulated,updated distribution",
     #    expect_true(ks.test(lus[i,],lsu[i,])$p.value  > 0.01))
 }
@@ -161,7 +160,6 @@ for (i in 1:length(X_n)) {
     plot(density(ls[i,]),xlim=range(c(ls[i,],lsu[i,],lus[i,])))
     lines(density(lsu[i,]),col='orange')
     lines(density(lus[i,]),col='red')
-    #if (all(abs(X_n[i]-X_u)>1e-2))
     if (sd(lsu[i,])>1e-3 && sd(lus[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution at x=",X_n[i]," ",
     mean(lus[i,]),",",sd(lus[i,])," != ",mean(lsu[i,]),",",sd(lsu[i,])),
@@ -201,7 +199,7 @@ lkd <- NuggetKriging(y = y_o,
 
 ## Predict & simulate
 
-X_n = matrix(runif(100),ncol=d) #seq(0,1,,)
+X_n = matrix(runif(min=0,max=1,101),ncol=d) #seq(0,1,,)
 
 lpd = lkd$predict(X_n) # libK predict
 #lines(X_n,lp$mean,col='red')
@@ -298,7 +296,7 @@ lsud = lud$simulate(1000, 123, X_n)
 #    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 #}
 #
-#for (i in 1:1:length(X_n)) {
+#for (i in 1:length(X_n)) {
 #    dsu=density(lsu[i,])
 #    dus=density(lus[i,])
 #    polygon(

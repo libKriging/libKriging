@@ -37,6 +37,7 @@ X_n = unique(sort(c(X_o,seq(0,1,,21))))
 #              parameters = list(theta = matrix(0.1), sigma2 = 0.1))
 
 ## Ckeck consistency bw predict & simulate
+
 lp = NULL
 lp = lk$predict(X_n) # libK predict
 lines(X_n,lp$mean,col='red')
@@ -108,12 +109,11 @@ for (i in 1:length(X_n)) {
 
 ## Update simulate
 
-i_u = c(9,13)
-X_u = X_n[i_u]# c(.4,.6)
+X_u = c(.4,.6)
 y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
 noise_u = rep(noise, length(X_u))
 
-X_n = sort(c(X_u+1e-3,X_n)) # add some nugget to avoid degenerate cases
+X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n))
 
 ls = lk$simulate(1000, 123, X_n, with_noise=NULL, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
@@ -207,15 +207,15 @@ lkd <- NoiseKriging(y = y_o,
 
 ## Predict & simulate
 
-X_n = matrix(runif(100),ncol=d) #seq(0,1,,)
+X_n = matrix(runif(min=0,max=1,101),ncol=d) #seq(0,1,,)
 
 lpd = lkd$predict(X_n) # libK predict
-#lines(seq(0,1,,21),lp$mean,col='red')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
+#lines(X_n,lp$mean,col='red')
+#polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
 lsd = lkd$simulate(1000, 123, X_n) # libK simulate
 #for (i in 1:100) {
-#    lines(seq(0,1,,21),ls[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 #}
 
 for (i in 1:nrow(X_n)) {
@@ -244,24 +244,24 @@ for (i in 1:nrow(X_n)) {
 #
 ### Update, predict & simulate
 #
-#lp2 = l2$predict(seq(0,1,,21))
-#lpu = lu$predict(seq(0,1,,21))
+#lp2 = l2$predict(X_n)
+#lpu = lu$predict(X_n)
 #
 #plot(f)
 #points(X_o,y_o)
-#lines(seq(0,1,,21),lp2$mean,col='red')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
-#lines(seq(0,1,,21),lpu$mean,col='blue')
-#polygon(c(seq(0,1,,21),rev(seq(0,1,,21))),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
+#lines(X_n,lp2$mean,col='red')
+#polygon(c(X_n,rev(X_n)),c(lp2$mean+2*lp2$stdev,rev(lp2$mean-2*lp2$stdev)),col=rgb(1,0,0,0.2),border=NA)
+#lines(X_n,lpu$mean,col='blue')
+#polygon(c(X_n,rev(X_n)),c(lpu$mean+2*lpu$stdev,rev(lpu$mean-2*lpu$stdev)),col=rgb(0,0,1,0.2),border=NA)
 #
-#ls2 = l2$simulate(100, 123, seq(0,1,,21))
-#lsu = lu$simulate(100, 123, seq(0,1,,21))
+#ls2 = l2$simulate(100, 123, X_n)
+#lsu = lu$simulate(100, 123, X_n)
 #for (i in 1:100) {
-#    lines(seq(0,1,,21),ls2[,i],col=rgb(1,0,0,.1),lwd=4)
-#    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+#    lines(X_n,ls2[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 #}
 #
-#for (i in 1:21) {
+#for (i in 1:length(X_n)) {
 #    m2 = lp2$mean[i,]
 #    s2 = lp2$stdev[i,]
 #    mu = lpu$mean[i,]
@@ -300,8 +300,8 @@ lsud = lud$simulate(1000, 123, X_n)
 #points(X_o,y_o,pch=20)
 #points(X_u,y_u,col='red',pch=20)
 #for (i in 1:ncol(lus)) {
-#    lines(seq(0,1,,21),lus[,i],col=rgb(1,0,0,.1),lwd=4)
-#    lines(seq(0,1,,21),lsu[,i],col=rgb(0,0,1,.1),lwd=4)
+#    lines(X_n,lus[,i],col=rgb(1,0,0,.1),lwd=4)
+#    lines(X_n,lsu[,i],col=rgb(0,0,1,.1),lwd=4)
 #}
 #
 #for (i in 1:length(X_n)) {
