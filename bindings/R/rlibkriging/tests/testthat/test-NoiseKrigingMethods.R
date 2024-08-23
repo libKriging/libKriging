@@ -117,9 +117,10 @@ contour(x,x,matrix(ll(cbind(as.matrix(expand.grid(x,x)),r$sigma2())),nrow=length
 gll = function(X) {
   logLikelihoodFun(r20,X,return_grad=T)$logLikelihoodGrad
 }
-for (ix in 1:21) {
-for (iy in 1:21) {
-  xx = c(ix/21,iy/21,r$sigma2())
+xy = seq(0,1,,21)
+for (ix in 1:length(xy)) {
+for (iy in 1:length(xy)) {
+  xx = c(ix/length(xy),iy/length(xy),r$sigma2())
   g = gll(xx)
   arrows(xx[1],xx[2],xx[1]+g[1]/1000,xx[2]+g[2]/1000,col='grey',length=0.05)
 }

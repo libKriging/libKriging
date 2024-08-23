@@ -83,7 +83,7 @@ as_ll <- function(Theta){
     apply(Theta, 1,
           function(theta) rlibkriging::logLikelihoodFun(KM1@Kriging, theta)$logLikelihood[1])
 }
-t <- seq(from = 0.01, to = 2, length.out = 51)
+t <- seq(from = 0.01, to = 2,,51)
 ttg <- expand.grid(t, t)
 contour(t, t,
         matrix(ll(as.matrix(ttg)), nrow = length(t)), nlevels = 30)
@@ -123,7 +123,7 @@ points(X, y, col = 'blue')
 #rlibkriging:::optim_use_variogram_bounds_heuristic(TRUE)
 
 r <- Kriging(y, X, kernel = "gauss")
-x <- seq(from = 0, to = 1, length.out = 101)
+x <- seq(0,1,,101)
 s_x <- simulate(r, nsim = 3, x = x)
 lines(x, s_x[ , 1], col = 'blue')
 lines(x, s_x[ , 2], col = 'blue')
@@ -225,7 +225,7 @@ t <- t.test(sims_km2, sims_KM2, var.equal = FALSE)
 if (t$p.value < 0.05) {
     plot(f)
     points(X, y)
-    xx <-  seq(from = 0, to = 1, length.out = 101)
+    xx <-  seq(0,1,,101)
     for (i in 1:100) {
         lines(xx, DiceKriging::simulate(km2, nsim = 1, newdata = xx,
                            checkNames = FALSE, cond = TRUE,
