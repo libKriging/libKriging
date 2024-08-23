@@ -268,8 +268,7 @@ for (i in 1:nrow(X_n)) {
 #
 ## Update simulate
 
-i_u = c(9,13,25,43,42,35,24)
-X_u = X_n[i_u,,drop=FALSE]# c(.4,.6)
+X_u = matrix(c(.4,.6),nrow=2,ncol=2)
 y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(nugget))
 
 X_n = rbind(X_u+1e-2,X_n) # add some nugget to avoid degenerate cases
