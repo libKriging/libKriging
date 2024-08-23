@@ -13,7 +13,7 @@ n <- 1000
 d <- 3
 set.seed(1234)
 X <- matrix(runif(n*d),ncol=d)
-y <- f(X)+rnorm(1000,0,0.1)
+y <- f(X)+rnorm(nrow(X),0,0.1)
 r = NULL
 try( r <- NuggetKriging(y, X, "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), beta = matrix(0.01), nugget=0.1^2, sigma2=0.09)) )
 
