@@ -127,8 +127,9 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   m.R = arma::mat(n, n, arma::fill::none);
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
-  if (!m_is_empty) update = (m_sigma2 / (m_sigma2 + m_nugget) == alpha) && (m_theta.size() == theta.size())
-                && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
+  if (!m_is_empty)
+    update = (m_sigma2 / (m_sigma2 + m_nugget) == alpha) && (m_theta.size() == theta.size())
+             && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, alpha, NuggetKriging::ones, m_T, m_R);
   } else

@@ -125,8 +125,9 @@ NoiseKriging::KModel NoiseKriging::make_Model(const arma::vec& theta,
   m.R = arma::mat(n, n, arma::fill::none);
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
-  if (!m_is_empty) update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
-                && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
+  if (!m_is_empty)
+    update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
+             && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise, m_T, m_R);
   } else
@@ -639,7 +640,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
           m_theta = Optim::reparam_from(m_theta);
         m_est_theta = true;
         min_ofn = min_ofn_tmp;
-    
+
         m_is_empty = false;
         m_T = std::move(m.L);
         m_R = std::move(m.R);

@@ -87,7 +87,7 @@ class Kriging {
   bool m_est_theta;
   double m_sigma2;
   bool m_est_sigma2;
-  bool m_is_empty = true; // this will force the model to be make from scratch first time (no update)
+  bool m_is_empty = true;  // this will force the model to be make from scratch first time (no update)
 
   // Simulation stored data
   arma::mat lastsim_Xn_n;

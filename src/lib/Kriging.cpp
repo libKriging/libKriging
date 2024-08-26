@@ -126,7 +126,7 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
   bool update = false;
   if (!m_is_empty)
     update = (m_theta.size() == theta.size()) && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr)
-                && (n > this->m_T.n_rows);
+             && (n > this->m_T.n_rows);
   if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, 1, Kriging::ones, m_T, m_R);
   } else
