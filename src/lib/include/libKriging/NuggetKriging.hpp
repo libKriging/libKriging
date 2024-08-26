@@ -94,6 +94,7 @@ class NuggetKriging {
   bool m_est_sigma2;
   double m_nugget;
   bool m_est_nugget;
+  bool m_is_empty = true; // this will force the model to be make from scratch first time (no update)
 
   // Simulation stored data
   arma::mat lastsim_Xn_n;

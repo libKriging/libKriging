@@ -126,7 +126,8 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   auto t0 = Bench::tic();
   m.R = arma::mat(n, n, arma::fill::none);
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
-  bool update = (m_sigma2 / (m_sigma2 + m_nugget) == alpha) && (m_theta.size() == theta.size())
+  bool update = false;
+  if (!m_is_empty) update = (m_sigma2 / (m_sigma2 + m_nugget) == alpha) && (m_theta.size() == theta.size())
                 && (theta - m_theta).is_zero() && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, alpha, NuggetKriging::ones, m_T, m_R);
@@ -783,7 +784,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       m_est_nugget = true;
 
     NuggetKriging::KModel m = make_Model(m_theta, sigma2 / (nugget + sigma2), nullptr);
-
+    m_is_empty = false;
     m_T = std::move(m.L);
     m_R = std::move(m.R);
     m_M = std::move(m.Fstar);
@@ -1036,6 +1037,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         m_est_theta = true;
         min_ofn = min_ofn_tmp;
 
+        m_is_empty = false;
         m_T = std::move(m.L);
         m_R = std::move(m.R);
         m_M = std::move(m.Fstar);
@@ -1735,6 +1737,7 @@ NuggetKriging NuggetKriging::load(const std::string filename) {
   kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
   kr.m_nugget = j["nugget"].template get<decltype(kr.m_nugget)>();
   kr.m_est_nugget = j["est_nugget"].template get<decltype(kr.m_est_nugget)>();
+  kr.m_is_empty = false;
 
   return kr;
 }

@@ -124,7 +124,8 @@ NoiseKriging::KModel NoiseKriging::make_Model(const arma::vec& theta,
   auto t0 = Bench::tic();
   m.R = arma::mat(n, n, arma::fill::none);
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
-  bool update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
+  bool update = false;
+  if (!m_is_empty) update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
                 && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise, m_T, m_R);
@@ -410,7 +411,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     m_est_sigma2 = false;
 
     NoiseKriging::KModel m = make_Model(m_theta, m_sigma2, nullptr);
-
+    m_is_empty = false;
     m_T = std::move(m.L);
     m_R = std::move(m.R);
     m_M = std::move(m.Fstar);
@@ -638,7 +639,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
           m_theta = Optim::reparam_from(m_theta);
         m_est_theta = true;
         min_ofn = min_ofn_tmp;
-
+    
+        m_is_empty = false;
         m_T = std::move(m.L);
         m_R = std::move(m.R);
         m_M = std::move(m.Fstar);
@@ -1333,6 +1335,7 @@ NoiseKriging NoiseKriging::load(const std::string filename) {
   kr.m_est_theta = j["est_theta"].template get<decltype(kr.m_est_theta)>();
   kr.m_sigma2 = j["sigma2"].template get<decltype(kr.m_sigma2)>();
   kr.m_est_sigma2 = j["est_sigma2"].template get<decltype(kr.m_est_sigma2)>();
+  kr.m_is_empty = false;
 
   return kr;
 }
