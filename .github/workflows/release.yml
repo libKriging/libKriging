@@ -415,7 +415,7 @@ jobs:
       - all-package-build-checkpoint
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: python-artifact
           path: dist
@@ -451,18 +451,18 @@ jobs:
 #        with:
 #          submodules: false
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4.1.7
 #        with:
 #          name: python-artifact
 #          path: dist
 #        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4.1.7
 #        with:
 #          name: octave-package
 #          path: dist
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4.1.7
 #        with:
 #          name: R-package
 #          path: dist
