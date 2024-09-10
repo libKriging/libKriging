@@ -31,8 +31,70 @@ struct NuggetKrigingParameters {
 class NuggetKriging {
  private:
   NuggetKriging() = delete;
-  NuggetKriging(const NuggetKriging& other)
-      = default;  // Should be specialized is non default copy constructor is required
+  NuggetKriging(const NuggetKriging& other) {
+    m_covType = other.m_covType;
+    m_X = other.m_X;
+    m_centerX = other.m_centerX;
+    m_scaleX = other.m_scaleX;
+    m_y = other.m_y;
+    m_centerY = other.m_centerY;
+    m_scaleY = other.m_scaleY;
+    m_normalize = other.m_normalize;
+    m_regmodel = other.m_regmodel;
+    m_optim = other.m_optim;
+    m_objective = other.m_objective;
+    // Auxiliary data
+    m_dX = other.m_dX;
+    m_maxdX = other.m_maxdX;
+    m_F = other.m_F;
+    m_T = other.m_T;
+    m_R = other.m_R;
+    m_M = other.m_M;
+    m_star = other.m_star;
+    m_circ = other.m_circ;
+    m_z = other.m_z;
+    m_beta = other.m_beta;
+    m_est_beta = other.m_est_beta;
+    m_theta = other.m_theta;
+    m_est_theta = other.m_est_theta;
+    m_sigma2 = other.m_sigma2;
+    m_est_sigma2 = other.m_est_sigma2;
+    m_nugget = other.m_nugget;
+    m_est_nugget = other.m_est_nugget;
+    m_is_empty = other.m_is_empty;
+
+    // Simulation stored data
+    lastsim_Xn_n = other.lastsim_Xn_n;
+    lastsim_y_n = other.lastsim_y_n;
+    lastsim_nsim = other.lastsim_nsim;
+    lastsim_seed = other.lastsim_seed;
+    lastsim_with_nugget = other.lastsim_with_nugget;
+    lastsim_F_n = other.lastsim_F_n;
+    lastsim_R_nn = other.lastsim_R_nn;
+    lastsim_L_oCn = other.lastsim_L_oCn;
+    lastsim_L_nCn = other.lastsim_L_nCn;
+    lastsim_L_on = other.lastsim_L_on;
+    lastsim_Rinv_on = other.lastsim_Rinv_on;
+    lastsim_F_on = other.lastsim_F_on;
+    lastsim_Fstar_on = other.lastsim_Fstar_on;
+    lastsim_circ_on = other.lastsim_circ_on;
+    lastsim_Fcirc_on = other.lastsim_Fcirc_on;
+    lastsim_Fhat_nKo = other.lastsim_Fhat_nKo;
+    lastsim_Ecirc_nKo = other.lastsim_Ecirc_nKo;
+
+    // Updated simulation stored data
+    lastsimup_Xn_u = other.lastsimup_Xn_u;
+    lastsimup_y_u = other.lastsimup_y_u;
+    lastsimup_Wtild_nKu = other.lastsimup_Wtild_nKu;
+    lastsimup_R_uo = other.lastsimup_R_uo;
+    lastsimup_R_un = other.lastsimup_R_un;
+    lastsimup_R_uu = other.lastsimup_R_uu;
+
+    _Cov = other._Cov;
+    _DlnCovDtheta = other._DlnCovDtheta;
+    _DlnCovDx = other._DlnCovDx;
+    _Cov_pow = other._Cov_pow;
+  }
 
  public:
   using Parameters = NuggetKrigingParameters;
