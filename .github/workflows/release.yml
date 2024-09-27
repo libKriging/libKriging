@@ -176,7 +176,7 @@ jobs:
           .travis-ci/release/python-release.sh
 
       - name: Archive build artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: python-artifact
           path: |
@@ -264,7 +264,7 @@ jobs:
 #          .travis-ci/release/octave-release.sh
 #
 #      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v2
+#        uses: actions/upload-artifact@v4
 #        with:
 #          name: octave-package
 #          path: |
@@ -354,7 +354,7 @@ jobs:
 #          .travis-ci/release/r-release.sh
 #
 #      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v2
+#        uses: actions/upload-artifact@v4
 #        with:
 #          name: R-package
 #          path: |
@@ -415,7 +415,7 @@ jobs:
       - all-package-build-checkpoint
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: python-artifact
           path: dist
@@ -451,18 +451,18 @@ jobs:
 #        with:
 #          submodules: false
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: python-artifact
 #          path: dist
 #        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: octave-package
 #          path: dist
 #
-#      - uses: actions/download-artifact@v2
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: R-package
 #          path: dist
