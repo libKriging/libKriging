@@ -64,9 +64,9 @@ class NoiseKriging {
   arma::rowvec m_centerX;
   arma::rowvec m_scaleX;
   arma::vec m_y;
-  double m_centerY;
-  double m_scaleY;
-  bool m_normalize;
+  double m_centerY{};
+  double m_scaleY{};
+  bool m_normalize{};
   arma::vec m_noise;
   Trend::RegressionModel m_regmodel;
   std::string m_optim;
@@ -83,19 +83,19 @@ class NoiseKriging {
   arma::mat m_circ;
   arma::vec m_z;
   arma::vec m_beta;
-  bool m_est_beta;
+  bool m_est_beta{};
   arma::vec m_theta;
-  bool m_est_theta;
-  double m_sigma2;
-  bool m_est_sigma2;
+  bool m_est_theta{};
+  double m_sigma2{};
+  bool m_est_sigma2{};
   bool m_is_empty = true;  // this will force the model to be make from scratch first time (no update)
 
   // Simulation stored data
   arma::mat lastsim_Xn_n;
   arma::mat lastsim_y_n;
   arma::vec lastsim_with_noise;
-  int lastsim_nsim;
-  int lastsim_seed;
+  int lastsim_nsim{};
+  int lastsim_seed{};
   arma::mat lastsim_F_n;
   arma::mat lastsim_R_nn;
   arma::mat lastsim_L_oCn;
@@ -121,7 +121,7 @@ class NoiseKriging {
   std::function<double(const arma::vec&, const arma::vec&)> _Cov;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
-  double _Cov_pow;
+  double _Cov_pow{};
 
   // This will create the dist(xi,xj) function above. Need to parse "kernel".
   void make_Cov(const std::string& covType);
