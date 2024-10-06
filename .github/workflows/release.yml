@@ -178,7 +178,7 @@ jobs:
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifact
+          name: python-artifact-${{ matrix.os }}-${{ matrix.python-version }}
           path: |
             dist 
             
@@ -417,8 +417,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: python-artifact
+          pattern: python-artifact-*
           path: dist
+          merge-multiple: true
 
       - name: upload
         env:
