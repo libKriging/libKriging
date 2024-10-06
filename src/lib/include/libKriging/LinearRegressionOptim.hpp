@@ -30,7 +30,7 @@ class LinearRegressionOptim {
 
  private:
   arma::colvec m_coef;
-  double m_sig2;
+  double m_sig2{};
   arma::colvec m_stderrest;
 };
 

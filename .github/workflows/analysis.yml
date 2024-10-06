@@ -35,7 +35,7 @@ env:
 
 jobs:
   guideline-checks:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -70,14 +70,14 @@ jobs:
             force_update: on
             # /!\ need after_success
           - name: "Memcheck mode"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Debug
             enable_python: on
             enable_matlab: on
             enable_memcheck: on
             force_update: on
           - name: "Address Sanitizer"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Debug
             enable_python: off
             enable_octave: off
@@ -85,7 +85,7 @@ jobs:
             force_update: on
             sanitizer: address
           - name: "Leak Sanitizer"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Debug
             enable_python: off
             enable_octave: off
@@ -93,7 +93,7 @@ jobs:
             force_update: on
             sanitizer: leak
           - name: "Thread Sanitizer"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Debug
             enable_python: off
             enable_octave: off

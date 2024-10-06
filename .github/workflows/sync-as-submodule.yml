@@ -4,6 +4,7 @@ on:
   push:
     branches: 
       - master
+      - ubsan-test
 
 jobs:
   update:
@@ -14,7 +15,7 @@ jobs:
         with: 
           repository: libKriging/rlibkriging
           token: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
-          ref: master
+          ref: ${{ github.ref_name }} 
 
       - name: Pull & update submodules recursively
         run: |

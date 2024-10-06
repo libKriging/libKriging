@@ -23,7 +23,7 @@ env:
 jobs:
   check-release-consistency:
     name: Check Release Consistency
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       git-tag: ${{ steps.expose-variable.outputs.git-tag }}
       draft-release: ${{ steps.expose-variable.outputs.draft-release }}
@@ -91,7 +91,7 @@ jobs:
   display_release_tag:
     name: Release tag ${{ needs.check-release-consistency.outputs.git-tag }}
     needs: check-release-consistency
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Tag ${{ needs.check-release-consistency.outputs.git-tag }}
         shell: bash
@@ -104,13 +104,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-2019, macOS-14 ]
+        os: [ windows-latest, macOS-latest ]
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
         exclude:
-          - os: macOS-14
+          - os: macOS-latest
             python-version: 3.7
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             # all versions done in one script wrapper
 
     steps:
@@ -176,9 +176,9 @@ jobs:
           .travis-ci/release/python-release.sh
 
       - name: Archive build artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: python-artifact
+          name: python-artifact-${{ matrix.os }}-${{ matrix.python-version }}
           path: |
             dist 
             
@@ -193,9 +193,9 @@ jobs:
 #            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
 #            force_update: on
 #          - name: "Octave macOS"
-#            os: macOS-14
+#            os: macOS-latest
 #          - name: "Octave Windows"
-#            os: windows-2019
+#            os: windows-latest
 #
 #    steps:
 #      - uses: actions/checkout@v2
@@ -264,7 +264,7 @@ jobs:
 #          .travis-ci/release/octave-release.sh
 #
 #      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v2
+#        uses: actions/upload-artifact@v4
 #        with:
 #          name: octave-package
 #          path: |
@@ -278,11 +278,11 @@ jobs:
 #      matrix:
 #        include:
 #          - name: "R Linux"
-#            os: ubuntu-20.04
+#            os: ubuntu-22.04
 #          - name: "R macOS"
-#            os: macOS-14
+#            os: macOS-latest
 #          - name: "R Windows"
-#            os: windows-2019
+#            os: windows-latest
 #
 #    steps:
 #      - uses: actions/checkout@v2
@@ -354,7 +354,7 @@ jobs:
 #          .travis-ci/release/r-release.sh
 #
 #      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v2
+#        uses: actions/upload-artifact@v4
 #        with:
 #          name: R-package
 #          path: |
@@ -367,7 +367,7 @@ jobs:
       - build-wheel-python
 #      - build-R-package
 #      - build-octave-package
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -413,12 +413,13 @@ jobs:
     needs:
       - check-release-consistency
       - all-package-build-checkpoint
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v4.1.7
+      - uses: actions/download-artifact@v4
         with:
-          name: python-artifact
+          pattern: python-artifact-*
           path: dist
+          merge-multiple: true
 
       - name: upload
         env:
@@ -445,24 +446,24 @@ jobs:
 #    needs:
 #      - check-release-consistency
 #      - all-package-build-checkpoint
-#    runs-on: ubuntu-20.04
+#    runs-on: ubuntu-22.04
 #    steps:
 #      - uses: actions/checkout@v2
 #        with:
 #          submodules: false
 #
-#      - uses: actions/download-artifact@v4.1.7
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: python-artifact
 #          path: dist
 #        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
 #
-#      - uses: actions/download-artifact@v4.1.7
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: octave-package
 #          path: dist
 #
-#      - uses: actions/download-artifact@v4.1.7
+#      - uses: actions/download-artifact@v4
 #        with:
 #          name: R-package
 #          path: dist
