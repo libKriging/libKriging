@@ -22,10 +22,10 @@ if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
 	"${BASEDIR}"/install_conda.bat
 	popd
 fi
-$HOME/Miniconda3/condabin/conda.bat update -y -n base -c defaults conda
+$HOME/Miniconda3/Scripts/conda.exe update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
-$HOME/Miniconda3/condabin/conda.bat install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
+$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
 
 # https://chocolatey.org/docs/commands-install
 # required to compile fortran part
