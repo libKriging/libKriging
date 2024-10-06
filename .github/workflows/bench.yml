@@ -19,19 +19,19 @@ jobs:
       matrix:
         include:
           - name: "Linux BLAS"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Release
             enable_R: on
             install_blas: sudo apt install -qy libblas3 libblas-dev
 
           - name: "Linux OpenBLAS"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Release
             enable_R: on
             install_blas: sudo apt install -qy libopenblas-base libopenblas-dev
 
           - name: "Linux Intel MKL"
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             mode: Release
             enable_R: on
             install_blas: sudo apt install -qy intel-mkl-full
