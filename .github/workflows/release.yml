@@ -105,13 +105,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ windows-latest, macOS-latest ]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
-        exclude:
-          - os: macOS-latest
-            python-version: 3.7
-        include:
-          - os: ubuntu-22.04
-            # all versions done in one script wrapper
+        python-version: ["3.12"]
+#        exclude:
+#          - os: macOS-latest
+#            python-version: 3.7
+#        include:
+#          - os: ubuntu-22.04
+#            # all versions done in one script wrapper
 
     steps:
       - uses: actions/checkout@v2
@@ -169,6 +169,18 @@ jobs:
       - name: before_script
         shell: bash
         run: .travis-ci/common/before_script.sh
+
+      - name: find all components
+        shell: bash
+        run: |
+          LIBKRIGING_DLL_PATH=/c/Users/runneradmin/Miniconda3/Library/bin
+          find $LIBKRIGING_DLL_PATH
+
+      - name: find specific components
+        shell: bash
+        run: |
+          LIBKRIGING_DLL_PATH=/c/Users/runneradmin/Miniconda3/Library/bin
+          find $LIBKRIGING_DLL_PATH -name "flang*"
 
       - name: build
         shell: bash
