@@ -18,7 +18,7 @@ def main():
 
     extra_libs = []
     if platform.system() == "Windows":
-        extra_libs = [find_in_path(f) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
+        extra_libs = [find_in_path(f) for f in ['openblas.dll']]
 
     argparser = argparse.ArgumentParser(add_help=False)
     argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
