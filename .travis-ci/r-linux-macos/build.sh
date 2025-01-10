@@ -17,6 +17,12 @@ MAKE_SHARED_LIBS=on
 if [[ "$(uname -s)" == "Linux" ]]; then
   MAKE_SHARED_LIBS=off # Quick workaround for not found armadillo lib
 fi
+# STATIC_LIB = !SHARED_LIB
+if [[ ${MAKE_SHARED_LIBS} == "on" ]]; then
+  STATIC_LIB=off
+else
+  STATIC_LIB=on
+fi  
 
 MODE=${MODE:-Release}
 
@@ -24,7 +30,7 @@ BUILD_TEST=false \
     MODE=${MODE} \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
-    EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} ${EXTRA_CMAKE_OPTIONS}" \
+    EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DSTATIC_LIB=${STATIC_LIB} ${EXTRA_CMAKE_OPTIONS}" \
     "${BASEDIR}"/../linux-macos/build.sh
 
 export LIBKRIGING_PATH=${PWD}/${BUILD_DIR:-build}/installed
@@ -38,4 +44,4 @@ cd bindings/R
 make uninstall || true
 make clean
 MAKEFLAGS=-j${NPROC}
-MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} make
+MAKE_SHARED_LIBS=${MAKE_SHARED_LIBS} STATIC_LIB=${STATIC_LIB} make
