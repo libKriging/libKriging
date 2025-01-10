@@ -9,7 +9,7 @@
 [submodule "dependencies/armadillo-code"]
 	path = dependencies/armadillo-code
 	url = https://github.com/libKriging/armadillo-code.git
-	branch = 10.6.x
+	branch = 14.2.x
 [submodule "dependencies/Catch2"]
 	path = dependencies/Catch2
 	url = https://github.com/catchorg/Catch2.git
