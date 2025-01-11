@@ -11,7 +11,6 @@
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
-LIBKRIGING_EXPORT
 arma::solve_opts::opts LinearAlgebra::default_solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx;
 
