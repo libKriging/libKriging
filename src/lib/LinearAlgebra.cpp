@@ -12,7 +12,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 LIBKRIGING_EXPORT
-const arma::solve_opts::opts LinearAlgebra::default_solve_opts
+arma::solve_opts::opts LinearAlgebra::default_solve_opts
     = arma::solve_opts::fast + arma::solve_opts::no_approx;
 
 double LinearAlgebra::num_nugget = 1E-10;
@@ -50,7 +50,7 @@ int LinearAlgebra::max_inc_choldiag = 10;
 // Recursive turn-around for ill-condition of correlation matrix. Used in *Kriging::fit & *Kriging::simulate
 //' @ref: Andrianakis, I. and Challenor, P. G. (2012). The effect of the nugget on Gaussian pro-cess emulators of
 // computer models. Comput. Stat. Data Anal., 56(12):4215–4228.
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
+arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
   arma::mat L = arma::mat(X.n_rows, X.n_cols, arma::fill::none);
   // auto t0 = Bench::tic();
   bool ok = arma::chol(L, X, "lower");

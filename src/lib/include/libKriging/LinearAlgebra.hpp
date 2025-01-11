@@ -7,7 +7,7 @@
 
 class LinearAlgebra {
  public:
-  static const arma::solve_opts::opts default_solve_opts;
+  static arma::solve_opts::opts default_solve_opts;
 
   static double num_nugget;
   LIBKRIGING_EXPORT static void set_num_nugget(double nugget);
