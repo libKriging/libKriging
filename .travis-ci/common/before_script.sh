@@ -67,6 +67,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
 
     if ( command -v matlab >/dev/null 2>&1 ); then
       echo "Matlab config: $(command -v matlab)"
+      export LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 
       matlab -batch "ver; exit" 2>&1 | sed 's/^/  /'
     else
       echo "No matlab command found"
