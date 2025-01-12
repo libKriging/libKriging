@@ -28,6 +28,7 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 # mwblas and mwlapack are provided by Matlab/extern on Windows
 # export EXTRA_SYSTEM_LIBRARY_PATH="C:/Program Files/MATLAB/R2022a/extern/lib/win64/microsoft"
 # EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBLAS_NAMES=libmwblas -DLAPACK_NAMES=libmwlapack"
+EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DSTATIC_LIB=${STATIC_LIB}"
 
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}
