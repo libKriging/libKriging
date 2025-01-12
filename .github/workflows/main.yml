@@ -195,7 +195,7 @@ jobs:
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
       - name: pre-install-matlab
-        uses: matlab-actions/setup-matlab@v1
+        uses: matlab-actions/setup-matlab@v2
         if: matrix.enable_matlab == 'on'
 
       - name: install
