@@ -25,7 +25,7 @@ BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" || "$ENABLE_MATLAB_BINDING" == "on" ]]; then
-  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=off"
+  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=off -DSTATIC_LIB=on"
 fi
 
 case "$COMPILER" in 

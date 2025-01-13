@@ -75,7 +75,7 @@ if ver_less_than "$matlab_ver" '9.5'; then
   # escape single quotes in command
   exp=$(echo "$command" | sed "s/'/''/g")
 
-  matlab "$opts" -r "try,eval('$exp'),catch e,disp(getReport(e,'extended')),exit(1),end,exit"
+  LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 matlab "$opts" -r "try,eval('$exp'),catch e,disp(getReport(e,'extended')),exit(1),end,exit"
 else
-  matlab -batch "$command"
+  LD_PRELOAD=/lib/x86_64-linux-gnu/libstdc++.so.6 matlab -batch "$command"
 fi
