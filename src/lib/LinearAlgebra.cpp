@@ -11,8 +11,7 @@
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
-arma::solve_opts::opts LinearAlgebra::default_solve_opts
-    = arma::solve_opts::fast + arma::solve_opts::no_approx;
+arma::solve_opts::opts LinearAlgebra::default_solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx;
 
 double LinearAlgebra::num_nugget = 1E-10;
 
