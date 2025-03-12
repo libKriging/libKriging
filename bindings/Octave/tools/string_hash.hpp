@@ -19,7 +19,7 @@ size_t fnv_hash(const std::string& input) {
   return fnv_hash(input.c_str());
 }
 
-constexpr size_t operator"" _hash(const char* s, std::size_t) {
+constexpr size_t operator""_hash(const char* s, std::size_t) {
   return fnv_hash(s);
 }
 
