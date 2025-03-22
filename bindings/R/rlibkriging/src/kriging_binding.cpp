@@ -6,8 +6,8 @@
 // clang-format on
 
 #include "libKriging/Covariance.hpp"
-#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
@@ -256,7 +256,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
   ret["F"] = impl_ptr->F();
   ret["T"] = impl_ptr->T();
   ret["M"] = impl_ptr->M();
-  ret["z"] = impl_ptr->z(); 
+  ret["z"] = impl_ptr->z();
 
   return ret;
 }
@@ -437,7 +437,7 @@ Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool return_gra
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   if (theta.n_elem != impl_ptr->theta().n_elem)
-  Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
+    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
 
   std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, return_grad, bench);
 

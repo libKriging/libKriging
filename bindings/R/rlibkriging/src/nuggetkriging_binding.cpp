@@ -299,7 +299,7 @@ Rcpp::List nuggetkriging_model(Rcpp::List k) {
   ret["F"] = impl_ptr->F();
   ret["T"] = impl_ptr->T();
   ret["M"] = impl_ptr->M();
-  ret["z"] = impl_ptr->z(); 
+  ret["z"] = impl_ptr->z();
 
   return ret;
 }
@@ -448,8 +448,8 @@ Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k,
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  if (theta_alpha.n_elem != impl_ptr->theta().n_elem+1)
-    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem+1) + ")");
+  if (theta_alpha.n_elem != impl_ptr->theta().n_elem + 1)
+    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem + 1) + ")");
 
   std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_alpha, return_grad, bench);
 
@@ -473,15 +473,18 @@ double nuggetkriging_logLikelihood(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k, arma::vec theta_alpha, bool return_grad = false, bool bench = false) {
+Rcpp::List nuggetkriging_logMargPostFun(Rcpp::List k,
+                                        arma::vec theta_alpha,
+                                        bool return_grad = false,
+                                        bool bench = false) {
   if (!k.inherits("NuggetKriging"))
     Rcpp::stop("Input must be a NuggetKriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<NuggetKriging> impl_ptr(impl);
 
-  if (theta_alpha.n_elem != impl_ptr->theta().n_elem+1)
-  Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem+1) + ")");
+  if (theta_alpha.n_elem != impl_ptr->theta().n_elem + 1)
+    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem + 1) + ")");
 
   std::tuple<double, arma::vec> lmp = impl_ptr->logMargPostFun(theta_alpha, return_grad, bench);
 

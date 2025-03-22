@@ -262,7 +262,7 @@ Rcpp::List noisekriging_model(Rcpp::List k) {
   ret["F"] = impl_ptr->F();
   ret["T"] = impl_ptr->T();
   ret["M"] = impl_ptr->M();
-  ret["z"] = impl_ptr->z(); 
+  ret["z"] = impl_ptr->z();
 
   return ret;
 }
@@ -417,8 +417,8 @@ Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k,
 
   Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
 
-  if (theta_sigma2.n_elem != impl_ptr->theta().n_elem+1)
-    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem+1) + ")");
+  if (theta_sigma2.n_elem != impl_ptr->theta().n_elem + 1)
+    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem + 1) + ")");
 
   std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_sigma2, return_grad, bench);
 
