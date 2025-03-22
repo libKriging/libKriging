@@ -53,7 +53,7 @@ setOldClass("NoiseKriging")
 #' @slot NoiseKriging A copy of the \code{NoiseKriging} object used to create
 #'     the current \code{NoiseKM} object.
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @name NoiseKM-class
 #' @rdname NoiseKM-class
@@ -76,7 +76,7 @@ setClass("NoiseKM", slots = c("NoiseKriging" = "NoiseKriging"), contains = "km")
 #'
 #' @title Create an \code{NoiseKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param formula R formula object to setup the linear trend in
 #'     Universal NoiseKriging. Supports \code{~ 1}, ~. and \code{~ .^2}.
@@ -303,7 +303,7 @@ predict.NoiseKM <- function(object, newdata, type = "UK",
 #' 
 #' @title Prediction Method for a \code{NoiseKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object \code{NoiseKM} object.
 #' @param newdata Matrix of "new" input points where to perform
@@ -383,7 +383,7 @@ simulate.NoiseKM <- function(object, nsim = 1, seed = NULL, newdata,
 #'
 #' @title Simulation from a \code{NoiseKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A \code{NoiseKM} object.
 #'
@@ -477,7 +477,7 @@ update.NoiseKM <- function(object,
 #'
 #' @title Update a \code{NoiseKM} Object with New Points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A NoiseKM object.
 #' @param newX A numeric matrix containing the new design points. It

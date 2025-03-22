@@ -53,7 +53,7 @@ setOldClass("Kriging")
 #' @slot Kriging A copy of the \code{Kriging} object used to create
 #'     the current \code{KM} object.
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @name KM-class
 #' @rdname KM-class
@@ -76,7 +76,7 @@ setClass("KM", slots = c("Kriging" = "Kriging"), contains = "km")
 #'
 #' @title Create an \code{KM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param formula R formula object to setup the linear trend in
 #'     Universal Kriging. Supports \code{~ 1}, ~. and \code{~ .^2}.
@@ -301,7 +301,7 @@ predict.KM <- function(object, newdata, type = "UK",
 #' 
 #' @title Prediction Method for a \code{KM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object \code{KM} object.
 #' @param newdata Matrix of "new" input points where to perform
@@ -379,7 +379,7 @@ simulate.KM <- function(object, nsim = 1, seed = NULL, newdata,
 #'
 #' @title Simulation from a \code{KM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A \code{KM} object.
 #'
@@ -475,7 +475,7 @@ update.KM <- function(object,
 #'
 #' @title Update a \code{KM} Object with New Points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A KM object.
 #' @param newX A numeric matrix containing the new design points. It

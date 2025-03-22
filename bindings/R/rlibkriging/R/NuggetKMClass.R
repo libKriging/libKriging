@@ -53,7 +53,7 @@ setOldClass("NuggetKriging")
 #' @slot NuggetKriging A copy of the \code{NuggetKriging} object used to create
 #'     the current \code{NuggetKM} object.
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @name NuggetKM-class
 #' @rdname NuggetKM-class
@@ -76,7 +76,7 @@ setClass("NuggetKM", slots = c("NuggetKriging" = "NuggetKriging"), contains = "k
 #'
 #' @title Create an \code{NuggetKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param formula R formula object to setup the linear trend in
 #'     Universal NuggetKriging. Supports \code{~ 1}, ~. and \code{~ .^2}.
@@ -308,7 +308,7 @@ predict.NuggetKM <- function(object, newdata, type = "UK",
 #' 
 #' @title Prediction Method for a \code{NuggetKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object \code{NuggetKM} object.
 #' @param newdata Matrix of "new" input points where to perform
@@ -387,7 +387,7 @@ simulate.NuggetKM <- function(object, nsim = 1, seed = NULL, newdata,
 #'
 #' @title Simulation from a \code{NuggetKM} Object
 #' 
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A \code{NuggetKM} object.
 #'
@@ -483,7 +483,7 @@ update.NuggetKM <- function(object,
 #'
 #' @title Update a \code{NuggetKM} Object with New Points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #' 
 #' @param object A NuggetKM object.
 #' @param newX A numeric matrix containing the new design points. It

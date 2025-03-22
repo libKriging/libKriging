@@ -219,7 +219,7 @@ fit <- function(object, ...) {
 ##' Save a Kriging Model inside a file. Back to base::save if argument 
 ##' is not a Kriging object.
 ##' 
-##' @author Yann Richet \email{yann.richet@irsn.fr}
+##' @author Yann Richet \email{yann.richet@asnr.fr}
 ##' 
 ##' @param object An object representing a model.
 ##' @param filename A file to save the object.
@@ -276,7 +276,7 @@ save <- function(object=NULL, filename=NULL, ...) {
 ## *****************************************************************************
 ##' Load any Kriging Model from a file storage. Back to base::load if not a Kriging object.
 ##'
-##' @author Yann Richet \email{yann.richet@irsn.fr}
+##' @author Yann Richet \email{yann.richet@asnr.fr}
 ##'
 ##' @param filename A file holding any Kriging object.
 ##' @param ... Arguments used by base::load.

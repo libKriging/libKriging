@@ -32,7 +32,7 @@ classNuggetKriging <-function(nk) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param y Numeric vector of response values.
 #' @param X Numeric matrix of input design.
@@ -114,7 +114,7 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
 
 #' Coerce a \code{NuggetKriging} Object into a List
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with class \code{"NuggetKriging"}.
 #' @param ... Ignored
@@ -149,7 +149,7 @@ as.list.NuggetKriging <- function(x, ...) {
 #' Coerce a \code{NuggetKriging} object into the \code{"km"} class of the
 #' \pkg{DiceKriging} package.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with S3 class \code{"NuggetKriging"}.
 #' @param .call Force the \code{call} slot to be filled in the
@@ -260,7 +260,7 @@ as.km.NuggetKriging <- function(x, .call = NULL, ...) {
 
 #' Print the content of a \code{NuggetKriging} object.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x A (S3) \code{NuggetKriging} Object.
 #' @param ... Ignored.
@@ -295,7 +295,7 @@ print.NuggetKriging <- function(x, ...) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #'
@@ -373,7 +373,7 @@ fit.NuggetKriging <- function(object, y, X,
 #' stochastic process, conditional on the values at the input points
 #' used when fitting the model.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #' @param x Input points where the prediction must be computed.
@@ -429,7 +429,7 @@ predict.NuggetKriging <- function(object, x, return_stdev = TRUE, return_cov = F
 #' points conditional on the values at the input points used in the
 #' fit.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #' @param nsim Number of simulations to perform.
@@ -484,7 +484,7 @@ simulate.NuggetKriging <- function(object, nsim = 1, seed = 123, x, with_nugget 
 #' This method draws paths of the stochastic process conditional on the values at the input points used in the
 #' fit, plus the new input points and their values given as argument (knonw as 'update' points).
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -536,7 +536,7 @@ update_simulate.NuggetKriging <- function(object, y_u, X_u, ...) {
 
 #' Update a \code{NuggetKriging} model object with new points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -600,7 +600,7 @@ update.NuggetKriging <- function(object, y_u, X_u, refit=TRUE, ...) {
 
 #' Save a NuggetKriging Model to a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param filename File name to save in.
@@ -637,7 +637,7 @@ save.NuggetKriging <- function(object, filename, ...) {
 
 #' Load a NuggetKriging Model from a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param filename File name to load from.
 #' @param ... Not used.
@@ -669,7 +669,7 @@ load.NuggetKriging <- function(filename, ...) {
 
 #' Compute Covariance Matrix of NuggetKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param x1 Numeric matrix of input points.
@@ -705,7 +705,7 @@ covMat.NuggetKriging <- function(object, x1, x2, ...) {
 
 #' Compute Log-Likelihood of NuggetKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param theta_alpha A numeric vector of (positive) range parameters and variance over variance plus nugget at
@@ -770,7 +770,7 @@ logLikelihoodFun.NuggetKriging <- function(object, theta_alpha,
 
 #' Get logLikelihood of NuggetKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param ... Not used.
@@ -800,7 +800,7 @@ logLikelihood.NuggetKriging <- function(object, ...) {
 #' Compute the log-marginal posterior of a kriging model, using the
 #' prior XXXY.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NuggetKriging object.
 #' @param theta_alpha Numeric vector of correlation range and variance over variance plus nugget parameters at
@@ -868,7 +868,7 @@ logMargPostFun.NuggetKriging <- function(object, theta_alpha, return_grad = FALS
 
 #' Get logMargPost of NuggetKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param ... Not used.
@@ -898,7 +898,7 @@ logMargPost.NuggetKriging <- function(object, ...) {
 
 #' Duplicate a NuggetKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NuggetKriging object.
 #' @param ... Not used.

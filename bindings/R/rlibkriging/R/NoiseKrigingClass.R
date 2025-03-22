@@ -32,7 +32,7 @@ classNoiseKriging <- function(nk) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param y Numeric vector of response values.
 #' @param noise Numeric vector of response variances.
@@ -116,7 +116,7 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
 
 #' Coerce a \code{NoiseKriging} Object into a List
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with class \code{"NoiseKriging"}.
 #' @param ... Ignored
@@ -151,7 +151,7 @@ as.list.NoiseKriging <- function(x, ...) {
 #' Coerce a \code{NoiseKriging} object into the \code{"km"} class of the
 #' \pkg{DiceKriging} package.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with S3 class \code{"NoiseKriging"}.
 #' @param .call Force the \code{call} slot to be filled in the
@@ -263,7 +263,7 @@ as.km.NoiseKriging <- function(x, .call = NULL, ...) {
 
 #' Print the content of a \code{NoiseKriging} object.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x A (S3) \code{NoiseKriging} Object.
 #' @param ... Ignored.
@@ -298,7 +298,7 @@ print.NoiseKriging <- function(x, ...) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NoiseKriging object.
 #' @param y Numeric vector of response values.
@@ -373,7 +373,7 @@ fit.NoiseKriging <- function(object, y, noise, X,
 #' stochastic process, conditional on the values at the input points
 #' used when fitting the model.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NoiseKriging object.
 #' @param x Input points where the prediction must be computed.
@@ -429,7 +429,7 @@ predict.NoiseKriging <- function(object, x, return_stdev = TRUE, return_cov = FA
 #' points conditional on the values at the input points used in the
 #' fit.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NoiseKriging object.
 #' @param nsim Number of simulations to perform.
@@ -485,7 +485,7 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, with_noise = 
 #' This method draws paths of the stochastic process conditional on the values at the input points used in the
 #' fit, plus the new input points and their values given as argument (knonw as 'update' points).
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NoiseKriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -538,7 +538,7 @@ update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
 
 #' Update a \code{NoiseKriging} model object with new points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 NoiseKriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -603,7 +603,7 @@ update.NoiseKriging <- function(object, y_u, noise_u, X_u, refit=TRUE, ...) {
 
 #' Save a NoiseKriging Model to a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NoiseKriging object.
 #' @param filename File name to save in.
@@ -639,7 +639,7 @@ save.NoiseKriging <- function(object, filename, ...) {
 
 #' Load a NoiseKriging Model from a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param filename File name to load from.
 #' @param ... Not used.
@@ -671,7 +671,7 @@ load.NoiseKriging <- function(filename, ...) {
 
 #' Compute Covariance Matrix of NoiseKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NoiseKriging object.
 #' @param x1 Numeric matrix of input points.
@@ -707,7 +707,7 @@ covMat.NoiseKriging <- function(object, x1, x2, ...) {
 
 #' Compute Log-Likelihood of NoiseKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NoiseKriging object.
 #' @param theta_sigma2 A numeric vector of (positive) range parameters and variance at
@@ -772,7 +772,7 @@ logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
 
 #' Get logLikelihood of NoiseKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NoiseKriging object.
 #' @param ... Not used.
@@ -801,7 +801,7 @@ logLikelihood.NoiseKriging <- function(object, ...) {
 
 #' Duplicate a NoiseKriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 NoiseKriging object.
 #' @param ... Not used.

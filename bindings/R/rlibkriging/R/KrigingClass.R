@@ -33,7 +33,7 @@ classKriging <- function(nk) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param y Numeric vector of response values.
 #' @param X Numeric matrix of input design.
@@ -120,7 +120,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
 
 #' Coerce a \code{Kriging} Object into a List
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with class \code{"Kriging"}.
 #' @param ... Ignored
@@ -155,7 +155,7 @@ as.list.Kriging <- function(x, ...) {
 #' Coerce a \code{Kriging} object into the \code{"km"} class of the
 #' \pkg{DiceKriging} package.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x An object with S3 class \code{"Kriging"}.
 #' @param .call Force the \code{call} slot to be filled in the
@@ -270,7 +270,7 @@ as.km.Kriging <- function(x, .call = NULL, ...) {
 
 #' Print the content of a \code{Kriging} object.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param x A (S3) \code{Kriging} Object.
 #' @param ... Ignored.
@@ -305,7 +305,7 @@ print.Kriging <- function(x, ...) {
 #' are estimated thanks to the optimization of a criterion given by
 #' \code{objective}, using the method given in \code{optim}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param y Numeric vector of response values.
@@ -382,7 +382,7 @@ fit.Kriging <- function(object, y, X,
 #' stochastic process, conditional on the values at the input points
 #' used when fitting the model.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param x Input points where the prediction must be computed.
@@ -438,7 +438,7 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' points conditional on the values at the input points used in the
 #' fit.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param nsim Number of simulations to perform.
@@ -492,7 +492,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALS
 #' This method draws paths of the stochastic process conditional on the values at the input points used in the
 #' fit, plus the new input points and their values given as argument (knonw as 'update' points).
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -544,7 +544,7 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 
 #' Update a \code{Kriging} model object with new points
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param y_u Numeric vector of new responses (output).
@@ -607,7 +607,7 @@ update.Kriging <- function(object, y_u, X_u, refit=TRUE,...) {
 
 #' Save a Kriging Model to a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param filename File name to save in.
@@ -642,7 +642,7 @@ save.Kriging <- function(object, filename, ...) {
 
 #' Load a Kriging Model from a file storage
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param filename File name to load from.
 #' @param ... Not used.
@@ -673,7 +673,7 @@ load.Kriging <- function(filename, ...) {
 
 #' Compute Covariance Matrix of Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param x1 Numeric matrix of input points.
@@ -709,7 +709,7 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 
 #' Compute Log-Likelihood of Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param theta A numeric vector of (positive) range parameters at
@@ -766,7 +766,7 @@ logLikelihoodFun.Kriging <- function(object, theta,
 
 #' Get Log-Likelihood of Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param ... Not used.
@@ -802,7 +802,7 @@ logLikelihood.Kriging <- function(object, ...) {
 #' prediction of \eqn{y_i}{y[i]} based on the the observations \eqn{y_j}{y[j]}
 #' with \eqn{j \neq i}{j != i}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object A \code{Kriging} object.
 #' @param theta A numeric vector of range parameters at which the LOO
@@ -856,7 +856,7 @@ leaveOneOutFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 #' prediction of \eqn{y_i}{y[i]} based on the the observations \eqn{y_j}{y[j]}
 #' with \eqn{j \neq i}{j != i}.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object A \code{Kriging} object.
 #' @param theta A numeric vector of range parameters at which the LOO
@@ -917,7 +917,7 @@ leaveOneOutVec.Kriging <- function(object, theta, ...) {
 
 #' Get leaveOneOut of Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param ... Not used.
@@ -947,7 +947,7 @@ leaveOneOut.Kriging <- function(object, ...) {
 #' Compute the log-marginal posterior of a kriging model, using the
 #' prior XXXY.
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object S3 Kriging object.
 #' @param theta Numeric vector of correlation range parameters at
@@ -1002,7 +1002,7 @@ logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FAL
 
 #' Get logMargPost of Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param ... Not used.
@@ -1032,7 +1032,7 @@ logMargPost.Kriging <- function(object, ...) {
 
 #' Duplicate a Kriging Model
 #'
-#' @author Yann Richet \email{yann.richet@irsn.fr}
+#' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
 #' @param ... Not used.

@@ -7,7 +7,7 @@ Authors@R:
     c(person(given = "Yann",
              family = "Richet",
              role = c("aut","cre"),
-             email = "yann.richet@irsn.fr",
+             email = "yann.richet@asnr.fr",
              comment = c(ORCID = "0000-0002-5677-8458")),
       person(given = "Pascal",
              family = "Havé",
@@ -17,7 +17,7 @@ Authors@R:
              family = "Deville",
              role = c("aut"),
              email = "deville.yves@alpestat.com"))
-Maintainer: Yann Richet <yann.richet@irsn.fr>
+Maintainer: Yann Richet <yann.richet@asnr.fr>
 Description: Interface to 'libKriging' 'C++' library <https://github.com/libKriging> that should
     provide most standard Kriging / Gaussian process regression features
     (like in 'DiceKriging', 'kergp' or 'RobustGaSP' packages).
