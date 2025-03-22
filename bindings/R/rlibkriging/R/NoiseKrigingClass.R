@@ -416,13 +416,9 @@ fit.NoiseKriging <- function(object, y, noise, X,
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
 predict.NoiseKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
     ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
-    if (!is.matrix(x)) x=matrix(x,ncol=ncol(k$X))
-    if (ncol(x) != ncol(k$X))
-        stop("Input x must have ", ncol(k$X), " columns (instead of ",
-             ncol(x), ")")
+    if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
     return(noisekriging_predict(object, x, return_stdev, return_cov, return_deriv))
 }
 
@@ -476,12 +472,9 @@ predict.NoiseKriging <- function(object, x, return_stdev = TRUE, return_cov = FA
 #' lines(x, s[ , 3], col = "blue")
 simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE,  ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
+    ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
-    if (!is.matrix(x)) x = matrix(x, ncol = ncol(k$X))
-    if (ncol(x) != ncol(k$X))
-        stop("Input x must have ", ncol(k$X), " columns (instead of ",
-             ncol(x),")")
+    if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
     if (is.null(with_noise) || isFALSE(with_noise)) with_noise = rep(0, nrow(x))
     return(noisekriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_noise = with_noise, will_update = will_update))
@@ -535,17 +528,10 @@ simulate.NoiseKriging <- function(object, nsim = 1, seed = 123, x, with_noise = 
 #' lines(x, su[ , 3], col = "blue", lty=2)
 update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
-    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
-    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
-    if (ncol(X_u) != ncol(k$X))
-        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
-             ncol(X_u), ")")
-    if (nrow(y_u) != nrow(X_u))
-        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
-
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
     ## Modify 'object' in the parent environment
     return(noisekriging_update_simulate(object, y_u, noise_u, X_u))
 }
@@ -604,20 +590,10 @@ update_simulate.NoiseKriging <- function(object, y_u, noise_u, X_u, ...) {
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
 update.NoiseKriging <- function(object, y_u, noise_u, X_u, refit=TRUE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
-    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(k$X))
+    if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
-    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = ncol(k$y))
-    if (!is.matrix(noise_u)) noise_u <- matrix(noise_u, ncol = ncol(k$y))
-    if (ncol(X_u) != ncol(k$X))
-        stop("Object 'X_u' must have ", ncol(k$X), " columns (instead of ",
-             ncol(X_u), ")")
-    if (nrow(y_u) != nrow(X_u))
-        stop("Objects 'X_u' and 'y_u' must have the same number of rows.")
-    if (nrow(noise_u) != nrow(X_u))
-        stop("Objects 'noise_u' and 'y_u' must have the same number of rows.")
-
+    if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
     ## Modify 'object' in the parent environment
     noisekriging_update(object, y_u, noise_u, X_u, refit)
 
@@ -722,17 +698,10 @@ load.NoiseKriging <- function(filename, ...) {
 #' covMat(k, x1, x2)
 covMat.NoiseKriging <- function(object, x1, x2, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
     if (is.data.frame(x1)) x1 = data.matrix(x1)
     if (is.data.frame(x2)) x2 = data.matrix(x2)
-    if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(k$X))
-    if (!is.matrix(x2)) x2 = matrix(x2, ncol = ncol(k$X))
-    if (ncol(x1) != ncol(k$X))
-        stop("Input x1 must have ", ncol(k$X), " columns (instead of ",
-             ncol(x1), ")")
-    if (ncol(x2) != ncol(k$X))
-        stop("Input x2 must have ", ncol(k$X), " columns (instead of ",
-             ncol(x2), ")")
+    if (!is.matrix(x1)) x1 = matrix(x1, ncol = ncol(object$X()))
+    if (!is.matrix(x2)) x2 = matrix(x2, ncol = ncol(object$X()))
     return(noisekriging_covMat(object, x1, x2))
 }
 
@@ -783,12 +752,8 @@ covMat.NoiseKriging <- function(object, x1, x2, ...) {
 logLikelihoodFun.NoiseKriging <- function(object, theta_sigma2,
                                   return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
-    k <- noisekriging_model(object)
     if (is.data.frame(theta_sigma2)) theta_sigma2 = data.matrix(theta_sigma2)
-    if (!is.matrix(theta_sigma2)) theta_sigma2 <- matrix(theta_sigma2, ncol = ncol(k$X)+1)
-    if (ncol(theta_sigma2) != ncol(k$X)+1)
-        stop("Input theta_sigma2 must have ", ncol(k$X)+1, " columns (instead of ",
-             ncol(theta_sigma2),")")
+    if (!is.matrix(theta_sigma2)) theta_sigma2 <- matrix(theta_sigma2, ncol = ncol(object$X())+1)
     out <- list(logLikelihood = matrix(NA, nrow = nrow(theta_sigma2)),
                 logLikelihoodGrad = matrix(NA,nrow=nrow(theta_sigma2),
                                            ncol = ncol(theta_sigma2)))

@@ -6,8 +6,8 @@
 // clang-format on
 
 #include "libKriging/Covariance.hpp"
-#include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
@@ -234,29 +234,29 @@ Rcpp::List kriging_model(Rcpp::List k) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("kernel") = impl_ptr->kernel(),
-                                      Rcpp::Named("optim") = impl_ptr->optim(),
-                                      Rcpp::Named("objective") = impl_ptr->objective(),
-                                      Rcpp::Named("theta") = impl_ptr->theta(),
-                                      Rcpp::Named("is_theta_estim") = impl_ptr->is_theta_estim(),
-                                      Rcpp::Named("sigma2") = impl_ptr->sigma2(),
-                                      Rcpp::Named("is_sigma2_estim") = impl_ptr->is_sigma2_estim(),
-                                      Rcpp::Named("X") = impl_ptr->X(),
-                                      Rcpp::Named("centerX") = impl_ptr->centerX(),
-                                      Rcpp::Named("scaleX") = impl_ptr->scaleX(),
-                                      Rcpp::Named("y") = impl_ptr->y(),
-                                      Rcpp::Named("centerY") = impl_ptr->centerY(),
-                                      Rcpp::Named("scaleY") = impl_ptr->scaleY(),
-                                      Rcpp::Named("normalize") = impl_ptr->normalize(),
-                                      Rcpp::Named("regmodel") = Trend::toString(impl_ptr->regmodel()),
-                                      Rcpp::Named("beta") = impl_ptr->beta(),
-                                      Rcpp::Named("is_beta_estim") = impl_ptr->is_beta_estim());
+  Rcpp::List ret = Rcpp::List(20);
 
-  // because Rcpp::List::create accepts no more than 20 args...
-  ret.push_back(impl_ptr->F(), "F");
-  ret.push_back(impl_ptr->T(), "T");
-  ret.push_back(impl_ptr->M(), "M");
-  ret.push_back(impl_ptr->z(), "z");
+  ret["kernel"] = impl_ptr->kernel();
+  ret["optim"] = impl_ptr->optim();
+  ret["objective"] = impl_ptr->objective();
+  ret["theta"] = impl_ptr->theta();
+  ret["is_theta_estim"] = impl_ptr->is_theta_estim();
+  ret["sigma2"] = impl_ptr->sigma2();
+  ret["is_sigma2_estim"] = impl_ptr->is_sigma2_estim();
+  ret["X"] = impl_ptr->X();
+  ret["centerX"] = impl_ptr->centerX();
+  ret["scaleX"] = impl_ptr->scaleX();
+  ret["y"] = impl_ptr->y();
+  ret["centerY"] = impl_ptr->centerY();
+  ret["scaleY"] = impl_ptr->scaleY();
+  ret["normalize"] = impl_ptr->normalize();
+  ret["regmodel"] = Trend::toString(impl_ptr->regmodel());
+  ret["beta"] = impl_ptr->beta();
+  ret["is_beta_estim"] = impl_ptr->is_beta_estim();
+  ret["F"] = impl_ptr->F();
+  ret["T"] = impl_ptr->T();
+  ret["M"] = impl_ptr->M();
+  ret["z"] = impl_ptr->z(); 
 
   return ret;
 }
@@ -284,6 +284,10 @@ Rcpp::List kriging_predict(Rcpp::List k,
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
+  int d = impl_ptr->X().n_cols;
+  if (d != X_n.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
   auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
@@ -309,6 +313,10 @@ arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
+  int d = impl_ptr->X().n_cols;
+  if (d != X_n.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
   return impl_ptr->simulate(nsim, seed, X_n, will_update);
 }
 
@@ -320,6 +328,13 @@ arma::mat kriging_update_simulate(Rcpp::List k, arma::vec y_u, arma::mat X_u) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
+  int d = impl_ptr->X().n_cols;
+  if (d != X_u.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  if (X_u.n_rows != y_u.n_elem)
+    Rcpp::stop("Length of arg data should be the same.");
+
   return impl_ptr->update_simulate(y_u, X_u);
 }
 
@@ -330,6 +345,13 @@ void kriging_update(Rcpp::List k, arma::vec y_u, arma::mat X_u, bool refit = tru
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  int d = impl_ptr->X().n_cols;
+  if (d != X_u.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  if (X_u.n_rows != y_u.n_elem)
+    Rcpp::stop("Length of arg data should be the same.");
 
   impl_ptr->update(y_u, X_u, refit);
 
@@ -358,6 +380,12 @@ arma::mat kriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
+  int d = impl_ptr->X().n_cols;
+  if (d != X1.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+  if (d != X2.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
   return impl_ptr->covMat(X1, X2);
 }
 
@@ -372,6 +400,9 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  if (theta.n_elem != impl_ptr->theta().n_elem)
+    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
 
   std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, return_grad, return_hess, bench);
 
@@ -404,6 +435,9 @@ Rcpp::List kriging_leaveOneOutFun(Rcpp::List k, arma::vec theta, bool return_gra
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  if (theta.n_elem != impl_ptr->theta().n_elem)
+  Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
 
   std::tuple<double, arma::vec> loo = impl_ptr->leaveOneOutFun(theta, return_grad, bench);
 
