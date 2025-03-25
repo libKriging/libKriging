@@ -246,7 +246,7 @@ Rcpp::List noisekriging_model(Rcpp::List k) {
   ret["objective"] = impl_ptr->objective();
   ret["theta"] = impl_ptr->theta();
   ret["is_theta_estim"] = impl_ptr->is_theta_estim();
-  ret["noise"] = impl_ptr->sigma2();
+  ret["sigma2"] = impl_ptr->sigma2();
   ret["is_sigma2_estim"] = impl_ptr->is_sigma2_estim();
   ret["noise"] = impl_ptr->noise();
   ret["X"] = impl_ptr->X();
