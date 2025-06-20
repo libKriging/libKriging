@@ -1019,8 +1019,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   // Define regression matrix
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
-  m_est_beta = (m_regmodel != Trend::RegressionModel::None);
-  if ((parameters.beta.has_value())
+  m_est_beta = parameters.is_beta_estim && (m_regmodel != Trend::RegressionModel::None);
+  if (!m_est_beta && parameters.beta.has_value()
       && parameters.beta.value().n_elem > 0) {  // Then force beta to be fixed (not estimated, no variance)
     m_est_beta = false;
     m_beta = parameters.beta.value();
