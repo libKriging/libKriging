@@ -7,7 +7,7 @@
 #$ install_version("ggplot2", version = "0.9.1", repos = "http://cran.us.r-project.org")
 
 # repos <- 'http://cran.us.r-project.org'
-repos <- 'https://cran.irsn.fr'
+repos <- 'https://cran.asnr.fr'
 
 type <- switch(Sys.info()[['sysname']],
                Windows= {"binary"},
