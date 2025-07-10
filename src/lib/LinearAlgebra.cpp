@@ -73,8 +73,9 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
-    if (warn_chol && (inc_cond > 0))
+    if (warn_chol && (inc_cond > 0)) {
       arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
+    }
     return L;
   }
 }
