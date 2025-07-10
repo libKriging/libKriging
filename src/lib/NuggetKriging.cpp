@@ -293,8 +293,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logLikelihoodFun(
     size_t num = 0;
     for (auto& kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto& kv : bench)
+    for (auto& kv : bench) {
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+    }
 
   } else {
     if (_grad) {
