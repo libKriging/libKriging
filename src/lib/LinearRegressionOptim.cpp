@@ -18,11 +18,11 @@ double err_fn(const arma::vec& coef, arma::vec* grad_out, err_fn_data* fn_data) 
 
   arma::vec y_est = d->X * coef;
 
-  std::cout << "****************" << std::endl;
+  arma::cout << "****************" << std::endl;
   arma::cout << "coef: " << coef << arma::endl;
 
   double err = arma::sum(arma::square(y_est - d->y));
-  std::cout << "Err: " << err << std::endl;
+  arma::cout << "Err: " << err << std::endl;
 
   if (grad_out != nullptr) {
     int k = coef.n_elem;

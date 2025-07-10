@@ -85,8 +85,9 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
   double rcond = arma::rcond(chol);
   rcond *= rcond;
   if (warn_chol)
-    if (rcond < (chol.n_rows * min_rcond))
+    if (rcond < (chol.n_rows * min_rcond)) {
       arma::cout << "[WARNING] rcond " << rcond << " is below minimal value." << arma::endl;
+    }
   return rcond;
 }
 
@@ -109,8 +110,9 @@ LIBKRIGING_EXPORT double LinearAlgebra::rcond_approx_chol(arma::mat chol) {
   double rcond = m / M;
   rcond = rcond * rcond;
   if (warn_chol)
-    if (rcond < (chol.n_rows * min_rcond_approx))
+    if (rcond < (chol.n_rows * min_rcond_approx)) {
       arma::cout << "[WARNING] rcond_approx " << rcond << " is below minimal value." << arma::endl;
+    }
   return rcond;
 }
 

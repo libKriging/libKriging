@@ -617,8 +617,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
           retry++;
         } else {
-          if (Optim::log_level > 1)
+          if (Optim::log_level > 1) {
             result.print();
+          }
           break;
         }
       }
@@ -628,10 +629,11 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
       if (Optim::log_level > 0) {
         arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
-        if (Optim::reparametrize)
+        if (Optim::reparametrize) {
           arma::cout << "  best solution: " << Optim::reparam_from(best_gamma).t() << " ";
-        else
+        } else {
           arma::cout << "  best solution: " << best_gamma.t() << "";
+        }
       }
 
       if (min_ofn_tmp < min_ofn) {

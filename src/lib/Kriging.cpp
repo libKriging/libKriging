@@ -714,8 +714,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const ar
     size_t num = 0;
     for (auto& kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto& kv : bench)
+    for (auto& kv : bench) {
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+    }
 
   } else {
     if (_grad) {
@@ -744,8 +745,9 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
                     arma::vec& x_0,
                     const arma::vec& x_lower,
                     const arma::vec& x_upper) {
-  if (Optim::log_level > 0)
+  if (Optim::log_level > 0) {
     arma::cout << "x_0: " << x_0 << " ";
+  }
 
   double delta = 0.1;
   double x_tol = 0.01;  // Optim::solution_rel_tolerance;
@@ -771,27 +773,31 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
 
     f_previous = f_new;
     f_new = f(x, &grad, &hess);
-    if (Optim::log_level > 1)
+    if (Optim::log_level > 1) {
       arma::cout << "    f_new: " << f_new << arma::endl;
+    }
     if (f_best > f_new) {
       f_best = f_new;
       x_best = x;
     }
 
     if (std::abs((f_new - f_previous) / f_previous) < y_tol) {
-      if (Optim::log_level > 0)
+      if (Optim::log_level > 0) {
         arma::cout << "  X f_new ~ f_previous" << arma::endl;
+      }
       break;
     }
     if (arma::abs(grad).max() < g_tol) {
-      if (Optim::log_level > 0)
+      if (Optim::log_level > 0) {
         arma::cout << "  X grad ~ 0" << arma::endl;
+      }
       break;
     }
 
     arma::vec delta_x(x.n_elem);
-    if (Optim::log_level > 2)
+    if (Optim::log_level > 2) {
       arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
+    }
     if (arma::all(arma::eig_sym(hess) > 0)) {
       // try to fit a second order polynom to use its minimizer. Otherwise, just iterate with conjugate gradient
       // arma::cout << "!";
@@ -799,35 +805,42 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
     } else {
       delta_x = delta * grad / std::sqrt(arma::sum(arma::square(grad)));
     }
-    if (Optim::log_level > 2)
+    if (Optim::log_level > 2) {
       arma::cout << "  delta_x: " << delta_x << arma::endl;
+    }
 
     arma::vec x_next = x - delta_x;
-    if (Optim::log_level > 1)
+    if (Optim::log_level > 1) {
       arma::cout << "  x_next: " << x_next << arma::endl;
+    }
 
     for (arma::uword j = 0; j < x_next.n_elem; j++) {
       if (x_next[j] < x_lower[j]) {
-        if (Optim::log_level > 2)
+        if (Optim::log_level > 2) {
           arma::cout << "    <" << x_lower[j] << arma::endl;
+        }
         delta_x = delta_x * (x[j] - x_lower[j]) / (x[j] - x_next[j]) / 2;
         x_next = x - delta_x;
       }
       if (x_next[j] > x_upper[j]) {
-        if (Optim::log_level > 2)
+        if (Optim::log_level > 2) {
           arma::cout << "    >" << x_upper[j] << arma::endl;
+        }
         delta_x = delta_x * (x_upper[j] - x[j]) / (x_next[j] - x[j]) / 2;
         x_next = x - delta_x;
       }
     }
-    if (Optim::log_level > 2)
+    if (Optim::log_level > 2) {
       arma::cout << "    delta_x: " << delta << arma::endl;
-    if (Optim::log_level > 2)
+    }
+    if (Optim::log_level > 2) {
       arma::cout << "    x_next: " << x_next << arma::endl;
+    }
 
     if (arma::abs((x - x_next) / x).max() < x_tol) {
-      if (Optim::log_level > 1)
+      if (Optim::log_level > 1) {
         arma::cout << "  X x_0 ~ x_next" << arma::endl;
+      }
       break;
     }
 
@@ -836,13 +849,15 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
 
     // TODO : keep best result instead of last one
     ++i;
-    if (Optim::log_level > 0)
+    if (Optim::log_level > 0) {
       arma::cout << "  f_best: " << f_best << arma::endl;
+    }
   }
 
   x_0 = x_best;
-  if (Optim::log_level > 0)
+  if (Optim::log_level > 0) {
     arma::cout << " " << x_0 << " " << f_best << arma::endl;
+  }
 
   return f_best;
 }
@@ -1232,8 +1247,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
             retry++;
           } else {
-            if (Optim::log_level > 1)
+            if (Optim::log_level > 1) {
               result.print();
+            }
             break;
           }
         }
@@ -1243,10 +1259,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
         if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
-          if (Optim::reparametrize)
+          if (Optim::reparametrize) {
             arma::cout << "  best solution: " << Optim::reparam_from(best_gamma).t() << " ";
-          else
+          } else {
             arma::cout << "  best solution: " << best_gamma.t() << " ";
+          }
         }
 
         if (min_ofn_tmp < min_ofn) {
@@ -1348,10 +1365,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
         if (Optim::log_level > 0) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
-          if (Optim::reparametrize)
+          if (Optim::reparametrize) {
             arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
-          else
+          } else {
             arma::cout << "  best solution: " << gamma_tmp.t() << " ";
+          }
         }
 
         if (min_ofn_tmp < min_ofn) {

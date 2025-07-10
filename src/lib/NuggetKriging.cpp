@@ -539,8 +539,9 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> NuggetKriging::logMargPostFun(co
     size_t num = 0;
     for (auto& kv : bench)
       num = std::max(kv.first.size(), num);
-    for (auto& kv : bench)
+    for (auto& kv : bench) {
       arma::cout << "| " << Bench::pad(kv.first, num, ' ') << " | " << kv.second << " |" << arma::endl;
+    }
 
   } else {
     if (_grad) {
@@ -1013,8 +1014,9 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
 
           retry++;
         } else {
-          if (Optim::log_level > 1)
+          if (Optim::log_level > 1) {
             result.print();
+          }
           break;
         }
       }
@@ -1024,10 +1026,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
 
       if (Optim::log_level > 0) {
         arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
-        if (Optim::reparametrize)
+        if (Optim::reparametrize) {
           arma::cout << "  best solution: " << NuggetKriging::reparam_from(best_gamma).t() << " ";
-        else
+        } else {
           arma::cout << "  best solution: " << best_gamma.t() << " ";
+        }
       }
 
       if (min_ofn_tmp < min_ofn) {
