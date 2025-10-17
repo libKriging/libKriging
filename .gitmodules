@@ -16,4 +16,4 @@
 	branch = v2.x
 [submodule "dependencies/lbfgsb_cpp"]
 	path = dependencies/lbfgsb_cpp
-	url = https://github.com/libKriging/lbfgsb_cpp.git
+	url = https://github.com/yannrichet/lbfgsb_cpp.git
