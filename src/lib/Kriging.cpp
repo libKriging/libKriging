@@ -25,6 +25,7 @@
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <thread>
 #include <tuple>
 #include <vector>
 
@@ -885,105 +886,74 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       fit_ofn;
   m_optim = optim;
   m_objective = objective;
+  // NOTE: Caching disabled for thread-safety in multistart optimization
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
-            // Change variable for opt: . -> 1/exp(.)
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-            const arma::vec _theta = Optim::reparam_from(_gamma);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
-            if (grad_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-              *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
-            }
-            if (hess_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > hess ll: " << hess_out << arma::endl;
-              *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
-            }
-            return -ll;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
+        // Change variable for opt: . -> 1/exp(.)
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
+        if (grad_out != nullptr) {
+          *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+        }
+        if (hess_out != nullptr) {
+          *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
+        }
+        return -ll;
+      };
     } else {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
-            const arma::vec _theta = _gamma;
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > ll: " << ll << arma::endl;
-            if (grad_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-              *grad_out = -*grad_out;
-            }
-            if (hess_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > hess ll: " << hess_out << arma::endl;
-              *hess_out = -*hess_out;
-            }
-            return -ll;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
+        const arma::vec _theta = _gamma;
+        double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
+        if (grad_out != nullptr) {
+          *grad_out = -*grad_out;
+        }
+        if (hess_out != nullptr) {
+          *hess_out = -*hess_out;
+        }
+        return -ll;
+      };
     }
   } else if (objective.compare("LOO") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-            // Change variable for opt: . -> 1/exp(.)
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-            const arma::vec _theta = Optim::reparam_from(_gamma);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
-            if (grad_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-              *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
-            }
-            return loo;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+        // Change variable for opt: . -> 1/exp(.)
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
+        if (grad_out != nullptr) {
+          *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
+        }
+        return loo;
+      };
     } else {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-            const arma::vec _theta = _gamma;
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > loo: " << loo << arma::endl;
-            // if (grad_out != nullptr) {
-            //   if (Optim::log_level>3) arma::cout << "  > grad ll: " << grad_out << arma::endl;
-            //   *grad_out = *grad_out; // so not necessary
-            //  }
-            return loo;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+        const arma::vec _theta = _gamma;
+        double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
+        return loo;
+      };
     }
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-            // Change variable for opt: . -> 1/exp(.)
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> gamma: " << _gamma << arma::endl;
-            const arma::vec _theta = Optim::reparam_from(_gamma);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
-            if (grad_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
-              *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
-            }
-            return -lmp;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+        // Change variable for opt: . -> 1/exp(.)
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
+        if (grad_out != nullptr) {
+          *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+        }
+        return -lmp;
+      };
     } else {
-      fit_ofn = CacheFunction(
-          [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-            const arma::vec _theta = _gamma;
-            // DEBUG: if (Optim::log_level>3) arma::cout << "> theta: " << _theta << arma::endl;
-            double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
-            // DEBUG: if (Optim::log_level>3) arma::cout << "  > lmp: " << lmp << arma::endl;
-            if (grad_out != nullptr) {
-              // DEBUG: if (Optim::log_level>3) arma::cout << "  > grad lmp: " << grad_out << arma::endl;
-              *grad_out = -*grad_out;
-            }
-            return -lmp;
-          });
+      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+        const arma::vec _theta = _gamma;
+        double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
+        if (grad_out != nullptr) {
+          *grad_out = -*grad_out;
+        }
+        return -lmp;
+      };
     }
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
@@ -1156,144 +1126,209 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         gamma_upper = Optim::reparam_to(theta_lower);
       }
 
-      double min_ofn = std::numeric_limits<double>::infinity();
+      // Set estimation flags before threading
+      m_est_sigma2 = parameters.is_sigma2_estim;
+      if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
+        m_sigma2 = parameters.sigma2.value();
+        if (m_normalize)
+          m_sigma2 /= (scaleY * scaleY);
+      } else {
+        m_est_sigma2 = true;
+      }
 
-      for (arma::uword i = 0; i < multistart; i++) {  // TODO: use some foreach/pragma to let OpenMP work.
-        arma::vec gamma_tmp = theta0.row(i % multistart).t();
-        if (Optim::reparametrize)
-          gamma_tmp = Optim::reparam_to(theta0.row(i % multistart).t());
+      // Multi-threading implementation for BFGS multistart
+      // Structure to hold optimization results from each thread
+      struct OptimizationResult {
+        arma::uword start_index;
+        double objective_value;
+        arma::vec gamma;
+        arma::vec theta;
+        arma::mat L;
+        arma::mat R;
+        arma::mat Fstar;
+        arma::mat Rstar;
+        arma::mat Qstar;
+        arma::vec Estar;
+        arma::vec ystar;
+        double SSEstar;
+        arma::vec betahat;
+        bool success;
+        std::string error_message;
 
-        gamma_lower = arma::min(gamma_tmp, gamma_lower);
-        gamma_upper = arma::max(gamma_tmp, gamma_upper);
+        OptimizationResult()
+            : start_index(0), objective_value(std::numeric_limits<double>::infinity()), success(false) {}
+      };
 
-        if (Optim::log_level > 0) {
-          arma::cout << "BFGS:" << arma::endl;
-          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
-          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
-          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
-          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
-          arma::cout << "  normalize: " << m_normalize << arma::endl;
-          arma::cout << "  lower_bounds: " << theta_lower.t() << " ";
-          arma::cout << "  upper_bounds: " << theta_upper.t() << " ";
-          arma::cout << "  start_point: " << theta0.row(i % multistart) << " ";
-        }
+      // Worker function for each thread
+      auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
+        OptimizationResult result;
+        result.start_index = start_idx;
 
-        m_est_sigma2 = parameters.is_sigma2_estim;
-        if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
-          m_sigma2 = parameters.sigma2.value();
-          if (m_normalize)
-            m_sigma2 /= (scaleY * scaleY);
-        } else {
-          m_est_sigma2 = true;  // force estim if no value given
-        }
+        try {
+          arma::vec gamma_tmp = theta0.row(start_idx % multistart).t();
+          if (Optim::reparametrize)
+            gamma_tmp = Optim::reparam_to(theta0.row(start_idx % multistart).t());
 
-        lbfgsb::Optimizer optimizer{d};
-        optimizer.iprint = Optim::log_level - 2;
-        optimizer.max_iter = Optim::max_iteration;
-        optimizer.pgtol = Optim::gradient_tolerance;
-        optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
-        arma::ivec bounds_type{d, arma::fill::value(2)};  // means both upper  &lower bounds
-
-        int retry = 0;
-        double best_f_opt = std::numeric_limits<double>::infinity();
-        arma::vec best_gamma = gamma_tmp;
-        Kriging::KModel m = make_Model(theta0.row(i % multistart).t(), nullptr);
-
-        while (retry <= Optim::max_restart) {
-          arma::vec gamma_0 = gamma_tmp;
-          auto result = optimizer.minimize(
-              [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-                return fit_ofn(vals_inp, &grad_out, nullptr, &m);
-              },
-              gamma_tmp,
-              gamma_lower.memptr(),
-              gamma_upper.memptr(),
-              bounds_type.memptr());
+          arma::vec gamma_lower_local = gamma_lower;
+          arma::vec gamma_upper_local = gamma_upper;
+          gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+          gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
           if (Optim::log_level > 0) {
-            arma::cout << "     iterations: " << result.num_iters << arma::endl;
-            arma::cout << "     status: " << result.task << arma::endl;
-            if (Optim::reparametrize) {
-              arma::cout << "     start_point: " << Optim::reparam_from(gamma_0).t() << " ";
-              arma::cout << "     solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
+            arma::cout << "BFGS start point " << (start_idx + 1) << "/" << multistart << ":" << arma::endl;
+          }
+
+          Kriging::KModel m = make_Model(theta0.row(start_idx % multistart).t(), nullptr);
+
+          lbfgsb::Optimizer optimizer{d};
+          optimizer.iprint = Optim::log_level - 2;
+          optimizer.max_iter = Optim::max_iteration;
+          optimizer.pgtol = Optim::gradient_tolerance;
+          optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+          arma::ivec bounds_type{d, arma::fill::value(2)};
+
+          int retry = 0;
+          double best_f_opt = std::numeric_limits<double>::infinity();
+          arma::vec best_gamma = gamma_tmp;
+
+          while (retry <= Optim::max_restart) {
+            arma::vec gamma_0 = gamma_tmp;
+            auto opt_result = optimizer.minimize(
+                [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+                  return fit_ofn(vals_inp, &grad_out, nullptr, &m);
+                },
+                gamma_tmp,
+                gamma_lower_local.memptr(),
+                gamma_upper_local.memptr(),
+                bounds_type.memptr());
+
+            if (opt_result.f_opt < best_f_opt) {
+              best_f_opt = opt_result.f_opt;
+              best_gamma = gamma_tmp;
+            }
+
+            double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower_local));
+            double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper_local));
+            double sol_to_b = std::min(sol_to_ub, sol_to_lb);
+
+            if ((retry < Optim::max_restart)
+                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
+                    || ((sol_to_b < arma::datum::eps) && (opt_result.num_iters <= 2))
+                    || (opt_result.f_opt > best_f_opt))) {
+              gamma_tmp = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
+              if (Optim::reparametrize)
+                gamma_tmp = Optim::reparam_to(gamma_tmp);
+              gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+              gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
+              retry++;
             } else {
-              arma::cout << "     start_point: " << gamma_0.t() << " ";
-              arma::cout << "     solution: " << gamma_tmp.t() << " ";
+              break;
             }
           }
 
-          if (result.f_opt < best_f_opt) {
-            best_f_opt = result.f_opt;
-            best_gamma = gamma_tmp;
-          }
+          double min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
 
-          double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower));
-          double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper));
-          double sol_to_b = std::min(sol_to_ub, sol_to_lb);
-          // Optim::reparametrize ? sol_to_ub : sol_to_lb;  // just consider theta lower bound
-          if ((retry < Optim::max_restart)
-              && ((result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // error in algorithm
-                  || ((sol_to_b < arma::datum::eps) && (result.num_iters <= 2))  // we are stuck on a bound
-                  || (result.f_opt > best_f_opt)  // maybe still better start point available
-                  )) {
-            gamma_tmp = (theta0.row(i % multistart).t() + theta_lower)
-                        / pow(2.0, retry + 1);  // so move starting point to middle-point
+          result.objective_value = min_ofn_tmp;
+          result.gamma = best_gamma;
+          result.theta = Optim::reparametrize ? Optim::reparam_from(best_gamma) : best_gamma;
+          result.L = std::move(m.L);
+          result.R = std::move(m.R);
+          result.Fstar = std::move(m.Fstar);
+          result.Rstar = std::move(m.Rstar);
+          result.Qstar = std::move(m.Qstar);
+          result.Estar = std::move(m.Estar);
+          result.ystar = std::move(m.ystar);
+          result.SSEstar = m.SSEstar;
+          result.betahat = std::move(m.betahat);
+          result.success = true;
 
-            if (Optim::reparametrize)
-              gamma_tmp = Optim::reparam_to(gamma_tmp);
-
-            gamma_lower = arma::min(gamma_tmp, gamma_lower);
-            gamma_upper = arma::max(gamma_tmp, gamma_upper);
-
-            retry++;
-          } else {
-            if (Optim::log_level > 1) {
-              result.print();
-            }
-            break;
+        } catch (const std::exception& e) {
+          result.success = false;
+          result.error_message = e.what();
+          if (Optim::log_level > 0) {
+            arma::cout << "Warning: start point " << (start_idx + 1) << " failed: " << e.what() << arma::endl;
           }
         }
 
-        // last call to ensure that T and z are up-to-date with solution.
-        double min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
+        return result;
+      };
 
-        if (Optim::log_level > 0) {
-          arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
-          if (Optim::reparametrize) {
-            arma::cout << "  best solution: " << Optim::reparam_from(best_gamma).t() << " ";
-          } else {
-            arma::cout << "  best solution: " << best_gamma.t() << " ";
-          }
+      // Execute optimizations (parallel if multistart > 1)
+      std::vector<OptimizationResult> results(multistart);
+
+      if (multistart == 1) {
+        results[0] = optimize_worker(0);
+      } else {
+        std::vector<std::thread> threads;
+        threads.reserve(multistart);
+        for (arma::uword i = 0; i < multistart; i++) {
+          threads.emplace_back([&, i]() { results[i] = optimize_worker(i); });
         }
-
-        if (min_ofn_tmp < min_ofn) {
-          m_theta = best_gamma;
-          if (Optim::reparametrize)
-            m_theta = Optim::reparam_from(best_gamma);
-          m_est_theta = true;
-          min_ofn = min_ofn_tmp;
-
-          m_is_empty = false;
-          m_T = std::move(m.L);
-          m_R = std::move(m.R);
-          m_M = std::move(m.Fstar);
-          m_circ = std::move(m.Rstar);
-          m_star = std::move(m.Qstar);
-          if (m_est_beta) {
-            m_beta = std::move(m.betahat);
-            m_z = std::move(m.Estar);
-          } else {
-            // m_beta = parameters.beta.value(); already done above
-            m_z = std::move(m.ystar) - m_M * m_beta;
-          }
-          if (m_est_sigma2) {
-            m_sigma2 = m.SSEstar / n;
-            if (m_objective.compare("LMP") == 0) {
-              m_sigma2 = m.SSEstar / (n - m_F.n_cols);
-            }
+        for (auto& t : threads) {
+          if (t.joinable()) {
+            t.join();
           }
         }
       }
+
+      // Find best result
+      double min_ofn = std::numeric_limits<double>::infinity();
+      int best_idx = -1;
+      int successful_optimizations = 0;
+
+      for (size_t i = 0; i < results.size(); i++) {
+        const auto& r = results[i];
+        if (r.success) {
+          successful_optimizations++;
+          if (r.objective_value < min_ofn) {
+            min_ofn = r.objective_value;
+            best_idx = static_cast<int>(i);
+          }
+        }
+      }
+
+      if (successful_optimizations == 0) {
+        throw std::runtime_error("All " + std::to_string(multistart)
+                                 + " optimization attempts failed");
+      }
+
+      if (Optim::log_level > 0 && successful_optimizations < multistart) {
+        arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart
+                  << " succeeded" << arma::endl;
+      }
+
+      // Update member variables with best result
+      if (best_idx >= 0) {
+        const auto& best = results[best_idx];
+        m_theta = best.theta;  // copy
+        m_est_theta = true;
+        m_is_empty = false;
+        m_T = best.L;          // copy instead of move to avoid issues
+        m_R = best.R;
+        m_M = best.Fstar;
+        m_circ = best.Rstar;
+        m_star = best.Qstar;
+
+        if (m_est_beta) {
+          m_beta = best.betahat;
+          m_z = best.Estar;
+        } else {
+          m_z = best.ystar - m_M * m_beta;
+        }
+
+        if (m_est_sigma2) {
+          m_sigma2 = best.SSEstar / n;
+          if (m_objective.compare("LMP") == 0) {
+            m_sigma2 = best.SSEstar / (n - m_F.n_cols);
+          }
+        }
+
+        if (Optim::log_level > 0) {
+          arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
+                    << arma::endl;
+        }
+      }
+
     } else if (optim.rfind("Newton", 0) == 0) {
       Random::init();
 

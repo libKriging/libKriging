@@ -176,7 +176,7 @@ jobs:
           if [ "${{matrix.force_update}}" == "on" ]; then
             sudo apt update
           fi
-          sudo apt install liblapack-dev python3-pip
+          sudo apt install liblapack-dev python3-pip libjemalloc-dev
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
             sudo apt install -qy octave liboctave-dev
           fi
