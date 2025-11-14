@@ -36,6 +36,14 @@ endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
+# Link jemalloc if enabled
+if(USE_JEMALLOC AND NOT WIN32)
+    add_dependencies(Kriging jemalloc_external)
+    target_include_directories(Kriging PRIVATE ${JEMALLOC_INCLUDE_DIR})
+    target_link_libraries(Kriging PRIVATE ${JEMALLOC_LIBRARY} pthread dl)
+    target_compile_definitions(Kriging PRIVATE LIBKRIGING_USE_JEMALLOC)
+endif()
+
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html
 #   To build shared libraries in Windows, we set CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS to TRUE.

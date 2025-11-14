@@ -5,10 +5,15 @@
 #ifdef LIBKRIGING_DEBUG_ALLOC
 #include <iostream>
 #include <unordered_set>
+#include <mutex>
 #endif
 
 #include <cassert>
 #include <cstdlib>
+#include <mutex>
+
+// When USE_JEMALLOC is enabled, jemalloc's malloc/free override the standard ones via linking
+// No need to explicitly call je_malloc/je_free
 
 #if WIN32
 #define _AMD64_
@@ -47,13 +52,17 @@ void (*custom_free)(void*) = nullptr;
 
 #ifdef LIBKRIGING_DEBUG_ALLOC
 std::unordered_set<void*> seens;
+std::mutex debug_mutex;
 #endif
 
 LIBKRIGING_EXPORT
 void* malloc(size_t n_bytes) {
 #ifdef LIBKRIGING_DEBUG_ALLOC
   static int count = 0;
-  ++count;
+  {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    ++count;
+  }
   // std::cout << "Using lkalloc allocator " /* << custom_malloc */ << " (#" << count << ") in " << dllName() << "\n";
 #endif
   void* mem_ptr = nullptr;
@@ -68,7 +77,10 @@ void* malloc(size_t n_bytes) {
 #endif
   }
 #ifdef LIBKRIGING_DEBUG_ALLOC
-  seens.insert(mem_ptr);
+  {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    seens.insert(mem_ptr);
+  }
 #endif
   return mem_ptr;
 }
@@ -77,11 +89,14 @@ LIBKRIGING_EXPORT
 void free(void* mem_ptr) {
 #ifdef LIBKRIGING_DEBUG_ALLOC
   static int count = 0;
-  ++count;
-  // std::cout << "Using lkalloc deallocator " /* << custom_free */ << " (#" << count << ") in " << dllName() << "\n";
-  if (seens.find(mem_ptr) == seens.end()) {
-    std::cout << "### (#" << count << ") lkalloc allocator has never seen " << mem_ptr << " ##" << std::endl;
-    return;
+  {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    ++count;
+    // std::cout << "Using lkalloc deallocator " /* << custom_free */ << " (#" << count << ") in " << dllName() << "\n";
+    if (seens.find(mem_ptr) == seens.end()) {
+      std::cout << "### (#" << count << ") lkalloc allocator has never seen " << mem_ptr << " ##" << std::endl;
+      return;
+    }
   }
 #endif
   if (custom_free) {
@@ -94,7 +109,10 @@ void free(void* mem_ptr) {
 #endif
   }
 #ifdef LIBKRIGING_DEBUG_ALLOC
-  seens.erase(mem_ptr);
+  {
+    std::lock_guard<std::mutex> lock(debug_mutex);
+    seens.erase(mem_ptr);
+  }
 #endif
 }
 
