@@ -1181,8 +1181,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       // Multi-threading implementation for BFGS multistart
-      // Global mutex to serialize fit_ofn calls (LAPACK/BLAS may not be thread-safe)
-      static std::mutex fit_ofn_mutex;
+      // Each thread uses its own preallocated KModel, so no mutex needed
       
       // Structure to hold optimization results from each thread
       struct OptimizationResult {
@@ -1248,7 +1247,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             arma::vec gamma_0 = gamma_tmp;
             auto opt_result = optimizer.minimize(
                 [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-                  std::lock_guard<std::mutex> lock(fit_ofn_mutex);
                   return fit_ofn(vals_inp, &grad_out, nullptr, &m);
                 },
                 gamma_tmp,
@@ -1281,10 +1279,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           }
 
           double min_ofn_tmp;
-          {
-            std::lock_guard<std::mutex> lock(fit_ofn_mutex);
-            min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
-          }
+          min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
 
           result.objective_value = min_ofn_tmp;
           result.gamma = best_gamma;
