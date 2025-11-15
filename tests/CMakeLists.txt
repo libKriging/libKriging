@@ -57,6 +57,11 @@ set(AdditionalCatchParameters --benchmark-samples 10)
 catch_discover_tests(KrigingTest)
 unset(AdditionalCatchParameters)
 
+add_executable(KrigingLogLikTest KrigingLogLikTest.cpp)
+target_link_libraries(KrigingLogLikTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingLogLikTest)
+catch_discover_tests(KrigingLogLikTest)
+
 add_executable(CacheTest CacheFunctionTest.cpp)
 target_link_libraries(CacheTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries CacheTest)
