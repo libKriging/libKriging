@@ -330,29 +330,13 @@ TEST_CASE("Branin BFGS") {
     INFO("  |sigma2_BFGS20 - sigma2_best_BFGS1| = " << sigma2_diff);
     INFO("  |LL_BFGS20 - LL_best_BFGS1| = " << ll_diff);
     
-    // Check equivalence with reasonable tolerances
-    // KNOWN ISSUE: BFGS20 and 20×BFGS1 should theoretically give identical results
-    // (same algorithm, same starting points), but currently give slightly different results.
-    // 
-    // Root cause: make_Model() has a mutex that serializes ALL threads during optimization
-    // - _logLikelihood() calls make_Model() on every objective evaluation (100+ times)
-    // - With 20 parallel threads, they serialize at this mutex
-    // - Order of mutex acquisition is non-deterministic
-    // - This affects optimization trajectory → slightly different convergence
-    //
-    // Without the mutex: crashes due to Armadillo memory management race conditions
-    // With the mutex: works but defeats parallelism and introduces non-determinism
-    //
-    // Proper fix requires refactoring to cache/reuse KModel during optimization
-    // For now, we accept small differences and verify BFGS20 finds competitive solutions
-    CHECK(theta_diff < 0.01);  // Theta should be close
-    CHECK(sigma2_diff / std::max(sigma2_best_bfgs1, 1.0) < 0.05); // Relative diff < 5%
-    CHECK(ll_diff < 0.1);      // Log-likelihood should be close
+    // Check for EXACT equivalence
+    // BFGS20 and 20×BFGS1 should give identical results (same algorithm, same starting points)
+    // With proper thread-local optimization and staggered startup, results should be deterministic
+    CHECK(theta_diff == 0.0);  // Theta must be exactly the same
+    CHECK(sigma2_diff == 0.0); // Sigma2 must be exactly the same
+    CHECK(ll_diff == 0.0);     // Log-likelihood must be exactly the same
     
-    // Most important: BFGS20 should find a competitive solution
-    INFO("Checking that BFGS20 found a competitive solution...");
-    CHECK(ll_bfgs20 >= ll_best_bfgs1 - 0.1);
-    
-    INFO("✓ BFGS20 and best of 20×BFGS1 are equivalent!");
+    INFO("✓ BFGS20 and best of 20×BFGS1 are EXACTLY equivalent!");
   }
 }
