@@ -28,6 +28,7 @@
 #include <thread>
 #include <tuple>
 #include <vector>
+#include <atomic>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -1347,42 +1348,61 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       if (multistart == 1) {
         results[0] = optimize_worker(0);
       } else {
+        // Determine thread pool size
+        unsigned int n_cpu = std::thread::hardware_concurrency();
+        int pool_size = Optim::thread_pool_size;
+        if (pool_size <= 0) {
+          // Auto-detect: ncpu/8 (conservative default for nested parallelism)
+          pool_size = std::max(1u, n_cpu / 8);
+        }
+        pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
+        
+        if (Optim::log_level > 0) {
+          arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
+                     << ", multistart=" << multistart << ")" << arma::endl;
+        }
+        
+        // Thread pool implementation: use semaphore-like counter
+        std::atomic<int> next_task(0);
         std::vector<std::thread> threads;
-        threads.reserve(multistart);
-        for (arma::uword i = 0; i < multistart; i++) {
-          threads.emplace_back([&, i]() { 
-            
-            // Add staggered startup delay to avoid thread initialization race conditions
-            int delay_ms = i * Optim::thread_start_delay_ms;
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-            
-            OptimizationResult local_result = optimize_worker(i);
-            
-            {
-              std::lock_guard<std::mutex> lock(results_mutex);
-              // Deep copy each matrix to ensure no shared memory
-              results[i].start_index = local_result.start_index;
-              results[i].objective_value = local_result.objective_value;
-              results[i].gamma = arma::vec(local_result.gamma);
-              results[i].theta = arma::vec(local_result.theta);
-              results[i].L = arma::mat(local_result.L);
-              results[i].R = arma::mat(local_result.R);
-              results[i].Fstar = arma::mat(local_result.Fstar);
-              results[i].Rstar = arma::mat(local_result.Rstar);
-              results[i].Qstar = arma::mat(local_result.Qstar);
-              results[i].Estar = arma::vec(local_result.Estar);
-              results[i].ystar = arma::vec(local_result.ystar);
-              results[i].SSEstar = local_result.SSEstar;
-              results[i].betahat = arma::vec(local_result.betahat);
-              results[i].success = local_result.success;
-              results[i].error_message = local_result.error_message;
+        threads.reserve(pool_size);
+        
+        for (int worker_id = 0; worker_id < pool_size; worker_id++) {
+          threads.emplace_back([&, worker_id]() {
+            while (true) {
+              int task_id = next_task.fetch_add(1);
+              if (task_id >= multistart) break;
+              
+              // Add staggered startup delay to avoid thread initialization race conditions
+              int delay_ms = task_id * Optim::thread_start_delay_ms;
+              std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+              
+              OptimizationResult local_result = optimize_worker(task_id);
+              
+              {
+                std::lock_guard<std::mutex> lock(results_mutex);
+                // Deep copy each matrix to ensure no shared memory
+                results[task_id].start_index = local_result.start_index;
+                results[task_id].objective_value = local_result.objective_value;
+                results[task_id].gamma = arma::vec(local_result.gamma);
+                results[task_id].theta = arma::vec(local_result.theta);
+                results[task_id].L = arma::mat(local_result.L);
+                results[task_id].R = arma::mat(local_result.R);
+                results[task_id].Fstar = arma::mat(local_result.Fstar);
+                results[task_id].Rstar = arma::mat(local_result.Rstar);
+                results[task_id].Qstar = arma::mat(local_result.Qstar);
+                results[task_id].Estar = arma::vec(local_result.Estar);
+                results[task_id].ystar = arma::vec(local_result.ystar);
+                results[task_id].SSEstar = local_result.SSEstar;
+                results[task_id].betahat = arma::vec(local_result.betahat);
+                results[task_id].success = local_result.success;
+                results[task_id].error_message = local_result.error_message;
+              }
             }
-            
-            // local_result goes out of scope here and is destroyed
           });
         }
-        for (arma::uword i = 0; i < threads.size(); i++) {
-          auto& t = threads[i];
+        
+        for (auto& t : threads) {
           if (t.joinable()) {
             t.join();
           }
