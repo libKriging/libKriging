@@ -168,7 +168,9 @@ g++ -std=c++17 -O2 -fopenmp -DARMA_32BIT_WORD \
     -I"$BUILD_DIR/src/lib" \
     -L"$BUILD_DIR/src/lib" \
     -lKriging \
-    -Wl,-rpath,"$BUILD_DIR/src/lib"
+    -Wl,-rpath,"$BUILD_DIR/src/lib" \
+    "$BUILD_DIR/jemalloc-install/lib/libjemalloc.a" \
+    -lpthread -ldl
 
 if [ $? -ne 0 ]; then
     echo "Error: Compilation failed"
