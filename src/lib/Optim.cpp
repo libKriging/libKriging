@@ -98,3 +98,23 @@ LIBKRIGING_EXPORT void Optim::set_objective_rel_tolerance(double objective_rel_t
 LIBKRIGING_EXPORT double Optim::get_objective_rel_tolerance() {
   return Optim::objective_rel_tolerance;
 };
+
+int Optim::thread_start_delay_ms = 10;
+
+LIBKRIGING_EXPORT void Optim::set_thread_start_delay_ms(int delay_ms) {
+  Optim::thread_start_delay_ms = delay_ms;
+};
+
+LIBKRIGING_EXPORT int Optim::get_thread_start_delay_ms() {
+  return Optim::thread_start_delay_ms;
+};
+
+int Optim::thread_pool_size = 0;  // 0 means auto-detect (ncpu/8)
+
+LIBKRIGING_EXPORT void Optim::set_thread_pool_size(int pool_size) {
+  Optim::thread_pool_size = pool_size;
+};
+
+LIBKRIGING_EXPORT int Optim::get_thread_pool_size() {
+  return Optim::thread_pool_size;
+};

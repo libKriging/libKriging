@@ -70,7 +70,25 @@ class Optim {
   //
   // Usage: Each worker thread i waits (i × thread_start_delay_ms) milliseconds
   //        before beginning optimization work.
-  static constexpr int thread_start_delay_ms = 10;
+  static int thread_start_delay_ms;
+  LIBKRIGING_EXPORT static void set_thread_start_delay_ms(int delay_ms);
+  LIBKRIGING_EXPORT static int get_thread_start_delay_ms();
+
+  // Thread pool size for BFGS multistart optimization
+  // Purpose: Limit concurrent threads to avoid oversubscription
+  //
+  // Default: ncpu/8 (conservative to allow nested BLAS parallelism)
+  // - Each worker thread can use multiple CPU cores for BLAS operations
+  // - Prevents thread thrashing and memory bandwidth saturation
+  // - Can be set to 0 to use unlimited threads (one per multistart)
+  //
+  // Example: On a 20-core system:
+  //   - pool_size = 20/8 = 2 workers at a time
+  //   - Each worker uses ~10 BLAS threads (20/2)
+  //   - BFGS20 runs as 10 batches of 2 workers each
+  static int thread_pool_size;
+  LIBKRIGING_EXPORT static void set_thread_pool_size(int pool_size);
+  LIBKRIGING_EXPORT static int get_thread_pool_size();
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINLIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_OPTIM_HPPEARALGEBRA_HPP
