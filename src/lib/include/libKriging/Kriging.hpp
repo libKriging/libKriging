@@ -137,6 +137,7 @@ class Kriging {
     arma::vec betahat;
   };
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
+  void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
 
   double _logLikelihood(const arma::vec& _theta,
                         arma::vec* grad_out,
@@ -235,7 +236,9 @@ class Kriging {
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
-   * @return output is m*nsim matrix of simulations at X_n
+   * @return
+   * 
+   * put is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
 

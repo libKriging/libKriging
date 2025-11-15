@@ -8,7 +8,6 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/Bench.hpp"
-#include "libKriging/CacheFunction.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingException.hpp"
@@ -25,6 +24,7 @@
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <mutex>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -104,25 +104,14 @@ LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) 
 
 arma::vec Kriging::ones = arma::ones<arma::vec>(0);
 
-Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const {
-  arma::mat R;
-  arma::mat L;
-  arma::mat Linv;
-  arma::mat Fstar;
-  arma::vec ystar;
-  arma::mat Rstar;
-  arma::mat Qstar;
-  arma::vec Estar;
-  double SSEstar{};
-  arma::vec betahat;
-  Kriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
-
+// Populate an existing KModel with data (for thread-safe preallocation)
+void Kriging::populate_Model(KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const {
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;
   arma::uword p = m_F.n_cols;
 
   auto t0 = Bench::tic();
-  m.R = arma::mat(n, n, arma::fill::none);
+  // Reuse existing m.R allocation
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
   if (!m_is_empty)
@@ -156,6 +145,37 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
   } else {
     m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
   }
+}
+
+Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const {
+  arma::mat R;
+  arma::mat L;
+  arma::mat Linv;
+  arma::mat Fstar;
+  arma::vec ystar;
+  arma::mat Rstar;
+  arma::mat Qstar;
+  arma::vec Estar;
+  double SSEstar{};
+  arma::vec betahat;
+  Kriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
+
+  arma::uword n = m_X.n_rows;
+  arma::uword p = m_F.n_cols;
+
+  // Allocate matrices
+  m.R = arma::mat(n, n, arma::fill::none);
+  m.L = arma::mat(n, n, arma::fill::none);
+  m.Linv = arma::mat();  // Empty matrix, will be filled on demand in gradient computation
+  m.Fstar = arma::mat(n, p, arma::fill::none);
+  m.ystar = arma::vec(n, arma::fill::none);
+  m.Rstar = arma::mat(p, p, arma::fill::none);
+  m.Qstar = arma::mat(n, p, arma::fill::none);
+  m.Estar = arma::vec(n, arma::fill::none);
+  m.betahat = arma::vec(p, arma::fill::none);
+
+  // Populate the model
+  populate_Model(m, theta, bench);
 
   return m;
 }
@@ -886,7 +906,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       fit_ofn;
   m_optim = optim;
   m_objective = objective;
-  // NOTE: Caching disabled for thread-safety in multistart optimization
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
       fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
@@ -917,7 +936,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   } else if (objective.compare("LOO") == 0) {
     if (Optim::reparametrize) {
       fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        // Change variable for opt: . -> 1/exp(.)
         const arma::vec _theta = Optim::reparam_from(_gamma);
         double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
         if (grad_out != nullptr) {
@@ -937,7 +955,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
       fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        // Change variable for opt: . -> 1/exp(.)
         const arma::vec _theta = Optim::reparam_from(_gamma);
         double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
         if (grad_out != nullptr) {
@@ -1104,6 +1121,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         // let multistart = 1
       }
 
+
       arma::mat theta0_rand
           = arma::repmat(trans(theta_lower), multistart, 1)
             + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
@@ -1126,6 +1144,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         gamma_upper = Optim::reparam_to(theta_lower);
       }
 
+      double min_ofn = std::numeric_limits<double>::infinity();
+
       // Set estimation flags before threading
       m_est_sigma2 = parameters.is_sigma2_estim;
       if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
@@ -1133,10 +1153,37 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         if (m_normalize)
           m_sigma2 /= (scaleY * scaleY);
       } else {
-        m_est_sigma2 = true;
+        m_est_sigma2 = true;  // force estim if no value given
+      }
+
+      // Preallocate KModels for each thread to avoid race conditions
+      arma::uword n_data = n;
+      arma::uword p_data = m_F.n_cols;
+      std::vector<Kriging::KModel> preallocated_models(multistart);
+      
+      if (Optim::log_level > 0) {
+        arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data
+                   << ", p=" << p_data << ")..." << arma::endl;
+      }
+      
+      for (int i = 0; i < multistart; i++) {
+        auto& m = preallocated_models[i];
+        m.R = arma::mat(n_data, n_data, arma::fill::none);
+        m.L = arma::mat(n_data, n_data, arma::fill::none);
+        m.Linv = arma::mat();  // Empty matrix
+        m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
+        m.ystar = arma::vec(n_data, arma::fill::none);
+        m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
+        m.Qstar = arma::mat(n_data, p_data, arma::fill::none);
+        m.Estar = arma::vec(n_data, arma::fill::none);
+        m.betahat = arma::vec(p_data, arma::fill::none);
+        m.SSEstar = 0.0;
       }
 
       // Multi-threading implementation for BFGS multistart
+      // Global mutex to serialize fit_ofn calls (LAPACK/BLAS may not be thread-safe)
+      static std::mutex fit_ofn_mutex;
+      
       // Structure to hold optimization results from each thread
       struct OptimizationResult {
         arma::uword start_index;
@@ -1178,7 +1225,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             arma::cout << "BFGS start point " << (start_idx + 1) << "/" << multistart << ":" << arma::endl;
           }
 
-          Kriging::KModel m = make_Model(theta0.row(start_idx % multistart).t(), nullptr);
+          // Use pre-allocated KModel for this thread (thread-safe)
+          if (start_idx >= preallocated_models.size()) {
+            throw std::runtime_error("Preallocated model index out of bounds");
+          }
+          
+          Kriging::KModel& m = preallocated_models[start_idx];
+          populate_Model(m, theta0.row(start_idx % multistart).t(), nullptr);
 
           lbfgsb::Optimizer optimizer{d};
           optimizer.iprint = Optim::log_level - 2;
@@ -1195,6 +1248,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             arma::vec gamma_0 = gamma_tmp;
             auto opt_result = optimizer.minimize(
                 [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+                  std::lock_guard<std::mutex> lock(fit_ofn_mutex);
                   return fit_ofn(vals_inp, &grad_out, nullptr, &m);
                 },
                 gamma_tmp,
@@ -1226,20 +1280,27 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             }
           }
 
-          double min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
+          double min_ofn_tmp;
+          {
+            std::lock_guard<std::mutex> lock(fit_ofn_mutex);
+            min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
+          }
 
           result.objective_value = min_ofn_tmp;
           result.gamma = best_gamma;
           result.theta = Optim::reparametrize ? Optim::reparam_from(best_gamma) : best_gamma;
-          result.L = std::move(m.L);
-          result.R = std::move(m.R);
-          result.Fstar = std::move(m.Fstar);
-          result.Rstar = std::move(m.Rstar);
-          result.Qstar = std::move(m.Qstar);
-          result.Estar = std::move(m.Estar);
-          result.ystar = std::move(m.ystar);
+          
+          // Copy (not move) since m is a reference to preallocated memory
+          // Force DEEP copy to avoid any shared memory issues
+          result.L = arma::mat(m.L);  // Force copy constructor
+          result.R = arma::mat(m.R);  // Force copy constructor
+          result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
+          result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
+          result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
+          result.Estar = arma::vec(m.Estar);  // Force copy constructor
+          result.ystar = arma::vec(m.ystar);  // Force copy constructor
           result.SSEstar = m.SSEstar;
-          result.betahat = std::move(m.betahat);
+          result.betahat = arma::vec(m.betahat);  // Force copy constructor
           result.success = true;
 
         } catch (const std::exception& e) {
@@ -1255,6 +1316,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
       // Execute optimizations (parallel if multistart > 1)
       std::vector<OptimizationResult> results(multistart);
+      std::mutex results_mutex;  // Protect results vector writes
 
       if (multistart == 1) {
         results[0] = optimize_worker(0);
@@ -1262,9 +1324,39 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         std::vector<std::thread> threads;
         threads.reserve(multistart);
         for (arma::uword i = 0; i < multistart; i++) {
-          threads.emplace_back([&, i]() { results[i] = optimize_worker(i); });
+          threads.emplace_back([&, i]() { 
+            
+            // Add staggered startup delay to avoid thread initialization race conditions
+            int delay_ms = i * Optim::thread_start_delay_ms;
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            
+            OptimizationResult local_result = optimize_worker(i);
+            
+            {
+              std::lock_guard<std::mutex> lock(results_mutex);
+              // Deep copy each matrix to ensure no shared memory
+              results[i].start_index = local_result.start_index;
+              results[i].objective_value = local_result.objective_value;
+              results[i].gamma = arma::vec(local_result.gamma);
+              results[i].theta = arma::vec(local_result.theta);
+              results[i].L = arma::mat(local_result.L);
+              results[i].R = arma::mat(local_result.R);
+              results[i].Fstar = arma::mat(local_result.Fstar);
+              results[i].Rstar = arma::mat(local_result.Rstar);
+              results[i].Qstar = arma::mat(local_result.Qstar);
+              results[i].Estar = arma::vec(local_result.Estar);
+              results[i].ystar = arma::vec(local_result.ystar);
+              results[i].SSEstar = local_result.SSEstar;
+              results[i].betahat = arma::vec(local_result.betahat);
+              results[i].success = local_result.success;
+              results[i].error_message = local_result.error_message;
+            }
+            
+            // local_result goes out of scope here and is destroyed
+          });
         }
-        for (auto& t : threads) {
+        for (arma::uword i = 0; i < threads.size(); i++) {
+          auto& t = threads[i];
           if (t.joinable()) {
             t.join();
           }
@@ -1272,7 +1364,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       // Find best result
-      double min_ofn = std::numeric_limits<double>::infinity();
       int best_idx = -1;
       int successful_optimizations = 0;
 
