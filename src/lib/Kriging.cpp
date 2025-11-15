@@ -29,6 +29,15 @@
 #include <tuple>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// Weak symbol for OpenBLAS thread control (if available)
+extern "C" {
+  void openblas_set_num_threads(int num_threads) __attribute__((weak));
+}
+
 /************************************************/
 /**      Kriging implementation        **/
 /************************************************/
@@ -1119,6 +1128,28 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         multistart = std::stoi(optim.substr(4));
       } catch (std::invalid_argument&) {
         // let multistart = 1
+      }
+
+      // Configure threads for Armadillo/BLAS to balance nested parallelism
+      // Each of the 'multistart' threads will use internal parallelism
+      unsigned int n_cpu = std::thread::hardware_concurrency();
+      if (n_cpu > 0 && multistart > 1) {
+        unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
+        
+        // Set OpenBLAS threads (if available)
+        if (openblas_set_num_threads != nullptr) {
+          openblas_set_num_threads(threads_per_worker);
+        }
+        
+        // Set OpenMP threads (for Armadillo operations that use OpenMP)
+        #ifdef _OPENMP
+        omp_set_num_threads(threads_per_worker);
+        #endif
+        
+        if (Optim::log_level > 0) {
+          arma::cout << "Threads per worker: " << threads_per_worker 
+                     << " (total CPUs: " << n_cpu << ", multistart: " << multistart << ")" << arma::endl;
+        }
       }
 
 
