@@ -27,6 +27,9 @@
 #include <map>
 #include <tuple>
 #include <vector>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 /************************************************/
 /**      NuggetKriging implementation        **/
@@ -104,27 +107,16 @@ LIBKRIGING_EXPORT NuggetKriging::NuggetKriging(const NuggetKriging& other, Expli
 
 arma::vec NuggetKriging::ones = arma::ones<arma::vec>(0);
 
-NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
-                                                const double alpha,
-                                                std::map<std::string, double>* bench) const {
-  arma::mat R;
-  arma::mat L;
-  arma::mat Linv;
-  arma::mat Fstar;
-  arma::vec ystar;
-  arma::mat Rstar;
-  arma::mat Qstar;
-  arma::vec Estar;
-  double SSEstar{};
-  arma::vec betahat;
-  NuggetKriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
-
+void NuggetKriging::populate_Model(KModel& m,
+                                   const arma::vec& theta,
+                                   const double alpha,
+                                   std::map<std::string, double>* bench) const {
   arma::uword n = m_X.n_rows;
   arma::uword d = m_X.n_cols;
   arma::uword p = m_F.n_cols;
 
   auto t0 = Bench::tic();
-  m.R = arma::mat(n, n, arma::fill::none);
+  // Reuse existing m.R allocation
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
   if (!m_is_empty)
@@ -158,6 +150,39 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   } else {
     m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
   }
+}
+
+NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
+                                                const double alpha,
+                                                std::map<std::string, double>* bench) const {
+  arma::mat R;
+  arma::mat L;
+  arma::mat Linv;
+  arma::mat Fstar;
+  arma::vec ystar;
+  arma::mat Rstar;
+  arma::mat Qstar;
+  arma::vec Estar;
+  double SSEstar{};
+  arma::vec betahat;
+  NuggetKriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
+
+  arma::uword n = m_X.n_rows;
+  arma::uword p = m_F.n_cols;
+
+  // Allocate matrices
+  m.R = arma::mat(n, n, arma::fill::none);
+  m.L = arma::mat(n, n, arma::fill::none);
+  m.Linv = arma::mat();  // Empty matrix, will be filled on demand in gradient computation
+  m.Fstar = arma::mat(n, p, arma::fill::none);
+  m.ystar = arma::vec(n, arma::fill::none);
+  m.Rstar = arma::mat(p, p, arma::fill::none);
+  m.Qstar = arma::mat(n, p, arma::fill::none);
+  m.Estar = arma::vec(n, arma::fill::none);
+  m.betahat = arma::vec(p, arma::fill::none);
+
+  // Populate the model
+  populate_Model(m, theta, alpha, bench);
 
   return m;
 }
@@ -901,178 +926,279 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       gamma_upper.at(d) = gamma_lower_at_d;
     }
 
+    // Structure to hold optimization results from each worker thread
+    struct OptimizationResult {
+      int start_index;
+      double objective_value;
+      arma::vec gamma;
+      arma::vec theta_alpha;
+      NuggetKriging::KModel model;
+      bool success;
+      std::string error_message;
+      
+      OptimizationResult() : start_index(-1), objective_value(std::numeric_limits<double>::infinity()), success(false) {}
+    };
+
     double min_ofn = std::numeric_limits<double>::infinity();
 
-    for (arma::uword i = 0; i < multistart; i++) {
-      arma::vec gamma_tmp = arma::vec(d + 1);
-      gamma_tmp.head(d) = theta0.row(i % multistart).t();
-      gamma_tmp.at(d) = alpha0[i % alpha0.n_elem];
-      if (Optim::reparametrize) {
-        gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
-      }
+    // Set estimation flags before parallel execution (these are read by fit_ofn in all threads)
+    m_est_sigma2 = parameters.is_sigma2_estim;
+    if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
+      m_sigma2 = parameters.sigma2.value()[0];
+      if (m_normalize)
+        m_sigma2 /= (scaleY * scaleY);
+    } else {
+      m_est_sigma2 = true;  // force estim if no value given
+    }
+    m_est_nugget = parameters.is_nugget_estim;
+    if ((!m_est_nugget) && (parameters.nugget.has_value())) {
+      m_nugget = parameters.nugget.value()[0];
+      if (m_normalize)
+        m_nugget /= (scaleY * scaleY);
+    } else {
+      m_est_nugget = true;  // force estim if no value given
+    }
 
-      gamma_lower = arma::min(gamma_tmp, gamma_lower);
-      gamma_upper = arma::max(gamma_tmp, gamma_upper);
+    // Pre-allocate KModel structures (one per multistart)
+    arma::uword n_data = n;
+    arma::uword p_data = m_F.n_cols;
+    std::vector<NuggetKriging::KModel> thread_kmodels(multistart);
+    
+    if (Optim::log_level > 0) {
+      arma::cout << "Preallocating " << multistart << " KModel structures (n=" 
+                 << n_data << ", p=" << p_data << ")..." << arma::endl;
+    }
+    
+    for (int i = 0; i < multistart; i++) {
+      auto& m = thread_kmodels[i];
+      m.R = arma::mat(n_data, n_data, arma::fill::none);
+      m.L = arma::mat(n_data, n_data, arma::fill::none);
+      m.Linv = arma::mat();  // Empty matrix
+      m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
+      m.ystar = arma::vec(n_data, arma::fill::none);
+      m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
+      m.Qstar = arma::mat(n_data, p_data, arma::fill::none);
+      m.Estar = arma::vec(n_data, arma::fill::none);
+      m.betahat = arma::vec(p_data, arma::fill::none);
+      m.SSEstar = 0.0;
+    }
 
-      if (Optim::log_level > 0) {
-        arma::cout << "BFGS:" << arma::endl;
-        arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
-        arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
-        arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
-        arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
-        arma::cout << "  normalize: " << m_normalize << arma::endl;
-        arma::cout << "  lower_bounds: " << theta_lower.t() << "";
-        arma::cout << "                " << alpha_lower << arma::endl;
-        arma::cout << "  upper_bounds: " << theta_upper.t() << "";
-        arma::cout << "                " << alpha_upper << arma::endl;
-        arma::cout << "  start_point: " << theta0.row(i % multistart) << "";
-        arma::cout << "               " << alpha0[i % alpha0.n_elem] << arma::endl;
-      }
-
-      m_est_sigma2 = parameters.is_sigma2_estim;
-      if ((!m_est_sigma2) && (parameters.sigma2.has_value())) {
-        m_sigma2 = parameters.sigma2.value()[0];
-        if (m_normalize)
-          m_sigma2 /= (scaleY * scaleY);
-      } else {
-        m_est_sigma2 = true;  // force estim if no value given
-      }
-      m_est_nugget = parameters.is_nugget_estim;
-      if ((!m_est_nugget) && (parameters.nugget.has_value())) {
-        m_nugget = parameters.nugget.value()[0];
-        if (m_normalize)
-          m_nugget /= (scaleY * scaleY);
-      } else {
-        m_est_nugget = true;  // force estim if no value given
-      }
-
-      lbfgsb::Optimizer optimizer{d + 1};
-      optimizer.iprint = Optim::log_level - 2;
-      optimizer.max_iter = Optim::max_iteration;
-      optimizer.pgtol = Optim::gradient_tolerance;
-      optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
-      arma::ivec bounds_type{d + 1, arma::fill::value(2)};  // means both upper & lower bounds
-
-      int retry = 0;
-      double best_f_opt = std::numeric_limits<double>::infinity();
-      arma::vec best_gamma = gamma_tmp;
-      NuggetKriging::KModel m = make_Model(theta0.row(i % multistart).t(), alpha0[i % alpha0.n_elem], nullptr);
-
-      while (retry <= Optim::max_restart) {
-        arma::vec gamma_0 = gamma_tmp;
-        auto result = optimizer.minimize(
-            [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-              return fit_ofn(vals_inp, &grad_out, &m);
-            },
-            gamma_tmp,
-            gamma_lower.memptr(),
-            gamma_upper.memptr(),
-            bounds_type.memptr());
-
+    // Worker function for each optimization start point
+    auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
+      OptimizationResult result;
+      result.start_index = start_idx;
+      
+      try {
         if (Optim::log_level > 0) {
-          arma::cout << "     iterations: " << result.num_iters << arma::endl;
-          arma::cout << "     status: " << result.task << arma::endl;
-          if (Optim::reparametrize) {
-            arma::cout << "     start_point: " << NuggetKriging::reparam_from(gamma_0).t() << " ";
-            arma::cout << "     solution: " << NuggetKriging::reparam_from(gamma_tmp).t() << " ";
-          } else {
-            arma::cout << "     start_point: " << gamma_0.t() << " ";
-            arma::cout << "     solution: " << gamma_tmp.t() << " ";
-          }
+          arma::cout << "BFGS start point " << (start_idx + 1) << "/" << multistart << ":" << arma::endl;
         }
 
-        if (result.f_opt < best_f_opt) {
-          best_f_opt = result.f_opt;
-          best_gamma = gamma_tmp;
-        }
-
-        double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower.head(d)));
-        double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper.head(d)));
-        double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta);
-        //= Optim::reparametrize ? sol_to_ub_theta : sol_to_lb_theta;         // just consider theta lower bound
-        double sol_to_lb_alpha = std::abs(gamma_tmp.at(d) - gamma_lower.at(d));
-        double sol_to_ub_alpha = std::abs(gamma_tmp.at(d) - gamma_upper.at(d));
-        double sol_to_b_alpha = std::min(sol_to_ub_alpha, sol_to_lb_alpha);
-        //= Optim::reparametrize ? sol_to_ub_alpha : sol_to_lb_alpha;         // just consider alpha lower bound
-        // Optim::reparametrize
-        //    ? std::abs(gamma_tmp.at(d) - gamma_upper.at(d))
-        //    : std::abs(gamma_tmp.at(d) - gamma_lower.at(d));
-        double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
-        if ((retry < Optim::max_restart)  //&& (result.num_iters <= 2 * d)
-            && ((result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
-                || ((sol_to_b < arma::datum::eps) && (result.num_iters <= 2))  // we fastly converged to one bound
-                || (result.f_opt > best_f_opt))) {
-          gamma_tmp.head(d)
-              = (theta0.row(i % multistart).t() + theta_lower)
-                / pow(2.0, retry + 1);  // so, re-use previous starting point and change it to middle-point
-          gamma_tmp.at(d) = alpha_upper - (alpha0[i % alpha0.n_elem] + alpha_upper) / pow(2.0, retry + 1);
-
-          if (Optim::reparametrize)
-            gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
-
-          gamma_lower = arma::min(gamma_tmp, gamma_lower);
-          gamma_upper = arma::max(gamma_tmp, gamma_upper);
-
-          retry++;
-        } else {
-          if (Optim::log_level > 1) {
-            result.print();
-          }
-          break;
-        }
-      }
-
-      // last call to ensure that T and z are up-to-date with solution.
-      double min_ofn_tmp = fit_ofn(best_gamma, nullptr, &m);
-
-      if (Optim::log_level > 0) {
-        arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
+        arma::vec gamma_tmp = arma::vec(d + 1);
+        gamma_tmp.head(d) = theta0.row(start_idx % multistart).t();
+        gamma_tmp.at(d) = alpha0[start_idx % alpha0.n_elem];
         if (Optim::reparametrize) {
-          arma::cout << "  best solution: " << NuggetKriging::reparam_from(best_gamma).t() << " ";
-        } else {
-          arma::cout << "  best solution: " << best_gamma.t() << " ";
+          gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
+        }
+
+        arma::vec gamma_lower_local = gamma_lower;
+        arma::vec gamma_upper_local = gamma_upper;
+        gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+        gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
+
+        lbfgsb::Optimizer optimizer{d + 1};
+        optimizer.iprint = -1;  // Disable output in parallel mode
+        optimizer.max_iter = Optim::max_iteration;
+        optimizer.pgtol = Optim::gradient_tolerance;
+        optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+        arma::ivec bounds_type{d + 1, arma::fill::value(2)};
+
+        int retry = 0;
+        double best_f_opt = std::numeric_limits<double>::infinity();
+        arma::vec best_gamma = gamma_tmp;
+        NuggetKriging::KModel& m = thread_kmodels[start_idx];
+
+        while (retry <= Optim::max_restart) {
+          arma::vec gamma_0 = gamma_tmp;
+          
+          lbfgsb::OptimizeResult opt_result = optimizer.minimize(
+              [&m, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+                return fit_ofn(vals_inp, &grad_out, &m);
+              },
+              gamma_tmp,
+              gamma_lower_local.memptr(),
+              gamma_upper_local.memptr(),
+              bounds_type.memptr());
+
+          if (opt_result.f_opt < best_f_opt) {
+            best_f_opt = opt_result.f_opt;
+            best_gamma = gamma_tmp;
+          }
+
+          double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower_local.head(d)));
+          double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper_local.head(d)));
+          double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta);
+          double sol_to_lb_alpha = std::abs(gamma_tmp.at(d) - gamma_lower_local.at(d));
+          double sol_to_ub_alpha = std::abs(gamma_tmp.at(d) - gamma_upper_local.at(d));
+          double sol_to_b_alpha = std::min(sol_to_ub_alpha, sol_to_lb_alpha);
+          double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
+
+          if ((retry < Optim::max_restart)
+              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
+                  || ((sol_to_b < arma::datum::eps) && (opt_result.num_iters <= 2))
+                  || (opt_result.f_opt > best_f_opt))) {
+            gamma_tmp.head(d) = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
+            gamma_tmp.at(d) = alpha_upper - (alpha0[start_idx % alpha0.n_elem] + alpha_upper) / pow(2.0, retry + 1);
+            if (Optim::reparametrize)
+              gamma_tmp = NuggetKriging::reparam_to(gamma_tmp);
+            gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
+            gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
+            retry++;
+          } else {
+            break;
+          }
+        }
+
+        // Final evaluation to update model
+        double min_ofn_tmp = fit_ofn(best_gamma, nullptr, &m);
+
+        result.objective_value = min_ofn_tmp;
+        result.gamma = best_gamma;
+        if (Optim::reparametrize)
+          result.theta_alpha = NuggetKriging::reparam_from(best_gamma);
+        else
+          result.theta_alpha = best_gamma;
+        
+        // Copy model data (deep copy)
+        result.model.L = arma::mat(m.L);
+        result.model.R = arma::mat(m.R);
+        result.model.Fstar = arma::mat(m.Fstar);
+        result.model.Rstar = arma::mat(m.Rstar);
+        result.model.Qstar = arma::mat(m.Qstar);
+        result.model.Estar = arma::vec(m.Estar);
+        result.model.ystar = arma::vec(m.ystar);
+        result.model.SSEstar = m.SSEstar;
+        result.model.betahat = arma::vec(m.betahat);
+        result.success = true;
+
+      } catch (const std::exception& e) {
+        result.success = false;
+        result.error_message = e.what();
+        if (Optim::log_level > 0) {
+          arma::cout << "Warning: start point " << (start_idx + 1) << " failed: " << e.what() << arma::endl;
         }
       }
 
-      if (min_ofn_tmp < min_ofn) {
-        arma::vec best_theta_alpha = best_gamma;
-        if (Optim::reparametrize)
-          best_theta_alpha = NuggetKriging::reparam_from(best_gamma);
-        m_theta = best_theta_alpha.head(d);
-        m_est_theta = true;
-        min_ofn = min_ofn_tmp;
+      return result;
+    };
 
-        m_is_empty = false;
-        m_T = std::move(m.L);
-        m_R = std::move(m.R);
-        m_M = std::move(m.Fstar);
-        m_circ = std::move(m.Rstar);
-        m_star = std::move(m.Qstar);
-        if (m_est_beta) {
-          m_beta = std::move(m.betahat);
-          m_z = std::move(m.Estar);
-        } else {
-          // m_beta = parameters.beta.value(); already done above
-          m_z = std::move(m.ystar) - m_M * m_beta;
-        }
-        double m_alpha = best_theta_alpha.at(d);
-        if (m_est_sigma2) {
-          if (m_est_nugget) {
-            m_sigma2 = m_alpha * as_scalar(LinearAlgebra::crossprod(m_z)) / n;
-            if (m_objective.compare("LMP") == 0) {
-              m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+    // Execute optimizations (parallel if multistart > 1)
+    std::vector<OptimizationResult> results(multistart);
+    std::mutex results_mutex;
+
+    if (multistart == 1) {
+      results[0] = optimize_worker(0);
+    } else {
+      // Determine thread pool size
+      unsigned int n_cpu = std::thread::hardware_concurrency();
+      int pool_size = Optim::thread_pool_size;
+      if (pool_size <= 0) {
+        pool_size = std::max(1u, n_cpu / 4);
+      }
+      pool_size = std::min(pool_size, (int)multistart);
+      
+      if (Optim::log_level > 0) {
+        arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
+                   << ", multistart=" << multistart << ")" << arma::endl;
+      }
+      
+      std::atomic<int> next_task(0);
+      std::vector<std::thread> threads;
+      threads.reserve(pool_size);
+      
+      for (int worker_id = 0; worker_id < pool_size; worker_id++) {
+        threads.emplace_back([&, worker_id]() {
+          // Staggered startup delay (only once per thread, not per task)
+          int delay_ms = worker_id * Optim::thread_start_delay_ms;
+          std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+          
+          while (true) {
+            int task_id = next_task.fetch_add(1);
+            if (task_id >= multistart) break;
+            
+            OptimizationResult local_result = optimize_worker(task_id);
+            
+            {
+              std::lock_guard<std::mutex> lock(results_mutex);
+              results[task_id] = std::move(local_result);
             }
-            m_nugget = m_sigma2 / m_alpha - m_sigma2;
-          } else {
-            m_sigma2 = m_nugget * m_alpha / (1 - m_alpha);
           }
-        } else {
-          if (m_est_nugget) {
-            m_nugget = m_sigma2 * (1 - m_alpha) / m_alpha;
-          } else {
-            // don't care about alpha
-          }
+        });
+      }
+      
+      for (auto& t : threads) {
+        if (t.joinable()) {
+          t.join();
         }
+      }
+    }
+
+    // Find best result
+    int best_idx = -1;
+    int successful_optimizations = 0;
+
+    for (size_t i = 0; i < results.size(); i++) {
+      const auto& r = results[i];
+      if (r.success) {
+        successful_optimizations++;
+        if (r.objective_value < min_ofn) {
+          min_ofn = r.objective_value;
+          best_idx = i;
+        }
+      }
+    }
+
+    if (best_idx < 0) {
+      throw std::runtime_error("All " + std::to_string(multistart) + " optimization attempts failed");
+    }
+
+    if (Optim::log_level > 0) {
+      arma::cout << "\nBest solution from start point " << (best_idx + 1) 
+                 << " with objective: " << min_ofn << arma::endl;
+      arma::cout << "Successful optimizations: " << successful_optimizations 
+                 << "/" << multistart << arma::endl;
+    }
+
+    // Apply best result
+    const auto& best = results[best_idx];
+    m_theta = best.theta_alpha.head(d);
+    m_est_theta = true;
+
+    m_is_empty = false;
+    m_T = std::move(best.model.L);
+    m_R = std::move(best.model.R);
+    m_M = std::move(best.model.Fstar);
+    m_circ = std::move(best.model.Rstar);
+    m_star = std::move(best.model.Qstar);
+    if (m_est_beta) {
+      m_beta = std::move(best.model.betahat);
+      m_z = std::move(best.model.Estar);
+    } else {
+      m_z = std::move(best.model.ystar) - m_M * m_beta;
+    }
+    double m_alpha = best.theta_alpha.at(d);
+    if (m_est_sigma2) {
+      if (m_est_nugget) {
+        m_sigma2 = m_alpha * as_scalar(LinearAlgebra::crossprod(m_z)) / n;
+        if (m_objective.compare("LMP") == 0) {
+          m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+        }
+        m_nugget = m_sigma2 / m_alpha - m_sigma2;
+      } else {
+        m_sigma2 = m_nugget * m_alpha / (1 - m_alpha);
+      }
+    } else {
+      if (m_est_nugget) {
+        m_nugget = m_sigma2 * (1 - m_alpha) / m_alpha;
       }
     }
   } else
