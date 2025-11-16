@@ -68,7 +68,7 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
       throw std::runtime_error("[ERROR] Cannot add numerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
-      X.diag() += LinearAlgebra::num_nugget* std::pow(10, inc_cond);
+      X.diag() += LinearAlgebra::num_nugget * std::pow(10, inc_cond);
       return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1);
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
