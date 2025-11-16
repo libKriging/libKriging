@@ -1265,7 +1265,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           populate_Model(m, theta0.row(start_idx % multistart).t(), nullptr);
 
           lbfgsb::Optimizer optimizer{d};
-          optimizer.iprint = Optim::log_level - 2;
+          optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
           optimizer.pgtol = Optim::gradient_tolerance;
           optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
