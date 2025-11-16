@@ -68,13 +68,13 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
       throw std::runtime_error("[ERROR] Cannot add numerical nugget which is not strictly positive: "
                                + std::to_string(LinearAlgebra::num_nugget));
     } else {
-      X.diag() += LinearAlgebra::num_nugget;  // inc diagonal
+      X.diag() += LinearAlgebra::num_nugget* std::pow(10, inc_cond);
       return LinearAlgebra::safe_chol_lower_retry(X, inc_cond + 1);
     }
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
     if (warn_chol && (inc_cond > 0)) {
-      arma::cout << "[WARNING] Added " << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
+      arma::cout << "[WARNING] Added " << LinearAlgebra::num_nugget << " x 10^" << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
     }
     return L;
   }

@@ -428,3 +428,206 @@ TEST_CASE("LinearAlgebra - rapid fire varying sizes", "[LinearAlgebra][threading
     REQUIRE(results[i]);
   }
 }
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - nearly singular matrix", "[LinearAlgebra][chol][edge]") {
+  // Create a matrix that is nearly singular (very small eigenvalue)
+  arma::mat M = make_pd_matrix(10, 42);
+  
+  // Make it nearly singular by reducing one eigenvalue
+  arma::vec eigval;
+  arma::mat eigvec;
+  arma::eig_sym(eigval, eigvec, M);
+  
+  // Set the smallest eigenvalue to a very small value
+  eigval(0) = 1e-12;
+  
+  // Reconstruct the matrix
+  M = eigvec * arma::diagmat(eigval) * eigvec.t();
+  
+  // This should trigger the numerical nugget addition
+  arma::mat L = LinearAlgebra::safe_chol_lower(M);
+  
+  REQUIRE(L.n_rows == 10);
+  REQUIRE(L.n_cols == 10);
+  
+  // The Cholesky decomposition should succeed (with added nugget)
+  arma::mat reconstructed = L * L.t();
+  // Due to nugget addition, this won't be exact but should be close
+  REQUIRE(arma::approx_equal(reconstructed.diag(), M.diag(), "reldiff", 1e-6));
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - matrix with small negative eigenvalue", "[LinearAlgebra][chol][edge]") {
+  // Create a matrix that should be PD but has a tiny negative eigenvalue due to numerical errors
+  arma::mat M = make_pd_matrix(8, 123);
+  
+  arma::vec eigval;
+  arma::mat eigvec;
+  arma::eig_sym(eigval, eigvec, M);
+  
+  // Make one eigenvalue slightly negative (simulating numerical error)
+  eigval(0) = -1e-14;
+  
+  // Reconstruct
+  M = eigvec * arma::diagmat(eigval) * eigvec.t();
+  
+  // Should handle this gracefully with numerical nugget
+  REQUIRE_NOTHROW([&]() {
+    arma::mat L = LinearAlgebra::safe_chol_lower(M);
+    REQUIRE(L.n_rows == 8);
+  }());
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - ill-conditioned matrix", "[LinearAlgebra][chol][edge]") {
+  // Create an ill-conditioned matrix (large condition number)
+  arma::mat M = make_pd_matrix(10, 456);
+  
+  arma::vec eigval;
+  arma::mat eigvec;
+  arma::eig_sym(eigval, eigvec, M);
+  
+  // Create large condition number: max/min eigenvalue ratio ~ 1e15
+  eigval = arma::linspace<arma::vec>(1e-14, 1.0, 10);
+  
+  // Reconstruct
+  M = eigvec * arma::diagmat(eigval) * eigvec.t();
+  
+  // Should handle with numerical nugget
+  arma::mat L = LinearAlgebra::safe_chol_lower(M);
+  
+  REQUIRE(L.n_rows == 10);
+  REQUIRE(L.n_cols == 10);
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - rank deficient approximation", "[LinearAlgebra][chol][edge]") {
+  // Create a nearly rank-deficient matrix
+  arma::mat A = arma::randn<arma::mat>(10, 3);
+  arma::mat M = A * A.t();  // Rank 3 matrix
+  
+  // Add small diagonal to make it "almost" full rank
+  M.diag() += 1e-13;
+  
+  // This should require multiple nugget additions
+  arma::mat L = LinearAlgebra::safe_chol_lower(M);
+  
+  REQUIRE(L.n_rows == 10);
+  REQUIRE(L.n_cols == 10);
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - correlation-like matrix near singular", "[LinearAlgebra][chol][edge]") {
+  // Create a correlation-like matrix that's nearly singular (almost collinear data)
+  const int n = 5;
+  arma::mat M = arma::mat(n, n, arma::fill::ones);
+  
+  // Set diagonal to 1 (correlation matrix)
+  M.diag().ones();
+  
+  // Make off-diagonal elements very close to 1 (almost collinear)
+  M.fill(1.0-1e-20);
+  M.diag().ones();
+
+  // Enable warnings for nugget addition
+  bool prev_warn_chol = LinearAlgebra::warn_chol;
+  LinearAlgebra::warn_chol = true;
+  // print rcond
+  double rcond = LinearAlgebra::rcond_chol(M);
+  arma::cout << "[INFO] rcond: " << rcond << arma::endl;
+
+  // This should require nugget addition
+  LinearAlgebra::chol_rcond_check = true;
+  arma::mat L = LinearAlgebra::safe_chol_lower(M);
+
+  // reset warnings for nugget addition
+  LinearAlgebra::warn_chol = prev_warn_chol;
+
+  REQUIRE(L.n_rows == n);
+  REQUIRE(L.n_cols == n);
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - near-singular concurrent", "[LinearAlgebra][chol][edge][threading]") {
+  const int n_threads = 10;
+  const int n_size = 15;
+  
+  std::vector<std::thread> threads;
+  std::vector<bool> results(n_threads, false);
+  std::vector<arma::mat> inputs(n_threads);
+  
+  // Create different near-singular matrices for each thread
+  for (int i = 0; i < n_threads; i++) {
+    arma::mat M = make_pd_matrix(n_size, 2000 + i);
+    
+    // Make it near-singular
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, M);
+    
+    // Set smallest eigenvalues to very small values
+    eigval(0) = 1e-13;
+    eigval(1) = 1e-12;
+    
+    inputs[i] = eigvec * arma::diagmat(eigval) * eigvec.t();
+  }
+  
+  // Launch threads
+  for (int i = 0; i < n_threads; i++) {
+    threads.emplace_back([i, &inputs, &results]() {
+      try {
+        arma::mat L = LinearAlgebra::safe_chol_lower(inputs[i]);
+        results[i] = (L.n_rows == inputs[i].n_rows);
+      } catch (...) {
+        results[i] = false;
+      }
+    });
+  }
+  
+  // Wait for all threads
+  for (auto& t : threads) {
+    t.join();
+  }
+  
+  // Check all succeeded
+  for (int i = 0; i < n_threads; i++) {
+    REQUIRE(results[i]);
+  }
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - extremely small eigenvalues", "[LinearAlgebra][chol][edge]") {
+  // Test with eigenvalues spanning many orders of magnitude
+  const int n = 10;
+  arma::arma_rng::set_seed(789);
+  arma::mat eigvec = arma::orth(arma::randn<arma::mat>(n, n));
+  
+  // Eigenvalues from 1e-16 to 1
+  arma::vec eigval = arma::vec(n);
+  for (int i = 0; i < n; i++) {
+    eigval(i) = std::pow(10.0, -16.0 + i * 1.6);  // 1e-16 to 1
+  }
+  
+  arma::mat M = eigvec * arma::diagmat(eigval) * eigvec.t();
+  
+  // Should handle with multiple nugget additions
+  arma::mat L;
+  REQUIRE_NOTHROW([&]() {
+    L = LinearAlgebra::safe_chol_lower(M);
+  }());
+  
+  REQUIRE(L.n_rows == n);
+}
+
+TEST_CASE("LinearAlgebra::safe_chol_lower - asymmetric numerical errors", "[LinearAlgebra][chol][edge]") {
+  // Create a matrix that should be symmetric but has small asymmetric errors
+  arma::mat M = make_pd_matrix(8, 999);
+  
+  // Add small asymmetric perturbation
+  arma::arma_rng::set_seed(1111);
+  arma::mat noise = arma::randn<arma::mat>(8, 8) * 1e-14;
+  M += noise;
+  
+  // Symmetrize it (as would happen in practice)
+  M = (M + M.t()) / 2.0;
+  
+  // Should still work
+  arma::mat L = LinearAlgebra::safe_chol_lower(M);
+  
+  REQUIRE(L.n_rows == 8);
+  REQUIRE(L.n_cols == 8);
+}
