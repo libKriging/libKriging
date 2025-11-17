@@ -15,7 +15,6 @@
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
-#include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"

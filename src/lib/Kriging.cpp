@@ -15,7 +15,6 @@
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
-#include "libKriging/utils/custom_hash_function.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
@@ -1351,7 +1350,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         int pool_size = Optim::thread_pool_size;
         if (pool_size <= 0) {
           // Auto-detect: ncpu/8 (conservative default for nested parallelism)
-          pool_size = std::max(1u, n_cpu / 8);
+          pool_size = std::max(1u, n_cpu);// / 8);
         }
         pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
         
