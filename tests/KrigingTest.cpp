@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
@@ -505,4 +506,137 @@ TEST_CASE("Kriging all parameter combinations") {
   auto pred = kr_final.predict(X_new, true, false, false);
   CHECK(std::get<0>(pred).n_elem == 1);
   CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("Kriging intensive stress test") {
+  arma::arma_rng::set_seed(789);
+  
+  SECTION("Many iterations with BFGS20") {
+    const int n_iterations = 50;
+    const arma::uword n = 30;
+    const arma::uword d = 2;
+    int failure_count = 0;
+
+    INFO("Running " << n_iterations << " intensive iterations with BFGS20");
+    
+    for (int iter = 0; iter < n_iterations; ++iter) {
+      arma::mat X = arma::randu<arma::mat>(n, d);
+      arma::colvec y = arma::sin(5.0 * X.col(0)) % arma::cos(3.0 * X.col(1));
+      y += 0.1 * arma::randn(n);
+
+      Kriging ok = Kriging("gauss");
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      
+      try {
+        ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+        
+        // Check if fit produced invalid results
+        if (!std::isfinite(ok.sigma2()) || ok.sigma2() <= 0) {
+          failure_count++;
+          std::stringstream X_filename, y_filename;
+          X_filename << "failing_kriging_X_iter" << iter << "_failure" << failure_count << ".csv";
+          y_filename << "failing_kriging_y_iter" << iter << "_failure" << failure_count << ".csv";
+          
+          X.save(X_filename.str(), arma::csv_ascii);
+          y.save(y_filename.str(), arma::csv_ascii);
+          
+          INFO("Saved failing case " << failure_count << " (iteration " << iter << "):");
+          INFO("  X saved to: " << X_filename.str());
+          INFO("  y saved to: " << y_filename.str());
+          INFO("  sigma2 = " << ok.sigma2());
+          
+          // Still report the failure for test tracking
+          CHECK(ok.sigma2() > 0);
+        } else {
+          CHECK(ok.theta().n_elem == d);
+          CHECK(ok.sigma2() > 0);
+          
+          // Prediction test
+          arma::mat X_new = arma::randu<arma::mat>(5, d);
+          auto pred = ok.predict(X_new, true, false, false);
+          CHECK(std::get<0>(pred).n_elem == 5);
+        }
+        
+        if ((iter + 1) % 10 == 0) {
+          INFO("Completed iteration " << (iter + 1) << "/" << n_iterations 
+               << " (" << failure_count << " failures so far)");
+        }
+      } catch (const std::exception& e) {
+        FAIL("Exception at iteration " << (iter + 1) << ": " << e.what());
+      }
+    }
+    
+    INFO("Total failures: " << failure_count << " out of " << n_iterations);
+  }
+
+  SECTION("Large dataset with multiple starts") {
+    const arma::uword n = 100;
+    const arma::uword d = 3;
+
+    arma::mat X = arma::randu<arma::mat>(n, d);
+    arma::colvec y = arma::sin(4.0 * X.col(0)) % arma::cos(3.0 * X.col(1)) % arma::exp(-2.0 * X.col(2));
+    y += 0.05 * arma::randn(n);
+
+    INFO("Testing large dataset (n=" << n << ", d=" << d << ") with BFGS20");
+    
+    Kriging ok = Kriging("gauss");
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    
+    ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+    
+    CHECK(ok.theta().n_elem == d);
+    CHECK(ok.sigma2() > 0);
+    
+    // Large prediction batch
+    arma::mat X_new = arma::randu<arma::mat>(50, d);
+    auto pred = ok.predict(X_new, true, true, true);
+    CHECK(std::get<0>(pred).n_elem == 50);
+    CHECK(std::get<1>(pred).n_elem == 50);
+    CHECK(std::get<2>(pred).n_rows == 50);
+  }
+
+  SECTION("Rapid sequential BFGS20 calls") {
+    const int n_rapid = 20;
+    const arma::uword n = 25;
+    const arma::uword d = 2;
+
+    INFO("Running " << n_rapid << " rapid sequential BFGS20 fits");
+    
+    for (int i = 0; i < n_rapid; ++i) {
+      arma::mat X = arma::randu<arma::mat>(n, d);
+      arma::colvec y = arma::sin(5.0 * X.col(0) + 3.0 * X.col(1));
+      y += 0.05 * arma::randn(n);
+
+      Kriging ok = Kriging("gauss");
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+      
+      CHECK(ok.sigma2() > 0);
+      CHECK(ok.theta().n_elem == d);
+    }
+    
+    INFO("Completed all " << n_rapid << " rapid sequential fits successfully");
+  }
+
+  SECTION("Different kernel types with BFGS20") {
+    const arma::uword n = 30;
+    const arma::uword d = 2;
+    arma::mat X = arma::randu<arma::mat>(n, d);
+    arma::colvec y = arma::sin(5.0 * X.col(0)) % arma::cos(3.0 * X.col(1));
+    y += 0.1 * arma::randn(n);
+
+    std::vector<std::string> kernels = {"gauss", "exp", "matern3_2", "matern5_2"};
+    
+    for (const auto& kernel : kernels) {
+      INFO("Testing kernel: " << kernel);
+      
+      Kriging ok = Kriging(kernel);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      
+      ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+      
+      CHECK(ok.theta().n_elem == d);
+      CHECK(ok.sigma2() > 0);
+    }
+  }
 }
