@@ -19,7 +19,6 @@ add_library(Kriging
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
-        CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
         include/libKriging/utils/LinearHashStorage.hpp
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
