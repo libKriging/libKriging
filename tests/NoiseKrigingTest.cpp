@@ -200,4 +200,181 @@ TEST_CASE("NoiseKriging multistart and parallel tests") {
   }
 }
 
+TEST_CASE("NoiseKriging fit with given parameters - BFGS1") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
 
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+  
+  arma::colvec noise(n);
+  noise.fill(0.01);
+
+  // Define specific starting parameters
+  arma::mat theta_start(1, d);
+  theta_start(0, 0) = 0.5;
+  theta_start(0, 1) = 0.3;
+  arma::vec sigma2_start(1);
+  sigma2_start(0) = 0.1;
+
+  NoiseKriging nk = NoiseKriging("gauss");
+  // Provide starting values, optimize all
+  NoiseKriging::Parameters parameters{sigma2_start, true, theta_start, true, std::nullopt, true};
+  nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
+
+  // Check that optimization ran
+  CHECK(nk.sigma2() > 0);
+  CHECK(nk.theta().n_elem == d);
+
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("NoiseKriging fit with given parameters - BFGS20") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+  
+  arma::colvec noise(n);
+  noise.fill(0.01);
+
+  // Define specific theta starting points for multistart
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+  arma::vec sigma2_start(1);
+  sigma2_start(0) = 0.1;
+
+  NoiseKriging nk = NoiseKriging("gauss");
+  // Provide starting values, optimize all
+  NoiseKriging::Parameters parameters{sigma2_start, true, theta_starts, true, std::nullopt, true};
+  nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+
+  // Check that optimization ran
+  CHECK(nk.sigma2() > 0);
+  CHECK(nk.theta().n_elem == d);
+
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+
+
+TEST_CASE("NoiseKriging all parameter combinations") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+  
+  arma::colvec noise(n);
+  noise.fill(0.01);
+
+  // Pre-defined parameter values
+  arma::vec sigma2_val(1);
+  sigma2_val(0) = 0.1;
+  arma::mat theta_val(1, d);
+  theta_val.fill(0.5);
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+
+  // Test all combinations with different optimizers
+  std::vector<std::string> optims = {"none", "BFGS", "BFGS20"};
+  
+  for (const auto& optim : optims) {
+    DYNAMIC_SECTION("Optim: " << optim) {
+      // Combination 1: Estimate all parameters (not valid for "none")
+      if (optim != "none") {
+        SECTION("Estimate all (sigma2, theta, beta)") {
+          NoiseKriging nk("gauss");
+          NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 2: Fix sigma2, estimate theta and beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Fix sigma2, estimate theta and beta") {
+          NoiseKriging nk("gauss");
+          NoiseKriging::Parameters params{sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.sigma2() == sigma2_val(0));
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 3: Estimate sigma2, fix theta, estimate beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Estimate sigma2, fix theta, estimate beta") {
+          NoiseKriging nk("gauss");
+          NoiseKriging::Parameters params{std::nullopt, true, theta_val, false, std::nullopt, true};
+          nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 4: Fix both sigma2 and theta, estimate beta
+      SECTION("Fix sigma2 and theta, estimate beta") {
+        NoiseKriging nk("gauss");
+        NoiseKriging::Parameters params{sigma2_val, false, theta_val, false, std::nullopt, true};
+        nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+        CHECK(nk.sigma2() == sigma2_val(0));
+        if (optim == "none") {
+          CHECK(arma::approx_equal(nk.theta(), theta_val.t(), "absdiff", 1e-10));
+        } else {
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 5: Multistart with theta starting points (BFGS20 only)
+      if (optim == "BFGS20") {
+        SECTION("Multistart with theta starting points") {
+          NoiseKriging nk("gauss");
+          NoiseKriging::Parameters params{std::nullopt, true, theta_starts, true, std::nullopt, true};
+          nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+    }
+  }
+
+  // Verify predictions work for a representative case
+  NoiseKriging nk_final("gauss");
+  NoiseKriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  nk_final.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
+  
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk_final.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}

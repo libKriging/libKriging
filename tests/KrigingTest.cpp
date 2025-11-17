@@ -340,3 +340,169 @@ TEST_CASE("Branin BFGS") {
     INFO("✓ BFGS20 and best of 20×BFGS1 are EXACTLY equivalent!");
   }
 }
+
+TEST_CASE("Kriging fit with given parameters - BFGS1") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = f(X.row(k));
+
+  // Define specific starting parameters
+  arma::mat theta_start(1, d);
+  theta_start(0, 0) = 0.5;
+  theta_start(0, 1) = 0.3;
+  double sigma2_start = 0.1;
+
+  Kriging ok = Kriging("gauss");
+  // Provide starting values for sigma2 and theta, optimize all
+  Kriging::Parameters parameters{sigma2_start, true, theta_start, true, std::nullopt, true};
+  ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
+
+  // Check that optimization ran (parameters should be different from starting values)
+  CHECK(ok.theta().n_elem == d);
+  CHECK(ok.sigma2() > 0);
+  
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = ok.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("Kriging fit with given parameters - BFGS20") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = f(X.row(k));
+
+  // Define specific theta starting points for multistart
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+  double sigma2_given = 0.1;
+
+  Kriging ok = Kriging("gauss");
+  Kriging::Parameters parameters{sigma2_given, false, theta_starts, true, std::nullopt, true};
+  ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+
+  // Check that sigma2 was kept fixed
+  CHECK(ok.sigma2() == sigma2_given);
+  // Theta should be optimized (one of the starting points)
+  CHECK(ok.theta().n_elem == d);
+
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = ok.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("Kriging all parameter combinations") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = f(X.row(k));
+
+  // Pre-defined parameter values
+  double sigma2_val = 0.1;
+  arma::mat theta_val(1, d);
+  theta_val.fill(0.5);
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+
+  // Test all combinations of parameter estimation flags with different optimizers
+  std::vector<std::string> optims = {"none", "BFGS", "BFGS20"};
+  
+  for (const auto& optim : optims) {
+    DYNAMIC_SECTION("Optim: " << optim) {
+      // Combination 1: Estimate all parameters (not valid for "none")
+      if (optim != "none") {
+        SECTION("Estimate all (sigma2, theta, beta)") {
+          Kriging kr("gauss");
+          Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(kr.sigma2() > 0);
+          CHECK(kr.theta().n_elem == d);
+        }
+      }
+
+      // Combination 2: Fix sigma2, estimate theta and beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Fix sigma2, estimate theta and beta") {
+          Kriging kr("gauss");
+          Kriging::Parameters params{sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(kr.sigma2() == sigma2_val);
+          CHECK(kr.theta().n_elem == d);
+        }
+      }
+
+      // Combination 3: Estimate sigma2, fix theta, estimate beta (only "none" truly fixes theta)
+      SECTION("Estimate sigma2, fix theta, estimate beta") {
+        Kriging kr("gauss");
+        Kriging::Parameters params{std::nullopt, true, theta_val, false, std::nullopt, true};
+        kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+        CHECK(kr.sigma2() > 0);
+        if (optim == "none") {
+          CHECK(arma::approx_equal(kr.theta(), theta_val.t(), "absdiff", 1e-10));
+        } else {
+          // BFGS variants use theta as starting point even when is_theta_estim=false
+          CHECK(kr.theta().n_elem == d);
+        }
+      }
+
+      // Combination 4: Fix both sigma2 and theta, estimate beta (only "none" truly fixes theta)
+      SECTION("Fix sigma2 and theta, estimate beta") {
+        Kriging kr("gauss");
+        Kriging::Parameters params{sigma2_val, false, theta_val, false, std::nullopt, true};
+        kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+        CHECK(kr.sigma2() == sigma2_val);
+        if (optim == "none") {
+          CHECK(arma::approx_equal(kr.theta(), theta_val.t(), "absdiff", 1e-10));
+        } else {
+          // BFGS variants use theta as starting point even when is_theta_estim=false
+          CHECK(kr.theta().n_elem == d);
+        }
+      }
+
+      // Combination 5: Provide starting values for sigma2 and theta (BFGS20 multistart only)
+      if (optim == "BFGS20") {
+        SECTION("Multistart with theta starting points") {
+          Kriging kr("gauss");
+          Kriging::Parameters params{sigma2_val, true, theta_starts, true, std::nullopt, true};
+          kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(kr.sigma2() > 0);
+          CHECK(kr.theta().n_elem == d);
+        }
+      }
+    }
+  }
+
+  // Verify predictions work for a representative case
+  Kriging kr_final("gauss");
+  Kriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  kr_final.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
+  
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = kr_final.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}

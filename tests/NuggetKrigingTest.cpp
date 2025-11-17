@@ -351,6 +351,235 @@ TEST_CASE("NuggetKriging intensive stress test") {
   }
 }
 
+TEST_CASE("NuggetKriging fit with given parameters - BFGS1") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+
+  // Define specific starting parameters
+  arma::mat theta_start(1, d);
+  theta_start(0, 0) = 0.5;
+  theta_start(0, 1) = 0.3;
+  arma::vec sigma2_start(1);
+  sigma2_start(0) = 0.1;
+  arma::vec nugget_start(1);
+  nugget_start(0) = 0.01;
+
+  NuggetKriging nk = NuggetKriging("gauss");
+  // Provide starting values, optimize all
+  NuggetKriging::Parameters parameters{nugget_start, true, sigma2_start, true, theta_start, true, std::nullopt, true};
+  nk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
+
+  // Check that optimization ran
+  CHECK(nk.sigma2() > 0);
+  CHECK(nk.nugget() >= 0);
+  CHECK(nk.theta().n_elem == d);
+
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("NuggetKriging fit with given parameters - BFGS20") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+
+  // Define specific theta starting points for multistart
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+  arma::vec sigma2_start(1);
+  sigma2_start(0) = 0.1;
+  arma::vec nugget_start(1);
+  nugget_start(0) = 0.01;
+
+  NuggetKriging nk = NuggetKriging("gauss");
+  // Provide starting values, optimize all
+  NuggetKriging::Parameters parameters{nugget_start, true, sigma2_start, true, theta_starts, true, std::nullopt, true};
+  nk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
+
+  // Check that optimization ran
+  CHECK(nk.sigma2() > 0);
+  CHECK(nk.nugget() >= 0);
+  CHECK(nk.theta().n_elem == d);
+
+  // Verify predictions work
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
+TEST_CASE("NuggetKriging all parameter combinations") {
+  arma::arma_rng::set_seed(123);
+  const arma::uword n = 20;
+  const arma::uword d = 2;
+
+  arma::mat X(n, d, arma::fill::randu);
+  arma::colvec y(n);
+  for (arma::uword k = 0; k < n; ++k)
+    y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
+  y += 0.05 * arma::randn(n);
+
+  // Pre-defined parameter values
+  arma::vec nugget_val(1);
+  nugget_val(0) = 0.01;
+  arma::vec sigma2_val(1);
+  sigma2_val(0) = 0.1;
+  arma::mat theta_val(1, d);
+  theta_val.fill(0.5);
+  arma::mat theta_starts(20, d);
+  for (arma::uword i = 0; i < 20; i++) {
+    theta_starts.row(i) = arma::randu<arma::rowvec>(d) * 2.0 + 0.1;
+  }
+
+  // Test all combinations with different optimizers
+  std::vector<std::string> optims = {"none", "BFGS", "BFGS20"};
+  
+  for (const auto& optim : optims) {
+    DYNAMIC_SECTION("Optim: " << optim) {
+      // Combination 1: Estimate all parameters (not valid for "none")
+      if (optim != "none") {
+        SECTION("Estimate all (nugget, sigma2, theta, beta)") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() >= 0);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 2: Fix nugget, estimate others (not valid for "none")
+      if (optim != "none") {
+        SECTION("Fix nugget, estimate sigma2, theta, beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{nugget_val, false, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() == nugget_val(0));
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 3: Fix sigma2, estimate others (not valid for "none" without theta)
+      if (optim != "none") {
+        SECTION("Estimate nugget, fix sigma2, estimate theta and beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{std::nullopt, true, sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() >= 0);
+          CHECK(nk.sigma2() == sigma2_val(0));
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 4: Fix theta, estimate others (not valid for "none" - can't estimate variance params)
+      if (optim != "none") {
+        SECTION("Estimate nugget and sigma2, fix theta, estimate beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, theta_val, false, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() >= 0);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 5: Fix nugget and sigma2, estimate theta and beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Fix nugget and sigma2, estimate theta and beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{nugget_val, false, sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() == nugget_val(0));
+          CHECK(nk.sigma2() == sigma2_val(0));
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 6: Fix nugget and theta, estimate sigma2 and beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Fix nugget and theta, estimate sigma2 and beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{nugget_val, false, std::nullopt, true, theta_val, false, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() == nugget_val(0));
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 7: Fix sigma2 and theta, estimate nugget and beta (not valid for "none")
+      if (optim != "none") {
+        SECTION("Estimate nugget, fix sigma2 and theta, estimate beta") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{std::nullopt, true, sigma2_val, false, theta_val, false, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() >= 0);
+          CHECK(nk.sigma2() == sigma2_val(0));
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 8: Fix all variance parameters, estimate beta only
+      SECTION("Fix nugget, sigma2 and theta, estimate beta only") {
+        NuggetKriging nk("gauss");
+        NuggetKriging::Parameters params{nugget_val, false, sigma2_val, false, theta_val, false, std::nullopt, true};
+        nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+        CHECK(nk.nugget() == nugget_val(0));
+        CHECK(nk.sigma2() == sigma2_val(0));
+        if (optim == "none") {
+          CHECK(arma::approx_equal(nk.theta(), theta_val.t(), "absdiff", 1e-10));
+        } else {
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+
+      // Combination 9: Multistart with theta starting points (BFGS20 only)
+      if (optim == "BFGS20") {
+        SECTION("Multistart with theta starting points") {
+          NuggetKriging nk("gauss");
+          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, theta_starts, true, std::nullopt, true};
+          nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
+          CHECK(nk.nugget() >= 0);
+          CHECK(nk.sigma2() > 0);
+          CHECK(nk.theta().n_elem == d);
+        }
+      }
+    }
+  }
+
+  // Verify predictions work for a representative case
+  NuggetKriging nk_final("gauss");
+  NuggetKriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  nk_final.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
+  
+  arma::mat X_new(1, d);
+  X_new.fill(0.5);
+  auto pred = nk_final.predict(X_new, true, false, false);
+  CHECK(std::get<0>(pred).n_elem == 1);
+  CHECK(std::get<1>(pred).n_elem == 1);
+}
+
 // NOTE: The NuggetKriging tests above demonstrate the parallelization infrastructure
 // (thread pool, multistart, timing comparisons) but may encounter numerical issues
 // with certain test data configurations. The parallelization itself works correctly
