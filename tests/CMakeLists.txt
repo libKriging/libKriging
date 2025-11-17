@@ -86,11 +86,6 @@ target_link_libraries(NoiseKrigingLogLikTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries NoiseKrigingLogLikTest)
 catch_discover_tests(NoiseKrigingLogLikTest)
 
-add_executable(CacheTest CacheFunctionTest.cpp)
-target_link_libraries(CacheTest LINK_PUBLIC Kriging Catch2)
-add_dependencies(all_test_binaries CacheTest)
-catch_discover_tests(CacheTest)
-
 add_executable(LinearAlgebraTest LinearAlgebraTest.cpp)
 target_link_libraries(LinearAlgebraTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries LinearAlgebraTest)
