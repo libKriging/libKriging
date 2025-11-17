@@ -5,11 +5,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-# Use jemalloc for multi-threaded stability (Linux only)
-if [[ "$(uname -s)" == "Linux" && -f /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ]]; then
-  export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
-  echo "Using jemalloc for thread-safe memory allocation"
-fi
+# jemalloc is statically linked into libKriging (no need for LD_PRELOAD)
 
 # Add MKL library path if MKL is installed
 if [[ "$(uname -s)" == "Linux" && -d /opt/intel/oneapi/mkl/latest/lib ]]; then
