@@ -109,7 +109,7 @@ LIBKRIGING_EXPORT int Optim::get_thread_start_delay_ms() {
   return Optim::thread_start_delay_ms;
 };
 
-int Optim::thread_pool_size = 0;  // 0 means auto-detect (ncpu/8)
+int Optim::thread_pool_size = 0;  // 0 means auto-detect (ncpu/4)
 
 LIBKRIGING_EXPORT void Optim::set_thread_pool_size(int pool_size) {
   Optim::thread_pool_size = pool_size;

@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <libKriging/NuggetKriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
@@ -244,6 +245,7 @@ TEST_CASE("NuggetKriging intensive stress test") {
     const int n_iterations = 50;
     const arma::uword n = 30;
     const arma::uword d = 2;
+    int failure_count = 0;
 
     INFO("Running " << n_iterations << " intensive iterations with BFGS20");
     
@@ -258,22 +260,45 @@ TEST_CASE("NuggetKriging intensive stress test") {
       try {
         ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
         
-        CHECK(ok.theta().n_elem == d);
-        CHECK(ok.sigma2() > 0);
-        CHECK(ok.nugget() >= 0);
-        
-        // Prediction test
-        arma::mat X_new = arma::randu<arma::mat>(5, d);
-        auto pred = ok.predict(X_new, true, false, false);
-        CHECK(std::get<0>(pred).n_elem == 5);
+        // Check if fit produced invalid results
+        if (!std::isfinite(ok.sigma2()) || ok.sigma2() <= 0) {
+          failure_count++;
+          std::stringstream X_filename, y_filename;
+          X_filename << "failing_X_iter" << iter << "_failure" << failure_count << ".csv";
+          y_filename << "failing_y_iter" << iter << "_failure" << failure_count << ".csv";
+          
+          X.save(X_filename.str(), arma::csv_ascii);
+          y.save(y_filename.str(), arma::csv_ascii);
+          
+          INFO("Saved failing case " << failure_count << " (iteration " << iter << "):");
+          INFO("  X saved to: " << X_filename.str());
+          INFO("  y saved to: " << y_filename.str());
+          INFO("  sigma2 = " << ok.sigma2());
+          INFO("  nugget = " << ok.nugget());
+          
+          // Still report the failure for test tracking
+          CHECK(ok.sigma2() > 0);
+        } else {
+          CHECK(ok.theta().n_elem == d);
+          CHECK(ok.sigma2() > 0);
+          CHECK(ok.nugget() >= 0);
+          
+          // Prediction test
+          arma::mat X_new = arma::randu<arma::mat>(5, d);
+          auto pred = ok.predict(X_new, true, false, false);
+          CHECK(std::get<0>(pred).n_elem == 5);
+        }
         
         if ((iter + 1) % 10 == 0) {
-          INFO("Completed iteration " << (iter + 1) << "/" << n_iterations);
+          INFO("Completed iteration " << (iter + 1) << "/" << n_iterations 
+               << " (" << failure_count << " failures so far)");
         }
       } catch (const std::exception& e) {
         FAIL("Exception at iteration " << (iter + 1) << ": " << e.what());
       }
     }
+    
+    INFO("Total failures: " << failure_count << " out of " << n_iterations);
   }
 
   SECTION("Large dataset with multiple starts") {

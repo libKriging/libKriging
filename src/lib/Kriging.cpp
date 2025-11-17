@@ -1240,9 +1240,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
           gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
-          if (Optim::log_level > 0) {
-            arma::cout << "BFGS start point " << (start_idx + 1) << "/" << multistart << ":" << arma::endl;
-          }
+        if (Optim::log_level > 0) {
+          arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
+          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
+          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
+          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
+          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+          arma::cout << "  normalize: " << m_normalize << arma::endl;
+          arma::cout << "  lower_bounds: " << theta_lower.t() << arma::endl;
+          arma::cout << "  upper_bounds: " << theta_upper.t() << arma::endl;
+          arma::cout << "  start_point: " << theta0.row(start_idx % multistart) << arma::endl;
+        }
 
           // Use pre-allocated KModel for this thread (thread-safe)
           if (start_idx >= preallocated_models.size()) {
@@ -1288,8 +1296,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                     || ((sol_to_b < arma::datum::eps) && (opt_result.num_iters <= 2))
                     || (opt_result.f_opt > best_f_opt))) {
               gamma_tmp = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
+              
               if (Optim::reparametrize)
                 gamma_tmp = Optim::reparam_to(gamma_tmp);
+
               gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
               gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
               retry++;
@@ -1298,8 +1308,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             }
           }
 
-          double min_ofn_tmp;
-          min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
+          // Final evaluation to update model
+          double min_ofn_tmp = fit_ofn(best_gamma, nullptr, nullptr, &m);
 
           result.objective_value = min_ofn_tmp;
           result.gamma = best_gamma;
