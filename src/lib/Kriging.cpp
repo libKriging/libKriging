@@ -81,12 +81,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::covMat(const arma::mat& X1, const arma::mat
   Xn2.each_row() /= m_scaleX;
 
   arma::mat R = arma::mat(X1.n_rows, X2.n_rows, arma::fill::none);
-  for (arma::uword i = 0; i < Xn1.n_rows; i++) {
-    for (arma::uword j = 0; j < Xn2.n_rows; j++) {
-      R.at(i, j) = _Cov((Xn1.row(i) - Xn2.row(j)).t(), m_theta);
-    }
-  }
-  return R * m_sigma2;
+  LinearAlgebra::covMat_rect(&R, Xn1.t(), Xn2.t(), m_theta, _Cov, m_sigma2);
+  return R;
 }
 
 // at least, just call make_Cov(kernel)
@@ -1017,15 +1013,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
   // Now we compute the distance matrix between points. Will be used to compute R(theta) later (e.g. when fitting)
   // Note: m_dX is transposed compared to m_X
-  m_dX = arma::mat(d, n * n, arma::fill::zeros);
-  for (arma::uword ij = 0; ij < m_dX.n_cols; ij++) {
-    int i = (int)ij / n;
-    int j = ij % n;  // i,j <-> i*n+j
-    if (i < j) {
-      m_dX.col(ij) = trans(m_X.row(i) - m_X.row(j));
-      m_dX.col(j * n + i) = m_dX.col(ij);
-    }
-  }
+  m_dX = LinearAlgebra::compute_dX(m_X);
   m_maxdX = arma::max(arma::abs(m_dX), 1);
 
   // Define regression matrix
@@ -1650,13 +1638,7 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
   if (return_cov) {
     // Compute the covariance matrix between new data points
     arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-    for (arma::uword i = 0; i < n_n; i++) {
-      // R_nn.at(i, i) = 1;
-      for (arma::uword j = 0; j < i; j++) {
-        R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
-      }
-    }
-    R_nn.diag().ones();
+    LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov);
     t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
     Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
@@ -1787,22 +1769,12 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
   auto t0 = Bench::tic();
   // Compute covariance between new data
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_n; i++) {
-    // R_nn.at(i, i) = 1.0;
-    for (arma::uword j = 0; j < i; j++) {
-      R_nn.at(i, j) = R_nn.at(j, i) = _Cov((Xn_n.col(i) - Xn_n.col(j)), m_theta);
-    }
-  }
-  R_nn.diag().ones();
+  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov);
   t0 = Bench::toc(nullptr, "R_nn          ", t0);
 
   // Compute covariance between training data and new data to predict
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_o; i++) {
-    for (arma::uword j = 0; j < n_n; j++) {
-      R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
-    }
-  }
+  LinearAlgebra::covMat_rect(&R_on, Xn_o, Xn_n, m_theta, _Cov);
   t0 = Bench::toc(nullptr, "R_on        ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
@@ -1933,31 +1905,17 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 
     // Compute covariance between updated data
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
-    for (arma::uword i = 0; i < n_u; i++) {
-      // lastsimup_R_uu.at(i, i) = 1.0;
-      for (arma::uword j = 0; j < i; j++) {
-        lastsimup_R_uu.at(i, j) = lastsimup_R_uu.at(j, i) = _Cov((Xn_u.col(i) - Xn_u.col(j)), m_theta);
-      }
-    }
-    lastsimup_R_uu.diag().ones();
+    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Xn_u, m_theta, _Cov);
     t0 = Bench::toc(nullptr, "R_uu          ", t0);
 
     // Compute covariance between updated/old data
     lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
-    for (arma::uword i = 0; i < n_u; i++) {
-      for (arma::uword j = 0; j < n_o; j++) {
-        lastsimup_R_uo.at(i, j) = _Cov((Xn_u.col(i) - Xn_o.col(j)), m_theta);
-      }
-    }
+    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Xn_u, Xn_o, m_theta, _Cov);
     t0 = Bench::toc(nullptr, "R_uo          ", t0);
 
     // Compute covariance between updated/new data
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
-    for (arma::uword i = 0; i < n_u; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
-        lastsimup_R_un.at(i, j) = _Cov((Xn_u.col(i) - Xn_n.col(j)), m_theta);
-      }
-    }
+    LinearAlgebra::covMat_rect(&lastsimup_R_un, Xn_u, Xn_n, m_theta, _Cov);
     t0 = Bench::toc(nullptr, "R_un          ", t0);
   }
 

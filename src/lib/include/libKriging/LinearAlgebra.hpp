@@ -57,6 +57,41 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static arma::mat diagcrossprod(const arma::mat& A);
 
   LIBKRIGING_EXPORT static arma::colvec diagABA(const arma::mat& A, const arma::mat& B);
+
+  // Fast pointer-based computation of pairwise differences
+  // Computes dX where dX.col(i*n+j) = X.row(i) - X.row(j) for all i,j
+  // Result is a (d x n*n) matrix where d = X.n_cols and n = X.n_rows
+  LIBKRIGING_EXPORT static arma::mat compute_dX(const arma::mat& X);
+
+  // Compute symmetric covariance matrix R from pre-computed differences dX
+  // R[i,j] = R[j,i] = factor * Cov(dX.col(i*n+j), theta) for i < j
+  // diag is set after factor multiplication
+  LIBKRIGING_EXPORT static void covMat_sym_dX(arma::mat* R,
+                                               const arma::mat& dX,
+                                               const arma::vec& theta,
+                                               std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                               double factor = 1.0,
+                                               const arma::vec& diag = arma::vec());
+
+  // Compute symmetric covariance matrix R directly from X
+  // R[i,j] = R[j,i] = factor * Cov(X.col(i) - X.col(j), theta) for i < j
+  // X is assumed to be (d x n) with observations in columns
+  LIBKRIGING_EXPORT static void covMat_sym_X(arma::mat* R,
+                                              const arma::mat& X,
+                                              const arma::vec& theta,
+                                              std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                              double factor = 1.0,
+                                              const arma::vec& diag = arma::vec());
+
+  // Compute rectangular covariance matrix R between X1 and X2
+  // R[i,j] = factor * Cov(X1.col(i) - X2.col(j), theta)
+  // X1 is (d x n1), X2 is (d x n2) with observations in columns
+  LIBKRIGING_EXPORT static void covMat_rect(arma::mat* R,
+                                             const arma::mat& X1,
+                                             const arma::mat& X2,
+                                             const arma::vec& theta,
+                                             std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                             double factor = 1.0);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
