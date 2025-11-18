@@ -599,14 +599,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       all_gamma_upper[i] = arma::max(gamma_tmp, gamma_upper);
     }
 
-    // Thread pool for parallel optimization
-    size_t pool_size = Optim::get_thread_pool_size();
-    if (pool_size == 0) {
-      pool_size = std::max(1, (int)std::thread::hardware_concurrency() / 4);
-    }
-    if (Optim::log_level > 0) {
-      arma::cout << "Using thread pool size: " << pool_size << " for " << multistart << " starts" << arma::endl;
-    }
+    // Thread pool configuration will be handled in the parallel execution section below
 
     // Multi-threading implementation for BFGS multistart
     // Each thread uses its own preallocated KModel, so no mutex needed
@@ -769,8 +762,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       unsigned int n_cpu = std::thread::hardware_concurrency();
       int pool_size = Optim::thread_pool_size;
       if (pool_size <= 0) {
-        // Auto-detect: ncpu/8 (conservative default for nested parallelism)
-        pool_size = std::max(1u, n_cpu / 8);
+        pool_size = std::max(1u, n_cpu);
       }
       pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
       

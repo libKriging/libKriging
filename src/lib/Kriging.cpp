@@ -1349,8 +1349,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         unsigned int n_cpu = std::thread::hardware_concurrency();
         int pool_size = Optim::thread_pool_size;
         if (pool_size <= 0) {
-          // Auto-detect: ncpu/8 (conservative default for nested parallelism)
-          pool_size = std::max(1u, n_cpu);// / 8);
+          pool_size = std::max(1u, n_cpu);
         }
         pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
         
