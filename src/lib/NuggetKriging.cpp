@@ -34,9 +34,12 @@
 #endif
 
 // Weak symbol for OpenBLAS thread control (if available)
+// Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
+#if !defined(__APPLE__) || !defined(__arm64__)
 extern "C" {
   void openblas_set_num_threads(int num_threads) __attribute__((weak));
 }
+#endif
 
 /************************************************/
 /**      NuggetKriging implementation        **/
@@ -854,9 +857,12 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
       
       // Set OpenBLAS threads (if available)
+      // Note: Skip on macOS ARM64 where Accelerate framework is used
+#if !defined(__APPLE__) || !defined(__arm64__)
       if (openblas_set_num_threads != nullptr) {
         openblas_set_num_threads(threads_per_worker);
       }
+#endif
       
       // Set OpenMP threads (for Armadillo operations that use OpenMP)
       #ifdef _OPENMP
