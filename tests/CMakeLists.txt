@@ -62,6 +62,16 @@ target_link_libraries(KrigingFitTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingFitTest)
 catch_discover_tests(KrigingFitTest)
 
+add_executable(KrigingUpdateTest KrigingUpdateTest.cpp)
+target_link_libraries(KrigingUpdateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingUpdateTest)
+catch_discover_tests(KrigingUpdateTest)
+
+add_executable(KrigingUpdateSimulateTest KrigingUpdateSimulateTest.cpp)
+target_link_libraries(KrigingUpdateSimulateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingUpdateSimulateTest)
+catch_discover_tests(KrigingUpdateSimulateTest)
+
 add_executable(KrigingPredictTest KrigingPredictTest.cpp)
 target_link_libraries(KrigingPredictTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingPredictTest)
@@ -84,6 +94,16 @@ target_link_libraries(NuggetKrigingFitTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries NuggetKrigingFitTest)
 catch_discover_tests(NuggetKrigingFitTest)
 
+add_executable(NuggetKrigingUpdateTest NuggetKrigingUpdateTest.cpp)
+target_link_libraries(NuggetKrigingUpdateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries NuggetKrigingUpdateTest)
+catch_discover_tests(NuggetKrigingUpdateTest)
+
+add_executable(NuggetKrigingUpdateSimulateTest NuggetKrigingUpdateSimulateTest.cpp)
+target_link_libraries(NuggetKrigingUpdateSimulateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries NuggetKrigingUpdateSimulateTest)
+catch_discover_tests(NuggetKrigingUpdateSimulateTest)
+
 add_executable(NuggetKrigingPredictTest NuggetKrigingPredictTest.cpp)
 target_link_libraries(NuggetKrigingPredictTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries NuggetKrigingPredictTest)
@@ -105,6 +125,16 @@ add_executable(NoiseKrigingFitTest NoiseKrigingFitTest.cpp)
 target_link_libraries(NoiseKrigingFitTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries NoiseKrigingFitTest)
 catch_discover_tests(NoiseKrigingFitTest)
+
+add_executable(NoiseKrigingUpdateTest NoiseKrigingUpdateTest.cpp)
+target_link_libraries(NoiseKrigingUpdateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries NoiseKrigingUpdateTest)
+catch_discover_tests(NoiseKrigingUpdateTest)
+
+add_executable(NoiseKrigingUpdateSimulateTest NoiseKrigingUpdateSimulateTest.cpp)
+target_link_libraries(NoiseKrigingUpdateSimulateTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries NoiseKrigingUpdateSimulateTest)
+catch_discover_tests(NoiseKrigingUpdateSimulateTest)
 
 add_executable(NoiseKrigingPredictTest NoiseKrigingPredictTest.cpp)
 target_link_libraries(NoiseKrigingPredictTest LINK_PUBLIC Kriging Catch2)
@@ -152,3 +182,7 @@ add_test(NAME JsonTest COMMAND JsonTest)
 
 # list of all tests
 # get_directory_property(all_tests TESTS)
+add_executable(KSTestValidation KSTestValidation.cpp)
+target_link_libraries(KSTestValidation LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KSTestValidation)
+catch_discover_tests(KSTestValidation)

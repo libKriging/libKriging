@@ -36,29 +36,31 @@ echo ""
 echo "Running test: $TEST_NAME"
 echo "----------------------------------------"
 
-# Try to find and run the test in common test executables
-TEST_EXECUTABLES=(
-    "tests/KrigingTest"
-    "tests/KrigingFitTest"
-    "tests/KrigingPredictTest"
-    "tests/KrigingSimulateTest"
-    "tests/NuggetKrigingTest"
-    "tests/NuggetKrigingFitTest"
-    "tests/NuggetKrigingPredictTest"
-    "tests/NuggetKrigingSimulateTest"
-    "tests/NoiseKrigingTest"
-    "tests/NoiseKrigingFitTest"
-    "tests/NoiseKrigingPredictTest"
-    "tests/NoiseKrigingSimulateTest"
-    "tests/KrigingLogLikTest"
-    "tests/NuggetKrigingLogLikTest"
-    "tests/NoiseKrigingLogLikTest"
-    "tests/LinearAlgebraTest"
-    "tests/CacheTest"
-    "tests/JsonTest"
+# Dynamically discover all test executables from *Test.cpp files in the tests directory
+TEST_EXECUTABLES=()
+for test_file in "$SCRIPT_DIR"/*Test*.cpp; do
+    if [ -f "$test_file" ]; then
+        # Extract basename without extension
+        test_name=$(basename "$test_file" .cpp)
+        test_exec="tests/$test_name"
+        # Check if the executable exists in build directory
+        if [ -f "$test_exec" ]; then
+            TEST_EXECUTABLES+=("$test_exec")
+        fi
+    fi
+done
+
+# Add other test executables that don't follow the *Test.cpp pattern
+OTHER_EXECUTABLES=(
     "tests/catch2_unit_test"
     "tests/regression_unit_test"
 )
+
+for TEST_EXEC in "${OTHER_EXECUTABLES[@]}"; do
+    if [ -f "$TEST_EXEC" ]; then
+        TEST_EXECUTABLES+=("$TEST_EXEC")
+    fi
+done
 
 FOUND=0
 for TEST_EXEC in "${TEST_EXECUTABLES[@]}"; do
