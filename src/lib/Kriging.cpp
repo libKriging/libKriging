@@ -1860,13 +1860,6 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
   return y_n;
 }
 
-LIBKRIGING_EXPORT arma::mat Kriging::rand(const int nsim,
-                                          const int seed,
-                                          const arma::mat& X_n,
-                                          const bool will_update) {
-  return simulate(nsim, seed, X_n, will_update);
-}
-
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
@@ -1989,10 +1982,6 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   }
 
   return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u);
-}
-
-LIBKRIGING_EXPORT arma::mat Kriging::update_rand(const arma::vec& y_u, const arma::mat& X_u) {
-  return update_simulate(y_u, X_u);
 }
 
 /** Add new conditional data points to previous (X,y), then perform new fit.

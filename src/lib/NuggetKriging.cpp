@@ -1701,26 +1701,44 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
   // rebuild starting parameters
   Parameters parameters;
   if (refit) {  // re-fit
-    if (m_est_beta)
-      parameters = Parameters{
-          std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
-          this->m_est_nugget,
-          std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
-          this->m_est_sigma2,
-          std::make_optional(trans(this->m_theta) % this->m_scaleX),
-          this->m_est_theta,
-          std::make_optional(arma::ones<arma::vec>(0)),
-          true};
-    else
-      parameters = Parameters{
-          std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
-          this->m_est_nugget,
-          std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
-          this->m_est_sigma2,
-          std::make_optional(trans(this->m_theta) % this->m_scaleX),
-          this->m_est_theta,
-          std::make_optional(trans(this->m_beta) * this->m_scaleY),
-          false};
+    if (m_est_beta) {
+      if (m_est_nugget && m_est_sigma2 && m_est_theta) {
+        // All parameters are being estimated - use default initialization for better convergence
+        parameters = Parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      } else {
+        parameters = Parameters{
+            std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
+            this->m_est_nugget,
+            std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
+            this->m_est_sigma2,
+            std::make_optional(trans(this->m_theta) % this->m_scaleX),
+            this->m_est_theta,
+            std::make_optional(arma::ones<arma::vec>(0)),
+            true};
+      }
+    } else {
+      if (m_est_nugget && m_est_sigma2 && m_est_theta) {
+        // All parameters except beta are being estimated - use default initialization
+        parameters = Parameters{std::nullopt,
+                                true,
+                                std::nullopt,
+                                true,
+                                std::nullopt,
+                                true,
+                                std::make_optional(trans(this->m_beta) * this->m_scaleY),
+                                false};
+      } else {
+        parameters = Parameters{
+            std::make_optional(arma::vec(1, arma::fill::value(this->m_nugget * this->m_scaleY * this->m_scaleY))),
+            this->m_est_nugget,
+            std::make_optional(arma::vec(1, arma::fill::value(this->m_sigma2 * this->m_scaleY * this->m_scaleY))),
+            this->m_est_sigma2,
+            std::make_optional(trans(this->m_theta) % this->m_scaleX),
+            this->m_est_theta,
+            std::make_optional(trans(this->m_beta) * this->m_scaleY),
+            false};
+      }
+    }
     this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                               y_u),  // de-normalize previous data according to suite unnormed new data
               arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
@@ -1737,7 +1755,7 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
         false,
         std::make_optional(trans(this->m_theta) % this->m_scaleX),
         false,
-        std::make_optional(arma::ones<arma::vec>(0)),
+        std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
         false};
     this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
                               y_u),  // de-normalize previous data according to suite unnormed new data
