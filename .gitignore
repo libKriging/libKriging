@@ -58,3 +58,13 @@ dependencies/armadillo-code/examples/Makefile
 
 # old dir
 old/
+# jemalloc files
+jemalloc*
+# compiled makefiles
+**.*make
+# compiled shared objects
+*.so*
+# AI documentation files
+*_*.md
+# compiled makefiles
+**Makefile
