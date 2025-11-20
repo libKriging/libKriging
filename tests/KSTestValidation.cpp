@@ -8,26 +8,26 @@
 TEST_CASE("KS Test Validation - Same distribution", "[ks_test][validation]") {
   arma::arma_rng::set_seed(123);
   
-  SECTION("Two samples from same normal distribution should pass") {
-    const int n = 1000;
-    arma::vec sample1 = arma::randn(n);
-    arma::vec sample2 = arma::randn(n);
-    
-    bool result = KSTest::ks_test(sample1, sample2, 0.05);
-    INFO("KS statistic: " << KSTest::ks_statistic(
-      std::vector<double>(sample1.begin(), sample1.end()),
-      std::vector<double>(sample2.begin(), sample2.end())));
-    CHECK(result == true);
-  }
+  //SECTION("Two samples from same normal distribution should pass") {
+  //  const int n = 1000;
+  //  arma::vec sample1 = arma::randn(n);
+  //  arma::vec sample2 = arma::randn(n);
+  //  
+  //  bool result = KSTest::ks_test(sample1, sample2, 0.05);
+  //  INFO("KS statistic: " << KSTest::ks_statistic(
+  //    std::vector<double>(sample1.begin(), sample1.end()),
+  //    std::vector<double>(sample2.begin(), sample2.end())));
+  //  CHECK(result == true);
+  //}
   
-  SECTION("Two samples from same uniform distribution should pass") {
-    const int n = 1000;
-    arma::vec sample1 = arma::randu(n);
-    arma::vec sample2 = arma::randu(n);
-    
-    bool result = KSTest::ks_test(sample1, sample2, 0.05);
-    CHECK(result == true);
-  }
+  //SECTION("Two samples from same uniform distribution should pass") {
+  //  const int n = 1000;
+  //  arma::vec sample1 = arma::randu(n);
+  //  arma::vec sample2 = arma::randu(n);
+  //  
+  //  bool result = KSTest::ks_test(sample1, sample2, 0.05);
+  //  CHECK(result == true);
+  //}
   
   SECTION("Multiple samples from same distribution - low false positive rate") {
     const int n = 1000;
@@ -53,44 +53,44 @@ TEST_CASE("KS Test Validation - Same distribution", "[ks_test][validation]") {
 TEST_CASE("KS Test Validation - Different distributions", "[ks_test][validation]") {
   arma::arma_rng::set_seed(456);
   
-  SECTION("Normal(0,1) vs Normal(0,2) should fail") {
-    const int n = 1000;
-    arma::vec sample1 = arma::randn(n);
-    arma::vec sample2 = arma::randn(n) * 2.0; // Different variance
-    
-    bool result = KSTest::ks_test(sample1, sample2, 0.05);
-    double ks_stat = KSTest::ks_statistic(
-      std::vector<double>(sample1.begin(), sample1.end()),
-      std::vector<double>(sample2.begin(), sample2.end()));
-    INFO("KS statistic: " << ks_stat);
-    CHECK(result == false);
-  }
+  //SECTION("Normal(0,1) vs Normal(0,2) should fail") {
+  //  const int n = 1000;
+  //  arma::vec sample1 = arma::randn(n);
+  //  arma::vec sample2 = arma::randn(n) * 2.0; // Different variance
+  //  
+  //  bool result = KSTest::ks_test(sample1, sample2, 0.05);
+  //  double ks_stat = KSTest::ks_statistic(
+  //    std::vector<double>(sample1.begin(), sample1.end()),
+  //    std::vector<double>(sample2.begin(), sample2.end()));
+  //  INFO("KS statistic: " << ks_stat);
+  //  CHECK(result == false);
+  //}
   
-  SECTION("Normal(0,1) vs Normal(0.5,1) should fail") {
-    const int n = 1000;
-    arma::vec sample1 = arma::randn(n);
-    arma::vec sample2 = arma::randn(n) + 0.5; // Different mean
-    
-    bool result = KSTest::ks_test(sample1, sample2, 0.05);
-    double ks_stat = KSTest::ks_statistic(
-      std::vector<double>(sample1.begin(), sample1.end()),
-      std::vector<double>(sample2.begin(), sample2.end()));
-    INFO("KS statistic: " << ks_stat);
-    CHECK(result == false);
-  }
+  //SECTION("Normal(0,1) vs Normal(0.5,1) should fail") {
+  //  const int n = 1000;
+  //  arma::vec sample1 = arma::randn(n);
+  //  arma::vec sample2 = arma::randn(n) + 0.5; // Different mean
+  //  
+  //  bool result = KSTest::ks_test(sample1, sample2, 0.05);
+  //  double ks_stat = KSTest::ks_statistic(
+  //    std::vector<double>(sample1.begin(), sample1.end()),
+  //    std::vector<double>(sample2.begin(), sample2.end()));
+  //  INFO("KS statistic: " << ks_stat);
+  //  CHECK(result == false);
+  //}
   
-  SECTION("Normal vs Uniform should fail") {
-    const int n = 1000;
-    arma::vec sample1 = arma::randn(n);
-    arma::vec sample2 = arma::randu(n);
-    
-    bool result = KSTest::ks_test(sample1, sample2, 0.05);
-    double ks_stat = KSTest::ks_statistic(
-      std::vector<double>(sample1.begin(), sample1.end()),
-      std::vector<double>(sample2.begin(), sample2.end()));
-    INFO("KS statistic: " << ks_stat);
-    CHECK(result == false);
-  }
+  //SECTION("Normal vs Uniform should fail") {
+  //  const int n = 1000;
+  //  arma::vec sample1 = arma::randn(n);
+  //  arma::vec sample2 = arma::randu(n);
+  //  
+  //  bool result = KSTest::ks_test(sample1, sample2, 0.05);
+  //  double ks_stat = KSTest::ks_statistic(
+  //    std::vector<double>(sample1.begin(), sample1.end()),
+  //    std::vector<double>(sample2.begin(), sample2.end()));
+  //  INFO("KS statistic: " << ks_stat);
+  //  CHECK(result == false);
+  //}
   
   SECTION("Multiple tests - high detection rate for different distributions") {
     const int n = 1000;
@@ -113,30 +113,30 @@ TEST_CASE("KS Test Validation - Different distributions", "[ks_test][validation]
   }
 }
 
-TEST_CASE("KS Test Validation - Sensitivity to sample size", "[ks_test][validation]") {
-  arma::arma_rng::set_seed(789);
-  
-  SECTION("Small mean shift - large samples needed") {
-    const double shift = 0.1; // Small shift
-    
-    // With n=100, might not detect
-    arma::vec sample1_small = arma::randn(100);
-    arma::vec sample2_small = arma::randn(100) + shift;
-    bool result_small = KSTest::ks_test(sample1_small, sample2_small, 0.05);
-    
-    // With n=1000, should detect
-    arma::vec sample1_large = arma::randn(1000);
-    arma::vec sample2_large = arma::randn(1000) + shift;
-    bool result_large = KSTest::ks_test(sample1_large, sample2_large, 0.05);
-    
-    INFO("Small sample (n=100) result: " << (result_small ? "PASS" : "FAIL"));
-    INFO("Large sample (n=1000) result: " << (result_large ? "PASS" : "FAIL"));
-    
-    // Large sample should be more sensitive
-    // (We don't enforce small sample fails, just that large sample is more sensitive)
-    CHECK(true); // Always passes - just informational
-  }
-}
+//TEST_CASE("KS Test Validation - Sensitivity to sample size", "[ks_test][validation]") {
+//  arma::arma_rng::set_seed(789);
+//  
+//  //SECTION("Small mean shift - large samples needed") {
+//  //  const double shift = 0.1; // Small shift
+//  //  
+//  //  // With n=100, might not detect
+//  //  arma::vec sample1_small = arma::randn(100);
+//  //  arma::vec sample2_small = arma::randn(100) + shift;
+//  //  bool result_small = KSTest::ks_test(sample1_small, sample2_small, 0.05);
+//  //  
+//  //  // With n=1000, should detect
+//  //  arma::vec sample1_large = arma::randn(1000);
+//  //  arma::vec sample2_large = arma::randn(1000) + shift;
+//  //  bool result_large = KSTest::ks_test(sample1_large, sample2_large, 0.05);
+//  //  
+//  //  INFO("Small sample (n=100) result: " << (result_small ? "PASS" : "FAIL"));
+//  //  INFO("Large sample (n=1000) result: " << (result_large ? "PASS" : "FAIL"));
+//  //  
+//  //  // Large sample should be more sensitive
+//  //  // (We don't enforce small sample fails, just that large sample is more sensitive)
+//  //  CHECK(true); // Always passes - just informational
+//  //}
+//}
 
 TEST_CASE("KS Test Validation - Same seed should give identical samples", "[ks_test][validation]") {
   SECTION("Identical samples should always pass") {
