@@ -8,6 +8,8 @@ on:
     tags-ignore:
       - 'v*' # done in release
   pull_request:
+    branches:
+      - '*'
   schedule:
     - cron: '0 2 * * SAT'
 
@@ -130,6 +132,13 @@ jobs:
           r-version: 'release'
           rtools-version: '' # Default Rtools version, matching the R version
         if: matrix.enable_R == 'on'
+
+      - name: install miniconda for Windows
+        run: |
+          install.packages("reticulate")
+          reticulate::install_miniconda()
+        shell: Rscript {0}
+        if: runner.os == 'Windows'
 
       - name: Define local variables
         shell: bash

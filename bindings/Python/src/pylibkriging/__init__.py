@@ -1,8 +1,25 @@
 import platform
+import sys
 
-if platform.system() == "Windows":
+# Fix "cannot allocate memory in static TLS block" error on Linux/Unix
+# This occurs because OpenMP (libgomp/libomp) uses static TLS which has limited space
+# when loaded via dlopen(). We preload it using RTLD_GLOBAL before importing the module.
+if platform.system() != "Windows":
+    import ctypes
     import os
-    import sys
+
+    # Try to preload OpenMP library (libgomp or libomp) with RTLD_GLOBAL
+    # This ensures its TLS is allocated in the initial TLS block
+    openmp_libs = ['libgomp.so.1', 'libgomp.so', 'libomp.so']
+    for lib_name in openmp_libs:
+        try:
+            # RTLD_GLOBAL (0x00100 | 0x00002) makes symbols available to subsequently loaded libraries
+            ctypes.CDLL(lib_name, mode=ctypes.RTLD_GLOBAL)
+            break  # Successfully loaded
+        except OSError:
+            continue  # Try next library name
+else:  # Windows
+    import os
 
     shared_lib_paths = [os.path.join(os.path.dirname(__file__), 'shared_libs')]  # cf setup.py
     lk_path = os.environ.get("LIBKRIGING_DLL_PATH")

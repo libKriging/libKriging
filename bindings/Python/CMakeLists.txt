@@ -38,6 +38,18 @@ list(APPEND pylibkriging_SRCS
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
 target_link_libraries(_pylibkriging PRIVATE Kriging carma)
 
+# Fix "cannot allocate memory in static TLS block" error
+# This occurs because OpenMP (libgomp) uses static TLS which has limited space when loaded via dlopen()
+# Solution: Link libgomp/libomp explicitly with RTLD_NOW to load it before our library
+if(NOT WIN32)
+    find_package(OpenMP)
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(_pylibkriging PRIVATE OpenMP::OpenMP_CXX)
+        # Set RTLD_NOW flag to ensure OpenMP is loaded before the module initializes
+        set_target_properties(_pylibkriging PROPERTIES LINK_FLAGS "-Wl,-z,now")
+    endif()
+endif()
+
 target_compile_definitions(_pylibkriging PUBLIC KRIGING_VERSION_INFO=\"${KRIGING_VERSION}\") # renamed to avoid collision with VERSION_INFO from carma
 target_compile_definitions(_pylibkriging PUBLIC BUILD_TYPE=\"$<CONFIG>\") # do not use CMAKE_BUILD_TYPE specially for Windows
 

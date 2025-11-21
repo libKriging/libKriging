@@ -24,6 +24,15 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
+# Add MKL library path if MKL is installed
+if [[ "$(uname -s)" == "Linux" && -d /opt/intel/oneapi/mkl/latest/lib ]]; then
+  export LD_LIBRARY_PATH=/opt/intel/oneapi/mkl/latest/lib:${LD_LIBRARY_PATH}
+  echo "Added MKL library path to LD_LIBRARY_PATH"
+elif [[ "$(uname -s)" == "Linux" && -d /opt/intel/mkl/lib/intel64 ]]; then
+  export LD_LIBRARY_PATH=/opt/intel/mkl/lib/intel64:${LD_LIBRARY_PATH}
+  echo "Added MKL library path to LD_LIBRARY_PATH"
+fi
+
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" || "$ENABLE_MATLAB_BINDING" == "on" ]]; then
   EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=off -DSTATIC_LIB=on"
 fi

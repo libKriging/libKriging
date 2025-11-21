@@ -139,6 +139,10 @@ class NoiseKriging {
     double SSEstar;
     arma::vec betahat;
   };
+  void populate_Model(KModel& m,
+                      const arma::vec& theta,
+                      const double sigma2,
+                      std::map<std::string, double>* bench) const;
   NoiseKriging::KModel make_Model(const arma::vec& theta,
                                   const double sigma2,
                                   std::map<std::string, double>* bench) const;
