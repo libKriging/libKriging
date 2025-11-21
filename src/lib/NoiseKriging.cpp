@@ -781,19 +781,32 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       std::atomic<int> next_task(0);
       std::vector<std::thread> threads;
       threads.reserve(pool_size);
-      
+
+      // RAII guard to ensure threads are always joined, even on exception
+      struct ThreadJoiner {
+        std::vector<std::thread>& threads_ref;
+        explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
+        ~ThreadJoiner() {
+          for (auto& t : threads_ref) {
+            if (t.joinable()) {
+              t.join();
+            }
+          }
+        }
+      };
+
       for (int worker_id = 0; worker_id < pool_size; worker_id++) {
         threads.emplace_back([&, worker_id]() {
           while (true) {
             int task_id = next_task.fetch_add(1);
             if (task_id >= multistart) break;
-            
+
             // Add staggered startup delay to avoid thread initialization race conditions
             int delay_ms = task_id * Optim::thread_start_delay_ms;
             std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-            
+
             OptimizationResult local_result = optimize_worker(task_id);
-            
+
             {
               std::lock_guard<std::mutex> lock(results_mutex);
               // Deep copy each matrix to ensure no shared memory
@@ -816,12 +829,9 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
           }
         });
       }
-      
-      for (auto& t : threads) {
-        if (t.joinable()) {
-          t.join();
-        }
-      }
+
+      // Ensure threads are joined when leaving this scope
+      ThreadJoiner joiner(threads);
     }
 
     // Find best result
