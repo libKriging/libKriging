@@ -135,7 +135,7 @@ jobs:
         run: |
           reticulate::install_miniconda()
         shell: Rscript {0}
-        if: runner.os == 'on'
+        if: runner.os == 'Windows'
 
       - name: Define local variables
         shell: bash
