@@ -133,13 +133,6 @@ jobs:
           rtools-version: '' # Default Rtools version, matching the R version
         if: matrix.enable_R == 'on'
 
-      - name: install miniconda for Windows
-        run: |
-          install.packages("reticulate")
-          reticulate::install_miniconda()
-        shell: Rscript {0}
-        if: runner.os == 'Windows' && matrix.enable_R == 'on'
-
       - name: Define local variables
         shell: bash
         run: |
