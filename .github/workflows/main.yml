@@ -135,6 +135,7 @@ jobs:
 
       - name: install miniconda for Windows
         run: |
+          install.packages("reticulate")
           reticulate::install_miniconda()
         shell: Rscript {0}
         if: runner.os == 'Windows'
