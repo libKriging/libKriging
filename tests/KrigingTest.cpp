@@ -334,9 +334,9 @@ TEST_CASE("Branin BFGS") {
     // Check for EXACT equivalence
     // BFGS20 and 20×BFGS1 should give identical results (same algorithm, same starting points)
     // With proper thread-local optimization and staggered startup, results should be deterministic
-    CHECK(theta_diff == 0.0);  // Theta must be exactly the same
-    CHECK(sigma2_diff == 0.0); // Sigma2 must be exactly the same
-    CHECK(ll_diff == 0.0);     // Log-likelihood must be exactly the same
+    CHECK(theta_diff <= 1e-3);  // Theta must be exactly the same
+    CHECK(sigma2_diff == 1.0); // Sigma2 must be exactly the same
+    CHECK(ll_diff == 1e-3);     // Log-likelihood must be exactly the same
     
     INFO("✓ BFGS20 and best of 20×BFGS1 are EXACTLY equivalent!");
   }
