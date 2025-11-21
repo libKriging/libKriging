@@ -35,6 +35,17 @@ endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
+# Fix "cannot allocate memory in static TLS block" error when loading as Python module
+# This occurs because OpenMP/OpenBLAS use static TLS which has limited space when loaded via dlopen()
+# Solution: Add -Wl,-z,nodlopen to prevent dlopen issues, or preload the library
+# The Python bindings should use LD_PRELOAD or link libgomp before loading pylibkriging
+if(NOT WIN32)
+    # Use global-dynamic TLS model for our code
+    target_compile_options(Kriging PRIVATE -ftls-model=global-dynamic)
+    # Note: The STATIC_TLS flag may still appear due to OpenMP/OpenBLAS dependencies
+    # Python bindings need to ensure libgomp.so is loaded before importing pylibkriging
+endif()
+
 # Link jemalloc if enabled
 if(USE_JEMALLOC AND NOT WIN32)
     add_dependencies(Kriging jemalloc_external)
