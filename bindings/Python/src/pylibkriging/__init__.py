@@ -7,17 +7,54 @@ import sys
 if platform.system() != "Windows":
     import ctypes
     import os
+    import glob
 
     # Try to preload OpenMP library (libgomp or libomp) with RTLD_GLOBAL
     # This ensures its TLS is allocated in the initial TLS block
-    openmp_libs = ['libgomp.so.1', 'libgomp.so', 'libomp.so']
-    for lib_name in openmp_libs:
-        try:
-            # RTLD_GLOBAL (0x00100 | 0x00002) makes symbols available to subsequently loaded libraries
-            ctypes.CDLL(lib_name, mode=ctypes.RTLD_GLOBAL)
-            break  # Successfully loaded
-        except OSError:
-            continue  # Try next library name
+    openmp_loaded = False
+
+    # First, try common library paths with full paths
+    common_paths = [
+        '/usr/lib/x86_64-linux-gnu/libgomp.so.1',
+        '/usr/lib/x86_64-linux-gnu/libgomp.so',
+        '/usr/lib/aarch64-linux-gnu/libgomp.so.1',
+        '/usr/lib/aarch64-linux-gnu/libgomp.so',
+        '/usr/lib64/libgomp.so.1',
+        '/usr/lib64/libgomp.so',
+        '/usr/local/lib/libomp.so',
+        '/usr/lib/libomp.so',
+    ]
+
+    # Also try to find via glob patterns
+    glob_patterns = [
+        '/usr/lib/*/libgomp.so*',
+        '/usr/lib*/libgomp.so*',
+        '/usr/local/lib/libomp.so*',
+    ]
+
+    for pattern in glob_patterns:
+        common_paths.extend(glob.glob(pattern))
+
+    for lib_path in common_paths:
+        if os.path.exists(lib_path):
+            try:
+                # RTLD_GLOBAL (0x00100 | 0x00002) makes symbols available to subsequently loaded libraries
+                ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+                openmp_loaded = True
+                break  # Successfully loaded
+            except OSError:
+                continue  # Try next library
+
+    # Fallback: try by name only (relies on LD_LIBRARY_PATH)
+    if not openmp_loaded:
+        openmp_libs = ['libgomp.so.1', 'libgomp.so', 'libomp.so']
+        for lib_name in openmp_libs:
+            try:
+                ctypes.CDLL(lib_name, mode=ctypes.RTLD_GLOBAL)
+                openmp_loaded = True
+                break  # Successfully loaded
+            except OSError:
+                continue  # Try next library name
 else:  # Windows
     import os
 

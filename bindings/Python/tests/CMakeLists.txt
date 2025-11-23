@@ -42,8 +42,24 @@ macro(add_python_test)
     else()
         set(SEP ":")
     endif()
-    
+
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}${SEP}${CMAKE_CURRENT_SOURCE_DIR}/../src")
+
+    # Preload OpenMP library to avoid "cannot allocate memory in static TLS block" error
+    # This ensures libgomp/libomp is loaded before the Python extension module
+    if(NOT WIN32 AND OpenMP_CXX_FOUND)
+        if(OpenMP_libomp_LIBRARY)
+            # For LLVM/Clang OpenMP (libomp)
+            set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=${OpenMP_libomp_LIBRARY}")
+        elseif(OpenMP_gomp_LIBRARY)
+            # For GNU OpenMP (libgomp)
+            set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=${OpenMP_gomp_LIBRARY}")
+        elseif(EXISTS "/usr/lib/x86_64-linux-gnu/libgomp.so.1")
+            # Fallback for Ubuntu/Debian
+            set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libgomp.so.1")
+        endif()
+    endif()
+
     set_tests_properties(${TEST_NAME}
             PROPERTIES
             WORKING_DIRECTORY "${LIBKRIGING_PYTHON_BINARY_DIR}"
