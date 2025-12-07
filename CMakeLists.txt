@@ -59,7 +59,7 @@ if(USE_JEMALLOC AND NOT WIN32)
     ExternalProject_Add(jemalloc_external
         URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
         URL_HASH SHA256=2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/jemalloc-install --disable-doc --disable-stats --disable-prof --enable-static --disable-shared CFLAGS=-fPIC
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/jemalloc-install --disable-doc --disable-stats --disable-prof --enable-static --disable-shared --disable-initial-exec-tls CFLAGS=-fPIC
         BUILD_COMMAND make
         INSTALL_COMMAND make install
         BUILD_IN_SOURCE 0
