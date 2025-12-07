@@ -133,12 +133,8 @@ jobs:
           rtools-version: '' # Default Rtools version, matching the R version
         if: matrix.enable_R == 'on'
 
-      - name: install miniconda for Windows
-        run: |
-          install.packages("reticulate")
-          reticulate::install_miniconda()
-        shell: Rscript {0}
-        if: runner.os == 'Windows'
+      # Note: Miniconda is installed directly in .travis-ci/windows/install.sh for all Windows jobs
+      # This provides BLAS/LAPACK dependencies and Python environment consistently
 
       - name: Define local variables
         shell: bash

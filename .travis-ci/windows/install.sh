@@ -14,17 +14,26 @@ if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     travis_terminate 1
 fi
 
+# Install Miniconda for all Windows builds
+# This provides:
+#   1. BLAS/LAPACK dependencies (openblas, liblapack) for C++ library compilation
+#   2. Python environment for R bindings (via reticulate package)
+#   3. pkg-config and other build tools
+# Note: Miniconda is installed with /RegisterPython=0 flag (see install_conda.bat)
+#       to prevent it from interfering with GitHub Actions setup-python for Python jobs
 if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
   # --insecure option provides a workaround to:
   #   error setting certificate verify locations:  CAfile: /usr/ssl/certs/ca-bundle.crt CApath: none
-	curl --insecure -s -o "${HOME}"/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-	pushd "${HOME}"/Downloads
-	"${BASEDIR}"/install_conda.bat
-	popd
+  echo "Installing Miniconda (provides BLAS/LAPACK + Python environment)..."
+  curl --insecure -s -o "${HOME}"/Downloads/Miniconda3-latest-Windows-x86_64.exe https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
+  pushd "${HOME}"/Downloads
+  "${BASEDIR}"/install_conda.bat
+  popd
 fi
 $HOME/Miniconda3/Scripts/conda.exe update -y -n base -c defaults conda
 
 # https://anaconda.org/search?q=blas
+# Install BLAS/LAPACK from conda-forge (easier than building from source on Windows)
 $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
 
 # https://chocolatey.org/docs/commands-install
@@ -34,7 +43,7 @@ choco install -y --no-progress make --version 4.3
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # Check if python is available (it could be a python wrapper given by Windows)
-  if ( ! python -V | grep "Python 3." &>/dev/null ); then 
+  if ( ! python -V | grep "Python 3." &>/dev/null ); then
     echo "#########################################################"
     echo "Missing Python interpreter"
     echo "Go to https://www.python.org/downloads and install it"
@@ -43,6 +52,13 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
     echo "#########################################################"
     exit 1
   fi
+
+  # Verify which Python is being used (should be from GitHub Actions setup-python, not conda)
+  echo "=== Python Configuration ==="
+  echo "Python executable: $(which python)"
+  python -V
+  echo "Python path: $(python -c 'import sys; print(sys.executable)')"
+  echo "==========================="
   # ** Install python tools **
   
   ## Using Chocolatey (by default only includes Python2)
