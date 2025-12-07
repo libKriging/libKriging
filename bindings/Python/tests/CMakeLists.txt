@@ -44,6 +44,41 @@ macro(add_python_test)
     endif()
     
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}${SEP}${CMAKE_CURRENT_SOURCE_DIR}/../src")
+
+    # Fix "cannot allocate memory in static TLS block" error
+    # Preload OpenMP library before loading the Python extension module
+    # This ensures OpenMP's TLS is allocated in the initial TLS block
+    if(NOT WIN32)
+        find_package(OpenMP)
+        if(OpenMP_CXX_FOUND)
+            # Try to find the actual libgomp/libomp library path
+            if(OpenMP_CXX_LIBRARIES)
+                # Extract library path from OpenMP_CXX_LIBRARIES
+                foreach(lib ${OpenMP_CXX_LIBRARIES})
+                    if(lib MATCHES "gomp|omp")
+                        get_filename_component(lib_path ${lib} DIRECTORY)
+                        set(OPENMP_LIB_PATH ${lib})
+                        break()
+                    endif()
+                endforeach()
+            endif()
+
+            # Fallback: search common locations for libgomp.so.1
+            if(NOT OPENMP_LIB_PATH)
+                find_library(GOMP_LIBRARY NAMES gomp PATHS /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib64 /lib64 NO_DEFAULT_PATH)
+                if(GOMP_LIBRARY)
+                    set(OPENMP_LIB_PATH ${GOMP_LIBRARY})
+                else()
+                    # Last resort: use just the library name and let LD find it
+                    set(OPENMP_LIB_PATH "libgomp.so.1")
+                endif()
+            endif()
+
+            set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=${OPENMP_LIB_PATH}")
+            message(STATUS "Python test ${TEST_NAME} will preload OpenMP: ${OPENMP_LIB_PATH}")
+        endif()
+    endif()
+
     set_tests_properties(${TEST_NAME}
             PROPERTIES
             WORKING_DIRECTORY "${LIBKRIGING_PYTHON_BINARY_DIR}"
