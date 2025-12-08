@@ -51,36 +51,40 @@ macro(add_python_test)
     if(NOT WIN32)
         find_package(OpenMP)
         if(OpenMP_CXX_FOUND)
-            # Search for libgomp.so.1 runtime library
-            # Note: OpenMP_CXX_LIBRARIES often points to linker stub (e.g., /usr/lib/gcc/.../libgomp.so)
-            # instead of the runtime library (e.g., /usr/lib/x86_64-linux-gnu/libgomp.so.1)
+            # Search for libgomp.so.1 runtime library (not the linker stub libgomp.so)
+            # Note: Must use NAMES_PER_DIR to check all names before checking next directory
+            # This prevents finding the linker stub in GCC directories before the runtime library
 
-            # Try standard runtime library locations first
-            find_library(GOMP_LIBRARY NAMES gomp
-                         PATHS /usr/lib/x86_64-linux-gnu
-                               /lib/x86_64-linux-gnu
-                               /usr/lib64
-                               /lib64
-                         NO_DEFAULT_PATH)
+            # Search standard runtime library locations with explicit .so.1 suffix
+            find_file(GOMP_RUNTIME_LIB
+                      NAMES libgomp.so.1
+                      PATHS /usr/lib/x86_64-linux-gnu
+                            /lib/x86_64-linux-gnu
+                            /usr/lib64
+                            /lib64
+                            /usr/lib
+                            /lib
+                      NO_DEFAULT_PATH)
 
-            # If not found, try GCC library directories
-            if(NOT GOMP_LIBRARY)
-                find_library(GOMP_LIBRARY NAMES gomp
-                             PATHS /usr/lib/gcc/x86_64-linux-gnu
-                                   /usr/lib/gcc
-                             PATH_SUFFIXES 11 12 13 14
-                             NO_DEFAULT_PATH)
+            # If not found, try GCC library directories (Ubuntu 22.04 may have it here)
+            if(NOT GOMP_RUNTIME_LIB)
+                find_file(GOMP_RUNTIME_LIB
+                          NAMES libgomp.so.1
+                          PATHS /usr/lib/gcc/x86_64-linux-gnu
+                                /usr/lib/gcc
+                          PATH_SUFFIXES 11 12 13 14
+                          NO_DEFAULT_PATH)
             endif()
 
-            # If still not found, use system search
-            if(NOT GOMP_LIBRARY)
-                find_library(GOMP_LIBRARY NAMES gomp)
+            # Last resort: system-wide search
+            if(NOT GOMP_RUNTIME_LIB)
+                find_file(GOMP_RUNTIME_LIB NAMES libgomp.so.1)
             endif()
 
-            if(GOMP_LIBRARY)
-                set(OPENMP_LIB_PATH ${GOMP_LIBRARY})
+            if(GOMP_RUNTIME_LIB)
+                set(OPENMP_LIB_PATH ${GOMP_RUNTIME_LIB})
             else()
-                # Last resort: use just the library name and let LD find it
+                # Very last resort: use just the library name and let LD find it
                 set(OPENMP_LIB_PATH "libgomp.so.1")
             endif()
 
