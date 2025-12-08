@@ -51,10 +51,32 @@ macro(add_python_test)
     if(NOT WIN32)
         find_package(OpenMP)
         if(OpenMP_CXX_FOUND)
-            # Search common locations for libgomp.so.1 (runtime library)
+            # Search for libgomp.so.1 runtime library
             # Note: OpenMP_CXX_LIBRARIES often points to linker stub (e.g., /usr/lib/gcc/.../libgomp.so)
             # instead of the runtime library (e.g., /usr/lib/x86_64-linux-gnu/libgomp.so.1)
-            find_library(GOMP_LIBRARY NAMES gomp PATHS /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib64 /lib64 NO_DEFAULT_PATH)
+
+            # Try standard runtime library locations first
+            find_library(GOMP_LIBRARY NAMES gomp
+                         PATHS /usr/lib/x86_64-linux-gnu
+                               /lib/x86_64-linux-gnu
+                               /usr/lib64
+                               /lib64
+                         NO_DEFAULT_PATH)
+
+            # If not found, try GCC library directories
+            if(NOT GOMP_LIBRARY)
+                find_library(GOMP_LIBRARY NAMES gomp
+                             PATHS /usr/lib/gcc/x86_64-linux-gnu
+                                   /usr/lib/gcc
+                             PATH_SUFFIXES 11 12 13 14
+                             NO_DEFAULT_PATH)
+            endif()
+
+            # If still not found, use system search
+            if(NOT GOMP_LIBRARY)
+                find_library(GOMP_LIBRARY NAMES gomp)
+            endif()
+
             if(GOMP_LIBRARY)
                 set(OPENMP_LIB_PATH ${GOMP_LIBRARY})
             else()
