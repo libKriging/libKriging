@@ -36,24 +36,25 @@ env:
   DEBUG_CI: true
 
 jobs:
-  guideline-checks:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: false # submodules not required here
-          fetch-depth: 2 # git rev-parse HEAD^ will fail without this
-
-      - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v3.x
-
-      - name: before_script
-        shell: bash
-        run: .travis-ci/common/before_script.sh
-
-      - name: check
-        shell: bash
-        run: .travis-ci/checks/test.sh
+  # TEMPORARY: Disabled for debugging TLS issue
+  #guideline-checks:
+  #  runs-on: ubuntu-22.04
+  #  steps:
+  #    - uses: actions/checkout@v2
+  #      with:
+  #        submodules: false # submodules not required here
+  #        fetch-depth: 2 # git rev-parse HEAD^ will fail without this
+  #
+  #    - name: Inject slug/short variables
+  #      uses: rlespinasse/github-slug-action@v3.x
+  #
+  #    - name: before_script
+  #      shell: bash
+  #      run: .travis-ci/common/before_script.sh
+  #
+  #    - name: check
+  #      shell: bash
+  #      run: .travis-ci/checks/test.sh
 
   build:
     runs-on: ${{ matrix.os }}
@@ -62,60 +63,62 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # TEMPORARY: Only testing Linux Debug for TLS fix debugging
           - name: "Linux Debug"
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
-          - name: "macOS Debug"
-            os: macOS-latest
-            mode: Debug
-            enable_python: on
-          - name: "Python (3.7) Windows Debug"
-            os: windows-latest
-            mode: Debug
-            enable_python: on
-            python-version: 3.7
-          - name: "Python (3.9) Windows Debug"
-            os: windows-latest
-            mode: Debug
-            enable_python: on
-            python-version: 3.9
-          - name: "Octave Linux"
-            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
-            mode: Release
-            enable_python: off
-            enable_octave: on
-            force_update: on
-          - name: "Octave macOS"
-            os: macOS-latest
-            mode: Release
-            enable_python: off
-            enable_octave: on
-          - name: "Octave Windows"
-            os: windows-latest
-            mode: Release
-            # using python and octave in windows leads to the following error:
-            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-            #   491 | # define snprintf _snprintf
-            enable_python: off
-            enable_octave: on
-          - name: "Matlab Linux"
-            # Using matlab-actions/setup-matlab@v1, only available on Linux
-            os: ubuntu-22.04
-            mode: Release
-            enable_matlab: on
-          - name: "R Linux"
-            os: ubuntu-22.04
-            mode: Release
-            enable_R: on
-          - name: "R macOS"
-            os: macOS-latest
-            mode: Release
-            enable_R: on
-          - name: "R Windows"
-            os: windows-latest
-            mode: Release
-            enable_R: on
+          # TEMPORARY: Disabled for debugging
+          #- name: "macOS Debug"
+          #  os: macOS-latest
+          #  mode: Debug
+          #  enable_python: on
+          #- name: "Python (3.7) Windows Debug"
+          #  os: windows-latest
+          #  mode: Debug
+          #  enable_python: on
+          #  python-version: 3.7
+          #- name: "Python (3.9) Windows Debug"
+          #  os: windows-latest
+          #  mode: Debug
+          #  enable_python: on
+          #  python-version: 3.9
+          #- name: "Octave Linux"
+          #  os: ubuntu-22.04 # required to ease the support of octave ≥ 6
+          #  mode: Release
+          #  enable_python: off
+          #  enable_octave: on
+          #  force_update: on
+          #- name: "Octave macOS"
+          #  os: macOS-latest
+          #  mode: Release
+          #  enable_python: off
+          #  enable_octave: on
+          #- name: "Octave Windows"
+          #  os: windows-latest
+          #  mode: Release
+          #  # using python and octave in windows leads to the following error:
+          #  # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+          #  #   491 | # define snprintf _snprintf
+          #  enable_python: off
+          #  enable_octave: on
+          #- name: "Matlab Linux"
+          #  # Using matlab-actions/setup-matlab@v1, only available on Linux
+          #  os: ubuntu-22.04
+          #  mode: Release
+          #  enable_matlab: on
+          #- name: "R Linux"
+          #  os: ubuntu-22.04
+          #  mode: Release
+          #  enable_R: on
+          #- name: "R macOS"
+          #  os: macOS-latest
+          #  mode: Release
+          #  enable_R: on
+          #- name: "R Windows"
+          #  os: windows-latest
+          #  mode: Release
+          #  enable_R: on
 
     steps:
       - uses: actions/checkout@v2
@@ -216,7 +219,15 @@ jobs:
 
       - name: test
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/test.sh
+        # TEMPORARY: Only run Python/canary test for TLS debugging
+        run: |
+          cd "${BUILD_DIR:-build}"
+          if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
+            ROOT_DIR=$(git rev-parse --show-toplevel)
+            echo "Loading virtual environment from ${ROOT_DIR}/venv"
+            . "${ROOT_DIR}"/venv/bin/activate
+          fi
+          ctest -C "${MODE}" --verbose --output-on-failure -R "Python/canary"
         id: test
         continue-on-error: true
 
