@@ -36,25 +36,24 @@ env:
   DEBUG_CI: true
 
 jobs:
-  # TEMPORARY: Disabled for debugging TLS issue
-  #guideline-checks:
-  #  runs-on: ubuntu-22.04
-  #  steps:
-  #    - uses: actions/checkout@v2
-  #      with:
-  #        submodules: false # submodules not required here
-  #        fetch-depth: 2 # git rev-parse HEAD^ will fail without this
-  #
-  #    - name: Inject slug/short variables
-  #      uses: rlespinasse/github-slug-action@v3.x
-  #
-  #    - name: before_script
-  #      shell: bash
-  #      run: .travis-ci/common/before_script.sh
-  #
-  #    - name: check
-  #      shell: bash
-  #      run: .travis-ci/checks/test.sh
+  guideline-checks:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false # submodules not required here
+          fetch-depth: 2 # git rev-parse HEAD^ will fail without this
+
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v3.x
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: check
+        shell: bash
+        run: .travis-ci/checks/test.sh
 
   build:
     runs-on: ${{ matrix.os }}
@@ -63,62 +62,60 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # TEMPORARY: Only testing Linux Debug for TLS fix debugging
           - name: "Linux Debug"
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
-          # TEMPORARY: Disabled for debugging
-          #- name: "macOS Debug"
-          #  os: macOS-latest
-          #  mode: Debug
-          #  enable_python: on
-          #- name: "Python (3.7) Windows Debug"
-          #  os: windows-latest
-          #  mode: Debug
-          #  enable_python: on
-          #  python-version: 3.7
-          #- name: "Python (3.9) Windows Debug"
-          #  os: windows-latest
-          #  mode: Debug
-          #  enable_python: on
-          #  python-version: 3.9
-          #- name: "Octave Linux"
-          #  os: ubuntu-22.04 # required to ease the support of octave ≥ 6
-          #  mode: Release
-          #  enable_python: off
-          #  enable_octave: on
-          #  force_update: on
-          #- name: "Octave macOS"
-          #  os: macOS-latest
-          #  mode: Release
-          #  enable_python: off
-          #  enable_octave: on
-          #- name: "Octave Windows"
-          #  os: windows-latest
-          #  mode: Release
-          #  # using python and octave in windows leads to the following error:
-          #  # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-          #  #   491 | # define snprintf _snprintf
-          #  enable_python: off
-          #  enable_octave: on
-          #- name: "Matlab Linux"
-          #  # Using matlab-actions/setup-matlab@v1, only available on Linux
-          #  os: ubuntu-22.04
-          #  mode: Release
-          #  enable_matlab: on
-          #- name: "R Linux"
-          #  os: ubuntu-22.04
-          #  mode: Release
-          #  enable_R: on
-          #- name: "R macOS"
-          #  os: macOS-latest
-          #  mode: Release
-          #  enable_R: on
-          #- name: "R Windows"
-          #  os: windows-latest
-          #  mode: Release
-          #  enable_R: on
+          - name: "macOS Debug"
+            os: macOS-latest
+            mode: Debug
+            enable_python: on
+          - name: "Python (3.7) Windows Debug"
+            os: windows-latest
+            mode: Debug
+            enable_python: on
+            python-version: 3.7
+          - name: "Python (3.9) Windows Debug"
+            os: windows-latest
+            mode: Debug
+            enable_python: on
+            python-version: 3.9
+          - name: "Octave Linux"
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
+            mode: Release
+            enable_python: off
+            enable_octave: on
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-latest
+            mode: Release
+            enable_python: off
+            enable_octave: on
+          - name: "Octave Windows"
+            os: windows-latest
+            mode: Release
+            # using python and octave in windows leads to the following error:
+            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+            #   491 | # define snprintf _snprintf
+            enable_python: off
+            enable_octave: on
+          - name: "Matlab Linux"
+            # Using matlab-actions/setup-matlab@v1, only available on Linux
+            os: ubuntu-22.04
+            mode: Release
+            enable_matlab: on
+          - name: "R Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+          - name: "R macOS"
+            os: macOS-latest
+            mode: Release
+            enable_R: on
+          - name: "R Windows"
+            os: windows-latest
+            mode: Release
+            enable_R: on
 
     steps:
       - uses: actions/checkout@v2
@@ -219,7 +216,6 @@ jobs:
 
       - name: test
         shell: bash
-        # TEMPORARY: Only run Python/canary test for TLS debugging with extensive debug info
         run: |
           cd "${BUILD_DIR:-build}"
           if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
@@ -227,51 +223,7 @@ jobs:
             echo "Loading virtual environment from ${ROOT_DIR}/venv"
             . "${ROOT_DIR}"/venv/bin/activate
           fi
-
-          echo "===== DEBUG: TLS ERROR INVESTIGATION ====="
-          echo "=== 1. Check libKriging.so.0 dependencies ==="
-          ldd src/lib/libKriging.so.0 || true
-          echo ""
-
-          echo "=== 2. Check libKriging.so.0 TLS usage ==="
-          readelf -l src/lib/libKriging.so.0 | grep -A 5 TLS || echo "No TLS segment"
-          echo ""
-
-          echo "=== 3. Check OpenMP library ==="
-          ls -lh /usr/lib/x86_64-linux-gnu/libgomp.so* || true
-          ls -lh /usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so* || true
-          echo ""
-
-          echo "=== 4. Test LD_PRELOAD with Python directly ==="
-          export PYTHONPATH="$PWD/bindings/Python:${ROOT_DIR}/bindings/Python/src"
-          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libgomp.so.1
-          echo "PYTHONPATH=$PYTHONPATH"
-          echo "LD_PRELOAD=$LD_PRELOAD"
-          echo ""
-
-          echo "=== 5. Check what libraries Python loads ==="
-          LD_DEBUG=libs python3 -c "import sys; sys.path.insert(0, '$PWD/bindings/Python'); import pylibkriging" 2>&1 | grep -E "(libgomp|libKriging|TLS)" || true
-          echo ""
-
-          echo "=== 6. Try loading with different LD_PRELOAD options ==="
-          echo "--- Attempt 1: Preload libgomp.so.1 only ---"
-          LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libgomp.so.1 python3 -c "import sys; sys.path.insert(0, '$PWD/bindings/Python'); import pylibkriging; print('SUCCESS: Import worked!')" 2>&1 || echo "FAILED with libgomp.so.1"
-          echo ""
-
-          echo "--- Attempt 2: Preload libgomp.so.1 and libstdc++ ---"
-          LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libgomp.so.1 /usr/lib/x86_64-linux-gnu/libstdc++.so.6" python3 -c "import sys; sys.path.insert(0, '$PWD/bindings/Python'); import pylibkriging; print('SUCCESS: Import worked!')" 2>&1 || echo "FAILED with libgomp + libstdc++"
-          echo ""
-
-          echo "--- Attempt 3: Preload all OpenMP-related libs ---"
-          LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libgomp.so.1 /lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libstdc++.so.6" python3 -c "import sys; sys.path.insert(0, '$PWD/bindings/Python'); import pylibkriging; print('SUCCESS: Import worked!')" 2>&1 || echo "FAILED with full preload"
-          echo ""
-
-          echo "=== 7. Check if jemalloc or other allocators are involved ==="
-          ldd src/lib/libKriging.so.0 | grep -E "(jemalloc|tcmalloc|mimalloc)" || echo "No custom allocator detected"
-          echo ""
-
-          echo "=== 8. Run actual ctest with verbose output ==="
-          ctest -C "${MODE}" --verbose --output-on-failure -R "Python/canary"
+          ctest -C "${MODE}" --output-on-failure
         id: test
         continue-on-error: true
 
