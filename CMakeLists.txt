@@ -42,6 +42,14 @@ if(OpenMP_CXX_FOUND)
     message(STATUS "OpenMP found - enabling parallel multistart optimization")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+    # Fix TLS error for Python bindings: Use global-dynamic TLS model instead of initial-exec
+    # This prevents "cannot allocate memory in static TLS block" when loaded via dlopen()
+    if(NOT WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftls-model=global-dynamic")
+        message(STATUS "Using global-dynamic TLS model for OpenMP (Python dlopen compatibility)")
+    endif()
+
     message(STATUS "Armadillo's internal OpenMP disabled (see line 189)")
 else()
     message(WARNING "OpenMP not found - multistart optimization will run sequentially")
