@@ -51,27 +51,15 @@ macro(add_python_test)
     if(NOT WIN32)
         find_package(OpenMP)
         if(OpenMP_CXX_FOUND)
-            # Try to find the actual libgomp/libomp library path
-            if(OpenMP_CXX_LIBRARIES)
-                # Extract library path from OpenMP_CXX_LIBRARIES
-                foreach(lib ${OpenMP_CXX_LIBRARIES})
-                    if(lib MATCHES "gomp|omp")
-                        get_filename_component(lib_path ${lib} DIRECTORY)
-                        set(OPENMP_LIB_PATH ${lib})
-                        break()
-                    endif()
-                endforeach()
-            endif()
-
-            # Fallback: search common locations for libgomp.so.1
-            if(NOT OPENMP_LIB_PATH)
-                find_library(GOMP_LIBRARY NAMES gomp PATHS /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib64 /lib64 NO_DEFAULT_PATH)
-                if(GOMP_LIBRARY)
-                    set(OPENMP_LIB_PATH ${GOMP_LIBRARY})
-                else()
-                    # Last resort: use just the library name and let LD find it
-                    set(OPENMP_LIB_PATH "libgomp.so.1")
-                endif()
+            # Search common locations for libgomp.so.1 (runtime library)
+            # Note: OpenMP_CXX_LIBRARIES often points to linker stub (e.g., /usr/lib/gcc/.../libgomp.so)
+            # instead of the runtime library (e.g., /usr/lib/x86_64-linux-gnu/libgomp.so.1)
+            find_library(GOMP_LIBRARY NAMES gomp PATHS /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu /usr/lib64 /lib64 NO_DEFAULT_PATH)
+            if(GOMP_LIBRARY)
+                set(OPENMP_LIB_PATH ${GOMP_LIBRARY})
+            else()
+                # Last resort: use just the library name and let LD find it
+                set(OPENMP_LIB_PATH "libgomp.so.1")
             endif()
 
             set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=${OPENMP_LIB_PATH}")
