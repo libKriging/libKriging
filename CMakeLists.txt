@@ -57,7 +57,8 @@ else()
 endif()
 
 # Build jemalloc as default allocator for thread-safe memory allocation
-option(USE_JEMALLOC "Use jemalloc as default allocator" ON)
+# TEMPORARY: Disabled to debug TLS error in Python bindings
+option(USE_JEMALLOC "Use jemalloc as default allocator" OFF)
 if(USE_JEMALLOC AND NOT WIN32)
     message(STATUS "Downloading and building jemalloc 5.3.0")
     include(ExternalProject)
