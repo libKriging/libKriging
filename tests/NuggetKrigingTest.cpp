@@ -17,7 +17,7 @@ auto simple_f = [](double x) {
   return std::sin(3.0 * x) + 0.5 * std::cos(7.0 * x);
 };
 
-TEST_CASE("NuggetKriging multistart and parallel tests") {
+TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   arma::arma_rng::set_seed(123);
   const arma::uword n = 20;
   const arma::uword d = 1;
@@ -238,7 +238,7 @@ TEST_CASE("NuggetKriging with LMP objective") {
   }
 }
 
-TEST_CASE("NuggetKriging intensive stress test") {
+TEST_CASE("NuggetKriging intensive stress test", "[intensive][multistart]") {
   arma::arma_rng::set_seed(789);
   
   SECTION("Many iterations with BFGS20") {

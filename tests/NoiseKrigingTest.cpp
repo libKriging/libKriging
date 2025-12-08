@@ -16,7 +16,7 @@ auto simple_f = [](double x) {
   return std::sin(3.0 * x) + 0.5 * std::cos(7.0 * x);
 };
 
-TEST_CASE("NoiseKriging multistart and parallel tests") {
+TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   arma::arma_rng::set_seed(123);
   const arma::uword n = 20;
   const arma::uword d = 1;

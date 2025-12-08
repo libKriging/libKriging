@@ -409,7 +409,7 @@ TEST_CASE("Kriging fit with given parameters - BFGS20") {
   CHECK(std::get<1>(pred).n_elem == 1);
 }
 
-TEST_CASE("Kriging all parameter combinations") {
+TEST_CASE("Kriging all parameter combinations", "[multistart]") {
   arma::arma_rng::set_seed(123);
   const arma::uword n = 20;
   const arma::uword d = 2;
@@ -508,7 +508,7 @@ TEST_CASE("Kriging all parameter combinations") {
   CHECK(std::get<1>(pred).n_elem == 1);
 }
 
-TEST_CASE("Kriging intensive stress test") {
+TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
   arma::arma_rng::set_seed(789);
   
   SECTION("Many iterations with BFGS20") {
