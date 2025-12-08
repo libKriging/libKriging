@@ -40,7 +40,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - concurrent access", "[LinearAlgebra]
   const int n_size = 50;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> inputs(n_threads);
   
   // Create different matrices for each thread
@@ -56,7 +56,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - concurrent access", "[LinearAlgebra]
         arma::mat reconstructed = L * L.t();
         results[i] = arma::approx_equal(reconstructed, inputs[i], "absdiff", 1e-8);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -78,7 +78,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - varying sizes", "[LinearAlgebra][thr
   
   for (auto size : sizes) {
     std::vector<std::thread> threads;
-    std::vector<bool> results(n_threads, false);
+    std::vector<int> results(n_threads, 0);
     std::vector<arma::mat> inputs(n_threads);
     
     for (int i = 0; i < n_threads; i++) {
@@ -92,7 +92,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - varying sizes", "[LinearAlgebra][thr
           arma::mat reconstructed = L * L.t();
           results[i] = arma::approx_equal(reconstructed, inputs[i], "absdiff", 1e-8);
         } catch (...) {
-          results[i] = false;
+          results[i] = 0;
         }
       });
     }
@@ -112,7 +112,7 @@ TEST_CASE("LinearAlgebra::solve - concurrent access", "[LinearAlgebra][threading
   const int n_size = 50;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> A_matrices(n_threads);
   std::vector<arma::mat> B_matrices(n_threads);
   
@@ -129,7 +129,7 @@ TEST_CASE("LinearAlgebra::solve - concurrent access", "[LinearAlgebra][threading
         arma::mat reconstructed = A_matrices[i] * X;
         results[i] = arma::approx_equal(reconstructed, B_matrices[i], "absdiff", 1e-8);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -148,7 +148,7 @@ TEST_CASE("LinearAlgebra::rsolve - concurrent access", "[LinearAlgebra][threadin
   const int n_size = 50;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> A_matrices(n_threads);
   std::vector<arma::mat> B_matrices(n_threads);
   
@@ -165,7 +165,7 @@ TEST_CASE("LinearAlgebra::rsolve - concurrent access", "[LinearAlgebra][threadin
         arma::mat reconstructed = X * A_matrices[i];
         results[i] = arma::approx_equal(reconstructed, B_matrices[i], "absdiff", 1e-8);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -185,7 +185,7 @@ TEST_CASE("LinearAlgebra::crossprod - concurrent access", "[LinearAlgebra][threa
   const int n_cols = 50;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> matrices(n_threads);
   
   for (int i = 0; i < n_threads; i++) {
@@ -200,7 +200,7 @@ TEST_CASE("LinearAlgebra::crossprod - concurrent access", "[LinearAlgebra][threa
         arma::mat expected = matrices[i].t() * matrices[i];
         results[i] = arma::approx_equal(result, expected, "absdiff", 1e-10);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -220,7 +220,7 @@ TEST_CASE("LinearAlgebra::tcrossprod - concurrent access", "[LinearAlgebra][thre
   const int n_cols = 100;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> matrices(n_threads);
   
   for (int i = 0; i < n_threads; i++) {
@@ -235,7 +235,7 @@ TEST_CASE("LinearAlgebra::tcrossprod - concurrent access", "[LinearAlgebra][thre
         arma::mat expected = matrices[i] * matrices[i].t();
         results[i] = arma::approx_equal(result, expected, "absdiff", 1e-10);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -254,7 +254,7 @@ TEST_CASE("LinearAlgebra::diagABA - concurrent access", "[LinearAlgebra][threadi
   const int n_size = 50;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> A_matrices(n_threads);
   std::vector<arma::mat> B_matrices(n_threads);
   
@@ -272,7 +272,7 @@ TEST_CASE("LinearAlgebra::diagABA - concurrent access", "[LinearAlgebra][threadi
         arma::colvec expected = ABA.diag();
         results[i] = arma::approx_equal(result, expected, "absdiff", 1e-10);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -293,7 +293,7 @@ TEST_CASE("LinearAlgebra::chol_block - concurrent access", "[LinearAlgebra][thre
   const int n_total = n_old + n_new;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> C_matrices(n_threads);
   std::vector<arma::mat> Loo_matrices(n_threads);
   
@@ -310,7 +310,7 @@ TEST_CASE("LinearAlgebra::chol_block - concurrent access", "[LinearAlgebra][thre
         arma::mat reconstructed = L * L.t();
         results[i] = arma::approx_equal(reconstructed, C_matrices[i], "absdiff", 1e-8);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -329,7 +329,7 @@ TEST_CASE("LinearAlgebra - stress test with mixed operations", "[LinearAlgebra][
   const int n_iterations = 10;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   
   for (int i = 0; i < n_threads; i++) {
     threads.emplace_back([i, n_iterations, &results]() {
@@ -369,7 +369,7 @@ TEST_CASE("LinearAlgebra - stress test with mixed operations", "[LinearAlgebra][
         }
         results[i] = all_ok;
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -388,7 +388,7 @@ TEST_CASE("LinearAlgebra - rapid fire varying sizes", "[LinearAlgebra][threading
   std::vector<int> sizes = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   
   for (int i = 0; i < n_threads; i++) {
     threads.emplace_back([i, &sizes, &results]() {
@@ -415,7 +415,7 @@ TEST_CASE("LinearAlgebra - rapid fire varying sizes", "[LinearAlgebra][threading
                      arma::approx_equal(cp, expected_cp, "absdiff", 1e-10) &&
                      arma::approx_equal(tcp, expected_tcp, "absdiff", 1e-10);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
@@ -548,7 +548,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - near-singular concurrent", "[LinearA
   const int n_size = 15;
   
   std::vector<std::thread> threads;
-  std::vector<bool> results(n_threads, false);
+  std::vector<int> results(n_threads, 0);
   std::vector<arma::mat> inputs(n_threads);
   
   // Create different near-singular matrices for each thread
@@ -574,7 +574,7 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - near-singular concurrent", "[LinearA
         arma::mat L = LinearAlgebra::safe_chol_lower(inputs[i]);
         results[i] = (L.n_rows == inputs[i].n_rows);
       } catch (...) {
-        results[i] = false;
+        results[i] = 0;
       }
     });
   }
