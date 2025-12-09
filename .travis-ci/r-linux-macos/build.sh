@@ -35,7 +35,7 @@ fi
 
 MODE=${MODE:-Release}
 
-BUILD_TEST=false \
+BUILD_TEST=true \
     MODE=${MODE} \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
