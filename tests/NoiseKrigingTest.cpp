@@ -11,6 +11,27 @@
 #include <libKriging/Trend.hpp>
 #include <libKriging/Optim.hpp>
 
+// Cross-platform environment variable functions
+#ifdef _WIN32
+#include <cstdlib>
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  if (!overwrite && std::getenv(name) != nullptr) {
+    return 0;
+  }
+  return _putenv_s(name, value);
+}
+inline int unsetenv_portable(const char* name) {
+  return _putenv_s(name, "");
+}
+#else
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  return setenv(name, value, overwrite);
+}
+inline int unsetenv_portable(const char* name) {
+  return unsetenv(name);
+}
+#endif
+
 // Simple 1D test function
 auto simple_f = [](double x) {
   return std::sin(3.0 * x) + 0.5 * std::cos(7.0 * x);
@@ -89,8 +110,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
     // Limit OpenBLAS/OpenMP threads to avoid contention with multistart parallelism
     const char* old_openblas = std::getenv("OPENBLAS_NUM_THREADS");
     const char* old_blas = std::getenv("OMP_NUM_THREADS");
-    setenv("OPENBLAS_NUM_THREADS", "1", 1);
-    setenv("OMP_NUM_THREADS", "1", 1);
+    setenv_portable("OPENBLAS_NUM_THREADS", "1", 1);
+    setenv_portable("OMP_NUM_THREADS", "1", 1);
 
     const int n_runs = 3;
     std::vector<double> times10, times20;
@@ -118,14 +139,14 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
 
     // Restore environment
     if (old_openblas) {
-      setenv("OPENBLAS_NUM_THREADS", old_openblas, 1);
+      setenv_portable("OPENBLAS_NUM_THREADS", old_openblas, 1);
     } else {
-      unsetenv("OPENBLAS_NUM_THREADS");
+      unsetenv_portable("OPENBLAS_NUM_THREADS");
     }
     if (old_blas) {
-      setenv("OMP_NUM_THREADS", old_blas, 1);
+      setenv_portable("OMP_NUM_THREADS", old_blas, 1);
     } else {
-      unsetenv("OMP_NUM_THREADS");
+      unsetenv_portable("OMP_NUM_THREADS");
     }
 
     double avg10 = 0.0, avg20 = 0.0;
