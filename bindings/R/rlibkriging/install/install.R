@@ -41,20 +41,19 @@ if (is.null(repos) || identical(repos, c(CRAN = "@CRAN@")) || repos["CRAN"] == "
 }
 
 # Determine appropriate package type based on OS and repository
+# Note: When using RSPM on Linux, R will automatically use binaries
+# without needing type="binary". We only need to explicitly set type
+# for Windows and macOS.
 type <- switch(Sys.info()[['sysname']],
                Windows = "binary",
                Darwin  = "binary",
                Linux   = {
-                 # On Linux, only use binary if we have an RSPM binary repo
-                 # (URLs contain __linux__ pattern)
-                 if (grepl("__linux__", repos)) {
-                   "binary"
-                 } else {
-                   "source"  # Fall back to source packages
-                 }
+                 # On Linux, let R use its default behavior
+                 # RSPM repos will automatically provide binaries without type="binary"
+                 getOption("pkgType", default = "source")
                },
                # Default fallback
-               "source")
+               getOption("pkgType", default = "source"))
 
 # Print repository configuration for debugging
 message("Using repository: ", repos)
