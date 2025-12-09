@@ -45,7 +45,7 @@ if (is.null(repos) || identical(repos, c(CRAN = "@CRAN@")) || repos["CRAN"] == "
 # without needing type="binary". We only need to explicitly set type
 # for Windows and macOS.
 type <- switch(Sys.info()[['sysname']],
-               Windows = "binary",
+               Windows = "both",  # Try binary first, fall back to source if needed
                Darwin  = "binary",
                Linux   = {
                  # On Linux, let R use its default behavior
