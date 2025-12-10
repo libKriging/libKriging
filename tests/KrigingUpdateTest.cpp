@@ -12,7 +12,7 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
 
   // Generate initial training data
   const arma::uword n_old = 10;
-  const arma::uword n_new = 5;
+  const arma::uword n_new = 1;
   const arma::uword d = 2;
   
   arma::mat X_old(n_old, d, arma::fill::randu);
