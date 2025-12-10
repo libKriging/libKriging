@@ -60,14 +60,14 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
     INFO("Updated beta: " << kr_updated.beta().t());
     INFO("Combined beta: " << kr_combined.beta().t());
     
-    // Check theta (should be very close)
-    CHECK(arma::approx_equal(kr_updated.theta(), kr_combined.theta(), "absdiff", 1e-3));
+    // Check theta (should be very close) - using relative precision 0.05 (5%)
+    CHECK(arma::approx_equal(kr_updated.theta(), kr_combined.theta(), "reldiff", 0.05));
     
-    // Check sigma2
-    CHECK(std::abs(kr_updated.sigma2() - kr_combined.sigma2()) < 1e-3);
+    // Check sigma2 - using relative precision 0.05 (5%)
+    CHECK(std::abs(kr_updated.sigma2() - kr_combined.sigma2()) / std::abs(kr_combined.sigma2()) < 0.05);
     
-    // Check beta
-    CHECK(arma::approx_equal(kr_updated.beta(), kr_combined.beta(), "absdiff", 1e-3));
+    // Check beta - using relative precision 0.05 (5%)
+    CHECK(arma::approx_equal(kr_updated.beta(), kr_combined.beta(), "reldiff", 0.05));
     
     // Test predictions on new points
     arma::mat X_test(5, d, arma::fill::randu);

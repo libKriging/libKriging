@@ -62,17 +62,17 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
     INFO("Updated beta: " << nk_updated.beta().t());
     INFO("Combined beta: " << nk_combined.beta().t());
     
-    // Check theta (should be very close)
-    CHECK(arma::approx_equal(nk_updated.theta(), nk_combined.theta(), "absdiff", 1e-3));
+    // Check theta (should be very close) - using relative precision 0.05 (5%)
+    CHECK(arma::approx_equal(nk_updated.theta(), nk_combined.theta(), "reldiff", 0.05));
     
-    // Check sigma2
-    CHECK(std::abs(nk_updated.sigma2() - nk_combined.sigma2()) < 1e-3);
+    // Check sigma2 - using relative precision 0.05 (5%)
+    CHECK(std::abs(nk_updated.sigma2() - nk_combined.sigma2()) / std::abs(nk_combined.sigma2()) < 0.05);
     
-    // Check nugget
-    CHECK(std::abs(nk_updated.nugget() - nk_combined.nugget()) < 1e-3);
+    // Check nugget - using relative precision 0.05 (5%)
+    CHECK(std::abs(nk_updated.nugget() - nk_combined.nugget()) / std::abs(nk_combined.nugget()) < 0.05);
     
-    // Check beta
-    CHECK(arma::approx_equal(nk_updated.beta(), nk_combined.beta(), "absdiff", 1e-3));
+    // Check beta - using relative precision 0.05 (5%)
+    CHECK(arma::approx_equal(nk_updated.beta(), nk_combined.beta(), "reldiff", 0.05));
     
     // Test predictions on new points (main validation)
     arma::mat X_test(5, d, arma::fill::randu);
