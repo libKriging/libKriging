@@ -1,3 +1,6 @@
+// Must be before any include that might include <cmath>
+#define _USE_MATH_DEFINES
+
 #define CATCH_CONFIG_MAIN
 #include "libKriging/utils/lk_armadillo.hpp"
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
