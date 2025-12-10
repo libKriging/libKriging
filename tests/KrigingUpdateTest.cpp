@@ -61,12 +61,15 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
     INFO("Combined beta: " << kr_combined.beta().t());
     
     // Check theta (should be very close) - using relative precision 0.05 (5%)
+    REQUIRE(arma::all(kr_combined.theta() != 0.0));  // Ensure no zero values for relative comparison
     CHECK(arma::approx_equal(kr_updated.theta(), kr_combined.theta(), "reldiff", 0.05));
     
     // Check sigma2 - using relative precision 0.05 (5%)
+    REQUIRE(kr_combined.sigma2() != 0.0);  // Ensure non-zero for relative comparison
     CHECK(std::abs(kr_updated.sigma2() - kr_combined.sigma2()) / std::abs(kr_combined.sigma2()) < 0.05);
     
     // Check beta - using relative precision 0.05 (5%)
+    REQUIRE(arma::all(kr_combined.beta() != 0.0));  // Ensure no zero values for relative comparison
     CHECK(arma::approx_equal(kr_updated.beta(), kr_combined.beta(), "reldiff", 0.05));
     
     // Test predictions on new points
