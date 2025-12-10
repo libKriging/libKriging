@@ -29,7 +29,7 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
   SECTION("LL - BFGS should find better or equal LL than grid search") {
     // First fit a NuggetKriging model
     NuggetKriging nk_grid("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, false, std::nullopt, true, std::nullopt, true};
+    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_grid.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Grid search over theta_alpha = [theta(1), theta(2), alpha]

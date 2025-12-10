@@ -30,7 +30,7 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
   SECTION("LL - BFGS should find better or equal LL than grid search") {
     // First fit a NoiseKriging model
     NoiseKriging nk_grid("gauss");
-    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, false, std::nullopt, true};
+    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_grid.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Grid search over theta using logLikelihoodFun
