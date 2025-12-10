@@ -33,12 +33,41 @@
 #include <omp.h>
 #endif
 
-// Weak symbol for OpenBLAS thread control (if available)
+// Helper to get OpenBLAS thread control function (if available)
 // Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
 #if !defined(__APPLE__) || !defined(__arm64__)
-extern "C" {
-  void openblas_set_num_threads(int num_threads) __attribute__((weak));
-}
+#if defined(_MSC_VER)
+  // MSVC doesn't support weak symbols; use runtime dynamic loading
+  #include <windows.h>
+  namespace {
+    typedef void (*openblas_set_num_threads_t)(int);
+    openblas_set_num_threads_t get_openblas_set_num_threads() {
+      static openblas_set_num_threads_t func = nullptr;
+      static bool initialized = false;
+      if (!initialized) {
+        initialized = true;
+        // Try to load from OpenBLAS DLL (used by numpy/scipy)
+        HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+        if (!hModule) hModule = GetModuleHandleA("openblas.dll");
+        if (hModule) {
+          func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
+        }
+      }
+      return func;
+    }
+  }
+#else
+  // GCC/Clang support weak symbols
+  extern "C" {
+    void openblas_set_num_threads(int num_threads) __attribute__((weak));
+  }
+  namespace {
+    typedef void (*openblas_set_num_threads_t)(int);
+    openblas_set_num_threads_t get_openblas_set_num_threads() {
+      return openblas_set_num_threads;
+    }
+  }
+#endif
 #endif
 
 /************************************************/
@@ -1130,8 +1159,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         // Set OpenBLAS threads (if available)
         // Note: Skip on macOS ARM64 where Accelerate framework is used
 #if !defined(__APPLE__) || !defined(__arm64__)
-        if (openblas_set_num_threads != nullptr) {
-          openblas_set_num_threads(threads_per_worker);
+        auto openblas_fn = get_openblas_set_num_threads();
+        if (openblas_fn != nullptr) {
+          openblas_fn(threads_per_worker);
         }
 #endif
         
