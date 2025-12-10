@@ -38,6 +38,9 @@
 #if !defined(__APPLE__) || !defined(__arm64__)
 #if defined(_MSC_VER)
   // MSVC doesn't support weak symbols; use runtime dynamic loading
+  #ifndef NOMINMAX
+  #define NOMINMAX
+  #endif
   #include <windows.h>
   namespace {
     typedef void (*openblas_set_num_threads_t)(int);
