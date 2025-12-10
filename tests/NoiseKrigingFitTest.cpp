@@ -39,25 +39,27 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
     double theta_max = 10.0;
     
     double best_ll_grid = -arma::datum::inf;
-    arma::rowvec best_theta_grid(d);
+    arma::rowvec best_theta_sigma2_grid(d + 1);
     
     INFO("Performing dense grid search for LL (evaluating " << grid_size * grid_size << " points)...");
     for (arma::uword i1 = 0; i1 < grid_size; ++i1) {
       for (arma::uword i2 = 0; i2 < grid_size; ++i2) {
-        arma::vec theta(d);
-        theta(0) = theta_min + i1 * (theta_max - theta_min) / (grid_size - 1);
-        theta(1) = theta_min + i2 * (theta_max - theta_min) / (grid_size - 1);
+        // logLikelihoodFun expects [theta(1), ..., theta(d), sigma2]
+        arma::vec theta_sigma2(d + 1);
+        theta_sigma2(0) = theta_min + i1 * (theta_max - theta_min) / (grid_size - 1);
+        theta_sigma2(1) = theta_min + i2 * (theta_max - theta_min) / (grid_size - 1);
+        theta_sigma2(d) = nk_grid.sigma2();  // Use fitted sigma2 from initial fit
         
-        // Evaluate LL at this theta
-        auto [ll, grad] = nk_grid.logLikelihoodFun(theta, false, false);
+        // Evaluate LL at this theta_sigma2
+        auto [ll, grad] = nk_grid.logLikelihoodFun(theta_sigma2, false, false);
         if (ll > best_ll_grid) {
           best_ll_grid = ll;
-          best_theta_grid = theta.t();
+          best_theta_sigma2_grid = theta_sigma2.t();
         }
       }
     }
     
-    INFO("Best grid LL: " << best_ll_grid << " at theta = " << best_theta_grid);
+    INFO("Best grid LL: " << best_ll_grid << " at theta_sigma2 = " << best_theta_sigma2_grid);
     
     // BFGS optimization
     NoiseKriging nk_bfgs("gauss");

@@ -47,6 +47,7 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     for (arma::uword i1 = 0; i1 < grid_size_theta; ++i1) {
       for (arma::uword i2 = 0; i2 < grid_size_theta; ++i2) {
         for (arma::uword ia = 0; ia < grid_size_alpha; ++ia) {
+          // logLikelihoodFun expects [theta(1), ..., theta(d), alpha]
           arma::vec theta_alpha(d + 1);
           theta_alpha(0) = theta_min + i1 * (theta_max - theta_min) / (grid_size_theta - 1);
           theta_alpha(1) = theta_min + i2 * (theta_max - theta_min) / (grid_size_theta - 1);
