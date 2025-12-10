@@ -9,15 +9,15 @@
 #  ifndef LIBKRIGING_EXPORT
 #    ifdef Kriging_EXPORTS
         /* We are building this library */
-#      define LIBKRIGING_EXPORT __attribute__((visibility("default")))
+#      define LIBKRIGING_EXPORT 
 #    else
         /* We are using this library */
-#      define LIBKRIGING_EXPORT __attribute__((visibility("default")))
+#      define LIBKRIGING_EXPORT 
 #    endif
 #  endif
 
 #  ifndef LIBKRIGING_NO_EXPORT
-#    define LIBKRIGING_NO_EXPORT __attribute__((visibility("hidden")))
+#    define LIBKRIGING_NO_EXPORT 
 #  endif
 #endif
 
