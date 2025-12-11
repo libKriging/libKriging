@@ -217,14 +217,7 @@ jobs:
 
       - name: test
         shell: bash
-        run: |
-          cd "${BUILD_DIR:-build}"
-          if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
-            ROOT_DIR=$(git rev-parse --show-toplevel)
-            echo "Loading virtual environment from ${ROOT_DIR}/venv"
-            . "${ROOT_DIR}"/venv/bin/activate
-          fi
-          ctest -C "${MODE}" --output-on-failure
+        run: .travis-ci/${BUILD_NAME}/test.sh
         id: test
         continue-on-error: true
 
