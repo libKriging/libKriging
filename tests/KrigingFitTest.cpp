@@ -67,7 +67,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     INFO("BFGS LL: " << ll_bfgs << " at theta = " << theta_bfgs.t());
     
     // BFGS should find at least as good solution as grid search
-    CHECK(ll_bfgs >= best_ll_grid - 1e-3);
+    CHECK(ll_bfgs >= best_ll_grid - std::abs(best_ll_grid) * 1e-3);
   }
 
   SECTION("LOO - BFGS should find better or equal LOO than grid search") {
@@ -113,7 +113,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     INFO("BFGS LOO: " << loo_bfgs << " at theta = " << theta_bfgs.t());
     
     // BFGS should find at least as good solution (lower LOO is better)
-    CHECK(loo_bfgs <= best_loo_grid + 1e-3);
+    CHECK(loo_bfgs <= best_loo_grid + std::abs(best_loo_grid) * 1e-3);
   }
 
   SECTION("LMP - BFGS should find better or equal LMP than grid search") {

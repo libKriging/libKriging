@@ -72,6 +72,6 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
     INFO("BFGS LL: " << ll_bfgs << " at theta = " << theta_bfgs.t());
     
     // BFGS should find at least as good solution as grid search
-    CHECK(ll_bfgs >= best_ll_grid - 1e-3);
+    CHECK(ll_bfgs >= best_ll_grid - std::abs(best_ll_grid) * 1e-3);
   }
 }

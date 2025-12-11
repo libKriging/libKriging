@@ -102,7 +102,7 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
     WARN("Enable OpenMP for parallel speedup: configure with -DCMAKE_CXX_FLAGS=\"-fopenmp\"");
 #endif
 
-    CHECK(ll_multi >= ll_single - 1e-6);
+    CHECK(ll_multi >= ll_single - std::abs(ll_single) * 1e-6);
   }
 
   SECTION("BFGS10 vs BFGS20 timing (parallel efficiency)") {

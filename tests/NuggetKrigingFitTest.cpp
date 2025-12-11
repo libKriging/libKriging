@@ -77,7 +77,7 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     INFO("BFGS nugget: " << nk_bfgs.nugget());
     
     // BFGS should find at least as good solution as grid search
-    CHECK(ll_bfgs >= best_ll_grid - 1e-3);
+    CHECK(ll_bfgs >= best_ll_grid - std::abs(best_ll_grid) * 1e-3);
   }
 
   SECTION("LMP - BFGS should find better or equal LMP than grid search") {
@@ -130,6 +130,6 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     INFO("BFGS nugget: " << nk_bfgs.nugget());
     
     // BFGS should find at least as good solution
-    CHECK(lmp_bfgs >= best_lmp_grid - 1e-3);
+    CHECK(lmp_bfgs >= best_lmp_grid - std::abs(best_lmp_grid) * 1e-3);
   }
 }

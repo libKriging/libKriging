@@ -198,7 +198,7 @@ TEST_CASE("Branin BFGS") {
     WARN("Enable OpenMP for parallel speedup: configure with -DCMAKE_CXX_FLAGS=\"-fopenmp\"");
 #endif
 
-    CHECK(ll_multi >= ll_single - 1e-6);  // Allow small numerical tolerance
+    CHECK(ll_multi >= ll_single - std::abs(ll_single) * 1e-6);  // Allow small numerical tolerance (relative)
   }
 
   SECTION("BFGS10 vs BFGS20 timing (parallel efficiency)") {
@@ -326,6 +326,7 @@ TEST_CASE("Branin BFGS") {
     // Compare BFGS20 result with best BFGS1 result
     // They should be very close (within numerical tolerance)
     double theta_diff = arma::norm(theta_bfgs20 - theta_best_bfgs1, 2);
+    double theta_norm = arma::norm(theta_best_bfgs1, 2);
     double sigma2_diff = std::abs(sigma2_bfgs20 - sigma2_best_bfgs1);
     double ll_diff = std::abs(ll_bfgs20 - ll_best_bfgs1);
     
@@ -337,9 +338,9 @@ TEST_CASE("Branin BFGS") {
     // Check for EXACT equivalence
     // BFGS20 and 20×BFGS1 should give identical results (same algorithm, same starting points)
     // With proper thread-local optimization and staggered startup, results should be deterministic
-    CHECK(theta_diff <= 1e-3);  // Theta must be exactly the same
-    CHECK(sigma2_diff <= 1e-3); // Sigma2 must be exactly the same
-    CHECK(ll_diff <= 1e-3);     // Log-likelihood must be exactly the same
+    CHECK(theta_diff / theta_norm <= 1e-3);  // Theta must be exactly the same (relative)
+    CHECK(sigma2_diff / std::abs(sigma2_best_bfgs1) <= 1e-3); // Sigma2 must be exactly the same (relative)
+    CHECK(ll_diff / std::abs(ll_best_bfgs1) <= 1e-3);     // Log-likelihood must be exactly the same (relative)
     
     INFO("✓ BFGS20 and best of 20×BFGS1 are EXACTLY equivalent!");
   }

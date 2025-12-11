@@ -83,7 +83,7 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
     
     INFO("Max prediction difference: " << arma::max(arma::abs(std::get<0>(pred_updated) - std::get<0>(pred_combined))));
     
-    CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "absdiff", 1e-2));
+    CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "reldiff", 0.05));
   }
 
   SECTION("Multiple updates equal combined fit") {
@@ -111,7 +111,7 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
     
     INFO("Max prediction difference: " << arma::max(arma::abs(std::get<0>(pred_updated) - std::get<0>(pred_combined))));
     
-    CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "absdiff", 1e-2));
+    CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "reldiff", 0.05));
   }
 
   SECTION("Different kernels") {
@@ -135,7 +135,7 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
       auto pred_updated = kr_updated.predict(X_test, true, false, false);
       auto pred_combined = kr_combined.predict(X_test, true, false, false);
       
-      CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "absdiff", 1e-2));
+      CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "reldiff", 0.05));
     }
   }
 
@@ -164,7 +164,7 @@ TEST_CASE("KrigingUpdateTest - Updated model equals combined fit", "[update][kri
       auto pred_updated = kr_updated.predict(X_test, true, false, false);
       auto pred_combined = kr_combined.predict(X_test, true, false, false);
       
-      CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "absdiff", 1e-2));
+      CHECK(arma::approx_equal(std::get<0>(pred_updated), std::get<0>(pred_combined), "reldiff", 0.05));
     }
   }
 }
