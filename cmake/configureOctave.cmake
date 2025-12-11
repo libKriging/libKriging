@@ -117,7 +117,9 @@ macro(octave_add_mex)
     # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#properties-on-targets
     set_target_properties(${ARGS_NAME} PROPERTIES
             PREFIX ""
-            SUFFIX ".mex")
+            SUFFIX ".mex"
+            VERSION "${PROJECT_VERSION}"
+            SOVERSION "${PROJECT_VERSION_MAJOR}")
     #mkoctfile compile = CXX OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS -I. -DMEX_DEBUG
     set_target_properties(${ARGS_NAME} PROPERTIES
             COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}") 
