@@ -243,6 +243,16 @@ catch_discover_tests(KrigingLogLikTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(KrigingLeaveOneOutTest KrigingLeaveOneOutTest.cpp)
+target_link_libraries(KrigingLeaveOneOutTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingLeaveOneOutTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(KrigingLeaveOneOutTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(NuggetKrigingLogLikTest NuggetKrigingLogLikTest.cpp)
 target_link_libraries(NuggetKrigingLogLikTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries NuggetKrigingLogLikTest)

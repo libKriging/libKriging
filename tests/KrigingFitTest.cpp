@@ -5,6 +5,7 @@
 
 #include <catch2/catch.hpp>
 #include "libKriging/Kriging.hpp"
+#include "libKriging/Optim.hpp"
 // clang-format on
 
 TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fit][kriging]") {
@@ -101,12 +102,16 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     }
     
     INFO("Best grid LOO: " << best_loo_grid << " at theta = " << best_theta_grid);
-    
+
+    Optim::log(10);
+
     // BFGS optimization
     Kriging kr_bfgs("gauss");
     Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO", params_bfgs);
     
+    Optim::log(0);
+
     double loo_bfgs = kr_bfgs.leaveOneOut();
     arma::vec theta_bfgs = kr_bfgs.theta();
     
