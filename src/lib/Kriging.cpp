@@ -1288,7 +1288,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           lbfgsb::Optimizer optimizer{d};
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
-          optimizer.pgtol = objective.compare("LOO") == 0 ? Optim::gradient_tolerance / (10*n*n) : Optim::gradient_tolerance; // scale by: n^2 for LOO vs. LL, and /10 because LOO is usually more smooth
+          optimizer.pgtol = objective.compare("LOO") == 0 ? Optim::gradient_tolerance / (100*n*n) : Optim::gradient_tolerance; // scale by: n^2 for LOO vs. LL, and /10 because LOO is usually more smooth
           optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n*n) : Optim::objective_rel_tolerance / 1E-13;
           arma::ivec bounds_type{d, arma::fill::value(2)};
 
