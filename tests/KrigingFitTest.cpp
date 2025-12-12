@@ -77,7 +77,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     kr_grid.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO", params);
     
     // Grid search over theta using leaveOneOutFun
-    const arma::uword grid_size = 8;  // Smaller grid as LOO is more expensive
+    const arma::uword grid_size = 10;  // Smaller grid as LOO is more expensive
     double theta_min = 1e-6;
     double theta_max = 10.0;
     
@@ -123,7 +123,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     kr_grid.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", params);
     
     // Grid search over theta using logMargPostFun
-    const arma::uword grid_size = 8;
+    const arma::uword grid_size = 10;
     double theta_min = 1e-6;
     double theta_max = 10.0;
     
@@ -157,10 +157,10 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     arma::vec theta_bfgs = kr_bfgs.theta();
     
     INFO("BFGS LMP: " << lmp_bfgs << " at theta = " << theta_bfgs.t());
-    
+
     // BFGS should find a competitive solution (within reasonable range of best grid)
     // Note: For some objectives/data, dense grid might find better local optima
     INFO("Difference: " << (best_lmp_grid - lmp_bfgs) << " (positive means grid is better)");
-    CHECK(lmp_bfgs >= best_lmp_grid - 5.0);  // Relax tolerance for wider theta range
+    CHECK(lmp_bfgs >= best_lmp_grid - std::abs(best_lmp_grid) * 1e-3);  // Relax tolerance for wider theta range
   }
 }

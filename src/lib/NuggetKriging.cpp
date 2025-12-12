@@ -1043,21 +1043,6 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
         gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
-        if (Optim::log_level > 0) {
-          arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
-          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
-          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
-          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
-          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
-          arma::cout << "  normalize: " << m_normalize << arma::endl;
-          arma::cout << "  lower_bounds: " << theta_lower.t() << "";
-          arma::cout << "                " << alpha_lower << arma::endl;
-          arma::cout << "  upper_bounds: " << theta_upper.t() << "";
-          arma::cout << "                " << alpha_upper << arma::endl;
-          arma::cout << "  start_point: " << theta0.row(start_idx % multistart) << "";
-          arma::cout << "               " << alpha0[start_idx % alpha0.n_elem] << arma::endl;
-        }
-
         // Use pre-allocated KModel for this thread (thread-safe)
         if (start_idx >= preallocated_models.size()) {
           throw std::runtime_error("Preallocated model index out of bounds");
@@ -1072,6 +1057,21 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         optimizer.pgtol = Optim::gradient_tolerance;
         optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
         arma::ivec bounds_type{d + 1, arma::fill::value(2)};
+
+        if (Optim::log_level > 0) {
+          arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
+          arma::cout << "  objective: " << m_objective << arma::endl;
+          arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
+          arma::cout << "  null gradient tolerance: " << optimizer.pgtol << arma::endl;
+          arma::cout << "  constant objective tolerance: " << optimizer.factr * 1E-13 << arma::endl;          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+          arma::cout << "  normalize: " << m_normalize << arma::endl;
+          arma::cout << "  lower_bounds: " << theta_lower.t() << "";
+          arma::cout << "                " << alpha_lower << arma::endl;
+          arma::cout << "  upper_bounds: " << theta_upper.t() << "";
+          arma::cout << "                " << alpha_upper << arma::endl;
+          arma::cout << "  start_point: " << theta0.row(start_idx % multistart) << "";
+          arma::cout << "               " << alpha0[start_idx % alpha0.n_elem] << arma::endl;
+        }
 
         int retry = 0;
         double best_f_opt = std::numeric_limits<double>::infinity();
@@ -1089,23 +1089,46 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
               gamma_upper_local.memptr(),
               bounds_type.memptr());
 
+          if (Optim::log_level > 3) {
+            arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
+                       << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
+                       << ", task=" << opt_result.task << arma::endl;
+          }
+          
           if (opt_result.f_opt < best_f_opt) {
             best_f_opt = opt_result.f_opt;
             best_gamma = gamma_tmp;
           }
 
-          double sol_to_lb_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_lower_local.head(d)));
-          double sol_to_ub_theta = arma::min(arma::abs(gamma_tmp.head(d) - gamma_upper_local.head(d)));
-          double sol_to_b_theta = std::min(sol_to_ub_theta, sol_to_lb_theta);
-          double sol_to_lb_alpha = std::abs(gamma_tmp.at(d) - gamma_lower_local.at(d));
-          double sol_to_ub_alpha = std::abs(gamma_tmp.at(d) - gamma_upper_local.at(d));
-          double sol_to_b_alpha = std::min(sol_to_ub_alpha, sol_to_lb_alpha);
-          double sol_to_b = sol_to_b_theta < sol_to_b_alpha ? sol_to_b_theta : sol_to_b_alpha;
+          double sol_to_lb_theta = Optim::reparametrize
+                                        ? arma::min(arma::abs(NuggetKriging::reparam_from(gamma_tmp.head(d)) - theta_lower))
+                                        : arma::min(arma::abs(gamma_tmp.head(d) - theta_upper));
+          double sol_to_ub_theta = Optim::reparametrize
+                                        ? arma::min(arma::abs(NuggetKriging::reparam_from(gamma_tmp.head(d)) - theta_upper))
+                                        : arma::min(arma::abs(gamma_tmp.head(d) - theta_lower));
+          double sol_to_lb_alpha = Optim::reparametrize
+                                        ? std::abs(NuggetKriging::reparam_from(gamma_tmp).at(d) - alpha_lower)
+                                        : std::abs(gamma_tmp.at(d) - alpha_lower);
+          double sol_to_ub_alpha = Optim::reparametrize
+                                        ? std::abs(NuggetKriging::reparam_from(gamma_tmp).at(d) - alpha_upper)
+                                        : std::abs(gamma_tmp.at(d) - alpha_upper);
 
           if ((retry < Optim::max_restart)
-              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
-                  || ((sol_to_b < arma::datum::eps) && (opt_result.num_iters <= 2))
-                  || (opt_result.f_opt > best_f_opt))) {
+              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) // Check for abnormal termination
+                  || (opt_result.num_iters <= 2) // Start point is strangely quite optimal...
+                  || (sol_to_lb_theta < arma::datum::eps) // Stuck at theta lower bound
+                  || (sol_to_ub_alpha < arma::datum::eps) // Stuck at sigma2 upper bound, i.e. nugget lower bound
+                  || (opt_result.f_opt > best_f_opt))) { // No improvement
+
+            if (Optim::log_level > 0) {
+              arma::cout << "  Restarting BFGS (start " << (start_idx+1) << ", retry " << (retry+1)
+                         << "): f_opt=" << opt_result.f_opt
+                         << ", sol_to_lb=" << sol_to_lb_theta
+                         << ", sol_to_ub=" << sol_to_ub_theta
+                         << ", sol_to_lb_alpha=" << sol_to_lb_alpha
+                         << ", sol_to_ub_alpha=" << sol_to_ub_alpha << arma::endl;
+            }
+
             gamma_tmp.head(d) = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
             gamma_tmp.at(d) = alpha_upper - (alpha0[start_idx % alpha0.n_elem] + alpha_upper) / pow(2.0, retry + 1);
             

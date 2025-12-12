@@ -1179,7 +1179,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         }
       }
 
-
       arma::mat theta0_rand
           = arma::repmat(trans(theta_lower), multistart, 1)
             + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
@@ -1278,18 +1277,6 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           gamma_lower_local = arma::min(gamma_tmp, gamma_lower_local);
           gamma_upper_local = arma::max(gamma_tmp, gamma_upper_local);
 
-        if (Optim::log_level > 0) {
-          arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
-          arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
-          arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
-          arma::cout << "  constant objective tolerance: " << Optim::objective_rel_tolerance << arma::endl;
-          arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
-          arma::cout << "  normalize: " << m_normalize << arma::endl;
-          arma::cout << "  lower_bounds: " << theta_lower.t() << arma::endl;
-          arma::cout << "  upper_bounds: " << theta_upper.t() << arma::endl;
-          arma::cout << "  start_point: " << theta0.row(start_idx % multistart) << arma::endl;
-        }
-
           // Use pre-allocated KModel for this thread (thread-safe)
           if (start_idx >= preallocated_models.size()) {
             throw std::runtime_error("Preallocated model index out of bounds");
@@ -1301,9 +1288,22 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           lbfgsb::Optimizer optimizer{d};
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
-          optimizer.pgtol = Optim::gradient_tolerance;
-          optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+          optimizer.pgtol = objective.compare("LOO") == 0 ? Optim::gradient_tolerance / (10*n*n) : Optim::gradient_tolerance; // scale by: n^2 for LOO vs. LL, and /10 because LOO is usually more smooth
+          optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n*n) : Optim::objective_rel_tolerance / 1E-13;
           arma::ivec bounds_type{d, arma::fill::value(2)};
+
+          if (Optim::log_level > 0) {
+            arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
+            arma::cout << "  objective: " << m_objective << arma::endl;
+            arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
+            arma::cout << "  null gradient tolerance: " << optimizer.pgtol << arma::endl;
+            arma::cout << "  constant objective tolerance: " << optimizer.factr * 1E-13 << arma::endl;
+            arma::cout << "  reparametrize: " << Optim::reparametrize << arma::endl;
+            arma::cout << "  normalize: " << m_normalize << arma::endl;
+            arma::cout << "  lower_bounds: " << theta_lower.t() << arma::endl;
+            arma::cout << "  upper_bounds: " << theta_upper.t() << arma::endl;
+            arma::cout << "  start_point: " << theta0.row(start_idx % multistart) << arma::endl;
+          }
 
           int retry = 0;
           double best_f_opt = std::numeric_limits<double>::infinity();
@@ -1320,19 +1320,40 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                 gamma_upper_local.memptr(),
                 bounds_type.memptr());
 
+            if (Optim::log_level > 3) {
+              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
+                         << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
+                         << ", task=" << opt_result.task << arma::endl;
+            }
+
             if (opt_result.f_opt < best_f_opt) {
               best_f_opt = opt_result.f_opt;
               best_gamma = gamma_tmp;
             }
 
-            double sol_to_lb = arma::min(arma::abs(gamma_tmp - gamma_lower_local));
-            double sol_to_ub = arma::min(arma::abs(gamma_tmp - gamma_upper_local));
+            // check theta for distance to bounds
+            double sol_to_lb = Optim::reparametrize
+                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_lower))
+                                        : arma::min(arma::abs(gamma_tmp - theta_upper));
+            double sol_to_ub = Optim::reparametrize
+                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_upper))
+                                        : arma::min(arma::abs(gamma_tmp - theta_lower));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
+            // Check abnormal termination or convergence at bounds to decide on restart
             if ((retry < Optim::max_restart)
-                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)
-                    || ((sol_to_b < arma::datum::eps) && (opt_result.num_iters <= 2))
-                    || (opt_result.f_opt > best_f_opt))) {
+                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) // Check for abnormal termination
+                    || (opt_result.num_iters <= 2) // Start point is strangely quite optimal...
+                    || (sol_to_lb < arma::datum::eps) // Stuck at lower bound
+                    || (opt_result.f_opt > best_f_opt))) { // No improvement
+
+              if (Optim::log_level > 0) {
+                arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
+                           << "): f_opt=" << opt_result.f_opt << ", sol_to_lb=" << sol_to_lb
+                           << ", sol_to_ub=" << sol_to_ub << arma::endl;
+              }
+
+              // Restart with contracted bounds around initial point
               gamma_tmp = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
               
               if (Optim::reparametrize)
