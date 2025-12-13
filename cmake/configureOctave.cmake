@@ -71,17 +71,6 @@ execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p OCTLIBDIR
         OUTPUT_VARIABLE OCTAVE_LIBRARIES_PATHS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-find_library(OCTAVE_OCTINTERP_LIBRARY
-        NAMES octinterp liboctinterp
-        HINTS ${OCTAVE_LIBRARIES_PATHS}
-        )
-find_library(OCTAVE_OCTAVE_LIBRARY
-        NAMES octave liboctave
-        HINTS ${OCTAVE_LIBRARIES_PATHS}
-        )
-set(OCTAVE_LIBRARIES ${OCTAVE_OCTINTERP_LIBRARY})
-list(APPEND OCTAVE_LIBRARIES ${OCTAVE_OCTAVE_LIBRARY})
-
 execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -v
         OUTPUT_VARIABLE OCTAVE_VERSION_STRING
         OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -91,6 +80,26 @@ if (OCTAVE_VERSION_STRING)
     string(REGEX REPLACE "[0-9]+\\.([0-9]+).*" "\\1" OCTAVE_MINOR_VERSION ${OCTAVE_VERSION_STRING})
     string(REGEX REPLACE "[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" OCTAVE_PATCH_VERSION ${OCTAVE_VERSION_STRING})
 endif ()
+
+# Octave 10+ uses liboctmex instead of liboctinterp/liboctave for MEX files
+if (OCTAVE_MAJOR_VERSION AND OCTAVE_MAJOR_VERSION GREATER_EQUAL 10)
+    find_library(OCTAVE_OCTMEX_LIBRARY
+            NAMES octmex liboctmex
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    set(OCTAVE_LIBRARIES ${OCTAVE_OCTMEX_LIBRARY})
+else()
+    find_library(OCTAVE_OCTINTERP_LIBRARY
+            NAMES octinterp liboctinterp
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    find_library(OCTAVE_OCTAVE_LIBRARY
+            NAMES octave liboctave
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    set(OCTAVE_LIBRARIES ${OCTAVE_OCTINTERP_LIBRARY})
+    list(APPEND OCTAVE_LIBRARIES ${OCTAVE_OCTAVE_LIBRARY})
+endif()
 
 
 macro(octave_add_mex)
@@ -115,12 +124,16 @@ macro(octave_add_mex)
     add_library(${ARGS_NAME} MODULE ${ARGS_SOURCES})
     target_link_libraries(${ARGS_NAME} ${ARGS_LINK_LIBRARIES} ${OCTAVE_LIBRARIES})
     # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#properties-on-targets
-    # Set VERSION/SOVERSION for Octave 10.x compatibility on all platforms
     set_target_properties(${ARGS_NAME} PROPERTIES
             PREFIX ""
-            SUFFIX ".mex"
-            VERSION "${PROJECT_VERSION}"
-            SOVERSION "${PROJECT_VERSION_MAJOR}")
+            SUFFIX ".mex")
+    # On macOS, MODULE libraries are bundles and must not have VERSION properties
+    # as they cause -current_version linker flags which are incompatible with -bundle
+    if(APPLE)
+        set_target_properties(${ARGS_NAME} PROPERTIES
+                VERSION ""
+                SOVERSION "")
+    endif()
     #mkoctfile compile = CXX OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS -I. -DMEX_DEBUG
     set_target_properties(${ARGS_NAME} PROPERTIES
             COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}") 
