@@ -89,10 +89,9 @@ if (OCTAVE_MAJOR_VERSION AND OCTAVE_MAJOR_VERSION GREATER_EQUAL 10)
             )
     set(OCTAVE_LIBRARIES ${OCTAVE_OCTMEX_LIBRARY})
     
-    # Get MEX SOVERSION for Octave 10+
-    execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -p OCTAVE_MEX_SOVERSION
-            OUTPUT_VARIABLE OCTAVE_MEX_SOVERSION
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
+    # Set MEX SOVERSION for Octave 10+
+    # liboctmex was introduced in Octave 10 with SOVERSION 1 for stable ABI
+    set(OCTAVE_MEX_SOVERSION 1)
 else()
     find_library(OCTAVE_OCTINTERP_LIBRARY
             NAMES octinterp liboctinterp
