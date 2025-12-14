@@ -91,19 +91,19 @@ jobs:
           #   mode: Release
           #   enable_python: off
           #   enable_octave: on
-          - name: "Octave Windows"
-            os: windows-latest
-            mode: Release
-            # using python and octave in windows leads to the following error:
-            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-            #   491 | # define snprintf _snprintf
-            enable_python: off
-            enable_octave: on
-          # - name: "Matlab Linux"
-          #   # Using matlab-actions/setup-matlab@v1, only available on Linux
-          #   os: ubuntu-22.04
+          # - name: "Octave Windows"
+          #   os: windows-latest
           #   mode: Release
-          #   enable_matlab: on
+          #   # using python and octave in windows leads to the following error:
+          #   # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+          #   #   491 | # define snprintf _snprintf
+          #   enable_python: off
+          #   enable_octave: on
+          - name: "Matlab Linux"
+            # Using matlab-actions/setup-matlab@v1, only available on Linux
+            os: ubuntu-22.04
+            mode: Release
+            enable_matlab: on
           # - name: "R Linux"
           #   os: ubuntu-22.04
           #   mode: Release
