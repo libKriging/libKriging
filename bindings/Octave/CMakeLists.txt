@@ -7,7 +7,12 @@ if (NOT OCTAVE_BINDING_MODE)
     message(FATAL_ERROR "OCTAVE_BINDING_MODE should be defined")
 endif ()
 
+if (NOT KRIGING_VERSION)
+    message(FATAL_ERROR "KRIGING_VERSION should be defined by parent project")
+endif ()
+
 project(libKriging-${OCTAVE_BINDING_MODE}
+        VERSION ${KRIGING_VERSION}
         DESCRIPTION "LibKriging's ${OCTAVE_BINDING_MODE} binding")
 
 set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")

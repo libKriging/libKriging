@@ -36,6 +36,52 @@ enable_language(CXX)
 
 #------------------------------------------------------
 
+# Find and enable OpenMP for parallel optimization
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP found - enabling parallel multistart optimization")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+
+    # Fix TLS error for Python bindings: Use global-dynamic TLS model instead of initial-exec
+    # This prevents "cannot allocate memory in static TLS block" when loaded via dlopen()
+    if(NOT WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftls-model=global-dynamic")
+        message(STATUS "Using global-dynamic TLS model for OpenMP (Python dlopen compatibility)")
+    endif()
+
+    message(STATUS "Armadillo's internal OpenMP disabled (see line 189)")
+else()
+    message(WARNING "OpenMP not found - multistart optimization will run sequentially")
+    message(STATUS "To enable OpenMP: install libomp-dev (or libomp-18-dev) package")
+endif()
+
+# Build jemalloc as default allocator for thread-safe memory allocation
+# TEMPORARY: Disabled to debug TLS error in Python bindings
+option(USE_JEMALLOC "Use jemalloc as default allocator" OFF)
+if(USE_JEMALLOC AND NOT WIN32)
+    message(STATUS "Downloading and building jemalloc 5.3.0")
+    include(ExternalProject)
+    set(JEMALLOC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/jemalloc-install/include)
+    set(JEMALLOC_LIBRARY ${CMAKE_BINARY_DIR}/jemalloc-install/lib/libjemalloc.a)
+    
+    ExternalProject_Add(jemalloc_external
+        URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
+        URL_HASH SHA256=2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/jemalloc-install --disable-doc --disable-stats --disable-prof --enable-static --disable-shared --disable-initial-exec-tls CFLAGS=-fPIC
+        BUILD_COMMAND make
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 0
+        BUILD_BYPRODUCTS ${JEMALLOC_LIBRARY}
+    )
+    
+    message(STATUS "jemalloc will be used as default allocator")
+else()
+    message(STATUS "Using standard allocator")
+endif()
+
+#------------------------------------------------------
+
 # Prevent from root system installation
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installed" CACHE PATH "default install path" FORCE)
@@ -168,7 +214,9 @@ list(APPEND CMAKE_SYSTEM_LIBRARY_PATH ${EXTRA_SYSTEM_LIBRARY_PATH})
 # Dependencies
 set(DETECT_HDF5 false CACHE BOOL "Disable HDF5 to avoid conflict with armadillo") # prevent issue #40
 set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # disable warning about missing version in project command
-set(BUILD_SMOKE_TEST OFF CACHE BOOL "armadillo smoke test") # no smoke tests: it fails due to custom memory guard in memory.hpp 
+set(BUILD_SMOKE_TEST OFF CACHE BOOL "armadillo smoke test") # no smoke tests: it fails due to custom memory guard in memory.hpp
+# Disable Armadillo's internal OpenMP to prevent thread-safety issues
+add_definitions(-DARMA_DONT_USE_OPENMP)
 add_subdirectory(dependencies/armadillo-code)
 include_directories(SYSTEM dependencies/armadillo-code/include)
 add_library(blas ALIAS armadillo) # to use armadillo blas inside lbfgsb_cpp
@@ -222,9 +270,11 @@ endif()
 # /D or -D definition headers are updated according to the compiler 'style'
 # Use windows style for easy checking on Unix
 add_definitions(/DARMA_32BIT_WORD)
-add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
-add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
-add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
+# DISABLED: Custom allocators cause ABI mismatch with external code (R, Python, standalone tests)
+# See SOLUTION_1_PROPER_KMODEL_INIT.md for details
+#add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
+#add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
+#add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 #add_definitions(-DCARMA_DEBUG)
 #add_definitions(-DCARMA_EXTRA_DEBUG)
 
@@ -544,6 +594,25 @@ endif()
 set(CATCH_MODULE_PATH "${LIBKRIGING_SOURCE_DIR}/dependencies/Catch2")
 add_subdirectory("${CATCH_MODULE_PATH}")
 list(APPEND CMAKE_MODULE_PATH ${CATCH_MODULE_PATH}/contrib)
+
+# On Windows, ensure DLL files are in the same directory as test executables
+# This prevents "Exit code 0xc0000135" (STATUS_DLL_NOT_FOUND) errors
+if(WIN32)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_BINARY_DIR}/bin)
+    
+    # Also set for libraries to ensure DLLs are in the same directory
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_BINARY_DIR}/bin)
+    
+    message(STATUS "Windows: Setting runtime output directory to ${CMAKE_BINARY_DIR}/bin for DLL accessibility")
+endif()
 
 include(CTest)
 add_subdirectory(tests)

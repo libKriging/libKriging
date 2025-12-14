@@ -8,6 +8,8 @@ on:
     tags-ignore:
       - 'v*' # done in release
   pull_request:
+    branches:
+      - '*'
   schedule:
     - cron: '0 2 * * SAT'
 
@@ -55,7 +57,7 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +131,11 @@ jobs:
         with:
           r-version: 'release'
           rtools-version: '' # Default Rtools version, matching the R version
+          use-public-rspm: true
         if: matrix.enable_R == 'on'
+
+      # Note: Miniconda is installed directly in .travis-ci/windows/install.sh for all Windows jobs
+      # This provides BLAS/LAPACK dependencies and Python environment consistently
 
       - name: Define local variables
         shell: bash

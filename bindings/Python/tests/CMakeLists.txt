@@ -44,6 +44,55 @@ macro(add_python_test)
     endif()
     
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${LIBKRIGING_PYTHON_BINARY_DIR}${SEP}${CMAKE_CURRENT_SOURCE_DIR}/../src")
+
+    # Fix "cannot allocate memory in static TLS block" error
+    # Preload OpenMP library before loading the Python extension module
+    # This ensures OpenMP's TLS is allocated in the initial TLS block
+    if(NOT WIN32)
+        find_package(OpenMP)
+        if(OpenMP_CXX_FOUND)
+            # Search for libgomp.so.1 runtime library (not the linker stub libgomp.so)
+            # Note: Must use NAMES_PER_DIR to check all names before checking next directory
+            # This prevents finding the linker stub in GCC directories before the runtime library
+
+            # Search standard runtime library locations with explicit .so.1 suffix
+            find_file(GOMP_RUNTIME_LIB
+                      NAMES libgomp.so.1
+                      PATHS /usr/lib/x86_64-linux-gnu
+                            /lib/x86_64-linux-gnu
+                            /usr/lib64
+                            /lib64
+                            /usr/lib
+                            /lib
+                      NO_DEFAULT_PATH)
+
+            # If not found, try GCC library directories (Ubuntu 22.04 may have it here)
+            if(NOT GOMP_RUNTIME_LIB)
+                find_file(GOMP_RUNTIME_LIB
+                          NAMES libgomp.so.1
+                          PATHS /usr/lib/gcc/x86_64-linux-gnu
+                                /usr/lib/gcc
+                          PATH_SUFFIXES 11 12 13 14
+                          NO_DEFAULT_PATH)
+            endif()
+
+            # Last resort: system-wide search
+            if(NOT GOMP_RUNTIME_LIB)
+                find_file(GOMP_RUNTIME_LIB NAMES libgomp.so.1)
+            endif()
+
+            if(GOMP_RUNTIME_LIB)
+                set(OPENMP_LIB_PATH ${GOMP_RUNTIME_LIB})
+            else()
+                # Very last resort: use just the library name and let LD find it
+                set(OPENMP_LIB_PATH "libgomp.so.1")
+            endif()
+
+            set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "LD_PRELOAD=${OPENMP_LIB_PATH}")
+            message(STATUS "Python test ${TEST_NAME} will preload OpenMP: ${OPENMP_LIB_PATH}")
+        endif()
+    endif()
+
     set_tests_properties(${TEST_NAME}
             PROPERTIES
             WORKING_DIRECTORY "${LIBKRIGING_PYTHON_BINARY_DIR}"

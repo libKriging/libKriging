@@ -17,7 +17,7 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 MAKE_SHARED_LIBS=off
 STATIC_LIB=on
 
-BUILD_TEST=false \
+BUILD_TEST=true \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \
     FC=$(R CMD config FC) \

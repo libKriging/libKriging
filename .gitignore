@@ -55,3 +55,16 @@ CMakeFiles
 # armadillo 'in source' generated Makefile
 dependencies/armadillo-code/examples/Makefile
 .Rproj.user
+
+# old dir
+old/
+# jemalloc files
+jemalloc*
+# compiled makefiles
+**.*make
+# compiled shared objects
+*.so*
+# AI documentation files
+*_*.md
+# compiled makefiles
+**Makefile

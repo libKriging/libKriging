@@ -144,6 +144,10 @@ class NuggetKriging {
     double SSEstar;
     arma::vec betahat;
   };
+  void populate_Model(KModel& m,
+                      const arma::vec& theta,
+                      const double alpha,
+                      std::map<std::string, double>* bench) const;
   NuggetKriging::KModel make_Model(const arma::vec& theta,
                                    const double alpha,
                                    std::map<std::string, double>* bench) const;

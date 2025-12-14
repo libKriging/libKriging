@@ -33,15 +33,15 @@ try(L2 <- t(chol(X2)))
 test_that(desc="Chol without nugget does not pass", expect_null(L2))
 
 rlibkriging:::linalg_set_num_nugget(0.001)
-rlibkriging:::linalg_set_chol_warning(TRUE)
+#rlibkriging:::linalg_set_chol_warning(TRUE)
 L2_lk = NULL
 L2_lk = rlibkriging:::linalg_chol_safe(X2)
-rlibkriging:::linalg_set_num_nugget(1e-15) # default setup
+rlibkriging:::linalg_set_num_nugget(1e-10) # reset to default
 
 test_that(desc="Chol with nugget passes", expect_false(is.null(L2_lk)))
 
 test_that(desc="Chol with nugget is close to be good",
-    expect_equal(L2_lk %*% t(L2_lk) - 6*0.001*diag(n), X2, tol=1e-10))
+    expect_equal(L2_lk %*% t(L2_lk) - 0.011*diag(n), X2, tol=1e-10))
 
 #######################################################################
 

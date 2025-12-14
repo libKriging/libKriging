@@ -137,6 +137,7 @@ class Kriging {
     arma::vec betahat;
   };
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
+  void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
 
   double _logLikelihood(const arma::vec& _theta,
                         arma::vec* grad_out,
@@ -223,28 +224,14 @@ class Kriging {
    */
   LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update = false);
 
-  /** Draw sampled trajectories of kriging at given points X_n
-   * @param X_n is m*d matrix of points where to simulate output
-   * @param nsim is number of simulations to draw
-   * @param seed random seed setup for sample simulations
-   * @param will_update store useful data for possible future update
-   * @return output is m*nsim matrix of simulations at X_n
-   */
-  LIBKRIGING_EXPORT arma::mat rand(const int nsim, const int seed, const arma::mat& X_n, const bool will_update);
-
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
-   * @return output is m*nsim matrix of simulations at X_n
+   * @return
+   * 
+   * put is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
-
-  /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-sample to previous X_n
-   * @param y_u is m length column vector of new output
-   * @param X_u is m*d matrix of new input
-   * @return output is m*nsim matrix of simulations at X_n
-   */
-  LIBKRIGING_EXPORT arma::mat update_rand(const arma::vec& y_u, const arma::mat& X_u);
 
   /** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output

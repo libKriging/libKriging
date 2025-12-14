@@ -19,7 +19,6 @@ add_library(Kriging
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
-        CacheFunction.cpp include/libKriging/CacheFunction.hpp include/libKriging/utils/custom_hash_function.hpp include/libKriging/utils/cache_details.hpp
         include/libKriging/utils/LinearHashStorage.hpp
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
@@ -35,6 +34,25 @@ if (CXX_CLANG_TIDY)
 endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
+
+# Fix "cannot allocate memory in static TLS block" error when loading as Python module
+# This occurs because OpenMP/OpenBLAS use static TLS which has limited space when loaded via dlopen()
+# Solution: Add -Wl,-z,nodlopen to prevent dlopen issues, or preload the library
+# The Python bindings should use LD_PRELOAD or link libgomp before loading pylibkriging
+if(NOT WIN32)
+    # Use global-dynamic TLS model for our code
+    target_compile_options(Kriging PRIVATE -ftls-model=global-dynamic)
+    # Note: The STATIC_TLS flag may still appear due to OpenMP/OpenBLAS dependencies
+    # Python bindings need to ensure libgomp.so is loaded before importing pylibkriging
+endif()
+
+# Link jemalloc if enabled
+if(USE_JEMALLOC AND NOT WIN32)
+    add_dependencies(Kriging jemalloc_external)
+    target_include_directories(Kriging PRIVATE ${JEMALLOC_INCLUDE_DIR})
+    target_link_libraries(Kriging PRIVATE ${JEMALLOC_LIBRARY} pthread dl)
+    target_compile_definitions(Kriging PRIVATE LIBKRIGING_USE_JEMALLOC)
+endif()
 
 # TODO check if this method is useful
 # * https://atomheartother.github.io/c++/2018/07/12/CPPDynLib.html

@@ -71,17 +71,6 @@ execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p OCTLIBDIR
         OUTPUT_VARIABLE OCTAVE_LIBRARIES_PATHS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-find_library(OCTAVE_OCTINTERP_LIBRARY
-        NAMES octinterp liboctinterp
-        HINTS ${OCTAVE_LIBRARIES_PATHS}
-        )
-find_library(OCTAVE_OCTAVE_LIBRARY
-        NAMES octave liboctave
-        HINTS ${OCTAVE_LIBRARIES_PATHS}
-        )
-set(OCTAVE_LIBRARIES ${OCTAVE_OCTINTERP_LIBRARY})
-list(APPEND OCTAVE_LIBRARIES ${OCTAVE_OCTAVE_LIBRARY})
-
 execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -v
         OUTPUT_VARIABLE OCTAVE_VERSION_STRING
         OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -91,6 +80,30 @@ if (OCTAVE_VERSION_STRING)
     string(REGEX REPLACE "[0-9]+\\.([0-9]+).*" "\\1" OCTAVE_MINOR_VERSION ${OCTAVE_VERSION_STRING})
     string(REGEX REPLACE "[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" OCTAVE_PATCH_VERSION ${OCTAVE_VERSION_STRING})
 endif ()
+
+# Octave 10+ uses liboctmex instead of liboctinterp/liboctave for MEX files
+if (OCTAVE_MAJOR_VERSION AND OCTAVE_MAJOR_VERSION GREATER_EQUAL 10)
+    find_library(OCTAVE_OCTMEX_LIBRARY
+            NAMES octmex liboctmex
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    set(OCTAVE_LIBRARIES ${OCTAVE_OCTMEX_LIBRARY})
+    
+    # Set MEX SOVERSION for Octave 10+
+    # liboctmex was introduced in Octave 10 with SOVERSION 1 for stable ABI
+    set(OCTAVE_MEX_SOVERSION 1)
+else()
+    find_library(OCTAVE_OCTINTERP_LIBRARY
+            NAMES octinterp liboctinterp
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    find_library(OCTAVE_OCTAVE_LIBRARY
+            NAMES octave liboctave
+            HINTS ${OCTAVE_LIBRARIES_PATHS}
+            )
+    set(OCTAVE_LIBRARIES ${OCTAVE_OCTINTERP_LIBRARY})
+    list(APPEND OCTAVE_LIBRARIES ${OCTAVE_OCTAVE_LIBRARY})
+endif()
 
 
 macro(octave_add_mex)
@@ -112,12 +125,31 @@ macro(octave_add_mex)
         logFatalError("octave_add_mex needs SOURCES")
     endif ()
 
-    add_library(${ARGS_NAME} MODULE ${ARGS_SOURCES})
+    # For Octave 10+, add soversion source file
+    set(MEX_SOURCES ${ARGS_SOURCES})
+    if(OCTAVE_MEX_SOVERSION)
+        list(APPEND MEX_SOURCES "${LIBKRIGING_SOURCE_DIR}/bindings/Octave/mex_soversion.c")
+    endif()
+    
+    add_library(${ARGS_NAME} MODULE ${MEX_SOURCES})
     target_link_libraries(${ARGS_NAME} ${ARGS_LINK_LIBRARIES} ${OCTAVE_LIBRARIES})
+    
+    # For Octave 10+, define the SOVERSION
+    if(OCTAVE_MEX_SOVERSION)
+        target_compile_definitions(${ARGS_NAME} PRIVATE OCTAVE_MEX_SOVERSION=${OCTAVE_MEX_SOVERSION})
+    endif()
+    
     # https://cmake.org/cmake/help/latest/manual/cmake-properties.7.html#properties-on-targets
     set_target_properties(${ARGS_NAME} PROPERTIES
             PREFIX ""
             SUFFIX ".mex")
+    # On macOS, MODULE libraries are bundles and must not have VERSION properties
+    # as they cause -current_version linker flags which are incompatible with -bundle
+    if(APPLE)
+        set_target_properties(${ARGS_NAME} PROPERTIES
+                VERSION ""
+                SOVERSION "")
+    endif()
     #mkoctfile compile = CXX OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS -I. -DMEX_DEBUG
     set_target_properties(${ARGS_NAME} PROPERTIES
             COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}") 

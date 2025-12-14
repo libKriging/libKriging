@@ -8,6 +8,8 @@ on:
     tags-ignore:
       - 'v*' # done in release
   pull_request:
+    branches:
+      - '*'
   schedule:
     - cron: '0 2 * * SAT'
 
