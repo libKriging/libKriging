@@ -537,7 +537,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       omp_set_num_threads(threads_per_worker);
       #endif
       
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "Threads per worker: " << threads_per_worker 
                    << " (total CPUs: " << n_cpu << ", multistart: " << multistart << ")" << arma::endl;
       }
@@ -603,7 +603,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     arma::uword p_data = m_F.n_cols;
     std::vector<NoiseKriging::KModel> preallocated_models(multistart);
     
-    if (Optim::log_level > 0) {
+    if (Optim::log_level > Optim::log_none) {
       arma::cout << "Preallocating " << multistart << " KModel structures (n=" 
                  << n_data << ", p=" << p_data << ")..." << arma::endl;
     }
@@ -695,7 +695,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
         arma::ivec bounds_type{d + 1, arma::fill::value(2)};
 
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
           arma::cout << "  objective: " << m_objective << arma::endl;
           arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
@@ -726,7 +726,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
               gamma_upper_local.memptr(),
               bounds_type.memptr());
 
-          if (Optim::log_level > 3) {
+          if (Optim::log_level > Optim::log_info) {
             arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
                        << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
                        << ", task=" << opt_result.task << arma::endl;
@@ -758,7 +758,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
               || (sol_to_lb_theta < arma::datum::eps) // Stuck at lower bound
               || (opt_result.f_opt > best_f_opt))) { // No improvement
 
-            if (Optim::log_level > 0) {
+            if (Optim::log_level > Optim::log_none) {
               arma::cout << "  Restarting BFGS (start " << (start_idx+1) << ", retry " << (retry+1)
                          << "): f_opt=" << opt_result.f_opt
                          << ", sol_to_lb=" << sol_to_lb_theta
@@ -805,7 +805,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       } catch (const std::exception& e) {
         result.success = false;
         result.error_message = e.what();
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "Warning: start point " << (start_idx + 1) << " failed: " << e.what() << arma::endl;
         }
       }
@@ -828,7 +828,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       }
       pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
       
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
                    << ", multistart=" << multistart << ")" << arma::endl;
       }
@@ -910,7 +910,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
                                + " optimization attempts failed");
     }
 
-    if (Optim::log_level > 0 && successful_optimizations < multistart) {
+    if (Optim::log_level > Optim::log_none && successful_optimizations < multistart) {
       arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart
                 << " succeeded" << arma::endl;
     }
@@ -938,7 +938,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         m_sigma2 = best.theta_sigma2.at(d);
       }
 
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
                   << arma::endl;
       }

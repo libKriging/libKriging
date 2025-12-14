@@ -806,7 +806,7 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
                     arma::vec& x_0,
                     const arma::vec& x_lower,
                     const arma::vec& x_upper) {
-  if (Optim::log_level > 0) {
+  if (Optim::log_level > Optim::log_none) {
     arma::cout << "x_0: " << x_0 << " ";
   }
 
@@ -827,14 +827,14 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
   arma::mat hess(x.n_elem, x.n_elem);
   int i = 0;
   while (i < max_iteration) {
-    if (Optim::log_level > 0) {
+    if (Optim::log_level > Optim::log_none) {
       arma::cout << "iteration: " << i << arma::endl;
       arma::cout << "  x: " << x << arma::endl;
     }
 
     f_previous = f_new;
     f_new = f(x, &grad, &hess);
-    if (Optim::log_level > 1) {
+    if (Optim::log_level > Optim::log_error) {
       arma::cout << "    f_new: " << f_new << arma::endl;
     }
     if (f_best > f_new) {
@@ -843,20 +843,20 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
     }
 
     if (std::abs((f_new - f_previous) / f_previous) < y_tol) {
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "  X f_new ~ f_previous" << arma::endl;
       }
       break;
     }
     if (arma::abs(grad).max() < g_tol) {
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "  X grad ~ 0" << arma::endl;
       }
       break;
     }
 
     arma::vec delta_x(x.n_elem);
-    if (Optim::log_level > 2) {
+    if (Optim::log_level > Optim::log_warning) {
       arma::cout << "  eig(hess)" << arma::eig_sym(hess) << arma::endl;
     }
     if (arma::all(arma::eig_sym(hess) > 0)) {
@@ -866,40 +866,40 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
     } else {
       delta_x = delta * grad / std::sqrt(arma::sum(arma::square(grad)));
     }
-    if (Optim::log_level > 2) {
+    if (Optim::log_level > Optim::log_warning) {
       arma::cout << "  delta_x: " << delta_x << arma::endl;
     }
 
     arma::vec x_next = x - delta_x;
-    if (Optim::log_level > 1) {
+    if (Optim::log_level > Optim::log_error) {
       arma::cout << "  x_next: " << x_next << arma::endl;
     }
 
     for (arma::uword j = 0; j < x_next.n_elem; j++) {
       if (x_next[j] < x_lower[j]) {
-        if (Optim::log_level > 2) {
+        if (Optim::log_level > Optim::log_warning) {
           arma::cout << "    <" << x_lower[j] << arma::endl;
         }
         delta_x = delta_x * (x[j] - x_lower[j]) / (x[j] - x_next[j]) / 2;
         x_next = x - delta_x;
       }
       if (x_next[j] > x_upper[j]) {
-        if (Optim::log_level > 2) {
+        if (Optim::log_level > Optim::log_warning) {
           arma::cout << "    >" << x_upper[j] << arma::endl;
         }
         delta_x = delta_x * (x_upper[j] - x[j]) / (x_next[j] - x[j]) / 2;
         x_next = x - delta_x;
       }
     }
-    if (Optim::log_level > 2) {
+    if (Optim::log_level > Optim::log_warning) {
       arma::cout << "    delta_x: " << delta << arma::endl;
     }
-    if (Optim::log_level > 2) {
+    if (Optim::log_level > Optim::log_warning) {
       arma::cout << "    x_next: " << x_next << arma::endl;
     }
 
     if (arma::abs((x - x_next) / x).max() < x_tol) {
-      if (Optim::log_level > 1) {
+      if (Optim::log_level > Optim::log_error) {
         arma::cout << "  X x_0 ~ x_next" << arma::endl;
       }
       break;
@@ -910,13 +910,13 @@ double optim_newton(std::function<double(arma::vec& x, arma::vec* grad_out, arma
 
     // TODO : keep best result instead of last one
     ++i;
-    if (Optim::log_level > 0) {
+    if (Optim::log_level > Optim::log_none) {
       arma::cout << "  f_best: " << f_best << arma::endl;
     }
   }
 
   x_0 = x_best;
-  if (Optim::log_level > 0) {
+  if (Optim::log_level > Optim::log_none) {
     arma::cout << " " << x_0 << " " << f_best << arma::endl;
   }
 
@@ -1173,7 +1173,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         omp_set_num_threads(threads_per_worker);
         #endif
         
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "Threads per worker: " << threads_per_worker 
                      << " (total CPUs: " << n_cpu << ", multistart: " << multistart << ")" << arma::endl;
         }
@@ -1218,7 +1218,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       arma::uword p_data = m_F.n_cols;
       std::vector<Kriging::KModel> preallocated_models(multistart);
       
-      if (Optim::log_level > 0) {
+      if (Optim::log_level > Optim::log_none) {
         arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data
                    << ", p=" << p_data << ")..." << arma::endl;
       }
@@ -1292,7 +1292,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n*n) : Optim::objective_rel_tolerance / 1E-13;
           arma::ivec bounds_type{d, arma::fill::value(2)};
 
-          if (Optim::log_level > 0) {
+          if (Optim::log_level > Optim::log_none) {
             arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
             arma::cout << "  objective: " << m_objective << arma::endl;
             arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
@@ -1320,7 +1320,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                 gamma_upper_local.memptr(),
                 bounds_type.memptr());
 
-            if (Optim::log_level > 3) {
+            if (Optim::log_level > Optim::log_info) {
               arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
                          << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
                          << ", task=" << opt_result.task << arma::endl;
@@ -1347,7 +1347,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                     || (sol_to_lb < arma::datum::eps) // Stuck at lower bound
                     || (opt_result.f_opt > best_f_opt))) { // No improvement
 
-              if (Optim::log_level > 0) {
+              if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
                            << "): f_opt=" << opt_result.f_opt << ", sol_to_lb=" << sol_to_lb
                            << ", sol_to_ub=" << sol_to_ub << arma::endl;
@@ -1390,7 +1390,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         } catch (const std::exception& e) {
           result.success = false;
           result.error_message = e.what();
-          if (Optim::log_level > 0) {
+          if (Optim::log_level > Optim::log_none) {
             arma::cout << "Warning: start point " << (start_idx + 1) << " failed: " << e.what() << arma::endl;
           }
         }
@@ -1413,7 +1413,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         }
         pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
         
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
                      << ", multistart=" << multistart << ")" << arma::endl;
         }
@@ -1495,7 +1495,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                  + " optimization attempts failed");
       }
 
-      if (Optim::log_level > 0 && successful_optimizations < multistart) {
+      if (Optim::log_level > Optim::log_none && successful_optimizations < multistart) {
         arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart
                   << " succeeded" << arma::endl;
       }
@@ -1526,7 +1526,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           }
         }
 
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
                     << arma::endl;
         }
@@ -1571,7 +1571,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         gamma_lower = arma::min(gamma_tmp, gamma_lower);
         gamma_upper = arma::max(gamma_tmp, gamma_upper);
 
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "Newton:" << arma::endl;
           arma::cout << "  max iterations: " << Optim::max_iteration << arma::endl;
           arma::cout << "  null gradient tolerance: " << Optim::gradient_tolerance << arma::endl;
@@ -1601,7 +1601,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             gamma_lower,
             gamma_upper);
 
-        if (Optim::log_level > 0) {
+        if (Optim::log_level > Optim::log_none) {
           arma::cout << "  best objective: " << min_ofn_tmp << arma::endl;
           if (Optim::reparametrize) {
             arma::cout << "  best solution: " << Optim::reparam_from(gamma_tmp).t() << " ";
