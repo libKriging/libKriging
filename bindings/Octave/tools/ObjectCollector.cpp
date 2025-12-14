@@ -1,5 +1,6 @@
 #include "ObjectCollector.hpp"
 
+#include <cstdint>
 #include <iostream>
 
 void Destroyable::debug(const char* msg, void* t) const {
