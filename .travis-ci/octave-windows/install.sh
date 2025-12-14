@@ -32,7 +32,8 @@ choco install -y --no-progress make --version 4.3
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   # select your version from https://community.chocolatey.org/packages/octave.portable#versionhistory
   # Don't forget to update loadenv.sh with the related path
-  choco install -y --no-progress octave.portable --version=6.2.0
+  # Using 9.2.0 as 6.2.0 is no longer available on GNU FTP servers
+  choco install -y --no-progress octave.portable --version=9.2.0
   
   # Note: We use Octave's built-in MinGW compiler instead of installing a separate mingw package
   # This avoids conflicts between different MinGW versions
