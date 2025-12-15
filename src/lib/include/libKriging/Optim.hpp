@@ -30,8 +30,17 @@ class Optim {
   LIBKRIGING_EXPORT static void use_variogram_bounds_heuristic(bool _variogram_bounds_heuristic);
   LIBKRIGING_EXPORT static bool variogram_bounds_heuristic_used();
 
+  // Log levels
+  static constexpr int log_none = 0;
+  static constexpr int log_error = 1;
+  static constexpr int log_warning = 2;
+  static constexpr int log_info = 3;
+  static constexpr int log_debug = 4;
+  static constexpr int log_trace = 5;
+
   static int log_level;
-  LIBKRIGING_EXPORT static void log(int t);
+  LIBKRIGING_EXPORT static void set_log_level(int t);
+  LIBKRIGING_EXPORT static int get_log_level();
 
   static int max_restart;  // eg. for wrong convergence to bounds
 

@@ -91,8 +91,12 @@ LIBKRIGING_EXPORT bool Optim::variogram_bounds_heuristic_used() {
 
 int Optim::log_level = get_env_or_default("LK_LOG_LEVEL", 0);
 
-LIBKRIGING_EXPORT void Optim::log(int l) {
+LIBKRIGING_EXPORT void Optim::set_log_level(int l) {
   Optim::log_level = l;
+};
+
+LIBKRIGING_EXPORT int Optim::get_log_level() {
+  return Optim::log_level;
 };
 
 int Optim::max_restart = get_env_or_default("LK_MAX_RESTART", 10);

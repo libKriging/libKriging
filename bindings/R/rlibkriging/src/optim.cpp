@@ -64,10 +64,13 @@ void optim_use_variogram_bounds_heuristic(bool variogram_bounds_heuristic) {
 }
 
 // [[Rcpp::export]]
-void optim_log(int l) {
-  Optim* la = new Optim();
-  Rcpp::XPtr<Optim> impl_ptr(la);
-  impl_ptr->log(l);
+void optim_set_log_level(int l) {
+  Optim::set_log_level(l);
+}
+
+// [[Rcpp::export]]
+int optim_get_log_level() {
+  return Optim::get_log_level();
 }
 
 // [[Rcpp::export]]
