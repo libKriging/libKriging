@@ -79,6 +79,14 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::logMargPost", obj.ref, varargin{:});
         end
 
+        function varargout = covMat(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::covMat", obj.ref, varargin{:});
+        end
+
+        function varargout = model(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::model", obj.ref, varargin{:});
+        end
+
         function varargout = kernel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::kernel", obj.ref, varargin{:});
         end

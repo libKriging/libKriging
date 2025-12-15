@@ -236,3 +236,37 @@ double PyNuggetKriging::nugget() {
 bool PyNuggetKriging::is_nugget_estim() {
   return m_internal->is_nugget_estim();
 }
+
+py::array_t<double> PyNuggetKriging::covMat(const py::array_t<double>& X1, const py::array_t<double>& X2) {
+  arma::mat mat_X1 = carma::arr_to_mat<double>(X1);
+  arma::mat mat_X2 = carma::arr_to_mat<double>(X2);
+  return carma::mat_to_arr(m_internal->covMat(mat_X1, mat_X2), true);
+}
+
+py::dict PyNuggetKriging::model() const {
+  py::dict d;
+  d["kernel"] = m_internal->kernel();
+  d["optim"] = m_internal->optim();
+  d["objective"] = m_internal->objective();
+  d["theta"] = carma::col_to_arr(m_internal->theta());
+  d["is_theta_estim"] = m_internal->is_theta_estim();
+  d["sigma2"] = m_internal->sigma2();
+  d["is_sigma2_estim"] = m_internal->is_sigma2_estim();
+  d["nugget"] = m_internal->nugget();
+  d["is_nugget_estim"] = m_internal->is_nugget_estim();
+  d["X"] = carma::mat_to_arr(m_internal->X());
+  d["centerX"] = carma::row_to_arr(m_internal->centerX());
+  d["scaleX"] = carma::row_to_arr(m_internal->scaleX());
+  d["y"] = carma::col_to_arr(m_internal->y());
+  d["centerY"] = m_internal->centerY();
+  d["scaleY"] = m_internal->scaleY();
+  d["normalize"] = m_internal->normalize();
+  d["regmodel"] = Trend::toString(m_internal->regmodel());
+  d["beta"] = carma::col_to_arr(m_internal->beta());
+  d["is_beta_estim"] = m_internal->is_beta_estim();
+  d["F"] = carma::mat_to_arr(m_internal->F());
+  d["T"] = carma::mat_to_arr(m_internal->T());
+  d["M"] = carma::mat_to_arr(m_internal->M());
+  d["z"] = carma::col_to_arr(m_internal->z());
+  return d;
+}

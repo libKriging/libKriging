@@ -240,6 +240,16 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->logMargPost(), "Model logMargPost");
 }
 
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<NuggetKriging>(0, "NuggetKriging reference");
+  output.set(0, km->covMat(input.get<arma::mat>(1, "X1"), input.get<arma::mat>(2, "X2")), "Covariance matrix");
+}
+
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

@@ -80,6 +80,10 @@ class PyNuggetKriging {
   double logLikelihood();
   double logMargPost();
 
+  py::array_t<double> covMat(const py::array_t<double>& X1, const py::array_t<double>& X2);
+  
+  py::dict model() const;
+
   std::string kernel();
   std::string optim();
   std::string objective();

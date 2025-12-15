@@ -221,6 +221,16 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->logLikelihood(), "Model logLikelihood");
 }
 
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<NoiseKriging>(0, "NoiseKriging reference");
+  output.set(0, km->covMat(input.get<arma::mat>(1, "X1"), input.get<arma::mat>(2, "X2")), "Covariance matrix");
+}
+
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

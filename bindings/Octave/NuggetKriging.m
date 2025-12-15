@@ -67,6 +67,14 @@ classdef NuggetKriging < handle
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::logMargPost", obj.ref, varargin{:});
         end
 
+        function varargout = covMat(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::covMat", obj.ref, varargin{:});
+        end
+
+        function varargout = model(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NuggetKriging::model", obj.ref, varargin{:});
+        end
+
         function varargout = kernel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NuggetKriging::kernel", obj.ref, varargin{:});
         end
