@@ -240,7 +240,8 @@ bool PyNuggetKriging::is_nugget_estim() {
 py::array_t<double> PyNuggetKriging::covMat(const py::array_t<double>& X1, const py::array_t<double>& X2) {
   arma::mat mat_X1 = carma::arr_to_mat<double>(X1);
   arma::mat mat_X2 = carma::arr_to_mat<double>(X2);
-  return carma::mat_to_arr(m_internal->covMat(mat_X1, mat_X2), true);
+  arma::mat result = m_internal->covMat(mat_X1, mat_X2);
+  return carma::mat_to_arr(result, true);
 }
 
 py::dict PyNuggetKriging::model() const {
