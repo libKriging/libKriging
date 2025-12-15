@@ -156,13 +156,13 @@ py::dict PyNoiseKriging::model() const {
   d["kernel"] = m_internal->kernel();
   d["optim"] = m_internal->optim();
   d["objective"] = m_internal->objective();
-  
+
   arma::vec theta = m_internal->theta();
   d["theta"] = carma::col_to_arr(theta);
   d["is_theta_estim"] = m_internal->is_theta_estim();
   d["sigma2"] = m_internal->sigma2();
   d["is_sigma2_estim"] = m_internal->is_sigma2_estim();
-  
+
   arma::mat X = m_internal->X();
   d["X"] = carma::mat_to_arr(X);
   arma::rowvec centerX = m_internal->centerX();
@@ -177,7 +177,7 @@ py::dict PyNoiseKriging::model() const {
   d["noise"] = carma::col_to_arr(noise);
   d["normalize"] = m_internal->normalize();
   d["regmodel"] = Trend::toString(m_internal->regmodel());
-  
+
   arma::vec beta = m_internal->beta();
   d["beta"] = carma::col_to_arr(beta);
   d["is_beta_estim"] = m_internal->is_beta_estim();
