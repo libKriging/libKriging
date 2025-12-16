@@ -97,11 +97,11 @@ test_that("model/as.list basic functionality works", {
 })
 
 test_that("as.list for NoiseKriging includes noise field", {
-  set.seed(321)
-  n <- 12
+  set.seed(123)
+  n <- 20
   X <- matrix(runif(n * 2), ncol = 2)
-  y <- sin(X[, 1]) * cos(X[, 2])
-  noise <- rep(0.05, n)
+  y <- sin(X[, 1] * 3) * cos(X[, 2] * 3) + 1
+  noise <- rep(0.1, n)
   
   k <- NoiseKriging(y, noise, X, kernel = "gauss")
   params <- as.list(k)
