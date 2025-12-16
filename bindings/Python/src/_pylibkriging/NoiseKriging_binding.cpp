@@ -144,6 +144,54 @@ double PyNoiseKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
+py::array_t<double> PyNoiseKriging::covMat(const py::array_t<double>& X1, const py::array_t<double>& X2) {
+  arma::mat mat_X1 = carma::arr_to_mat<double>(X1);
+  arma::mat mat_X2 = carma::arr_to_mat<double>(X2);
+  arma::mat result = m_internal->covMat(mat_X1, mat_X2);
+  return carma::mat_to_arr(result, true);
+}
+
+py::dict PyNoiseKriging::model() const {
+  py::dict d;
+  d["kernel"] = m_internal->kernel();
+  d["optim"] = m_internal->optim();
+  d["objective"] = m_internal->objective();
+
+  arma::vec theta = m_internal->theta();
+  d["theta"] = carma::col_to_arr(theta);
+  d["is_theta_estim"] = m_internal->is_theta_estim();
+  d["sigma2"] = m_internal->sigma2();
+  d["is_sigma2_estim"] = m_internal->is_sigma2_estim();
+
+  arma::mat X = m_internal->X();
+  d["X"] = carma::mat_to_arr(X);
+  arma::rowvec centerX = m_internal->centerX();
+  d["centerX"] = carma::row_to_arr(centerX);
+  arma::rowvec scaleX = m_internal->scaleX();
+  d["scaleX"] = carma::row_to_arr(scaleX);
+  arma::vec y = m_internal->y();
+  d["y"] = carma::col_to_arr(y);
+  d["centerY"] = m_internal->centerY();
+  d["scaleY"] = m_internal->scaleY();
+  arma::vec noise = m_internal->noise();
+  d["noise"] = carma::col_to_arr(noise);
+  d["normalize"] = m_internal->normalize();
+  d["regmodel"] = Trend::toString(m_internal->regmodel());
+
+  arma::vec beta = m_internal->beta();
+  d["beta"] = carma::col_to_arr(beta);
+  d["is_beta_estim"] = m_internal->is_beta_estim();
+  arma::mat F = m_internal->F();
+  d["F"] = carma::mat_to_arr(F);
+  arma::mat T = m_internal->T();
+  d["T"] = carma::mat_to_arr(T);
+  arma::mat M = m_internal->M();
+  d["M"] = carma::mat_to_arr(M);
+  arma::vec z = m_internal->z();
+  d["z"] = carma::col_to_arr(z);
+  return d;
+}
+
 std::string PyNoiseKriging::kernel() {
   return m_internal->kernel();
 }

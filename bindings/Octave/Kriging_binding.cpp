@@ -256,6 +256,63 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, km->logMargPost(), "Model logMargPost");
 }
 
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->covMat(input.get<arma::mat>(1, "X1"), input.get<arma::mat>(2, "X2")), "Covariance matrix");
+}
+
+void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+
+  const char* fieldnames[] = {"kernel", "optim",           "objective", "theta",     "is_theta_estim",
+                              "sigma2", "is_sigma2_estim", "X",         "centerX",   "scaleX",
+                              "y",      "centerY",         "scaleY",    "normalize", "regmodel",
+                              "beta",   "is_beta_estim",   "F",         "T",         "M",
+                              "z"};
+  mxArray* model_struct = mxCreateStructMatrix(1, 1, 21, fieldnames);
+
+  // Helper lambda to create mxArray* from arma types using setter
+  auto createMxArray = [](const auto& value) -> mxArray* {
+    mxArray* result = nullptr;
+    setter(value, result);
+    return result;
+  };
+
+  mxSetField(model_struct, 0, "kernel", mxCreateString(km->kernel().c_str()));
+  mxSetField(model_struct, 0, "optim", mxCreateString(km->optim().c_str()));
+  mxSetField(model_struct, 0, "objective", mxCreateString(km->objective().c_str()));
+  mxSetField(model_struct, 0, "theta", createMxArray(km->theta()));
+  mxSetField(model_struct, 0, "is_theta_estim", mxCreateLogicalScalar(km->is_theta_estim()));
+  mxSetField(model_struct, 0, "sigma2", mxCreateDoubleScalar(km->sigma2()));
+  mxSetField(model_struct, 0, "is_sigma2_estim", mxCreateLogicalScalar(km->is_sigma2_estim()));
+  mxSetField(model_struct, 0, "X", createMxArray(km->X()));
+  mxSetField(model_struct, 0, "centerX", createMxArray(km->centerX()));
+  mxSetField(model_struct, 0, "scaleX", createMxArray(km->scaleX()));
+  mxSetField(model_struct, 0, "y", createMxArray(km->y()));
+  mxSetField(model_struct, 0, "centerY", mxCreateDoubleScalar(km->centerY()));
+  mxSetField(model_struct, 0, "scaleY", mxCreateDoubleScalar(km->scaleY()));
+  mxSetField(model_struct, 0, "normalize", mxCreateLogicalScalar(km->normalize()));
+  mxSetField(model_struct, 0, "regmodel", mxCreateString(Trend::toString(km->regmodel()).c_str()));
+  mxSetField(model_struct, 0, "beta", createMxArray(km->beta()));
+  mxSetField(model_struct, 0, "is_beta_estim", mxCreateLogicalScalar(km->is_beta_estim()));
+  mxSetField(model_struct, 0, "F", createMxArray(km->F()));
+  mxSetField(model_struct, 0, "T", createMxArray(km->T()));
+  mxSetField(model_struct, 0, "M", createMxArray(km->M()));
+  mxSetField(model_struct, 0, "z", createMxArray(km->z()));
+
+  output.set(0, model_struct, "model");
+}
+
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

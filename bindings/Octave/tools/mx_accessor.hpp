@@ -198,4 +198,10 @@ inline void setter<EmptyObject>(const EmptyObject& /*v*/, mxArray*& x) {
   x = mxCreateNumericMatrix(0, 0, mxUINT64_CLASS, mxREAL);
 }
 
+// Specialization for mxArray* - just pass through (already an mxArray*)
+template <>
+inline void setter<mxArray*>(mxArray* const& v, mxArray*& x) {
+  x = v;
+}
+
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_TOOLS_MX_ACCESSOR_HPP

@@ -59,6 +59,14 @@ classdef NoiseKriging < handle
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::logLikelihood", obj.ref, varargin{:});
         end
 
+        function varargout = covMat(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NoiseKriging::covMat", obj.ref, varargin{:});
+        end
+
+        function varargout = model(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NoiseKriging::model", obj.ref, varargin{:});
+        end
+
         function varargout = kernel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NoiseKriging::kernel", obj.ref, varargin{:});
         end

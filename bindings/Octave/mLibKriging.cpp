@@ -2,6 +2,7 @@
 #include "LinearRegression_binding.hpp"
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
+#include "Optim_binding.hpp"
 #include "Params_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
@@ -107,6 +108,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::logMargPost"_hash:
       return KrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::covMat"_hash:
+      return KrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::model"_hash:
+      return KrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Kriging::kernel"_hash:
       return KrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
@@ -181,6 +186,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NuggetKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logMargPost"_hash:
       return NuggetKrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::covMat"_hash:
+      return NuggetKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NuggetKriging::model"_hash:
+      return NuggetKrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NuggetKriging::kernel"_hash:
       return NuggetKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
@@ -255,6 +264,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NoiseKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::logLikelihood"_hash:
       return NoiseKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::covMat"_hash:
+      return NoiseKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NoiseKriging::model"_hash:
+      return NoiseKrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NoiseKriging::kernel"_hash:
       return NoiseKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
@@ -298,8 +311,49 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NoiseKrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::sigma2"_hash:
       return NoiseKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "NoiseKriging::is_sigma2_estim "_hash:
+    case "NoiseKriging::is_sigma2_estim"_hash:
       return NoiseKrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "Optim::is_reparametrized"_hash:
+      return OptimBinding::is_reparametrized(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::use_reparametrize"_hash:
+      return OptimBinding::use_reparametrize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_theta_lower_factor"_hash:
+      return OptimBinding::get_theta_lower_factor(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_theta_lower_factor"_hash:
+      return OptimBinding::set_theta_lower_factor(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_theta_upper_factor"_hash:
+      return OptimBinding::get_theta_upper_factor(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_theta_upper_factor"_hash:
+      return OptimBinding::set_theta_upper_factor(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::variogram_bounds_heuristic_used"_hash:
+      return OptimBinding::variogram_bounds_heuristic_used(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::use_variogram_bounds_heuristic"_hash:
+      return OptimBinding::use_variogram_bounds_heuristic(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_log_level"_hash:
+      return OptimBinding::get_log_level(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_log_level"_hash:
+      return OptimBinding::set_log_level(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_max_iteration"_hash:
+      return OptimBinding::get_max_iteration(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_max_iteration"_hash:
+      return OptimBinding::set_max_iteration(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_gradient_tolerance"_hash:
+      return OptimBinding::get_gradient_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_gradient_tolerance"_hash:
+      return OptimBinding::set_gradient_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_objective_rel_tolerance"_hash:
+      return OptimBinding::get_objective_rel_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_objective_rel_tolerance"_hash:
+      return OptimBinding::set_objective_rel_tolerance(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_thread_start_delay_ms"_hash:
+      return OptimBinding::get_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_thread_start_delay_ms"_hash:
+      return OptimBinding::set_thread_start_delay_ms(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::get_thread_pool_size"_hash:
+      return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Optim::set_thread_pool_size"_hash:
+      return OptimBinding::set_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

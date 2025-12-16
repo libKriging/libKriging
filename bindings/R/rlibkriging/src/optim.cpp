@@ -114,3 +114,23 @@ void optim_set_objective_rel_tolerance(double objective_rel_tolerance) {
   Rcpp::XPtr<Optim> impl_ptr(la);
   impl_ptr->set_objective_rel_tolerance(objective_rel_tolerance);
 }
+
+// [[Rcpp::export]]
+int optim_get_thread_start_delay_ms() {
+  return Optim::get_thread_start_delay_ms();
+}
+
+// [[Rcpp::export]]
+void optim_set_thread_start_delay_ms(int delay_ms) {
+  Optim::set_thread_start_delay_ms(delay_ms);
+}
+
+// [[Rcpp::export]]
+int optim_get_thread_pool_size() {
+  return Optim::get_thread_pool_size();
+}
+
+// [[Rcpp::export]]
+void optim_set_thread_pool_size(int pool_size) {
+  Optim::set_thread_pool_size(pool_size);
+}

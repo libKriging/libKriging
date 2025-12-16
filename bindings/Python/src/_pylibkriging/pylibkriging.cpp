@@ -6,6 +6,7 @@
 #include <carma>
 #include <iostream>
 #include <libKriging/LinearRegression.hpp>
+#include <libKriging/Optim.hpp>
 
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
@@ -139,6 +140,9 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
       .def("logMargPost", &PyKriging::logMargPost)
+      .def("leaveOneOut", &PyKriging::leaveOneOut)
+      .def("covMat", &PyKriging::covMat)
+      .def("model", &PyKriging::model)
 
       .def("kernel", &PyKriging::kernel)
       .def("optim", &PyKriging::optim)
@@ -199,6 +203,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("logMargPostFun", &PyNuggetKriging::logMargPostFun)
       .def("logLikelihood", &PyNuggetKriging::logLikelihood)
       .def("logMargPost", &PyNuggetKriging::logMargPost)
+      .def("covMat", &PyNuggetKriging::covMat)
+      .def("model", &PyNuggetKriging::model)
 
       .def("kernel", &PyNuggetKriging::kernel)
       .def("optim", &PyNuggetKriging::optim)
@@ -261,6 +267,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def_static("load", &PyNoiseKriging::load)
       .def("logLikelihoodFun", &PyNoiseKriging::logLikelihoodFun)
       .def("logLikelihood", &PyNoiseKriging::logLikelihood)
+      .def("covMat", &PyNoiseKriging::covMat)
+      .def("model", &PyNoiseKriging::model)
 
       .def("kernel", &PyNoiseKriging::kernel)
       .def("optim", &PyNoiseKriging::optim)
@@ -284,4 +292,28 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_theta_estim", &PyNoiseKriging::is_theta_estim)
       .def("sigma2", &PyNoiseKriging::sigma2)
       .def("is_sigma2_estim", &PyNoiseKriging::is_sigma2_estim);
+
+  // Optim class - static methods for optimization settings
+  py::class_<Optim>(m, "Optim")
+      .def(py::init<>())
+      .def_static("is_reparametrized", &Optim::is_reparametrized)
+      .def_static("use_reparametrize", &Optim::use_reparametrize)
+      .def_static("get_theta_lower_factor", &Optim::get_theta_lower_factor)
+      .def_static("set_theta_lower_factor", &Optim::set_theta_lower_factor)
+      .def_static("get_theta_upper_factor", &Optim::get_theta_upper_factor)
+      .def_static("set_theta_upper_factor", &Optim::set_theta_upper_factor)
+      .def_static("variogram_bounds_heuristic_used", &Optim::variogram_bounds_heuristic_used)
+      .def_static("use_variogram_bounds_heuristic", &Optim::use_variogram_bounds_heuristic)
+      .def_static("get_log_level", &Optim::get_log_level)
+      .def_static("set_log_level", &Optim::set_log_level)
+      .def_static("get_max_iteration", &Optim::get_max_iteration)
+      .def_static("set_max_iteration", &Optim::set_max_iteration)
+      .def_static("get_gradient_tolerance", &Optim::get_gradient_tolerance)
+      .def_static("set_gradient_tolerance", &Optim::set_gradient_tolerance)
+      .def_static("get_objective_rel_tolerance", &Optim::get_objective_rel_tolerance)
+      .def_static("set_objective_rel_tolerance", &Optim::set_objective_rel_tolerance)
+      .def_static("get_thread_start_delay_ms", &Optim::get_thread_start_delay_ms)
+      .def_static("set_thread_start_delay_ms", &Optim::set_thread_start_delay_ms)
+      .def_static("get_thread_pool_size", &Optim::get_thread_pool_size)
+      .def_static("set_thread_pool_size", &Optim::set_thread_pool_size);
 }

@@ -22,6 +22,8 @@ void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
