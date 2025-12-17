@@ -18,8 +18,9 @@ def main():
 
     extra_libs = []
     if platform.system() == "Windows":
-        # Try to find DLLs, make flang optional as it may not be available
-        extra_libs = [find_in_path(f, required=(f != 'flang.dll')) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
+        # Try to find DLLs, make Fortran DLLs optional as they may not be available
+        optional_dlls = ['flang.dll', 'flangrti.dll']
+        extra_libs = [find_in_path(f, required=(f not in optional_dlls)) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
         extra_libs = [lib for lib in extra_libs if lib is not None]
 
     argparser = argparse.ArgumentParser(add_help=False)

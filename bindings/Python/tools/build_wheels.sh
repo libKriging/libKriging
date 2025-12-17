@@ -16,6 +16,10 @@ fi
 # Fix git dubious ownership issue in docker
 git config --global --add safe.directory "${ROOT_DIR}"
 
+# Initialize submodules (pybind11, etc.)
+cd "${ROOT_DIR}"
+git submodule update --init --recursive
+
 function repair_wheel {
     wheel="$1"
     if ! auditwheel show "$wheel"; then
