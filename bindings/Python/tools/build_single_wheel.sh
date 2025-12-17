@@ -27,6 +27,14 @@ git config --global --add safe.directory "${ROOT_DIR}"
 cd "${ROOT_DIR}"
 git submodule update --init --recursive
 
+# Upgrade CMake if needed (manylinux images often have old CMake)
+if command -v yum &> /dev/null; then
+    yum install -y cmake3 2>/dev/null || yum install -y cmake 2>/dev/null || true
+    if [ -f /usr/bin/cmake3 ]; then
+        ln -sf /usr/bin/cmake3 /usr/local/bin/cmake
+    fi
+fi
+
 # Map Python version to manylinux binary path
 case $PYVER in
   3.8)
