@@ -182,191 +182,351 @@ jobs:
           path: |
             dist 
             
-#  build-octave-package:
-#    needs: check-release-consistency
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - name: "Octave Linux"
-#            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
-#            force_update: on
-#          - name: "Octave macOS"
-#            os: macOS-latest
-#          - name: "Octave Windows"
-#            os: windows-latest
-#
-#    steps:
-#      - uses: actions/checkout@v2
-#        with:
-#          submodules: 'recursive'
-#
-#      - name: Check tag
-#        shell: bash
-#        run: |
-#          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
-#          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
-#
-#      - name: Define local variables
-#        shell: bash
-#        run: |
-#          echo "MODE=Release"              >> $GITHUB_ENV
-#          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
-#          echo "ENABLE_OCTAVE_BINDING=on"  >> $GITHUB_ENV
-#
-#      - name: Define local variables Unix Like
-#        shell: bash
-#        run: |
-#          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
-#        if: runner.os != 'Windows'
-#
-#      - name: Define local variables Windows
-#        shell: bash
-#        run: |
-#          echo "BUILD_NAME=octave-windows" >> $GITHUB_ENV
-#        if: runner.os == 'Windows'
-#
-#      - name: pre-install-linux
-#        shell: bash
-#        run: |
-#          if [ "${{matrix.force_update}}" == "on" ]; then
-#            sudo apt update
-#          fi
-#          sudo apt install liblapack-dev python3-pip
-#          sudo apt install -qy octave liboctave-dev
-#        if: runner.os == 'Linux' # or use $RUNNER_OS
-#
-#      - name: install
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/install.sh
-#
-#      - name: Setup cmake
-#        uses: jwlawson/actions-setup-cmake@v1.13
-#        with:
-#          cmake-version: '3.24.x'
-#
-#      - name: before_script
-#        shell: bash
-#        run: .travis-ci/common/before_script.sh
-#
-#      - name: script
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/build.sh
-#
-#      - name: test
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/test.sh
-#
-#      - name: make package
-#        shell: bash
-#        run: |
-#          .travis-ci/release/octave-release.sh
-#
-#      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: octave-package
-#          path: |
-#            octave-package
+  build-octave-package:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Octave Linux"
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-latest
+          - name: "Octave Windows"
+            os: windows-latest
 
-#  build-R-package:
-#    needs: check-release-consistency
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - name: "R Linux"
-#            os: ubuntu-22.04
-#          - name: "R macOS"
-#            os: macOS-latest
-#          - name: "R Windows"
-#            os: windows-latest
-#
-#    steps:
-#      - uses: actions/checkout@v2
-#        with:
-#          submodules: 'recursive'
-#
-#      - uses: r-lib/actions/setup-r@v2
-#        with:
-#          r-version: '4.2'
-#
-#      - name: Check tag
-#        shell: bash
-#        run: |
-#          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
-#          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
-#
-#      - name: Define local variables
-#        shell: bash
-#        run: |
-#          echo "MODE=Release"              >> $GITHUB_ENV
-#          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
-#          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
-#
-#      - name: Define local variables Unix Like
-#        shell: bash
-#        run: |
-#          echo "BUILD_NAME=r-linux-macos"  >> $GITHUB_ENV
-#        if: runner.os != 'Windows'
-#
-#      - name: Define local variables Windows
-#        shell: bash
-#        run: |
-#          echo "BUILD_NAME=r-windows"      >> $GITHUB_ENV
-#        if: runner.os == 'Windows'
-#
-#      - name: pre-install-linux
-#        shell: bash
-#        run: |
-#          if [ "${{matrix.force_update}}" == "on" ]; then
-#            sudo apt update
-#          fi
-#          sudo apt install -qy r-base liblapack-dev gfortran
-#        if: runner.os == 'Linux' # or use $RUNNER_OS
-#
-#      - name: install
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/install.sh
-#
-#      - name: Setup cmake
-#        uses: jwlawson/actions-setup-cmake@v1.13
-#        with:
-#          cmake-version: '3.24.x'
-#
-#      - name: before_script
-#        shell: bash
-#        run: .travis-ci/common/before_script.sh
-#
-#      - name: script
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/build.sh
-#
-#      - name: test
-#        shell: bash
-#        run: .travis-ci/${BUILD_NAME}/test.sh
-#
-#      - name: make package
-#        shell: bash
-#        run: |
-#          .travis-ci/release/r-release.sh
-#
-#      - name: Archive build artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: R-package
-#          path: |
-#            R-package
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=on"  >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=octave-windows" >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install liblapack-dev python3-pip
+          sudo apt install -qy octave liboctave-dev
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: make package
+        shell: bash
+        run: |
+          .travis-ci/release/octave-release.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: octave-artifact-${{ matrix.os }}
+          path: |
+            octave-package
+
+  build-R-package:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "R Linux"
+            os: ubuntu-22.04
+            force_update: on
+          - name: "R macOS"
+            os: macOS-latest
+          - name: "R Windows"
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.2'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=r-linux-macos"  >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=r-windows"      >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          if [ "${{matrix.force_update}}" == "on" ]; then
+            sudo apt update
+          fi
+          sudo apt install -qy liblapack-dev gfortran
+        if: runner.os == 'Linux' # or use $RUNNER_OS
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: make package
+        shell: bash
+        run: |
+          .travis-ci/release/r-release.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: R-artifact-${{ matrix.os }}
+          path: |
+            R-package
+
+  build-matlab-package:
+    needs: check-release-consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_MATLAB_BINDING=on"  >> $GITHUB_ENV
+          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install liblapack-dev python3-pip
+          sudo apt install -qy intel-mkl
+
+      - name: Setup Matlab
+        uses: matlab-actions/setup-matlab@v1
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: Create package
+        shell: bash
+        run: |
+          cd build
+          cpack -G TGZ
+          mkdir -p ../matlab-package
+          cp *.tar.gz ../matlab-package/ || true
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: matlab-artifact
+          path: |
+            matlab-package
+
+  build-cpp-library:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "C++ Linux"
+            os: ubuntu-22.04
+          - name: "C++ macOS"
+            os: macOS-latest
+          - name: "C++ Windows"
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_R_BINDING=off"      >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=windows"        >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install liblapack-dev python3-pip
+        if: runner.os == 'Linux'
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: Create package
+        shell: bash
+        run: |
+          cd build
+          cpack -G TGZ
+          mkdir -p ../cpp-package
+          cp *.tar.gz ../cpp-package/ || true
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-artifact-${{ matrix.os }}
+          path: |
+            cpp-package
 
   all-package-build-checkpoint:
     name: Build package checkpoint
     needs:
       - check-release-consistency
       - build-wheel-python
-#      - build-R-package
-#      - build-octave-package
+      - build-R-package
+      - build-octave-package
+      - build-matlab-package
+      - build-cpp-library
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -441,56 +601,84 @@ jobs:
                   ./dist/*.whl
         if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}  
 
-#  release-artifacts:
-#    name: Upload Release Asset
-#    needs:
-#      - check-release-consistency
-#      - all-package-build-checkpoint
-#    runs-on: ubuntu-22.04
-#    steps:
-#      - uses: actions/checkout@v2
-#        with:
-#          submodules: false
-#
-#      - uses: actions/download-artifact@v4
-#        with:
-#          name: python-artifact
-#          path: dist
-#        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
-#
-#      - uses: actions/download-artifact@v4
-#        with:
-#          name: octave-package
-#          path: dist
-#
-#      - uses: actions/download-artifact@v4
-#        with:
-#          name: R-package
-#          path: dist
-#
-#      - name: Check tag
-#        shell: bash
-#        run: |
-#          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
-#          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
-#
-#      - name: upload assets
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        shell: bash
-#        run: |
-#          set -eo pipefail
-#          set -x
-#
-#          # using https://github.com/github/hub
-#          mkdir -p dist
-#          assets=()
-#          for asset in ./dist/*; do
-#            assets+=("-a" "$asset")
-#          done
-#          if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
-#            hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
-#          else
-#            hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
-#          fi
-#
+  release-artifacts:
+    name: Upload Release Assets
+    needs:
+      - check-release-consistency
+      - all-package-build-checkpoint
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Install hub tools
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y hub
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: python-artifact-*
+          path: dist
+          merge-multiple: true
+        if: ${{ needs.check-release-consistency.outputs.draft-release == 'true' }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: octave-artifact-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: R-artifact-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: matlab-artifact
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cpp-artifact-*
+          path: dist
+          merge-multiple: true
+
+      - name: Prepare assets for upload
+        shell: bash
+        run: |
+          find dist -type f -exec ls -lh {} \;
+
+      - name: upload assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          set -x
+
+          # using https://github.com/github/hub
+          mkdir -p dist
+          assets=()
+          for asset in ./dist/*; do
+            if [ -f "$asset" ]; then
+              assets+=("-a" "$asset")
+            fi
+          done
+          if [ ${#assets[@]} -gt 0 ]; then
+            if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+              hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+            else
+              hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+            fi
+          fi
+
