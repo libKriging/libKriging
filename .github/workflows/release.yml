@@ -97,14 +97,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-latest, macOS-latest ]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        os: [ windows-latest, macOS-latest, ubuntu-22.04 ]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         exclude:
           - os: macOS-latest
             python-version: 3.7
         include:
-          - os: ubuntu-22.04
-            # all versions done in one script wrapper
+          - os: windows-latest
+            python-version: "3.7"
 
     steps:
       - uses: actions/checkout@v2
@@ -121,12 +121,12 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-        if: runner.os != 'Linux'
 
       - name: Define local variables
         shell: bash
         run: |
-          echo "ENABLE_PYTHON_BINDING=on"  >> $GITHUB_ENV          
+          echo "ENABLE_PYTHON_BINDING=on"  >> $GITHUB_ENV
+          echo "PYTHON_VERSION=${{ matrix.python-version }}" >> $GITHUB_ENV
           if [ "$RUNNER_OS" != "Windows" ]; then          
             echo "BUILD_NAME=linux-macos"  >> $GITHUB_ENV
           else
@@ -166,7 +166,11 @@ jobs:
       - name: build
         shell: bash
         run: |
-          .travis-ci/release/python-release.sh
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            .travis-ci/release/python-release-single.sh
+          else
+            .travis-ci/release/python-release.sh
+          fi
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
