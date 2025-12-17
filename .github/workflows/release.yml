@@ -289,7 +289,12 @@ jobs:
       - name: Prepare assets for upload
         shell: bash
         run: |
-          find dist -type f -exec ls -lh {} \;
+          mkdir -p dist
+          if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+            find dist -type f -exec ls -lh {} \;
+          else
+            echo "No artifacts to upload"
+          fi
 
       - name: upload assets
         env:
