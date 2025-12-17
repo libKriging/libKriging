@@ -20,6 +20,13 @@ git config --global --add safe.directory "${ROOT_DIR}"
 cd "${ROOT_DIR}"
 git submodule update --init --recursive
 
+# Upgrade CMake to support newer pybind11
+# manylinux2014 has old CMake that doesn't support pybind11's requirements
+yum install -y cmake3
+if [ -f /usr/bin/cmake3 ]; then
+    ln -sf /usr/bin/cmake3 /usr/local/bin/cmake
+fi
+
 function repair_wheel {
     wheel="$1"
     if ! auditwheel show "$wheel"; then
