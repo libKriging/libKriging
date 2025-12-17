@@ -84,9 +84,8 @@ jobs:
           else
             DRAFT_RELEASE=true
           fi
-          # GHA hack
-          echo "::set-output name=git-tag::${GIT_TAG}"
-          echo "::set-output name=draft-release::${DRAFT_RELEASE}"
+          echo "git-tag=${GIT_TAG}" >> $GITHUB_OUTPUT
+          echo "draft-release=${DRAFT_RELEASE}" >> $GITHUB_OUTPUT
 
   display_release_tag:
     name: Release tag ${{ needs.check-release-consistency.outputs.git-tag }}
