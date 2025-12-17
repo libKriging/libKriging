@@ -18,7 +18,9 @@ def main():
 
     extra_libs = []
     if platform.system() == "Windows":
-        extra_libs = [find_in_path(f) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
+        # Try to find DLLs, make flang optional as it may not be available
+        extra_libs = [find_in_path(f, required=(f != 'flang.dll')) for f in ['flang.dll', 'flangrti.dll', 'libomp.dll', 'openblas.dll']]
+        extra_libs = [lib for lib in extra_libs if lib is not None]
 
     argparser = argparse.ArgumentParser(add_help=False)
     argparser.add_argument('--debug', action="store_true", help='compile in debug mode')
@@ -70,7 +72,7 @@ def main():
     )
 
 
-def find_in_path(filename):
+def find_in_path(filename, required=True):
     fpath, fname = os.path.split(filename)
     if fpath:
         if os.path.isfile(fpath):
@@ -80,7 +82,9 @@ def find_in_path(filename):
             test_file = os.path.join(path, filename)
             if os.path.isfile(test_file):
                 return test_file
-    raise RuntimeError(f"Cannot find required file '{filename}'")
+    if required:
+        raise RuntimeError(f"Cannot find required file '{filename}'")
+    return None
 
 
 class CMakeExtension(Extension):
