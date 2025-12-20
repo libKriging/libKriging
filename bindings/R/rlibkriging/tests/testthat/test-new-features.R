@@ -61,7 +61,7 @@ test_that("covMat works for all Kriging classes", {
 
 test_that("model/as.list basic functionality works", {
   set.seed(789)
-  n <- 10
+  n <- 11
   X <- matrix(runif(n), ncol = 1)
   y <- exp(X[, 1])
   
@@ -225,7 +225,7 @@ test_that("Optim thread settings work", {
 
 test_that("All classes have covMat", {
   set.seed(111)
-  n <- 10
+  n <- 11
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]
   noise <- rep(0.01, n)
@@ -248,7 +248,7 @@ test_that("All classes have covMat", {
 
 test_that("All classes have as.list/model", {
   set.seed(222)
-  n <- 10
+  n <- 11
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]
   noise <- rep(0.01, n)
