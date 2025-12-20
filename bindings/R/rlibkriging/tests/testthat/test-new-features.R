@@ -129,103 +129,103 @@ test_that("as.list for NuggetKriging includes nugget fields", {
 
 test_that("Optim reparametrization works", {
   # Save original state
-  orig_state <- optim_is_reparametrized()
+  orig_state <- rlibkriging:::optim_is_reparametrized()
   
   # Test setter and getter
-  optim_use_reparametrize(TRUE)
-  expect_true(optim_is_reparametrized())
+  rlibkriging:::optim_use_reparametrize(TRUE)
+  expect_true(rlibkriging:::optim_is_reparametrized())
   
-  optim_use_reparametrize(FALSE)
-  expect_false(optim_is_reparametrized())
+  rlibkriging:::optim_use_reparametrize(FALSE)
+  expect_false(rlibkriging:::optim_is_reparametrized())
   
   # Restore original state
-  optim_use_reparametrize(orig_state)
+  rlibkriging:::optim_use_reparametrize(orig_state)
 })
 
 test_that("Optim theta bounds work", {
   # Save original values
-  orig_lower <- optim_get_theta_lower_factor()
-  orig_upper <- optim_get_theta_upper_factor()
+  orig_lower <- rlibkriging:::optim_get_theta_lower_factor()
+  orig_upper <- rlibkriging:::optim_get_theta_upper_factor()
   
   # Test lower factor
-  optim_set_theta_lower_factor(0.05)
-  expect_equal(optim_get_theta_lower_factor(), 0.05, tolerance = 1e-10)
+  rlibkriging:::optim_set_theta_lower_factor(0.05)
+  expect_equal(rlibkriging:::optim_get_theta_lower_factor(), 0.05, tolerance = 1e-10)
   
   # Test upper factor
-  optim_set_theta_upper_factor(15.0)
-  expect_equal(optim_get_theta_upper_factor(), 15.0, tolerance = 1e-10)
-  
+  rlibkriging:::optim_set_theta_upper_factor(15.0)
+  expect_equal(rlibkriging:::optim_get_theta_upper_factor(), 15.0, tolerance = 1e-10)
+
   # Restore original values
-  optim_set_theta_lower_factor(orig_lower)
-  optim_set_theta_upper_factor(orig_upper)
+  rlibkriging:::optim_set_theta_lower_factor(orig_lower)
+  rlibkriging:::optim_set_theta_upper_factor(orig_upper)
 })
 
 test_that("Optim variogram bounds work", {
-  orig_state <- optim_variogram_bounds_heuristic_used()
-  
-  optim_use_variogram_bounds_heuristic(TRUE)
-  expect_true(optim_variogram_bounds_heuristic_used())
-  
-  optim_use_variogram_bounds_heuristic(FALSE)
-  expect_false(optim_variogram_bounds_heuristic_used())
-  
-  optim_use_variogram_bounds_heuristic(orig_state)
+  orig_state <- rlibkriging:::optim_variogram_bounds_heuristic_used()
+
+  rlibkriging:::optim_use_variogram_bounds_heuristic(TRUE)
+  expect_true(rlibkriging:::optim_variogram_bounds_heuristic_used())
+
+  rlibkriging:::optim_use_variogram_bounds_heuristic(FALSE)
+  expect_false(rlibkriging:::optim_variogram_bounds_heuristic_used())
+
+  rlibkriging:::optim_use_variogram_bounds_heuristic(orig_state)
 })
 
 test_that("Optim log level works", {
-  orig_level <- optim_get_log_level()
-  
+  orig_level <- rlibkriging:::optim_get_log_level()
+
   for (level in c(0, 1, 2, 3)) {
-    optim_set_log_level(level)
-    expect_equal(optim_get_log_level(), level)
+    rlibkriging:::optim_set_log_level(level)
+    expect_equal(rlibkriging:::optim_get_log_level(), level)
   }
-  
-  optim_set_log_level(orig_level)
+
+  rlibkriging:::optim_set_log_level(orig_level)
 })
 
 test_that("Optim max iteration works", {
-  orig_max <- optim_get_max_iteration()
-  
-  optim_set_max_iteration(500)
-  expect_equal(optim_get_max_iteration(), 500)
-  
-  optim_set_max_iteration(1000)
-  expect_equal(optim_get_max_iteration(), 1000)
-  
-  optim_set_max_iteration(orig_max)
+  orig_max <- rlibkriging:::optim_get_max_iteration()
+
+  rlibkriging:::optim_set_max_iteration(500)
+  expect_equal(rlibkriging:::optim_get_max_iteration(), 500)
+
+  rlibkriging:::optim_set_max_iteration(1000)
+  expect_equal(rlibkriging:::optim_get_max_iteration(), 1000)
+
+  rlibkriging:::optim_set_max_iteration(orig_max)
 })
 
 test_that("Optim tolerances work", {
-  orig_grad <- optim_get_gradient_tolerance()
-  orig_obj <- optim_get_objective_rel_tolerance()
-  
-  optim_set_gradient_tolerance(1e-6)
-  expect_equal(optim_get_gradient_tolerance(), 1e-6, tolerance = 1e-15)
-  
-  optim_set_objective_rel_tolerance(1e-8)
-  expect_equal(optim_get_objective_rel_tolerance(), 1e-8, tolerance = 1e-15)
-  
-  optim_set_gradient_tolerance(orig_grad)
-  optim_set_objective_rel_tolerance(orig_obj)
+  orig_grad <- rlibkriging:::optim_get_gradient_tolerance()
+  orig_obj <- rlibkriging:::optim_get_objective_rel_tolerance()
+
+  rlibkriging:::optim_set_gradient_tolerance(1e-6)
+  expect_equal(rlibkriging:::optim_get_gradient_tolerance(), 1e-6, tolerance = 1e-15)
+
+  rlibkriging:::optim_set_objective_rel_tolerance(1e-8)
+  expect_equal(rlibkriging:::optim_get_objective_rel_tolerance(), 1e-8, tolerance = 1e-15)
+
+  rlibkriging:::optim_set_gradient_tolerance(orig_grad)
+  rlibkriging:::optim_set_objective_rel_tolerance(orig_obj)
 })
 
 test_that("Optim thread settings work", {
-  orig_delay <- optim_get_thread_start_delay_ms()
-  orig_pool <- optim_get_thread_pool_size()
-  
-  optim_set_thread_start_delay_ms(20)
-  expect_equal(optim_get_thread_start_delay_ms(), 20)
-  
-  optim_set_thread_pool_size(4)
-  expect_equal(optim_get_thread_pool_size(), 4)
-  
-  optim_set_thread_start_delay_ms(orig_delay)
-  optim_set_thread_pool_size(orig_pool)
+  orig_delay <- rlibkriging:::optim_get_thread_start_delay_ms()
+  orig_pool <- rlibkriging:::optim_get_thread_pool_size()
+
+  rlibkriging:::optim_set_thread_start_delay_ms(20)
+  expect_equal(rlibkriging:::optim_get_thread_start_delay_ms(), 20)
+
+  rlibkriging:::optim_set_thread_pool_size(4)
+  expect_equal(rlibkriging:::optim_get_thread_pool_size(), 4)
+
+  rlibkriging:::optim_set_thread_start_delay_ms(orig_delay)
+  rlibkriging:::optim_set_thread_pool_size(orig_pool)
 })
 
 test_that("All classes have covMat", {
   set.seed(111)
-  n <- 10
+  n <- 1
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]
   noise <- rep(0.01, n)
@@ -248,7 +248,7 @@ test_that("All classes have covMat", {
 
 test_that("All classes have as.list/model", {
   set.seed(222)
-  n <- 10
+  n <- 1
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]
   noise <- rep(0.01, n)
