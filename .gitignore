@@ -68,3 +68,9 @@ jemalloc*
 *_*.md
 # compiled makefiles
 **Makefile
+# compiled tests & bench
+tests/*_test
+tests/*_example
+tests/GetVersion
+tests/KSTestValidation
+bench/*_computation
