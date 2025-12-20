@@ -225,7 +225,7 @@ test_that("Optim thread settings work", {
 
 test_that("All classes have covMat", {
   set.seed(111)
-  n <- 1
+  n <- 10
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]
   noise <- rep(0.01, n)

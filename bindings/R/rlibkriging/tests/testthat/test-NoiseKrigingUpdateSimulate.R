@@ -207,7 +207,7 @@ lkd <- NoiseKriging(y = y_o,
 
 ## Predict & simulate
 
-X_n = matrix(runif(min=0,max=1,101),ncol=d) #seq(0,1,,)
+X_n = matrix(runif(min=0,max=1,101*d),ncol=d) #seq(0,1,,)
 
 lpd = lkd$predict(X_n) # libK predict
 #lines(X_n,lp$mean,col='red')
