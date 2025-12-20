@@ -73,4 +73,4 @@ tests/*_test
 tests/*_example
 tests/GetVersion
 tests/KSTestValidation
-bench/*_computation
+bench
