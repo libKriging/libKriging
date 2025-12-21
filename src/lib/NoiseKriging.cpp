@@ -861,26 +861,11 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
             int delay_ms = task_id * Optim::thread_start_delay_ms;
             std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 
-            OptimizationResult local_result = optimize_worker(task_id);
-
+            // FIX: Eliminate intermediate stack allocation by writing directly to results
+            // This reduces C stack pressure for R bindings (issue with BFGS10)
             {
               std::lock_guard<std::mutex> lock(results_mutex);
-              // Deep copy each matrix to ensure no shared memory
-              results[task_id].start_index = local_result.start_index;
-              results[task_id].objective_value = local_result.objective_value;
-              results[task_id].gamma = arma::vec(local_result.gamma);
-              results[task_id].theta_sigma2 = arma::vec(local_result.theta_sigma2);
-              results[task_id].L = arma::mat(local_result.L);
-              results[task_id].R = arma::mat(local_result.R);
-              results[task_id].Fstar = arma::mat(local_result.Fstar);
-              results[task_id].Rstar = arma::mat(local_result.Rstar);
-              results[task_id].Qstar = arma::mat(local_result.Qstar);
-              results[task_id].Estar = arma::vec(local_result.Estar);
-              results[task_id].ystar = arma::vec(local_result.ystar);
-              results[task_id].SSEstar = local_result.SSEstar;
-              results[task_id].betahat = arma::vec(local_result.betahat);
-              results[task_id].success = local_result.success;
-              results[task_id].error_message = local_result.error_message;
+              results[task_id] = optimize_worker(task_id);
             }
           }
         });

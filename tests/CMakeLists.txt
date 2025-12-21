@@ -308,3 +308,8 @@ endif()
 catch_discover_tests(KSTestValidation EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(unstableLLTest unstableLLTest.cpp)
+target_link_libraries(unstableLLTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries unstableLLTest)
+catch_discover_tests(unstableLLTest)
+
