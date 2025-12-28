@@ -57,11 +57,13 @@ jobs:
             -DENABLE_R_BINDING=OFF
 
       - name: Build library and benchmarks
+        shell: bash
         run: |
           cd build
           cmake --build . --target all_benchmarks -j$(nproc)
 
       - name: Run all benchmark configurations
+        shell: bash
         run: |
           cd build
           ITERATIONS=${{ github.event.inputs.iterations || '10' }}
@@ -74,12 +76,13 @@ jobs:
             for d in 2 4 8; do
               for bench in kriging nugget noise; do
                 echo "Running: n=$n d=$d benchmark=$bench iterations=$ITERATIONS"
-                bash ../bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "benchmark-results/${bench}_n${n}_d${d}.log" 2>&1
+                bash ../bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "benchmark-results/${bench}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for $bench n=$n d=$d"
               done
             done
           done
 
       - name: Generate markdown report
+        shell: bash
         run: |
           cd build
           ITERATIONS=${{ github.event.inputs.iterations || '10' }}
@@ -109,22 +112,6 @@ jobs:
           echo "## Summary Tables" >> "$REPORT"
           echo "" >> "$REPORT"
 
-          # Function to extract fit time from log
-          extract_fit_mean() {
-            local logfile=$1
-            grep "^fit" "$logfile" | awk '{print $3}'
-          }
-
-          extract_predict_mean() {
-            local logfile=$1
-            grep "^predict" "$logfile" | awk '{print $3}'
-          }
-
-          extract_update_mean() {
-            local logfile=$1
-            grep "^update[^_]" "$logfile" | awk '{print $3}'
-          }
-
           # Kriging Summary
           echo "### Kriging" >> "$REPORT"
           echo "" >> "$REPORT"
@@ -134,9 +121,9 @@ jobs:
             for d in 2 4 8; do
               logfile="benchmark-results/kriging_n${n}_d${d}.log"
               if [ -f "$logfile" ]; then
-                fit=$(extract_fit_mean "$logfile")
-                pred=$(extract_predict_mean "$logfile")
-                upd=$(extract_update_mean "$logfile")
+                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
                 echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
               fi
             done
@@ -152,9 +139,9 @@ jobs:
             for d in 2 4 8; do
               logfile="benchmark-results/nugget_n${n}_d${d}.log"
               if [ -f "$logfile" ]; then
-                fit=$(extract_fit_mean "$logfile")
-                pred=$(extract_predict_mean "$logfile")
-                upd=$(extract_update_mean "$logfile")
+                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
                 echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
               fi
             done
@@ -170,9 +157,9 @@ jobs:
             for d in 2 4 8; do
               logfile="benchmark-results/noise_n${n}_d${d}.log"
               if [ -f "$logfile" ]; then
-                fit=$(extract_fit_mean "$logfile")
-                pred=$(extract_predict_mean "$logfile")
-                upd=$(extract_update_mean "$logfile")
+                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
                 echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
               fi
             done
@@ -216,11 +203,13 @@ jobs:
           retention-days: 90
 
       - name: Display summary report
+        shell: bash
         run: |
           cd build
           cat benchmark-results/BENCHMARK_REPORT.md
 
       - name: Add report to job summary
+        shell: bash
         run: |
           cd build
           cat benchmark-results/BENCHMARK_REPORT.md >> $GITHUB_STEP_SUMMARY
