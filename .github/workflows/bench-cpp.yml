@@ -56,27 +56,20 @@ jobs:
             -DENABLE_PYTHON_BINDING=OFF \
             -DENABLE_R_BINDING=OFF
 
-      - name: Build library and benchmarks
-        shell: bash
-        run: |
-          cd build
-          cmake --build . --target all_benchmarks -j$(nproc)
-
       - name: Run all benchmark configurations
         shell: bash
         run: |
-          cd build
           ITERATIONS=${{ github.event.inputs.iterations || '10' }}
 
           # Initialize results directory
-          mkdir -p benchmark-results
+          mkdir -p build/benchmark-results
 
-          # Run all combinations
+          # Run all combinations using bench.sh (it handles building internally)
           for n in 100 200 400; do
             for d in 2 4 8; do
               for bench in kriging nugget noise; do
                 echo "Running: n=$n d=$d benchmark=$bench iterations=$ITERATIONS"
-                bash ../bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "benchmark-results/${bench}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for $bench n=$n d=$d"
+                bash bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "build/benchmark-results/${bench}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for $bench n=$n d=$d"
               done
             done
           done
