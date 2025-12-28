@@ -4,13 +4,12 @@ on:
   push:
     branches:
       - master
-      - develop
+      - '*'
     tags:
       - 'bench-cpp*'
   pull_request:
     branches:
       - master
-      - develop
   workflow_dispatch:
     inputs:
       iterations:
