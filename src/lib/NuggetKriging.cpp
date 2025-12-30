@@ -1352,7 +1352,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov,
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 8) ? 8 : max_threads;
+    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
@@ -1549,7 +1549,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim,
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 8) ? 8 : max_threads;
+    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {

@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef _OPENMP
   int max_threads = omp_get_max_threads();
-  int optimal_threads = (max_threads > 8) ? 8 : max_threads;
+  int optimal_threads = (max_threads > 2) ? 2 : max_threads;
   std::cout << "OpenMP enabled: max_threads=" << max_threads
             << ", using optimal=" << optimal_threads << std::endl;
 #else
