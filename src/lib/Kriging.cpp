@@ -1666,15 +1666,35 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_o; i++) {
-    for (arma::uword j = 0; j < n_n; j++) {
-      arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-      if (dij.is_zero(arma::datum::eps))
-        R_on.at(i, j) = 1.0;
-      else
-        R_on.at(i, j) = _Cov(dij, m_theta);
+  #ifdef _OPENMP
+  arma::uword total_work = n_o * n_n;
+  if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
+    int max_threads = omp_get_max_threads();
+    int optimal_threads = (max_threads > 8) ? 8 : max_threads;
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
+    for (arma::uword i = 0; i < n_o; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta);
+      }
     }
+  } else {
+  #endif
+    for (arma::uword i = 0; i < n_o; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta);
+      }
+    }
+  #ifdef _OPENMP
   }
+  #endif
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
