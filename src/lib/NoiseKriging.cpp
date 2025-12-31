@@ -175,7 +175,9 @@ void NoiseKriging::populate_Model(KModel& m,
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
   // Compute intermediate useful matrices
-  arma::mat Fystar = LinearAlgebra::solve(m.L, arma::join_rows(m_F, m_y));
+  // Force evaluation of join_rows to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
+  arma::mat Fy = arma::join_rows(m_F, m_y);
+  arma::mat Fystar = LinearAlgebra::solve(m.L, Fy);
   t0 = Bench::toc(bench, "Fy* = L \\ [F,y]", t0);
   m.Fstar = Fystar.head_cols(p);
   m.ystar = Fystar.tail_cols(1);
@@ -191,7 +193,9 @@ void NoiseKriging::populate_Model(KModel& m,
   m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
 
   if (m_est_beta) {
-    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
+    // Force evaluation of tail_cols view to avoid LAPACK issues
+    arma::mat R_qr_last = R_qr.tail_cols(1);
+    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr_last);
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
   } else {
     m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
