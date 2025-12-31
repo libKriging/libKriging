@@ -1363,8 +1363,8 @@ NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov,
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
+      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
         arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
         if (dij.is_zero(arma::datum::eps))
           R_on.at(i, j) = 1.0;
@@ -1559,8 +1559,8 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim,
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
+      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
         arma::mat dij = Xn_o.col(i) - Xn_n.col(j);
         if (with_nugget && dij.is_zero(arma::datum::eps))
           R_on.at(i, j) = 1.0;

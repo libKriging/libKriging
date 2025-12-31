@@ -325,8 +325,8 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
   if (n >= 200) {  // Only use OpenMP for large enough matrices
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = i + 1; j < n; j++) {
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
+      for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
         arma::uword ij = i * n + j;
         arma::uword ji = j * n + i;
         for (arma::uword k = 0; k < d; k++) {
@@ -375,8 +375,8 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
-    for (arma::uword i = 0; i < n; i++) {
-      for (arma::uword j = 0; j < i; j++) {
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
+      for (arma::sword j = 0; j < i; j++) {
         double cov_val = Cov(dX.col(i * n + j), theta) * factor;
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
@@ -426,7 +426,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
-    for (arma::uword bi = 0; bi < n; bi += BLOCK_SIZE) {
+    for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
 
       // Pre-allocate diff vector once per thread (thread-local)
