@@ -274,27 +274,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
-  // return A.t() * A;
-  arma::mat AtA = arma::mat(A.n_cols, A.n_cols, arma::fill::none);
-  for (arma::uword i = 0; i < A.n_cols; i++) {
-    for (arma::uword j = 0; j <= i; j++) {
-      AtA.at(i, j) = arma::dot(A.col(i), A.col(j));
-      AtA.at(j, i) = AtA.at(i, j);
-    }
-  }
-  return AtA;
+  // Use BLAS GEMM via Armadillo for A^T * A
+  // This is faster than manual loops as it uses optimized BLAS library
+  return arma::trans(A) * A;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::tcrossprod(const arma::mat& A) {
-  // return A * A.t();
-  arma::mat AAt = arma::mat(A.n_rows, A.n_rows, arma::fill::none);
-  for (arma::uword i = 0; i < A.n_rows; i++) {
-    for (arma::uword j = 0; j <= i; j++) {
-      AAt.at(i, j) = arma::dot(A.row(i), A.row(j));
-      AAt.at(j, i) = AAt.at(i, j);
-    }
-  }
-  return AAt;
+  // Use BLAS GEMM via Armadillo for A * A^T
+  // This is faster than manual loops as it uses optimized BLAS library
+  return A * arma::trans(A);
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::diagcrossprod(const arma::mat& A) {
