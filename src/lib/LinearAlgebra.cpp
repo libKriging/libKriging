@@ -504,10 +504,10 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
       double* diff_mem = diff.memptr();
 
       #pragma omp for schedule(static) collapse(2)
-      for (arma::uword bi = 0; bi < n1; bi += BLOCK_SIZE) {
-        for (arma::uword bj = 0; bj < n2; bj += BLOCK_SIZE) {
-          arma::uword block_end_i = (bi + BLOCK_SIZE < n1) ? bi + BLOCK_SIZE : n1;
-          arma::uword block_end_j = (bj + BLOCK_SIZE < n2) ? bj + BLOCK_SIZE : n2;
+      for (arma::sword bi = 0; bi < static_cast<arma::sword>(n1); bi += BLOCK_SIZE) {
+        for (arma::sword bj = 0; bj < static_cast<arma::sword>(n2); bj += BLOCK_SIZE) {
+          arma::uword block_end_i = (bi + BLOCK_SIZE < static_cast<arma::sword>(n1)) ? bi + BLOCK_SIZE : n1;
+          arma::uword block_end_j = (bj + BLOCK_SIZE < static_cast<arma::sword>(n2)) ? bj + BLOCK_SIZE : n2;
 
           // Process block with good cache locality
           for (arma::uword i = bi; i < block_end_i; i++) {
