@@ -79,8 +79,8 @@ fi
 # Define available benchmarks
 declare -A BENCHMARKS
 BENCHMARKS["kriging"]="bench/bench-kriging"
-BENCHMARKS["nugget"]="bench/bench-nugget-kriging"
-BENCHMARKS["noise"]="bench/bench-noise-kriging"
+BENCHMARKS["nugget"]="bench/bench-nuggetkriging"
+BENCHMARKS["noise"]="bench/bench-noisekriging"
 
 # Function to filter output by operation
 filter_operation() {
