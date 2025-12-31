@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
   std::cout << "NuggetKriging Benchmark (BFGS, LL objective)" << std::endl;
 
   // Parse command line arguments
-  // Usage: bench-nugget-kriging [iterations] [n] [d]
+  // Usage: bench-nuggetkriging [iterations] [n] [d]
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;

@@ -47,13 +47,13 @@ The `bench.sh` script provides an easy way to run benchmarks with explicit named
 
 # Run with custom parameters (all optional, order-independent)
 ./bench/bench.sh iterations=20 n=50 d=2 kriging
-./bench/bench.sh n=200 d=4 nugget
-./bench/bench.sh iterations=5 noise
+./bench/bench.sh n=200 d=4 nuggetkriging
+./bench/bench.sh iterations=5 noisekriging
 
 # Filter by operation (show only specific operation)
 ./bench/bench.sh kriging fit
-./bench/bench.sh n=50 d=2 nugget predict
-./bench/bench.sh iterations=3 noise update_simulate
+./bench/bench.sh n=50 d=2 nuggetkriging predict
+./bench/bench.sh iterations=3 noisekriging update_simulate
 ```
 
 **Named Parameters (all optional):**
@@ -63,8 +63,8 @@ The `bench.sh` script provides an easy way to run benchmarks with explicit named
 
 **Benchmark Type Filter:**
 - `kriging` - Standard Kriging (uses LL objective) [default]
-- `nugget` - NuggetKriging (uses LMP objective)
-- `noise` - NoiseKriging (uses LL objective)
+- `nuggetkriging` - NuggetKriging (uses LMP objective)
+- `noisekriging` - NoiseKriging (uses LL objective)
 
 **Operation Filter (optional):**
 - `fit` - Show only fit operation
@@ -87,8 +87,8 @@ cd build/bench
 # Run with custom parameters: [iterations] [n] [d]
 ./bench-kriging 20              # 20 iterations, n=100, d=4
 ./bench-kriging 15 50 2         # 15 iterations, n=50, d=2
-./bench-nugget-kriging 10 200 4 # 10 iterations, n=200, d=4
-./bench-noise-kriging 5 30 1    # 5 iterations, n=30, d=1
+./bench-nuggetkriging 10 200 4 # 10 iterations, n=200, d=4
+./bench-noisekriging 5 30 1    # 5 iterations, n=30, d=1
 ```
 
 ### Running Full Test Suite
@@ -104,7 +104,7 @@ for n in 10 100 1000; do
 done
 
 # Or create a custom script
-for benchmark in kriging nugget noise; do
+for benchmark in kriging nuggetkriging noisekriging; do
   for n in 50 100 200; do
     ./bench/bench.sh iterations=5 n=$n d=4 $benchmark
   done
@@ -195,8 +195,8 @@ This script will:
 ## Files
 
 - **bench-kriging.cpp** - Kriging benchmark implementation
-- **bench-nugget-kriging.cpp** - NuggetKriging benchmark implementation
-- **bench-noise-kriging.cpp** - NoiseKriging benchmark implementation
+- **bench-nuggetkriging.cpp** - NuggetKriging benchmark implementation
+- **bench-noisekriging.cpp** - NoiseKriging benchmark implementation
 - **bench.sh** - Convenience script to run benchmarks
 - **test-report-generation.sh** - Local test script for CI report generation
 - **CMakeLists.txt** - Build configuration
@@ -243,8 +243,8 @@ cmake --build . --target all_benchmarks -j8
 
 # Run benchmarks with custom parameters
 ./bench/bench.sh iterations=20 n=100 d=4 kriging
-./bench/bench.sh iterations=20 n=100 d=4 nugget
-./bench/bench.sh iterations=20 n=100 d=4 noise
+./bench/bench.sh iterations=20 n=100 d=4 nuggetkriging
+./bench/bench.sh iterations=20 n=100 d=4 noisekriging
 
 # Test specific operation
 ./bench/bench.sh iterations=50 n=200 d=4 kriging fit

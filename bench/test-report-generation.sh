@@ -15,7 +15,7 @@ echo "Running benchmark configurations (this may take a while)..."
 # Run all combinations
 for n in 100 200 400; do
   for d in 2 4 8; do
-    for bench in kriging nugget noise; do
+    for bench in kriging nuggetkriging noisekriging; do
       echo "Running: n=$n d=$d benchmark=$bench iterations=$ITERATIONS"
       bash ../bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "benchmark-results/${bench}_n${n}_d${d}.log" 2>&1
     done
@@ -92,7 +92,7 @@ echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
 echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
 for n in 100 200 400; do
   for d in 2 4 8; do
-    logfile="benchmark-results/nugget_n${n}_d${d}.log"
+    logfile="benchmark-results/nuggetkriging_n${n}_d${d}.log"
     if [ -f "$logfile" ]; then
       fit=$(extract_fit_mean "$logfile")
       pred=$(extract_predict_mean "$logfile")
@@ -110,7 +110,7 @@ echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
 echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
 for n in 100 200 400; do
   for d in 2 4 8; do
-    logfile="benchmark-results/noise_n${n}_d${d}.log"
+    logfile="benchmark-results/noisekriging_n${n}_d${d}.log"
     if [ -f "$logfile" ]; then
       fit=$(extract_fit_mean "$logfile")
       pred=$(extract_predict_mean "$logfile")
@@ -125,10 +125,10 @@ echo "" >> "$REPORT"
 echo "## Detailed Results" >> "$REPORT"
 echo "" >> "$REPORT"
 
-for bench in kriging nugget noise; do
+for bench in kriging nuggetkriging noisekriging; do
   BENCH_NAME="${bench^}"
-  if [ "$bench" = "nugget" ]; then BENCH_NAME="NuggetKriging"; fi
-  if [ "$bench" = "noise" ]; then BENCH_NAME="NoiseKriging"; fi
+  if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="NuggetKriging"; fi
+  if [ "$bench" = "noisekriging" ]; then BENCH_NAME="NoiseKriging"; fi
 
   echo "### $BENCH_NAME" >> "$REPORT"
   echo "" >> "$REPORT"

@@ -1,25 +1,27 @@
 #!/bin/bash
 
 # Script to compile and run benchmarks with explicit parameters
-# Usage: ./bench.sh [iterations=N] [n=N] [d=N] [filter]
+# Usage: ./bench.sh [--clean] [iterations=N] [n=N] [d=N] [filter]
 #
 # Arguments (all optional, order-independent):
+#   --clean      : Remove all benchmark binaries before rebuilding
 #   iterations=N  : Number of iterations per test (default: 10)
 #   n=N          : Number of training points (default: 100)
 #   d=N          : Number of dimensions (default: 4)
-#   filter       : Benchmark type filter (kriging/nugget/noise) or
+#   filter       : Benchmark type filter (kriging/nuggetkriging/noisekriging) or
 #                  Operation filter (fit/predict/simulate/update/update_simulate)
 #                  Default: kriging
 #
 # Examples:
 #   ./bench.sh                                    # n=100 d=4 iterations=10 kriging
-#   ./bench.sh iterations=20                      # n=100 d=4 iterations=20 kriging
+#   ./bench.sh --clean iterations=20              # Clean rebuild, n=100 d=4 iterations=20 kriging
 #   ./bench.sh n=50 d=2                          # n=50 d=2 iterations=10 kriging
 #   ./bench.sh iterations=5 n=1000 d=4 fit       # Only fit operation
-#   ./bench.sh nugget                             # NuggetKriging benchmark
-#   ./bench.sh noise iterations=15 predict       # NoiseKriging predict only
+#   ./bench.sh nuggetkriging                      # NuggetKriging benchmark
+#   ./bench.sh noisekriging iterations=15 predict # NoiseKriging predict only
 
 # Default values
+CLEAN_BUILD=false
 ITERATIONS=10
 N_POINTS=100
 D_DIMS=4
@@ -29,6 +31,9 @@ OPERATION_FILTER=""
 # Parse arguments
 for arg in "$@"; do
   case "$arg" in
+    --clean)
+      CLEAN_BUILD=true
+      ;;
     iterations=*)
       ITERATIONS="${arg#*=}"
       ;;
@@ -38,7 +43,7 @@ for arg in "$@"; do
     d=*)
       D_DIMS="${arg#*=}"
       ;;
-    kriging|nugget|noise)
+    kriging|nuggetkriging|noisekriging)
       BENCHMARK_FILTER="$arg"
       ;;
     fit|predict|simulate|update|update_simulate)
@@ -46,7 +51,7 @@ for arg in "$@"; do
       ;;
     *)
       echo "Unknown argument: $arg"
-      echo "Valid arguments: iterations=N, n=N, d=N, kriging|nugget|noise, fit|predict|simulate|update|update_simulate"
+      echo "Valid arguments: --clean, iterations=N, n=N, d=N, kriging|nuggetkriging|noisekriging, fit|predict|simulate|update|update_simulate"
       exit 1
       ;;
   esac
@@ -70,17 +75,25 @@ fi
 
 cd "$BUILD_DIR"
 
-# Build the benchmarks (silently)
-if ! cmake --build . --target all_benchmarks -j$(nproc) 2>&1 > /dev/null; then
-    echo "Error: Failed to build benchmarks"
-    exit 1
+# Clean benchmark binaries if requested
+if [ "$CLEAN_BUILD" = true ]; then
+    echo "Cleaning benchmark binaries..."
+    rm -f bench/bench-kriging bench/bench-nuggetkriging bench/bench-noisekriging bench/bench-linearalgebra
+    echo "Removed all benchmark binaries"
+    echo ""
 fi
+
+# Build the benchmarks (but don't fail if some benchmarks fail to build)
+echo "Building benchmarks..."
+cmake --build . --target all_benchmarks -j$(nproc) 2>&1 | tail -20 || true
+
+echo ""
 
 # Define available benchmarks
 declare -A BENCHMARKS
 BENCHMARKS["kriging"]="bench/bench-kriging"
-BENCHMARKS["nugget"]="bench/bench-nuggetkriging"
-BENCHMARKS["noise"]="bench/bench-noisekriging"
+BENCHMARKS["nuggetkriging"]="bench/bench-nuggetkriging"
+BENCHMARKS["noisekriging"]="bench/bench-noisekriging"
 
 # Function to filter output by operation
 filter_operation() {
@@ -158,6 +171,28 @@ fi
 
 TOTAL_COUNT=1
 executable="${BENCHMARKS[$BENCHMARK_FILTER]}"
+
+# Check if executable exists
+if [ ! -f "$executable" ]; then
+    echo "Error: Benchmark executable not found: $executable"
+    echo ""
+    echo "Available benchmark executables:"
+    for name in "${!BENCHMARKS[@]}"; do
+        bench_exec="${BENCHMARKS[$name]}"
+        if [ -f "$bench_exec" ]; then
+            echo "  ✓ $bench_exec"
+        else
+            echo "  ✗ $bench_exec (not built)"
+        fi
+    done
+    exit 1
+fi
+
+echo "Running benchmark: $BENCHMARK_FILTER (n=$N_POINTS, d=$D_DIMS, iterations=$ITERATIONS)"
+if [ -n "$OPERATION_FILTER" ]; then
+    echo "Operation filter: $OPERATION_FILTER"
+fi
+echo "----------------------------------------"
 
 if run_benchmark "$BENCHMARK_FILTER" "$executable" "$ITERATIONS" "$N_POINTS" "$D_DIMS" "$OPERATION_FILTER" | tee -a "$OUTPUT_PATH"; then
     SUCCESS_COUNT=1

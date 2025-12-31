@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
   std::cout << "NoiseKriging Benchmark (BFGS, LL objective)" << std::endl;
 
   // Parse command line arguments
-  // Usage: bench-noise-kriging [iterations] [n] [d]
+  // Usage: bench-noisekriging [iterations] [n] [d]
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;
