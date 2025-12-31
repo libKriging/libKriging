@@ -1412,7 +1412,7 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
 
   // rebuild starting parameters
   Parameters parameters;
-  if (refit) {  // re-fit
+  if (refit) {  // re-fit with parameter optimization
     if (m_est_beta)
       parameters
           = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
@@ -1439,24 +1439,54 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
               m_optim,
               m_objective,
               parameters);
-  } else {  // just update
-    parameters
-        = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
-                     false,
-                     std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
-                     false,
-                     std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
-                     false};
-    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                              y_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
-                              noise_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-              m_regmodel,
-              m_normalize,
-              "none",
-              m_objective,
-              parameters);
+  } else {  // incremental update without parameter re-optimization
+    // Normalize new data using existing normalization parameters
+    arma::mat Xn_u = X_u;
+    Xn_u.each_row() -= m_centerX;
+    Xn_u.each_row() /= m_scaleX;
+
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+    arma::vec noise_n_u = noise_u / (m_scaleY * m_scaleY);
+
+    // Extend training data
+    arma::uword n_old = m_X.n_rows;
+    arma::uword n_new = X_u.n_rows;
+    arma::uword n_total = n_old + n_new;
+
+    m_X = arma::join_cols(m_X, Xn_u);
+    m_y = arma::join_cols(m_y, yn_u);
+    m_noise = arma::join_cols(m_noise, noise_n_u);
+
+    // Recompute distance matrix (full recomputation for now)
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+
+    // Extend trend matrix
+    m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+    // Call make_Model which will use incremental Cholesky update
+    // (the update logic in make_Model checks if theta and sigma2 are unchanged and m_T exists)
+    NoiseKriging::KModel m = make_Model(m_theta, m_sigma2, nullptr);
+
+    // Update member variables from the extended model
+    m_T = std::move(m.L);
+    m_R = std::move(m.R);
+    m_M = std::move(m.Fstar);
+    m_circ = std::move(m.Rstar);
+    m_star = std::move(m.Qstar);
+
+    if (m_est_beta) {
+      m_beta = std::move(m.betahat);
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta remains unchanged (fixed parameter)
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
+
+    if (m_est_sigma2) {
+      m_sigma2 = m.SSEstar / n_total;
+    }
+    // else m_sigma2 remains unchanged (fixed parameter)
   }
 }
 
