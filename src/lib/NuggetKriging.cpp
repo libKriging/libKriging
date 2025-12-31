@@ -31,6 +31,16 @@
 
 #ifdef _OPENMP
 #include <omp.h>
+
+// Helper function to safely get optimal thread count
+// Windows MSVC OpenMP can sometimes return unexpected values
+inline int get_optimal_threads(int max_default = 2) {
+  int max_threads = omp_get_max_threads();
+  if (max_threads <= 0) {
+    return 1;
+  }
+  return (max_threads > max_default) ? max_default : max_threads;
+}
 #endif
 
 // Helper to get OpenBLAS thread control function (if available)
@@ -1351,8 +1361,7 @@ NuggetKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov,
   #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
@@ -1548,8 +1557,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim,
   #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {

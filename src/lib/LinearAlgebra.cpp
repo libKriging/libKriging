@@ -9,7 +9,19 @@
 #include <thread>
 #ifdef _OPENMP
 #include <omp.h>
+
+// Helper function to safely get optimal thread count
+// Windows MSVC OpenMP can sometimes return unexpected values
+inline int get_optimal_threads(int max_default = 2) {
+  int max_threads = omp_get_max_threads();
+  // Defensive: ensure we get a valid thread count
+  if (max_threads <= 0) {
+    return 1;  // Fallback to serial if OpenMP returns invalid value
+  }
+  return (max_threads > max_default) ? max_default : max_threads;
+}
 #endif
+
 #include "libKriging/Bench.hpp"
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
@@ -311,8 +323,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
 
   #ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = i + 1; j < n; j++) {
@@ -362,8 +373,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
   #ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
@@ -414,8 +424,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
   #ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
     for (arma::uword bi = 0; bi < n; bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
@@ -487,8 +496,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
-    int max_threads = omp_get_max_threads();
-    int optimal_threads = (max_threads > 2) ? 2 : max_threads;
+    int optimal_threads = get_optimal_threads(2);
     #pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
     {
       // Pre-allocate diff vector once per thread (thread-local)
