@@ -276,26 +276,42 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     arma::mat x = LinearAlgebra::solve(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
-    arma::cube gradC = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
+    // Optimized gradient computation: compute on-the-fly without storing full gradC cube
+    // This eliminates expensive tube() operations and reduces memory usage
+
+    // Initialize gradient accumulators
+    arma::vec term1_vec(d, arma::fill::zeros);
+    arma::vec term2_vec(d, arma::fill::zeros);
+
+    t0 = Bench::tic();
+    // Compute gradients in single pass over (i,j) pairs
     for (arma::uword i = 0; i < n; i++) {
-      gradC.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradC.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradC.tube(j, i) = gradC.tube(i, j);
+        // Compute gradient vector once for this (i,j) pair
+        arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        double R_ij = m.R.at(i, j);
+        double x_i = x.at(i);
+        double x_j = x.at(j);
+        double Cinv_ij = Cinv.at(i, j);
+
+        // Accumulate contributions for all dimensions
+        for (arma::uword k = 0; k < d; k++) {
+          double gradC_k_ij = R_ij * dlnCov.at(k);
+
+          // terme1: x.t() * gradC_k * x (factor of 2 for symmetry)
+          term1_vec.at(k) += 2.0 * x_i * gradC_k_ij * x_j;
+
+          // terme2: -trace(Cinv * gradC_k) (factor of 2 for symmetry)
+          term2_vec.at(k) -= 2.0 * Cinv_ij * gradC_k_ij;
+        }
       }
     }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    t0 = Bench::toc(bench, "gradC computation [optimized]", t0);
 
+    // Finalize gradients
     for (arma::uword k = 0; k < d; k++) {
-      t0 = Bench::tic();
-      arma::mat gradC_k = gradC.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
-
-      terme1.at(k) = as_scalar(x.t() * gradC_k * x);
-      double terme2 = -arma::trace(Cinv * gradC_k);
-      (*grad_out).at(k) = (terme1.at(k) + terme2) / 2;
-      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
+      terme1.at(k) = term1_vec.at(k);
+      (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
     }
 
     if (m_est_sigma2) {

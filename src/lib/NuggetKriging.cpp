@@ -304,27 +304,42 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     arma::mat x = LinearAlgebra::solve(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
-    arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
+    // Optimized gradient computation: compute on-the-fly without storing full gradR cube
+    // This eliminates expensive tube() operations and reduces memory usage
+
+    // Initialize gradient accumulators
+    arma::vec term1_vec(d, arma::fill::zeros);
+    arma::vec term2_vec(d, arma::fill::zeros);
+
+    t0 = Bench::tic();
+    // Compute gradients in single pass over (i,j) pairs
     for (arma::uword i = 0; i < n; i++) {
-      gradR.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradR.tube(j, i) = gradR.tube(i, j);
+        // Compute gradient vector once for this (i,j) pair
+        arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        double R_ij = m.R.at(i, j);
+        double x_i = x.at(i);
+        double x_j = x.at(j);
+        double Rinv_ij = Rinv.at(i, j);
+
+        // Accumulate contributions for all dimensions
+        for (arma::uword k = 0; k < d; k++) {
+          double gradR_k_ij = R_ij * dlnCov.at(k);
+
+          // terme1: x.t() * gradR_k * x (factor of 2 for symmetry)
+          term1_vec.at(k) += 2.0 * x_i * gradR_k_ij * x_j;
+
+          // terme2: -trace(Rinv * gradR_k) (factor of 2 for symmetry)
+          term2_vec.at(k) -= 2.0 * Rinv_ij * gradR_k_ij;
+        }
       }
     }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    t0 = Bench::toc(bench, "gradR computation [optimized]", t0);
 
+    // Finalize gradients
     for (arma::uword k = 0; k < d; k++) {
-      t0 = Bench::tic();
-      arma::mat gradR_k = gradR.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
-
-      // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
-      terme1.at(k) = as_scalar(x.t() * gradR_k * x) / (_sigma2 + _nugget);
-      double terme2 = -arma::trace(Rinv * gradR_k);  //-arma::accu(Rinv % gradR_k_upper)
-      (*grad_out).at(k) = (terme1.at(k) + terme2) / 2;
-      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
+      terme1.at(k) = term1_vec.at(k) / (_sigma2 + _nugget);
+      (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
     }
 
     //  # partial derivative with respect to (alpha=) v = sigma^2 + delta^2
@@ -670,8 +685,8 @@ std::function<arma::vec(const arma::vec&, const arma::vec&)> NuggetKriging::repa
         return D_theta_alpha;
       };
 
-double NuggetKriging::alpha_upper = 1.0;
-double NuggetKriging::alpha_lower = 1E-3;
+double NuggetKriging::alpha_upper = 1.0; // means nugget variance is 0
+double NuggetKriging::alpha_lower = 1E-3;  // Smart retry logic handles boundary cases
 
 /** Fit the kriging object on (X,y):
  * @param y is n length column vector of output
@@ -1127,12 +1142,31 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
                                         ? std::abs(NuggetKriging::reparam_from(gamma_tmp).at(d) - alpha_upper)
                                         : std::abs(gamma_tmp.at(d) - alpha_upper);
 
-          if ((retry < Optim::max_restart)
-              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) // Check for abnormal termination
-                  || (opt_result.num_iters <= 2) // Start point is strangely quite optimal...
-                  || (sol_to_lb_theta < arma::datum::eps) // Stuck at theta lower bound
-                  || (sol_to_ub_alpha < arma::datum::eps) // Stuck at sigma2 upper bound, i.e. nugget lower bound
-                  || (opt_result.f_opt > best_f_opt))) { // No improvement
+          // Use relaxed boundary tolerance instead of eps (1e-16)
+          // BFGS has already checked gradient convergence (pgtol), so if it converged
+          // near a boundary, that's likely the true optimum
+          const double boundary_tol = 1e-6;  // Relaxed from arma::datum::eps (~1e-16)
+
+          bool at_theta_lb = (sol_to_lb_theta < boundary_tol);
+          bool at_theta_ub = (sol_to_ub_theta < boundary_tol);
+          bool at_alpha_lb = (sol_to_lb_alpha < boundary_tol);
+          bool at_alpha_ub = (sol_to_ub_alpha < boundary_tol);
+
+          // Only retry if BFGS failed abnormally, not if it legitimately converged to boundary
+          // BFGS convergence means gradient is small (checked by pgtol), so boundary is optimal
+          bool should_retry = false;
+          if (retry < Optim::max_restart) {
+            if (opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) {
+              should_retry = true;  // Abnormal termination, always retry
+            } else if (opt_result.num_iters <= 2) {
+              should_retry = true;  // Too few iterations, likely bad start point
+            } else if (opt_result.f_opt > best_f_opt) {
+              should_retry = true;  // No improvement over previous attempts
+            }
+            // Removed boundary checks from retry logic - BFGS convergence is sufficient
+          }
+
+          if (should_retry) {
 
             if (Optim::log_level > Optim::log_none) {
               arma::cout << "  Restarting BFGS (start " << (start_idx+1) << ", retry " << (retry+1)

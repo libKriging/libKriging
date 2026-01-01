@@ -546,3 +546,31 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   }
   #endif
 }
+
+// Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
+// This avoids the explicit matrix multiplication A * B
+LIBKRIGING_EXPORT double LinearAlgebra::trace_prod(const arma::mat& A, const arma::mat& B) {
+  arma::uword n = A.n_rows;
+  arma::uword m = A.n_cols;
+
+  if (B.n_rows != m || B.n_cols != n) {
+    throw std::invalid_argument("trace_prod: incompatible matrix dimensions");
+  }
+
+  double sum = 0.0;
+  const double* A_mem = A.memptr();
+  const double* B_mem = B.memptr();
+
+  // A is stored column-major: A(i,j) = A_mem[i + j*n]
+  // B is stored column-major: B(i,j) = B_mem[i + j*m]
+  // We need: sum_i sum_j A(i,j) * B(j,i)
+  //        = sum_i sum_j A_mem[i + j*n] * B_mem[j + i*m]
+
+  for (arma::uword j = 0; j < m; j++) {
+    for (arma::uword i = 0; i < n; i++) {
+      sum += A_mem[i + j * n] * B_mem[j + i * m];
+    }
+  }
+
+  return sum;
+}
