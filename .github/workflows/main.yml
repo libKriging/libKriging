@@ -57,7 +57,7 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -99,6 +99,7 @@ jobs:
             #   491 | # define snprintf _snprintf
             enable_python: off
             enable_octave: on
+            timeout_minutes: 90
           - name: "Matlab Linux"
             # Using matlab-actions/setup-matlab@v1, only available on Linux
             os: ubuntu-22.04
