@@ -616,6 +616,7 @@ endif()
 
 include(CTest)
 add_subdirectory(tests)
+add_subdirectory(bench)
 
 add_custom_target(run_unit_tests
         COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT}

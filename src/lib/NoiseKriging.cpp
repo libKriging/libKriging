@@ -31,6 +31,16 @@
 
 #ifdef _OPENMP
 #include <omp.h>
+
+// Helper function to safely get optimal thread count
+// Windows MSVC OpenMP can sometimes return unexpected values
+inline int get_optimal_threads(int max_default = 2) {
+  int max_threads = omp_get_max_threads();
+  if (max_threads <= 0) {
+    return 1;
+  }
+  return (max_threads > max_default) ? max_default : max_threads;
+}
 #endif
 
 // Helper to get OpenBLAS thread control function (if available)
@@ -165,7 +175,9 @@ void NoiseKriging::populate_Model(KModel& m,
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
   // Compute intermediate useful matrices
-  arma::mat Fystar = LinearAlgebra::solve(m.L, arma::join_rows(m_F, m_y));
+  // Force evaluation of join_rows to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
+  arma::mat Fy = arma::join_rows(m_F, m_y);
+  arma::mat Fystar = LinearAlgebra::solve(m.L, Fy);
   t0 = Bench::toc(bench, "Fy* = L \\ [F,y]", t0);
   m.Fstar = Fystar.head_cols(p);
   m.ystar = Fystar.tail_cols(1);
@@ -181,7 +193,9 @@ void NoiseKriging::populate_Model(KModel& m,
   m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
 
   if (m_est_beta) {
-    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
+    // Force evaluation of tail_cols view to avoid LAPACK issues
+    arma::mat R_qr_last = R_qr.tail_cols(1);
+    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr_last);
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
   } else {
     m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
@@ -262,26 +276,42 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     arma::mat x = LinearAlgebra::solve(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
-    arma::cube gradC = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
+    // Optimized gradient computation: compute on-the-fly without storing full gradC cube
+    // This eliminates expensive tube() operations and reduces memory usage
+
+    // Initialize gradient accumulators
+    arma::vec term1_vec(d, arma::fill::zeros);
+    arma::vec term2_vec(d, arma::fill::zeros);
+
+    t0 = Bench::tic();
+    // Compute gradients in single pass over (i,j) pairs
     for (arma::uword i = 0; i < n; i++) {
-      gradC.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradC.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradC.tube(j, i) = gradC.tube(i, j);
+        // Compute gradient vector once for this (i,j) pair
+        arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        double R_ij = m.R.at(i, j);
+        double x_i = x.at(i);
+        double x_j = x.at(j);
+        double Cinv_ij = Cinv.at(i, j);
+
+        // Accumulate contributions for all dimensions
+        for (arma::uword k = 0; k < d; k++) {
+          double gradC_k_ij = R_ij * dlnCov.at(k);
+
+          // terme1: x.t() * gradC_k * x (factor of 2 for symmetry)
+          term1_vec.at(k) += 2.0 * x_i * gradC_k_ij * x_j;
+
+          // terme2: -trace(Cinv * gradC_k) (factor of 2 for symmetry)
+          term2_vec.at(k) -= 2.0 * Cinv_ij * gradC_k_ij;
+        }
       }
     }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    t0 = Bench::toc(bench, "gradC computation [optimized]", t0);
 
+    // Finalize gradients
     for (arma::uword k = 0; k < d; k++) {
-      t0 = Bench::tic();
-      arma::mat gradC_k = gradC.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
-
-      terme1.at(k) = as_scalar(x.t() * gradC_k * x);
-      double terme2 = -arma::trace(Cinv * gradC_k);
-      (*grad_out).at(k) = (terme1.at(k) + terme2) / 2;
-      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
+      terme1.at(k) = term1_vec.at(k);
+      (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
     }
 
     if (m_est_sigma2) {
@@ -967,11 +997,26 @@ NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, 
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_o; i++) {
-    for (arma::uword j = 0; j < n_n; j++) {
-      R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
+  #ifdef _OPENMP
+  arma::uword total_work = n_o * n_n;
+  if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
+    int optimal_threads = get_optimal_threads(2);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
+      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
+        R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
+      }
     }
+  } else {
+  #endif
+    for (arma::uword i = 0; i < n_o; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
+      }
+    }
+  #ifdef _OPENMP
   }
+  #endif
   R_on *= m_sigma2;
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
@@ -1387,7 +1432,7 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
 
   // rebuild starting parameters
   Parameters parameters;
-  if (refit) {  // re-fit
+  if (refit) {  // re-fit with parameter optimization
     if (m_est_beta)
       parameters
           = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
@@ -1414,24 +1459,54 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
               m_optim,
               m_objective,
               parameters);
-  } else {  // just update
-    parameters
-        = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY * arma::ones<arma::vec>(1)),
-                     false,
-                     std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
-                     false,
-                     std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
-                     false};
-    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                              y_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols(m_noise * this->m_scaleY * this->m_scaleY,
-                              noise_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-              m_regmodel,
-              m_normalize,
-              "none",
-              m_objective,
-              parameters);
+  } else {  // incremental update without parameter re-optimization
+    // Normalize new data using existing normalization parameters
+    arma::mat Xn_u = X_u;
+    Xn_u.each_row() -= m_centerX;
+    Xn_u.each_row() /= m_scaleX;
+
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+    arma::vec noise_n_u = noise_u / (m_scaleY * m_scaleY);
+
+    // Extend training data
+    arma::uword n_old = m_X.n_rows;
+    arma::uword n_new = X_u.n_rows;
+    arma::uword n_total = n_old + n_new;
+
+    m_X = arma::join_cols(m_X, Xn_u);
+    m_y = arma::join_cols(m_y, yn_u);
+    m_noise = arma::join_cols(m_noise, noise_n_u);
+
+    // Recompute distance matrix (full recomputation for now)
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+
+    // Extend trend matrix
+    m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+    // Call make_Model which will use incremental Cholesky update
+    // (the update logic in make_Model checks if theta and sigma2 are unchanged and m_T exists)
+    NoiseKriging::KModel m = make_Model(m_theta, m_sigma2, nullptr);
+
+    // Update member variables from the extended model
+    m_T = std::move(m.L);
+    m_R = std::move(m.R);
+    m_M = std::move(m.Fstar);
+    m_circ = std::move(m.Rstar);
+    m_star = std::move(m.Qstar);
+
+    if (m_est_beta) {
+      m_beta = std::move(m.betahat);
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta remains unchanged (fixed parameter)
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
+
+    if (m_est_sigma2) {
+      m_sigma2 = m.SSEstar / n_total;
+    }
+    // else m_sigma2 remains unchanged (fixed parameter)
   }
 }
 

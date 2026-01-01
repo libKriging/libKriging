@@ -1,12 +1,21 @@
 #!/bin/bash
 
 # Script to compile and run a specific test by name
-# Usage: ./test.sh "test_name"
+# Usage: ./test.sh [--clean] "test_name"
 #   Example: ./test.sh "LinearAlgebra::safe_chol_lower - correlation-like matrix near singular"
+#   Example: ./test.sh --clean "LinearAlgebra::safe_chol_lower - correlation-like matrix near singular"
+
+# Parse arguments
+CLEAN_BUILD=false
+if [ "$1" = "--clean" ]; then
+    CLEAN_BUILD=true
+    shift  # Remove --clean from arguments
+fi
 
 if [ $# -eq 0 ]; then
-    echo "Usage: $0 \"test_name\""
+    echo "Usage: $0 [--clean] \"test_name\""
     echo "Example: $0 \"LinearAlgebra::safe_chol_lower - correlation-like matrix near singular\""
+    echo "Example: $0 --clean \"LinearAlgebra::safe_chol_lower - correlation-like matrix near singular\""
     exit 1
 fi
 
@@ -27,6 +36,14 @@ if [ ! -d "$BUILD_DIR" ]; then
 fi
 
 cd "$BUILD_DIR"
+
+# Clean test binaries if requested
+if [ "$CLEAN_BUILD" = true ]; then
+    echo "Cleaning test binaries..."
+    rm -f tests/*Test tests/catch2_unit_test tests/regression_unit_test tests/unstableLLTest
+    echo "Removed all test binaries"
+    echo ""
+fi
 
 # Build the tests (but don't fail if some tests fail to build)
 echo "Building tests..."

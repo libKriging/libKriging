@@ -31,6 +31,16 @@
 
 #ifdef _OPENMP
 #include <omp.h>
+
+// Helper function to safely get optimal thread count
+// Windows MSVC OpenMP can sometimes return unexpected values
+inline int get_optimal_threads(int max_default = 2) {
+  int max_threads = omp_get_max_threads();
+  if (max_threads <= 0) {
+    return 1;
+  }
+  return (max_threads > max_default) ? max_default : max_threads;
+}
 #endif
 
 // Helper to get OpenBLAS thread control function (if available)
@@ -164,7 +174,9 @@ void Kriging::populate_Model(KModel& m, const arma::vec& theta, std::map<std::st
   t0 = Bench::toc(bench, "R = _Cov(dX)  &L = Chol(R)", t0);
 
   // Compute intermediate useful matrices
-  arma::mat Fystar = LinearAlgebra::solve(m.L, arma::join_rows(m_F, m_y));
+  // Force evaluation of join_rows to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
+  arma::mat Fy = arma::join_rows(m_F, m_y);
+  arma::mat Fystar = LinearAlgebra::solve(m.L, Fy);
   t0 = Bench::toc(bench, "Fy* = L \\ [F,y]", t0);
   m.Fstar = Fystar.head_cols(p);
   m.ystar = Fystar.tail_cols(1);
@@ -180,7 +192,9 @@ void Kriging::populate_Model(KModel& m, const arma::vec& theta, std::map<std::st
   m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
 
   if (m_est_beta) {
-    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr.tail_cols(1));
+    // Force evaluation of tail_cols view to avoid LAPACK issues
+    arma::mat R_qr_last = R_qr.tail_cols(1);
+    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr_last);
     t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
   } else {
     m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
@@ -265,30 +279,64 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     arma::mat x = LinearAlgebra::solve(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
-    arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
+    // Optimized gradient computation: compute on-the-fly without storing full gradR cube
+    // This eliminates expensive tube() operations and reduces memory usage
+
+    // Initialize gradient accumulators
+    arma::vec term1_vec(d, arma::fill::zeros);
+    arma::vec term2_vec(d, arma::fill::zeros);
+
+    t0 = Bench::tic();
+    // Compute gradients in single pass over (i,j) pairs
     for (arma::uword i = 0; i < n; i++) {
-      gradR.tube(i, i) = zeros;
       for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradR.tube(j, i) = gradR.tube(i, j);
+        // Compute gradient vector once for this (i,j) pair
+        arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+        double R_ij = m.R.at(i, j);
+        double x_i = x.at(i);
+        double x_j = x.at(j);
+        double Rinv_ij = Rinv.at(i, j);
+
+        // Accumulate contributions for all dimensions
+        for (arma::uword k = 0; k < d; k++) {
+          double gradR_k_ij = R_ij * dlnCov.at(k);
+
+          // terme1: x.t() * gradR_k * x (factor of 2 for symmetry)
+          term1_vec.at(k) += 2.0 * x_i * gradR_k_ij * x_j;
+
+          // terme2: -trace(Rinv * gradR_k) (factor of 2 for symmetry)
+          term2_vec.at(k) -= 2.0 * Rinv_ij * gradR_k_ij;
+        }
       }
     }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    t0 = Bench::toc(bench, "gradR computation [optimized]", t0);
 
+    // Finalize gradients
     for (arma::uword k = 0; k < d; k++) {
+      terme1.at(k) = term1_vec.at(k) / sigma2;
+      (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
+    }
+
+    // For Hessian computation, we still need the gradR cube
+    // This is only computed when hess_out != nullptr (rare)
+    if (hess_out != nullptr) {
       t0 = Bench::tic();
-      arma::mat gradR_k = gradR.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
+      arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
+      const arma::vec zeros = arma::vec(d, arma::fill::zeros);
+      for (arma::uword i = 0; i < n; i++) {
+        gradR.tube(i, i) = zeros;
+        for (arma::uword j = 0; j < i; j++) {
+          gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          gradR.tube(j, i) = gradR.tube(i, j);
+        }
+      }
+      t0 = Bench::toc(bench, "gradR cube for Hessian", t0);
 
-      // should make a fast function trace_prod(A,B) -> sum_i(sum_j(Ai,j*Bj,i))
-      terme1.at(k) = as_scalar(x.t() * gradR_k * x) / sigma2;
-      double terme2 = -arma::trace(Rinv * gradR_k);  //-arma::accu(Rinv % gradR_k_upper)
-      (*grad_out).at(k) = (terme1.at(k) + terme2) / 2;
-      t0 = Bench::toc(bench, "grad_ll[k] = xt * gradR_k / S2 + tr(Ri * gradR_k)", t0);
-
-      if (hess_out != nullptr) {
-        //' @ref O. Roustant
+      //' @ref O. Roustant
+      for (arma::uword k = 0; k < d; k++) {
+        t0 = Bench::tic();
+        arma::mat gradR_k = gradR.slice(k);
+        t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
         // for (k in 1:d) {
         //   for (l in 1:k) {
         //     aux <- grad_R[[k]] %*% Rinv %*% grad_R[[l]]
@@ -490,31 +538,32 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
     arma::uword d = m_X.n_cols;
 
-    t0 = Bench::tic();
-    arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
-    const arma::vec zeros = arma::vec(d, arma::fill::zeros);
-    for (arma::uword i = 0; i < n; i++) {
-      gradR.tube(i, i) = zeros;
-      for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradR.tube(j, i) = gradR.tube(i, j);
-      }
-    }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    // Optimized gradient computation: compute gradR_k on-the-fly without storing full gradR cube
+    // This eliminates expensive tube() operations and reduces memory usage
 
-    for (arma::uword k = 0; k < m_X.n_cols; k++) {
+    for (arma::uword k = 0; k < d; k++) {
       t0 = Bench::tic();
-      arma::mat gradR_k = gradR.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
+      
+      // Build gradR_k matrix on-the-fly for this dimension only
+      arma::mat gradR_k(n, n, arma::fill::zeros);
+      for (arma::uword i = 0; i < n; i++) {
+        for (arma::uword j = 0; j < i; j++) {
+          arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          double gradR_k_ij = m.R.at(i, j) * dlnCov.at(k);
+          gradR_k.at(i, j) = gradR_k_ij;
+          gradR_k.at(j, i) = gradR_k_ij;
+        }
+      }
+      t0 = Bench::toc(bench, "gradR_k [optimized]", t0);
 
       arma::vec diagdB = -LinearAlgebra::diagABA(B, gradR_k);
-      t0 = Bench::toc(bench, "diagdQ = DiagABA(B, gradR_k)", t0);
+      t0 = Bench::toc(bench, "diagdB = DiagABA(B, gradR_k)", t0);
 
       arma::vec dsigma2LOO = -sigma2LOO % sigma2LOO % diagdB;
-      t0 = Bench::toc(bench, "dS2l = -S2l % S2l % diagdQ", t0);
+      t0 = Bench::toc(bench, "dS2l = -S2l % S2l % diagdB", t0);
 
       arma::vec derrorsLOO = dsigma2LOO % By - sigma2LOO % (B * (gradR_k * By));
-      t0 = Bench::toc(bench, "dE = dS2l * By- S2l * (B * gradR_k * By)", t0);
+      t0 = Bench::toc(bench, "dE = dS2l * By - S2l * (B * gradR_k * By)", t0);
 
       (*grad_out)(k) = 2 * dot(errorsLOO, derrorsLOO) / n;
       t0 = Bench::toc(bench, "grad_loo[k] = E * dE / n", t0);
@@ -712,22 +761,24 @@ double Kriging::_logMargPost(const arma::vec& _theta,
       arma::mat Q_output = trans(yt_Rinv) - Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y;
       t0 = Bench::toc(bench, "Qo = YtRi - RiFFtRiFiFtRi * y", t0);
 
-      arma::cube gradR = arma::cube(n, n, d, arma::fill::zeros);
-      // const arma::vec zeros = arma::vec(d,arma::fill::zeros);
-      for (arma::uword i = 0; i < n; i++) {
-        // gradR.tube(i, i) = zeros;
-        for (arma::uword j = 0; j < i; j++) {
-          gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-          gradR.tube(j, i) = gradR.tube(i, j);
-        }
-      }
-      t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
-
+      // Optimized gradient computation: compute gradR_k on-the-fly without storing full gradR cube
+      // This eliminates expensive tube() operations and reduces memory usage
+      
       arma::mat Wb_k;
       for (arma::uword k = 0; k < d; k++) {
         t0 = Bench::tic();
-        arma::mat gradR_k = gradR.slice(k);
-        t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
+        
+        // Build gradR_k matrix on-the-fly for this dimension only
+        arma::mat gradR_k(n, n, arma::fill::zeros);
+        for (arma::uword i = 0; i < n; i++) {
+          for (arma::uword j = 0; j < i; j++) {
+            arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+            double gradR_k_ij = m.R.at(i, j) * dlnCov.at(k);
+            gradR_k.at(i, j) = gradR_k_ij;
+            gradR_k.at(j, i) = gradR_k_ij;
+          }
+        }
+        t0 = Bench::toc(bench, "gradR_k [optimized]", t0);
 
         Wb_k = trans(LinearAlgebra::solve(trans(m.L), LinearAlgebra::solve(m.L, gradR_k)))
                - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
@@ -1666,15 +1717,34 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  for (arma::uword i = 0; i < n_o; i++) {
-    for (arma::uword j = 0; j < n_n; j++) {
-      arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-      if (dij.is_zero(arma::datum::eps))
-        R_on.at(i, j) = 1.0;
-      else
-        R_on.at(i, j) = _Cov(dij, m_theta);
+  #ifdef _OPENMP
+  arma::uword total_work = n_o * n_n;
+  if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
+    int optimal_threads = get_optimal_threads(2);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
+      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta);
+      }
     }
+  } else {
+  #endif
+    for (arma::uword i = 0; i < n_o; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta);
+      }
+    }
+  #ifdef _OPENMP
   }
+  #endif
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
@@ -2055,7 +2125,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
   // rebuild starting parameters
   Parameters parameters;
-  if (refit) {  // re-fit
+  if (refit) {  // re-fit with parameter optimization
     if (m_est_beta)
       parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
                               this->m_est_sigma2,
@@ -2078,21 +2148,52 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
               m_optim,
               m_objective,
               parameters);
-  } else {  // just update
-    parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
-                            false,
-                            std::make_optional(trans(arma::mat(this->m_theta)) % this->m_scaleX),
-                            false,
-                            std::make_optional(arma::vec(this->m_beta) * this->m_scaleY),
-                            false};
-    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                              y_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-              m_regmodel,
-              m_normalize,
-              "none",
-              m_objective,
-              parameters);
+  } else {  // incremental update without parameter re-optimization
+    // Normalize new data using existing normalization parameters
+    arma::mat Xn_u = X_u;
+    Xn_u.each_row() -= m_centerX;
+    Xn_u.each_row() /= m_scaleX;
+
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+
+    // Extend training data
+    arma::uword n_old = m_X.n_rows;
+    arma::uword n_new = X_u.n_rows;
+    arma::uword n_total = n_old + n_new;
+
+    m_X = arma::join_cols(m_X, Xn_u);
+    m_y = arma::join_cols(m_y, yn_u);
+
+    // Recompute distance matrix (full recomputation for now)
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+
+    // Extend trend matrix
+    m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+    // Call make_Model which will use incremental Cholesky update
+    // (the update logic in make_Model checks if theta is unchanged and m_T exists)
+    Kriging::KModel m = make_Model(m_theta, nullptr);
+
+    // Update member variables from the extended model
+    m_T = std::move(m.L);
+    m_R = std::move(m.R);
+    m_M = std::move(m.Fstar);
+    m_circ = std::move(m.Rstar);
+    m_star = std::move(m.Qstar);
+
+    if (m_est_beta) {
+      m_beta = std::move(m.betahat);
+      m_z = std::move(m.Estar);
+    } else {
+      // m_beta remains unchanged (fixed parameter)
+      m_z = std::move(m.ystar) - m_M * m_beta;
+    }
+
+    if (m_est_sigma2) {
+      m_sigma2 = m.SSEstar / n_total;
+    }
+    // else m_sigma2 remains unchanged (fixed parameter)
   }
 }
 

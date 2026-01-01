@@ -92,6 +92,10 @@ class LinearAlgebra {
                                              const arma::vec& theta,
                                              std::function<double(const arma::vec&, const arma::vec&)> Cov,
                                              double factor = 1.0);
+
+  // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
+  // Avoids explicit matrix multiplication
+  LIBKRIGING_EXPORT static double trace_prod(const arma::mat& A, const arma::mat& B);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
