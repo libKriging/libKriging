@@ -570,22 +570,24 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
     arma::mat Q_output = trans(yt_Rinv) - Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y;
     t0 = Bench::toc(bench, "Qo = YtRi - RiFFtRiFiFtRi * y", t0);
 
-    arma::cube gradR = arma::cube(n, n, d, arma::fill::zeros);
-    // const arma::vec zeros = arma::vec(d,arma::fill::zeros);
-    for (arma::uword i = 0; i < n; i++) {
-      // gradR.tube(i, i) = zeros;
-      for (arma::uword j = 0; j < i; j++) {
-        gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        gradR.tube(j, i) = gradR.tube(i, j);
-      }
-    }
-    t0 = Bench::toc(bench, "gradR = R * dlnCov(dX)", t0);
+    // Optimized gradient computation: compute gradR_k on-the-fly without storing full gradR cube
+    // This eliminates expensive tube() operations and reduces memory usage
 
     arma::mat Wb_k;
     for (arma::uword k = 0; k < d; k++) {
       t0 = Bench::tic();
-      arma::mat gradR_k = gradR.slice(k);
-      t0 = Bench::toc(bench, "gradR_k = gradR[k]", t0);
+      
+      // Build gradR_k matrix on-the-fly for this dimension only
+      arma::mat gradR_k(n, n, arma::fill::zeros);
+      for (arma::uword i = 0; i < n; i++) {
+        for (arma::uword j = 0; j < i; j++) {
+          arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          double gradR_k_ij = m.R.at(i, j) * dlnCov.at(k);
+          gradR_k.at(i, j) = gradR_k_ij;
+          gradR_k.at(j, i) = gradR_k_ij;
+        }
+      }
+      t0 = Bench::toc(bench, "gradR_k [optimized]", t0);
 
       Wb_k = trans(LinearAlgebra::solve(trans(m.L), LinearAlgebra::solve(m.L, gradR_k)))
              - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
