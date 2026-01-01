@@ -282,11 +282,13 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma:
 
 // Solve X*A=B : X = B / A
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
-  // Force evaluation of transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
+  // Force evaluation of ALL transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
   // arma::trans() creates a view which can confuse DGELS about leading dimensions
+  // CRITICAL: Must also evaluate the final transpose, not just input transposes
   arma::mat At = A.t();
   arma::mat Bt = B.t();
-  return arma::solve(At, Bt, LinearAlgebra::default_solve_opts).t();
+  arma::mat result = arma::solve(At, Bt, LinearAlgebra::default_solve_opts).t();
+  return result;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::crossprod(const arma::mat& A) {
