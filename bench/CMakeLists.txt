@@ -16,13 +16,16 @@ target_link_libraries(bench-noisekriging LINK_PUBLIC Kriging)
 add_executable(bench-linearalgebra bench-linearalgebra.cpp)
 target_link_libraries(bench-linearalgebra LINK_PUBLIC Kriging)
 
+add_executable(bench-fit-profile bench-fit-profile.cpp)
+target_link_libraries(bench-fit-profile LINK_PUBLIC Kriging)
+
 # Optionally install benchmarks
-install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra
+install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile
         RUNTIME DESTINATION bin/bench)
 
 # Add custom target to build all benchmarks
 add_custom_target(all_benchmarks
-    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra
+    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile
     COMMENT "Building all benchmark executables")
 
 # Add CTest entries for benchmarks (optional - can be run manually or via CI)
