@@ -66,6 +66,11 @@ jobs:
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
+          - name: "Linux Debug without OpenMP"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: on
+            disable_openmp: on
           - name: "macOS Debug"
             os: macOS-latest
             mode: Debug
@@ -109,6 +114,11 @@ jobs:
             os: ubuntu-22.04
             mode: Release
             enable_R: on
+          - name: "R Linux without OpenMP"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+            disable_openmp: on
           - name: "R macOS"
             os: macOS-latest
             mode: Release
@@ -148,6 +158,7 @@ jobs:
           echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
+          echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash
@@ -176,6 +187,15 @@ jobs:
         run: |
           if [ "${{matrix.force_update}}" == "on" ]; then
             sudo apt update
+          fi
+          # Remove OpenMP packages if requested to test builds without OpenMP
+          if [ "${DISABLE_OPENMP}" == "on" ]; then
+            echo "=== Removing OpenMP packages to test build without OpenMP ==="
+            # Remove OpenMP development packages (but keep runtime libs that GCC depends on)
+            sudo apt-get remove -y libomp-dev libomp5-dev || true
+            # Verify OpenMP is not available for CMake
+            echo "Checking for OpenMP availability:"
+            echo '#include <omp.h>' | gcc -fopenmp -E - 2>&1 || echo "OpenMP headers not found (expected)"
           fi
           sudo apt install liblapack-dev python3-pip
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
