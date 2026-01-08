@@ -35,6 +35,11 @@ endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
+# Link OpenMP if found (required for omp_set_num_threads calls in Kriging.cpp, etc.)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(Kriging PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 # Fix "cannot allocate memory in static TLS block" error when loading as Python module
 # This occurs because OpenMP/OpenBLAS use static TLS which has limited space when loaded via dlopen()
 # Solution: Add -Wl,-z,nodlopen to prevent dlopen issues, or preload the library
