@@ -283,11 +283,23 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma:
 // Solve X*A=B : X = B / A
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
   // Force evaluation of ALL transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
-  // arma::trans() creates a view which can confuse DGELS about leading dimensions
-  // CRITICAL: Must also evaluate the final transpose, not just input transposes
-  arma::mat At = A.t();
-  arma::mat Bt = B.t();
-  arma::mat result = arma::solve(At, Bt, LinearAlgebra::default_solve_opts).t();
+  // Explicitly allocate and copy to ensure contiguous memory with correct leading dimensions
+  // CRITICAL: MKL's DGELS requires proper matrix layout; views/templates cause Parameter 7 errors
+
+  // Pre-allocate with correct dimensions and copy transposed data
+  arma::mat At(A.n_cols, A.n_rows);
+  At = A.t();  // Force copy, not view
+
+  arma::mat Bt(B.n_cols, B.n_rows);
+  Bt = B.t();  // Force copy, not view
+
+  // Solve and store result
+  arma::mat temp = arma::solve(At, Bt, LinearAlgebra::default_solve_opts);
+
+  // Transpose result with explicit allocation
+  arma::mat result(temp.n_cols, temp.n_rows);
+  result = temp.t();  // Force copy, not view
+
   return result;
 }
 
