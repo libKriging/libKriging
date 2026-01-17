@@ -1,0 +1,122 @@
+name: Tag submodules on release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+' # Only exact release tags like v1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+-*' # Also pre-release tags like v1.2.3-rc1
+
+env:
+  DEBUG_CI: true
+
+jobs:
+  tag-submodules:
+    name: Tag submodules with libK prefix
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Extract tag name
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            GIT_TAG=$(git describe --tags --exact-match)
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+          echo "SUBMODULE_TAG=libK-${GIT_TAG}" >> $GITHUB_ENV
+          echo "Release tag: ${GIT_TAG}"
+          echo "Submodule tag: libK-${GIT_TAG}"
+
+      - name: Configure git
+        shell: bash
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Tag armadillo-code submodule
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: |
+          set -x
+          cd dependencies/armadillo-code
+          
+          # Get current commit
+          COMMIT=$(git rev-parse HEAD)
+          echo "Current armadillo-code commit: ${COMMIT}"
+          
+          # Check if tag already exists
+          if git ls-remote --tags origin | grep -q "refs/tags/${SUBMODULE_TAG}"; then
+            echo "Tag ${SUBMODULE_TAG} already exists in armadillo-code, skipping"
+          else
+            # Create and push tag
+            git tag -a "${SUBMODULE_TAG}" -m "Tagged for libKriging ${GIT_TAG}"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/libKriging/armadillo-code.git "${SUBMODULE_TAG}"
+            echo "Created tag ${SUBMODULE_TAG} at ${COMMIT} in armadillo-code"
+          fi
+
+      - name: Tag lbfgsb_cpp submodule
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: |
+          set -x
+          cd dependencies/lbfgsb_cpp
+          
+          # Get current commit
+          COMMIT=$(git rev-parse HEAD)
+          echo "Current lbfgsb_cpp commit: ${COMMIT}"
+          
+          # Check if tag already exists
+          if git ls-remote --tags origin | grep -q "refs/tags/${SUBMODULE_TAG}"; then
+            echo "Tag ${SUBMODULE_TAG} already exists in lbfgsb_cpp, skipping"
+          else
+            # Create and push tag
+            git tag -a "${SUBMODULE_TAG}" -m "Tagged for libKriging ${GIT_TAG}"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/libKriging/lbfgsb_cpp.git "${SUBMODULE_TAG}"
+            echo "Created tag ${SUBMODULE_TAG} at ${COMMIT} in lbfgsb_cpp"
+          fi
+
+      - name: Tag carma submodule
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: |
+          set -x
+          cd dependencies/carma
+          
+          # Get current commit
+          COMMIT=$(git rev-parse HEAD)
+          echo "Current carma commit: ${COMMIT}"
+          
+          # Check if tag already exists
+          if git ls-remote --tags origin | grep -q "refs/tags/${SUBMODULE_TAG}"; then
+            echo "Tag ${SUBMODULE_TAG} already exists in carma, skipping"
+          else
+            # Create and push tag
+            git tag -a "${SUBMODULE_TAG}" -m "Tagged for libKriging ${GIT_TAG}"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/libKriging/carma.git "${SUBMODULE_TAG}"
+            echo "Created tag ${SUBMODULE_TAG} at ${COMMIT} in carma"
+          fi
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "=== Submodule Tagging Summary ==="
+          echo "Main repository tag: ${GIT_TAG}"
+          echo "Submodule tag: ${SUBMODULE_TAG}"
+          echo ""
+          echo "Tagged submodules:"
+          echo "  - armadillo-code: $(cd dependencies/armadillo-code && git rev-parse HEAD)"
+          echo "  - lbfgsb_cpp: $(cd dependencies/lbfgsb_cpp && git rev-parse HEAD)"
+          echo "  - carma: $(cd dependencies/carma && git rev-parse HEAD)"
+          echo ""
+          echo "Note: Catch2 and pybind11 are upstream projects and not tagged"
