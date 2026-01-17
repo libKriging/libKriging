@@ -1,0 +1,270 @@
+name: libKriging release workflow (C++ library)
+
+on:
+  push:
+    tags:
+       - 'v*' # release tag trigger 
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag'
+        required: false
+        default: ''
+
+env:
+  DEBUG_CI: true
+
+jobs:
+  check-release-consistency:
+    name: Check Release Consistency
+    runs-on: ubuntu-22.04
+    outputs:
+      git-tag: ${{ steps.expose-variable.outputs.git-tag }}
+      draft-release: ${{ steps.expose-variable.outputs.draft-release }}
+      
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            echo "Default GITHUB_REF is $GITHUB_REF" 
+            GIT_TAG=$(git describe --tags --dirty=-d)
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Verify version name
+        run: |
+          echo "Checking release tag: ${GIT_TAG}" 
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+            echo "Valid version name"
+          else
+            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+.*\$"
+            exit 1
+          fi
+          
+      - name: Verify source code consistency
+        run: |
+          CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
+          if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
+            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
+            echo "Non consistent code and requested tag versions"
+            exit 1
+          fi
+          
+      - name: Define a global variables for next jobs
+        id: expose-variable
+        run: |
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DRAFT_RELEASE=false
+          else
+            DRAFT_RELEASE=true
+          fi
+          echo "git-tag=${GIT_TAG}" >> $GITHUB_OUTPUT
+          echo "draft-release=${DRAFT_RELEASE}" >> $GITHUB_OUTPUT
+
+  build-cpp-library:
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "C++ Linux"
+            os: ubuntu-22.04
+          - name: "C++ macOS"
+            os: macOS-latest
+          - name: "C++ Windows"
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release"              >> $GITHUB_ENV
+          echo "ENABLE_PYTHON_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_OCTAVE_BINDING=off" >> $GITHUB_ENV
+          echo "ENABLE_R_BINDING=off"      >> $GITHUB_ENV
+
+      - name: Define local variables Unix Like
+        shell: bash
+        run: |
+          echo "BUILD_NAME=linux-macos"    >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: Define local variables Windows
+        shell: bash
+        run: |
+          echo "BUILD_NAME=windows"        >> $GITHUB_ENV
+        if: runner.os == 'Windows'
+
+      - name: pre-install-linux
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install liblapack-dev python3-pip
+        if: runner.os == 'Linux'
+
+      - name: install
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: .travis-ci/common/before_script.sh
+
+      - name: script
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: .travis-ci/${BUILD_NAME}/test.sh
+
+      - name: Create package
+        shell: bash
+        run: |
+          cd build
+          cpack -G TGZ
+          mkdir -p ../cpp-package
+          cp *.tar.gz ../cpp-package/ || true
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-artifact-${{ matrix.os }}
+          path: |
+            cpp-package
+
+  create-release-if-needed:
+    name: Create Release
+    needs:
+      - check-release-consistency
+      - build-cpp-library
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Install hub tools
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y hub
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+
+          if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+              QUALIFIER="Draft release"            
+          else
+              QUALIFIER="Release"  
+          fi
+          cat <<EOF > RELEASE_NOTE.md
+          ${QUALIFIER} ${GIT_TAG}
+
+          This is an automated release note.
+          
+          EOF
+          if [ -z "${{ github.event.release.tag_name }}" ]; then
+            if hub release show "$GIT_TAG" >/dev/null 2>&1; then
+              echo "Release $GIT_TAG already exists, skipping creation"
+            else
+              hub release create -F RELEASE_NOTE.md "$GIT_TAG"
+            fi
+          fi
+
+  upload-cpp-artifacts:
+    name: Upload C++ Library Assets
+    needs:
+      - check-release-consistency
+      - create-release-if-needed
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Install hub tools
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y hub
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cpp-artifact-*
+          path: dist
+          merge-multiple: true
+
+      - name: Prepare assets for upload
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ -d dist ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+            find dist -type f -exec ls -lh {} \;
+          else
+            echo "No C++ artifacts to upload"
+          fi
+
+      - name: upload C++ assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          set -x
+
+          mkdir -p dist
+          assets=()
+          for asset in ./dist/*; do
+            if [ -f "$asset" ]; then
+              assets+=("-a" "$asset")
+            fi
+          done
+          if [ ${#assets[@]} -gt 0 ]; then
+            if [ "${{ needs.check-release-consistency.outputs.draft-release }}" == "true" ]; then
+              hub release edit -m "Draft Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+            else
+              hub release edit -m "Release $GIT_TAG" "${assets[@]}" "$GIT_TAG"
+            fi
+          fi
