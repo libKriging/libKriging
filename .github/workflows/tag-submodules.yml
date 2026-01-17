@@ -3,8 +3,9 @@ name: Tag submodules on release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+' # Only exact release tags like v1.2.3
-      - 'v[0-9]+.[0-9]+.[0-9]+-*' # Also pre-release tags like v1.2.3-rc1
+      - 'v[0-9]+.[0-9]+.[0-9]+' # Exact release tags like v1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+-*' # Pre-release tags like v1.2.3-rc1
+      - 'v[0-9]+.[0-9]+.[0-9]+*' # Test tags like v1.2.3tmp4
 
 env:
   DEBUG_CI: true
