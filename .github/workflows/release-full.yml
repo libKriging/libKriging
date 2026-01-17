@@ -564,7 +564,11 @@ jobs:
           
           EOF
           if [ -z "${{ github.event.release.tag_name }}" ]; then
-            hub release create -F RELEASE_NOTE.md "$GIT_TAG"
+            if hub release show "$GIT_TAG" >/dev/null 2>&1; then
+              echo "Release $GIT_TAG already exists, skipping creation"
+            else
+              hub release create -F RELEASE_NOTE.md "$GIT_TAG"
+            fi
           fi
 
   release-python-wheel:
