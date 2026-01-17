@@ -148,10 +148,16 @@ jobs:
       - name: Create package
         shell: bash
         run: |
-          cd build
-          cpack -G TGZ
-          mkdir -p ../cpp-package
-          cp *.tar.gz ../cpp-package/ || true
+          VERSION=${GIT_TAG#v}
+          OS_NAME=$(echo "${{ matrix.os }}" | sed 's/ubuntu-/linux-/;s/-latest//')
+          PKG_NAME="libKriging-${VERSION}-${OS_NAME}-cpp"
+          mkdir -p cpp-package
+          if [ -d build/installed ]; then
+            cd build/installed
+            tar czf "../../cpp-package/${PKG_NAME}.tar.gz" .
+          else
+            echo "Warning: build/installed directory not found"
+          fi
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4

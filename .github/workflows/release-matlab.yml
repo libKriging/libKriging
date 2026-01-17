@@ -129,10 +129,15 @@ jobs:
       - name: Create package
         shell: bash
         run: |
-          cd build
-          cpack -G TGZ
-          mkdir -p ../matlab-package
-          cp *.tar.gz ../matlab-package/ || true
+          VERSION=${GIT_TAG#v}
+          PKG_NAME="libKriging-${VERSION}-matlab"
+          mkdir -p matlab-package
+          if [ -d build/installed ]; then
+            cd build/installed
+            tar czf "../../matlab-package/${PKG_NAME}.tar.gz" .
+          else
+            echo "Warning: build/installed directory not found"
+          fi
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
