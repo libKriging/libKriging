@@ -1,4 +1,4 @@
-name: libKriging release workflow (Python only)
+name: libKriging release workflow (Python binding)
 
 on:
   push:
