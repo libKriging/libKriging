@@ -313,3 +313,12 @@ target_link_libraries(unstableLLTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries unstableLLTest)
 catch_discover_tests(unstableLLTest)
 
+add_executable(WarpKrigingTest WarpKrigingTest.cpp)
+target_link_libraries(WarpKrigingTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries WarpKrigingTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(WarpKrigingTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+

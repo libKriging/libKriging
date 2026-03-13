@@ -791,9 +791,167 @@ is_beta_estim(k::NoiseKriging) = ccall(dlsym(_lk(), :lk_noise_kriging_is_beta_es
 is_theta_estim(k::NoiseKriging) = ccall(dlsym(_lk(), :lk_noise_kriging_is_theta_estim), Cint, (Ptr{Nothing},), k.ptr) != 0
 is_sigma2_estim(k::NoiseKriging) = ccall(dlsym(_lk(), :lk_noise_kriging_is_sigma2_estim), Cint, (Ptr{Nothing},), k.ptr) != 0
 
+# ─── WarpKriging ──────────────────────────────────────────────────
+
+mutable struct WarpKriging
+    ptr::Ptr{Nothing}
+
+    function WarpKriging(ptr::Ptr{Nothing})
+        obj = new(ptr)
+        finalizer(obj) do o
+            if o.ptr != C_NULL
+                ccall(dlsym(_lk(), :lk_warp_kriging_delete), Nothing, (Ptr{Nothing},), o.ptr)
+                o.ptr = C_NULL
+            end
+        end
+        return obj
+    end
+end
+
+function WarpKriging(warping::Vector{String}, kernel::String="gauss")
+    ptrs = [Base.unsafe_convert(Cstring, s) for s in warping]
+    GC.@preserve warping begin
+        ptr = ccall(dlsym(_lk(), :lk_warp_kriging_new), Ptr{Nothing},
+                    (Ptr{Cstring}, Cint, Cstring),
+                    ptrs, length(warping), kernel)
+    end
+    return WarpKriging(_check_ptr(ptr))
+end
+
+function WarpKriging(y::Vector{Float64}, X::Matrix{Float64},
+                     warping::Vector{String}, kernel::String="gauss";
+                     regmodel::String="constant",
+                     normalize::Bool=false,
+                     optim::String="BFGS+Adam",
+                     objective::String="LL")
+    n, d = size(X)
+    @assert length(y) == n
+    @assert length(warping) == d || length(warping) == 1
+    ptrs = [Base.unsafe_convert(Cstring, s) for s in warping]
+    GC.@preserve warping begin
+        ptr = ccall(dlsym(_lk(), :lk_warp_kriging_new_fit), Ptr{Nothing},
+                    (Ptr{Float64}, Cint,
+                     Ptr{Float64}, Cint, Cint,
+                     Ptr{Cstring}, Cint,
+                     Cstring, Cstring, Cint, Cstring, Cstring),
+                    y, n, X, n, d,
+                    ptrs, length(warping),
+                    kernel, regmodel, normalize ? 1 : 0, optim, objective)
+    end
+    return WarpKriging(_check_ptr(ptr))
+end
+
+function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Float64};
+              regmodel::String="constant",
+              normalize::Bool=false,
+              optim::String="BFGS+Adam",
+              objective::String="LL")
+    n, d = size(X)
+    @assert length(y) == n
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_fit), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint,
+                 Cstring, Cint, Cstring, Cstring),
+                wk.ptr, y, n, X, n, d, regmodel, normalize ? 1 : 0, optim, objective)
+    _check_error(ret)
+    return wk
+end
+
+function predict(wk::WarpKriging, X_n::Matrix{Float64};
+                 return_stdev::Bool=true,
+                 return_cov::Bool=false)
+    m, d = size(X_n)
+    mean_out = Vector{Float64}(undef, m)
+    stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
+    cov_out = return_cov ? Matrix{Float64}(undef, m, m) : Matrix{Float64}(undef, 0, 0)
+
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_predict), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                wk.ptr, X_n, m, d,
+                return_stdev ? 1 : 0, return_cov ? 1 : 0,
+                mean_out,
+                return_stdev ? stdev_out : C_NULL,
+                return_cov ? cov_out : C_NULL)
+    _check_error(ret)
+    return (mean=mean_out,
+            stdev=return_stdev ? stdev_out : nothing,
+            cov=return_cov ? cov_out : nothing)
+end
+
+function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Float64})
+    m, d = size(X_n)
+    sim_out = Matrix{Float64}(undef, m, nsim)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_simulate), Cint,
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                wk.ptr, nsim, seed, X_n, m, d, sim_out)
+    _check_error(ret)
+    return sim_out
+end
+
+function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
+    n, d = size(X_u)
+    @assert length(y_u) == n
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_update), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint),
+                wk.ptr, y_u, n, X_u, n, d)
+    _check_error(ret)
+    return wk
+end
+
+function summary(wk::WarpKriging)
+    s = ccall(dlsym(_lk(), :lk_warp_kriging_summary), Cstring, (Ptr{Nothing},), wk.ptr)
+    return unsafe_string(s)
+end
+
+function log_likelihood(wk::WarpKriging)
+    return ccall(dlsym(_lk(), :lk_warp_kriging_log_likelihood), Float64, (Ptr{Nothing},), wk.ptr)
+end
+
+function log_likelihood_fun(wk::WarpKriging, theta::Vector{Float64};
+                             return_grad::Bool=false,
+                             return_hess::Bool=false)
+    n = length(theta)
+    ll = Ref{Float64}(0.0)
+    grad = return_grad ? Vector{Float64}(undef, n) : Float64[]
+    hess = return_hess ? Matrix{Float64}(undef, n, n) : Matrix{Float64}(undef, 0, 0)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_log_likelihood_fun), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                wk.ptr, theta, n, return_grad ? 1 : 0, return_hess ? 1 : 0,
+                ll, return_grad ? grad : C_NULL, return_hess ? hess : C_NULL)
+    _check_error(ret)
+    return (ll=ll[],
+            grad=return_grad ? grad : nothing,
+            hess=return_hess ? hess : nothing)
+end
+
+kernel(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_kernel), Cstring, (Ptr{Nothing},), wk.ptr))
+is_fitted(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_is_fitted), Cint, (Ptr{Nothing},), wk.ptr) != 0
+feature_dim(wk::WarpKriging) = Int(ccall(dlsym(_lk(), :lk_warp_kriging_feature_dim), Cint, (Ptr{Nothing},), wk.ptr))
+get_X(wk::WarpKriging) = _get_mat(:lk_warp_kriging_get_X, wk.ptr)
+get_y(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_y, wk.ptr)
+get_theta(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_theta, wk.ptr)
+get_sigma2(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_sigma2), Float64, (Ptr{Nothing},), wk.ptr)
+
+function get_warping(wk::WarpKriging)
+    n_ref = Ref{Cint}(0)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}),
+                wk.ptr, C_NULL, n_ref)
+    _check_error(ret)
+    n = n_ref[]
+    ptrs = Vector{Ptr{Cchar}}(undef, n)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}),
+                wk.ptr, ptrs, n_ref)
+    _check_error(ret)
+    return [unsafe_string(p) for p in ptrs]
+end
+
 # ─── Exports ──────────────────────────────────────────────────────
 
-export LinearRegression, Kriging, NuggetKriging, NoiseKriging
+export LinearRegression, Kriging, NuggetKriging, NoiseKriging, WarpKriging
 export fit!, predict, simulate, update!, update_simulate, save, summary
 export load_kriging, load_nugget_kriging, load_noise_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
@@ -804,5 +962,6 @@ export get_X, get_centerX, get_scaleX, get_y, get_centerY, get_scaleY
 export get_F, get_T, get_M, get_z, get_beta, get_theta, get_sigma2
 export is_beta_estim, is_theta_estim, is_sigma2_estim
 export get_nugget, is_nugget_estim, get_noise
+export is_fitted, feature_dim, get_warping
 
 end # module

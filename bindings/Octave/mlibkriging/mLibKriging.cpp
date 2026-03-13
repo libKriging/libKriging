@@ -2,6 +2,7 @@
 #include "LinearRegression_binding.hpp"
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
+#include "WarpKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
@@ -313,6 +314,43 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NoiseKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::is_sigma2_estim"_hash:
       return NoiseKrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "WarpKriging::new"_hash:
+      return WarpKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::copy"_hash:
+      return WarpKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::delete"_hash:
+      return WarpKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::fit"_hash:
+      return WarpKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::predict"_hash:
+      return WarpKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::simulate"_hash:
+      return WarpKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::update"_hash:
+      return WarpKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::summary"_hash:
+      return WarpKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::logLikelihoodFun"_hash:
+      return WarpKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::logLikelihood"_hash:
+      return WarpKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::kernel"_hash:
+      return WarpKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::X"_hash:
+      return WarpKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::y"_hash:
+      return WarpKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::theta"_hash:
+      return WarpKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::sigma2"_hash:
+      return WarpKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::is_fitted"_hash:
+      return WarpKrigingBinding::is_fitted(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::feature_dim"_hash:
+      return WarpKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::warping"_hash:
+      return WarpKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Optim::is_reparametrized"_hash:
       return OptimBinding::is_reparametrized(nlhs, plhs, nrhs - 1, prhs + 1);
