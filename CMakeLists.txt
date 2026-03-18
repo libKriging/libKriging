@@ -177,6 +177,19 @@ else ()
     endif ()
 endif ()
 
+# ENABLE_JULIA_BINDING default is AUTO
+string(TOUPPER "${ENABLE_JULIA_BINDING}" ENABLE_JULIA_BINDING)
+if (NOT DEFINED ENABLE_JULIA_BINDING OR ENABLE_JULIA_BINDING STREQUAL "")
+    set(ENABLE_JULIA_BINDING "AUTO" CACHE STRING
+            "Enable Julia binding; choose between ON, OFF and AUTO (if available)"
+            FORCE)
+else ()
+    string(REGEX MATCH "^(ON|OFF|AUTO)$" VALID_JULIA_BINDING "${ENABLE_JULIA_BINDING}")
+    if (VALID_JULIA_BINDING STREQUAL "")
+        logFatalError("Invalid ENABLE_JULIA_BINDING option '${ENABLE_JULIA_BINDING}'; choose between ON, OFF and AUTO.")
+    endif ()
+endif ()
+
 #------------------------------------------------------
 
 if (USE_COMPILER_CACHE)
@@ -577,6 +590,28 @@ endif ()
 
 #------------------------------------------------------
 
+# Julia binding (C API shared library)
+
+if (ENABLE_JULIA_BINDING STREQUAL "ON" OR ENABLE_JULIA_BINDING STREQUAL "AUTO")
+    if (NOT BUILD_SHARED_LIBS)
+        if (ENABLE_JULIA_BINDING STREQUAL "ON")
+            logFatalError("Julia binding requires shared library mode (BUILD_SHARED_LIBS=ON)")
+        else()
+            message(STATUS "Julia binding disabled since it requires shared library mode")
+        endif()
+    else()
+        add_subdirectory(bindings/Julia/jlibkriging)
+        set(ENABLED_JULIA_BINDING ON)
+        message(STATUS "Julia binding enabled")
+    endif()
+elseif (ENABLE_JULIA_BINDING STREQUAL "OFF")
+    message(STATUS "Julia binding disabled as requested.")
+else ()
+    logFatalError("INTERNAL ERROR: value '${ENABLE_JULIA_BINDING}' not managed")
+endif ()
+
+#------------------------------------------------------
+
 add_subdirectory(src)
 
 #------------------------------------------------------
@@ -774,6 +809,9 @@ if (ENABLED_PYTHON_BINDING)
 endif()
 if (ENABLED_OCTAVE_BINDING)
     ADD_DEPENDENCIES(install.lib mLibKriging)
+endif()
+if (ENABLED_JULIA_BINDING)
+    ADD_DEPENDENCIES(install.lib libkriging_c)
 endif()
 
 

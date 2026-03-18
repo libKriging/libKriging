@@ -1,0 +1,12 @@
+name = "jlibkriging"
+uuid = "e8f3b728-4a2f-4b5c-9c3a-7d8b5e6f1a2d"
+version = "0.9.3"
+
+[deps]
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
