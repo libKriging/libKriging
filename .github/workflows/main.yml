@@ -135,6 +135,10 @@ jobs:
             os: macOS-latest
             mode: Release
             enable_julia: on
+          - name: "Julia Windows"
+            os: windows-latest
+            mode: Release
+            enable_julia: on
 
     steps:
       - uses: actions/checkout@v2
