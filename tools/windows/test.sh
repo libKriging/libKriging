@@ -16,7 +16,7 @@ MODE=${MODE:-Debug}
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     echo "Coverage not supported for Windows"
-    travis_terminate 1
+    exit 1
 fi
 
 cd ${BUILD_DIR:-build}

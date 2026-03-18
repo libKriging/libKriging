@@ -50,19 +50,19 @@ fi
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   case "$(uname -s)" in
    Darwin)
-     # using brew in .travis-ci.yml is too slow or fails with "update: true"
+     # using brew in CI is too slow or fails with "update: true"
      brew install octave gnuplot
      ;;
 
    Linux)
-     if [ "${TRAVIS}" == "true" ]; then
+     if [ "${CI}" == "true" ]; then
        # add kitware server signature cf https://apt.kitware.com       
        sudo apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common
        curl -s https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
        
        sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
        sudo apt-get install -y cmake # requires cmake ≥3.13 for target_link_options
-       test -d /usr/local/cmake-3.12.4 && sudo mv /usr/local/cmake-3.12.4 /usr/local/cmake-3.12.4.old # Overrides Travis installation
+       test -d /usr/local/cmake-3.12.4 && sudo mv /usr/local/cmake-3.12.4 /usr/local/cmake-3.12.4.old # Overrides pre-installed version
        # octave 4 is installed using packager
      fi
      ;;

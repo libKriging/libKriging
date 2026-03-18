@@ -11,7 +11,7 @@ test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
-    travis_terminate 1
+    exit 1
 fi
 
 # Install Miniconda for all Windows builds
@@ -62,7 +62,7 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # ** Install python tools **
   
   ## Using Chocolatey (by default only includes Python2)
-  # should be installed using choco in main .travis.yml
+  # should be installed using choco in CI workflow
   
   # ** Install PIP if not yet available **   
   if ( ! python -m pip --version 2>/dev/null ); then

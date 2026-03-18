@@ -1,5 +1,5 @@
 # if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
-  # Using choco installer : should be load by env in .travis.yml
+  # Using choco installer : should be loaded by env in CI workflow
   # export PATH=/c/Python37:/c/Python37/Scripts:$PATH
     
   ## Using miniconda (Python 3.7 is already included in Miniconda3)

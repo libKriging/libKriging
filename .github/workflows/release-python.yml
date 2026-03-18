@@ -254,8 +254,8 @@ jobs:
 
           pip3 install twine
           find .
-          # TWINE_USERNAME is set from travis global environment
-          # TWINE_PASSWORD is set to an API token in Travis settings
+          # TWINE_USERNAME is set from GitHub Actions environment
+          # TWINE_PASSWORD is set to an API token in GitHub Actions secrets
           python3 -m twine upload \
                   --repository-url https://upload.pypi.org/legacy/ \
                   ./dist/*.whl

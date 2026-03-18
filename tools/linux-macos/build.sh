@@ -6,7 +6,7 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-# Default configuration when used out of travis-ci
+# Default configuration when used out of CI
 MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
 EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DCMAKE_INSTALL_LIBDIR=lib" # avoid using "lib64" for some distros

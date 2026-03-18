@@ -11,7 +11,7 @@ test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
-    travis_terminate 1
+    exit 1
 fi
 
 # Install Miniconda for BLAS/LAPACK dependencies
@@ -39,7 +39,7 @@ if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   # This avoids conflicts between different MinGW versions
   
   if [[ ! -e  /c/windows/system32/GLU32.DLL ]]; then
-    # add missing GLU32.dll in travis-ci windows image
+    # add missing GLU32.dll in CI windows image
     # 64bit 10.0.14393.0	161.5 KB	U.S. English	OpenGL Utility Library DLL
     # found at https://fr.dllfile.net/microsoft/glu32-dll
     curl -s -o glu32.zip https://fr.dllfile.net/download/9439

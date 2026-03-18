@@ -1,15 +1,10 @@
-This page contains useful links to Travis CI features.
+**Note:** This project has migrated from Travis CI to GitHub Actions.
 
-The full documentation is available on [Travis CI documentation](https://docs.travis-ci.com).
+CI workflows are located in `.github/workflows/`.
+CI scripts are located in `tools/`.
 
-# Validate .travis.yml before pushing
+## Historical Travis CI links (for reference)
 
-Project https://github.com/haveneer/travis-ci-yml contains a TravisCI linter command.
-
-# Use Docker in Travis CI
-
+* [Travis CI documentation](https://docs.travis-ci.com)
 * https://docs.travis-ci.com/user/docker/
-
-# Add Worker to Travis CI
-
 * https://github.com/travis-ci/worker

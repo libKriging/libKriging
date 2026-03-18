@@ -14,7 +14,7 @@ and [Anaconda](https://docs.conda.io/en/latest/miniconda.html).
 
 ### [Chocolatey](https://chocolatey.org) package manager
 
-`choco` is the default package in Travis-CI and in GitHub Actions.
+`choco` is the default package manager in GitHub Actions.
 
 However `choco` has only few packages available about scientific computing.
 
@@ -24,7 +24,7 @@ NB: On Windows, `choco` package manager requires admin rights, so that it could 
 
 ### Anaconda package manager
 
-`conda` is an interesting alternative but not available by default in Travis-CI.
+`conda` is an interesting alternative but not available by default in GitHub Actions.
 
 [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is one of its client.
 

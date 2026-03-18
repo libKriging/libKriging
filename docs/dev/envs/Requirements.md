@@ -14,7 +14,7 @@
   |      Clang       | 7.1          | AppleClang **9.1**<br>AppleClang 10.0 (Mojave)<br>AppleClang 11.0 (Catalina)<br>Clang 9.0|               |
   | MS Visual Studio |              |                          | **15 (2017)** |
 
-  (bold values represent configurations used in Travis CI pipelines)
+  (bold values represent configurations used in CI pipelines)
 
 * Linear algebra packages providing blas and lapack functions.
 

@@ -16,9 +16,8 @@ if [ "${GITHUB_ACTIONS:=false}" == "true" ]; then
     BASE_COMMIT="$GITHUB_REF_SLUG"
   fi
 elif [ "${TRAVIS:=false}" == "true" ]; then 
+  # Legacy Travis CI support (no longer used)
   if [ "${TRAVIS_PULL_REQUEST:=false}" == "false" ] ; then
-    # Not in a pull request, so compare against parent commit
-    # FIXME: need to use first commit of this push
     BASE_COMMIT="HEAD^"
   else
     BASE_COMMIT="$TRAVIS_BRANCH"
