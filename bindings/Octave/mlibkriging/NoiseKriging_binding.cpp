@@ -239,12 +239,28 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<NoiseKriging>(0, "NoiseKriging reference");
 
-  const char* fieldnames[]
-      = {"kernel",     "optim",          "objective",     "theta",         "is_theta_estim",
-         "sigma2",     "is_sigma2_estim", "X",             "centerX",       "scaleX",
-         "y",          "centerY",        "scaleY",        "noise",         "normalize",
-         "regmodel",   "beta",           "is_beta_estim", "F",             "T",
-         "M",          "z"};
+  const char* fieldnames[] = {"kernel",
+                              "optim",
+                              "objective",
+                              "theta",
+                              "is_theta_estim",
+                              "sigma2",
+                              "is_sigma2_estim",
+                              "X",
+                              "centerX",
+                              "scaleX",
+                              "y",
+                              "centerY",
+                              "scaleY",
+                              "noise",
+                              "normalize",
+                              "regmodel",
+                              "beta",
+                              "is_beta_estim",
+                              "F",
+                              "T",
+                              "M",
+                              "z"};
   mxArray* model_struct = mxCreateStructMatrix(1, 1, 22, fieldnames);
 
   auto createMxArray = [](const auto& value) -> mxArray* {
