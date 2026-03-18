@@ -28,7 +28,7 @@ Or build directly with CMake:
 
 ```shell
 cmake -B build -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=on -DENABLE_JULIA_BINDING=on .
+  -DENABLE_JULIA_BINDING=on .
 cmake --build build
 ```
 
@@ -43,7 +43,7 @@ Or build directly with CMake:
 
 ```shell
 cmake -B build -DCMAKE_GENERATOR_PLATFORM=x64 \
-  -DBUILD_SHARED_LIBS=on -DENABLE_JULIA_BINDING=on .
+  -DENABLE_JULIA_BINDING=on .
 cmake --build build --config Release
 ```
 

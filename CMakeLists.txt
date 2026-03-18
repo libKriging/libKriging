@@ -591,19 +591,14 @@ endif ()
 #------------------------------------------------------
 
 # Julia binding (C API shared library)
+# libkriging_c is always built as SHARED (declared explicitly in its CMakeLists.txt).
+# It links against the Kriging static/shared lib. PIC is globally ON (line 220),
+# so static libs can be linked into the shared libkriging_c on all platforms.
 
 if (ENABLE_JULIA_BINDING STREQUAL "ON" OR ENABLE_JULIA_BINDING STREQUAL "AUTO")
-    if (NOT BUILD_SHARED_LIBS)
-        if (ENABLE_JULIA_BINDING STREQUAL "ON")
-            logFatalError("Julia binding requires shared library mode (BUILD_SHARED_LIBS=ON)")
-        else()
-            message(STATUS "Julia binding disabled since it requires shared library mode")
-        endif()
-    else()
-        add_subdirectory(bindings/Julia/jlibkriging)
-        set(ENABLED_JULIA_BINDING ON)
-        message(STATUS "Julia binding enabled")
-    endif()
+    add_subdirectory(bindings/Julia/jlibkriging)
+    set(ENABLED_JULIA_BINDING ON)
+    message(STATUS "Julia binding enabled")
 elseif (ENABLE_JULIA_BINDING STREQUAL "OFF")
     message(STATUS "Julia binding disabled as requested.")
 else ()
