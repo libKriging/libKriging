@@ -107,7 +107,7 @@ jobs:
 
       - name: install
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/install.sh
+        run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v1.13
@@ -116,11 +116,11 @@ jobs:
 
       - name: before_script
         shell: bash
-        run: .travis-ci/common/before_script.sh
+        run: tools/common/before_script.sh
 
       - name: script
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/build.sh
+        run: tools/${BUILD_NAME}/build.sh
 
       - name: bench
         shell: bash

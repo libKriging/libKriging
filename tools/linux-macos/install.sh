@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+if [[ "$DEBUG_CI" == "true" ]]; then
+  set -x
+fi
+
+case "$(uname -s)" in
+ Darwin)
+   # brew install hdf5
+   ;;
+
+ Linux)
+   # sudo apt install -y libhdf5-dev
+   ;;
+
+ *)
+   echo 'Unknown OS'
+   exit 1 
+   ;;
+esac
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
+  if ( command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1 ); then
+    # python3 -m pip install pip # --upgrade # --progress-bar off
+    if ( ! python3 "${ROOT_DIR}"/bindings/Python/pylibkriging/check_requirements.py --pretty "${ROOT_DIR}"/bindings/Python/pylibkriging/requirements.txt "${ROOT_DIR}"/bindings/Python/pylibkriging/dev-requirements.txt ); then
+      # modern macOS Python installation (using brew) requires to install local packages in a virtual environment
+      if [ ! -d "$VIRTUAL_ENV" ]; then
+        echo "Preparing virtual environment in ${ROOT_DIR}/venv"
+        python3 -m venv "${ROOT_DIR}"/venv
+        . "${ROOT_DIR}"/venv/bin/activate
+      fi
+      python3 -m pip install -r bindings/Python/pylibkriging/requirements.txt # --upgrade # --progress-bar off
+      python3 -m pip install -r bindings/Python/pylibkriging/dev-requirements.txt # --upgrade # --progress-bar off
+    fi
+
+    if [[ "$ENABLE_MEMCHECK" == "on" ]]; then
+      python3 -m pip install wheel # required ton compile pytest-valgrind
+      python3 -m pip install pytest-valgrind
+    fi
+  fi
+fi
+
+if [[ "$ENABLE_COVERAGE" == "on" ]] && [[ "$ENABLE_MEMCHECK" == "on" ]]; then
+  echo "Mixing coverage mode and memcheck is not supported"
+  exit 1
+fi
+
+if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
+  case "$(uname -s)" in
+   Darwin)
+     # using brew in CI is too slow or fails with "update: true"
+     brew install octave gnuplot
+     ;;
+
+   Linux)
+     # Octave is installed via apt in the pre-install-linux step of the workflow.
+     # cmake ≥3.13 is provided by the actions-setup-cmake workflow step.
+     ;;
+
+   *)
+     echo 'Unknown OS'
+     exit 1 
+     ;;
+  esac
+fi

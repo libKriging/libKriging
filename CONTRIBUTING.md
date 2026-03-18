@@ -53,7 +53,7 @@ The subject contains succinct description of the change:
 * don't capitalize first letter
 * no dot (.) at the end
 
-To skip Travis CI build, the HEAD commit message on push must contain `[skip ci]`.
+To skip CI build, the HEAD commit message on push must contain `[skip ci]`.
 
 ## Message Body
 Just as in the **Subject**, use the imperative, present tense: "change" not "changed" nor "changes". 
@@ -113,13 +113,13 @@ CI build is a waste of time for a so tiny mispelling fix.
 When you submit a pull request, be sure that 
 * your code is well formatted (use `cmake --build . --target clang-format` for force format using clang-format)
   
-  it will be check by travis-ci
+  it will be checked by CI
   
 * you have removed useless debug outputs
 
 * you added tests for any new features
 
-* you have checked clang-tidy warnings (on your workstation or using travis-ci output)
+* you have checked clang-tidy warnings (on your workstation or using CI output)
   
   You can disable irrelevant warnings using `NOLINT` or `NOLINTNEXTLINE` special comments (see https://clang.llvm.org/extra/clang-tidy/#suppressing-undesired-diagnostics)
   

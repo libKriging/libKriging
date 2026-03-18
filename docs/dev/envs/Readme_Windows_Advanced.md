@@ -114,14 +114,14 @@ Don't forget to configure a port redirection from host:2022 to VM:22 if you want
 * Install project dependencies  
   ```
   # bash script from libKriging repository clone (once per installation)
-  .travis-ci/windows/install.sh
+  tools/windows/install.sh
   ```
 * Build libKriging
   ```
-  .travis-ci/windows/build.sh
+  tools/windows/build.sh
   ```
 
-  For R development, use scripts in `.travis-ci/r-windows` instead of `.travis-ci/windows`.
+  For R development, use scripts in `tools/r-windows` instead of `tools/windows`.
   
   To get paths to load to launch command by hand, use:
   ```

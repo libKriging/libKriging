@@ -2,12 +2,12 @@ import importlib.util
 import sys
 from pathlib import Path
 
-# This file a hack to redirect calls from libKriging root to bindings/Python
+# This file a hack to redirect calls from libKriging root to bindings/Python/pylibkriging
 
 
 # To help to find check_requirements.py which is in a non local part (according to the current file)
 
-python_binding_path = Path(__file__).absolute().parent / "bindings" / "Python"
+python_binding_path = Path(__file__).absolute().parent / "bindings" / "Python" / "pylibkriging"
 sys.path.append(str(python_binding_path))
 
 # Since this file and the file to import have the same name, we need a manual loading

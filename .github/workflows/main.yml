@@ -49,11 +49,11 @@ jobs:
 
       - name: before_script
         shell: bash
-        run: .travis-ci/common/before_script.sh
+        run: tools/common/before_script.sh
 
       - name: check
         shell: bash
-        run: .travis-ci/checks/test.sh
+        run: tools/checks/test.sh
 
   build:
     runs-on: ${{ matrix.os }}
@@ -127,6 +127,18 @@ jobs:
             os: windows-latest
             mode: Release
             enable_R: on
+          - name: "Julia Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_julia: on
+          - name: "Julia macOS"
+            os: macOS-latest
+            mode: Release
+            enable_julia: on
+          - name: "Julia Windows"
+            os: windows-latest
+            mode: Release
+            enable_julia: on
 
     steps:
       - uses: actions/checkout@v2
@@ -145,7 +157,12 @@ jobs:
           use-public-rspm: true
         if: matrix.enable_R == 'on'
 
-      # Note: Miniconda is installed directly in .travis-ci/windows/install.sh for all Windows jobs
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+        if: matrix.enable_julia == 'on'
+
+      # Note: Miniconda is installed directly in tools/windows/install.sh for all Windows jobs
       # This provides BLAS/LAPACK dependencies and Python environment consistently
 
       - name: Define local variables
@@ -156,6 +173,7 @@ jobs:
           echo "ENABLE_OCTAVE_BINDING=${{matrix.enable_octave}}" >> $GITHUB_ENV
           echo "ENABLE_MATLAB_BINDING=${{matrix.enable_matlab}}" >> $GITHUB_ENV
           echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
+          echo "ENABLE_JULIA_BINDING=${{matrix.enable_julia}}"   >> $GITHUB_ENV
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
@@ -221,7 +239,7 @@ jobs:
 
       - name: install
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/install.sh
+        run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v1.13
@@ -230,15 +248,15 @@ jobs:
 
       - name: before_script
         shell: bash
-        run: .travis-ci/common/before_script.sh
+        run: tools/common/before_script.sh
 
       - name: script
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/build.sh
+        run: tools/${BUILD_NAME}/build.sh
 
       - name: test
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/test.sh
+        run: tools/${BUILD_NAME}/test.sh
         id: test
         continue-on-error: true
 

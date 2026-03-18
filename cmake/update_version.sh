@@ -31,7 +31,7 @@ sed -i.bak -e "s/^Date: .*$/Date: $DATE/" \
 
 # Update pylibKriging version in tests
 sed -i.bak -e "s/m.__version__ == .*$/m.__version__ == '${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}'/" \
-  "${BASEDIR}"/bindings/Python/tests/loading_test.py
+  "${BASEDIR}"/bindings/Python/pylibkriging/tests/loading_test.py
 
 sed -i.bak -e "s/pkgs=\"rlibkriging_.*\.tgz\"/pkgs=\"rlibkriging_${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}-${KRIGING_VERSION_PATCH}.tgz\"/" \
   "${BASEDIR}"/bindings/R/rlibkriging/tests/testthat/notest-LinearRegression.R
@@ -39,7 +39,7 @@ sed -i.bak -e "s/pkgs=\"rlibkriging_.*\.tgz\"/pkgs=\"rlibkriging_${KRIGING_VERSI
 git commit -m "build: update version to ${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}" \
   "${BASEDIR}"/cmake/version.cmake \
   "${BASEDIR}"/bindings/R/rlibkriging/DESCRIPTION \
-  "${BASEDIR}"/bindings/Python/tests/loading_test.py \
+  "${BASEDIR}"/bindings/Python/pylibkriging/tests/loading_test.py \
   "${BASEDIR}"/bindings/R/rlibkriging/tests/testthat/notest-LinearRegression.R
   
 git tag "v${KRIGING_VERSION_MAJOR}.${KRIGING_VERSION_MINOR}.${KRIGING_VERSION_PATCH}"

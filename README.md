@@ -9,6 +9,7 @@ Table of contents
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging  for R](#rlibkriging--for-r)
   - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
+  - [jlibkriging for Julia](#jlibkriging-for-julia)
   - [Expected demo results](#expected-demo-results)
   - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
@@ -30,7 +31,7 @@ If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 # Installation from pre-built packages
 
-For the most common target {Python, R, Octave, Matlab} x {Linux, macOS, Windows} x { x86-64, ARM }, you can
+For the most common target {Python, R, Octave, Matlab, Julia} x {Linux, macOS, Windows} x { x86-64, ARM }, you can
 use [released binaries](https://github.com/libKriging/libKriging/releases), or R CRAN or Python PyPI.
 
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
@@ -45,7 +46,7 @@ or for pre-release packages (according to your OS and Python version, see https:
 pip3 install https://github.com/libKriging/libKriging/releases/download/v0.9.0/pylibkriging-0.9.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
-**Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
+**Usage example [here](bindings/Python/pylibkriging/tests/pylibkriging_demo.py)**
 
 <details>
 <summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
@@ -173,7 +174,7 @@ or inside Octave or Matlab
 addpath("path/to/mLibKriging")
 ```
 
-**Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)**
+**Usage example [here](bindings/Octave/mlibkriging/tests/mLibKriging_demo.m)**
 
 <details>
 <summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
@@ -212,9 +213,47 @@ hold off;
 
 </details>
 
+## jlibkriging for Julia
+
+The Julia binding requires building libKriging from source with `-DENABLE_JULIA_BINDING=ON`:
+
+```shell
+git clone --recurse-submodules https://github.com/libKriging/libKriging.git
+cd libKriging
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_JULIA_BINDING=ON .
+cmake --build build
+```
+
+Then install the Julia package (the library is auto-detected from the `build/` directory):
+
+```shell
+julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
+```
+
+```julia
+using jlibkriging
+
+X = reshape([0.0, 0.25, 0.5, 0.75, 1.0], :, 1)
+f(x) = 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7)
+y = f.(X[:, 1])
+
+k = Kriging(y, X, "gauss")
+println(jlibkriging.summary(k))
+
+x = reshape(collect(0:0.01:1), :, 1)
+p = predict(k, x; stdev=true, cov=false)
+println("Predicted mean: ", p.mean[1:5])
+println("Predicted stdev: ", p.stdev[1:5])
+
+s = simulate(k, 10, 123, x)
+println("Simulation size: ", size(s))
+```
+
+**Usage example [here](bindings/Julia/jlibkriging/tests/jlibkriging_demo.jl)**
+
 ## Expected demo results
 
-Using the previous linked examples (in Python, R, Octave or Matlab), you should obtain the following results
+Using the previous linked examples (in Python, R, Octave, Matlab or Julia), you should obtain the following results
 
 `predict` plot                               |  `simulate` plot
 :-------------------------------------------:|:---------------------------------------------:
@@ -232,6 +271,7 @@ with libKriging 0.9
 | R      | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  |
 | Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 8.3      |
 | Matlab | <span style="color:green">️✔</span> R2022a   | <span style="color:green">✔</span> R2022*   | <span style="color:green">✔</span> R2022*   |
+| Julia  | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   |
 
 * \* : no pre-built package or CI
 
@@ -257,6 +297,8 @@ with libKriging 0.9
 
 * R ≥ 4.0 (optional)
 
+* Julia ≥ 1.10 (optional)
+
 ## Get the code
 
 Just clone it with its submodules:
@@ -279,6 +321,7 @@ To configure it, you can define following environment variables ([more details](
 |`ENABLE_OCTAVE_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) | Exclusive with Matlab binding build             |
 |`ENABLE_MATLAB_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) | Exclusive with Octave binding build             |
 |`ENABLE_PYTHON_BINDING` | `AUTO`        | `ON`, `OFF`, `AUTO` (if available) |                                                 |
+|`ENABLE_JULIA_BINDING`  | `OFF`         | `ON`, `OFF`                        | Requires Julia ≥ 1.10                           |
 
 Then choose your `BUILD_NAME` using the following rule (stops a rule matches)
 
@@ -298,17 +341,17 @@ Then:
     ```
 * Prepare your environment (Once, for your first compilation)
     ```shell
-    .travis-ci/${BUILD_NAME}/install.sh
+    tools/${BUILD_NAME}/install.sh
     ```
 * Build
   ```shell
-  .travis-ci/${BUILD_NAME}/build.sh
+  tools/${BUILD_NAME}/build.sh
   ```
   NB: It will create a `build` directory.
 
 * Test
   ```shell
-  .travis-ci/${BUILD_NAME}/test.sh
+  tools/${BUILD_NAME}/test.sh
   ```
 
 ## Compilation and tests *manually*

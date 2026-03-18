@@ -54,7 +54,7 @@ jobs:
           
       - name: Verify source code consistency
         run: |
-          CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
+          CODE_VERSION=$(python3 tools/release/get_code_version.py)
           if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
             echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Non consistent code and requested tag versions"
@@ -63,7 +63,7 @@ jobs:
           
       - name: Check available version in pypi.org
         run: |
-          if ( python3 .travis-ci/release/check_python_release.py pylibkriging ${GIT_TAG##v} ); then
+          if ( python3 tools/release/check_python_release.py pylibkriging ${GIT_TAG##v} ); then
             echo "Cannot re-upload already available version ${GIT_TAG} in pypi.org"  
             exit 1
           else
@@ -152,7 +152,7 @@ jobs:
 
       - name: install
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/install.sh
+        run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v1.13
@@ -161,15 +161,15 @@ jobs:
 
       - name: before_script
         shell: bash
-        run: .travis-ci/common/before_script.sh
+        run: tools/common/before_script.sh
 
       - name: build
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            .travis-ci/release/python-release-single.sh
+            tools/release/python-release-single.sh
           else
-            .travis-ci/release/python-release.sh
+            tools/release/python-release.sh
           fi
 
       - name: Archive build artifacts
@@ -254,8 +254,8 @@ jobs:
 
           pip3 install twine
           find .
-          # TWINE_USERNAME is set from travis global environment
-          # TWINE_PASSWORD is set to an API token in Travis settings
+          # TWINE_USERNAME is set from GitHub Actions environment
+          # TWINE_PASSWORD is set to an API token in GitHub Actions secrets
           python3 -m twine upload \
                   --repository-url https://upload.pypi.org/legacy/ \
                   ./dist/*.whl

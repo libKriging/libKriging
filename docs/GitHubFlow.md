@@ -60,7 +60,7 @@
 
 ## 5. Use *Pull Request* form
  
-   Use *Pull Request* form to watch Travis Continuous Integration process and interact with the maintainer (code review, requested changes) 
+   Use *Pull Request* form to watch GitHub Actions Continuous Integration process and interact with the maintainer (code review, requested changes) 
 
    **Don't do any other change in the submitted branch other than those resquested to process this PR**
    

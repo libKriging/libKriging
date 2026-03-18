@@ -14,7 +14,7 @@ and [Anaconda](https://docs.conda.io/en/latest/miniconda.html).
 
 ### [Chocolatey](https://chocolatey.org) package manager
 
-`choco` is the default package in Travis-CI and in GitHub Actions.
+`choco` is the default package manager in GitHub Actions.
 
 However `choco` has only few packages available about scientific computing.
 
@@ -24,13 +24,13 @@ NB: On Windows, `choco` package manager requires admin rights, so that it could 
 
 ### Anaconda package manager
 
-`conda` is an interesting alternative but not available by default in Travis-CI.
+`conda` is an interesting alternative but not available by default in GitHub Actions.
 
 [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is one of its client.
 
 Package list is available here: [https://anaconda.org/search](https://anaconda.org/search).
 
-To install it, you can use [`install.sh`](../../../.travis-ci/windows/install.sh) script for more information.
+To install it, you can use [`install.sh`](../../../tools/windows/install.sh) script for more information.
 
 This script will also install all the other required dependencies.
 
@@ -46,6 +46,6 @@ the associated compiler (See R toolchain).
 Matlab on Windows provides blas and lapack implementations in `extern` subdirectory. Unfortunately, armadillo does not
 recognise this implementation *out-of-the-box*.
 See [libKriging/armadillo-code/tree/matlab-mkblas-on-windows](https://github.com/libKriging/armadillo-code/tree/matlab-mkblas-on-windows)
-for required changes in armadillo and `.travis-ci/windows/build.sh` for additional config on build.
+for required changes in armadillo and `tools/windows/build.sh` for additional config on build.
 
 # [Development for Windows without native Windows](Readme_Windows_Advanced.md)

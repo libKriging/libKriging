@@ -54,7 +54,7 @@ jobs:
           
       - name: Verify source code consistency
         run: |
-          CODE_VERSION=$(python3 .travis-ci/release/get_code_version.py)
+          CODE_VERSION=$(python3 tools/release/get_code_version.py)
           if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
             echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
             echo "Non consistent code and requested tag versions"
@@ -107,7 +107,7 @@ jobs:
 
       - name: install
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/install.sh
+        run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v1.13
@@ -116,15 +116,15 @@ jobs:
 
       - name: before_script
         shell: bash
-        run: .travis-ci/common/before_script.sh
+        run: tools/common/before_script.sh
 
       - name: script
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/build.sh
+        run: tools/${BUILD_NAME}/build.sh
 
       - name: test
         shell: bash
-        run: .travis-ci/${BUILD_NAME}/test.sh
+        run: tools/${BUILD_NAME}/test.sh
 
       - name: Create package
         shell: bash

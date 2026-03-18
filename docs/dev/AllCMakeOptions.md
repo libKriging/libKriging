@@ -19,6 +19,7 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 | `ENABLE_OCTAVE_BINDING`      |           `AUTO`            | `ON`, `OFF`, `AUTO` (if available)                  | Exclusive with `ENABLE_MATLAB_BINDING=on`         |
 | `ENABLE_MATLAB_BINDING`      |           `AUTO`            | `ON`, `OFF`, `AUTO` (if available)                  | Exclusive with `ENABLE_OCTAVE_BINDING=on`         |
 | `ENABLE_PYTHON_BINDING`      |           `AUTO`            | `ON`, `OFF`, `AUTO` (if available)                  |                                                   |
+| `ENABLE_JULIA_BINDING`       |            `OFF`            | `ON`, `OFF`                                         | Requires Julia ≥ 1.10                             |
 | `USE_COMPILER_CACHE`         |        &lt;empty&gt;        | &lt;string&gt;                                      | name of a compiler cache program                  |
 | `BUILD_SHARED_LIBS`          |            `ON`             | `ON`, `OFF`                                         |                                                   |
 | `PYTHON_PREFIX_PATH`         |        &lt;empty&gt;        | &lt;string&gt;                                      | overrides default python path detection           |
