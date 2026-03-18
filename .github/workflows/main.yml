@@ -127,6 +127,14 @@ jobs:
             os: windows-latest
             mode: Release
             enable_R: on
+          - name: "Julia Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_julia: on
+          - name: "Julia macOS"
+            os: macOS-latest
+            mode: Release
+            enable_julia: on
 
     steps:
       - uses: actions/checkout@v2
@@ -145,6 +153,11 @@ jobs:
           use-public-rspm: true
         if: matrix.enable_R == 'on'
 
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+        if: matrix.enable_julia == 'on'
+
       # Note: Miniconda is installed directly in tools/windows/install.sh for all Windows jobs
       # This provides BLAS/LAPACK dependencies and Python environment consistently
 
@@ -156,6 +169,7 @@ jobs:
           echo "ENABLE_OCTAVE_BINDING=${{matrix.enable_octave}}" >> $GITHUB_ENV
           echo "ENABLE_MATLAB_BINDING=${{matrix.enable_matlab}}" >> $GITHUB_ENV
           echo "ENABLE_R_BINDING=${{matrix.enable_R}}"           >> $GITHUB_ENV
+          echo "ENABLE_JULIA_BINDING=${{matrix.enable_julia}}"   >> $GITHUB_ENV
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
