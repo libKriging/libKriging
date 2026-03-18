@@ -11,7 +11,7 @@ if [ "$MODE" != "Release" ]; then
 fi
 
 # windows environment requires to load special tools
-loadenv_sh=".travis-ci/${BUILD_NAME}/loadenv.sh"
+loadenv_sh="tools/${BUILD_NAME}/loadenv.sh"
 if [ -e "$loadenv_sh" ]; then
   . "$loadenv_sh"
 fi

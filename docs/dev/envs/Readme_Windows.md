@@ -30,7 +30,7 @@ NB: On Windows, `choco` package manager requires admin rights, so that it could 
 
 Package list is available here: [https://anaconda.org/search](https://anaconda.org/search).
 
-To install it, you can use [`install.sh`](../../../.travis-ci/windows/install.sh) script for more information.
+To install it, you can use [`install.sh`](../../../tools/windows/install.sh) script for more information.
 
 This script will also install all the other required dependencies.
 
@@ -46,6 +46,6 @@ the associated compiler (See R toolchain).
 Matlab on Windows provides blas and lapack implementations in `extern` subdirectory. Unfortunately, armadillo does not
 recognise this implementation *out-of-the-box*.
 See [libKriging/armadillo-code/tree/matlab-mkblas-on-windows](https://github.com/libKriging/armadillo-code/tree/matlab-mkblas-on-windows)
-for required changes in armadillo and `.travis-ci/windows/build.sh` for additional config on build.
+for required changes in armadillo and `tools/windows/build.sh` for additional config on build.
 
 # [Development for Windows without native Windows](Readme_Windows_Advanced.md)

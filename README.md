@@ -298,17 +298,17 @@ Then:
     ```
 * Prepare your environment (Once, for your first compilation)
     ```shell
-    .travis-ci/${BUILD_NAME}/install.sh
+    tools/${BUILD_NAME}/install.sh
     ```
 * Build
   ```shell
-  .travis-ci/${BUILD_NAME}/build.sh
+  tools/${BUILD_NAME}/build.sh
   ```
   NB: It will create a `build` directory.
 
 * Test
   ```shell
-  .travis-ci/${BUILD_NAME}/test.sh
+  tools/${BUILD_NAME}/test.sh
   ```
 
 ## Compilation and tests *manually*
