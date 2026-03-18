@@ -9,20 +9,27 @@ function _get_lib()
     if _lib[] == C_NULL
         path = get(ENV, "JLIBKRIGING_LIB_PATH", "")
         if isempty(path)
-            # Try common locations relative to this file
-            for candidate in [
-                joinpath(@__DIR__, "..", "..", "build", "libkriging_c.so"),
-                joinpath(@__DIR__, "..", "..", "build", "libkriging_c.dylib"),
-                joinpath(@__DIR__, "..", "..", "build", "libkriging_c.dll"),
-                "libkriging_c",
-            ]
+            # @__DIR__ is bindings/Julia/jlibkriging/src/
+            # repo root is four levels up
+            repo_root = joinpath(@__DIR__, "..", "..", "..", "..")
+            build_subdir = joinpath("bindings", "Julia", "jlibkriging")
+            candidates = String[]
+            for build_dir in ["build", "build-Release", "build-Debug"]
+                for libname in ["libkriging_c.so", "libkriging_c.dylib", "libkriging_c.dll"]
+                    push!(candidates, joinpath(repo_root, build_dir, build_subdir, libname))
+                end
+            end
+            push!(candidates, "libkriging_c")
+            for candidate in candidates
                 h = dlopen(candidate; throw_error=false)
                 if h !== nothing
                     _lib[] = h
                     return _lib[]
                 end
             end
-            error("Cannot find libkriging_c shared library. Set JLIBKRIGING_LIB_PATH environment variable.")
+            error("Cannot find libkriging_c shared library. " *
+                  "Set JLIBKRIGING_LIB_PATH environment variable or build with " *
+                  "cmake -DENABLE_JULIA_BINDING=ON.")
         else
             _lib[] = dlopen(path)
         end

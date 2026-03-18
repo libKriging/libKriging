@@ -17,7 +17,7 @@ macro(add_julia_test)
 
     add_test(NAME ${TEST_NAME}
              COMMAND ${JULIA_EXECUTABLE}
-                     --project=${CMAKE_CURRENT_SOURCE_DIR}/../julia
+                     --project=${CMAKE_CURRENT_SOURCE_DIR}/..
                      ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_FILENAME})
 
     if (ARGS_WILL_FAIL)

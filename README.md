@@ -215,17 +215,22 @@ hold off;
 
 ## jlibkriging for Julia
 
-The Julia binding requires building libKriging from source with `-DENABLE_JULIA_BINDING=ON`.
+The Julia binding requires building libKriging from source with `-DENABLE_JULIA_BINDING=ON`:
 
 ```shell
-cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_JULIA_BINDING=ON ${LIBKRIGING}
-cmake --build .
+git clone --recurse-submodules https://github.com/libKriging/libKriging.git
+cd libKriging
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_JULIA_BINDING=ON .
+cmake --build build
 ```
 
-Then set the library path and use:
+Then install the Julia package (the library is auto-detected from the `build/` directory):
+
+```shell
+julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
+```
 
 ```julia
-ENV["JLIBKRIGING_LIB_PATH"] = "/path/to/build/bindings/Julia/jlibkriging/libkriging_c.so"
 using jlibkriging
 
 X = reshape([0.0, 0.25, 0.5, 0.75, 1.0], :, 1)

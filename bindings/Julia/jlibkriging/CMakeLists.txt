@@ -8,8 +8,8 @@ set(LIBKRIGING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 include(${LIBKRIGING_SOURCE_DIR}/cmake/version.cmake)
 
 add_library(libkriging_c SHARED
-        src/libkriging_c.cpp
-        src/libkriging_c.h)
+        csrc/libkriging_c.cpp
+        csrc/libkriging_c.h)
 
 target_link_libraries(libkriging_c PRIVATE Kriging)
 
@@ -26,7 +26,7 @@ set_target_properties(libkriging_c PROPERTIES
 
 install(TARGETS libkriging_c
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Julia)
-install(FILES src/libkriging_c.h
+install(FILES csrc/libkriging_c.h
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Julia/include)
 
 # Julia tests (only if Julia is found)
