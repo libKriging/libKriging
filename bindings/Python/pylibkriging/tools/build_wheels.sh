@@ -46,9 +46,9 @@ for PYVER in cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
     echo "Building pyquantlib for Python ${PYVER}"
     echo "------------------------------------------"
     PYBIN=/opt/python/${PYVER}/bin
-    "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/requirements.txt # not for Windows
-    "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/dev-requirements.txt # not for Windows
-    "${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/setup.py bdist_wheel
+    "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/pylibkriging/requirements.txt # not for Windows
+    "${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/pylibkriging/dev-requirements.txt # not for Windows
+    "${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/pylibkriging/setup.py bdist_wheel
 done
 
 # Bundle external shared libraries into the wheels
@@ -64,7 +64,7 @@ done
 #    echo "-----------------------------------------"
 #    PYBIN=/opt/python/${PYVER}/bin
 #    "${PYBIN}/pip" install pylibkriging --no-index -f "${ROOT_DIR}"/dist
-#    (cd "${ROOT_DIR}"; "${PYBIN}/pytest" "${ROOT_DIR}"/bindings/Python/tests)
+#    (cd "${ROOT_DIR}"; "${PYBIN}/pytest" "${ROOT_DIR}"/bindings/Python/pylibkriging/tests)
 #done
 
 find "${ROOT_DIR}"/dist/ -name "*-linux_*" -exec rm {} \;

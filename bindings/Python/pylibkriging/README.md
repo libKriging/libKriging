@@ -36,7 +36,7 @@ importlib.reload(lk)
 ``` 
 
 ```shell
-PYTHONPATH=../../../build/bindings/Python python3 -i -c "exec(open('LinearRegression.py').read())"
+PYTHONPATH=../../../build/bindings/Python/pylibkriging python3 -i -c "exec(open('LinearRegression.py').read())"
 ```
 
 Deployment / upload:
@@ -59,5 +59,5 @@ Cf:
 ```
 docker run -it --rm -v "$PWD":"/data" quay.io/pypa/manylinux2014_x86_64 /bin/bash
 cd /data
-/opt/python/cp36-cp36m/bin/python3 bindings/Python/setup.py sdist bdist_wheel
+/opt/python/cp36-cp36m/bin/python3 bindings/Python/pylibkriging/setup.py sdist bdist_wheel
 ```

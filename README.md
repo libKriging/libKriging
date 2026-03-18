@@ -45,7 +45,7 @@ or for pre-release packages (according to your OS and Python version, see https:
 pip3 install https://github.com/libKriging/libKriging/releases/download/v0.9.0/pylibkriging-0.9.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
-**Usage example [here](bindings/Python/tests/pylibkriging_demo.py)**
+**Usage example [here](bindings/Python/pylibkriging/tests/pylibkriging_demo.py)**
 
 <details>
 <summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>
@@ -173,7 +173,7 @@ or inside Octave or Matlab
 addpath("path/to/mLibKriging")
 ```
 
-**Usage example [here](bindings/Octave/tests/mLibKriging_demo.m)**
+**Usage example [here](bindings/Octave/mlibkriging/tests/mLibKriging_demo.m)**
 
 <details>
 <summary>👆The sample code below should give you a taste. Please refer to the reference file linked above for a CI certified example.</summary>

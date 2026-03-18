@@ -62,11 +62,11 @@ esac
 yum install -y openblas-devel
 
 # Install Python requirements
-"${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/requirements.txt
-"${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/dev-requirements.txt
+"${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/pylibkriging/requirements.txt
+"${PYBIN}/pip" install -r "${ROOT_DIR}"/bindings/Python/pylibkriging/dev-requirements.txt
 
 # Build wheel
-"${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/setup.py bdist_wheel
+"${PYBIN}/python3" "${ROOT_DIR}"/bindings/Python/pylibkriging/setup.py bdist_wheel
 
 # Bundle external shared libraries into the wheels
 for whl in "${ROOT_DIR}"/dist/*.whl; do

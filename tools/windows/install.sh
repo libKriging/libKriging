@@ -82,6 +82,6 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   
   # ** Install required Python libs ** 
   python -m pip install --progress-bar off pip --upgrade
-  python -m pip install --progress-bar off -r bindings/Python/requirements.txt --upgrade
-  python -m pip install --progress-bar off -r bindings/Python/dev-requirements.txt --upgrade
+  python -m pip install --progress-bar off -r bindings/Python/pylibkriging/requirements.txt --upgrade
+  python -m pip install --progress-bar off -r bindings/Python/pylibkriging/dev-requirements.txt --upgrade
 fi

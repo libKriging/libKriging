@@ -27,13 +27,13 @@ case $ARCH in
       -w /data \
       -v `pwd`:/data \
       quay.io/pypa/manylinux_2_28_x86_64 \
-      /data/bindings/Python/tools/build_single_wheel.sh ${PYTHON_VERSION}
+      /data/bindings/Python/pylibkriging/tools/build_single_wheel.sh ${PYTHON_VERSION}
     ;;
   Darwin|MSYS_NT*|MINGW64_NT*)
-    python3 ./bindings/Python/setup.py bdist_wheel
+    python3 ./bindings/Python/pylibkriging/setup.py bdist_wheel
     # Temporarily disable tests to focus on build
     # pip install pylibkriging --no-index -f ./dist
-    # pytest -s ./bindings/Python/tests/
+    # pytest -s ./bindings/Python/pylibkriging/tests/
     ;;
   *)
     echo "Unknown OS [$ARCH]"

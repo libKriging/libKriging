@@ -25,7 +25,7 @@ if [ -z "${GIT_TAG}" ]; then
 fi
 echo "Release tag '${GIT_TAG}' in branch '$(git branch --show-current)'"
 
-PREFIX=${BUILD_DIR:-build}/bindings/Octave
+PREFIX=${BUILD_DIR:-build}/bindings/Octave/mlibkriging
 
 PACKAGE_DIR=octave-package
 [ -d "${PACKAGE_DIR}" ] && rm -fr "${PACKAGE_DIR}"

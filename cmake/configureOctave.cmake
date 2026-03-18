@@ -128,7 +128,7 @@ macro(octave_add_mex)
     # For Octave 10+, add soversion source file
     set(MEX_SOURCES ${ARGS_SOURCES})
     if(OCTAVE_MEX_SOVERSION)
-        list(APPEND MEX_SOURCES "${LIBKRIGING_SOURCE_DIR}/bindings/Octave/mex_soversion.c")
+        list(APPEND MEX_SOURCES "${LIBKRIGING_SOURCE_DIR}/bindings/Octave/mlibkriging/mex_soversion.c")
     endif()
     
     add_library(${ARGS_NAME} MODULE ${MEX_SOURCES})

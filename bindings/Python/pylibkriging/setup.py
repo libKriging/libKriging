@@ -61,8 +61,8 @@ def main():
         # long_description_content_type="text/markdown",
         ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
         cmdclass=dict(build_ext=CMakeBuild),
-        script_name='./bindings/Python/setup.py',
-        package_dir={'pylibkriging': 'bindings/Python/src/pylibkriging'},
+        script_name='./bindings/Python/pylibkriging/setup.py',
+        package_dir={'pylibkriging': 'bindings/Python/pylibkriging/src/pylibkriging'},
         # https://docs.python.org/3/distutils/setupscript.html#installing-package-data
         package_data={'pylibkriging': []},
         # https://docs.python.org/3/distutils/setupscript.html#installing-additional-files
