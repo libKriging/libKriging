@@ -4,8 +4,8 @@
 #include <iostream>
 #include <typeinfo>
 
-#include "../../../Octave/tools/formatString.hpp"
-#include "../../../Octave/tools/string_hash.hpp"
+#include "../../../../Octave/mlibkriging/tools/formatString.hpp"
+#include "../../../../Octave/mlibkriging/tools/string_hash.hpp"
 #include "py_to_cpp_cast.hpp"
 
 template <typename T>

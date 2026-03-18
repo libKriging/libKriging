@@ -8,7 +8,7 @@
 #include <optional>
 #include <stdexcept>
 
-#include "../../../Octave/tools/formatString.hpp"
+#include "../../../../Octave/mlibkriging/tools/formatString.hpp"
 
 namespace py = pybind11;
 
