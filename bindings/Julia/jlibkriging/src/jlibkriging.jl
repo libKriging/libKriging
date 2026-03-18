@@ -15,8 +15,10 @@ function _get_lib()
             build_subdir = joinpath("bindings", "Julia", "jlibkriging")
             candidates = String[]
             for build_dir in ["build", "build-Release", "build-Debug"]
-                for libname in ["libkriging_c.so", "libkriging_c.dylib", "libkriging_c.dll"]
-                    push!(candidates, joinpath(repo_root, build_dir, build_subdir, libname))
+                for config_subdir in ["", "Release", "Debug"]
+                    for libname in ["libkriging_c.so", "libkriging_c.dylib", "libkriging_c.dll"]
+                        push!(candidates, joinpath(repo_root, build_dir, build_subdir, config_subdir, libname))
+                    end
                 end
             end
             push!(candidates, "libkriging_c")

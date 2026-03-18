@@ -22,7 +22,8 @@ target_compile_definitions(libkriging_c PRIVATE
 set_target_properties(libkriging_c PROPERTIES
         OUTPUT_NAME "libkriging_c"
         PREFIX ""
-        POSITION_INDEPENDENT_CODE ON)
+        POSITION_INDEPENDENT_CODE ON
+        WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 install(TARGETS libkriging_c
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/Julia)
