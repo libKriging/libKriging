@@ -573,7 +573,7 @@ class WarpKriging {
 
   // ---- optimiser ----------------------------------------------------------
   arma::uword m_max_iter_bfgs = 100;
-  arma::uword m_max_iter_adam = 500;
+  arma::uword m_max_iter_adam = 10;
   double      m_adam_lr = 1e-3;
 
   // ---- private helpers ----------------------------------------------------
@@ -612,6 +612,8 @@ class WarpKriging {
   /// Refresh all cached quantities (Φ, R, Cholesky, β̂, σ̂², α) from
   /// the current warp params and θ.
   void refresh_cache();
+  /// Like refresh_cache but skips recomputing Φ (use when only θ changed).
+  void refresh_cache_theta_only();
   void normalise_data();
 
   /// Compute concentrated LL from current cache
@@ -641,27 +643,8 @@ class WarpKriging {
   //        σ̂² and β̂ concentrated out (computed analytically)
   //
 
-  /// Inner loop: optimise θ for fixed warping using L-BFGS
-  void optimise_theta_inner();
-
-  /// L-BFGS two-loop recursion (maximisation of f)
-  static arma::vec lbfgs_direction(
-      const arma::vec& grad,
-      const std::vector<arma::vec>& s_history,
-      const std::vector<arma::vec>& y_history);
-
-  /// Backtracking line search (Armijo, maximising)
-  double line_search(const arma::vec& log_theta, const arma::vec& dir,
-                     double current_ll) const;
-
-  /// Outer loop: joint optimisation
+  /// Joint optimisation (bi-level Adam+BFGS or joint L-BFGS-B)
   void optimise_joint(const std::string& method);
-
-  /// Adam step (for warp params)
-  static void adam_step(arma::vec& params, const arma::vec& grad,
-                        arma::vec& mm, arma::vec& vm,
-                        arma::uword t, double lr,
-                        double beta1, double beta2, double eps);
 
   /// Internal: initialise from pre-parsed WarpSpecs
   void init_from_specs(const std::vector<WarpSpec>& specs,

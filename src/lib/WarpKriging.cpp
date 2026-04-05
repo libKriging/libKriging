@@ -5,6 +5,7 @@
  */
 
 #include "libKriging/WarpKriging.hpp"
+#include "libKriging/AdamBFGS.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -1290,9 +1291,14 @@ arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new,
 //  refresh_cache  — rebuild Φ, R, Cholesky, β̂ (GLS), σ̂² (MLE), α
 // -------------------------------------------------------------------------
 void WarpKriging::refresh_cache() {
-  const arma::uword n = m_y.n_elem;
-
   m_Phi = apply_warping(m_X);
+  refresh_cache_theta_only();
+}
+
+/// Rebuild R, Cholesky, β̂, σ̂², α from current m_Phi and m_theta.
+/// Skips recomputing m_Phi — use when only θ changed.
+void WarpKriging::refresh_cache_theta_only() {
+  const arma::uword n = m_y.n_elem;
 
   arma::mat R = build_R(m_Phi);
   R.diag() += 1e-8;  // nugget for numerical stability
@@ -1369,7 +1375,6 @@ arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
 
       double d_k = diff(k);
       double theta_k = m_theta(k);
-      // ∂r²/∂θ_k = -2 d_k² / θ_k³
       double dr2_dtheta_k = -2.0 * d_k * d_k / (theta_k * theta_k * theta_k);
 
       double dR_ij = 0.0;
@@ -1416,6 +1421,9 @@ arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
 //
 //  ∂LL/∂θ_k = ½ tr[(α αᵀ / σ̂² - R⁻¹) · ∂R/∂θ_k]
 //  ∂LL/∂(log θ_k) = ∂LL/∂θ_k · θ_k
+//
+//  Fused: computes all dR_k in a single pass over (i,j) pairs, sharing
+//  diff, r2, r with the same loop structure as build_R.
 // -------------------------------------------------------------------------
 std::pair<double, arma::vec>
 WarpKriging::concentrated_ll_and_grad_theta() const {
@@ -1430,11 +1438,59 @@ WarpKriging::concentrated_ll_and_grad_theta() const {
 
   arma::mat dLL_dR = 0.5 * (m_alpha * m_alpha.t() / m_sigma2 - Rinv);
 
-  arma::vec grad_log_theta(d);
-  for (arma::uword k = 0; k < d; ++k) {
-    arma::mat dR_k = build_dR_dtheta_k(m_Phi, k);
-    double dLL_dtheta_k = arma::accu(dLL_dR % dR_k);
-    grad_log_theta(k) = dLL_dtheta_k * m_theta(k);
+  // Accumulate tr(dLL_dR · dR_k) for all k in a single pass over (i,j)
+  arma::vec grad_log_theta(d, arma::fill::zeros);
+
+  for (arma::uword i = 0; i < n; ++i) {
+    for (arma::uword j = i + 1; j < n; ++j) {
+      // Shared: diff, scaled, r2, r — computed once per (i,j)
+      arma::rowvec diff = m_Phi.row(i) - m_Phi.row(j);
+      arma::rowvec scaled = diff / m_theta.t();
+      double r2 = arma::dot(scaled, scaled);
+      double r  = std::sqrt(std::max(r2, 1e-30));
+
+      double w = 2.0 * dLL_dR(i, j);  // symmetry: (i,j) + (j,i)
+
+      // For each dimension k, compute dR_ij / dtheta_k and accumulate
+      for (arma::uword k = 0; k < d; ++k) {
+        double d_k = diff(k);
+        double theta_k = m_theta(k);
+        double dr2_dtheta_k = -2.0 * d_k * d_k / (theta_k * theta_k * theta_k);
+
+        double dR_ij = 0.0;
+        switch (m_base_kernel) {
+          case WarpBaseKernel::Gauss: {
+            double Rij = std::exp(-0.5 * r2);
+            dR_ij = Rij * (-0.5) * dr2_dtheta_k;
+            break;
+          }
+          case WarpBaseKernel::Matern32: {
+            if (r > 1e-15) {
+              double dR_dr = -3.0 * r * std::exp(-std::sqrt(3.0) * r);
+              dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
+            }
+            break;
+          }
+          case WarpBaseKernel::Matern52: {
+            double sr5 = std::sqrt(5.0);
+            if (r > 1e-15) {
+              double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r)
+                             * std::exp(-sr5 * r);
+              dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
+            }
+            break;
+          }
+          case WarpBaseKernel::Exp: {
+            if (r > 1e-15) {
+              double Rij = std::exp(-r);
+              dR_ij = -Rij * dr2_dtheta_k / (2.0 * r);
+            }
+            break;
+          }
+        }
+        grad_log_theta(k) += w * dR_ij * m_theta(k);
+      }
+    }
   }
 
   return {ll, grad_log_theta};
@@ -1581,178 +1637,125 @@ void WarpKriging::unpack_warp_params(const arma::vec& wp) {
 }
 
 // -------------------------------------------------------------------------
-//  L-BFGS two-loop recursion  (ascent direction)
-// -------------------------------------------------------------------------
-arma::vec WarpKriging::lbfgs_direction(
-    const arma::vec& grad,
-    const std::vector<arma::vec>& s_hist,
-    const std::vector<arma::vec>& y_hist) {
-  const int m = static_cast<int>(s_hist.size());
-  arma::vec q = grad;
-
-  std::vector<double> alpha_v(m);
-  std::vector<double> rho(m);
-
-  for (int i = m - 1; i >= 0; --i) {
-    rho[i] = 1.0 / arma::dot(y_hist[i], s_hist[i]);
-    if (!std::isfinite(rho[i])) rho[i] = 0.0;
-    alpha_v[i] = rho[i] * arma::dot(s_hist[i], q);
-    q -= alpha_v[i] * y_hist[i];
-  }
-
-  double gamma = 1.0;
-  if (m > 0) {
-    double ys = arma::dot(y_hist.back(), s_hist.back());
-    double yy = arma::dot(y_hist.back(), y_hist.back());
-    if (yy > 1e-30) gamma = ys / yy;
-    if (!std::isfinite(gamma) || gamma <= 0) gamma = 1.0;
-  }
-  arma::vec r = gamma * q;
-
-  for (int i = 0; i < m; ++i) {
-    double beta = rho[i] * arma::dot(y_hist[i], r);
-    r += (alpha_v[i] - beta) * s_hist[i];
-  }
-  return r;
-}
-
-// -------------------------------------------------------------------------
-//  Backtracking line search  (Armijo, maximising)
-// -------------------------------------------------------------------------
-double WarpKriging::line_search(const arma::vec& log_theta,
-                                const arma::vec& dir,
-                                double current_ll) const {
-  auto* self = const_cast<WarpKriging*>(this);
-  const double c1 = 1e-4;
-  double step = 1.0;
-
-  auto [ll0, grad0] = concentrated_ll_and_grad_theta();
-  double slope = arma::dot(grad0, dir);
-  if (slope <= 0) return 0.01;
-
-  for (int k = 0; k < 20; ++k) {
-    arma::vec trial = log_theta + step * dir;
-    self->m_theta = arma::exp(trial);
-    self->refresh_cache();
-    double trial_ll = concentrated_ll();
-
-    if (trial_ll >= current_ll + c1 * step * slope)
-      return step;
-    step *= 0.5;
-  }
-  return step;
-}
-
-// -------------------------------------------------------------------------
-//  Inner loop: L-BFGS on log(θ) for fixed warping
-// -------------------------------------------------------------------------
-void WarpKriging::optimise_theta_inner() {
-  const arma::uword d = m_theta.n_elem;
-  arma::vec log_theta = arma::log(m_theta);
-
-  const arma::uword lbfgs_mem = 10;
-  std::vector<arma::vec> s_hist, y_hist;
-
-  double best_ll = concentrated_ll();
-  arma::vec best_log_theta = log_theta;
-
-  for (arma::uword iter = 0; iter < m_max_iter_bfgs; ++iter) {
-    auto [ll, grad] = concentrated_ll_and_grad_theta();
-
-    if (ll > best_ll) {
-      best_ll = ll;
-      best_log_theta = log_theta;
-    }
-    if (arma::norm(grad) < 1e-6) break;
-
-    arma::vec dir = lbfgs_direction(grad, s_hist, y_hist);
-    double step = line_search(log_theta, dir, ll);
-
-    arma::vec log_theta_new = log_theta + step * dir;
-
-    arma::vec s = log_theta_new - log_theta;
-    m_theta = arma::exp(log_theta_new);
-    refresh_cache();
-    auto [ll_new, grad_new] = concentrated_ll_and_grad_theta();
-    arma::vec yy = grad_new - grad;
-
-    if (arma::dot(yy, s) > 1e-10) {
-      s_hist.push_back(s);
-      y_hist.push_back(yy);
-      if (s_hist.size() > lbfgs_mem) {
-        s_hist.erase(s_hist.begin());
-        y_hist.erase(y_hist.begin());
-      }
-    }
-    log_theta = log_theta_new;
-  }
-
-  m_theta = arma::exp(best_log_theta);
-  refresh_cache();
-}
-
-// -------------------------------------------------------------------------
-//  Adam step  (warp params, gradient ascent)
-// -------------------------------------------------------------------------
-void WarpKriging::adam_step(
-    arma::vec& params, const arma::vec& grad,
-    arma::vec& mm, arma::vec& vm,
-    arma::uword t, double lr, double b1, double b2, double eps) {
-  mm = b1 * mm + (1.0 - b1) * grad;
-  vm = b2 * vm + (1.0 - b2) * (grad % grad);
-  arma::vec mh = mm / (1.0 - std::pow(b1, t));
-  arma::vec vh = vm / (1.0 - std::pow(b2, t));
-  params += lr * mh / (arma::sqrt(vh) + eps);
-}
-
-// -------------------------------------------------------------------------
-//  Joint optimisation  (bi-level)
+//  Joint optimisation  (bi-level via AdamBFGS)
 //
-//  Outer: Adam on warp params
-//    For each outer step:
-//      1. Set warp params → compute Φ
-//      2. L-BFGS inner loop on log(θ) → optimal θ for this Φ
-//         (σ̂² and β̂ concentrated out at each step)
-//      3. Backprop ∂LL/∂(warp params)
-//      4. Adam update on warp params
+//  x_outer = warp params      (optimised by Adam)
+//  x_inner = log(θ)           (optimised by L-BFGS-B)
+//  σ̂² and β̂ are concentrated out at each evaluation.
 // -------------------------------------------------------------------------
-void WarpKriging::optimise_joint(const std::string& /*method*/) {
+void WarpKriging::optimise_joint(const std::string& method) {
   arma::uword n_warp = total_warp_params();
+  arma::uword d_theta = m_theta.n_elem;
 
-  // No warp params → just optimise θ
-  if (n_warp == 0) {
-    optimise_theta_inner();
-    return;
-  }
+  arma::vec wp0 = pack_warp_params();
+  arma::vec log_theta0 = arma::log(m_theta);
 
-  arma::vec wp = pack_warp_params();
-  arma::vec mm_w = arma::zeros(n_warp);
-  arma::vec vm_w = arma::zeros(n_warp);
+  // Bounds for log(θ): use wide range
+  arma::vec log_theta_lower = log_theta0 - 10.0;
+  arma::vec log_theta_upper = log_theta0 + 10.0;
 
-  double best_ll = -arma::datum::inf;
-  arma::vec best_wp = wp;
-  arma::vec best_theta = m_theta;
+  // Helper lambda: run joint L-BFGS-B on all params starting from current state
+  auto run_joint_bfgs = [&]() {
+    arma::uword n_total = n_warp + d_theta;
+    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
+    optimizer.iprint = -1;
+    optimizer.max_iter = m_max_iter_bfgs;
+    optimizer.pgtol = 1e-6;
+    optimizer.factr = 1e7;
 
-  for (arma::uword t = 1; t <= m_max_iter_adam; ++t) {
-    unpack_warp_params(wp);
+    arma::vec x0(n_total);
+    if (n_warp > 0) x0.head(n_warp) = pack_warp_params();
+    x0.tail(d_theta) = arma::log(m_theta);
+
+    arma::vec lb(n_total), ub(n_total);
+    arma::ivec btype(n_total);
+    if (n_warp > 0) {
+      lb.head(n_warp).fill(-1e20);
+      ub.head(n_warp).fill(1e20);
+      btype.head(n_warp).fill(0);
+    }
+    lb.tail(d_theta) = log_theta_lower;
+    ub.tail(d_theta) = log_theta_upper;
+    btype.tail(d_theta).fill(2);
+
+    auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
+      if (n_warp > 0) unpack_warp_params(x.head(n_warp));
+      m_theta = arma::exp(x.tail(d_theta));
+      refresh_cache();
+
+      auto [ll, g_log_theta] = concentrated_ll_and_grad_theta();
+      grad.tail(d_theta) = -g_log_theta;
+      if (n_warp > 0) grad.head(n_warp) = -warp_gradient();
+      return -ll;
+    };
+
+    optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
+
+    if (n_warp > 0) unpack_warp_params(x0.head(n_warp));
+    m_theta = arma::exp(x0.tail(d_theta));
+    refresh_cache();
+  };
+
+  if (method == "BFGS" || n_warp == 0) {
+    // --- Joint L-BFGS-B only ---
+    run_joint_bfgs();
+
+  } else {
+    // --- Bi-level Adam+BFGS ---
+    AdamBFGS opt(n_warp, d_theta);
+    opt.max_iter_adam = m_max_iter_adam;
+    opt.adam_lr = m_adam_lr;
+    opt.max_iter_bfgs = m_max_iter_bfgs;
+    opt.bfgs_pgtol = 1e-6;
+    opt.bfgs_factr = 1e7;
+    opt.maximize = true;
+
+    arma::vec current_wp = wp0;
+
+    auto obj_fn = [this, &current_wp](const arma::vec& x_outer, const arma::vec& x_inner,
+                                       arma::vec* grad_outer, arma::vec* grad_inner) -> double {
+      bool warp_changed = false;
+      if (x_outer.n_elem > 0) {
+        if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
+          unpack_warp_params(x_outer);
+          current_wp = x_outer;
+          warp_changed = true;
+        }
+      }
+
+      m_theta = arma::exp(x_inner);
+
+      if (warp_changed)
+        refresh_cache();
+      else
+        refresh_cache_theta_only();
+
+      double ll = concentrated_ll();
+
+      if (grad_inner) {
+        auto [ll2, g_log_theta] = concentrated_ll_and_grad_theta();
+        *grad_inner = g_log_theta;
+        (void)ll2;
+      }
+      if (grad_outer && x_outer.n_elem > 0) {
+        *grad_outer = warp_gradient();
+      }
+      return ll;
+    };
+
+    auto result = opt.optimize(wp0, log_theta0,
+                               log_theta_lower, log_theta_upper, obj_fn);
+
+    if (n_warp > 0)
+      unpack_warp_params(result.x_outer);
+    m_theta = arma::exp(result.x_inner);
     refresh_cache();
 
-    optimise_theta_inner();
-
-    double ll = concentrated_ll();
-    if (ll > best_ll) {
-      best_ll = ll;
-      best_wp = wp;
-      best_theta = m_theta;
+    // Joint BFGS polish if method requests it
+    if (method == "BFGS+Adam+BFGS" && n_warp > 0) {
+      run_joint_bfgs();
     }
-
-    arma::vec grad_w = warp_gradient();
-    adam_step(wp, grad_w, mm_w, vm_w, t, m_adam_lr, 0.9, 0.999, 1e-8);
   }
-
-  unpack_warp_params(best_wp);
-  m_theta = best_theta;
-  refresh_cache();
 }
 
 
