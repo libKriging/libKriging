@@ -1830,26 +1830,28 @@ WarpKriging::predict(const arma::mat& x_new,
   const arma::uword m = x_n.n_rows;
   arma::mat Phi_new = apply_warping(x_n);
   arma::mat F_new = build_trend_matrix(x_n);
-  arma::mat Kcross = build_Kcross(Phi_new, m_Phi);
+  // Use correlation cross-matrix (not covariance K = σ²R), because m_C is
+  // the Cholesky of R and m_alpha = R⁻¹(y − Fβ).
+  arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
 
-  arma::vec mean = F_new * m_beta + Kcross * m_alpha;
+  arma::vec mean = F_new * m_beta + Rcross * m_alpha;
   mean = mean * m_y_std + m_y_mean;
 
   arma::vec stdev;
   arma::mat cov;
 
   if (withStd || withCov) {
-    arma::mat v = arma::solve(arma::trimatl(m_C), Kcross.t());
+    arma::mat v = arma::solve(arma::trimatl(m_C), Rcross.t());
     arma::mat Cinv_F = arma::solve(arma::trimatl(m_C), m_F);
-    arma::mat FtKinvF = Cinv_F.t() * Cinv_F;
-    arma::mat FtKinvF_inv = arma::inv_sympd(FtKinvF);
+    arma::mat FtRinvF = Cinv_F.t() * Cinv_F;
+    arma::mat FtRinvF_inv = arma::inv_sympd(FtRinvF);
 
     if (withCov) {
-      arma::mat K_new = build_K(Phi_new);
-      cov = K_new - v.t() * v;
-      arma::mat R = F_new.t() - Cinv_F.t() * v;
-      cov += R.t() * FtKinvF_inv * R;
-      cov *= (m_y_std * m_y_std);
+      arma::mat R_new = build_R(Phi_new);
+      cov = R_new - v.t() * v;
+      arma::mat H = F_new.t() - Cinv_F.t() * v;
+      cov += H.t() * FtRinvF_inv * H;
+      cov *= (m_sigma2 * m_y_std * m_y_std);
       cov = 0.5 * (cov + cov.t());
       cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
       stdev = arma::sqrt(cov.diag());
@@ -1857,11 +1859,11 @@ WarpKriging::predict(const arma::mat& x_new,
       arma::vec var_diag(m);
       for (arma::uword i = 0; i < m; ++i) {
         var_diag(i) = std::max(0.0,
-                               m_sigma2 - arma::dot(v.col(i), v.col(i)));
+                               1.0 - arma::dot(v.col(i), v.col(i)));
         arma::vec r_i = F_new.row(i).t() - Cinv_F.t() * v.col(i);
-        var_diag(i) += arma::dot(r_i, FtKinvF_inv * r_i);
+        var_diag(i) += arma::dot(r_i, FtRinvF_inv * r_i);
       }
-      var_diag *= (m_y_std * m_y_std);
+      var_diag *= (m_sigma2 * m_y_std * m_y_std);
       var_diag = arma::clamp(var_diag, 0.0, arma::datum::inf);
       stdev = arma::sqrt(var_diag);
     }
