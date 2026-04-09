@@ -61,21 +61,21 @@ namespace libKriging {
 /// Warping type identifiers
 enum class WarpType {
   // --- continuous ---
-  None,            ///< identity (no transformation)
-  Affine,          ///< w(x) = a·x + b
-  BoxCox,          ///< w(x) = (x^λ - 1)/λ
-  Kumaraswamy,     ///< w(x) = 1 - (1-x^a)^b   on [0,1]
-  NeuralMono,      ///< small monotone neural network
-  MLP,             ///< unconstrained multi-layer perceptron (multi-dim output)
+  None,         ///< identity (no transformation)
+  Affine,       ///< w(x) = a·x + b
+  BoxCox,       ///< w(x) = (x^λ - 1)/λ
+  Kumaraswamy,  ///< w(x) = 1 - (1-x^a)^b   on [0,1]
+  NeuralMono,   ///< small monotone neural network
+  MLP,          ///< unconstrained multi-layer perceptron (multi-dim output)
 
   // --- discrete / categorical ---
-  Embedding,       ///< learned embedding vector per level
+  Embedding,  ///< learned embedding vector per level
 
   // --- ordinal ---
-  Ordinal,          ///< learned ordered positions on ℝ
+  Ordinal,  ///< learned ordered positions on ℝ
 
   // --- joint (multi-input) ---
-  MLPJoint          ///< MLP taking ALL inputs jointly (≡ NeuralKernelKriging)
+  MLPJoint  ///< MLP taking ALL inputs jointly (≡ NeuralKernelKriging)
 };
 
 /**
@@ -103,15 +103,15 @@ enum class WarpType {
  *   WarpKriging model(y, X, {"kumaraswamy", "categorical(5,2)"}, "gauss");
  */
 struct WarpSpec {
-  WarpType type  = WarpType::None;
-  arma::uword n_levels   = 0;   ///< number of levels (categorical/ordinal)
-  arma::uword embed_dim  = 1;   ///< embedding dimension (categorical only)
-  arma::uword n_hidden   = 8;   ///< hidden units (NeuralMono only)
+  WarpType type = WarpType::None;
+  arma::uword n_levels = 0;   ///< number of levels (categorical/ordinal)
+  arma::uword embed_dim = 1;  ///< embedding dimension (categorical only)
+  arma::uword n_hidden = 8;   ///< hidden units (NeuralMono only)
 
   // MLP-specific fields
   std::vector<arma::uword> hidden_dims = {};  ///< hidden layer sizes
-  arma::uword d_out      = 1;   ///< output dim (MLP only)
-  std::string activation = "selu"; ///< activation function (MLP only)
+  arma::uword d_out = 1;                      ///< output dim (MLP only)
+  std::string activation = "selu";            ///< activation function (MLP only)
 
   // ---- String parsing / serialisation ------------------------------------
 
@@ -188,8 +188,7 @@ class IWarp {
 
   /// Gradient of the output w.r.t. the parameters (for a batch)
   /// Given dL/dΦ (n × d_out), returns dL/d(params)
-  virtual arma::vec backward(const arma::vec& x,
-                             const arma::mat& dL_dPhi) const = 0;
+  virtual arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const = 0;
 
   /// Human-readable description
   virtual std::string describe() const = 0;
@@ -204,8 +203,7 @@ class WarpNone final : public IWarp {
   arma::vec get_params() const override { return {}; }
   void set_params(const arma::vec&) override {}
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override { return "None (identity)"; }
 };
 
@@ -217,9 +215,9 @@ class WarpAffine final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   double m_a = 1.0, m_b = 0.0;
 };
@@ -232,9 +230,9 @@ class WarpBoxCox final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   double m_lambda = 1.0;  ///< stored as unconstrained (real line)
 };
@@ -247,9 +245,9 @@ class WarpKumaraswamy final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   double m_log_a = 0.0, m_log_b = 0.0;  ///< a,b > 0 via exp()
 };
@@ -262,17 +260,17 @@ class WarpNeuralMono final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   arma::uword m_H;
   // Architecture:  x → |W1| x + b1 → softplus → |W2| h + b2
   // Positive weights enforced via exp(raw_W)
-  arma::vec m_raw_W1;   ///< (H)   weights layer 1 (unconstrained)
-  arma::vec m_b1;       ///< (H)   bias layer 1
-  arma::vec m_raw_W2;   ///< (H)   weights layer 2 (unconstrained)
-  double    m_b2 = 0.0; ///< scalar bias layer 2
+  arma::vec m_raw_W1;  ///< (H)   weights layer 1 (unconstrained)
+  arma::vec m_b1;      ///< (H)   bias layer 1
+  arma::vec m_raw_W2;  ///< (H)   weights layer 2 (unconstrained)
+  double m_b2 = 0.0;   ///< scalar bias layer 2
 };
 
 /**
@@ -312,8 +310,7 @@ class WarpMLP final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
 
   /// Parse activation name from string
@@ -380,20 +377,19 @@ class WarpMLPJoint {
 
 class WarpEmbedding final : public IWarp {
  public:
-  WarpEmbedding(arma::uword n_levels, arma::uword embed_dim,
-                uint64_t seed = 42);
+  WarpEmbedding(arma::uword n_levels, arma::uword embed_dim, uint64_t seed = 42);
   arma::uword output_dim() const override { return m_embed_dim; }
   arma::uword n_params() const override;
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   arma::uword m_n_levels;
   arma::uword m_embed_dim;
-  arma::mat   m_E;         ///< embedding matrix (n_levels × embed_dim)
+  arma::mat m_E;  ///< embedding matrix (n_levels × embed_dim)
 };
 
 class WarpOrdinal final : public IWarp {
@@ -404,12 +400,12 @@ class WarpOrdinal final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
-  arma::vec backward(const arma::vec& x,
-                     const arma::mat& dL_dPhi) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+
  private:
   arma::uword m_n_levels;
-  arma::vec   m_raw_gaps;  ///< (L-1) unconstrained; actual gaps = exp(raw)
+  arma::vec m_raw_gaps;  ///< (L-1) unconstrained; actual gaps = exp(raw)
 };
 
 // =========================================================================
@@ -448,42 +444,40 @@ class WarpKriging {
    *                  e.g. {"kumaraswamy", "categorical(5,2)", "none"}
    * @param kernel    base kernel: "gauss", "matern3_2", "matern5_2", "exp"
    */
-  LIBKRIGING_EXPORT WarpKriging(const std::vector<std::string>& warping,
-              const std::string& kernel = "gauss");
+  LIBKRIGING_EXPORT WarpKriging(const std::vector<std::string>& warping, const std::string& kernel = "gauss");
 
   /**
    * @brief Full constructor with string warping and immediate fitting.
    */
   LIBKRIGING_EXPORT WarpKriging(const arma::vec& y,
-              const arma::mat& X,
-              const std::vector<std::string>& warping,
-              const std::string& kernel,
-              const std::string& regmodel   = "constant",
-              bool normalize                = false,
-              const std::string& optim      = "BFGS+Adam",
-              const std::string& objective  = "LL",
-              const std::map<std::string, std::string>& parameters = {});
+                                const arma::mat& X,
+                                const std::vector<std::string>& warping,
+                                const std::string& kernel,
+                                const std::string& regmodel = "constant",
+                                bool normalize = false,
+                                const std::string& optim = "BFGS+Adam",
+                                const std::string& objective = "LL",
+                                const std::map<std::string, std::string>& parameters = {});
 
   // -----------------------------------------------------------------------
   //  Fitting
   // -----------------------------------------------------------------------
 
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
-           const arma::mat& X,
-           const std::string& regmodel   = "constant",
-           bool normalize                = false,
-           const std::string& optim      = "BFGS+Adam",
-           const std::string& objective  = "LL",
-           const std::map<std::string, std::string>& parameters = {});
+                             const arma::mat& X,
+                             const std::string& regmodel = "constant",
+                             bool normalize = false,
+                             const std::string& optim = "BFGS+Adam",
+                             const std::string& objective = "LL",
+                             const std::map<std::string, std::string>& parameters = {});
 
   // -----------------------------------------------------------------------
   //  Prediction
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat>
-  predict(const arma::mat& x_new,
-          bool withStd = true,
-          bool withCov = false) const;
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat> predict(const arma::mat& x_new,
+                                                                        bool withStd = true,
+                                                                        bool withCov = false) const;
 
   // -----------------------------------------------------------------------
   //  Simulation
@@ -503,10 +497,9 @@ class WarpKriging {
 
   LIBKRIGING_EXPORT double logLikelihood() const;
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat>
-  logLikelihoodFun(const arma::vec& theta_gp,
-                   bool withGrad = true,
-                   bool withHess = false) const;
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta_gp,
+                                                                              bool withGrad = true,
+                                                                              bool withHess = false) const;
 
   // -----------------------------------------------------------------------
   //  Accessors
@@ -526,7 +519,8 @@ class WarpKriging {
   /// Get warping specs as a vector of strings
   std::vector<std::string> warping_strings() const {
     std::vector<std::string> result;
-    for (const auto& s : m_warp_specs) result.push_back(s.to_string());
+    for (const auto& s : m_warp_specs)
+      result.push_back(s.to_string());
     return result;
   }
 
@@ -537,14 +531,14 @@ class WarpKriging {
   // ---- data ---------------------------------------------------------------
   arma::vec m_y;
   arma::mat m_X;
-  arma::mat m_Phi;       ///< warped design (n × feature_dim)
+  arma::mat m_Phi;  ///< warped design (n × feature_dim)
 
   // ---- warping ------------------------------------------------------------
-  std::vector<WarpSpec>                  m_warp_specs;
-  std::vector<std::unique_ptr<IWarp>>    m_warps;         ///< per-variable
-  std::unique_ptr<WarpMLPJoint>          m_joint_warp;    ///< joint MLP (if any)
-  bool                                   m_has_joint = false;
-  arma::uword                            m_feature_dim = 0;
+  std::vector<WarpSpec> m_warp_specs;
+  std::vector<std::unique_ptr<IWarp>> m_warps;  ///< per-variable
+  std::unique_ptr<WarpMLPJoint> m_joint_warp;   ///< joint MLP (if any)
+  bool m_has_joint = false;
+  arma::uword m_feature_dim = 0;
 
   // ---- normalisation ------------------------------------------------------
   bool m_normalize = false;
@@ -559,22 +553,22 @@ class WarpKriging {
   arma::vec m_beta;
 
   // ---- kernel + hyper-params -----------------------------------------------
-  std::string    m_kernel_name;
+  std::string m_kernel_name;
   WarpBaseKernel m_base_kernel = WarpBaseKernel::Gauss;
-  arma::vec      m_theta;
-  double         m_sigma2 = 1.0;
+  arma::vec m_theta;
+  double m_sigma2 = 1.0;
 
   // ---- GP cache -----------------------------------------------------------
-  arma::mat m_C;         ///< Cholesky(K + nugget), lower
-  arma::vec m_alpha;     ///< K^{-1}(y - Fβ)
-  double    m_logdet = 0.0;
+  arma::mat m_C;      ///< Cholesky(K + nugget), lower
+  arma::vec m_alpha;  ///< K^{-1}(y - Fβ)
+  double m_logdet = 0.0;
 
   bool m_fitted = false;
 
   // ---- optimiser ----------------------------------------------------------
   arma::uword m_max_iter_bfgs = 100;
   arma::uword m_max_iter_adam = 10;
-  double      m_adam_lr = 1e-3;
+  double m_adam_lr = 1e-3;
 
   // ---- private helpers ----------------------------------------------------
   static WarpBaseKernel parse_kernel(const std::string& name);
@@ -586,20 +580,16 @@ class WarpKriging {
 
   // ---- Correlation matrix (σ²=1) -----------------------------------------
   /// Evaluate the base correlation function (σ² factored out)
-  double corr_scalar(const arma::rowvec& phi_i,
-                     const arma::rowvec& phi_j) const;
+  double corr_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const;
   /// Build full correlation matrix R (n×n), with R_ii = 1
   arma::mat build_R(const arma::mat& Phi) const;
   /// Build cross-correlation  r(Φ_new, Φ_train)  →  (m × n)
-  arma::mat build_Rcross(const arma::mat& Phi_new,
-                         const arma::mat& Phi_train) const;
+  arma::mat build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const;
 
   // Keep K-based versions (K = σ² R) for predict/simulate
-  double kernel_scalar(const arma::rowvec& phi_i,
-                       const arma::rowvec& phi_j) const;
+  double kernel_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const;
   arma::mat build_K(const arma::mat& Phi) const;
-  arma::mat build_Kcross(const arma::mat& Phi_new,
-                         const arma::mat& Phi_train) const;
+  arma::mat build_Kcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const;
 
   // ---- Concentrated profile log-likelihood --------------------------------
   //
@@ -633,7 +623,7 @@ class WarpKriging {
   // ---- Warp param packing (θ is NOT in here — optimised separately) ------
   arma::uword total_warp_params() const;
   arma::vec pack_warp_params() const;
-  void      unpack_warp_params(const arma::vec& w);
+  void unpack_warp_params(const arma::vec& w);
 
   // ---- Optimisation -------------------------------------------------------
   //
@@ -647,8 +637,7 @@ class WarpKriging {
   void optimise_joint(const std::string& method);
 
   /// Internal: initialise from pre-parsed WarpSpecs
-  void init_from_specs(const std::vector<WarpSpec>& specs,
-                       const std::string& kernel);
+  void init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel);
 };
 
 }  // namespace libKriging

@@ -16,8 +16,8 @@
 #include "LinearRegression_binding.hpp"
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
-#include "WarpKriging_binding.hpp"
 #include "RandomGenerator.hpp"
+#include "WarpKriging_binding.hpp"
 
 // To compare string at compile time (before latest C++)
 constexpr bool strings_equal(char const* a, char const* b) {
@@ -337,10 +337,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("update", &PyWarpKriging::update, py::arg("y"), py::arg("X"))
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyWarpKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = true)
+      .def("logLikelihoodFun", &PyWarpKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = true)
       .def("kernel", &PyWarpKriging::kernel)
       .def("X", &PyWarpKriging::X)
       .def("y", &PyWarpKriging::y)

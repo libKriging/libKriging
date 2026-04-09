@@ -63,9 +63,7 @@ std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyWarpKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [mean, stdev, cov] = m_internal->predict(mat_X, return_stdev, return_cov);
-  return std::make_tuple(carma::col_to_arr(mean, true),
-                         carma::col_to_arr(stdev, true),
-                         carma::mat_to_arr(cov, true));
+  return std::make_tuple(carma::col_to_arr(mean, true), carma::col_to_arr(stdev, true), carma::mat_to_arr(cov, true));
 }
 
 py::array_t<double> PyWarpKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n) {

@@ -22,34 +22,49 @@ namespace libKriging {
 // *************************************************************************
 
 WarpSpec WarpSpec::none() {
-  WarpSpec s; s.type = WarpType::None; return s;
+  WarpSpec s;
+  s.type = WarpType::None;
+  return s;
 }
 WarpSpec WarpSpec::affine() {
-  WarpSpec s; s.type = WarpType::Affine; return s;
+  WarpSpec s;
+  s.type = WarpType::Affine;
+  return s;
 }
 WarpSpec WarpSpec::boxcox() {
-  WarpSpec s; s.type = WarpType::BoxCox; return s;
+  WarpSpec s;
+  s.type = WarpType::BoxCox;
+  return s;
 }
 WarpSpec WarpSpec::kumaraswamy() {
-  WarpSpec s; s.type = WarpType::Kumaraswamy; return s;
+  WarpSpec s;
+  s.type = WarpType::Kumaraswamy;
+  return s;
 }
 
 WarpSpec WarpSpec::neural_mono(arma::uword nh) {
-  WarpSpec s; s.type = WarpType::NeuralMono; s.n_hidden = nh; return s;
+  WarpSpec s;
+  s.type = WarpType::NeuralMono;
+  s.n_hidden = nh;
+  return s;
 }
 
 WarpSpec WarpSpec::categorical(arma::uword nlevels, arma::uword edim) {
-  WarpSpec s; s.type = WarpType::Embedding;
-  s.n_levels = nlevels; s.embed_dim = edim; return s;
+  WarpSpec s;
+  s.type = WarpType::Embedding;
+  s.n_levels = nlevels;
+  s.embed_dim = edim;
+  return s;
 }
 
 WarpSpec WarpSpec::ordinal(arma::uword nlevels) {
-  WarpSpec s; s.type = WarpType::Ordinal; s.n_levels = nlevels; return s;
+  WarpSpec s;
+  s.type = WarpType::Ordinal;
+  s.n_levels = nlevels;
+  return s;
 }
 
-WarpSpec WarpSpec::mlp(const std::vector<arma::uword>& hdims,
-                       arma::uword dout,
-                       const std::string& act) {
+WarpSpec WarpSpec::mlp(const std::vector<arma::uword>& hdims, arma::uword dout, const std::string& act) {
   WarpSpec s;
   s.type = WarpType::MLP;
   s.hidden_dims = hdims;
@@ -58,9 +73,7 @@ WarpSpec WarpSpec::mlp(const std::vector<arma::uword>& hdims,
   return s;
 }
 
-WarpSpec WarpSpec::mlp_joint(const std::vector<arma::uword>& hdims,
-                             arma::uword dout,
-                             const std::string& act) {
+WarpSpec WarpSpec::mlp_joint(const std::vector<arma::uword>& hdims, arma::uword dout, const std::string& act) {
   WarpSpec s;
   s.type = WarpType::MLPJoint;
   s.hidden_dims = hdims;
@@ -68,7 +81,6 @@ WarpSpec WarpSpec::mlp_joint(const std::vector<arma::uword>& hdims,
   s.activation = act;
   return s;
 }
-
 
 // -------------------------------------------------------------------------
 //  WarpSpec::from_string  —  parse "type(arg1,arg2,...)" format
@@ -84,7 +96,8 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
   // Trim whitespace
   auto trim = [](const std::string& s) -> std::string {
     auto b = s.find_first_not_of(" \t");
-    if (b == std::string::npos) return "";
+    if (b == std::string::npos)
+      return "";
     auto e = s.find_last_not_of(" \t");
     return s.substr(b, e - b + 1);
   };
@@ -167,16 +180,13 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
           "WarpSpec::from_string: categorical requires n_levels, e.g. 'categorical(5)' or 'categorical(5,2)'");
     auto parts = split(args_str, ',');
     arma::uword nl = static_cast<arma::uword>(std::stoul(parts[0]));
-    arma::uword ed = (parts.size() >= 2)
-                         ? static_cast<arma::uword>(std::stoul(parts[1]))
-                         : 2;
+    arma::uword ed = (parts.size() >= 2) ? static_cast<arma::uword>(std::stoul(parts[1])) : 2;
     return WarpSpec::categorical(nl, ed);
   }
 
   if (type_str == "ordinal") {
     if (args_str.empty())
-      throw std::invalid_argument(
-          "WarpSpec::from_string: ordinal requires n_levels, e.g. 'ordinal(4)'");
+      throw std::invalid_argument("WarpSpec::from_string: ordinal requires n_levels, e.g. 'ordinal(4)'");
     arma::uword nl = static_cast<arma::uword>(std::stoul(args_str));
     return WarpSpec::ordinal(nl);
   }
@@ -194,7 +204,8 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
       for (const auto& hp : hparts)
         hdims.push_back(static_cast<arma::uword>(std::stoul(hp)));
     }
-    if (hdims.empty()) hdims = {32, 16};
+    if (hdims.empty())
+      hdims = {32, 16};
 
     arma::uword dout = 2;
     if (parts.size() >= 2)
@@ -216,30 +227,35 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
 // -------------------------------------------------------------------------
 std::string WarpSpec::to_string() const {
   switch (type) {
-    case WarpType::None:        return "none";
-    case WarpType::Affine:      return "affine";
-    case WarpType::BoxCox:      return "boxcox";
-    case WarpType::Kumaraswamy: return "kumaraswamy";
+    case WarpType::None:
+      return "none";
+    case WarpType::Affine:
+      return "affine";
+    case WarpType::BoxCox:
+      return "boxcox";
+    case WarpType::Kumaraswamy:
+      return "kumaraswamy";
     case WarpType::NeuralMono:
       return "neural_mono(" + std::to_string(n_hidden) + ")";
     case WarpType::MLP: {
       std::string s = "mlp(";
       for (arma::uword i = 0; i < hidden_dims.size(); ++i) {
-        if (i > 0) s += ":";
+        if (i > 0)
+          s += ":";
         s += std::to_string(hidden_dims[i]);
       }
       s += "," + std::to_string(d_out) + "," + activation + ")";
       return s;
     }
     case WarpType::Embedding:
-      return "categorical(" + std::to_string(n_levels) + ","
-             + std::to_string(embed_dim) + ")";
+      return "categorical(" + std::to_string(n_levels) + "," + std::to_string(embed_dim) + ")";
     case WarpType::Ordinal:
       return "ordinal(" + std::to_string(n_levels) + ")";
     case WarpType::MLPJoint: {
       std::string s = "mlp_joint(";
       for (arma::uword i = 0; i < hidden_dims.size(); ++i) {
-        if (i > 0) s += ":";
+        if (i > 0)
+          s += ":";
         s += std::to_string(hidden_dims[i]);
       }
       s += "," + std::to_string(d_out) + "," + activation + ")";
@@ -257,8 +273,7 @@ arma::mat WarpNone::forward(const arma::vec& x) const {
   return arma::mat(x);  // (n × 1)
 }
 
-arma::vec WarpNone::backward(const arma::vec& /*x*/,
-                             const arma::mat& /*dL_dPhi*/) const {
+arma::vec WarpNone::backward(const arma::vec& /*x*/, const arma::mat& /*dL_dPhi*/) const {
   return {};  // no params → empty gradient
 }
 
@@ -268,7 +283,9 @@ arma::vec WarpNone::backward(const arma::vec& /*x*/,
 
 WarpAffine::WarpAffine() : m_a(1.0), m_b(0.0) {}
 
-arma::vec WarpAffine::get_params() const { return {m_a, m_b}; }
+arma::vec WarpAffine::get_params() const {
+  return {m_a, m_b};
+}
 
 void WarpAffine::set_params(const arma::vec& p) {
   m_a = p(0);
@@ -279,8 +296,7 @@ arma::mat WarpAffine::forward(const arma::vec& x) const {
   return arma::mat(m_a * x + m_b);
 }
 
-arma::vec WarpAffine::backward(const arma::vec& x,
-                               const arma::mat& dL_dPhi) const {
+arma::vec WarpAffine::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   // dL/da = Σ dL/dφ_i · x_i,   dL/db = Σ dL/dφ_i
   arma::vec grad(2);
   grad(0) = arma::dot(dL_dPhi.col(0), x);
@@ -301,9 +317,13 @@ std::string WarpAffine::describe() const {
 
 WarpBoxCox::WarpBoxCox() : m_lambda(1.0) {}
 
-arma::vec WarpBoxCox::get_params() const { return {m_lambda}; }
+arma::vec WarpBoxCox::get_params() const {
+  return {m_lambda};
+}
 
-void WarpBoxCox::set_params(const arma::vec& p) { m_lambda = p(0); }
+void WarpBoxCox::set_params(const arma::vec& p) {
+  m_lambda = p(0);
+}
 
 arma::mat WarpBoxCox::forward(const arma::vec& x) const {
   arma::vec out(x.n_elem);
@@ -317,8 +337,7 @@ arma::mat WarpBoxCox::forward(const arma::vec& x) const {
   return arma::mat(out);
 }
 
-arma::vec WarpBoxCox::backward(const arma::vec& x,
-                               const arma::mat& dL_dPhi) const {
+arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   // dw/dλ = [x^λ (λ ln(x) − 1) + 1] / λ²  (for λ ≠ 0)
   double grad_lambda = 0.0;
   for (arma::uword i = 0; i < x.n_elem; ++i) {
@@ -328,8 +347,7 @@ arma::vec WarpBoxCox::backward(const arma::vec& x,
       dw_dl = 0.5 * std::log(xi) * std::log(xi);  // Taylor approx
     } else {
       double xp = std::pow(xi, m_lambda);
-      dw_dl = (xp * (m_lambda * std::log(xi) - 1.0) + 1.0)
-              / (m_lambda * m_lambda);
+      dw_dl = (xp * (m_lambda * std::log(xi) - 1.0) + 1.0) / (m_lambda * m_lambda);
     }
     grad_lambda += dL_dPhi(i, 0) * dw_dl;
   }
@@ -369,17 +387,16 @@ arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
   return arma::mat(out);
 }
 
-arma::vec WarpKumaraswamy::backward(const arma::vec& x,
-                                    const arma::mat& dL_dPhi) const {
+arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   double a = std::exp(m_log_a);
   double b = std::exp(m_log_b);
   double grad_log_a = 0.0, grad_log_b = 0.0;
 
   for (arma::uword i = 0; i < x.n_elem; ++i) {
     double xi = std::clamp(x(i), 1e-10, 1.0 - 1e-10);
-    double xa  = std::pow(xi, a);
-    double u   = 1.0 - xa;           // 1 - x^a
-    double ub  = std::pow(u, b);     // (1 - x^a)^b
+    double xa = std::pow(xi, a);
+    double u = 1.0 - xa;         // 1 - x^a
+    double ub = std::pow(u, b);  // (1 - x^a)^b
 
     // dw/da = b · (1−x^a)^{b−1} · x^a · ln(x) · a   (chain via log_a)
     double dw_da = b * std::pow(u, b - 1.0) * xa * std::log(xi);
@@ -396,8 +413,7 @@ arma::vec WarpKumaraswamy::backward(const arma::vec& x,
 
 std::string WarpKumaraswamy::describe() const {
   std::ostringstream s;
-  s << "Kumaraswamy(a=" << std::exp(m_log_a)
-    << ", b=" << std::exp(m_log_b) << ")";
+  s << "Kumaraswamy(a=" << std::exp(m_log_a) << ", b=" << std::exp(m_log_b) << ")";
   return s.str();
 }
 
@@ -409,14 +425,13 @@ std::string WarpKumaraswamy::describe() const {
 //  Monotonicity is guaranteed by using positive weights (stored as exp(raw)).
 // *************************************************************************
 
-WarpNeuralMono::WarpNeuralMono(arma::uword n_hidden, uint64_t seed)
-    : m_H(n_hidden) {
+WarpNeuralMono::WarpNeuralMono(arma::uword n_hidden, uint64_t seed) : m_H(n_hidden) {
   arma::arma_rng::set_seed(seed);
   double scale = std::sqrt(2.0 / 1.0);  // Kaiming init, fan_in = 1
   m_raw_W1 = arma::randn<arma::vec>(m_H) * scale;
-  m_b1     = arma::zeros<arma::vec>(m_H);
+  m_b1 = arma::zeros<arma::vec>(m_H);
   m_raw_W2 = arma::randn<arma::vec>(m_H) * scale;
-  m_b2     = 0.0;
+  m_b2 = 0.0;
 }
 
 arma::uword WarpNeuralMono::n_params() const {
@@ -426,19 +441,25 @@ arma::uword WarpNeuralMono::n_params() const {
 arma::vec WarpNeuralMono::get_params() const {
   arma::vec p(n_params());
   arma::uword idx = 0;
-  p.subvec(idx, idx + m_H - 1) = m_raw_W1; idx += m_H;
-  p.subvec(idx, idx + m_H - 1) = m_b1;     idx += m_H;
-  p.subvec(idx, idx + m_H - 1) = m_raw_W2; idx += m_H;
+  p.subvec(idx, idx + m_H - 1) = m_raw_W1;
+  idx += m_H;
+  p.subvec(idx, idx + m_H - 1) = m_b1;
+  idx += m_H;
+  p.subvec(idx, idx + m_H - 1) = m_raw_W2;
+  idx += m_H;
   p(idx) = m_b2;
   return p;
 }
 
 void WarpNeuralMono::set_params(const arma::vec& p) {
   arma::uword idx = 0;
-  m_raw_W1 = p.subvec(idx, idx + m_H - 1); idx += m_H;
-  m_b1     = p.subvec(idx, idx + m_H - 1); idx += m_H;
-  m_raw_W2 = p.subvec(idx, idx + m_H - 1); idx += m_H;
-  m_b2     = p(idx);
+  m_raw_W1 = p.subvec(idx, idx + m_H - 1);
+  idx += m_H;
+  m_b1 = p.subvec(idx, idx + m_H - 1);
+  idx += m_H;
+  m_raw_W2 = p.subvec(idx, idx + m_H - 1);
+  idx += m_H;
+  m_b2 = p(idx);
 }
 
 arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
@@ -460,8 +481,7 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
   return arma::mat(out);
 }
 
-arma::vec WarpNeuralMono::backward(const arma::vec& x,
-                                   const arma::mat& dL_dPhi) const {
+arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   arma::vec W1 = arma::exp(m_raw_W1);
   arma::vec W2 = arma::exp(m_raw_W2);
 
@@ -478,13 +498,13 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x,
     arma::vec z = W1 * x(i) + m_b1;
     arma::vec h(m_H), sig(m_H);
     for (arma::uword j = 0; j < m_H; ++j) {
-      h(j)   = std::log1p(std::exp(z(j)));       // softplus
-      sig(j) = 1.0 / (1.0 + std::exp(-z(j)));    // sigmoid = d(softplus)/dz
+      h(j) = std::log1p(std::exp(z(j)));       // softplus
+      sig(j) = 1.0 / (1.0 + std::exp(-z(j)));  // sigmoid = d(softplus)/dz
     }
 
     // d(out)/d(W2) = h  → d/d(raw_W2) = h * W2 (chain via exp)
     g_rW2 += dl * (h % W2);
-    g_b2  += dl;
+    g_b2 += dl;
 
     // d(out)/d(h) = W2
     arma::vec dout_dh = W2;
@@ -494,13 +514,16 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x,
 
     // d(z_j)/d(W1_j) = x_i  → d/d(raw_W1) = x_i * W1 (chain via exp)
     g_rW1 += dl * (dout_dh % dh_dz) * x(i) % W1;
-    g_b1  += dl * (dout_dh % dh_dz);
+    g_b1 += dl * (dout_dh % dh_dz);
   }
 
   arma::uword idx = 0;
-  grad.subvec(idx, idx + m_H - 1) = g_rW1; idx += m_H;
-  grad.subvec(idx, idx + m_H - 1) = g_b1;  idx += m_H;
-  grad.subvec(idx, idx + m_H - 1) = g_rW2; idx += m_H;
+  grad.subvec(idx, idx + m_H - 1) = g_rW1;
+  idx += m_H;
+  grad.subvec(idx, idx + m_H - 1) = g_b1;
+  idx += m_H;
+  grad.subvec(idx, idx + m_H - 1) = g_rW2;
+  idx += m_H;
   grad(idx) = g_b2;
   return grad;
 }
@@ -528,12 +551,10 @@ arma::mat WarpMLP::apply_act(const arma::mat& Z, Act act) {
     case Act::ReLU:
       return arma::clamp(Z, 0.0, arma::datum::inf);
     case Act::SELU: {
-      const double alpha  = 1.6732632423543772;
+      const double alpha = 1.6732632423543772;
       const double lambda = 1.0507009873554805;
       arma::mat out = Z;
-      out.transform([&](double z) {
-        return lambda * (z >= 0.0 ? z : alpha * (std::exp(z) - 1.0));
-      });
+      out.transform([&](double z) { return lambda * (z >= 0.0 ? z : alpha * (std::exp(z) - 1.0)); });
       return out;
     }
     case Act::Tanh:
@@ -542,9 +563,7 @@ arma::mat WarpMLP::apply_act(const arma::mat& Z, Act act) {
       return 1.0 / (1.0 + arma::exp(-Z));
     case Act::ELU: {
       arma::mat out = Z;
-      out.transform([](double z) {
-        return z >= 0.0 ? z : std::exp(z) - 1.0;
-      });
+      out.transform([](double z) { return z >= 0.0 ? z : std::exp(z) - 1.0; });
       return out;
     }
   }
@@ -560,7 +579,7 @@ arma::mat WarpMLP::act_deriv(const arma::mat& Z, Act act) {
       return d;
     }
     case Act::SELU: {
-      const double alpha  = 1.6732632423543772;
+      const double alpha = 1.6732632423543772;
       const double lambda = 1.0507009873554805;
       arma::mat d(arma::size(Z));
       for (arma::uword i = 0; i < Z.n_elem; ++i)
@@ -588,18 +607,22 @@ arma::mat WarpMLP::act_deriv(const arma::mat& Z, Act act) {
 WarpMLP::Act WarpMLP::parse_act(const std::string& s) {
   std::string lower = s;
   std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-  if (lower == "relu")    return Act::ReLU;
-  if (lower == "selu")    return Act::SELU;
-  if (lower == "tanh")    return Act::Tanh;
-  if (lower == "sigmoid") return Act::Sigmoid;
-  if (lower == "elu")     return Act::ELU;
+  if (lower == "relu")
+    return Act::ReLU;
+  if (lower == "selu")
+    return Act::SELU;
+  if (lower == "tanh")
+    return Act::Tanh;
+  if (lower == "sigmoid")
+    return Act::Sigmoid;
+  if (lower == "elu")
+    return Act::ELU;
   throw std::invalid_argument("WarpMLP: unknown activation: " + s);
 }
 
 // -- construction -----------------------------------------------------------
 
-WarpMLP::WarpMLP(const std::vector<arma::uword>& hidden_dims,
-                 arma::uword d_out, Act activation, uint64_t seed)
+WarpMLP::WarpMLP(const std::vector<arma::uword>& hidden_dims, arma::uword d_out, Act activation, uint64_t seed)
     : m_d_out(d_out), m_act(activation) {
   if (hidden_dims.empty())
     throw std::invalid_argument("WarpMLP: need at least one hidden layer");
@@ -641,11 +664,9 @@ arma::vec WarpMLP::get_params() const {
   arma::vec p(m_n_params);
   arma::uword idx = 0;
   for (arma::uword l = 0; l < m_W.size(); ++l) {
-    std::memcpy(p.memptr() + idx, m_W[l].memptr(),
-                m_W[l].n_elem * sizeof(double));
+    std::memcpy(p.memptr() + idx, m_W[l].memptr(), m_W[l].n_elem * sizeof(double));
     idx += m_W[l].n_elem;
-    std::memcpy(p.memptr() + idx, m_b[l].memptr(),
-                m_b[l].n_elem * sizeof(double));
+    std::memcpy(p.memptr() + idx, m_b[l].memptr(), m_b[l].n_elem * sizeof(double));
     idx += m_b[l].n_elem;
   }
   return p;
@@ -654,11 +675,9 @@ arma::vec WarpMLP::get_params() const {
 void WarpMLP::set_params(const arma::vec& p) {
   arma::uword idx = 0;
   for (arma::uword l = 0; l < m_W.size(); ++l) {
-    std::memcpy(m_W[l].memptr(), p.memptr() + idx,
-                m_W[l].n_elem * sizeof(double));
+    std::memcpy(m_W[l].memptr(), p.memptr() + idx, m_W[l].n_elem * sizeof(double));
     idx += m_W[l].n_elem;
-    std::memcpy(m_b[l].memptr(), p.memptr() + idx,
-                m_b[l].n_elem * sizeof(double));
+    std::memcpy(m_b[l].memptr(), p.memptr() + idx, m_b[l].n_elem * sizeof(double));
     idx += m_b[l].n_elem;
   }
 }
@@ -686,8 +705,7 @@ arma::mat WarpMLP::forward(const arma::vec& x) const {
 
 // -- backward ---------------------------------------------------------------
 
-arma::vec WarpMLP::backward(const arma::vec& x,
-                            const arma::mat& dL_dPhi) const {
+arma::vec WarpMLP::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   const arma::uword L = m_W.size();
 
   // Forward pass with caching
@@ -756,7 +774,9 @@ std::string WarpMLP::describe() const {
 
 WarpMLPJoint::WarpMLPJoint(arma::uword d_in,
                            const std::vector<arma::uword>& hidden_dims,
-                           arma::uword d_out, Act activation, uint64_t seed)
+                           arma::uword d_out,
+                           Act activation,
+                           uint64_t seed)
     : m_d_in(d_in), m_d_out(d_out), m_act(activation) {
   if (hidden_dims.empty())
     throw std::invalid_argument("WarpMLPJoint: need at least one hidden layer");
@@ -765,9 +785,8 @@ WarpMLPJoint::WarpMLPJoint(arma::uword d_in,
 
   arma::uword prev = d_in;
   for (auto cur : hidden_dims) {
-    double scale = (m_act == Act::Tanh || m_act == Act::Sigmoid)
-                       ? std::sqrt(6.0 / (prev + cur))
-                       : std::sqrt(2.0 / prev);
+    double scale
+        = (m_act == Act::Tanh || m_act == Act::Sigmoid) ? std::sqrt(6.0 / (prev + cur)) : std::sqrt(2.0 / prev);
     m_W.push_back(scale * arma::randn<arma::mat>(prev, cur));
     m_b.push_back(arma::zeros<arma::vec>(cur));
     prev = cur;
@@ -788,11 +807,9 @@ arma::vec WarpMLPJoint::get_params() const {
   arma::vec p(m_n_params);
   arma::uword idx = 0;
   for (arma::uword l = 0; l < m_W.size(); ++l) {
-    std::memcpy(p.memptr() + idx, m_W[l].memptr(),
-                m_W[l].n_elem * sizeof(double));
+    std::memcpy(p.memptr() + idx, m_W[l].memptr(), m_W[l].n_elem * sizeof(double));
     idx += m_W[l].n_elem;
-    std::memcpy(p.memptr() + idx, m_b[l].memptr(),
-                m_b[l].n_elem * sizeof(double));
+    std::memcpy(p.memptr() + idx, m_b[l].memptr(), m_b[l].n_elem * sizeof(double));
     idx += m_b[l].n_elem;
   }
   return p;
@@ -801,11 +818,9 @@ arma::vec WarpMLPJoint::get_params() const {
 void WarpMLPJoint::set_params(const arma::vec& p) {
   arma::uword idx = 0;
   for (arma::uword l = 0; l < m_W.size(); ++l) {
-    std::memcpy(m_W[l].memptr(), p.memptr() + idx,
-                m_W[l].n_elem * sizeof(double));
+    std::memcpy(m_W[l].memptr(), p.memptr() + idx, m_W[l].n_elem * sizeof(double));
     idx += m_W[l].n_elem;
-    std::memcpy(m_b[l].memptr(), p.memptr() + idx,
-                m_b[l].n_elem * sizeof(double));
+    std::memcpy(m_b[l].memptr(), p.memptr() + idx, m_b[l].n_elem * sizeof(double));
     idx += m_b[l].n_elem;
   }
 }
@@ -824,8 +839,7 @@ arma::mat WarpMLPJoint::forward(const arma::mat& X) const {
   return H;  // (n × d_out)
 }
 
-arma::vec WarpMLPJoint::backward(const arma::mat& X,
-                                 const arma::mat& dL_dPhi) const {
+arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) const {
   const arma::uword L = m_W.size();
 
   // Forward with caching
@@ -880,8 +894,7 @@ std::string WarpMLPJoint::describe() const {
 //  WarpEmbedding  :  level l → row l of E ∈ ℝ^{L × q}
 // *************************************************************************
 
-WarpEmbedding::WarpEmbedding(arma::uword n_levels, arma::uword embed_dim,
-                             uint64_t seed)
+WarpEmbedding::WarpEmbedding(arma::uword n_levels, arma::uword embed_dim, uint64_t seed)
     : m_n_levels(n_levels), m_embed_dim(embed_dim) {
   arma::arma_rng::set_seed(seed);
   double scale = std::sqrt(1.0 / embed_dim);
@@ -906,17 +919,14 @@ arma::mat WarpEmbedding::forward(const arma::vec& x) const {
   for (arma::uword i = 0; i < n; ++i) {
     arma::uword level = static_cast<arma::uword>(std::round(x(i)));
     if (level >= m_n_levels)
-      throw std::out_of_range("WarpEmbedding: level " +
-                              std::to_string(level) +
-                              " >= n_levels " +
-                              std::to_string(m_n_levels));
+      throw std::out_of_range("WarpEmbedding: level " + std::to_string(level) + " >= n_levels "
+                              + std::to_string(m_n_levels));
     out.row(i) = m_E.row(level);
   }
   return out;
 }
 
-arma::vec WarpEmbedding::backward(const arma::vec& x,
-                                  const arma::mat& dL_dPhi) const {
+arma::vec WarpEmbedding::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   arma::mat dE(m_n_levels, m_embed_dim, arma::fill::zeros);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
     arma::uword level = static_cast<arma::uword>(std::round(x(i)));
@@ -936,17 +946,22 @@ std::string WarpEmbedding::describe() const {
 //  Enforces z_0 = 0 < z_1 < z_2 < … < z_{L-1}
 // *************************************************************************
 
-WarpOrdinal::WarpOrdinal(arma::uword n_levels, uint64_t seed)
-    : m_n_levels(n_levels) {
+WarpOrdinal::WarpOrdinal(arma::uword n_levels, uint64_t seed) : m_n_levels(n_levels) {
   arma::arma_rng::set_seed(seed);
   m_raw_gaps = arma::zeros<arma::vec>(n_levels - 1);
 }
 
-arma::uword WarpOrdinal::n_params() const { return m_n_levels - 1; }
+arma::uword WarpOrdinal::n_params() const {
+  return m_n_levels - 1;
+}
 
-arma::vec WarpOrdinal::get_params() const { return m_raw_gaps; }
+arma::vec WarpOrdinal::get_params() const {
+  return m_raw_gaps;
+}
 
-void WarpOrdinal::set_params(const arma::vec& p) { m_raw_gaps = p; }
+void WarpOrdinal::set_params(const arma::vec& p) {
+  m_raw_gaps = p;
+}
 
 arma::mat WarpOrdinal::forward(const arma::vec& x) const {
   // Precompute positions:  z_0 = 0, z_l = z_{l-1} + exp(gap_{l-1})
@@ -966,8 +981,7 @@ arma::mat WarpOrdinal::forward(const arma::vec& x) const {
   return arma::mat(out);
 }
 
-arma::vec WarpOrdinal::backward(const arma::vec& x,
-                                const arma::mat& dL_dPhi) const {
+arma::vec WarpOrdinal::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   // d(z_l)/d(gap_k) = exp(gap_k)  if k < l,  0 otherwise
   arma::vec grad(m_n_levels - 1, arma::fill::zeros);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
@@ -998,27 +1012,36 @@ std::string WarpOrdinal::describe() const {
 WarpBaseKernel WarpKriging::parse_kernel(const std::string& name) {
   std::string s = name;
   std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-  if (s == "gauss" || s == "rbf")       return WarpBaseKernel::Gauss;
-  if (s == "matern3_2" || s == "matern32") return WarpBaseKernel::Matern32;
-  if (s == "matern5_2" || s == "matern52") return WarpBaseKernel::Matern52;
-  if (s == "exp" || s == "exponential") return WarpBaseKernel::Exp;
+  if (s == "gauss" || s == "rbf")
+    return WarpBaseKernel::Gauss;
+  if (s == "matern3_2" || s == "matern32")
+    return WarpBaseKernel::Matern32;
+  if (s == "matern5_2" || s == "matern52")
+    return WarpBaseKernel::Matern52;
+  if (s == "exp" || s == "exponential")
+    return WarpBaseKernel::Exp;
   throw std::invalid_argument("Unknown kernel: " + name);
 }
 
 // -------------------------------------------------------------------------
 std::unique_ptr<IWarp> WarpKriging::make_warp(const WarpSpec& spec) const {
   switch (spec.type) {
-    case WarpType::None:        return std::make_unique<WarpNone>();
-    case WarpType::Affine:      return std::make_unique<WarpAffine>();
-    case WarpType::BoxCox:      return std::make_unique<WarpBoxCox>();
-    case WarpType::Kumaraswamy: return std::make_unique<WarpKumaraswamy>();
-    case WarpType::NeuralMono:  return std::make_unique<WarpNeuralMono>(spec.n_hidden);
+    case WarpType::None:
+      return std::make_unique<WarpNone>();
+    case WarpType::Affine:
+      return std::make_unique<WarpAffine>();
+    case WarpType::BoxCox:
+      return std::make_unique<WarpBoxCox>();
+    case WarpType::Kumaraswamy:
+      return std::make_unique<WarpKumaraswamy>();
+    case WarpType::NeuralMono:
+      return std::make_unique<WarpNeuralMono>(spec.n_hidden);
     case WarpType::MLP:
-      return std::make_unique<WarpMLP>(
-          spec.hidden_dims, spec.d_out,
-          WarpMLP::parse_act(spec.activation));
-    case WarpType::Embedding:   return std::make_unique<WarpEmbedding>(spec.n_levels, spec.embed_dim);
-    case WarpType::Ordinal:     return std::make_unique<WarpOrdinal>(spec.n_levels);
+      return std::make_unique<WarpMLP>(spec.hidden_dims, spec.d_out, WarpMLP::parse_act(spec.activation));
+    case WarpType::Embedding:
+      return std::make_unique<WarpEmbedding>(spec.n_levels, spec.embed_dim);
+    case WarpType::Ordinal:
+      return std::make_unique<WarpOrdinal>(spec.n_levels);
     case WarpType::MLPJoint:
       // MLPJoint is not a per-variable IWarp — handled separately in build_warps
       throw std::invalid_argument("make_warp: MLPJoint is handled by build_warps, not make_warp");
@@ -1047,8 +1070,7 @@ void WarpKriging::build_warps() {
   // Ensure no MLPJoint mixed with per-variable warps
   for (const auto& spec : m_warp_specs) {
     if (spec.type == WarpType::MLPJoint)
-      throw std::invalid_argument(
-          "mlp_joint must be the only warping entry (cannot mix with per-variable warps)");
+      throw std::invalid_argument("mlp_joint must be the only warping entry (cannot mix with per-variable warps)");
   }
 
   // Per-variable mode
@@ -1056,16 +1078,14 @@ void WarpKriging::build_warps() {
     auto w = make_warp(spec);
     m_feature_dim += w->output_dim();
     m_warps.push_back(std::move(w));
-    m_is_continuous.push_back(
-        spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal);
+    m_is_continuous.push_back(spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal);
   }
 }
 
 // -------------------------------------------------------------------------
 //  Constructors (string-based public API)
 // -------------------------------------------------------------------------
-static std::vector<WarpSpec> parse_warp_strings(
-    const std::vector<std::string>& strs) {
+static std::vector<WarpSpec> parse_warp_strings(const std::vector<std::string>& strs) {
   std::vector<WarpSpec> specs;
   specs.reserve(strs.size());
   for (const auto& s : strs)
@@ -1073,25 +1093,26 @@ static std::vector<WarpSpec> parse_warp_strings(
   return specs;
 }
 
-void WarpKriging::init_from_specs(const std::vector<WarpSpec>& specs,
-                                  const std::string& kernel) {
-  m_warp_specs  = specs;
+void WarpKriging::init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel) {
+  m_warp_specs = specs;
   m_kernel_name = kernel;
   m_base_kernel = parse_kernel(kernel);
   build_warps();
 }
 
-WarpKriging::WarpKriging(const std::vector<std::string>& warping,
-                         const std::string& kernel) {
+WarpKriging::WarpKriging(const std::vector<std::string>& warping, const std::string& kernel) {
   init_from_specs(parse_warp_strings(warping), kernel);
 }
 
-WarpKriging::WarpKriging(
-    const arma::vec& y, const arma::mat& X,
-    const std::vector<std::string>& warping, const std::string& kernel,
-    const std::string& regmodel, bool normalize,
-    const std::string& optim, const std::string& objective,
-    const std::map<std::string, std::string>& parameters) {
+WarpKriging::WarpKriging(const arma::vec& y,
+                         const arma::mat& X,
+                         const std::vector<std::string>& warping,
+                         const std::string& kernel,
+                         const std::string& regmodel,
+                         bool normalize,
+                         const std::string& optim,
+                         const std::string& objective,
+                         const std::map<std::string, std::string>& parameters) {
   init_from_specs(parse_warp_strings(warping), kernel);
   fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
@@ -1142,7 +1163,8 @@ arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
     arma::mat F(n, p);
     F.col(0) = arma::ones<arma::vec>(n);
     arma::uword c = 1;
-    for (arma::uword j = 0; j < d; ++j) F.col(c++) = Phi.col(j);
+    for (arma::uword j = 0; j < d; ++j)
+      F.col(c++) = Phi.col(j);
     for (arma::uword j = 0; j < d; ++j)
       for (arma::uword k = j; k < d; ++k)
         F.col(c++) = Phi.col(j) % Phi.col(k);
@@ -1154,22 +1176,19 @@ arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
 // -------------------------------------------------------------------------
 //  Kernel functions  (identical to NeuralKernelKriging)
 // -------------------------------------------------------------------------
-double WarpKriging::kernel_scalar(const arma::rowvec& phi_i,
-                                  const arma::rowvec& phi_j) const {
+double WarpKriging::kernel_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const {
   arma::rowvec diff = phi_i - phi_j;
   arma::rowvec scaled = diff / m_theta.t();
   double r2 = arma::dot(scaled, scaled);
-  double r  = std::sqrt(r2);
+  double r = std::sqrt(r2);
 
   switch (m_base_kernel) {
     case WarpBaseKernel::Gauss:
       return m_sigma2 * std::exp(-0.5 * r2);
     case WarpBaseKernel::Matern32:
-      return m_sigma2 * (1.0 + std::sqrt(3.0) * r) *
-             std::exp(-std::sqrt(3.0) * r);
+      return m_sigma2 * (1.0 + std::sqrt(3.0) * r) * std::exp(-std::sqrt(3.0) * r);
     case WarpBaseKernel::Matern52:
-      return m_sigma2 * (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2) *
-             std::exp(-std::sqrt(5.0) * r);
+      return m_sigma2 * (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2) * std::exp(-std::sqrt(5.0) * r);
     case WarpBaseKernel::Exp:
       return m_sigma2 * std::exp(-r);
   }
@@ -1190,8 +1209,7 @@ arma::mat WarpKriging::build_K(const arma::mat& Phi) const {
   return K;
 }
 
-arma::mat WarpKriging::build_Kcross(const arma::mat& Phi_new,
-                                    const arma::mat& Phi_train) const {
+arma::mat WarpKriging::build_Kcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
   const arma::uword m = Phi_new.n_rows;
   const arma::uword n = Phi_train.n_rows;
   arma::mat Kc(m, n);
@@ -1207,28 +1225,29 @@ arma::mat WarpKriging::build_Kcross(const arma::mat& Phi_new,
 void WarpKriging::normalise_data() {
   arma::uword d = m_X.n_cols;
   m_X_mean = arma::zeros<arma::rowvec>(d);
-  m_X_std  = arma::ones<arma::rowvec>(d);
+  m_X_std = arma::ones<arma::rowvec>(d);
 
   if (m_normalize) {
     for (arma::uword j = 0; j < d; ++j) {
       bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
       if (is_cont) {
         m_X_mean(j) = arma::mean(m_X.col(j));
-        m_X_std(j)  = arma::stddev(m_X.col(j));
-        if (m_X_std(j) < 1e-12) m_X_std(j) = 1.0;
+        m_X_std(j) = arma::stddev(m_X.col(j));
+        if (m_X_std(j) < 1e-12)
+          m_X_std(j) = 1.0;
         m_X.col(j) = (m_X.col(j) - m_X_mean(j)) / m_X_std(j);
       }
     }
     m_y_mean = arma::mean(m_y);
-    m_y_std  = arma::stddev(m_y);
-    if (m_y_std < 1e-12) m_y_std = 1.0;
+    m_y_std = arma::stddev(m_y);
+    if (m_y_std < 1e-12)
+      m_y_std = 1.0;
     m_y = (m_y - m_y_mean) / m_y_std;
   } else {
     m_y_mean = 0.0;
-    m_y_std  = 1.0;
+    m_y_std = 1.0;
   }
 }
-
 
 // =========================================================================
 //  CONCENTRATED PROFILE LOG-LIKELIHOOD + BI-LEVEL OPTIMISATION
@@ -1241,12 +1260,11 @@ void WarpKriging::normalise_data() {
 // -------------------------------------------------------------------------
 //  Correlation function  (R_ij = corr(φ_i, φ_j; θ),  R_ii = 1,  σ² factored out)
 // -------------------------------------------------------------------------
-double WarpKriging::corr_scalar(const arma::rowvec& phi_i,
-                                const arma::rowvec& phi_j) const {
+double WarpKriging::corr_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const {
   arma::rowvec diff = phi_i - phi_j;
   arma::rowvec scaled = diff / m_theta.t();
   double r2 = arma::dot(scaled, scaled);
-  double r  = std::sqrt(r2);
+  double r = std::sqrt(r2);
 
   switch (m_base_kernel) {
     case WarpBaseKernel::Gauss:
@@ -1254,8 +1272,7 @@ double WarpKriging::corr_scalar(const arma::rowvec& phi_i,
     case WarpBaseKernel::Matern32:
       return (1.0 + std::sqrt(3.0) * r) * std::exp(-std::sqrt(3.0) * r);
     case WarpBaseKernel::Matern52:
-      return (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2)
-             * std::exp(-std::sqrt(5.0) * r);
+      return (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2) * std::exp(-std::sqrt(5.0) * r);
     case WarpBaseKernel::Exp:
       return std::exp(-r);
   }
@@ -1276,8 +1293,7 @@ arma::mat WarpKriging::build_R(const arma::mat& Phi) const {
   return R;
 }
 
-arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new,
-                                    const arma::mat& Phi_train) const {
+arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
   const arma::uword m = Phi_new.n_rows;
   const arma::uword n = Phi_train.n_rows;
   arma::mat Rc(m, n);
@@ -1327,8 +1343,7 @@ void WarpKriging::refresh_cache_theta_only() {
 // -------------------------------------------------------------------------
 double WarpKriging::concentrated_ll() const {
   const double n = static_cast<double>(m_y.n_elem);
-  return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2))
-         - 0.5 * m_logdet;
+  return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2)) - 0.5 * m_logdet;
 }
 
 double WarpKriging::logLikelihood() const {
@@ -1337,9 +1352,9 @@ double WarpKriging::logLikelihood() const {
   return concentrated_ll();
 }
 
-std::tuple<double, arma::vec, arma::mat>
-WarpKriging::logLikelihoodFun(const arma::vec& theta_gp,
-                              bool withGrad, bool /*withHess*/) const {
+std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta_gp,
+                                                                       bool withGrad,
+                                                                       bool /*withHess*/) const {
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
   self->m_theta = theta_gp;
@@ -1361,8 +1376,7 @@ WarpKriging::logLikelihoodFun(const arma::vec& theta_gp,
 // -------------------------------------------------------------------------
 //  ∂R/∂θ_k  (analytical, n×n matrix)
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
-                                         arma::uword k) const {
+arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi, arma::uword k) const {
   const arma::uword n = Phi.n_rows;
   arma::mat dR(n, n, arma::fill::zeros);
 
@@ -1371,7 +1385,7 @@ arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
       arma::rowvec diff = Phi.row(i) - Phi.row(j);
       arma::rowvec scaled = diff / m_theta.t();
       double r2 = arma::dot(scaled, scaled);
-      double r  = std::sqrt(std::max(r2, 1e-30));
+      double r = std::sqrt(std::max(r2, 1e-30));
 
       double d_k = diff(k);
       double theta_k = m_theta(k);
@@ -1395,8 +1409,7 @@ arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
         case WarpBaseKernel::Matern52: {
           double sr5 = std::sqrt(5.0);
           if (r > 1e-15) {
-            double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r)
-                           * std::exp(-sr5 * r);
+            double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r) * std::exp(-sr5 * r);
             dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
           }
           break;
@@ -1425,16 +1438,13 @@ arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi,
 //  Fused: computes all dR_k in a single pass over (i,j) pairs, sharing
 //  diff, r2, r with the same loop structure as build_R.
 // -------------------------------------------------------------------------
-std::pair<double, arma::vec>
-WarpKriging::concentrated_ll_and_grad_theta() const {
+std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const {
   double ll = concentrated_ll();
 
   const arma::uword n = m_y.n_elem;
   const arma::uword d = m_theta.n_elem;
 
-  arma::mat Rinv = arma::solve(arma::trimatu(m_C.t()),
-                               arma::solve(arma::trimatl(m_C),
-                                           arma::eye(n, n)));
+  arma::mat Rinv = arma::solve(arma::trimatu(m_C.t()), arma::solve(arma::trimatl(m_C), arma::eye(n, n)));
 
   arma::mat dLL_dR = 0.5 * (m_alpha * m_alpha.t() / m_sigma2 - Rinv);
 
@@ -1447,7 +1457,7 @@ WarpKriging::concentrated_ll_and_grad_theta() const {
       arma::rowvec diff = m_Phi.row(i) - m_Phi.row(j);
       arma::rowvec scaled = diff / m_theta.t();
       double r2 = arma::dot(scaled, scaled);
-      double r  = std::sqrt(std::max(r2, 1e-30));
+      double r = std::sqrt(std::max(r2, 1e-30));
 
       double w = 2.0 * dLL_dR(i, j);  // symmetry: (i,j) + (j,i)
 
@@ -1474,8 +1484,7 @@ WarpKriging::concentrated_ll_and_grad_theta() const {
           case WarpBaseKernel::Matern52: {
             double sr5 = std::sqrt(5.0);
             if (r > 1e-15) {
-              double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r)
-                             * std::exp(-sr5 * r);
+              double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r) * std::exp(-sr5 * r);
               dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
             }
             break;
@@ -1499,22 +1508,23 @@ WarpKriging::concentrated_ll_and_grad_theta() const {
 // -------------------------------------------------------------------------
 //  Gradient of LL w.r.t. warp params  (backprop through K = σ̂² R)
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi,
-                               const arma::mat& dL_dK) const {
+arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) const {
   const arma::uword n = Phi.n_rows;
   const arma::uword d = Phi.n_cols;
   arma::mat dL_dPhi(n, d, arma::fill::zeros);
 
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = 0; j < n; ++j) {
-      if (i == j) continue;
+      if (i == j)
+        continue;
       double coeff = dL_dK(i, j);
-      if (std::abs(coeff) < 1e-15) continue;
+      if (std::abs(coeff) < 1e-15)
+        continue;
 
       arma::rowvec diff = Phi.row(i) - Phi.row(j);
       arma::rowvec scaled = diff / m_theta.t();
       double r2 = arma::dot(scaled, scaled);
-      double r  = std::sqrt(std::max(r2, 1e-30));
+      double r = std::sqrt(std::max(r2, 1e-30));
 
       arma::rowvec dk_dphi_i(d);
 
@@ -1525,22 +1535,24 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi,
           break;
         }
         case WarpBaseKernel::Matern32: {
-          double dk_dr = m_sigma2 * (-3.0 * r) *
-                         std::exp(-std::sqrt(3.0) * r);
+          double dk_dr = m_sigma2 * (-3.0 * r) * std::exp(-std::sqrt(3.0) * r);
           if (r > 1e-15) {
             arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
             dk_dphi_i = dk_dr * dr_dphi;
-          } else { dk_dphi_i.zeros(); }
+          } else {
+            dk_dphi_i.zeros();
+          }
           break;
         }
         case WarpBaseKernel::Matern52: {
           double sr5 = std::sqrt(5.0);
-          double dk_dr = m_sigma2 * std::exp(-sr5 * r) *
-                         (-5.0 / 3.0 * r * (1.0 + sr5 * r));
+          double dk_dr = m_sigma2 * std::exp(-sr5 * r) * (-5.0 / 3.0 * r * (1.0 + sr5 * r));
           if (r > 1e-15) {
             arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
             dk_dphi_i = dk_dr * dr_dphi;
-          } else { dk_dphi_i.zeros(); }
+          } else {
+            dk_dphi_i.zeros();
+          }
           break;
         }
         case WarpBaseKernel::Exp: {
@@ -1548,7 +1560,9 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi,
           if (r > 1e-15) {
             arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
             dk_dphi_i = -k_val * dr_dphi;
-          } else { dk_dphi_i.zeros(); }
+          } else {
+            dk_dphi_i.zeros();
+          }
           break;
         }
       }
@@ -1561,9 +1575,8 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi,
 arma::vec WarpKriging::warp_gradient() const {
   const arma::uword n = m_y.n_elem;
 
-  arma::mat Kinv = (1.0 / m_sigma2) *
-      arma::solve(arma::trimatu(m_C.t()),
-                  arma::solve(arma::trimatl(m_C), arma::eye(n, n)));
+  arma::mat Kinv
+      = (1.0 / m_sigma2) * arma::solve(arma::trimatu(m_C.t()), arma::solve(arma::trimatl(m_C), arma::eye(n, n)));
   arma::mat dLL_dK = 0.5 * (m_alpha * m_alpha.t() - Kinv);
 
   arma::mat dLL_dPhi = dK_dPhi(m_Phi, dLL_dK);
@@ -1573,7 +1586,8 @@ arma::vec WarpKriging::warp_gradient() const {
 
   if (m_has_joint && m_joint_warp) {
     arma::vec gw = m_joint_warp->backward(m_X, dLL_dPhi);
-    if (gw.n_elem > 0) grad.head(gw.n_elem) = gw;
+    if (gw.n_elem > 0)
+      grad.head(gw.n_elem) = gw;
   } else {
     arma::uword col = 0, idx = 0;
     for (arma::uword j = 0; j < m_warps.size(); ++j) {
@@ -1598,13 +1612,15 @@ arma::uword WarpKriging::total_warp_params() const {
   if (m_has_joint)
     return m_joint_warp ? m_joint_warp->n_params() : 0;
   arma::uword total = 0;
-  for (const auto& w : m_warps) total += w->n_params();
+  for (const auto& w : m_warps)
+    total += w->n_params();
   return total;
 }
 
 arma::vec WarpKriging::pack_warp_params() const {
   arma::uword n_warp = total_warp_params();
-  if (n_warp == 0) return {};
+  if (n_warp == 0)
+    return {};
   arma::vec wp(n_warp);
   arma::uword idx = 0;
   if (m_has_joint && m_joint_warp) {
@@ -1624,7 +1640,8 @@ arma::vec WarpKriging::pack_warp_params() const {
 void WarpKriging::unpack_warp_params(const arma::vec& wp) {
   arma::uword idx = 0;
   if (m_has_joint && m_joint_warp) {
-    if (wp.n_elem > 0) m_joint_warp->set_params(wp);
+    if (wp.n_elem > 0)
+      m_joint_warp->set_params(wp);
   } else {
     for (auto& w : m_warps) {
       arma::uword np = w->n_params();
@@ -1664,7 +1681,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
     optimizer.factr = 1e7;
 
     arma::vec x0(n_total);
-    if (n_warp > 0) x0.head(n_warp) = pack_warp_params();
+    if (n_warp > 0)
+      x0.head(n_warp) = pack_warp_params();
     x0.tail(d_theta) = arma::log(m_theta);
 
     arma::vec lb(n_total), ub(n_total);
@@ -1679,19 +1697,22 @@ void WarpKriging::optimise_joint(const std::string& method) {
     btype.tail(d_theta).fill(2);
 
     auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
-      if (n_warp > 0) unpack_warp_params(x.head(n_warp));
+      if (n_warp > 0)
+        unpack_warp_params(x.head(n_warp));
       m_theta = arma::exp(x.tail(d_theta));
       refresh_cache();
 
       auto [ll, g_log_theta] = concentrated_ll_and_grad_theta();
       grad.tail(d_theta) = -g_log_theta;
-      if (n_warp > 0) grad.head(n_warp) = -warp_gradient();
+      if (n_warp > 0)
+        grad.head(n_warp) = -warp_gradient();
       return -ll;
     };
 
     optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
 
-    if (n_warp > 0) unpack_warp_params(x0.head(n_warp));
+    if (n_warp > 0)
+      unpack_warp_params(x0.head(n_warp));
     m_theta = arma::exp(x0.tail(d_theta));
     refresh_cache();
   };
@@ -1712,8 +1733,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
 
     arma::vec current_wp = wp0;
 
-    auto obj_fn = [this, &current_wp](const arma::vec& x_outer, const arma::vec& x_inner,
-                                       arma::vec* grad_outer, arma::vec* grad_inner) -> double {
+    auto obj_fn = [this, &current_wp](const arma::vec& x_outer,
+                                      const arma::vec& x_inner,
+                                      arma::vec* grad_outer,
+                                      arma::vec* grad_inner) -> double {
       bool warp_changed = false;
       if (x_outer.n_elem > 0) {
         if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
@@ -1743,8 +1766,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
       return ll;
     };
 
-    auto result = opt.optimize(wp0, log_theta0,
-                               log_theta_lower, log_theta_upper, obj_fn);
+    auto result = opt.optimize(wp0, log_theta0, log_theta_lower, log_theta_upper, obj_fn);
 
     if (n_warp > 0)
       unpack_warp_params(result.x_outer);
@@ -1758,23 +1780,23 @@ void WarpKriging::optimise_joint(const std::string& method) {
   }
 }
 
-
 // -------------------------------------------------------------------------
 //  fit()
 // -------------------------------------------------------------------------
-void WarpKriging::fit(
-    const arma::vec& y, const arma::mat& X,
-    const std::string& regmodel, bool normalize,
-    const std::string& optim, const std::string& /*objective*/,
-    const std::map<std::string, std::string>& parameters) {
+void WarpKriging::fit(const arma::vec& y,
+                      const arma::mat& X,
+                      const std::string& regmodel,
+                      bool normalize,
+                      const std::string& optim,
+                      const std::string& /*objective*/,
+                      const std::map<std::string, std::string>& parameters) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
   // Column count check: in joint mode, 1 spec covers all columns
   if (!m_has_joint && X.n_cols != m_warp_specs.size())
-    throw std::invalid_argument(
-        "fit: X has " + std::to_string(X.n_cols) + " columns but " +
-        std::to_string(m_warp_specs.size()) + " warp specs were given");
+    throw std::invalid_argument("fit: X has " + std::to_string(X.n_cols) + " columns but "
+                                + std::to_string(m_warp_specs.size()) + " warp specs were given");
 
   m_y = y;
   m_X = X;
@@ -1782,9 +1804,12 @@ void WarpKriging::fit(
   m_normalize = normalize;
 
   for (const auto& [key, val] : parameters) {
-    if (key == "adam_lr")        m_adam_lr = std::stod(val);
-    if (key == "max_iter_adam")  m_max_iter_adam = std::stoul(val);
-    if (key == "max_iter_bfgs") m_max_iter_bfgs = std::stoul(val);
+    if (key == "adam_lr")
+      m_adam_lr = std::stod(val);
+    if (key == "max_iter_adam")
+      m_max_iter_adam = std::stoul(val);
+    if (key == "max_iter_bfgs")
+      m_max_iter_bfgs = std::stoul(val);
   }
 
   normalise_data();
@@ -1793,16 +1818,14 @@ void WarpKriging::fit(
   if (m_has_joint) {
     const auto& spec = m_warp_specs[0];
     auto hdims = spec.hidden_dims;
-    if (hdims.empty()) hdims = {32, 16};
-    m_joint_warp = std::make_unique<WarpMLPJoint>(
-        X.n_cols, hdims, spec.d_out,
-        WarpMLP::parse_act(spec.activation), 42);
+    if (hdims.empty())
+      hdims = {32, 16};
+    m_joint_warp = std::make_unique<WarpMLPJoint>(X.n_cols, hdims, spec.d_out, WarpMLP::parse_act(spec.activation), 42);
     m_feature_dim = spec.d_out;
   }
 
-  m_theta  = arma::ones<arma::vec>(m_feature_dim);
+  m_theta = arma::ones<arma::vec>(m_feature_dim);
   // σ̂² is concentrated — computed in refresh_cache
-  
 
   refresh_cache();
   optimise_joint(optim);
@@ -1812,9 +1835,9 @@ void WarpKriging::fit(
 // -------------------------------------------------------------------------
 //  predict()
 // -------------------------------------------------------------------------
-std::tuple<arma::vec, arma::vec, arma::mat>
-WarpKriging::predict(const arma::mat& x_new,
-                     bool withStd, bool withCov) const {
+std::tuple<arma::vec, arma::vec, arma::mat> WarpKriging::predict(const arma::mat& x_new,
+                                                                 bool withStd,
+                                                                 bool withCov) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
 
@@ -1858,8 +1881,7 @@ WarpKriging::predict(const arma::mat& x_new,
     } else {
       arma::vec var_diag(m);
       for (arma::uword i = 0; i < m; ++i) {
-        var_diag(i) = std::max(0.0,
-                               1.0 - arma::dot(v.col(i), v.col(i)));
+        var_diag(i) = std::max(0.0, 1.0 - arma::dot(v.col(i), v.col(i)));
         arma::vec r_i = F_new.row(i).t() - Cinv_F.t() * v.col(i);
         var_diag(i) += arma::dot(r_i, FtRinvF_inv * r_i);
       }
@@ -1874,8 +1896,7 @@ WarpKriging::predict(const arma::mat& x_new,
 // -------------------------------------------------------------------------
 //  simulate()
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::simulate(int nsim, uint64_t seed,
-                                const arma::mat& x_new) const {
+arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) const {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
@@ -1943,20 +1964,17 @@ std::string WarpKriging::summary() const {
       << "  - d features:  " << m_feature_dim << "\n";
 
   if (m_has_joint && m_joint_warp) {
-    oss << "  - warping:     \"" << m_warp_specs[0].to_string()
-        << "\"  →  " << m_joint_warp->describe() << "\n";
+    oss << "  - warping:     \"" << m_warp_specs[0].to_string() << "\"  →  " << m_joint_warp->describe() << "\n";
   } else {
     oss << "  - warpings:\n";
     for (arma::uword j = 0; j < m_warps.size(); ++j) {
-      oss << "      x" << j << ": \"" << m_warp_specs[j].to_string()
-          << "\"  →  " << m_warps[j]->describe() << "\n";
+      oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
     }
   }
 
   if (m_fitted) {
     oss << "  - sigma2:      " << m_sigma2 << "\n"
-        << "  - theta:       " << m_theta.t()
-        << "  - beta:        " << m_beta.t()
+        << "  - theta:       " << m_theta.t() << "  - beta:        " << m_beta.t()
         << "  - LL:          " << logLikelihood() << "\n"
         << "  - total warp params: " << total_warp_params() << "\n";
   } else {

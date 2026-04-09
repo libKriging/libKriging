@@ -1,9 +1,9 @@
 #ifndef LIBKRIGING_ADAM_BFGS_HPP
 #define LIBKRIGING_ADAM_BFGS_HPP
 
-#include "libKriging/utils/lk_armadillo.hpp"
-#include "libKriging/utils/data_from_arma_vec.hpp"
 #include "lbfgsb_cpp/lbfgsb.hpp"
+#include "libKriging/utils/data_from_arma_vec.hpp"
+#include "libKriging/utils/lk_armadillo.hpp"
 
 #include <functional>
 #include <vector>
@@ -50,10 +50,8 @@ class AdamBFGS {
   ///   f(x_outer, x_inner, grad_outer*, grad_inner*) -> objective value
   /// If grad_outer is non-null, fill ∂f/∂x_outer.
   /// If grad_inner is non-null, fill ∂f/∂x_inner.
-  using ObjFn = std::function<double(const arma::vec& x_outer,
-                                     const arma::vec& x_inner,
-                                     arma::vec* grad_outer,
-                                     arma::vec* grad_inner)>;
+  using ObjFn = std::function<
+      double(const arma::vec& x_outer, const arma::vec& x_inner, arma::vec* grad_outer, arma::vec* grad_inner)>;
 
   arma::uword n_outer;
   arma::uword n_inner;
@@ -73,8 +71,7 @@ class AdamBFGS {
   /// If true, maximize the objective (Adam does gradient ascent, BFGS minimizes -f).
   bool maximize = false;
 
-  AdamBFGS(arma::uword n_outer_, arma::uword n_inner_)
-      : n_outer(n_outer_), n_inner(n_inner_) {}
+  AdamBFGS(arma::uword n_outer_, arma::uword n_inner_) : n_outer(n_outer_), n_inner(n_inner_) {}
 
   /**
    * @brief Run the bi-level optimization.
@@ -130,18 +127,15 @@ class AdamBFGS {
         };
 
         if (has_bounds) {
-          auto res = optimizer.minimize(bfgs_fn, x_inner,
-                                        inner_lower.memptr(), inner_upper.memptr(),
-                                        bounds_type.memptr());
+          auto res
+              = optimizer.minimize(bfgs_fn, x_inner, inner_lower.memptr(), inner_upper.memptr(), bounds_type.memptr());
           total_bfgs_evals += res.num_fun_calls;
         } else {
           // Unbounded: use bound_type = 0 (no bounds)
           arma::ivec no_bounds(n_inner, arma::fill::zeros);
           arma::vec dummy_lb(n_inner, arma::fill::zeros);
           arma::vec dummy_ub(n_inner, arma::fill::zeros);
-          auto res = optimizer.minimize(bfgs_fn, x_inner,
-                                        dummy_lb.memptr(), dummy_ub.memptr(),
-                                        no_bounds.memptr());
+          auto res = optimizer.minimize(bfgs_fn, x_inner, dummy_lb.memptr(), dummy_ub.memptr(), no_bounds.memptr());
           total_bfgs_evals += res.num_fun_calls;
         }
       }

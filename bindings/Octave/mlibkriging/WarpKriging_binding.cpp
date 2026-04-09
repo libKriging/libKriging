@@ -97,8 +97,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->fit(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"),
-          regmodel, normalize, optim, objective);
+  wk->fit(
+      input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), regmodel, normalize, optim, objective);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -169,8 +169,7 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   const bool withGrad = flag_output_compliance(input, 2, "with gradient", output, 1);
   const bool withHess = flag_output_compliance(input, 3, "with hessian", output, 2);
 
-  auto [ll, grad, hess]
-      = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
+  auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
   output.set(0, ll, "log-likelihood value");
   if (withGrad)
     output.set(1, grad, "log-likelihood gradient");

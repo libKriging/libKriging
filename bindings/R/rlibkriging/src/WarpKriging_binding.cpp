@@ -35,12 +35,10 @@ SEXP warpKriging_new(const arma::vec& y,
     Rcpp::List plist(parameters);
     Rcpp::CharacterVector names = plist.names();
     for (int i = 0; i < plist.size(); ++i)
-      params[Rcpp::as<std::string>(names[i])] =
-          Rcpp::as<std::string>(plist[i]);
+      params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  WarpKriging* model = new WarpKriging(
-      y, X, warp_strs, kernel, regmodel, normalize, optim, objective, params);
+  WarpKriging* model = new WarpKriging(y, X, warp_strs, kernel, regmodel, normalize, optim, objective, params);
 
   return WarpKrigingPtr(model, true);
 }
@@ -50,17 +48,16 @@ SEXP warpKriging_new(const arma::vec& y,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_predict(SEXP model_ptr,
-                               const arma::mat& x_new,
-                               bool withStd = true,
-                               bool withCov = false) {
+Rcpp::List warpKriging_predict(SEXP model_ptr, const arma::mat& x_new, bool withStd = true, bool withCov = false) {
   WarpKrigingPtr model(model_ptr);
   auto [mean, stdev, cov] = model->predict(x_new, withStd, withCov);
 
   Rcpp::List result;
   result["mean"] = mean;
-  if (withStd)  result["stdev"] = stdev;
-  if (withCov)  result["cov"]   = cov;
+  if (withStd)
+    result["stdev"] = stdev;
+  if (withCov)
+    result["cov"] = cov;
   return result;
 }
 
@@ -69,9 +66,7 @@ Rcpp::List warpKriging_predict(SEXP model_ptr,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-arma::mat warpKriging_simulate(SEXP model_ptr,
-                               int nsim, int seed,
-                               const arma::mat& x_new) {
+arma::mat warpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::mat& x_new) {
   WarpKrigingPtr model(model_ptr);
   return model->simulate(nsim, static_cast<uint64_t>(seed), x_new);
 }
@@ -81,9 +76,7 @@ arma::mat warpKriging_simulate(SEXP model_ptr,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_update(SEXP model_ptr,
-                        const arma::vec& y_new,
-                        const arma::mat& X_new) {
+void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new) {
   WarpKrigingPtr model(model_ptr);
   model->update(y_new, X_new);
 }
@@ -99,15 +92,14 @@ double warpKriging_logLikelihood(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr,
-                                        const arma::vec& theta_gp,
-                                        bool withGrad = true) {
+Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp, bool withGrad = true) {
   WarpKrigingPtr model(model_ptr);
   auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, false);
 
   Rcpp::List result;
   result["logLikelihood"] = ll;
-  if (withGrad) result["gradient"] = grad;
+  if (withGrad)
+    result["gradient"] = grad;
   return result;
 }
 

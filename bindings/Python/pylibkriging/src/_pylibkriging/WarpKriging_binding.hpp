@@ -39,8 +39,9 @@ class PyWarpKriging {
            const std::string& objective,
            const py::dict& parameters);
 
-  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>>
-  predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov);
+  std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X_n,
+                                                                                    bool return_stdev,
+                                                                                    bool return_cov);
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n);
 
@@ -50,8 +51,7 @@ class PyWarpKriging {
 
   double logLikelihood();
 
-  std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
-                                                           const bool return_grad);
+  std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad);
 
   std::string kernel();
   py::array_t<double> X();

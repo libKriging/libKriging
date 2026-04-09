@@ -4,8 +4,8 @@
 #include <libKriging/LinearRegression.hpp>
 #include <libKriging/NoiseKriging.hpp>
 #include <libKriging/NuggetKriging.hpp>
-#include <libKriging/WarpKriging.hpp>
 #include <libKriging/Trend.hpp>
+#include <libKriging/WarpKriging.hpp>
 #include <libKriging/utils/ExplicitCopySpecifier.hpp>
 
 #include <cstring>
@@ -1698,23 +1698,22 @@ void* lk_warp_kriging_new(const char** warping, int n_warping, const char* kerne
 }
 
 void* lk_warp_kriging_new_fit(const double* y,
-                               int n,
-                               const double* X,
-                               int nX,
-                               int d,
-                               const char** warping,
-                               int n_warping,
-                               const char* kernel,
-                               const char* regmodel,
-                               int normalize,
-                               const char* optim,
-                               const char* objective) {
+                              int n,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char** warping,
+                              int n_warping,
+                              const char* kernel,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    return new WarpKriging(y_vec, X_mat,
-                           to_string_vec(warping, n_warping),
-                           kernel, regmodel, normalize != 0, optim, objective);
+    return new WarpKriging(
+        y_vec, X_mat, to_string_vec(warping, n_warping), kernel, regmodel, normalize != 0, optim, objective);
   }
   CATCH_RETURN_NULL
 }
@@ -1724,15 +1723,15 @@ void lk_warp_kriging_delete(void* ptr) {
 }
 
 int lk_warp_kriging_fit(void* ptr,
-                         const double* y,
-                         int n,
-                         const double* X,
-                         int nX,
-                         int d,
-                         const char* regmodel,
-                         int normalize,
-                         const char* optim,
-                         const char* objective) {
+                        const double* y,
+                        int n,
+                        const double* X,
+                        int nX,
+                        int d,
+                        const char* regmodel,
+                        int normalize,
+                        const char* optim,
+                        const char* objective) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
@@ -1743,14 +1742,14 @@ int lk_warp_kriging_fit(void* ptr,
 }
 
 int lk_warp_kriging_predict(void* ptr,
-                             const double* X_n,
-                             int m,
-                             int d,
-                             int return_stdev,
-                             int return_cov,
-                             double* mean_out,
-                             double* stdev_out,
-                             double* cov_out) {
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int return_stdev,
+                            int return_cov,
+                            double* mean_out,
+                            double* stdev_out,
+                            double* cov_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto [mean, stdev, cov] = static_cast<WarpKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0);
@@ -1765,13 +1764,7 @@ int lk_warp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_warp_kriging_simulate(void* ptr,
-                              int nsim,
-                              int seed,
-                              const double* X_n,
-                              int m,
-                              int d,
-                              double* sim_out) {
+int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, static_cast<uint64_t>(seed), X_mat);
@@ -1782,12 +1775,7 @@ int lk_warp_kriging_simulate(void* ptr,
   CATCH_RETURN
 }
 
-int lk_warp_kriging_update(void* ptr,
-                            const double* y_u,
-                            int n,
-                            const double* X_u,
-                            int nX,
-                            int d) {
+int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d) {
   try {
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
@@ -1814,17 +1802,17 @@ double lk_warp_kriging_log_likelihood(void* ptr) {
 }
 
 int lk_warp_kriging_log_likelihood_fun(void* ptr,
-                                        const double* theta,
-                                        int theta_n,
-                                        int return_grad,
-                                        int return_hess,
-                                        double* ll_out,
-                                        double* grad_out,
-                                        double* hess_out) {
+                                       const double* theta,
+                                       int theta_n,
+                                       int return_grad,
+                                       int return_hess,
+                                       double* ll_out,
+                                       double* grad_out,
+                                       double* hess_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess] = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(
-        theta_vec, return_grad != 0, return_hess != 0);
+    auto [ll, grad, hess]
+        = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
     if (ll_out)
       *ll_out = ll;
     if (return_grad && grad_out)
