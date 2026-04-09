@@ -167,7 +167,7 @@ struct WarpSpec {
  *
  * Each warp maps a scalar (or integer level) to a vector in ℝ^{d_out}.
  */
-class IWarp {
+class LIBKRIGING_EXPORT IWarp {
  public:
   virtual ~IWarp() = default;
 
@@ -196,7 +196,7 @@ class IWarp {
 
 // --- Concrete warp implementations ----------------------------------------
 
-class WarpNone final : public IWarp {
+class LIBKRIGING_EXPORT WarpNone final : public IWarp {
  public:
   arma::uword output_dim() const override { return 1; }
   arma::uword n_params() const override { return 0; }
@@ -207,7 +207,7 @@ class WarpNone final : public IWarp {
   std::string describe() const override { return "None (identity)"; }
 };
 
-class WarpAffine final : public IWarp {
+class LIBKRIGING_EXPORT WarpAffine final : public IWarp {
  public:
   WarpAffine();
   arma::uword output_dim() const override { return 1; }
@@ -222,7 +222,7 @@ class WarpAffine final : public IWarp {
   double m_a = 1.0, m_b = 0.0;
 };
 
-class WarpBoxCox final : public IWarp {
+class LIBKRIGING_EXPORT WarpBoxCox final : public IWarp {
  public:
   WarpBoxCox();
   arma::uword output_dim() const override { return 1; }
@@ -237,7 +237,7 @@ class WarpBoxCox final : public IWarp {
   double m_lambda = 1.0;  ///< stored as unconstrained (real line)
 };
 
-class WarpKumaraswamy final : public IWarp {
+class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {
  public:
   WarpKumaraswamy();
   arma::uword output_dim() const override { return 1; }
@@ -252,7 +252,7 @@ class WarpKumaraswamy final : public IWarp {
   double m_log_a = 0.0, m_log_b = 0.0;  ///< a,b > 0 via exp()
 };
 
-class WarpNeuralMono final : public IWarp {
+class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
  public:
   explicit WarpNeuralMono(arma::uword n_hidden = 8, uint64_t seed = 42);
   arma::uword output_dim() const override { return 1; }
@@ -289,7 +289,7 @@ class WarpNeuralMono final : public IWarp {
  * warps (Affine, BoxCox, Kumaraswamy, NeuralMono) as special cases.
  * Use when you have enough data to afford the extra parameters.
  */
-class WarpMLP final : public IWarp {
+class LIBKRIGING_EXPORT WarpMLP final : public IWarp {
  public:
   /// Supported activation functions
   enum class Act { ReLU, SELU, Tanh, Sigmoid, ELU };
@@ -342,7 +342,7 @@ class WarpMLP final : public IWarp {
  *
  *     Φ(x) = MLP(x₁, x₂, …, xₐ) ∈ ℝ^{d_out}
  */
-class WarpMLPJoint {
+class LIBKRIGING_EXPORT WarpMLPJoint {
  public:
   using Act = WarpMLP::Act;
 
@@ -375,7 +375,7 @@ class WarpMLPJoint {
   void count_params();
 };
 
-class WarpEmbedding final : public IWarp {
+class LIBKRIGING_EXPORT WarpEmbedding final : public IWarp {
  public:
   WarpEmbedding(arma::uword n_levels, arma::uword embed_dim, uint64_t seed = 42);
   arma::uword output_dim() const override { return m_embed_dim; }
@@ -392,7 +392,7 @@ class WarpEmbedding final : public IWarp {
   arma::mat m_E;  ///< embedding matrix (n_levels × embed_dim)
 };
 
-class WarpOrdinal final : public IWarp {
+class LIBKRIGING_EXPORT WarpOrdinal final : public IWarp {
  public:
   explicit WarpOrdinal(arma::uword n_levels, uint64_t seed = 42);
   arma::uword output_dim() const override { return 1; }

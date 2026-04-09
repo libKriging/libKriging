@@ -1,9 +1,9 @@
 #ifndef LIBKRIGING_ADAM_BFGS_HPP
 #define LIBKRIGING_ADAM_BFGS_HPP
 
-#include "lbfgsb_cpp/lbfgsb.hpp"
-#include "libKriging/utils/data_from_arma_vec.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
+#include "libKriging/utils/data_from_arma_vec.hpp"
+#include "lbfgsb_cpp/lbfgsb.hpp"
 
 #include <functional>
 #include <vector>
