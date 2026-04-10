@@ -35,9 +35,10 @@ fi
 
 # https://anaconda.org/search?q=blas
 # Install BLAS/LAPACK from conda-forge (easier than building from source on Windows)
-# Retry once on failure — Windows runners sometimes have transient file-lock issues.
-$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config \
-  || $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
+# Clean conda trash and lock files before install to avoid PermissionError with locked DLLs.
+find "$HOME/Miniconda3" -name "*.conda_trash" -delete 2>/dev/null || true
+$HOME/Miniconda3/Scripts/conda.exe clean --all -y 2>/dev/null || true
+$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
 
 # https://chocolatey.org/docs/commands-install
 # required to compile fortran part

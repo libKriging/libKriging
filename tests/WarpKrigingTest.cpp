@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES  // required for Visual Studio
 /**
  * @file test_WarpKriging.cpp
  * @brief Tests for the WarpKriging class.
