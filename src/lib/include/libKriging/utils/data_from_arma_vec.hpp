@@ -2,7 +2,7 @@
 #define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_UTILS_DATA_FROM_ARMA_VEC_HPP
 
 namespace arma {
-inline double* data(arma::vec& x) {
+inline double* data(vec& x) {
   return x.memptr();
 }
 }  // namespace arma
