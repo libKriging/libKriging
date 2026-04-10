@@ -185,7 +185,7 @@ jobs:
                   echo "#### Configuration: n=$n, d=$d" >> "$REPORT"
                   echo "" >> "$REPORT"
                   echo "\`\`\`" >> "$REPORT"
-                  cat "$logfile" | grep -A 100 "n=$n d=$d" | grep -v "Results saved" >> "$REPORT"
+                  cat "$logfile" | grep -A 100 "n=$n d=$d" | grep -v "Results saved" >> "$REPORT" || true
                   echo "\`\`\`" >> "$REPORT"
                   echo "" >> "$REPORT"
                 fi
