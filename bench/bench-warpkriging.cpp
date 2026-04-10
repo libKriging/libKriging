@@ -145,13 +145,10 @@ std::vector<WarpConfig> build_configs(arma::uword d) {
   return configs;
 }
 
-void benchmark_warpkriging(const WarpConfig& config,
-                           arma::uword n_train,
-                           arma::uword d,
-                           int n_iterations) {
+void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::uword d, int n_iterations) {
   std::cout << "\n";
-  std::cout << "warpkriging:" << config.name << " optim=" << config.optim << " n=" << n_train
-            << " d=" << d << " iterations=" << n_iterations << std::endl;
+  std::cout << "warpkriging:" << config.name << " optim=" << config.optim << " n=" << n_train << " d=" << d
+            << " iterations=" << n_iterations << std::endl;
 
   arma::arma_rng::set_seed(123);
 
