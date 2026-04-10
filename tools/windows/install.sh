@@ -30,11 +30,14 @@ if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
   "${BASEDIR}"/install_conda.bat
   popd
 fi
-$HOME/Miniconda3/Scripts/conda.exe update -y -n base -c defaults conda
+# Skip conda self-update: the bundled Miniconda version works and updating
+# can trigger PermissionError on Windows runners when DLLs are locked.
 
 # https://anaconda.org/search?q=blas
 # Install BLAS/LAPACK from conda-forge (easier than building from source on Windows)
-$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
+# Retry once on failure — Windows runners sometimes have transient file-lock issues.
+$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config \
+  || $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
 
 # https://chocolatey.org/docs/commands-install
 # required to compile fortran part
