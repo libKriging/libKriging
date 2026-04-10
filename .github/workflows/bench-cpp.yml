@@ -83,11 +83,13 @@ jobs:
 
           # WarpKriging benchmarks — each warping is treated as its own class.
           # Fewer iterations since fit is much slower (seconds vs milliseconds).
-          WARP_ITERATIONS=$(( ITERATIONS < 3 ? ITERATIONS : 3 ))
+          WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
           for n in 100 200 400; do
-            for warp in none affine boxcox kumaraswamy mlp neural_mono; do
-              echo "Running: n=$n warpkriging:$warp iterations=$WARP_ITERATIONS"
-              bash bench/bench.sh iterations=$WARP_ITERATIONS n=$n warpkriging warping=$warp > "build/benchmark-results/warpkriging_${warp}_n${n}.log" 2>&1 || echo "Warning: benchmark failed for warpkriging:$warp n=$n"
+            for d in 2 4 8; do
+              for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
+                echo "Running: n=$n d=$d warpkriging:$warp iterations=$WARP_ITERATIONS"
+                bash bench/bench.sh iterations=$WARP_ITERATIONS n=$n d=$d warpkriging warping=$warp > "build/benchmark-results/warpkriging_${warp}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for warpkriging:$warp n=$n d=$d"
+              done
             done
           done
 
@@ -96,7 +98,7 @@ jobs:
         run: |
           cd build
           ITERATIONS=${{ github.event.inputs.iterations || '10' }}
-          WARP_ITERATIONS=$(( ITERATIONS < 3 ? ITERATIONS : 3 ))
+          WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
           REPORT="benchmark-results/BENCHMARK_REPORT.md"
 
           # Header
@@ -106,7 +108,7 @@ jobs:
           echo "**Platform:** Ubuntu (latest)" >> "$REPORT"
           echo "**Build Type:** Release" >> "$REPORT"
           echo "**Iterations:** $ITERATIONS (WarpKriging: $WARP_ITERATIONS)" >> "$REPORT"
-          echo "**Test function:** Kriging/Nugget/Noise: f(x) = sum_i sin(2*pi*x_i) ; WarpKriging: Branin 2D" >> "$REPORT"
+          echo "**Test function:** f(x) = sum_i sin(2*pi*x_i) (categorical/ordinal: x_0 discrete 5 levels)" >> "$REPORT"
           echo "" >> "$REPORT"
 
           # Table of Contents
@@ -137,20 +139,22 @@ jobs:
             echo "" >> "$REPORT"
           done
 
-          # --- WarpKriging:<warping> summaries (n only, d=2 fixed) ---
-          for warp in none affine boxcox kumaraswamy mlp neural_mono; do
+          # --- WarpKriging:<warping> summaries (n x d) ---
+          for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
             echo "### WarpKriging:$warp" >> "$REPORT"
             echo "" >> "$REPORT"
-            echo "| n | fit (ms) | predict (ms) | simulate (ms) |" >> "$REPORT"
-            echo "|---|----------|--------------|---------------|" >> "$REPORT"
+            echo "| n | d | fit (ms) | predict (ms) | simulate (ms) |" >> "$REPORT"
+            echo "|---|---|----------|--------------|---------------|" >> "$REPORT"
             for n in 100 200 400; do
-              logfile="benchmark-results/warpkriging_${warp}_n${n}.log"
-              if [ -f "$logfile" ]; then
-                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
-                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
-                sim=$(grep "^simulate" "$logfile" | awk '{print $3}' || echo "N/A")
-                echo "| $n | $fit | $pred | $sim |" >> "$REPORT"
-              fi
+              for d in 2 4 8; do
+                logfile="benchmark-results/warpkriging_${warp}_n${n}_d${d}.log"
+                if [ -f "$logfile" ]; then
+                  fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                  pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                  sim=$(grep "^simulate" "$logfile" | awk '{print $3}' || echo "N/A")
+                  echo "| $n | $d | $fit | $pred | $sim |" >> "$REPORT"
+                fi
+              done
             done
             echo "" >> "$REPORT"
           done
@@ -182,20 +186,22 @@ jobs:
             done
           done
 
-          for warp in none affine boxcox kumaraswamy mlp neural_mono; do
+          for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
             echo "### WarpKriging:$warp" >> "$REPORT"
             echo "" >> "$REPORT"
 
             for n in 100 200 400; do
-              logfile="benchmark-results/warpkriging_${warp}_n${n}.log"
-              if [ -f "$logfile" ]; then
-                echo "#### n=$n" >> "$REPORT"
-                echo "" >> "$REPORT"
-                echo "\`\`\`" >> "$REPORT"
-                cat "$logfile" | grep -A 100 "warpkriging:" | grep -v "Results saved" >> "$REPORT" || true
-                echo "\`\`\`" >> "$REPORT"
-                echo "" >> "$REPORT"
-              fi
+              for d in 2 4 8; do
+                logfile="benchmark-results/warpkriging_${warp}_n${n}_d${d}.log"
+                if [ -f "$logfile" ]; then
+                  echo "#### n=$n, d=$d" >> "$REPORT"
+                  echo "" >> "$REPORT"
+                  echo "\`\`\`" >> "$REPORT"
+                  cat "$logfile" | grep -A 100 "warpkriging:" | grep -v "Results saved" >> "$REPORT" || true
+                  echo "\`\`\`" >> "$REPORT"
+                  echo "" >> "$REPORT"
+                fi
+              done
             done
           done
 

@@ -11,8 +11,9 @@
 #   filter       : Benchmark type filter (kriging/nuggetkriging/noisekriging/warpkriging) or
 #                  Operation filter (fit/predict/simulate/update/update_simulate)
 #                  Default: kriging
-#   warping=NAME : WarpKriging warping filter (none/affine/boxcox/kumaraswamy/mlp/neural_mono)
-#                  Only used with warpkriging benchmark. Default: all warpings.
+#   warping=NAME : WarpKriging warping filter (none/affine/boxcox/kumaraswamy/mlp/neural_mono/
+#                  mlp_joint/categorical/ordinal). Only used with warpkriging benchmark.
+#                  Default: all warpings.
 #
 # Examples:
 #   ./bench.sh                                    # n=100 d=4 iterations=10 kriging
@@ -147,10 +148,10 @@ run_benchmark() {
         return 1
     fi
 
-    # WarpKriging uses: iterations n [warping_filter]
+    # WarpKriging uses: iterations n d [warping_filter]
     # Others use: iterations n d
     if [ "$name" = "warpkriging" ]; then
-        "$executable" "$iterations" "$n" "$warp_filter" 2>&1 | filter_operation "$op_filter"
+        "$executable" "$iterations" "$n" "$d" "$warp_filter" 2>&1 | filter_operation "$op_filter"
     else
         "$executable" "$iterations" "$n" "$d" 2>&1 | filter_operation "$op_filter"
     fi
