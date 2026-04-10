@@ -59,11 +59,16 @@ void print_stats(const std::string& operation, const Stats& stats) {
 }
 
 void print_header() {
-  std::cout << std::setw(25) << std::left << "Operation" << " | ";
-  std::cout << std::setw(10) << std::right << "Mean (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Std (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Min (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Max (ms)" << " | ";
+  std::cout << std::setw(25) << std::left << "Operation"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Mean (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Std (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Min (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Max (ms)"
+            << " | ";
   std::cout << std::setw(10) << std::right << "Median (ms)" << std::endl;
 }
 
@@ -145,8 +150,8 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, int n_
 
   // Print LL summary
   auto ll_stats = compute_stats(ll_values);
-  std::cout << std::setw(25) << std::left << "logLikelihood" << " | " << std::fixed << std::setprecision(4)
-            << ll_stats.mean << std::endl;
+  std::cout << std::setw(25) << std::left << "logLikelihood"
+            << " | " << std::fixed << std::setprecision(4) << ll_stats.mean << std::endl;
 }
 
 int main(int argc, char* argv[]) {
