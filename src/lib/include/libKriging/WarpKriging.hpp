@@ -192,6 +192,9 @@ class LIBKRIGING_EXPORT IWarp {
 
   /// Human-readable description
   virtual std::string describe() const = 0;
+
+  /// Deep copy
+  virtual std::unique_ptr<IWarp> clone() const = 0;
 };
 
 // --- Concrete warp implementations ----------------------------------------
@@ -205,6 +208,7 @@ class LIBKRIGING_EXPORT WarpNone final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override { return "None (identity)"; }
+  std::unique_ptr<IWarp> clone() const override { return std::make_unique<WarpNone>(); }
 };
 
 class LIBKRIGING_EXPORT WarpAffine final : public IWarp {
@@ -217,6 +221,7 @@ class LIBKRIGING_EXPORT WarpAffine final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   double m_a = 1.0, m_b = 0.0;
@@ -232,6 +237,7 @@ class LIBKRIGING_EXPORT WarpBoxCox final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   double m_lambda = 1.0;  ///< stored as unconstrained (real line)
@@ -247,6 +253,7 @@ class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   double m_log_a = 0.0, m_log_b = 0.0;  ///< a,b > 0 via exp()
@@ -262,6 +269,7 @@ class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   arma::uword m_H;
@@ -312,6 +320,7 @@ class LIBKRIGING_EXPORT WarpMLP final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
   /// Parse activation name from string
   static Act parse_act(const std::string& s);
@@ -367,6 +376,9 @@ class LIBKRIGING_EXPORT WarpMLPJoint {
 
   std::string describe() const;
 
+  /// Deep copy
+  std::unique_ptr<WarpMLPJoint> clone() const;
+
  private:
   arma::uword m_d_in, m_d_out, m_n_params = 0;
   Act m_act;
@@ -385,6 +397,7 @@ class LIBKRIGING_EXPORT WarpEmbedding final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   arma::uword m_n_levels;
@@ -402,6 +415,7 @@ class LIBKRIGING_EXPORT WarpOrdinal final : public IWarp {
   arma::mat forward(const arma::vec& x) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
 
  private:
   arma::uword m_n_levels;
@@ -638,6 +652,9 @@ class WarpKriging {
 
   /// Joint optimisation (bi-level Adam+BFGS or joint L-BFGS-B)
   void optimise_joint(const std::string& method);
+
+  /// Deep copy for thread-parallel multistart (copies all state, deep-clones warps)
+  WarpKriging clone_for_thread() const;
 
   /// Internal: initialise from pre-parsed WarpSpecs
   void init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel);

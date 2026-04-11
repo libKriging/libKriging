@@ -1206,6 +1206,59 @@ void test_predict_derivative() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+// --- Test 18: Parallel multistart (BFGS3 and BFGS3+Adam) ----------------
+void test_parallel_multistart() {
+  std::cout << "--- Test 18: Parallel multistart optimization ---" << std::endl;
+
+  arma::arma_rng::set_seed(42);
+  const arma::uword n = 20;
+  arma::mat X = arma::randu<arma::mat>(n, 1);
+  arma::vec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = f1d(X(i, 0));
+
+  // Test BFGS3 (joint BFGS with 3 starts, parallel)
+  {
+    WarpKriging model({"kumaraswamy"}, "gauss");
+    model.fit(y, X, "constant", true, "BFGS3", "LL");
+    double ll_multi = model.logLikelihood();
+    std::cout << "  BFGS3 LL: " << ll_multi << ", theta: " << model.theta().t();
+
+    // Compare with single start
+    WarpKriging model_single({"kumaraswamy"}, "gauss");
+    model_single.fit(y, X, "constant", true, "BFGS", "LL");
+    double ll_single = model_single.logLikelihood();
+    std::cout << "  BFGS  LL: " << ll_single << std::endl;
+
+    // Multistart should be at least as good as single start
+    assert(ll_multi >= ll_single - 0.5);  // allow small tolerance
+  }
+
+  // Test BFGS3+Adam (Adam+BFGS with 3 starts, parallel)
+  {
+    WarpKriging model({"kumaraswamy"}, "gauss");
+    model.fit(y, X, "constant", true, "BFGS3+Adam", "LL");
+    double ll = model.logLikelihood();
+    std::cout << "  BFGS3+Adam LL: " << ll << ", theta: " << model.theta().t();
+    assert(std::isfinite(ll));
+  }
+
+  // Test with 2D and multiple warping types
+  {
+    arma::arma_rng::set_seed(123);
+    arma::mat X2 = arma::randu<arma::mat>(25, 2);
+    arma::vec y2 = arma::sin(X2.col(0) * 4) % arma::cos(X2.col(1) * 3) + 0.05 * arma::randn(25);
+
+    WarpKriging model({"none", "affine"}, "matern5_2");
+    model.fit(y2, X2, "constant", true, "BFGS3", "LL");
+    double ll = model.logLikelihood();
+    std::cout << "  2D BFGS3 LL: " << ll << std::endl;
+    assert(std::isfinite(ll));
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 // ==========================================================================
 int main() {
   std::cout << "============================================\n"
@@ -1232,6 +1285,7 @@ int main() {
     test_warping_strings_accessor();
     test_mlp_joint();
     test_predict_derivative();
+    test_parallel_multistart();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

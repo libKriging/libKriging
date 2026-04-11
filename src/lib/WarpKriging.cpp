@@ -12,12 +12,15 @@
 #include "libKriging/Random.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <mutex>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 
 namespace libKriging {
 
@@ -1009,6 +1012,67 @@ std::string WarpOrdinal::describe() const {
 }
 
 // *************************************************************************
+//  clone() implementations
+// *************************************************************************
+
+std::unique_ptr<IWarp> WarpAffine::clone() const {
+  auto c = std::make_unique<WarpAffine>();
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpBoxCox::clone() const {
+  auto c = std::make_unique<WarpBoxCox>();
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpKumaraswamy::clone() const {
+  auto c = std::make_unique<WarpKumaraswamy>();
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpNeuralMono::clone() const {
+  auto c = std::make_unique<WarpNeuralMono>(m_H);
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpMLP::clone() const {
+  // Reconstruct hidden_dims from weight matrices
+  // m_W[0..n-2] are hidden layers; m_W[n-1] is output layer
+  std::vector<arma::uword> hidden_dims;
+  for (size_t i = 0; i + 1 < m_W.size(); ++i)
+    hidden_dims.push_back(m_W[i].n_cols);
+  auto c = std::make_unique<WarpMLP>(hidden_dims, m_d_out, m_act);
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<WarpMLPJoint> WarpMLPJoint::clone() const {
+  // Reconstruct hidden_dims from weight matrices
+  std::vector<arma::uword> hidden_dims;
+  for (size_t i = 0; i + 1 < m_W.size(); ++i)
+    hidden_dims.push_back(m_W[i].n_cols);
+  auto c = std::make_unique<WarpMLPJoint>(m_d_in, hidden_dims, m_d_out, m_act);
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpEmbedding::clone() const {
+  auto c = std::make_unique<WarpEmbedding>(m_n_levels, m_embed_dim);
+  c->set_params(get_params());
+  return c;
+}
+
+std::unique_ptr<IWarp> WarpOrdinal::clone() const {
+  auto c = std::make_unique<WarpOrdinal>(m_n_levels);
+  c->set_params(get_params());
+  return c;
+}
+
+// *************************************************************************
 //  WarpKriging  —  implementation
 // *************************************************************************
 
@@ -1508,6 +1572,51 @@ void WarpKriging::unpack_warp_params(const arma::vec& wp) {
 }
 
 // -------------------------------------------------------------------------
+//  clone_for_thread()  —  deep copy for parallel multistart
+// -------------------------------------------------------------------------
+WarpKriging WarpKriging::clone_for_thread() const {
+  // Use the light constructor (warping strings + kernel, no data)
+  WarpKriging c(warping_strings(), m_kernel_name);
+
+  // Copy immutable data
+  c.m_y = m_y;
+  c.m_X = m_X;
+  c.m_F = m_F;
+  c.m_normalize = m_normalize;
+  c.m_X_mean = m_X_mean;
+  c.m_X_std = m_X_std;
+  c.m_y_mean = m_y_mean;
+  c.m_y_std = m_y_std;
+  c.m_is_continuous = m_is_continuous;
+  c.m_regmodel = m_regmodel;
+  c.m_feature_dim = m_feature_dim;
+  c.m_max_iter_bfgs = m_max_iter_bfgs;
+  c.m_max_iter_adam = m_max_iter_adam;
+  c.m_adam_lr = m_adam_lr;
+  c.m_fitted = true;
+
+  // Copy mutable GP state
+  c.m_theta = m_theta;
+  c.m_sigma2 = m_sigma2;
+  c.m_beta = m_beta;
+  c.m_alpha = m_alpha;
+  c.m_R = m_R;
+  c.m_C = m_C;
+  c.m_logdet = m_logdet;
+  c.m_Phi = m_Phi;
+  c.m_dPhi = m_dPhi;
+
+  // Deep-copy warp objects
+  c.m_warps.clear();
+  for (const auto& w : m_warps)
+    c.m_warps.push_back(w->clone());
+  if (m_has_joint && m_joint_warp)
+    c.m_joint_warp = m_joint_warp->clone();
+
+  return c;
+}
+
+// -------------------------------------------------------------------------
 //  Joint optimisation  (bi-level via AdamBFGS)
 //
 //  x_outer = warp params      (optimised by Adam)
@@ -1549,236 +1658,287 @@ void WarpKriging::optimise_joint(const std::string& method) {
     }
   }
 
-  // Helper lambda: run joint L-BFGS-B on all params from current member state.
+  // Helper lambda: run joint L-BFGS-B on a WarpKriging instance.
   // Returns the negative LL at the optimum (lower is better).
-  auto run_joint_bfgs = [&]() -> double {
-    arma::uword n_total = n_warp + d_theta;
+  auto run_joint_bfgs = [&](WarpKriging& wk) -> double {
+    arma::uword nw = wk.total_warp_params();
+    arma::uword dt = wk.m_theta.n_elem;
+    arma::uword n_total = nw + dt;
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
     optimizer.iprint = -1;
-    optimizer.max_iter = m_max_iter_bfgs;
+    optimizer.max_iter = wk.m_max_iter_bfgs;
     optimizer.pgtol = 1e-6;
     optimizer.factr = 1e7;
 
     arma::vec x0(n_total);
-    if (n_warp > 0)
-      x0.head(n_warp) = pack_warp_params();
-    x0.tail(d_theta) = arma::log(m_theta);
+    if (nw > 0)
+      x0.head(nw) = wk.pack_warp_params();
+    x0.tail(dt) = arma::log(wk.m_theta);
 
     arma::vec lb(n_total), ub(n_total);
     arma::ivec btype(n_total);
-    if (n_warp > 0) {
-      lb.head(n_warp).fill(-1e20);
-      ub.head(n_warp).fill(1e20);
-      btype.head(n_warp).fill(0);
+    if (nw > 0) {
+      lb.head(nw).fill(-1e20);
+      ub.head(nw).fill(1e20);
+      btype.head(nw).fill(0);
     }
-    lb.tail(d_theta) = log_theta_lower;
-    ub.tail(d_theta) = log_theta_upper;
-    btype.tail(d_theta).fill(2);
+    lb.tail(dt) = log_theta_lower;
+    ub.tail(dt) = log_theta_upper;
+    btype.tail(dt).fill(2);
 
     auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
-      if (n_warp > 0)
-        unpack_warp_params(x.head(n_warp));
-      m_theta = arma::exp(x.tail(d_theta));
-      refresh_cache();
+      if (nw > 0)
+        wk.unpack_warp_params(x.head(nw));
+      wk.m_theta = arma::exp(x.tail(dt));
+      wk.refresh_cache();
 
-      auto [ll, g_log_theta] = concentrated_ll_and_grad_theta();
-      grad.tail(d_theta) = -g_log_theta;
-      if (n_warp > 0)
-        grad.head(n_warp) = -warp_gradient();
+      auto [ll, g_log_theta] = wk.concentrated_ll_and_grad_theta();
+      grad.tail(dt) = -g_log_theta;
+      if (nw > 0)
+        grad.head(nw) = -wk.warp_gradient();
       return -ll;
     };
 
     auto result = optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
 
-    if (n_warp > 0)
-      unpack_warp_params(x0.head(n_warp));
-    m_theta = arma::exp(x0.tail(d_theta));
-    refresh_cache();
+    if (nw > 0)
+      wk.unpack_warp_params(x0.head(nw));
+    wk.m_theta = arma::exp(x0.tail(dt));
+    wk.refresh_cache();
     return result.f_opt;
+  };
+
+  // Helper lambda: run Adam+BFGS bi-level on a WarpKriging instance.
+  auto run_adam_bfgs = [&](WarpKriging& wk) -> double {
+    arma::uword nw = wk.total_warp_params();
+    arma::uword dt = wk.m_theta.n_elem;
+    AdamBFGS opt(nw, dt);
+    opt.max_iter_adam = wk.m_max_iter_adam;
+    opt.adam_lr = wk.m_adam_lr;
+    opt.max_iter_bfgs = wk.m_max_iter_bfgs;
+    opt.bfgs_pgtol = 1e-6;
+    opt.bfgs_factr = 1e7;
+    opt.maximize = true;
+
+    arma::vec current_wp = wk.pack_warp_params();
+    arma::vec current_log_theta = arma::log(wk.m_theta);
+
+    auto obj_fn = [&wk, &current_wp](const arma::vec& x_outer,
+                                     const arma::vec& x_inner,
+                                     arma::vec* grad_outer,
+                                     arma::vec* grad_inner) -> double {
+      bool warp_changed = false;
+      if (x_outer.n_elem > 0) {
+        if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
+          wk.unpack_warp_params(x_outer);
+          current_wp = x_outer;
+          warp_changed = true;
+        }
+      }
+
+      wk.m_theta = arma::exp(x_inner);
+
+      if (warp_changed)
+        wk.refresh_cache();
+      else
+        wk.refresh_cache_theta_only();
+
+      double ll = wk.concentrated_ll();
+
+      if (grad_inner) {
+        auto [ll2, g_log_theta] = wk.concentrated_ll_and_grad_theta();
+        *grad_inner = g_log_theta;
+        (void)ll2;
+      }
+      if (grad_outer && x_outer.n_elem > 0) {
+        *grad_outer = wk.warp_gradient();
+      }
+      return ll;
+    };
+
+    auto result = opt.optimize(current_wp, current_log_theta, log_theta_lower, log_theta_upper, obj_fn);
+
+    if (nw > 0)
+      wk.unpack_warp_params(result.x_outer);
+    wk.m_theta = arma::exp(result.x_inner);
+    wk.refresh_cache();
+    return -wk.concentrated_ll();  // return neg LL for consistency
+  };
+
+  // Structure to hold optimization results from each thread
+  struct OptimizationResult {
+    double neg_ll = std::numeric_limits<double>::infinity();
+    arma::vec theta;
+    arma::vec warp_params;
+    double sigma2 = 0;
+    arma::vec beta;
+    arma::vec alpha;
+    arma::mat C;
+    arma::mat R;
+    arma::mat Phi;
+    arma::mat dPhi;
+    double logdet = 0;
+    bool success = false;
+  };
+
+  // Helper: extract result from a WarpKriging instance after optimization
+  auto extract_result = [](WarpKriging& wk, double neg_ll) -> OptimizationResult {
+    OptimizationResult r;
+    r.neg_ll = neg_ll;
+    r.theta = wk.m_theta;
+    r.warp_params = wk.pack_warp_params();
+    r.sigma2 = wk.m_sigma2;
+    r.beta = wk.m_beta;
+    r.alpha = wk.m_alpha;
+    r.C = wk.m_C;
+    r.R = wk.m_R;
+    r.Phi = wk.m_Phi;
+    r.dPhi = wk.m_dPhi;
+    r.logdet = wk.m_logdet;
+    r.success = true;
+    return r;
+  };
+
+  // Helper: restore best result to `this`
+  auto restore_best = [&](const OptimizationResult& r) {
+    if (n_warp > 0)
+      unpack_warp_params(r.warp_params);
+    m_theta = r.theta;
+    m_sigma2 = r.sigma2;
+    m_beta = r.beta;
+    m_alpha = r.alpha;
+    m_C = r.C;
+    m_R = r.R;
+    m_Phi = r.Phi;
+    m_dPhi = r.dPhi;
+    m_logdet = r.logdet;
+  };
+
+  // Helper: run parallel multistart with a given optimizer function
+  auto run_parallel_multistart = [&](auto& optimizer_fn) {
+    // Generate random starting points for θ in [theta_lower, theta_upper]
+    arma::mat theta0_rand(multistart, d_theta);
+    for (int i = 0; i < multistart; ++i)
+      theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+    // First start uses the current theta
+    theta0_rand.row(0) = m_theta.t();
+
+    arma::vec wp_init = pack_warp_params();
+
+    std::vector<OptimizationResult> results(multistart);
+    std::mutex results_mutex;
+
+    // Create per-thread WarpKriging clones
+    std::vector<WarpKriging> clones;
+    clones.reserve(multistart);
+    for (int i = 0; i < multistart; ++i)
+      clones.push_back(clone_for_thread());
+
+    // Worker function
+    auto worker = [&](int task_id) {
+      try {
+        WarpKriging& wk = clones[task_id];
+        // Reset to initial warp params and set starting theta
+        if (n_warp > 0)
+          wk.unpack_warp_params(wp_init);
+        wk.m_theta = theta0_rand.row(task_id).t();
+        wk.refresh_cache();
+
+        double neg_ll = optimizer_fn(wk);
+
+        OptimizationResult r = extract_result(wk, neg_ll);
+        std::lock_guard<std::mutex> lock(results_mutex);
+        results[task_id] = std::move(r);
+      } catch (const std::exception& e) {
+        if (Optim::log_level > Optim::log_none) {
+          std::lock_guard<std::mutex> lock(results_mutex);
+          arma::cout << "Warning: WarpKriging multistart " << (task_id + 1) << " failed: " << e.what() << arma::endl;
+        }
+      }
+    };
+
+    if (multistart == 1) {
+      worker(0);
+    } else {
+      // Determine thread pool size
+      unsigned int n_cpu = std::thread::hardware_concurrency();
+      int pool_size = Optim::thread_pool_size;
+      if (pool_size <= 0)
+        pool_size = std::max(1u, n_cpu);
+      pool_size = std::min(pool_size, multistart);
+
+      if (Optim::log_level > Optim::log_none) {
+        arma::cout << "WarpKriging thread pool: " << pool_size << " workers (ncpu=" << n_cpu
+                   << ", multistart=" << multistart << ")" << arma::endl;
+      }
+
+      // Thread pool with atomic task counter
+      std::atomic<int> next_task(0);
+      std::vector<std::thread> threads;
+      threads.reserve(pool_size);
+
+      // RAII guard to ensure threads are always joined
+      struct ThreadJoiner {
+        std::vector<std::thread>& threads_ref;
+        explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
+        ~ThreadJoiner() {
+          for (auto& t : threads_ref)
+            if (t.joinable())
+              t.join();
+        }
+      };
+
+      for (int worker_id = 0; worker_id < pool_size; worker_id++) {
+        threads.emplace_back([&]() {
+          while (true) {
+            int task_id = next_task.fetch_add(1);
+            if (task_id >= multistart)
+              break;
+
+            // Staggered startup delay
+            int delay_ms = task_id * Optim::thread_start_delay_ms;
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+
+            worker(task_id);
+          }
+        });
+      }
+
+      ThreadJoiner joiner(threads);
+    }
+
+    // Find best result
+    int best_idx = -1;
+    double best_neg_ll = std::numeric_limits<double>::infinity();
+    for (int i = 0; i < multistart; ++i) {
+      if (results[i].success && results[i].neg_ll < best_neg_ll) {
+        best_neg_ll = results[i].neg_ll;
+        best_idx = i;
+      }
+    }
+    if (best_idx >= 0)
+      restore_best(results[best_idx]);
   };
 
   if (base_method == "BFGS" || n_warp == 0) {
     // --- Joint L-BFGS-B (with multistart) ---
     if (multistart <= 1) {
-      run_joint_bfgs();
+      run_joint_bfgs(*this);
     } else {
-      // Generate random starting points for θ in [theta_lower, theta_upper]
-      arma::mat theta0_rand(multistart, d_theta);
-      for (int i = 0; i < multistart; ++i)
-        theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
-      // First start uses the current theta (usually ones)
-      theta0_rand.row(0) = m_theta.t();
-
-      // Save initial warp state (for non-none warpings)
-      arma::vec wp_init = pack_warp_params();
-
-      double best_neg_ll = std::numeric_limits<double>::infinity();
-      arma::vec best_theta;
-      arma::vec best_wp;
-      double best_sigma2 = 0;
-      arma::vec best_beta;
-      arma::vec best_alpha;
-      arma::mat best_C;
-      arma::mat best_R;
-      arma::mat best_Phi;
-      arma::mat best_dPhi;
-      double best_logdet = 0;
-
-      for (int i = 0; i < multistart; ++i) {
-        // Reset warp params to initial state
-        if (n_warp > 0)
-          unpack_warp_params(wp_init);
-        m_theta = theta0_rand.row(i).t();
-        refresh_cache();
-
-        double neg_ll = run_joint_bfgs();
-
-        if (neg_ll < best_neg_ll) {
-          best_neg_ll = neg_ll;
-          best_theta = m_theta;
-          best_wp = pack_warp_params();
-          best_sigma2 = m_sigma2;
-          best_beta = m_beta;
-          best_alpha = m_alpha;
-          best_C = m_C;
-          best_R = m_R;
-          best_Phi = m_Phi;
-          best_dPhi = m_dPhi;
-          best_logdet = m_logdet;
-        }
-      }
-
-      // Restore best result
-      if (n_warp > 0)
-        unpack_warp_params(best_wp);
-      m_theta = best_theta;
-      m_sigma2 = best_sigma2;
-      m_beta = best_beta;
-      m_alpha = best_alpha;
-      m_C = best_C;
-      m_R = best_R;
-      m_Phi = best_Phi;
-      m_dPhi = best_dPhi;
-      m_logdet = best_logdet;
+      run_parallel_multistart(run_joint_bfgs);
     }
 
   } else {
     // --- Bi-level Adam+BFGS (with multistart) ---
-    auto run_adam_bfgs = [&]() -> double {
-      AdamBFGS opt(n_warp, d_theta);
-      opt.max_iter_adam = m_max_iter_adam;
-      opt.adam_lr = m_adam_lr;
-      opt.max_iter_bfgs = m_max_iter_bfgs;
-      opt.bfgs_pgtol = 1e-6;
-      opt.bfgs_factr = 1e7;
-      opt.maximize = true;
-
-      arma::vec current_wp = pack_warp_params();
-      arma::vec current_log_theta = arma::log(m_theta);
-
-      auto obj_fn = [this, &current_wp](const arma::vec& x_outer,
-                                        const arma::vec& x_inner,
-                                        arma::vec* grad_outer,
-                                        arma::vec* grad_inner) -> double {
-        bool warp_changed = false;
-        if (x_outer.n_elem > 0) {
-          if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
-            unpack_warp_params(x_outer);
-            current_wp = x_outer;
-            warp_changed = true;
-          }
-        }
-
-        m_theta = arma::exp(x_inner);
-
-        if (warp_changed)
-          refresh_cache();
-        else
-          refresh_cache_theta_only();
-
-        double ll = concentrated_ll();
-
-        if (grad_inner) {
-          auto [ll2, g_log_theta] = concentrated_ll_and_grad_theta();
-          *grad_inner = g_log_theta;
-          (void)ll2;
-        }
-        if (grad_outer && x_outer.n_elem > 0) {
-          *grad_outer = warp_gradient();
-        }
-        return ll;
-      };
-
-      auto result = opt.optimize(current_wp, current_log_theta, log_theta_lower, log_theta_upper, obj_fn);
-
-      if (n_warp > 0)
-        unpack_warp_params(result.x_outer);
-      m_theta = arma::exp(result.x_inner);
-      refresh_cache();
-      return -concentrated_ll();  // return neg LL for consistency
-    };
-
     if (multistart <= 1) {
-      run_adam_bfgs();
+      run_adam_bfgs(*this);
     } else {
-      arma::mat theta0_rand(multistart, d_theta);
-      for (int i = 0; i < multistart; ++i)
-        theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
-      theta0_rand.row(0) = m_theta.t();
-
-      arma::vec wp_init = pack_warp_params();
-
-      double best_neg_ll = std::numeric_limits<double>::infinity();
-      arma::vec best_theta;
-      arma::vec best_wp;
-      double best_sigma2 = 0;
-      arma::vec best_beta;
-      arma::vec best_alpha;
-      arma::mat best_C;
-      arma::mat best_R;
-      arma::mat best_Phi;
-      arma::mat best_dPhi;
-      double best_logdet = 0;
-
-      for (int i = 0; i < multistart; ++i) {
-        if (n_warp > 0)
-          unpack_warp_params(wp_init);
-        m_theta = theta0_rand.row(i).t();
-        refresh_cache();
-
-        double neg_ll = run_adam_bfgs();
-
-        if (neg_ll < best_neg_ll) {
-          best_neg_ll = neg_ll;
-          best_theta = m_theta;
-          best_wp = pack_warp_params();
-          best_sigma2 = m_sigma2;
-          best_beta = m_beta;
-          best_alpha = m_alpha;
-          best_C = m_C;
-          best_R = m_R;
-          best_Phi = m_Phi;
-          best_dPhi = m_dPhi;
-          best_logdet = m_logdet;
-        }
-      }
-
-      if (n_warp > 0)
-        unpack_warp_params(best_wp);
-      m_theta = best_theta;
-      m_sigma2 = best_sigma2;
-      m_beta = best_beta;
-      m_alpha = best_alpha;
-      m_C = best_C;
-      m_R = best_R;
-      m_Phi = best_Phi;
-      m_dPhi = best_dPhi;
-      m_logdet = best_logdet;
+      run_parallel_multistart(run_adam_bfgs);
     }
 
     // Joint BFGS polish if method requests it
     if (base_method == "BFGS+Adam+BFGS" && n_warp > 0) {
-      run_joint_bfgs();
+      run_joint_bfgs(*this);
     }
   }
 }
