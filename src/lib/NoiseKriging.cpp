@@ -23,11 +23,11 @@
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <mutex>
+#include <queue>
+#include <thread>
 #include <tuple>
 #include <vector>
-#include <thread>
-#include <queue>
-#include <mutex>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -47,39 +47,40 @@ inline int get_optimal_threads(int max_default = 2) {
 // Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
 #if !defined(__APPLE__) || !defined(__arm64__)
 #if defined(_MSC_VER)
-  // MSVC doesn't support weak symbols; use runtime dynamic loading
-  #ifndef NOMINMAX
-  #define NOMINMAX
-  #endif
-  #include <windows.h>
-  namespace {
-    typedef void (*openblas_set_num_threads_t)(int);
-    openblas_set_num_threads_t get_openblas_set_num_threads() {
-      static openblas_set_num_threads_t func = nullptr;
-      static bool initialized = false;
-      if (!initialized) {
-        initialized = true;
-        // Try to load from OpenBLAS DLL (used by numpy/scipy)
-        HMODULE hModule = GetModuleHandleA("libopenblas.dll");
-        if (!hModule) hModule = GetModuleHandleA("openblas.dll");
-        if (hModule) {
-          func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
-        }
-      }
-      return func;
+// MSVC doesn't support weak symbols; use runtime dynamic loading
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+typedef void (*openblas_set_num_threads_t)(int);
+openblas_set_num_threads_t get_openblas_set_num_threads() {
+  static openblas_set_num_threads_t func = nullptr;
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    // Try to load from OpenBLAS DLL (used by numpy/scipy)
+    HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+    if (!hModule)
+      hModule = GetModuleHandleA("openblas.dll");
+    if (hModule) {
+      func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
     }
   }
+  return func;
+}
+}  // namespace
 #else
-  // GCC/Clang support weak symbols
-  extern "C" {
-    void openblas_set_num_threads(int num_threads) __attribute__((weak));
-  }
-  namespace {
-    typedef void (*openblas_set_num_threads_t)(int);
-    openblas_set_num_threads_t get_openblas_set_num_threads() {
-      return openblas_set_num_threads;
-    }
-  }
+// GCC/Clang support weak symbols
+extern "C" {
+void openblas_set_num_threads(int num_threads) __attribute__((weak));
+}
+namespace {
+typedef void (*openblas_set_num_threads_t)(int);
+openblas_set_num_threads_t get_openblas_set_num_threads() {
+  return openblas_set_num_threads;
+}
+}  // namespace
 #endif
 #endif
 
@@ -90,30 +91,22 @@ inline int get_optimal_threads(int max_default = 2) {
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void NoiseKriging::make_Cov(const std::string& covType) {
   m_covType = covType;
-  if (covType.compare("gauss") == 0) {
-    _Cov = Covariance::Cov_gauss;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
-    _DlnCovDx = Covariance::DlnCovDx_gauss;
-    _Cov_pow = 2;
-  } else if (covType.compare("exp") == 0) {
-    _Cov = Covariance::Cov_exp;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_exp;
-    _DlnCovDx = Covariance::DlnCovDx_exp;
-    _Cov_pow = 1;
-  } else if (covType.compare("matern3_2") == 0) {
-    _Cov = Covariance::Cov_matern32;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
-    _DlnCovDx = Covariance::DlnCovDx_matern32;
-    _Cov_pow = 1.5;
-  } else if (covType.compare("matern5_2") == 0) {
-    _Cov = Covariance::Cov_matern52;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
-    _DlnCovDx = Covariance::DlnCovDx_matern52;
-    _Cov_pow = 2.5;
-  } else
-    throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
-  // arma::cout << "make_Cov done." << arma::endl;
+  auto cov = Covariance::resolve(covType);
+  _Cov = std::move(cov.Cov);
+  _DlnCovDtheta = std::move(cov.DlnCovDtheta);
+  _DlnCovDx = std::move(cov.DlnCovDx);
+
+  if (covType == "gauss")
+    _Cov_pow = 2;
+  else if (covType == "exp")
+    _Cov_pow = 1;
+  else if (covType == "matern3_2")
+    _Cov_pow = 1.5;
+  else if (covType == "matern5_2")
+    _Cov_pow = 2.5;
+  else
+    _Cov_pow = 2;  // default
 }
 
 LIBKRIGING_EXPORT arma::mat NoiseKriging::covMat(const arma::mat& X1, const arma::mat& X2) {
@@ -162,6 +155,8 @@ void NoiseKriging::populate_Model(KModel& m,
   arma::uword p = m_F.n_cols;
 
   auto t0 = Bench::tic();
+  // Invalidate cached Linv so gradient code recomputes it for the new L
+  m.Linv = arma::mat();
   // Reuse existing m.R allocation
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
@@ -252,9 +247,13 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
   }
   arma::vec _theta = _theta_sigma2.head(d);
 
-  NoiseKriging::KModel m = make_Model(_theta, _sigma2, bench);
-  if (model != nullptr)
-    *model = m;
+  NoiseKriging::KModel m_local;
+  if (model != nullptr) {
+    populate_Model(*model, _theta, _sigma2, bench);
+  } else {
+    m_local = make_Model(_theta, _sigma2, bench);
+  }
+  NoiseKriging::KModel& m = (model != nullptr) ? *model : m_local;
 
   arma::uword n = m_X.n_rows;
 
@@ -552,7 +551,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     unsigned int n_cpu = std::thread::hardware_concurrency();
     if (n_cpu > 0 && multistart > 1) {
       unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-      
+
       // Set OpenBLAS threads (if available)
       // Note: Skip on macOS ARM64 where Accelerate framework is used
 #if !defined(__APPLE__) || !defined(__arm64__)
@@ -561,15 +560,15 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         openblas_fn(threads_per_worker);
       }
 #endif
-      
-      // Set OpenMP threads (for Armadillo operations that use OpenMP)
-      #ifdef _OPENMP
+
+// Set OpenMP threads (for Armadillo operations that use OpenMP)
+#ifdef _OPENMP
       omp_set_num_threads(threads_per_worker);
-      #endif
-      
+#endif
+
       if (Optim::log_level > Optim::log_none) {
-        arma::cout << "Threads per worker: " << threads_per_worker 
-                   << " (total CPUs: " << n_cpu << ", multistart: " << multistart << ")" << arma::endl;
+        arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
+                   << ", multistart: " << multistart << ")" << arma::endl;
       }
     }
 
@@ -632,12 +631,12 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     arma::uword n_data = n;
     arma::uword p_data = m_F.n_cols;
     std::vector<NoiseKriging::KModel> preallocated_models(multistart);
-    
+
     if (Optim::log_level > Optim::log_none) {
-      arma::cout << "Preallocating " << multistart << " KModel structures (n=" 
-                 << n_data << ", p=" << p_data << ")..." << arma::endl;
+      arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data << ", p=" << p_data << ")..."
+                 << arma::endl;
     }
-    
+
     for (int i = 0; i < multistart; i++) {
       auto& m = preallocated_models[i];
       m.R = arma::mat(n_data, n_data, arma::fill::none);
@@ -655,7 +654,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     // Prepare gamma bounds for all starts
     std::vector<arma::vec> all_gamma_lower(multistart);
     std::vector<arma::vec> all_gamma_upper(multistart);
-    
+
     for (arma::uword i = 0; i < multistart; i++) {
       arma::vec gamma_tmp = arma::vec(d + 1);
       gamma_tmp.head(d) = theta0.row(i % multistart).t();
@@ -672,7 +671,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
     // Multi-threading implementation for BFGS multistart
     // Each thread uses its own preallocated KModel, so no mutex needed
-    
+
     // Structure to hold optimization results from each thread
     struct OptimizationResult {
       arma::uword start_index;
@@ -690,15 +689,15 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       arma::vec betahat;
       bool success;
       std::string error_message;
-      
+
       OptimizationResult() : start_index(0), objective_value(std::numeric_limits<double>::infinity()), success(false) {}
     };
-    
+
     // Worker function returns OptimizationResult
     auto optimize_worker = [&](arma::uword start_idx) -> OptimizationResult {
       OptimizationResult result;
       result.start_index = start_idx;
-      
+
       try {
         arma::vec gamma_tmp = arma::vec(d + 1);
         gamma_tmp.head(d) = theta0.row(start_idx % multistart).t();
@@ -714,7 +713,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         if (start_idx >= preallocated_models.size()) {
           throw std::runtime_error("Preallocated model index out of bounds");
         }
-        
+
         NoiseKriging::KModel& m = preallocated_models[start_idx];
         populate_Model(m, theta0.row(start_idx % multistart).t(), sigma20[start_idx % sigma20.n_elem], nullptr);
 
@@ -726,7 +725,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         arma::ivec bounds_type{d + 1, arma::fill::value(2)};
 
         if (Optim::log_level > Optim::log_none) {
-          arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
+          arma::cout << "BFGS (start " << (start_idx + 1) << "/" << multistart << "):" << arma::endl;
           arma::cout << "  objective: " << m_objective << arma::endl;
           arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
           arma::cout << "  null gradient tolerance: " << optimizer.pgtol << arma::endl;
@@ -757,9 +756,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
               bounds_type.memptr());
 
           if (Optim::log_level > Optim::log_info) {
-            arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
-                       << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
-                       << ", task=" << opt_result.task << arma::endl;
+            arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry) << ": f_opt=" << opt_result.f_opt
+                       << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
           }
 
           if (opt_result.f_opt < best_f_opt) {
@@ -768,36 +766,31 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
           }
 
           // check theta for distance to bounds
-            double sol_to_lb_theta = Optim::reparametrize
-                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp.head(d)) - theta_lower))
-                                        : arma::min(arma::abs(gamma_tmp.head(d) - theta_upper));
-            double sol_to_ub_theta = Optim::reparametrize
-                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp.head(d)) - theta_upper))
-                                        : arma::min(arma::abs(gamma_tmp.head(d) - theta_lower));
-            double sol_to_lb_sigma2 = Optim::reparametrize
-                                        ? Optim::reparam_from_(gamma_tmp.at(d)) - sigma2_lower
-                                        : gamma_tmp.at(d) - sigma2_lower;
-            double sol_to_ub_sigma2 = Optim::reparametrize
-                                        ? sigma2_upper - Optim::reparam_from_(gamma_tmp.at(d))
-                                        : sigma2_upper - gamma_tmp.at(d);
-          
+          double sol_to_lb_theta = Optim::reparametrize
+                                       ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp.head(d)) - theta_lower))
+                                       : arma::min(arma::abs(gamma_tmp.head(d) - theta_upper));
+          double sol_to_ub_theta = Optim::reparametrize
+                                       ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp.head(d)) - theta_upper))
+                                       : arma::min(arma::abs(gamma_tmp.head(d) - theta_lower));
+          double sol_to_lb_sigma2 = Optim::reparametrize ? Optim::reparam_from_(gamma_tmp.at(d)) - sigma2_lower
+                                                         : gamma_tmp.at(d) - sigma2_lower;
+          double sol_to_ub_sigma2 = Optim::reparametrize ? sigma2_upper - Optim::reparam_from_(gamma_tmp.at(d))
+                                                         : sigma2_upper - gamma_tmp.at(d);
+
           // Check abnormal termination or convergence at bounds to decide on restart
           if ((retry < Optim::max_restart)
-              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) // Check for abnormal termination
-              || (opt_result.num_iters <= 2) // Start point is strangely quite optimal...
-              || (sol_to_lb_theta < arma::datum::eps) // Stuck at lower bound
-              || (opt_result.f_opt > best_f_opt))) { // No improvement
+              && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
+                  || (opt_result.num_iters <= 2)           // Start point is strangely quite optimal...
+                  || (sol_to_lb_theta < arma::datum::eps)  // Stuck at lower bound
+                  || (opt_result.f_opt > best_f_opt))) {   // No improvement
 
             if (Optim::log_level > Optim::log_none) {
-              arma::cout << "  Restarting BFGS (start " << (start_idx+1) << ", retry " << (retry+1)
-                         << "): f_opt=" << opt_result.f_opt
-                         << ", sol_to_lb=" << sol_to_lb_theta
+              arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
+                         << "): f_opt=" << opt_result.f_opt << ", sol_to_lb=" << sol_to_lb_theta
                          << ", sol_to_ub=" << sol_to_ub_theta << arma::endl;
             }
 
-            gamma_tmp.head(d)
-                = (theta0.row(start_idx % multistart).t() + theta_lower)
-                  / pow(2.0, retry + 1);
+            gamma_tmp.head(d) = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
             gamma_tmp.at(d) = sigma20[start_idx % sigma20.n_elem];
 
             if (Optim::reparametrize)
@@ -821,8 +814,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
         // Copy (not move) since m is a reference to preallocated memory
         // Force DEEP copy to avoid any shared memory issues
-        result.L = arma::mat(m.L);  // Force copy constructor
-        result.R = arma::mat(m.R);  // Force copy constructor
+        result.L = arma::mat(m.L);          // Force copy constructor
+        result.R = arma::mat(m.R);          // Force copy constructor
         result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
         result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
         result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
@@ -857,12 +850,12 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         pool_size = std::max(1u, n_cpu);
       }
       pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
-      
+
       if (Optim::log_level > Optim::log_none) {
-        arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
-                   << ", multistart=" << multistart << ")" << arma::endl;
+        arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu << ", multistart=" << multistart << ")"
+                   << arma::endl;
       }
-      
+
       // Thread pool implementation: use semaphore-like counter
       std::atomic<int> next_task(0);
       std::vector<std::thread> threads;
@@ -885,7 +878,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         threads.emplace_back([&, worker_id]() {
           while (true) {
             int task_id = next_task.fetch_add(1);
-            if (task_id >= multistart) break;
+            if (task_id >= multistart)
+              break;
 
             // Add staggered startup delay to avoid thread initialization race conditions
             int delay_ms = task_id * Optim::thread_start_delay_ms;
@@ -921,13 +915,12 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     }
 
     if (successful_optimizations == 0) {
-      throw std::runtime_error("All " + std::to_string(multistart)
-                               + " optimization attempts failed");
+      throw std::runtime_error("All " + std::to_string(multistart) + " optimization attempts failed");
     }
 
     if (Optim::log_level > Optim::log_none && successful_optimizations < multistart) {
-      arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart
-                << " succeeded" << arma::endl;
+      arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart << " succeeded"
+                 << arma::endl;
     }
 
     // Update member variables with best result
@@ -936,7 +929,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       m_theta = best.theta_sigma2.head(d);  // copy
       m_est_theta = true;
       m_is_empty = false;
-      m_T = best.L;          // copy instead of move to avoid issues
+      m_T = best.L;  // copy instead of move to avoid issues
       m_R = best.R;
       m_M = best.Fstar;
       m_circ = best.Rstar;
@@ -955,7 +948,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
 
       if (Optim::log_level > Optim::log_none) {
         arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
-                  << arma::endl;
+                   << arma::endl;
       }
     }
   } else
@@ -997,26 +990,26 @@ NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, 
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  #ifdef _OPENMP
+#ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
+#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
         R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
       }
     }
   } else {
-  #endif
+#endif
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
         R_on.at(i, j) = _Cov((Xn_o.col(i) - Xn_n.col(j)), m_theta);
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
   R_on *= m_sigma2;
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 

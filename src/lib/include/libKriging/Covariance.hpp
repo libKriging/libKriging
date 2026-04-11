@@ -7,35 +7,38 @@
 
 class Covariance {
  public:
-  static std::function<double(const arma::vec&, const arma::vec&)> Cov_gauss;
+  using CovFunc = std::function<double(const arma::vec&, const arma::vec&)>;
+  using GradFunc = std::function<arma::vec(const arma::vec&, const arma::vec&)>;
 
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_gauss;
+  struct CovFunctions {
+    CovFunc Cov;
+    GradFunc DlnCovDtheta;
+    GradFunc DlnCovDx;
+  };
 
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx_gauss;
+  /// Resolve kernel name to function triplet.
+  /// Accepted names: "gauss", "exp", "matern3_2", "matern5_2", "whitenoise".
+  LIBKRIGING_EXPORT static CovFunctions resolve(const std::string& covType);
 
-  static std::function<double(const arma::vec&, const arma::vec&)> Cov_exp;
+  static CovFunc Cov_gauss;
+  static GradFunc DlnCovDtheta_gauss;
+  static GradFunc DlnCovDx_gauss;
 
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_exp;
+  static CovFunc Cov_exp;
+  static GradFunc DlnCovDtheta_exp;
+  static GradFunc DlnCovDx_exp;
 
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx_exp;
+  static CovFunc Cov_matern32;
+  static GradFunc DlnCovDtheta_matern32;
+  static GradFunc DlnCovDx_matern32;
 
-  static std::function<double(const arma::vec&, const arma::vec&)> Cov_matern32;
+  static CovFunc Cov_matern52;
+  static GradFunc DlnCovDtheta_matern52;
+  static GradFunc DlnCovDx_matern52;
 
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_matern32;
-
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx_matern32;
-
-  static std::function<double(const arma::vec&, const arma::vec&)> Cov_matern52;
-
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_matern52;
-
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx_matern52;
-
-  static std::function<double(const arma::vec&, const arma::vec&)> Cov_whitenoise;
-
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDtheta_whitenoise;
-
-  static std::function<arma::vec(const arma::vec&, const arma::vec&)> DlnCovDx_whitenoise;
+  static CovFunc Cov_whitenoise;
+  static GradFunc DlnCovDtheta_whitenoise;
+  static GradFunc DlnCovDx_whitenoise;
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_COVARIANCE_HPP

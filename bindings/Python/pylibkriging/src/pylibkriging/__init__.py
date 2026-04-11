@@ -47,4 +47,5 @@ from _pylibkriging import __version__, __build_type__
 Kriging = WrappedPyKriging
 NuggetKriging = WrappedPyNuggetKriging
 NoiseKriging = WrappedPyNoiseKriging
+WarpKriging = WrappedPyWarpKriging
 LinearRegression = PyLinearRegression

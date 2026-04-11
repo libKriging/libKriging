@@ -5,6 +5,7 @@
 #include <libKriging/NoiseKriging.hpp>
 #include <libKriging/NuggetKriging.hpp>
 #include <libKriging/Trend.hpp>
+#include <libKriging/WarpKriging.hpp>
 #include <libKriging/utils/ExplicitCopySpecifier.hpp>
 
 #include <cstring>
@@ -1667,4 +1668,246 @@ int lk_noise_kriging_is_sigma2_estim(void* ptr) {
   } catch (...) {
     return -1;
   }
+}
+
+/* ========================================================================== */
+/*  WarpKriging                                                               */
+/* ========================================================================== */
+
+using libKriging::WarpKriging;
+
+static std::vector<std::string> to_string_vec(const char** arr, int n) {
+  std::vector<std::string> result(n);
+  for (int i = 0; i < n; ++i) {
+    result[i] = arr[i];
+  }
+  return result;
+}
+
+// Per-object storage for strings returned to the caller
+static thread_local std::string g_wk_summary;
+static thread_local std::string g_wk_kernel;
+static thread_local std::vector<std::string> g_wk_warping;
+static thread_local std::vector<char*> g_wk_warping_ptrs;
+
+void* lk_warp_kriging_new(const char** warping, int n_warping, const char* kernel) {
+  try {
+    return new WarpKriging(to_string_vec(warping, n_warping), kernel);
+  }
+  CATCH_RETURN_NULL
+}
+
+void* lk_warp_kriging_new_fit(const double* y,
+                              int n,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char** warping,
+                              int n_warping,
+                              const char* kernel,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective) {
+  try {
+    arma::vec y_vec(const_cast<double*>(y), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
+    return new WarpKriging(
+        y_vec, X_mat, to_string_vec(warping, n_warping), kernel, regmodel, normalize != 0, optim, objective);
+  }
+  CATCH_RETURN_NULL
+}
+
+void lk_warp_kriging_delete(void* ptr) {
+  delete static_cast<WarpKriging*>(ptr);
+}
+
+int lk_warp_kriging_fit(void* ptr,
+                        const double* y,
+                        int n,
+                        const double* X,
+                        int nX,
+                        int d,
+                        const char* regmodel,
+                        int normalize,
+                        const char* optim,
+                        const char* objective) {
+  try {
+    arma::vec y_vec(const_cast<double*>(y), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
+    static_cast<WarpKriging*>(ptr)->fit(y_vec, X_mat, regmodel, normalize != 0, optim, objective);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_predict(void* ptr,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int return_stdev,
+                            int return_cov,
+                            double* mean_out,
+                            double* stdev_out,
+                            double* cov_out) {
+  try {
+    arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
+    auto [mean, stdev, cov, mean_deriv, stdev_deriv]
+        = static_cast<WarpKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0);
+    if (mean_out)
+      std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
+    if (return_stdev && stdev_out)
+      std::memcpy(stdev_out, stdev.memptr(), stdev.n_elem * sizeof(double));
+    if (return_cov && cov_out)
+      std::memcpy(cov_out, cov.memptr(), cov.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
+  try {
+    arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
+    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, static_cast<uint64_t>(seed), X_mat);
+    if (sim_out)
+      std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d) {
+  try {
+    arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
+    static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+const char* lk_warp_kriging_summary(void* ptr) {
+  try {
+    g_wk_summary = static_cast<WarpKriging*>(ptr)->summary();
+    return g_wk_summary.c_str();
+  } catch (...) {
+    return "";
+  }
+}
+
+double lk_warp_kriging_log_likelihood(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->logLikelihood();
+  }
+  CATCH_RETURN_NAN
+}
+
+int lk_warp_kriging_log_likelihood_fun(void* ptr,
+                                       const double* theta,
+                                       int theta_n,
+                                       int return_grad,
+                                       int return_hess,
+                                       double* ll_out,
+                                       double* grad_out,
+                                       double* hess_out) {
+  try {
+    arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
+    auto [ll, grad, hess]
+        = static_cast<WarpKriging*>(ptr)->logLikelihoodFun(theta_vec, return_grad != 0, return_hess != 0);
+    if (ll_out)
+      *ll_out = ll;
+    if (return_grad && grad_out)
+      std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
+    if (return_hess && hess_out)
+      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+const char* lk_warp_kriging_kernel(void* ptr) {
+  try {
+    g_wk_kernel = static_cast<WarpKriging*>(ptr)->kernel();
+    return g_wk_kernel.c_str();
+  } catch (...) {
+    return "";
+  }
+}
+
+int lk_warp_kriging_is_fitted(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->is_fitted() ? 1 : 0;
+  } catch (...) {
+    return -1;
+  }
+}
+
+int lk_warp_kriging_feature_dim(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<WarpKriging*>(ptr)->feature_dim());
+  } catch (...) {
+    return -1;
+  }
+}
+
+int lk_warp_kriging_get_X(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& X = static_cast<WarpKriging*>(ptr)->X();
+    if (n)
+      *n = static_cast<int>(X.n_rows);
+    if (d)
+      *d = static_cast<int>(X.n_cols);
+    if (out)
+      std::memcpy(out, X.memptr(), X.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_y(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<WarpKriging*>(ptr)->y();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_theta(void* ptr, double* out, int* n) {
+  try {
+    arma::vec v = static_cast<WarpKriging*>(ptr)->theta();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_warp_kriging_get_sigma2(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->sigma2();
+  }
+  CATCH_RETURN_NAN
+}
+
+int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping) {
+  try {
+    g_wk_warping = static_cast<WarpKriging*>(ptr)->warping_strings();
+    if (n_warping)
+      *n_warping = static_cast<int>(g_wk_warping.size());
+    if (out) {
+      g_wk_warping_ptrs.resize(g_wk_warping.size());
+      for (size_t i = 0; i < g_wk_warping.size(); ++i) {
+        g_wk_warping_ptrs[i] = const_cast<char*>(g_wk_warping[i].c_str());
+      }
+      std::memcpy(out, g_wk_warping_ptrs.data(), g_wk_warping.size() * sizeof(char*));
+    }
+    return 0;
+  }
+  CATCH_RETURN
 }

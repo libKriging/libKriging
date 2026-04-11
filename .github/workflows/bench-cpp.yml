@@ -81,11 +81,24 @@ jobs:
             done
           done
 
+          # WarpKriging benchmarks — each warping is treated as its own class.
+          # Fewer iterations since fit is much slower (seconds vs milliseconds).
+          WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
+          for n in 100 200 400; do
+            for d in 2 4 8; do
+              for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
+                echo "Running: n=$n d=$d warpkriging:$warp iterations=$WARP_ITERATIONS"
+                bash bench/bench.sh iterations=$WARP_ITERATIONS n=$n d=$d warpkriging warping=$warp > "build/benchmark-results/warpkriging_${warp}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for warpkriging:$warp n=$n d=$d"
+              done
+            done
+          done
+
       - name: Generate markdown report
         shell: bash
         run: |
           cd build
           ITERATIONS=${{ github.event.inputs.iterations || '10' }}
+          WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
           REPORT="benchmark-results/BENCHMARK_REPORT.md"
 
           # Header
@@ -94,79 +107,59 @@ jobs:
           echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$REPORT"
           echo "**Platform:** Ubuntu (latest)" >> "$REPORT"
           echo "**Build Type:** Release" >> "$REPORT"
-          echo "**Iterations per test:** $ITERATIONS" >> "$REPORT"
-          echo "**Test function:** f(x) = sum_i sin(2*pi*x_i)" >> "$REPORT"
+          echo "**Iterations:** $ITERATIONS (WarpKriging: $WARP_ITERATIONS)" >> "$REPORT"
+          echo "**Test function:** f(x) = sum_i sin(2*pi*x_i) (categorical/ordinal: x_0 discrete 5 levels)" >> "$REPORT"
           echo "" >> "$REPORT"
 
           # Table of Contents
-          echo "## Table of Contents" >> "$REPORT"
-          echo "" >> "$REPORT"
-          echo "- [Summary Tables](#summary-tables)" >> "$REPORT"
-          echo "  - [Kriging](#kriging)" >> "$REPORT"
-          echo "  - [NuggetKriging](#nuggetkriging)" >> "$REPORT"
-          echo "  - [NoiseKriging](#noisekriging)" >> "$REPORT"
-          echo "- [Detailed Results](#detailed-results)" >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          # Summary Tables
           echo "## Summary Tables" >> "$REPORT"
           echo "" >> "$REPORT"
 
-          # Kriging Summary
-          echo "### Kriging" >> "$REPORT"
-          echo "" >> "$REPORT"
-          echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
-          echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
-          for n in 100 200 400; do
-            for d in 2 4 8; do
-              logfile="benchmark-results/kriging_n${n}_d${d}.log"
-              if [ -f "$logfile" ]; then
-                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
-                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
-                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
-                echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
-              fi
-            done
-          done
-          echo "" >> "$REPORT"
+          # --- Kriging/NuggetKriging/NoiseKriging summaries (n x d) ---
+          for bench in kriging nuggetkriging noisekriging; do
+            BENCH_NAME="${bench^}"
+            if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="NuggetKriging"; fi
+            if [ "$bench" = "noisekriging" ]; then BENCH_NAME="NoiseKriging"; fi
 
-          # NuggetKriging Summary
-          echo "### NuggetKriging" >> "$REPORT"
-          echo "" >> "$REPORT"
-          echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
-          echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
-          for n in 100 200 400; do
-            for d in 2 4 8; do
-              logfile="benchmark-results/nuggetkriging_n${n}_d${d}.log"
-              if [ -f "$logfile" ]; then
-                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
-                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
-                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
-                echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
-              fi
+            echo "### $BENCH_NAME" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "| n | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
+            echo "|---|---|----------|--------------|-------------|" >> "$REPORT"
+            for n in 100 200 400; do
+              for d in 2 4 8; do
+                logfile="benchmark-results/${bench}_n${n}_d${d}.log"
+                if [ -f "$logfile" ]; then
+                  fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                  pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                  upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
+                  echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
+                fi
+              done
             done
+            echo "" >> "$REPORT"
           done
-          echo "" >> "$REPORT"
 
-          # NoiseKriging Summary
-          echo "### NoiseKriging" >> "$REPORT"
-          echo "" >> "$REPORT"
-          echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
-          echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
-          for n in 100 200 400; do
-            for d in 2 4 8; do
-              logfile="benchmark-results/noisekriging_n${n}_d${d}.log"
-              if [ -f "$logfile" ]; then
-                fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
-                pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
-                upd=$(grep "^update " "$logfile" | awk '{print $3}' || echo "N/A")
-                echo "| $n | $d | $fit | $pred | $upd |" >> "$REPORT"
-              fi
+          # --- WarpKriging:<warping> summaries (n x d) ---
+          for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
+            echo "### WarpKriging:$warp" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "| n | d | fit (ms) | predict (ms) | simulate (ms) |" >> "$REPORT"
+            echo "|---|---|----------|--------------|---------------|" >> "$REPORT"
+            for n in 100 200 400; do
+              for d in 2 4 8; do
+                logfile="benchmark-results/warpkriging_${warp}_n${n}_d${d}.log"
+                if [ -f "$logfile" ]; then
+                  fit=$(grep "^fit" "$logfile" | awk '{print $3}' || echo "N/A")
+                  pred=$(grep "^predict" "$logfile" | awk '{print $3}' || echo "N/A")
+                  sim=$(grep "^simulate" "$logfile" | awk '{print $3}' || echo "N/A")
+                  echo "| $n | $d | $fit | $pred | $sim |" >> "$REPORT"
+                fi
+              done
             done
+            echo "" >> "$REPORT"
           done
-          echo "" >> "$REPORT"
 
-          # Detailed Results
+          # --- Detailed Results ---
           echo "## Detailed Results" >> "$REPORT"
           echo "" >> "$REPORT"
 
@@ -182,10 +175,29 @@ jobs:
               for d in 2 4 8; do
                 logfile="benchmark-results/${bench}_n${n}_d${d}.log"
                 if [ -f "$logfile" ]; then
-                  echo "#### Configuration: n=$n, d=$d" >> "$REPORT"
+                  echo "#### n=$n, d=$d" >> "$REPORT"
                   echo "" >> "$REPORT"
                   echo "\`\`\`" >> "$REPORT"
-                  cat "$logfile" | grep -A 100 "n=$n d=$d" | grep -v "Results saved" >> "$REPORT"
+                  cat "$logfile" | grep -A 100 "n=$n d=$d" | grep -v "Results saved" >> "$REPORT" || true
+                  echo "\`\`\`" >> "$REPORT"
+                  echo "" >> "$REPORT"
+                fi
+              done
+            done
+          done
+
+          for warp in none affine boxcox kumaraswamy mlp neural_mono mlp_joint categorical ordinal; do
+            echo "### WarpKriging:$warp" >> "$REPORT"
+            echo "" >> "$REPORT"
+
+            for n in 100 200 400; do
+              for d in 2 4 8; do
+                logfile="benchmark-results/warpkriging_${warp}_n${n}_d${d}.log"
+                if [ -f "$logfile" ]; then
+                  echo "#### n=$n, d=$d" >> "$REPORT"
+                  echo "" >> "$REPORT"
+                  echo "\`\`\`" >> "$REPORT"
+                  cat "$logfile" | grep -A 100 "warpkriging:" | grep -v "Results saved" >> "$REPORT" || true
                   echo "\`\`\`" >> "$REPORT"
                   echo "" >> "$REPORT"
                 fi

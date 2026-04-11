@@ -407,6 +407,69 @@ int lk_noise_kriging_is_theta_estim(void* ptr);
 double lk_noise_kriging_get_sigma2(void* ptr);
 int lk_noise_kriging_is_sigma2_estim(void* ptr);
 
+/* --- WarpKriging --- */
+
+void* lk_warp_kriging_new(const char** warping, int n_warping, const char* kernel);
+void* lk_warp_kriging_new_fit(const double* y,
+                              int n,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char** warping,
+                              int n_warping,
+                              const char* kernel,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective);
+void lk_warp_kriging_delete(void* ptr);
+
+int lk_warp_kriging_fit(void* ptr,
+                        const double* y,
+                        int n,
+                        const double* X,
+                        int nX,
+                        int d,
+                        const char* regmodel,
+                        int normalize,
+                        const char* optim,
+                        const char* objective);
+
+int lk_warp_kriging_predict(void* ptr,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int return_stdev,
+                            int return_cov,
+                            double* mean_out,
+                            double* stdev_out,
+                            double* cov_out);
+
+int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
+
+int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d);
+
+const char* lk_warp_kriging_summary(void* ptr);
+double lk_warp_kriging_log_likelihood(void* ptr);
+
+int lk_warp_kriging_log_likelihood_fun(void* ptr,
+                                       const double* theta,
+                                       int theta_n,
+                                       int return_grad,
+                                       int return_hess,
+                                       double* ll_out,
+                                       double* grad_out,
+                                       double* hess_out);
+
+const char* lk_warp_kriging_kernel(void* ptr);
+int lk_warp_kriging_is_fitted(void* ptr);
+int lk_warp_kriging_feature_dim(void* ptr);
+int lk_warp_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_warp_kriging_get_y(void* ptr, double* out, int* n);
+int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
+double lk_warp_kriging_get_sigma2(void* ptr);
+int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
+
 #ifdef __cplusplus
 }
 #endif

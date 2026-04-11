@@ -8,9 +8,12 @@
 #   iterations=N  : Number of iterations per test (default: 10)
 #   n=N          : Number of training points (default: 100)
 #   d=N          : Number of dimensions (default: 4)
-#   filter       : Benchmark type filter (kriging/nuggetkriging/noisekriging) or
+#   filter       : Benchmark type filter (kriging/nuggetkriging/noisekriging/warpkriging) or
 #                  Operation filter (fit/predict/simulate/update/update_simulate)
 #                  Default: kriging
+#   warping=NAME : WarpKriging warping filter (none/affine/boxcox/kumaraswamy/mlp/neural_mono/
+#                  mlp_joint/categorical/ordinal). Only used with warpkriging benchmark.
+#                  Default: all warpings.
 #
 # Examples:
 #   ./bench.sh                                    # n=100 d=4 iterations=10 kriging
@@ -19,6 +22,9 @@
 #   ./bench.sh iterations=5 n=1000 d=4 fit       # Only fit operation
 #   ./bench.sh nuggetkriging                      # NuggetKriging benchmark
 #   ./bench.sh noisekriging iterations=15 predict # NoiseKriging predict only
+#   ./bench.sh warpkriging                        # All WarpKriging warpings
+#   ./bench.sh warpkriging warping=affine         # Only affine warping
+#   ./bench.sh warpkriging n=30 iterations=5      # WarpKriging with custom n
 
 # Default values
 CLEAN_BUILD=false
@@ -27,6 +33,7 @@ N_POINTS=100
 D_DIMS=4
 BENCHMARK_FILTER="kriging"
 OPERATION_FILTER=""
+WARPING_FILTER=""
 
 # Parse arguments
 for arg in "$@"; do
@@ -43,15 +50,18 @@ for arg in "$@"; do
     d=*)
       D_DIMS="${arg#*=}"
       ;;
-    kriging|nuggetkriging|noisekriging)
+    kriging|nuggetkriging|noisekriging|warpkriging)
       BENCHMARK_FILTER="$arg"
+      ;;
+    warping=*)
+      WARPING_FILTER="${arg#*=}"
       ;;
     fit|predict|simulate|update|update_simulate)
       OPERATION_FILTER="$arg"
       ;;
     *)
       echo "Unknown argument: $arg"
-      echo "Valid arguments: --clean, iterations=N, n=N, d=N, kriging|nuggetkriging|noisekriging, fit|predict|simulate|update|update_simulate"
+      echo "Valid arguments: --clean, iterations=N, n=N, d=N, kriging|nuggetkriging|noisekriging|warpkriging, warping=NAME, fit|predict|simulate|update|update_simulate"
       exit 1
       ;;
   esac
@@ -79,6 +89,7 @@ cd "$BUILD_DIR"
 if [ "$CLEAN_BUILD" = true ]; then
     echo "Cleaning benchmark binaries..."
     rm -f bench/bench-kriging bench/bench-nuggetkriging bench/bench-noisekriging bench/bench-linearalgebra
+    rm -f bench/bench-warpkriging bench/bench-adambfgs
     echo "Removed all benchmark binaries"
     echo ""
 fi
@@ -94,6 +105,7 @@ declare -A BENCHMARKS
 BENCHMARKS["kriging"]="bench/bench-kriging"
 BENCHMARKS["nuggetkriging"]="bench/bench-nuggetkriging"
 BENCHMARKS["noisekriging"]="bench/bench-noisekriging"
+BENCHMARKS["warpkriging"]="bench/bench-warpkriging"
 
 # Function to filter output by operation
 filter_operation() {
@@ -129,14 +141,20 @@ run_benchmark() {
     local n=$4
     local d=$5
     local op_filter=$6
+    local warp_filter=$7
 
     if [ ! -f "$executable" ]; then
         echo "Warning: Benchmark executable not found: $executable"
         return 1
     fi
 
-    # Run benchmark and filter output
-    "$executable" "$iterations" "$n" "$d" 2>&1 | filter_operation "$op_filter"
+    # WarpKriging uses: iterations n d [warping_filter]
+    # Others use: iterations n d
+    if [ "$name" = "warpkriging" ]; then
+        "$executable" "$iterations" "$n" "$d" "$warp_filter" 2>&1 | filter_operation "$op_filter"
+    else
+        "$executable" "$iterations" "$n" "$d" 2>&1 | filter_operation "$op_filter"
+    fi
     local exit_code=$?
 
     return $exit_code
@@ -192,9 +210,12 @@ echo "Running benchmark: $BENCHMARK_FILTER (n=$N_POINTS, d=$D_DIMS, iterations=$
 if [ -n "$OPERATION_FILTER" ]; then
     echo "Operation filter: $OPERATION_FILTER"
 fi
+if [ "$BENCHMARK_FILTER" = "warpkriging" ] && [ -n "$WARPING_FILTER" ]; then
+    echo "Warping filter: $WARPING_FILTER"
+fi
 echo "----------------------------------------"
 
-if run_benchmark "$BENCHMARK_FILTER" "$executable" "$ITERATIONS" "$N_POINTS" "$D_DIMS" "$OPERATION_FILTER" | tee -a "$OUTPUT_PATH"; then
+if run_benchmark "$BENCHMARK_FILTER" "$executable" "$ITERATIONS" "$N_POINTS" "$D_DIMS" "$OPERATION_FILTER" "$WARPING_FILTER" | tee -a "$OUTPUT_PATH"; then
     SUCCESS_COUNT=1
 else
     FAILED=1
