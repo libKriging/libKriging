@@ -475,11 +475,11 @@ class WarpKriging {
   //  Prediction
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(
-      const arma::mat& x_new,
-      bool withStd = true,
-      bool withCov = false,
-      bool withDeriv = false) const;
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& x_new,
+                                                                                              bool withStd = true,
+                                                                                              bool withCov = false,
+                                                                                              bool withDeriv
+                                                                                              = false) const;
 
   // -----------------------------------------------------------------------
   //  Simulation

@@ -1605,8 +1605,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
       // Generate random starting points for θ in [theta_lower, theta_upper]
       arma::mat theta0_rand(multistart, d_theta);
       for (int i = 0; i < multistart; ++i)
-        theta0_rand.row(i)
-            = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+        theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
       // First start uses the current theta (usually ones)
       theta0_rand.row(0) = m_theta.t();
 
@@ -1724,8 +1723,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     } else {
       arma::mat theta0_rand(multistart, d_theta);
       for (int i = 0; i < multistart; ++i)
-        theta0_rand.row(i)
-            = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+        theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
       theta0_rand.row(0) = m_theta.t();
 
       arma::vec wp_init = pack_warp_params();
@@ -1841,9 +1839,9 @@ void WarpKriging::fit(const arma::vec& y,
 //  predict()
 // -------------------------------------------------------------------------
 std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::predict(const arma::mat& x_new,
-                                                                                      bool withStd,
-                                                                                      bool withCov,
-                                                                                      bool withDeriv) const {
+                                                                                       bool withStd,
+                                                                                       bool withCov,
+                                                                                       bool withDeriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
 
@@ -2036,7 +2034,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new)
   // Conditional covariance at correlation scale (including trend uncertainty)
   arma::mat Cinv_F = arma::solve(arma::trimatl(m_C), m_F);
   arma::mat FtRinvF = Cinv_F.t() * Cinv_F;
-  arma::mat Ecirc_n = F_new - v.t() * Cinv_F;                       // n_n × p
+  arma::mat Ecirc_n = F_new - v.t() * Cinv_F;  // n_n × p
   arma::mat FtRinvF_inv = arma::inv_sympd(FtRinvF);
 
   arma::mat Sigma_nKo = R_nn - v.t() * v + Ecirc_n * FtRinvF_inv * Ecirc_n.t();

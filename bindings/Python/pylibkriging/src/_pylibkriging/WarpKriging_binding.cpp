@@ -62,8 +62,7 @@ void PyWarpKriging::fit(const py::array_t<double>& y,
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyWarpKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto [mean, stdev, cov, mean_deriv, stdev_deriv]
-      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(mean, true),
                          carma::col_to_arr(stdev, true),
                          carma::mat_to_arr(cov, true),

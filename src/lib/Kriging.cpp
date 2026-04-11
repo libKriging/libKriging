@@ -20,6 +20,7 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include <atomic>
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
@@ -27,7 +28,6 @@
 #include <thread>
 #include <tuple>
 #include <vector>
-#include <atomic>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -47,39 +47,40 @@ inline int get_optimal_threads(int max_default = 2) {
 // Note: On macOS ARM64, use Accelerate framework instead of OpenBLAS
 #if !defined(__APPLE__) || !defined(__arm64__)
 #if defined(_MSC_VER)
-  // MSVC doesn't support weak symbols; use runtime dynamic loading
-  #ifndef NOMINMAX
-  #define NOMINMAX
-  #endif
-  #include <windows.h>
-  namespace {
-    typedef void (*openblas_set_num_threads_t)(int);
-    openblas_set_num_threads_t get_openblas_set_num_threads() {
-      static openblas_set_num_threads_t func = nullptr;
-      static bool initialized = false;
-      if (!initialized) {
-        initialized = true;
-        // Try to load from OpenBLAS DLL (used by numpy/scipy)
-        HMODULE hModule = GetModuleHandleA("libopenblas.dll");
-        if (!hModule) hModule = GetModuleHandleA("openblas.dll");
-        if (hModule) {
-          func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
-        }
-      }
-      return func;
+// MSVC doesn't support weak symbols; use runtime dynamic loading
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+namespace {
+typedef void (*openblas_set_num_threads_t)(int);
+openblas_set_num_threads_t get_openblas_set_num_threads() {
+  static openblas_set_num_threads_t func = nullptr;
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    // Try to load from OpenBLAS DLL (used by numpy/scipy)
+    HMODULE hModule = GetModuleHandleA("libopenblas.dll");
+    if (!hModule)
+      hModule = GetModuleHandleA("openblas.dll");
+    if (hModule) {
+      func = (openblas_set_num_threads_t)GetProcAddress(hModule, "openblas_set_num_threads");
     }
   }
+  return func;
+}
+}  // namespace
 #else
-  // GCC/Clang support weak symbols
-  extern "C" {
-    void openblas_set_num_threads(int num_threads) __attribute__((weak));
-  }
-  namespace {
-    typedef void (*openblas_set_num_threads_t)(int);
-    openblas_set_num_threads_t get_openblas_set_num_threads() {
-      return openblas_set_num_threads;
-    }
-  }
+// GCC/Clang support weak symbols
+extern "C" {
+void openblas_set_num_threads(int num_threads) __attribute__((weak));
+}
+namespace {
+typedef void (*openblas_set_num_threads_t)(int);
+openblas_set_num_threads_t get_openblas_set_num_threads() {
+  return openblas_set_num_threads;
+}
+}  // namespace
 #endif
 #endif
 
@@ -546,7 +547,7 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
     for (arma::uword k = 0; k < d; k++) {
       t0 = Bench::tic();
-      
+
       // Build gradR_k matrix on-the-fly for this dimension only
       arma::mat gradR_k(n, n, arma::fill::zeros);
       for (arma::uword i = 0; i < n; i++) {
@@ -770,11 +771,11 @@ double Kriging::_logMargPost(const arma::vec& _theta,
 
       // Optimized gradient computation: compute gradR_k on-the-fly without storing full gradR cube
       // This eliminates expensive tube() operations and reduces memory usage
-      
+
       arma::mat Wb_k;
       for (arma::uword k = 0; k < d; k++) {
         t0 = Bench::tic();
-        
+
         // Build gradR_k matrix on-the-fly for this dimension only
         arma::mat gradR_k(n, n, arma::fill::zeros);
         for (arma::uword i = 0; i < n; i++) {
@@ -1033,42 +1034,46 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     }
   } else if (objective.compare("LOO") == 0) {
     if (Optim::reparametrize) {
-      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        const arma::vec _theta = Optim::reparam_from(_gamma);
-        double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
-        if (grad_out != nullptr) {
-          *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
-        }
-        return loo;
-      };
+      fit_ofn
+          = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+              const arma::vec _theta = Optim::reparam_from(_gamma);
+              double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
+              if (grad_out != nullptr) {
+                *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
+              }
+              return loo;
+            };
     } else {
-      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        const arma::vec _theta = _gamma;
-        double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
-        return loo;
-      };
+      fit_ofn
+          = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+              const arma::vec _theta = _gamma;
+              double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
+              return loo;
+            };
     }
   } else if (objective.compare("LMP") == 0) {
     // Our impl. of https://github.com/cran/RobustGaSP/blob/5cf21658e6a6e327be6779482b93dfee25d24592/R/rgasp.R#L303
     //@see Mengyang Gu, Xiao-jing Wang and Jim Berger, 2018, Annals of Statistics.
     if (Optim::reparametrize) {
-      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        const arma::vec _theta = Optim::reparam_from(_gamma);
-        double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
-        if (grad_out != nullptr) {
-          *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
-        }
-        return -lmp;
-      };
+      fit_ofn
+          = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+              const arma::vec _theta = Optim::reparam_from(_gamma);
+              double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
+              if (grad_out != nullptr) {
+                *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+              }
+              return -lmp;
+            };
     } else {
-      fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
-        const arma::vec _theta = _gamma;
-        double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
-        if (grad_out != nullptr) {
-          *grad_out = -*grad_out;
-        }
-        return -lmp;
-      };
+      fit_ofn
+          = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+              const arma::vec _theta = _gamma;
+              double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
+              if (grad_out != nullptr) {
+                *grad_out = -*grad_out;
+              }
+              return -lmp;
+            };
     }
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
@@ -1216,7 +1221,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       unsigned int n_cpu = std::thread::hardware_concurrency();
       if (n_cpu > 0 && multistart > 1) {
         unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-        
+
         // Set OpenBLAS threads (if available)
         // Note: Skip on macOS ARM64 where Accelerate framework is used
 #if !defined(__APPLE__) || !defined(__arm64__)
@@ -1225,15 +1230,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           openblas_fn(threads_per_worker);
         }
 #endif
-        
-        // Set OpenMP threads (for Armadillo operations that use OpenMP)
-        #ifdef _OPENMP
+
+// Set OpenMP threads (for Armadillo operations that use OpenMP)
+#ifdef _OPENMP
         omp_set_num_threads(threads_per_worker);
-        #endif
-        
+#endif
+
         if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Threads per worker: " << threads_per_worker 
-                     << " (total CPUs: " << n_cpu << ", multistart: " << multistart << ")" << arma::endl;
+          arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
+                     << ", multistart: " << multistart << ")" << arma::endl;
         }
       }
 
@@ -1275,12 +1280,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       arma::uword n_data = n;
       arma::uword p_data = m_F.n_cols;
       std::vector<Kriging::KModel> preallocated_models(multistart);
-      
+
       if (Optim::log_level > Optim::log_none) {
-        arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data
-                   << ", p=" << p_data << ")..." << arma::endl;
+        arma::cout << "Preallocating " << multistart << " KModel structures (n=" << n_data << ", p=" << p_data << ")..."
+                   << arma::endl;
       }
-      
+
       for (int i = 0; i < multistart; i++) {
         auto& m = preallocated_models[i];
         m.R = arma::mat(n_data, n_data, arma::fill::none);
@@ -1297,7 +1302,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
       // Multi-threading implementation for BFGS multistart
       // Each thread uses its own preallocated KModel, so no mutex needed
-      
+
       // Structure to hold optimization results from each thread
       struct OptimizationResult {
         arma::uword start_index;
@@ -1339,19 +1344,23 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           if (start_idx >= preallocated_models.size()) {
             throw std::runtime_error("Preallocated model index out of bounds");
           }
-          
+
           Kriging::KModel& m = preallocated_models[start_idx];
           populate_Model(m, theta0.row(start_idx % multistart).t(), nullptr);
 
           lbfgsb::Optimizer optimizer{d};
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
           optimizer.max_iter = Optim::max_iteration;
-          optimizer.pgtol = objective.compare("LOO") == 0 ? Optim::gradient_tolerance / (n*n) : Optim::gradient_tolerance; // scale by: n^2 for LOO vs. LL, and /10 because LOO is usually more smooth
-          optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n*n) : Optim::objective_rel_tolerance / 1E-13;
+          optimizer.pgtol = objective.compare("LOO") == 0
+                                ? Optim::gradient_tolerance / (n * n)
+                                : Optim::gradient_tolerance;  // scale by: n^2 for LOO vs. LL, and /10 because LOO is
+                                                              // usually more smooth
+          optimizer.factr = objective.compare("LOO") == 0 ? Optim::objective_rel_tolerance / 1E-13 / (n * n)
+                                                          : Optim::objective_rel_tolerance / 1E-13;
           arma::ivec bounds_type{d, arma::fill::value(2)};
 
           if (Optim::log_level > Optim::log_none) {
-            arma::cout << "BFGS (start " << (start_idx+1) << "/" << multistart << "):" << arma::endl;
+            arma::cout << "BFGS (start " << (start_idx + 1) << "/" << multistart << "):" << arma::endl;
             arma::cout << "  objective: " << m_objective << arma::endl;
             arma::cout << "  max iterations: " << optimizer.max_iter << arma::endl;
             arma::cout << "  null gradient tolerance: " << optimizer.pgtol << arma::endl;
@@ -1379,9 +1388,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                 bounds_type.memptr());
 
             if (Optim::log_level > Optim::log_info) {
-              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry)
-                         << ": f_opt=" << opt_result.f_opt << ", num_iters=" << opt_result.num_iters
-                         << ", task=" << opt_result.task << arma::endl;
+              arma::cout << "  Start " << (start_idx + 1) << ", Retry " << (retry) << ": f_opt=" << opt_result.f_opt
+                         << ", num_iters=" << opt_result.num_iters << ", task=" << opt_result.task << arma::endl;
             }
 
             if (opt_result.f_opt < best_f_opt) {
@@ -1390,20 +1398,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             }
 
             // check theta for distance to bounds
-            double sol_to_lb = Optim::reparametrize
-                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_lower))
-                                        : arma::min(arma::abs(gamma_tmp - theta_upper));
-            double sol_to_ub = Optim::reparametrize
-                                        ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_upper))
-                                        : arma::min(arma::abs(gamma_tmp - theta_lower));
+            double sol_to_lb = Optim::reparametrize ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_lower))
+                                                    : arma::min(arma::abs(gamma_tmp - theta_upper));
+            double sol_to_ub = Optim::reparametrize ? arma::min(arma::abs(Optim::reparam_from(gamma_tmp) - theta_upper))
+                                                    : arma::min(arma::abs(gamma_tmp - theta_lower));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
             // Check abnormal termination or convergence at bounds to decide on restart
             if ((retry < Optim::max_restart)
-                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) // Check for abnormal termination
-                    || (opt_result.num_iters <= 2) // Start point is strangely quite optimal...
-                    || (sol_to_lb < arma::datum::eps) // Stuck at lower bound
-                    || (opt_result.f_opt > best_f_opt))) { // No improvement
+                && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
+                    || (opt_result.num_iters <= 2)          // Start point is strangely quite optimal...
+                    || (sol_to_lb < arma::datum::eps)       // Stuck at lower bound
+                    || (opt_result.f_opt > best_f_opt))) {  // No improvement
 
               if (Optim::log_level > Optim::log_none) {
                 arma::cout << "  Restarting BFGS (start " << (start_idx + 1) << ", retry " << (retry + 1)
@@ -1413,7 +1419,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
               // Restart with contracted bounds around initial point
               gamma_tmp = (theta0.row(start_idx % multistart).t() + theta_lower) / pow(2.0, retry + 1);
-              
+
               if (Optim::reparametrize)
                 gamma_tmp = Optim::reparam_to(gamma_tmp);
 
@@ -1431,11 +1437,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           result.objective_value = min_ofn_tmp;
           result.gamma = best_gamma;
           result.theta = Optim::reparametrize ? Optim::reparam_from(best_gamma) : best_gamma;
-          
+
           // Copy (not move) since m is a reference to preallocated memory
           // Force DEEP copy to avoid any shared memory issues
-          result.L = arma::mat(m.L);  // Force copy constructor
-          result.R = arma::mat(m.R);  // Force copy constructor
+          result.L = arma::mat(m.L);          // Force copy constructor
+          result.R = arma::mat(m.R);          // Force copy constructor
           result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
           result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
           result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
@@ -1470,12 +1476,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           pool_size = std::max(1u, n_cpu);
         }
         pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
-        
+
         if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu 
-                     << ", multistart=" << multistart << ")" << arma::endl;
+          arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu << ", multistart=" << multistart
+                     << ")" << arma::endl;
         }
-        
+
         // Thread pool implementation: use semaphore-like counter
         std::atomic<int> next_task(0);
         std::vector<std::thread> threads;
@@ -1498,7 +1504,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           threads.emplace_back([&, worker_id]() {
             while (true) {
               int task_id = next_task.fetch_add(1);
-              if (task_id >= multistart) break;
+              if (task_id >= multistart)
+                break;
 
               // Add staggered startup delay to avoid thread initialization race conditions
               int delay_ms = task_id * Optim::thread_start_delay_ms;
@@ -1534,13 +1541,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       if (successful_optimizations == 0) {
-        throw std::runtime_error("All " + std::to_string(multistart)
-                                 + " optimization attempts failed");
+        throw std::runtime_error("All " + std::to_string(multistart) + " optimization attempts failed");
       }
 
       if (Optim::log_level > Optim::log_none && successful_optimizations < multistart) {
-        arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart
-                  << " succeeded" << arma::endl;
+        arma::cout << "\nOptimization summary: " << successful_optimizations << "/" << multistart << " succeeded"
+                   << arma::endl;
       }
 
       // Update member variables with best result
@@ -1549,7 +1555,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m_theta = best.theta;  // copy
         m_est_theta = true;
         m_is_empty = false;
-        m_T = best.L;          // copy instead of move to avoid issues
+        m_T = best.L;  // copy instead of move to avoid issues
         m_R = best.R;
         m_M = best.Fstar;
         m_circ = best.Rstar;
@@ -1571,7 +1577,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
         if (Optim::log_level > Optim::log_none) {
           arma::cout << "\nBest solution from start point " << (best_idx + 1) << " with objective: " << min_ofn
-                    << arma::endl;
+                     << arma::endl;
         }
       }
 
@@ -1724,11 +1730,11 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  #ifdef _OPENMP
+#ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if(total_work >= 40000)
+#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
       for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
         arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
@@ -1739,7 +1745,7 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
       }
     }
   } else {
-  #endif
+#endif
     for (arma::uword i = 0; i < n_o; i++) {
       for (arma::uword j = 0; j < n_n; j++) {
         arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
@@ -1749,9 +1755,9 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
           R_on.at(i, j) = _Cov(dij, m_theta);
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);

@@ -48,9 +48,13 @@ SEXP warpKriging_new(const arma::vec& y,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_predict(SEXP model_ptr, const arma::mat& x_new, bool withStd = true, bool withCov = false) {
+Rcpp::List warpKriging_predict(SEXP model_ptr,
+                               const arma::mat& x_new,
+                               bool withStd = true,
+                               bool withCov = false,
+                               bool withDeriv = false) {
   WarpKrigingPtr model(model_ptr);
-  auto [mean, stdev, cov] = model->predict(x_new, withStd, withCov);
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model->predict(x_new, withStd, withCov, withDeriv);
 
   Rcpp::List result;
   result["mean"] = mean;
@@ -58,6 +62,10 @@ Rcpp::List warpKriging_predict(SEXP model_ptr, const arma::mat& x_new, bool with
     result["stdev"] = stdev;
   if (withCov)
     result["cov"] = cov;
+  if (withDeriv) {
+    result["mean_deriv"] = mean_deriv;
+    result["stdev_deriv"] = stdev_deriv;
+  }
   return result;
 }
 

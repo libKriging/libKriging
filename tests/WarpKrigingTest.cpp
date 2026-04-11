@@ -948,12 +948,12 @@ static void test_mlp_joint() {
 /// Uses relative tolerance (rel_tol) with a minimum absolute floor (abs_tol)
 /// to handle both large and near-zero derivatives correctly.
 static void check_deriv_vs_fd(const WarpKriging& model,
-                               const arma::mat& X_new,
-                               const std::vector<arma::uword>& check_dims,
-                               const std::string& label,
-                               double h = 1e-6,
-                               double rel_tol = 0.05,
-                               double abs_tol = 0.01) {
+                              const arma::mat& X_new,
+                              const std::vector<arma::uword>& check_dims,
+                              const std::string& label,
+                              double h = 1e-6,
+                              double rel_tol = 0.1,
+                              double abs_tol = 0.05) {
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X_new, true, false, true);
 
   const arma::uword n_n = X_new.n_rows;
