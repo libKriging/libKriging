@@ -90,30 +90,22 @@ inline int get_optimal_threads(int max_default = 2) {
 // This will create the dist(xi,xj) function above. Need to parse "covType".
 void NuggetKriging::make_Cov(const std::string& covType) {
   m_covType = covType;
-  if (covType.compare("gauss") == 0) {
-    _Cov = Covariance::Cov_gauss;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_gauss;
-    _DlnCovDx = Covariance::DlnCovDx_gauss;
-    _Cov_pow = 2;
-  } else if (covType.compare("exp") == 0) {
-    _Cov = Covariance::Cov_exp;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_exp;
-    _DlnCovDx = Covariance::DlnCovDx_exp;
-    _Cov_pow = 1;
-  } else if (covType.compare("matern3_2") == 0) {
-    _Cov = Covariance::Cov_matern32;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_matern32;
-    _DlnCovDx = Covariance::DlnCovDx_matern32;
-    _Cov_pow = 1.5;
-  } else if (covType.compare("matern5_2") == 0) {
-    _Cov = Covariance::Cov_matern52;
-    _DlnCovDtheta = Covariance::DlnCovDtheta_matern52;
-    _DlnCovDx = Covariance::DlnCovDx_matern52;
-    _Cov_pow = 2.5;
-  } else
-    throw std::invalid_argument("Unsupported covariance kernel: " + covType);
 
-  // arma::cout << "make_Cov done." << arma::endl;
+  auto cov = Covariance::resolve(covType);
+  _Cov = std::move(cov.Cov);
+  _DlnCovDtheta = std::move(cov.DlnCovDtheta);
+  _DlnCovDx = std::move(cov.DlnCovDx);
+
+  if (covType == "gauss")
+    _Cov_pow = 2;
+  else if (covType == "exp")
+    _Cov_pow = 1;
+  else if (covType == "matern3_2")
+    _Cov_pow = 1.5;
+  else if (covType == "matern5_2")
+    _Cov_pow = 2.5;
+  else
+    _Cov_pow = 2;  // default
 }
 
 LIBKRIGING_EXPORT arma::mat NuggetKriging::covMat(const arma::mat& X1, const arma::mat& X2) {
@@ -164,6 +156,8 @@ void NuggetKriging::populate_Model(KModel& m,
   arma::uword p = m_F.n_cols;
 
   auto t0 = Bench::tic();
+  // Invalidate cached Linv so gradient code recomputes it for the new L
+  m.Linv = arma::mat();
   // Reuse existing m.R allocation
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
@@ -272,9 +266,13 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
   }
   arma::vec _theta = _theta_alpha.head(d);
 
-  NuggetKriging::KModel m = make_Model(_theta, _alpha, bench);
-  if (model != nullptr)
-    *model = m;
+  NuggetKriging::KModel m_local;
+  if (model != nullptr) {
+    populate_Model(*model, _theta, _alpha, bench);
+  } else {
+    m_local = make_Model(_theta, _alpha, bench);
+  }
+  NuggetKriging::KModel& m = (model != nullptr) ? *model : m_local;
 
   arma::uword n = m_X.n_rows;
 
@@ -479,9 +477,13 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
   }
   arma::vec _theta = _theta_alpha.head(d);
 
-  NuggetKriging::KModel m = make_Model(_theta, _alpha, bench);
-  if (model != nullptr)
-    *model = m;
+  NuggetKriging::KModel m_local;
+  if (model != nullptr) {
+    populate_Model(*model, _theta, _alpha, bench);
+  } else {
+    m_local = make_Model(_theta, _alpha, bench);
+  }
+  NuggetKriging::KModel& m = (model != nullptr) ? *model : m_local;
 
   arma::uword n = m_X.n_rows;
   arma::uword p = m_F.n_cols;

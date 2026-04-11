@@ -332,7 +332,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            &PyWarpKriging::predict,
            py::arg("X"),
            py::arg("return_stdev") = true,
-           py::arg("return_cov") = false)
+           py::arg("return_cov") = false,
+           py::arg("return_deriv") = false)
       .def("simulate", &PyWarpKriging::simulate, py::arg("nsim") = 1, py::arg("seed") = 123, py::arg("X"))
       .def("update", &PyWarpKriging::update, py::arg("y"), py::arg("X"))
       .def("summary", &PyWarpKriging::summary)

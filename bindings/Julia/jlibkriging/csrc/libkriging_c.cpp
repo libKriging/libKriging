@@ -1752,7 +1752,8 @@ int lk_warp_kriging_predict(void* ptr,
                             double* cov_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto [mean, stdev, cov] = static_cast<WarpKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0);
+    auto [mean, stdev, cov, mean_deriv, stdev_deriv]
+        = static_cast<WarpKriging*>(ptr)->predict(X_mat, return_stdev != 0, return_cov != 0);
     if (mean_out)
       std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
     if (return_stdev && stdev_out)

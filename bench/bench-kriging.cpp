@@ -134,7 +134,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     {
       auto t0 = std::chrono::high_resolution_clock::now();
 
-      auto [mean, stdev, cov, mean_deriv, stdev_deriv] = kr.predict(X_pred, true, true, true);
+      auto [mean, stdev, cov, mean_deriv, stdev_deriv] = kr.predict(X_pred, true, false, false);
 
       auto t1 = std::chrono::high_resolution_clock::now();
       double duration = std::chrono::duration<double, std::milli>(t1 - t0).count();

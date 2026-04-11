@@ -6,6 +6,10 @@
 
 #include "libKriging/WarpKriging.hpp"
 #include "libKriging/AdamBFGS.hpp"
+#include "libKriging/Covariance.hpp"
+#include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/Optim.hpp"
+#include "libKriging/Random.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -1093,10 +1097,30 @@ static std::vector<WarpSpec> parse_warp_strings(const std::vector<std::string>& 
   return specs;
 }
 
+void WarpKriging::make_Cov(const std::string& kernel) {
+  // Normalise aliases to the canonical names used by Covariance::resolve
+  std::string s = kernel;
+  std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+  if (s == "rbf")
+    s = "gauss";
+  else if (s == "exponential")
+    s = "exp";
+  else if (s == "matern32")
+    s = "matern3_2";
+  else if (s == "matern52")
+    s = "matern5_2";
+
+  auto cov = Covariance::resolve(s);
+  _Cov = std::move(cov.Cov);
+  _DlnCovDtheta = std::move(cov.DlnCovDtheta);
+  _DlnCovDx = std::move(cov.DlnCovDx);
+}
+
 void WarpKriging::init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel) {
   m_warp_specs = specs;
   m_kernel_name = kernel;
   m_base_kernel = parse_kernel(kernel);
+  make_Cov(kernel);
   build_warps();
 }
 
@@ -1174,52 +1198,6 @@ arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
 }
 
 // -------------------------------------------------------------------------
-//  Kernel functions  (identical to NeuralKernelKriging)
-// -------------------------------------------------------------------------
-double WarpKriging::kernel_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const {
-  arma::rowvec diff = phi_i - phi_j;
-  arma::rowvec scaled = diff / m_theta.t();
-  double r2 = arma::dot(scaled, scaled);
-  double r = std::sqrt(r2);
-
-  switch (m_base_kernel) {
-    case WarpBaseKernel::Gauss:
-      return m_sigma2 * std::exp(-0.5 * r2);
-    case WarpBaseKernel::Matern32:
-      return m_sigma2 * (1.0 + std::sqrt(3.0) * r) * std::exp(-std::sqrt(3.0) * r);
-    case WarpBaseKernel::Matern52:
-      return m_sigma2 * (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2) * std::exp(-std::sqrt(5.0) * r);
-    case WarpBaseKernel::Exp:
-      return m_sigma2 * std::exp(-r);
-  }
-  return 0.0;
-}
-
-arma::mat WarpKriging::build_K(const arma::mat& Phi) const {
-  const arma::uword n = Phi.n_rows;
-  arma::mat K(n, n);
-  for (arma::uword i = 0; i < n; ++i) {
-    K(i, i) = m_sigma2;
-    for (arma::uword j = i + 1; j < n; ++j) {
-      double kij = kernel_scalar(Phi.row(i), Phi.row(j));
-      K(i, j) = kij;
-      K(j, i) = kij;
-    }
-  }
-  return K;
-}
-
-arma::mat WarpKriging::build_Kcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
-  const arma::uword m = Phi_new.n_rows;
-  const arma::uword n = Phi_train.n_rows;
-  arma::mat Kc(m, n);
-  for (arma::uword i = 0; i < m; ++i)
-    for (arma::uword j = 0; j < n; ++j)
-      Kc(i, j) = kernel_scalar(Phi_new.row(i), Phi_train.row(j));
-  return Kc;
-}
-
-// -------------------------------------------------------------------------
 //  Data normalisation  (only continuous variables are normalised)
 // -------------------------------------------------------------------------
 void WarpKriging::normalise_data() {
@@ -1260,46 +1238,37 @@ void WarpKriging::normalise_data() {
 // -------------------------------------------------------------------------
 //  Correlation function  (R_ij = corr(φ_i, φ_j; θ),  R_ii = 1,  σ² factored out)
 // -------------------------------------------------------------------------
-double WarpKriging::corr_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const {
-  arma::rowvec diff = phi_i - phi_j;
-  arma::rowvec scaled = diff / m_theta.t();
-  double r2 = arma::dot(scaled, scaled);
-  double r = std::sqrt(r2);
+// -------------------------------------------------------------------------
+//  Precomputed pairwise differences (like Kriging's compute_dX)
+// -------------------------------------------------------------------------
+void WarpKriging::compute_dPhi() {
+  const arma::uword n = m_Phi.n_rows;
+  const arma::uword d = m_Phi.n_cols;
+  m_dPhi.set_size(d, n * n);
+  m_dPhi.zeros();
 
-  switch (m_base_kernel) {
-    case WarpBaseKernel::Gauss:
-      return std::exp(-0.5 * r2);
-    case WarpBaseKernel::Matern32:
-      return (1.0 + std::sqrt(3.0) * r) * std::exp(-std::sqrt(3.0) * r);
-    case WarpBaseKernel::Matern52:
-      return (1.0 + std::sqrt(5.0) * r + 5.0 / 3.0 * r2) * std::exp(-std::sqrt(5.0) * r);
-    case WarpBaseKernel::Exp:
-      return std::exp(-r);
-  }
-  return 0.0;
-}
+  const double* Phi_mem = m_Phi.memptr();
+  double* dPhi_mem = m_dPhi.memptr();
 
-arma::mat WarpKriging::build_R(const arma::mat& Phi) const {
-  const arma::uword n = Phi.n_rows;
-  arma::mat R(n, n);
   for (arma::uword i = 0; i < n; ++i) {
-    R(i, i) = 1.0;
     for (arma::uword j = i + 1; j < n; ++j) {
-      double rij = corr_scalar(Phi.row(i), Phi.row(j));
-      R(i, j) = rij;
-      R(j, i) = rij;
+      arma::uword ij = i * n + j;
+      arma::uword ji = j * n + i;
+      for (arma::uword k = 0; k < d; ++k) {
+        double diff = Phi_mem[i + k * n] - Phi_mem[j + k * n];
+        dPhi_mem[k + ij * d] = diff;
+        dPhi_mem[k + ji * d] = diff;
+      }
     }
   }
-  return R;
 }
 
 arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
   const arma::uword m = Phi_new.n_rows;
   const arma::uword n = Phi_train.n_rows;
   arma::mat Rc(m, n);
-  for (arma::uword i = 0; i < m; ++i)
-    for (arma::uword j = 0; j < n; ++j)
-      Rc(i, j) = corr_scalar(Phi_new.row(i), Phi_train.row(j));
+  // covMat_rect expects transposed inputs (d × n)
+  LinearAlgebra::covMat_rect(&Rc, Phi_new.t(), Phi_train.t(), m_theta, _Cov, 1.0);
   return Rc;
 }
 
@@ -1308,18 +1277,18 @@ arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& P
 // -------------------------------------------------------------------------
 void WarpKriging::refresh_cache() {
   m_Phi = apply_warping(m_X);
+  compute_dPhi();
   refresh_cache_theta_only();
 }
 
 /// Rebuild R, Cholesky, β̂, σ̂², α from current m_Phi and m_theta.
-/// Skips recomputing m_Phi — use when only θ changed.
+/// Skips recomputing m_Phi and m_dPhi — use when only θ changed.
 void WarpKriging::refresh_cache_theta_only() {
   const arma::uword n = m_y.n_elem;
 
-  arma::mat R = build_R(m_Phi);
-  R.diag() += 1e-8;  // nugget for numerical stability
-
-  m_C = arma::chol(R, "lower");
+  m_R.set_size(n, n);
+  arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
+  m_C = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
   m_logdet = 2.0 * arma::sum(arma::log(m_C.diag()));
 
   m_F = build_trend_matrix(m_X);
@@ -1376,52 +1345,14 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
 // -------------------------------------------------------------------------
 //  ∂R/∂θ_k  (analytical, n×n matrix)
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& Phi, arma::uword k) const {
-  const arma::uword n = Phi.n_rows;
+arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& /*Phi*/, arma::uword k) const {
+  const arma::uword n = m_Phi.n_rows;
   arma::mat dR(n, n, arma::fill::zeros);
 
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = i + 1; j < n; ++j) {
-      arma::rowvec diff = Phi.row(i) - Phi.row(j);
-      arma::rowvec scaled = diff / m_theta.t();
-      double r2 = arma::dot(scaled, scaled);
-      double r = std::sqrt(std::max(r2, 1e-30));
-
-      double d_k = diff(k);
-      double theta_k = m_theta(k);
-      double dr2_dtheta_k = -2.0 * d_k * d_k / (theta_k * theta_k * theta_k);
-
-      double dR_ij = 0.0;
-
-      switch (m_base_kernel) {
-        case WarpBaseKernel::Gauss: {
-          double Rij = std::exp(-0.5 * r2);
-          dR_ij = Rij * (-0.5) * dr2_dtheta_k;
-          break;
-        }
-        case WarpBaseKernel::Matern32: {
-          if (r > 1e-15) {
-            double dR_dr = -3.0 * r * std::exp(-std::sqrt(3.0) * r);
-            dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
-          }
-          break;
-        }
-        case WarpBaseKernel::Matern52: {
-          double sr5 = std::sqrt(5.0);
-          if (r > 1e-15) {
-            double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r) * std::exp(-sr5 * r);
-            dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
-          }
-          break;
-        }
-        case WarpBaseKernel::Exp: {
-          if (r > 1e-15) {
-            double Rij = std::exp(-r);
-            dR_ij = -Rij * dr2_dtheta_k / (2.0 * r);
-          }
-          break;
-        }
-      }
+      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
+      double dR_ij = m_R(i, j) * dlnCov(k);
       dR(i, j) = dR_ij;
       dR(j, i) = dR_ij;
     }
@@ -1453,50 +1384,13 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
 
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = i + 1; j < n; ++j) {
-      // Shared: diff, scaled, r2, r — computed once per (i,j)
-      arma::rowvec diff = m_Phi.row(i) - m_Phi.row(j);
-      arma::rowvec scaled = diff / m_theta.t();
-      double r2 = arma::dot(scaled, scaled);
-      double r = std::sqrt(std::max(r2, 1e-30));
-
+      // Use _DlnCovDtheta like Kriging: ∂R_ij/∂θ_k = R_ij * DlnCovDtheta_k
+      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
+      double R_ij = m_R(i, j);
       double w = 2.0 * dLL_dR(i, j);  // symmetry: (i,j) + (j,i)
 
-      // For each dimension k, compute dR_ij / dtheta_k and accumulate
       for (arma::uword k = 0; k < d; ++k) {
-        double d_k = diff(k);
-        double theta_k = m_theta(k);
-        double dr2_dtheta_k = -2.0 * d_k * d_k / (theta_k * theta_k * theta_k);
-
-        double dR_ij = 0.0;
-        switch (m_base_kernel) {
-          case WarpBaseKernel::Gauss: {
-            double Rij = std::exp(-0.5 * r2);
-            dR_ij = Rij * (-0.5) * dr2_dtheta_k;
-            break;
-          }
-          case WarpBaseKernel::Matern32: {
-            if (r > 1e-15) {
-              double dR_dr = -3.0 * r * std::exp(-std::sqrt(3.0) * r);
-              dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
-            }
-            break;
-          }
-          case WarpBaseKernel::Matern52: {
-            double sr5 = std::sqrt(5.0);
-            if (r > 1e-15) {
-              double dR_dr = -(5.0 / 3.0) * r * (1.0 + sr5 * r) * std::exp(-sr5 * r);
-              dR_ij = dR_dr * dr2_dtheta_k / (2.0 * r);
-            }
-            break;
-          }
-          case WarpBaseKernel::Exp: {
-            if (r > 1e-15) {
-              double Rij = std::exp(-r);
-              dR_ij = -Rij * dr2_dtheta_k / (2.0 * r);
-            }
-            break;
-          }
-        }
+        double dR_ij = R_ij * dlnCov(k);
         grad_log_theta(k) += w * dR_ij * m_theta(k);
       }
     }
@@ -1513,6 +1407,8 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) con
   const arma::uword d = Phi.n_cols;
   arma::mat dL_dPhi(n, d, arma::fill::zeros);
 
+  // K_ij = σ² · C(dPhi_ij, θ)
+  // ∂K_ij/∂Φ_i = K_ij · DlnCovDx(dPhi_ij, θ)   (sign: dPhi = Φ_i - Φ_j, so ∂dPhi/∂Φ_i = +1)
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = 0; j < n; ++j) {
       if (i == j)
@@ -1521,52 +1417,10 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) con
       if (std::abs(coeff) < 1e-15)
         continue;
 
-      arma::rowvec diff = Phi.row(i) - Phi.row(j);
-      arma::rowvec scaled = diff / m_theta.t();
-      double r2 = arma::dot(scaled, scaled);
-      double r = std::sqrt(std::max(r2, 1e-30));
-
-      arma::rowvec dk_dphi_i(d);
-
-      switch (m_base_kernel) {
-        case WarpBaseKernel::Gauss: {
-          double k_val = m_sigma2 * std::exp(-0.5 * r2);
-          dk_dphi_i = -k_val * (diff / (m_theta.t() % m_theta.t()));
-          break;
-        }
-        case WarpBaseKernel::Matern32: {
-          double dk_dr = m_sigma2 * (-3.0 * r) * std::exp(-std::sqrt(3.0) * r);
-          if (r > 1e-15) {
-            arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
-            dk_dphi_i = dk_dr * dr_dphi;
-          } else {
-            dk_dphi_i.zeros();
-          }
-          break;
-        }
-        case WarpBaseKernel::Matern52: {
-          double sr5 = std::sqrt(5.0);
-          double dk_dr = m_sigma2 * std::exp(-sr5 * r) * (-5.0 / 3.0 * r * (1.0 + sr5 * r));
-          if (r > 1e-15) {
-            arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
-            dk_dphi_i = dk_dr * dr_dphi;
-          } else {
-            dk_dphi_i.zeros();
-          }
-          break;
-        }
-        case WarpBaseKernel::Exp: {
-          double k_val = m_sigma2 * std::exp(-r);
-          if (r > 1e-15) {
-            arma::rowvec dr_dphi = diff / (m_theta.t() % m_theta.t() * r);
-            dk_dphi_i = -k_val * dr_dphi;
-          } else {
-            dk_dphi_i.zeros();
-          }
-          break;
-        }
-      }
-      dL_dPhi.row(i) += coeff * dk_dphi_i;
+      double K_ij = m_sigma2 * m_R(i, j);
+      arma::vec dlnCdx = _DlnCovDx(m_dPhi.col(i * n + j), m_theta);
+      // ∂K_ij/∂Φ_i_k = K_ij * dlnCdx_k
+      dL_dPhi.row(i) += coeff * K_ij * dlnCdx.t();
     }
   }
   return dL_dPhi;
@@ -1667,12 +1521,37 @@ void WarpKriging::optimise_joint(const std::string& method) {
   arma::vec wp0 = pack_warp_params();
   arma::vec log_theta0 = arma::log(m_theta);
 
-  // Bounds for log(θ): use wide range
-  arma::vec log_theta_lower = log_theta0 - 10.0;
-  arma::vec log_theta_upper = log_theta0 + 10.0;
+  // Compute data-driven θ bounds from feature-space pairwise diffs (like Kriging uses m_maxdX)
+  arma::vec maxdPhi = arma::max(arma::abs(m_dPhi), 1);
+  arma::vec theta_lower = Optim::theta_lower_factor * maxdPhi;
+  arma::vec theta_upper = Optim::theta_upper_factor * maxdPhi;
+  // Clamp to avoid degenerate bounds
+  theta_lower = arma::clamp(theta_lower, 1e-10, arma::datum::inf);
+  theta_upper = arma::max(theta_lower * 2.0, theta_upper);
+  arma::vec log_theta_lower = arma::log(theta_lower);
+  arma::vec log_theta_upper = arma::log(theta_upper);
 
-  // Helper lambda: run joint L-BFGS-B on all params starting from current state
-  auto run_joint_bfgs = [&]() {
+  // Parse multistart count from method: "BFGS10" → 10, "BFGS" → 1, "BFGS5+Adam" → 5
+  int multistart = 1;
+  std::string base_method = method;
+  // Extract the BFGS prefix and any trailing number
+  std::string bfgs_prefix = "BFGS";
+  if (method.rfind(bfgs_prefix, 0) == 0) {
+    // Find end of digits after "BFGS"
+    size_t pos = bfgs_prefix.size();
+    size_t num_end = pos;
+    while (num_end < method.size() && std::isdigit(method[num_end]))
+      ++num_end;
+    if (num_end > pos) {
+      multistart = std::stoi(method.substr(pos, num_end - pos));
+      // Reconstruct base method: "BFGS" + everything after the digits
+      base_method = bfgs_prefix + method.substr(num_end);
+    }
+  }
+
+  // Helper lambda: run joint L-BFGS-B on all params from current member state.
+  // Returns the negative LL at the optimum (lower is better).
+  auto run_joint_bfgs = [&]() -> double {
     arma::uword n_total = n_warp + d_theta;
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
     optimizer.iprint = -1;
@@ -1709,72 +1588,198 @@ void WarpKriging::optimise_joint(const std::string& method) {
       return -ll;
     };
 
-    optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
+    auto result = optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
 
     if (n_warp > 0)
       unpack_warp_params(x0.head(n_warp));
     m_theta = arma::exp(x0.tail(d_theta));
     refresh_cache();
+    return result.f_opt;
   };
 
-  if (method == "BFGS" || n_warp == 0) {
-    // --- Joint L-BFGS-B only ---
-    run_joint_bfgs();
+  if (base_method == "BFGS" || n_warp == 0) {
+    // --- Joint L-BFGS-B (with multistart) ---
+    if (multistart <= 1) {
+      run_joint_bfgs();
+    } else {
+      // Generate random starting points for θ in [theta_lower, theta_upper]
+      arma::mat theta0_rand(multistart, d_theta);
+      for (int i = 0; i < multistart; ++i)
+        theta0_rand.row(i)
+            = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+      // First start uses the current theta (usually ones)
+      theta0_rand.row(0) = m_theta.t();
 
-  } else {
-    // --- Bi-level Adam+BFGS ---
-    AdamBFGS opt(n_warp, d_theta);
-    opt.max_iter_adam = m_max_iter_adam;
-    opt.adam_lr = m_adam_lr;
-    opt.max_iter_bfgs = m_max_iter_bfgs;
-    opt.bfgs_pgtol = 1e-6;
-    opt.bfgs_factr = 1e7;
-    opt.maximize = true;
+      // Save initial warp state (for non-none warpings)
+      arma::vec wp_init = pack_warp_params();
 
-    arma::vec current_wp = wp0;
+      double best_neg_ll = std::numeric_limits<double>::infinity();
+      arma::vec best_theta;
+      arma::vec best_wp;
+      double best_sigma2 = 0;
+      arma::vec best_beta;
+      arma::vec best_alpha;
+      arma::mat best_C;
+      arma::mat best_R;
+      arma::mat best_Phi;
+      arma::mat best_dPhi;
+      double best_logdet = 0;
 
-    auto obj_fn = [this, &current_wp](const arma::vec& x_outer,
-                                      const arma::vec& x_inner,
-                                      arma::vec* grad_outer,
-                                      arma::vec* grad_inner) -> double {
-      bool warp_changed = false;
-      if (x_outer.n_elem > 0) {
-        if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
-          unpack_warp_params(x_outer);
-          current_wp = x_outer;
-          warp_changed = true;
+      for (int i = 0; i < multistart; ++i) {
+        // Reset warp params to initial state
+        if (n_warp > 0)
+          unpack_warp_params(wp_init);
+        m_theta = theta0_rand.row(i).t();
+        refresh_cache();
+
+        double neg_ll = run_joint_bfgs();
+
+        if (neg_ll < best_neg_ll) {
+          best_neg_ll = neg_ll;
+          best_theta = m_theta;
+          best_wp = pack_warp_params();
+          best_sigma2 = m_sigma2;
+          best_beta = m_beta;
+          best_alpha = m_alpha;
+          best_C = m_C;
+          best_R = m_R;
+          best_Phi = m_Phi;
+          best_dPhi = m_dPhi;
+          best_logdet = m_logdet;
         }
       }
 
-      m_theta = arma::exp(x_inner);
+      // Restore best result
+      if (n_warp > 0)
+        unpack_warp_params(best_wp);
+      m_theta = best_theta;
+      m_sigma2 = best_sigma2;
+      m_beta = best_beta;
+      m_alpha = best_alpha;
+      m_C = best_C;
+      m_R = best_R;
+      m_Phi = best_Phi;
+      m_dPhi = best_dPhi;
+      m_logdet = best_logdet;
+    }
 
-      if (warp_changed)
-        refresh_cache();
-      else
-        refresh_cache_theta_only();
+  } else {
+    // --- Bi-level Adam+BFGS (with multistart) ---
+    auto run_adam_bfgs = [&]() -> double {
+      AdamBFGS opt(n_warp, d_theta);
+      opt.max_iter_adam = m_max_iter_adam;
+      opt.adam_lr = m_adam_lr;
+      opt.max_iter_bfgs = m_max_iter_bfgs;
+      opt.bfgs_pgtol = 1e-6;
+      opt.bfgs_factr = 1e7;
+      opt.maximize = true;
 
-      double ll = concentrated_ll();
+      arma::vec current_wp = pack_warp_params();
+      arma::vec current_log_theta = arma::log(m_theta);
 
-      if (grad_inner) {
-        auto [ll2, g_log_theta] = concentrated_ll_and_grad_theta();
-        *grad_inner = g_log_theta;
-        (void)ll2;
-      }
-      if (grad_outer && x_outer.n_elem > 0) {
-        *grad_outer = warp_gradient();
-      }
-      return ll;
+      auto obj_fn = [this, &current_wp](const arma::vec& x_outer,
+                                        const arma::vec& x_inner,
+                                        arma::vec* grad_outer,
+                                        arma::vec* grad_inner) -> double {
+        bool warp_changed = false;
+        if (x_outer.n_elem > 0) {
+          if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
+            unpack_warp_params(x_outer);
+            current_wp = x_outer;
+            warp_changed = true;
+          }
+        }
+
+        m_theta = arma::exp(x_inner);
+
+        if (warp_changed)
+          refresh_cache();
+        else
+          refresh_cache_theta_only();
+
+        double ll = concentrated_ll();
+
+        if (grad_inner) {
+          auto [ll2, g_log_theta] = concentrated_ll_and_grad_theta();
+          *grad_inner = g_log_theta;
+          (void)ll2;
+        }
+        if (grad_outer && x_outer.n_elem > 0) {
+          *grad_outer = warp_gradient();
+        }
+        return ll;
+      };
+
+      auto result = opt.optimize(current_wp, current_log_theta, log_theta_lower, log_theta_upper, obj_fn);
+
+      if (n_warp > 0)
+        unpack_warp_params(result.x_outer);
+      m_theta = arma::exp(result.x_inner);
+      refresh_cache();
+      return -concentrated_ll();  // return neg LL for consistency
     };
 
-    auto result = opt.optimize(wp0, log_theta0, log_theta_lower, log_theta_upper, obj_fn);
+    if (multistart <= 1) {
+      run_adam_bfgs();
+    } else {
+      arma::mat theta0_rand(multistart, d_theta);
+      for (int i = 0; i < multistart; ++i)
+        theta0_rand.row(i)
+            = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
+      theta0_rand.row(0) = m_theta.t();
 
-    if (n_warp > 0)
-      unpack_warp_params(result.x_outer);
-    m_theta = arma::exp(result.x_inner);
-    refresh_cache();
+      arma::vec wp_init = pack_warp_params();
+
+      double best_neg_ll = std::numeric_limits<double>::infinity();
+      arma::vec best_theta;
+      arma::vec best_wp;
+      double best_sigma2 = 0;
+      arma::vec best_beta;
+      arma::vec best_alpha;
+      arma::mat best_C;
+      arma::mat best_R;
+      arma::mat best_Phi;
+      arma::mat best_dPhi;
+      double best_logdet = 0;
+
+      for (int i = 0; i < multistart; ++i) {
+        if (n_warp > 0)
+          unpack_warp_params(wp_init);
+        m_theta = theta0_rand.row(i).t();
+        refresh_cache();
+
+        double neg_ll = run_adam_bfgs();
+
+        if (neg_ll < best_neg_ll) {
+          best_neg_ll = neg_ll;
+          best_theta = m_theta;
+          best_wp = pack_warp_params();
+          best_sigma2 = m_sigma2;
+          best_beta = m_beta;
+          best_alpha = m_alpha;
+          best_C = m_C;
+          best_R = m_R;
+          best_Phi = m_Phi;
+          best_dPhi = m_dPhi;
+          best_logdet = m_logdet;
+        }
+      }
+
+      if (n_warp > 0)
+        unpack_warp_params(best_wp);
+      m_theta = best_theta;
+      m_sigma2 = best_sigma2;
+      m_beta = best_beta;
+      m_alpha = best_alpha;
+      m_C = best_C;
+      m_R = best_R;
+      m_Phi = best_Phi;
+      m_dPhi = best_dPhi;
+      m_logdet = best_logdet;
+    }
 
     // Joint BFGS polish if method requests it
-    if (method == "BFGS+Adam+BFGS" && n_warp > 0) {
+    if (base_method == "BFGS+Adam+BFGS" && n_warp > 0) {
       run_joint_bfgs();
     }
   }
@@ -1835,12 +1840,14 @@ void WarpKriging::fit(const arma::vec& y,
 // -------------------------------------------------------------------------
 //  predict()
 // -------------------------------------------------------------------------
-std::tuple<arma::vec, arma::vec, arma::mat> WarpKriging::predict(const arma::mat& x_new,
-                                                                 bool withStd,
-                                                                 bool withCov) const {
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::predict(const arma::mat& x_new,
+                                                                                      bool withStd,
+                                                                                      bool withCov,
+                                                                                      bool withDeriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
 
+  const arma::uword d = x_new.n_cols;
   arma::mat x_n = x_new;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
@@ -1850,7 +1857,8 @@ std::tuple<arma::vec, arma::vec, arma::mat> WarpKriging::predict(const arma::mat
     }
   }
 
-  const arma::uword m = x_n.n_rows;
+  const arma::uword n_n = x_n.n_rows;
+  const arma::uword n_o = m_Phi.n_rows;
   arma::mat Phi_new = apply_warping(x_n);
   arma::mat F_new = build_trend_matrix(x_n);
   // Use correlation cross-matrix (not covariance K = σ²R), because m_C is
@@ -1862,15 +1870,24 @@ std::tuple<arma::vec, arma::vec, arma::mat> WarpKriging::predict(const arma::mat
 
   arma::vec stdev;
   arma::mat cov;
+  arma::mat Dyhat_n;
+  arma::mat Dystdev_n;
 
-  if (withStd || withCov) {
-    arma::mat v = arma::solve(arma::trimatl(m_C), Rcross.t());
-    arma::mat Cinv_F = arma::solve(arma::trimatl(m_C), m_F);
+  // Compute v = C⁻¹ Rcross' when needed for stdev or derivatives
+  arma::mat v;
+  arma::mat Cinv_F;
+  arma::mat FtRinvF_inv;
+  arma::vec ysd2_n;
+
+  if (withStd || withCov || withDeriv) {
+    v = arma::solve(arma::trimatl(m_C), Rcross.t());
+    Cinv_F = arma::solve(arma::trimatl(m_C), m_F);
     arma::mat FtRinvF = Cinv_F.t() * Cinv_F;
-    arma::mat FtRinvF_inv = arma::inv_sympd(FtRinvF);
+    FtRinvF_inv = arma::inv_sympd(FtRinvF);
 
     if (withCov) {
-      arma::mat R_new = build_R(Phi_new);
+      arma::mat R_new(n_n, n_n);
+      LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
       cov = R_new - v.t() * v;
       arma::mat H = F_new.t() - Cinv_F.t() * v;
       cov += H.t() * FtRinvF_inv * H;
@@ -1878,48 +1895,165 @@ std::tuple<arma::vec, arma::vec, arma::mat> WarpKriging::predict(const arma::mat
       cov = 0.5 * (cov + cov.t());
       cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
       stdev = arma::sqrt(cov.diag());
+      ysd2_n = cov.diag();
     } else {
-      arma::vec var_diag(m);
-      for (arma::uword i = 0; i < m; ++i) {
-        var_diag(i) = std::max(0.0, 1.0 - arma::dot(v.col(i), v.col(i)));
+      ysd2_n.set_size(n_n);
+      for (arma::uword i = 0; i < n_n; ++i) {
+        ysd2_n(i) = std::max(0.0, 1.0 - arma::dot(v.col(i), v.col(i)));
         arma::vec r_i = F_new.row(i).t() - Cinv_F.t() * v.col(i);
-        var_diag(i) += arma::dot(r_i, FtRinvF_inv * r_i);
+        ysd2_n(i) += arma::dot(r_i, FtRinvF_inv * r_i);
       }
-      var_diag *= (m_sigma2 * m_y_std * m_y_std);
-      var_diag = arma::clamp(var_diag, 0.0, arma::datum::inf);
-      stdev = arma::sqrt(var_diag);
+      ysd2_n *= (m_sigma2 * m_y_std * m_y_std);
+      ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
+      if (withStd)
+        stdev = arma::sqrt(ysd2_n);
     }
   }
-  return {mean, stdev, cov};
+
+  if (withDeriv) {
+    const double h = 1.0E-5;
+    const double sigma2 = m_sigma2;
+
+    Dyhat_n.set_size(n_n, d);
+    Dyhat_n.zeros();
+    arma::mat Dysd2_n(n_n, d, arma::fill::zeros);
+
+    // Ecirc_n needed for stdev derivative
+    arma::mat Ecirc_n;
+    arma::mat circ;
+    if (withStd) {
+      arma::mat FtRinvF = Cinv_F.t() * Cinv_F;
+      circ = arma::chol(FtRinvF);  // upper triangular
+      arma::mat Fhat_n = v.t() * Cinv_F;
+      arma::mat E_n = F_new - Fhat_n;
+      Ecirc_n = arma::solve(arma::trimatu(circ), E_n.t()).t();  // E_n * circ⁻¹
+    }
+
+    for (arma::uword i = 0; i < n_n; i++) {
+      // Build perturbed points for finite-difference Jacobian (2d points)
+      arma::mat x_perturbed(2 * d, d);
+      for (arma::uword k = 0; k < d; k++) {
+        x_perturbed.row(k) = x_n.row(i);
+        x_perturbed.row(d + k) = x_n.row(i);
+        x_perturbed(k, k) += h;
+        x_perturbed(d + k, k) -= h;
+      }
+
+      // Warping Jacobian: dΦ/dx  (feature_dim × d)
+      arma::mat Phi_perturbed = apply_warping(x_perturbed);
+      arma::mat J_warp(m_feature_dim, d);
+      for (arma::uword k = 0; k < d; k++) {
+        J_warp.col(k) = (Phi_perturbed.row(k) - Phi_perturbed.row(d + k)).t() / (2.0 * h);
+      }
+
+      // Trend derivative: dF/dx  (d × p) via finite differences  [same layout as Kriging]
+      arma::mat F_perturbed = build_trend_matrix(x_perturbed);
+      arma::mat DF_n_i(d, F_new.n_cols);
+      for (arma::uword k = 0; k < d; k++) {
+        DF_n_i.row(k) = (F_perturbed.row(k) - F_perturbed.row(d + k)) / (2.0 * h);
+      }
+
+      // DR_on_i: derivative of cross-correlation w.r.t. x  (n_o × d)
+      // dR(Φ_new, Φ_train)/dx = R * DlnCovDx(ΔΦ, θ)ᵀ · J_warp
+      arma::mat DR_on_i(n_o, d);
+      for (arma::uword j = 0; j < n_o; j++) {
+        arma::vec dPhi = Phi_new.row(i).t() - m_Phi.row(j).t();
+        arma::vec dlnCovDx = _DlnCovDx(dPhi, m_theta);
+        DR_on_i.row(j) = Rcross(i, j) * (dlnCovDx.t() * J_warp);
+      }
+
+      // W_i = C⁻¹ DR_on_i  (n_o × d)
+      arma::mat W_i = arma::solve(arma::trimatl(m_C), DR_on_i);
+
+      // Mean derivative: dŷ/dx = dF/dx · β + dR/dx · α
+      Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * m_alpha).t();
+
+      if (withStd) {
+        // dvar/dx = -2 vᵢᵀ Wᵢ + 2 Ecirc_i · circ⁻ᵀ(DF_i - Wᵢᵀ Cinv_F)ᵀ
+        arma::mat DEcirc_n_i
+            = arma::solve(arma::trimatu(circ).t(), (DF_n_i - W_i.t() * Cinv_F).t());  // circ⁻ᵀ * (...)ᵀ
+        Dysd2_n.row(i) = -2.0 * v.col(i).t() * W_i + 2.0 * Ecirc_n.row(i) * DEcirc_n_i;
+      }
+    }
+    Dyhat_n *= m_y_std;
+    Dysd2_n *= sigma2 * m_y_std * m_y_std;
+
+    if (withStd) {
+      // Dystdev = d(sqrt(var))/dx = dvar/dx / (2·stdev)
+      Dystdev_n.set_size(n_n, d);
+      for (arma::uword i = 0; i < n_n; i++) {
+        double sd_i = std::sqrt(ysd2_n(i));
+        if (sd_i > 0)
+          Dystdev_n.row(i) = Dysd2_n.row(i) / (2.0 * sd_i);
+        else
+          Dystdev_n.row(i).zeros();
+      }
+    }
+  }
+
+  return {mean, stdev, cov, Dyhat_n, Dystdev_n};
 }
 
 // -------------------------------------------------------------------------
-//  simulate()
+//  simulate()  — consistent with Kriging::simulate
+//
+//  Works at correlation scale (R, not K = σ²R), applies σ̂ scaling after
+//  Cholesky, then denormalizes.  This is more numerically robust than
+//  doing Cholesky on the full-scale covariance matrix.
 // -------------------------------------------------------------------------
 arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) const {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
-  arma::arma_rng::set_seed(seed);
-  auto [mean, stdev, cov] = predict(x_new, false, true);
+  const arma::uword n_n = x_new.n_rows;
 
-  const arma::uword m = x_new.n_rows;
-  cov.diag() += 1e-8 * m_sigma2 * m_y_std * m_y_std;
-  arma::mat L;
-  bool ok = arma::chol(L, cov, "lower");
-  if (!ok) {
-    arma::vec eigval;
-    arma::mat eigvec;
-    arma::eig_sym(eigval, eigvec, cov);
-    eigval = arma::clamp(eigval, 1e-10, arma::datum::inf);
-    L = eigvec * arma::diagmat(arma::sqrt(eigval));
+  // Normalize new inputs
+  arma::mat x_n = x_new;
+  if (m_normalize) {
+    for (arma::uword j = 0; j < x_n.n_cols; ++j) {
+      bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
+      if (is_cont)
+        x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
+    }
   }
 
-  arma::mat Z = arma::randn<arma::mat>(m, nsim);
-  arma::mat sims(m, nsim);
-  for (int s = 0; s < nsim; ++s)
-    sims.col(s) = mean + L * Z.col(s);
-  return sims;
+  arma::mat Phi_new = apply_warping(x_n);
+  arma::mat F_new = build_trend_matrix(x_n);
+
+  // R_nn: correlation between new points (at correlation scale)
+  arma::mat R_nn(n_n, n_n);
+  LinearAlgebra::covMat_sym_X(&R_nn, Phi_new.t(), m_theta, _Cov);
+
+  // R_on: cross-correlation (n_train × n_new)
+  arma::mat Rcross = build_Rcross(Phi_new, m_Phi);  // n_new × n_train
+
+  // v = C⁻¹ Rcross'  (C is lower-Cholesky of R_train)
+  arma::mat v = arma::solve(arma::trimatl(m_C), Rcross.t());
+
+  // Kriging mean (normalized scale)
+  arma::vec yhat_n = F_new * m_beta + Rcross * m_alpha;
+
+  // Conditional covariance at correlation scale (including trend uncertainty)
+  arma::mat Cinv_F = arma::solve(arma::trimatl(m_C), m_F);
+  arma::mat FtRinvF = Cinv_F.t() * Cinv_F;
+  arma::mat Ecirc_n = F_new - v.t() * Cinv_F;                       // n_n × p
+  arma::mat FtRinvF_inv = arma::inv_sympd(FtRinvF);
+
+  arma::mat Sigma_nKo = R_nn - v.t() * v + Ecirc_n * FtRinvF_inv * Ecirc_n.t();
+
+  // Cholesky at correlation scale — more robust than on the full-scale covariance
+  arma::mat LSigma = LinearAlgebra::safe_chol_lower(Sigma_nKo);
+
+  // Generate simulations: mean + L * Z * sqrt(σ²), then denormalize
+  arma::mat y_n(n_n, nsim);
+  y_n.each_col() = yhat_n;
+  Random::reset_seed(seed);
+  y_n += LSigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
+
+  // Denormalize
+  y_n = m_y_mean + m_y_std * y_n;
+
+  return y_n;
 }
 
 // -------------------------------------------------------------------------

@@ -196,14 +196,14 @@ static void test_continuous_kumaraswamy() {
 
   std::cout << model.summary();
 
-  auto [mean_train, stdev_train, _] = model.predict(X_mat, true, false);
+  auto [mean_train, stdev_train, _cov1, _md1, _sd1] = model.predict(X_mat, true, false);
   double max_err = arma::max(arma::abs(mean_train - y));
   std::cout << "  Max train interp error: " << max_err << std::endl;
 
   arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
   arma::mat xp(50, 1);
   xp.col(0) = x_pred;
-  auto [mean, stdev, __] = model.predict(xp, true, false);
+  auto [mean, stdev, _cov2, _md2, _sd2] = model.predict(xp, true, false);
   arma::vec ytrue(50);
   for (arma::uword i = 0; i < 50; ++i)
     ytrue(i) = f1d(x_pred(i));
@@ -240,7 +240,7 @@ static void test_categorical_only() {
   X_test(0, 0) = 0.0;
   X_test(1, 0) = 1.0;
   X_test(2, 0) = 2.0;
-  auto [mean, stdev, _] = model.predict(X_test, true, false);
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
 
   std::cout << "  Predictions per level:\n";
   for (int l = 0; l < 3; ++l)
@@ -292,7 +292,7 @@ static void test_categorical_predict_at_train() {
   std::cout << model.summary();
 
   // Predict at training points — must recover training values
-  auto [mean, stdev, _] = model.predict(X, true, false);
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X, true, false);
 
   double max_mean_err = arma::max(arma::abs(mean - y));
   double max_stdev = arma::max(stdev);
@@ -346,7 +346,7 @@ static void test_mixed() {
     X_test.col(0) = xc;
     X_test.col(1).fill(static_cast<double>(cat));
 
-    auto [mean, stdev, _] = model.predict(X_test, true, false);
+    auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
 
     arma::vec ytrue(20);
     for (arma::uword i = 0; i < 20; ++i)
@@ -386,7 +386,7 @@ static void test_ordinal() {
   arma::mat X_test(L, 1);
   for (arma::uword l = 0; l < L; ++l)
     X_test(l, 0) = static_cast<double>(l);
-  auto [mean, stdev, _] = model.predict(X_test, true, false);
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
 
   std::cout << "  Predictions:\n";
   for (arma::uword l = 0; l < L; ++l)
@@ -415,7 +415,7 @@ static void test_neural_mono() {
 
   std::cout << model.summary();
 
-  auto [mean_train, stdev_train, _] = model.predict(X_mat, true, false);
+  auto [mean_train, stdev_train, _cov1, _md1, _sd1] = model.predict(X_mat, true, false);
   double max_err = arma::max(arma::abs(mean_train - y));
   std::cout << "  Max train interp error: " << max_err << std::endl;
 
@@ -441,14 +441,14 @@ static void test_mlp_warp() {
 
   std::cout << model1d.summary();
 
-  auto [mean_train, stdev_train, _1] = model1d.predict(X_mat, true, false);
+  auto [mean_train, stdev_train, _c1, _md1, _sd1] = model1d.predict(X_mat, true, false);
   double max_err = arma::max(arma::abs(mean_train - y));
   std::cout << "  [1D] Max train interp error:  " << max_err << std::endl;
 
   arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
   arma::mat xp(50, 1);
   xp.col(0) = x_pred;
-  auto [mean, stdev, _2] = model1d.predict(xp, true, false);
+  auto [mean, stdev, _c2, _md2, _sd2] = model1d.predict(xp, true, false);
   arma::vec ytrue(50);
   for (arma::uword i = 0; i < 50; ++i)
     ytrue(i) = f1d(x_pred(i));
@@ -485,7 +485,7 @@ static void test_mlp_warp() {
     arma::mat X_test(20, 2);
     X_test.col(0) = xc;
     X_test.col(1).fill(static_cast<double>(cat));
-    auto [m, s, _] = model_mix.predict(X_test, true, false);
+    auto [m, s, _cov, _md, _sd] = model_mix.predict(X_test, true, false);
     arma::vec yt(20);
     for (arma::uword i = 0; i < 20; ++i)
       yt(i) = std::sin(2.0 * M_PI * xc(i)) * offset[cat];
@@ -524,7 +524,7 @@ static void test_simulate_mixed() {
   assert(sims.n_rows == 10 && sims.n_cols == 30);
   assert(sims.is_finite());
 
-  auto [mean, stdev, _] = model.predict(X_sim, true, false);
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_sim, true, false);
   arma::vec sim_mean = arma::mean(sims, 1);
   double rel_diff = arma::norm(sim_mean - mean) / arma::norm(mean);
   std::cout << "  Sim mean vs kriging mean rel diff: " << rel_diff << std::endl;
@@ -607,14 +607,14 @@ static void test_branin_2d_mlp() {
   std::cout << model.summary();
 
   // Predict on training data (interpolation check)
-  auto [mean_train, stdev_train, _1] = model.predict(X, true, false);
+  auto [mean_train, stdev_train, _c1, _md1, _sd1] = model.predict(X, true, false);
   double max_interp = arma::max(arma::abs(mean_train - y));
   std::cout << "  Max train interpolation error: " << max_interp << std::endl;
   std::cout << "  Max train stdev:               " << arma::max(stdev_train) << std::endl;
 
   // Predict on new test points
   arma::mat X_test = arma::randu<arma::mat>(15, 2);
-  auto [mean_test, stdev_test, _2] = model.predict(X_test, true, false);
+  auto [mean_test, stdev_test, _c2, _md2, _sd2] = model.predict(X_test, true, false);
   assert(mean_test.n_elem == 15);
   assert(stdev_test.n_elem == 15);
   assert(mean_test.is_finite());
@@ -655,19 +655,19 @@ static void test_none_vs_mlp() {
   // Model A: no warping (baseline, like standard Kriging)
   WarpKriging model_none({"none"}, "gauss");
   model_none.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
-  auto [mean_none, sd_none, _1] = model_none.predict(xp, true, false);
+  auto [mean_none, sd_none, _c1, _md1, _sd1] = model_none.predict(xp, true, false);
   double rmse_none = std::sqrt(arma::mean(arma::square(mean_none - ytrue)));
 
   // Model B: MLP warping
   WarpKriging model_mlp({"mlp(16:8,2,selu)"}, "gauss");
   model_mlp.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
-  auto [mean_mlp, sd_mlp, _2] = model_mlp.predict(xp, true, false);
+  auto [mean_mlp, sd_mlp, _c2, _md2, _sd2] = model_mlp.predict(xp, true, false);
   double rmse_mlp = std::sqrt(arma::mean(arma::square(mean_mlp - ytrue)));
 
   // Model C: Kumaraswamy warping
   WarpKriging model_kuma({"kumaraswamy"}, "gauss");
   model_kuma.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
-  auto [mean_kuma, sd_kuma, _3] = model_kuma.predict(xp, true, false);
+  auto [mean_kuma, sd_kuma, _c3, _md3, _sd3] = model_kuma.predict(xp, true, false);
   double rmse_kuma = std::sqrt(arma::mean(arma::square(mean_kuma - ytrue)));
 
   std::cout << "  RMSE None (baseline):    " << rmse_none << std::endl;
@@ -869,14 +869,14 @@ static void test_mlp_joint() {
 
     std::cout << model.summary();
 
-    auto [mean_train, stdev_train, _1] = model.predict(X_mat, true, false);
+    auto [mean_train, stdev_train, _c1b, _md1b, _sd1b] = model.predict(X_mat, true, false);
     double max_err = arma::max(arma::abs(mean_train - y));
     std::cout << "  [1D] Max train interp error:  " << max_err << std::endl;
 
     arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
     arma::mat xp(50, 1);
     xp.col(0) = x_pred;
-    auto [mean, stdev, _2] = model.predict(xp, true, false);
+    auto [mean, stdev, _c2b, _md2b, _sd2b] = model.predict(xp, true, false);
     arma::vec ytrue(50);
     for (arma::uword i = 0; i < 50; ++i)
       ytrue(i) = f1d(x_pred(i));
@@ -911,7 +911,7 @@ static void test_mlp_joint() {
 
     // Predict
     arma::mat X_test = arma::randu<arma::mat>(10, 2);
-    auto [mean, stdev, _3] = model.predict(X_test, true, false);
+    auto [mean, stdev, _c3b, _md3b, _sd3b] = model.predict(X_test, true, false);
     assert(mean.n_elem == 10);
     assert(stdev.n_elem == 10);
     assert(mean.is_finite());
@@ -933,6 +933,274 @@ static void test_mlp_joint() {
     model.update(y_new, X_new);
     std::cout << "  [2D] n after update: " << model.y().n_elem << std::endl;
     assert(model.y().n_elem == n + 3);
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  17. Predict derivative check vs finite differences — all warping types
+// ==========================================================================
+
+/// Helper: check mean and stdev derivatives of a fitted WarpKriging model
+/// against central finite differences at the given test points.
+/// Only checks dimensions listed in `check_dims` (use to skip discrete dims).
+/// Uses relative tolerance (rel_tol) with a minimum absolute floor (abs_tol)
+/// to handle both large and near-zero derivatives correctly.
+static void check_deriv_vs_fd(const WarpKriging& model,
+                               const arma::mat& X_new,
+                               const std::vector<arma::uword>& check_dims,
+                               const std::string& label,
+                               double h = 1e-6,
+                               double rel_tol = 0.05,
+                               double abs_tol = 0.01) {
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X_new, true, false, true);
+
+  const arma::uword n_n = X_new.n_rows;
+  const arma::uword d = X_new.n_cols;
+
+  assert(mean_deriv.n_rows == n_n);
+  assert(mean_deriv.n_cols == d);
+  assert(stdev_deriv.n_rows == n_n);
+  assert(stdev_deriv.n_cols == d);
+  assert(mean_deriv.is_finite());
+  assert(stdev_deriv.is_finite());
+
+  for (arma::uword i = 0; i < n_n; ++i) {
+    for (arma::uword j : check_dims) {
+      arma::mat X_plus = X_new;
+      arma::mat X_minus = X_new;
+      X_plus(i, j) += h;
+      X_minus(i, j) -= h;
+
+      auto [m_p, s_p, c_p, md_p, sd_p] = model.predict(X_plus, true, false, false);
+      auto [m_m, s_m, c_m, md_m, sd_m] = model.predict(X_minus, true, false, false);
+
+      double fd_mean = (m_p(i) - m_m(i)) / (2.0 * h);
+      double fd_stdev = (s_p(i) - s_m(i)) / (2.0 * h);
+
+      double err_mean = std::abs(mean_deriv(i, j) - fd_mean);
+      double scale_mean = std::max(std::abs(fd_mean), std::abs(mean_deriv(i, j)));
+      double tol_mean = std::max(abs_tol, rel_tol * scale_mean);
+
+      double err_stdev = std::abs(stdev_deriv(i, j) - fd_stdev);
+      double scale_stdev = std::max(std::abs(fd_stdev), std::abs(stdev_deriv(i, j)));
+      double tol_stdev = std::max(abs_tol, rel_tol * scale_stdev);
+
+      if (err_mean > tol_mean) {
+        std::cerr << "  [" << label << "] Mean deriv error at (" << i << "," << j
+                  << "): analytical=" << mean_deriv(i, j) << " fd=" << fd_mean << " err=" << err_mean
+                  << " tol=" << tol_mean << std::endl;
+        assert(false);
+      }
+      if (err_stdev > tol_stdev) {
+        std::cerr << "  [" << label << "] Stdev deriv error at (" << i << "," << j
+                  << "): analytical=" << stdev_deriv(i, j) << " fd=" << fd_stdev << " err=" << err_stdev
+                  << " tol=" << tol_stdev << std::endl;
+        assert(false);
+      }
+    }
+  }
+  std::cout << "  [" << label << "] Derivative check PASSED" << std::endl;
+}
+
+void test_predict_derivative() {
+  std::cout << "--- Test 17: Predict derivative (mean + stdev) vs finite differences ---" << std::endl;
+
+  auto f1 = [](double x) { return std::sin(6.0 * x); };
+  auto f2 = [](double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2); };
+
+  // ---- 17a: none (2D, gauss) ------------------------------------------------
+  {
+    arma::arma_rng::set_seed(123);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 2);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f2(X(i, 0), X(i, 1));
+
+    WarpKriging model({"none", "none"}, "gauss");
+    model.fit(y, X, "constant", false, "BFGS", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 2);
+    check_deriv_vs_fd(model, X_new, {0, 1}, "none, gauss, 2D");
+  }
+
+  // ---- 17b: affine (1D, matern3_2) -----------------------------------------
+  {
+    arma::arma_rng::set_seed(42);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"affine"}, "matern3_2");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "affine, matern3_2");
+  }
+
+  // ---- 17c: boxcox (1D, gauss) ----------------------------------------------
+  {
+    arma::arma_rng::set_seed(77);
+    const arma::uword n = 15;
+    // BoxCox needs positive inputs
+    arma::mat X = 0.1 + 0.8 * arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"boxcox"}, "gauss");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.15 + 0.7 * arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "boxcox, gauss");
+  }
+
+  // ---- 17d: kumaraswamy (1D, matern5_2) ------------------------------------
+  {
+    arma::arma_rng::set_seed(42);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"kumaraswamy"}, "matern5_2");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "kumaraswamy, matern5_2");
+  }
+
+  // ---- 17e: neural_mono (1D, gauss) ----------------------------------------
+  {
+    arma::arma_rng::set_seed(99);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"neural_mono(8)"}, "gauss");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "neural_mono, gauss");
+  }
+
+  // ---- 17f: mlp (2D, matern5_2) --------------------------------------------
+  {
+    arma::arma_rng::set_seed(55);
+    const arma::uword n = 20;
+    arma::mat X = arma::randu<arma::mat>(n, 2);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f2(X(i, 0), X(i, 1));
+
+    WarpKriging model({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "matern5_2");
+    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 2);
+    check_deriv_vs_fd(model, X_new, {0, 1}, "mlp, matern5_2, 2D");
+  }
+
+  // ---- 17g: categorical (1D continuous + 1D categorical) --------------------
+  //  Derivative w.r.t. dim 0 (continuous) only; dim 1 is discrete.
+  {
+    arma::arma_rng::set_seed(33);
+    const arma::uword n = 20;
+    arma::mat X(n, 2);
+    X.col(0) = arma::randu<arma::vec>(n);
+    // 3 categories: 0, 1, 2
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 1) = std::floor(arma::randu() * 3.0);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(4.0 * X(i, 0)) + 0.5 * X(i, 1);
+
+    WarpKriging model({"none", "categorical(3,2)"}, "gauss");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    // Test points: continuous in [0,1], categorical fixed at level 1
+    arma::mat X_new(5, 2);
+    X_new.col(0) = arma::randu<arma::vec>(5);
+    X_new.col(1).fill(1.0);
+    check_deriv_vs_fd(model, X_new, {0}, "categorical mixed, gauss");
+  }
+
+  // ---- 17h: ordinal (1D continuous + 1D ordinal) ----------------------------
+  {
+    arma::arma_rng::set_seed(44);
+    const arma::uword n = 20;
+    arma::mat X(n, 2);
+    X.col(0) = arma::randu<arma::vec>(n);
+    // 4 ordinal levels: 0, 1, 2, 3
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 1) = std::floor(arma::randu() * 4.0);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(4.0 * X(i, 0)) + 0.3 * X(i, 1);
+
+    WarpKriging model({"none", "ordinal(4)"}, "gauss");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new(5, 2);
+    X_new.col(0) = arma::randu<arma::vec>(5);
+    X_new.col(1).fill(2.0);
+    check_deriv_vs_fd(model, X_new, {0}, "ordinal mixed, gauss");
+  }
+
+  // ---- 17i: mlp_joint (2D, gauss) ------------------------------------------
+  {
+    arma::arma_rng::set_seed(88);
+    const arma::uword n = 20;
+    arma::mat X = arma::randu<arma::mat>(n, 2);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f2(X(i, 0), X(i, 1));
+
+    WarpKriging model({"mlp_joint(16:8,2,selu)"}, "gauss");
+    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 2);
+    check_deriv_vs_fd(model, X_new, {0, 1}, "mlp_joint, gauss, 2D");
+  }
+
+  // ---- 17j: mixed continuous warpings (kumaraswamy + none + affine, 3D) -----
+  {
+    arma::arma_rng::set_seed(111);
+    const arma::uword n = 20;
+    arma::mat X = arma::randu<arma::mat>(n, 3);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(3.0 * X(i, 0)) + std::cos(4.0 * X(i, 1)) + 0.5 * X(i, 2);
+
+    WarpKriging model({"kumaraswamy", "none", "affine"}, "matern5_2");
+    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 3);
+    check_deriv_vs_fd(model, X_new, {0, 1, 2}, "kuma+none+affine, matern5_2, 3D");
+  }
+
+  // ---- 17k: none with different kernels (exp, matern3_2) --------------------
+  {
+    arma::arma_rng::set_seed(66);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    for (const auto& kern : {"exp", "matern3_2", "matern5_2", "gauss"}) {
+      WarpKriging model({"none"}, kern);
+      model.fit(y, X, "constant", false, "BFGS", "LL");
+
+      arma::mat X_new = arma::randu<arma::mat>(5, 1);
+      check_deriv_vs_fd(model, X_new, {0}, std::string("none, ") + kern);
+    }
   }
 
   std::cout << "  PASSED\n" << std::endl;
@@ -963,6 +1231,7 @@ int main() {
     test_from_string_roundtrip();
     test_warping_strings_accessor();
     test_mlp_joint();
+    test_predict_derivative();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

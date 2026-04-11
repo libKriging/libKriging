@@ -105,19 +105,25 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 5}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
 
   const bool withStd = flag_output_compliance(input, 2, "with standard deviation", output, 1);
   const bool withCov = flag_output_compliance(input, 3, "with covariance", output, 2);
+  const bool withDeriv = flag_output_compliance(input, 4, "with derivatives", output, 3);
 
-  auto [y_pred, stdev_pred, cov_pred] = wk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov);
+  auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
+      = wk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
   output.set(0, y_pred, "predicted y");
   if (withStd)
     output.set(1, stdev_pred, "predicted stdev");
   if (withCov)
     output.set(2, cov_pred, "predicted cov");
+  if (withDeriv) {
+    output.set(3, mean_deriv, "predicted mean derivative");
+    output.set(4, stdev_deriv, "predicted stdev derivative");
+  }
 }
 
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

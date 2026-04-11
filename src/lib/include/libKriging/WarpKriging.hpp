@@ -475,9 +475,11 @@ class WarpKriging {
   //  Prediction
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat> predict(const arma::mat& x_new,
-                                                                        bool withStd = true,
-                                                                        bool withCov = false) const;
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(
+      const arma::mat& x_new,
+      bool withStd = true,
+      bool withCov = false,
+      bool withDeriv = false) const;
 
   // -----------------------------------------------------------------------
   //  Simulation
@@ -531,7 +533,8 @@ class WarpKriging {
   // ---- data ---------------------------------------------------------------
   arma::vec m_y;
   arma::mat m_X;
-  arma::mat m_Phi;  ///< warped design (n × feature_dim)
+  arma::mat m_Phi;   ///< warped design (n × feature_dim)
+  arma::mat m_dPhi;  ///< precomputed pairwise diffs (feature_dim × n*n), like Kriging's m_dX
 
   // ---- warping ------------------------------------------------------------
   std::vector<WarpSpec> m_warp_specs;
@@ -555,12 +558,17 @@ class WarpKriging {
   // ---- kernel + hyper-params -----------------------------------------------
   std::string m_kernel_name;
   WarpBaseKernel m_base_kernel = WarpBaseKernel::Gauss;
+  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
+  void make_Cov(const std::string& kernel);
   arma::vec m_theta;
   double m_sigma2 = 1.0;
 
   // ---- GP cache -----------------------------------------------------------
-  arma::mat m_C;      ///< Cholesky(K + nugget), lower
-  arma::vec m_alpha;  ///< K^{-1}(y - Fβ)
+  arma::mat m_R;      ///< correlation matrix (n×n)
+  arma::mat m_C;      ///< Cholesky(R + nugget), lower
+  arma::vec m_alpha;  ///< R^{-1}(y - Fβ)
   double m_logdet = 0.0;
 
   bool m_fitted = false;
@@ -578,18 +586,13 @@ class WarpKriging {
   arma::mat build_trend_matrix(const arma::mat& X) const;
   arma::mat apply_warping(const arma::mat& X) const;
 
+  // ---- Precomputed pairwise differences -----------------------------------
+  /// Compute m_dPhi from m_Phi (feature_dim × n*n layout, like Kriging's m_dX)
+  void compute_dPhi();
+
   // ---- Correlation matrix (σ²=1) -----------------------------------------
-  /// Evaluate the base correlation function (σ² factored out)
-  double corr_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const;
-  /// Build full correlation matrix R (n×n), with R_ii = 1
-  arma::mat build_R(const arma::mat& Phi) const;
   /// Build cross-correlation  r(Φ_new, Φ_train)  →  (m × n)
   arma::mat build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const;
-
-  // Keep K-based versions (K = σ² R) for predict/simulate
-  double kernel_scalar(const arma::rowvec& phi_i, const arma::rowvec& phi_j) const;
-  arma::mat build_K(const arma::mat& Phi) const;
-  arma::mat build_Kcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const;
 
   // ---- Concentrated profile log-likelihood --------------------------------
   //

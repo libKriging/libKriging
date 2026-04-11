@@ -188,7 +188,7 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
 
   for (int iter = 0; iter < n_iterations; ++iter) {
     // Benchmark FIT
-    libKriging::WarpKriging wk(config.warping, "matern5_2");
+    libKriging::WarpKriging wk(config.warping, "gauss");
     {
       auto t0 = std::chrono::high_resolution_clock::now();
       wk.fit(y_train, X_train, "constant", false, config.optim, "LL", config.parameters);
@@ -201,7 +201,7 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
     // Benchmark PREDICT
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      auto [mean, stdev, cov] = wk.predict(X_pred, true, false);
+      auto [mean, stdev, cov, mean_deriv, stdev_deriv] = wk.predict(X_pred, true, false);
       auto t1 = std::chrono::high_resolution_clock::now();
       predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
