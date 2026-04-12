@@ -1443,8 +1443,9 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
 
   arma::mat dLL_dR = 0.5 * (m_alpha * m_alpha.t() / m_sigma2 - Rinv);
 
-  // Accumulate tr(dLL_dR · dR_k) for all k in a single pass over (i,j)
-  arma::vec grad_log_theta(d, arma::fill::zeros);
+  // Accumulate tr(dLL_dR · dR_k) for all k in a single pass over (i,j).
+  // Returns grad in theta-space; callers apply Optim::reparam_from_deriv when reparametrize is on.
+  arma::vec grad_theta(d, arma::fill::zeros);
 
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = i + 1; j < n; ++j) {
@@ -1454,13 +1455,12 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
       double w = 2.0 * dLL_dR(i, j);  // symmetry: (i,j) + (j,i)
 
       for (arma::uword k = 0; k < d; ++k) {
-        double dR_ij = R_ij * dlnCov(k);
-        grad_log_theta(k) += w * dR_ij * m_theta(k);
+        grad_theta(k) += w * R_ij * dlnCov(k);
       }
     }
   }
 
-  return {ll, grad_log_theta};
+  return {ll, grad_theta};
 }
 
 // -------------------------------------------------------------------------
@@ -1628,35 +1628,33 @@ void WarpKriging::optimise_joint(const std::string& method) {
   arma::uword d_theta = m_theta.n_elem;
 
   arma::vec wp0 = pack_warp_params();
-  arma::vec log_theta0 = arma::log(m_theta);
 
-  // Compute data-driven θ bounds from feature-space pairwise diffs (like Kriging uses m_maxdX)
+  // Data-driven θ bounds from feature-space pairwise diffs (shared helper).
   arma::vec maxdPhi = arma::max(arma::abs(m_dPhi), 1);
-  arma::vec theta_lower = Optim::theta_lower_factor * maxdPhi;
-  arma::vec theta_upper = Optim::theta_upper_factor * maxdPhi;
-  // Clamp to avoid degenerate bounds
+  auto theta_bounds_pair = Optim::theta_bounds(maxdPhi, m_dPhi, m_y, m_y.n_elem);
+  arma::vec theta_lower = theta_bounds_pair.first;
+  arma::vec theta_upper = theta_bounds_pair.second;
   theta_lower = arma::clamp(theta_lower, 1e-10, arma::datum::inf);
   theta_upper = arma::max(theta_lower * 2.0, theta_upper);
-  arma::vec log_theta_lower = arma::log(theta_lower);
-  arma::vec log_theta_upper = arma::log(theta_upper);
 
-  // Parse multistart count from method: "BFGS10" → 10, "BFGS" → 1, "BFGS5+Adam" → 5
-  int multistart = 1;
-  std::string base_method = method;
-  // Extract the BFGS prefix and any trailing number
-  std::string bfgs_prefix = "BFGS";
-  if (method.rfind(bfgs_prefix, 0) == 0) {
-    // Find end of digits after "BFGS"
-    size_t pos = bfgs_prefix.size();
-    size_t num_end = pos;
-    while (num_end < method.size() && std::isdigit(method[num_end]))
-      ++num_end;
-    if (num_end > pos) {
-      multistart = std::stoi(method.substr(pos, num_end - pos));
-      // Reconstruct base method: "BFGS" + everything after the digits
-      base_method = bfgs_prefix + method.substr(num_end);
-    }
-  }
+  // Honor Optim::reparametrize flag via local helpers.
+  auto to_gamma = [](const arma::vec& t) {
+    return Optim::reparametrize ? Optim::reparam_to(t) : t;
+  };
+  auto from_gamma = [](const arma::vec& g) {
+    return Optim::reparametrize ? Optim::reparam_from(g) : g;
+  };
+  auto grad_theta_to_gamma = [](const arma::vec& theta, const arma::vec& g_theta) {
+    return Optim::reparametrize ? Optim::reparam_from_deriv(theta, g_theta) : g_theta;
+  };
+
+  arma::vec gamma_lower = to_gamma(theta_lower);
+  arma::vec gamma_upper = to_gamma(theta_upper);
+
+  // Parse multistart count from method (shared helper).
+  auto parsed = Optim::parse_method(method, "BFGS");
+  const std::string base_method = parsed.first;
+  const int multistart = parsed.second;
 
   // Helper lambda: run joint L-BFGS-B on a WarpKriging instance.
   // Returns the negative LL at the optimum (lower is better).
@@ -1666,14 +1664,18 @@ void WarpKriging::optimise_joint(const std::string& method) {
     arma::uword n_total = nw + dt;
     lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
     optimizer.iprint = -1;
-    optimizer.max_iter = wk.m_max_iter_bfgs;
-    optimizer.pgtol = 1e-6;
-    optimizer.factr = 1e7;
+    optimizer.max_iter = Optim::max_iteration;
+    optimizer.pgtol = Optim::gradient_tolerance;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+
+    // Save the initial theta for retry contraction.
+    arma::vec theta0 = wk.m_theta;
+    arma::vec wp_init = (nw > 0) ? wk.pack_warp_params() : arma::vec();
 
     arma::vec x0(n_total);
     if (nw > 0)
-      x0.head(nw) = wk.pack_warp_params();
-    x0.tail(dt) = arma::log(wk.m_theta);
+      x0.head(nw) = wp_init;
+    x0.tail(dt) = to_gamma(theta0);
 
     arma::vec lb(n_total), ub(n_total);
     arma::ivec btype(n_total);
@@ -1682,30 +1684,56 @@ void WarpKriging::optimise_joint(const std::string& method) {
       ub.head(nw).fill(1e20);
       btype.head(nw).fill(0);
     }
-    lb.tail(dt) = log_theta_lower;
-    ub.tail(dt) = log_theta_upper;
+    lb.tail(dt) = gamma_lower;
+    ub.tail(dt) = gamma_upper;
     btype.tail(dt).fill(2);
 
     auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
       if (nw > 0)
         wk.unpack_warp_params(x.head(nw));
-      wk.m_theta = arma::exp(x.tail(dt));
+      wk.m_theta = from_gamma(x.tail(dt));
       wk.refresh_cache();
 
-      auto [ll, g_log_theta] = wk.concentrated_ll_and_grad_theta();
-      grad.tail(dt) = -g_log_theta;
+      auto [ll, g_theta] = wk.concentrated_ll_and_grad_theta();
+      grad.tail(dt) = -grad_theta_to_gamma(wk.m_theta, g_theta);
       if (nw > 0)
         grad.head(nw) = -wk.warp_gradient();
       return -ll;
     };
 
-    auto result = optimizer.minimize(obj_fn, x0, lb.memptr(), ub.memptr(), btype.memptr());
+    // Retry loop: on abnormal termination / stuck at bound / no progress,
+    // contract θ toward lower bound and restart (mirrors Kriging).
+    int retry = 0;
+    double best_f = std::numeric_limits<double>::infinity();
+    arma::vec best_x = x0;
+    arma::vec x = x0;
+    while (retry <= Optim::max_restart) {
+      auto res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
+      if (res.f_opt < best_f) {
+        best_f = res.f_opt;
+        best_x = x;
+      }
+      arma::vec theta_cur = from_gamma(x.tail(dt));
+      double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
+      if ((retry < Optim::max_restart)
+          && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
+              || (sol_to_lb < arma::datum::eps) || (res.f_opt > best_f))) {
+        // Contract theta starting point toward lower bound.
+        arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
+        x.tail(dt) = to_gamma(theta_restart);
+        if (nw > 0)
+          x.head(nw) = wp_init;
+        retry++;
+      } else {
+        break;
+      }
+    }
 
     if (nw > 0)
-      wk.unpack_warp_params(x0.head(nw));
-    wk.m_theta = arma::exp(x0.tail(dt));
+      wk.unpack_warp_params(best_x.head(nw));
+    wk.m_theta = from_gamma(best_x.tail(dt));
     wk.refresh_cache();
-    return result.f_opt;
+    return best_f;
   };
 
   // Helper lambda: run Adam+BFGS bi-level on a WarpKriging instance.
@@ -1715,18 +1743,19 @@ void WarpKriging::optimise_joint(const std::string& method) {
     AdamBFGS opt(nw, dt);
     opt.max_iter_adam = wk.m_max_iter_adam;
     opt.adam_lr = wk.m_adam_lr;
-    opt.max_iter_bfgs = wk.m_max_iter_bfgs;
-    opt.bfgs_pgtol = 1e-6;
-    opt.bfgs_factr = 1e7;
+    opt.max_iter_bfgs = Optim::max_iteration;
+    opt.bfgs_pgtol = Optim::gradient_tolerance;
+    opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;
 
     arma::vec current_wp = wk.pack_warp_params();
-    arma::vec current_log_theta = arma::log(wk.m_theta);
+    arma::vec current_gamma = to_gamma(wk.m_theta);
 
-    auto obj_fn = [&wk, &current_wp](const arma::vec& x_outer,
-                                     const arma::vec& x_inner,
-                                     arma::vec* grad_outer,
-                                     arma::vec* grad_inner) -> double {
+    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](
+                      const arma::vec& x_outer,
+                      const arma::vec& x_inner,
+                      arma::vec* grad_outer,
+                      arma::vec* grad_inner) -> double {
       bool warp_changed = false;
       if (x_outer.n_elem > 0) {
         if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
@@ -1736,7 +1765,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
         }
       }
 
-      wk.m_theta = arma::exp(x_inner);
+      wk.m_theta = from_gamma(x_inner);
 
       if (warp_changed)
         wk.refresh_cache();
@@ -1746,8 +1775,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
       double ll = wk.concentrated_ll();
 
       if (grad_inner) {
-        auto [ll2, g_log_theta] = wk.concentrated_ll_and_grad_theta();
-        *grad_inner = g_log_theta;
+        auto [ll2, g_theta] = wk.concentrated_ll_and_grad_theta();
+        *grad_inner = grad_theta_to_gamma(wk.m_theta, g_theta);
         (void)ll2;
       }
       if (grad_outer && x_outer.n_elem > 0) {
@@ -1756,11 +1785,11 @@ void WarpKriging::optimise_joint(const std::string& method) {
       return ll;
     };
 
-    auto result = opt.optimize(current_wp, current_log_theta, log_theta_lower, log_theta_upper, obj_fn);
+    auto result = opt.optimize(current_wp, current_gamma, gamma_lower, gamma_upper, obj_fn);
 
     if (nw > 0)
       wk.unpack_warp_params(result.x_outer);
-    wk.m_theta = arma::exp(result.x_inner);
+    wk.m_theta = from_gamma(result.x_inner);
     wk.refresh_cache();
     return -wk.concentrated_ll();  // return neg LL for consistency
   };
@@ -1944,7 +1973,28 @@ void WarpKriging::optimise_joint(const std::string& method) {
 }
 
 // -------------------------------------------------------------------------
-//  fit()
+//  fit()  —  map-based overload (tuning knobs via string map)
+// -------------------------------------------------------------------------
+void WarpKriging::fit(const arma::vec& y,
+                      const arma::mat& X,
+                      const std::string& regmodel,
+                      bool normalize,
+                      const std::string& optim,
+                      const std::string& objective,
+                      const std::map<std::string, std::string>& parameters) {
+  for (const auto& [key, val] : parameters) {
+    if (key == "adam_lr")
+      m_adam_lr = std::stod(val);
+    if (key == "max_iter_adam")
+      m_max_iter_adam = std::stoul(val);
+    if (key == "max_iter_bfgs")
+      m_max_iter_bfgs = std::stoul(val);
+  }
+  fit(y, X, regmodel, normalize, optim, objective, Parameters{});
+}
+
+// -------------------------------------------------------------------------
+//  fit()  —  typed-parameters overload (θ / warp-params seeds)
 // -------------------------------------------------------------------------
 void WarpKriging::fit(const arma::vec& y,
                       const arma::mat& X,
@@ -1952,7 +2002,7 @@ void WarpKriging::fit(const arma::vec& y,
                       bool normalize,
                       const std::string& optim,
                       const std::string& /*objective*/,
-                      const std::map<std::string, std::string>& parameters) {
+                      const Parameters& parameters) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
@@ -1966,15 +2016,6 @@ void WarpKriging::fit(const arma::vec& y,
   m_regmodel = regmodel;
   m_normalize = normalize;
 
-  for (const auto& [key, val] : parameters) {
-    if (key == "adam_lr")
-      m_adam_lr = std::stod(val);
-    if (key == "max_iter_adam")
-      m_max_iter_adam = std::stoul(val);
-    if (key == "max_iter_bfgs")
-      m_max_iter_bfgs = std::stoul(val);
-  }
-
   normalise_data();
 
   // In joint mode, instantiate the WarpMLPJoint now that we know d_in
@@ -1987,9 +2028,28 @@ void WarpKriging::fit(const arma::vec& y,
     m_feature_dim = spec.d_out;
   }
 
-  m_theta = arma::ones<arma::vec>(m_feature_dim);
-  // σ̂² is concentrated — computed in refresh_cache
+  // θ seed: use caller-supplied value or default to 1.
+  if (parameters.theta.has_value()) {
+    const arma::vec& t0 = *parameters.theta;
+    if (t0.n_elem != m_feature_dim)
+      throw std::invalid_argument("fit: parameters.theta has " + std::to_string(t0.n_elem)
+                                  + " elements but feature_dim is " + std::to_string(m_feature_dim));
+    m_theta = t0;
+  } else {
+    m_theta = arma::ones<arma::vec>(m_feature_dim);
+  }
 
+  // Warp-params seed: unpack into warp objects (if provided and non-empty).
+  if (parameters.warp_params.has_value() && parameters.warp_params->n_elem > 0) {
+    const arma::vec& wp = *parameters.warp_params;
+    arma::uword nw = total_warp_params();
+    if (wp.n_elem != nw)
+      throw std::invalid_argument("fit: parameters.warp_params has " + std::to_string(wp.n_elem)
+                                  + " elements but total_warp_params is " + std::to_string(nw));
+    unpack_warp_params(wp);
+  }
+
+  // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
   optimise_joint(optim);
   m_fitted = true;

@@ -47,12 +47,25 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
 
 namespace libKriging {
+
+// =========================================================================
+//  WarpKriging fit parameters (seed values + freeze flags)
+// =========================================================================
+struct WarpKrigingParameters {
+  /// Optional θ seed for the L-BFGS start point. When set, replaces the
+  /// default θ₀ = 1 initial guess and is used as the first multistart seed.
+  std::optional<arma::vec> theta;
+  /// Optional packed warp-params seed. When set, it is unpacked into the
+  /// warp objects before optimisation starts (first multistart seed).
+  std::optional<arma::vec> warp_params;
+};
 
 // =========================================================================
 //  Per-variable warping specification
@@ -448,6 +461,8 @@ enum class WarpBaseKernel { Gauss, Matern32, Matern52, Exp };
  */
 class WarpKriging {
  public:
+  using Parameters = WarpKrigingParameters;
+
   // -----------------------------------------------------------------------
   //  Construction
   // -----------------------------------------------------------------------
@@ -484,6 +499,15 @@ class WarpKriging {
                              const std::string& optim = "BFGS+Adam",
                              const std::string& objective = "LL",
                              const std::map<std::string, std::string>& parameters = {});
+
+  /// Typed-parameters overload: lets callers seed θ / warp params.
+  LIBKRIGING_EXPORT void fit(const arma::vec& y,
+                             const arma::mat& X,
+                             const std::string& regmodel,
+                             bool normalize,
+                             const std::string& optim,
+                             const std::string& objective,
+                             const Parameters& parameters);
 
   // -----------------------------------------------------------------------
   //  Prediction

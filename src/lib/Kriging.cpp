@@ -1008,14 +1008,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   if (objective.compare("LL") == 0) {
     if (Optim::reparametrize) {
       fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
-        // Change variable for opt: . -> 1/exp(.)
+        // Change variable for opt: gamma = log(theta)
         const arma::vec _theta = Optim::reparam_from(_gamma);
         double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
+        // Note: reparam_from_deriv2 expects theta-space grad, so compute Hessian first.
+        if (hess_out != nullptr && grad_out != nullptr) {
+          *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
+        }
         if (grad_out != nullptr) {
           *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
-        }
-        if (hess_out != nullptr) {
-          *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
         }
         return -ll;
       };
@@ -1175,46 +1176,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     }
 
   } else {
-    arma::vec theta_lower = Optim::theta_lower_factor * m_maxdX;
-    arma::vec theta_upper = Optim::theta_upper_factor * m_maxdX;
-
-    if (Optim::variogram_bounds_heuristic) {
-      arma::vec dy2 = arma::vec(n * n, arma::fill::zeros);
-      for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
-        int i = (int)ij / n;
-        int j = ij % n;  // i,j <-> i*n+j
-        if (i < j) {
-          dy2[ij] = m_y.at(i) - m_y.at(j);
-          dy2[ij] *= dy2[ij];
-          dy2[j * n + i] = dy2[ij];
-        }
-      }
-      // dy2 /= arma::var(m_y);
-      arma::vec dy2dX2_slope = dy2 / arma::sum(m_dX % m_dX, 0).t();
-      // arma::cout << "dy2dX_slope:" << dy2dX_slope << arma::endl;
-      dy2dX2_slope.replace(arma::datum::nan, 0.0);  // we are not interested in same points where dX=0, and dy=0
-      arma::vec w = dy2dX2_slope / sum(dy2dX2_slope);
-      arma::mat steepest_dX_mean = arma::abs(m_dX) * w;
-      // arma::cout << "steepest_dX_mean:" << steepest_dX_mean << arma::endl;
-
-      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor * steepest_dX_mean);
-      // no, only relevant for inf bound: theta_upper = arma::min(theta_upper, Optim::theta_upper_factor *
-      // steepest_dX_mean);
-      theta_lower = arma::min(theta_lower, theta_upper);
-      theta_upper = arma::max(theta_lower, theta_upper);
-    }
-    // arma::cout << "theta_lower:" << theta_lower << arma::endl;
-    // arma::cout << "theta_upper:" << theta_upper << arma::endl;
+    auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);
+    arma::vec theta_lower = theta_bounds_pair.first;
+    arma::vec theta_upper = theta_bounds_pair.second;
 
     if (optim.rfind("BFGS", 0) == 0) {
       Random::init();
 
-      int multistart = 1;
-      try {
-        multistart = std::stoi(optim.substr(4));
-      } catch (std::invalid_argument&) {
-        // let multistart = 1
-      }
+      auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
+      int multistart = parsed_bfgs.second;
 
       // Configure threads for Armadillo/BLAS to balance nested parallelism
       // Each of the 'multistart' threads will use internal parallelism
@@ -1260,8 +1230,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       arma::vec gamma_lower = theta_lower;
       arma::vec gamma_upper = theta_upper;
       if (Optim::reparametrize) {
-        gamma_lower = Optim::reparam_to(theta_upper);
-        gamma_upper = Optim::reparam_to(theta_lower);
+        gamma_lower = Optim::reparam_to(theta_lower);
+        gamma_upper = Optim::reparam_to(theta_upper);
       }
 
       double min_ofn = std::numeric_limits<double>::infinity();
@@ -1584,12 +1554,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     } else if (optim.rfind("Newton", 0) == 0) {
       Random::init();
 
-      int multistart = 1;
-      try {
-        multistart = std::stoi(optim.substr(6));
-      } catch (std::invalid_argument&) {
-        // let multistart = 1
-      }
+      auto parsed_nwt = Optim::parse_method(optim, "Newton");
+      int multistart = parsed_nwt.second;
 
       theta0 = arma::repmat(trans(theta_lower), multistart, 1)
                + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
@@ -1606,8 +1572,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       arma::vec gamma_lower = theta_lower;
       arma::vec gamma_upper = theta_upper;
       if (Optim::reparametrize) {
-        gamma_lower = Optim::reparam_to(theta_upper);
-        gamma_upper = Optim::reparam_to(theta_lower);
+        gamma_lower = Optim::reparam_to(theta_lower);
+        gamma_upper = Optim::reparam_to(theta_upper);
       }
 
       double min_ofn = std::numeric_limits<double>::infinity();

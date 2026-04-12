@@ -46,17 +46,24 @@ LIBKRIGING_EXPORT bool Optim::is_reparametrized() {
   return Optim::reparametrize;
 };
 
-std::function<double(const double&)> Optim::reparam_to_ = [](const double& _theta) { return -std::log(_theta); };
+// Unified reparametrization: gamma = log(theta), theta = exp(gamma).
+// Chain rule (theta-space grad -> gamma-space grad): dL/dgamma = dL/dtheta * theta.
+// Hessian (theta-space hess -> gamma-space hess):
+//   d2L/dgamma_k dgamma_l = theta_k * theta_l * d2L/dtheta_k dtheta_l + delta_kl * theta_k * dL/dtheta_k
+std::function<double(const double&)> Optim::reparam_to_ = [](const double& _theta) { return std::log(_theta); };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_to
-    = [](const arma::vec& _theta) { return arma::conv_to<arma::colvec>::from(-arma::log(_theta)); };
-std::function<double(const double&)> Optim::reparam_from_ = [](const double& _gamma) { return std::exp(-_gamma); };
+    = [](const arma::vec& _theta) { return arma::conv_to<arma::colvec>::from(arma::log(_theta)); };
+std::function<double(const double&)> Optim::reparam_from_ = [](const double& _gamma) { return std::exp(_gamma); };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_from
-    = [](const arma::vec& _gamma) { return arma::conv_to<arma::colvec>::from(arma::exp(-_gamma)); };
+    = [](const arma::vec& _gamma) { return arma::conv_to<arma::colvec>::from(arma::exp(_gamma)); };
 std::function<arma::vec(const arma::vec&, const arma::vec&)> Optim::reparam_from_deriv =
-    [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(-_grad % _theta); };
+    [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(_grad % _theta); };
 std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> Optim::reparam_from_deriv2
-    = [](const arma::vec& _theta, const arma::vec& _grad, const arma::mat& _hess) {
-        return arma::conv_to<arma::mat>::from(_grad - _hess % _theta);
+    = [](const arma::vec& _theta, const arma::vec& _grad_theta, const arma::mat& _hess_theta) {
+        // Returns gamma-space Hessian given theta-space grad and Hessian.
+        arma::mat H = _hess_theta % (_theta * _theta.t());
+        H.diag() += _grad_theta % _theta;
+        return H;
       };
 
 double Optim::theta_lower_factor = get_env_or_default("LK_THETA_LOWER_FACTOR", 0.02);
@@ -140,6 +147,66 @@ LIBKRIGING_EXPORT void Optim::set_thread_start_delay_ms(int delay_ms) {
 LIBKRIGING_EXPORT int Optim::get_thread_start_delay_ms() {
   return Optim::thread_start_delay_ms;
 };
+
+LIBKRIGING_EXPORT std::pair<std::string, int> Optim::parse_method(const std::string& method,
+                                                                   const std::string& prefix) {
+  if (method.rfind(prefix, 0) != 0)
+    return {method, 1};
+
+  // Find end of digits after prefix
+  size_t pos = prefix.size();
+  size_t num_end = pos;
+  while (num_end < method.size() && std::isdigit(static_cast<unsigned char>(method[num_end])))
+    ++num_end;
+
+  if (num_end == pos)
+    return {method, 1};
+
+  int multistart = 1;
+  try {
+    multistart = std::stoi(method.substr(pos, num_end - pos));
+  } catch (...) {
+    multistart = 1;
+  }
+  if (multistart < 1)
+    multistart = 1;
+
+  // Reconstruct base method: prefix + everything after the digits
+  std::string base = prefix + method.substr(num_end);
+  return {base, multistart};
+}
+
+LIBKRIGING_EXPORT std::pair<arma::vec, arma::vec> Optim::theta_bounds(const arma::vec& maxdX,
+                                                                      const arma::mat& dX,
+                                                                      const arma::vec& y,
+                                                                      arma::uword n) {
+  arma::vec theta_lower = Optim::theta_lower_factor * maxdX;
+  arma::vec theta_upper = Optim::theta_upper_factor * maxdX;
+
+  if (Optim::variogram_bounds_heuristic && n > 0 && dX.n_cols == n * n) {
+    arma::vec dy2(n * n, arma::fill::zeros);
+    for (arma::uword ij = 0; ij < dy2.n_elem; ++ij) {
+      arma::uword i = ij / n;
+      arma::uword j = ij % n;
+      if (i < j) {
+        double d = y.at(i) - y.at(j);
+        dy2[ij] = d * d;
+        dy2[j * n + i] = dy2[ij];
+      }
+    }
+    arma::vec dy2dX2_slope = dy2 / arma::sum(dX % dX, 0).t();
+    dy2dX2_slope.replace(arma::datum::nan, 0.0);
+    double wsum = arma::sum(dy2dX2_slope);
+    if (wsum > 0.0) {
+      arma::vec w = dy2dX2_slope / wsum;
+      arma::vec steepest_dX_mean = arma::abs(dX) * w;
+      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor * steepest_dX_mean);
+      theta_lower = arma::min(theta_lower, theta_upper);
+      theta_upper = arma::max(theta_lower, theta_upper);
+    }
+  }
+  return {theta_lower, theta_upper};
+}
 
 int Optim::thread_pool_size = get_env_or_default("LK_THREAD_POOL_SIZE", 0);  // 0 means auto-detect (ncpu/4)
 

@@ -668,26 +668,38 @@ LIBKRIGING_EXPORT double NuggetKriging::logMargPost() {
   return std::get<0>(NuggetKriging::logMargPostFun(_theta_alpha, false, false));
 }
 
+// Unified +log reparametrization for theta dims:   gamma_k = log(theta_k), theta_k = exp(gamma_k).
+// Alpha dimension keeps a dedicated transform that is monotone increasing in alpha and has
+// a non-vanishing Jacobian near alpha_lower (plain log(alpha) would make BFGS stall at the
+// lower bound because d(alpha)/d(log alpha) = alpha -> 0):
+//   gamma_alpha = -log(1 + alpha_lower - alpha)
+//   alpha        = 1 + alpha_lower - exp(-gamma_alpha)
+//   d(alpha)/d(gamma_alpha) = 1 + alpha_lower - alpha
+// Maps alpha in [alpha_lower, 1] -> gamma_alpha in [0, -log(alpha_lower)], monotone increasing
+// so bounds do not need to be swapped (consistent with the +log convention for theta).
 std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_to = [](const arma::vec& _theta_alpha) {
-  arma::vec _theta_malpha = _theta_alpha;
   const arma::uword d = _theta_alpha.n_elem - 1;
-  _theta_malpha.at(d) = 1 + alpha_lower - _theta_malpha.at(d);
-  return Optim::reparam_to(_theta_malpha);
+  arma::vec gamma(_theta_alpha.n_elem);
+  gamma.head(d) = Optim::reparam_to(_theta_alpha.head(d));
+  gamma.at(d) = -std::log(1.0 + alpha_lower - _theta_alpha.at(d));
+  return gamma;
 };
 
 std::function<arma::vec(const arma::vec&)> NuggetKriging::reparam_from = [](const arma::vec& _gamma) {
-  arma::vec _theta_alpha = Optim::reparam_from(_gamma);
-  const arma::uword d = _theta_alpha.n_elem - 1;
-  _theta_alpha.at(d) = 1 + alpha_lower - _theta_alpha.at(d);
-  return _theta_alpha;
+  const arma::uword d = _gamma.n_elem - 1;
+  arma::vec theta_alpha(_gamma.n_elem);
+  theta_alpha.head(d) = Optim::reparam_from(_gamma.head(d));
+  theta_alpha.at(d) = 1.0 + alpha_lower - std::exp(-_gamma.at(d));
+  return theta_alpha;
 };
 
 std::function<arma::vec(const arma::vec&, const arma::vec&)> NuggetKriging::reparam_from_deriv
     = [](const arma::vec& _theta_alpha, const arma::vec& _grad) {
-        arma::vec D_theta_alpha = arma::conv_to<arma::vec>::from(-_grad % _theta_alpha);
-        const arma::uword d = D_theta_alpha.n_elem - 1;
-        D_theta_alpha.at(d) = (1 + alpha_lower - _theta_alpha.at(d)) * _grad.at(d);
-        return D_theta_alpha;
+        const arma::uword d = _theta_alpha.n_elem - 1;
+        arma::vec D(_theta_alpha.n_elem);
+        D.head(d) = Optim::reparam_from_deriv(_theta_alpha.head(d), _grad.head(d));
+        D.at(d) = _grad.at(d) * (1.0 + alpha_lower - _theta_alpha.at(d));
+        return D;
       };
 
 double NuggetKriging::alpha_upper = 1.0;   // means nugget variance is 0
@@ -878,43 +890,11 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
   } else if (optim.rfind("BFGS", 0) == 0) {
     Random::init();
 
-    arma::vec theta_lower = Optim::theta_lower_factor * m_maxdX;
-    arma::vec theta_upper = Optim::theta_upper_factor * m_maxdX;
-
-    if (Optim::variogram_bounds_heuristic) {
-      arma::vec dy2 = arma::vec(n * n, arma::fill::zeros);
-      for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
-        int i = (int)ij / n;
-        int j = ij % n;  // i,j <-> i*n+j
-        if (i < j) {
-          dy2[ij] = m_y.at(i) - m_y.at(j);
-          dy2[ij] *= dy2[ij];
-          dy2[j * n + i] = dy2[ij];
-        }
-      }
-      // dy2 /= arma::var(m_y);
-      arma::vec dy2dX2_slope = dy2 / arma::sum(m_dX % m_dX, 0).t();
-      // arma::cout << "dy2dX_slope:" << dy2dX_slope << arma::endl;
-      dy2dX2_slope.replace(arma::datum::nan, 0.0);  // we are not interested in same points where dX=0, and dy=0
-      arma::vec w = dy2dX2_slope / sum(dy2dX2_slope);
-      arma::mat steepest_dX_mean = arma::abs(m_dX) * w;
-      // arma::cout << "steepest_dX_mean:" << steepest_dX_mean << arma::endl;
-
-      theta_lower = arma::max(theta_lower, Optim::theta_lower_factor * steepest_dX_mean);
-      // no, only relevant for inf bound: theta_upper = arma::min(theta_upper, Optim::theta_upper_factor *
-      // steepest_dX_mean);
-      theta_lower = arma::min(theta_lower, theta_upper);
-      theta_upper = arma::max(theta_lower, theta_upper);
-    }
-    // arma::cout << "theta_lower:" << theta_lower << arma::endl;
-    // arma::cout << "theta_upper:" << theta_upper << arma::endl;
-
-    int multistart = 1;
-    try {
-      multistart = std::stoi(optim.substr(4));
-    } catch (std::invalid_argument&) {
-      // let multistart = 1
-    }
+    auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);
+    arma::vec theta_lower = theta_bounds_pair.first;
+    arma::vec theta_upper = theta_bounds_pair.second;
+    auto parsed = Optim::parse_method(optim, "BFGS");
+    int multistart = parsed.second;
 
     // Configure threads for Armadillo/BLAS to balance nested parallelism
     // Each of the 'multistart' threads will use internal parallelism
@@ -983,12 +963,8 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     gamma_upper.head(d) = theta_upper;
     gamma_upper.at(d) = alpha_upper;
     if (Optim::reparametrize) {
-      arma::vec gamma_lower_tmp = gamma_lower;
-      gamma_lower = NuggetKriging::reparam_to(gamma_upper);
-      gamma_upper = NuggetKriging::reparam_to(gamma_lower_tmp);
-      double gamma_lower_at_d = gamma_lower.at(d);
-      gamma_lower.at(d) = gamma_upper.at(d);
-      gamma_upper.at(d) = gamma_lower_at_d;
+      gamma_lower = NuggetKriging::reparam_to(gamma_lower);
+      gamma_upper = NuggetKriging::reparam_to(gamma_upper);
     }
 
     double min_ofn = std::numeric_limits<double>::infinity();

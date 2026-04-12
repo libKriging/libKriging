@@ -539,12 +539,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     // arma::cout << "theta_lower:" << theta_lower << arma::endl;
     // arma::cout << "theta_upper:" << theta_upper << arma::endl;
 
-    int multistart = 1;
-    try {
-      multistart = std::stoi(optim.substr(4));
-    } catch (std::invalid_argument&) {
-      // let multistart = 1
-    }
+    auto parsed = Optim::parse_method(optim, "BFGS");
+    int multistart = parsed.second;
 
     // Configure threads for Armadillo/BLAS to balance nested parallelism
     // Each of the 'multistart' threads will use internal parallelism
@@ -610,9 +606,8 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     gamma_upper.head(d) = theta_upper;
     gamma_upper.at(d) = sigma2_upper;
     if (Optim::reparametrize) {
-      arma::vec gamma_lower_tmp = gamma_lower;
-      gamma_lower = Optim::reparam_to(gamma_upper);
-      gamma_upper = Optim::reparam_to(gamma_lower_tmp);
+      gamma_lower = Optim::reparam_to(gamma_lower);
+      gamma_upper = Optim::reparam_to(gamma_upper);
     }
 
     // Set estimation flags before parallel execution

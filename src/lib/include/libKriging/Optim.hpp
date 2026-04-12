@@ -18,6 +18,23 @@ class Optim {
   static std::function<arma::vec(const arma::vec&, const arma::vec&)> reparam_from_deriv;
   static std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> reparam_from_deriv2;
 
+  // Parse an optimizer method string of the form "<prefix><N>[<suffix>]".
+  // Returns {base_method_without_N, multistart_count}.
+  //   parse_method("BFGS")         -> {"BFGS", 1}
+  //   parse_method("BFGS10")       -> {"BFGS", 10}
+  //   parse_method("BFGS5+Adam")   -> {"BFGS+Adam", 5}
+  //   parse_method("Newton3")      -> {"Newton", 3}   (with prefix="Newton")
+  LIBKRIGING_EXPORT static std::pair<std::string, int> parse_method(const std::string& method,
+                                                                    const std::string& prefix = "BFGS");
+
+  // Data-driven θ bounds with optional variogram-slope heuristic (gated by
+  // Optim::variogram_bounds_heuristic). The dX matrix holds pairwise input
+  // (or feature) differences laid out as d × n² with column (i*n+j) = x_i − x_j.
+  LIBKRIGING_EXPORT static std::pair<arma::vec, arma::vec> theta_bounds(const arma::vec& maxdX,
+                                                                        const arma::mat& dX,
+                                                                        const arma::vec& y,
+                                                                        arma::uword n);
+
   static double theta_lower_factor;
   LIBKRIGING_EXPORT static void set_theta_lower_factor(double _theta_lower_factor);
   LIBKRIGING_EXPORT static double get_theta_lower_factor();
