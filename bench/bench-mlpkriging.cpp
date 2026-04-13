@@ -167,7 +167,7 @@ void benchmark_mlpkriging(const MLPConfig& config, arma::uword n_train, arma::uw
     // Benchmark SIMULATE
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      arma::mat sims = mk.simulate(10, 42 + iter, X_pred);
+      arma::mat sims = mk.simulate(100, 42 + iter, X_pred);
       auto t1 = std::chrono::high_resolution_clock::now();
       simulate_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }

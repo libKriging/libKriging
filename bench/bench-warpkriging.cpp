@@ -174,10 +174,27 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
     }
   }
 
+  // Prepare update data (10% of training data)
+  arma::uword n_update = std::max(static_cast<arma::uword>(1), n_train / 10);
+  arma::mat X_update(n_update, d, arma::fill::randu);
+  if (config.mixed_input) {
+    for (arma::uword i = 0; i < n_update; ++i) {
+      X_update(i, 0) = std::floor(X_update(i, 0) * N_LEVELS);
+      if (X_update(i, 0) >= N_LEVELS)
+        X_update(i, 0) = N_LEVELS - 1;
+    }
+  }
+  arma::colvec y_update(n_update);
+  auto test_fn_upd = config.mixed_input ? test_function_mixed : test_function_continuous;
+  for (arma::uword i = 0; i < n_update; ++i) {
+    y_update(i) = test_fn_upd(X_update.row(i));
+  }
+
   // Storage for timing results
   std::vector<double> fit_times;
   std::vector<double> predict_times;
   std::vector<double> simulate_times;
+  std::vector<double> update_times;
   std::vector<double> ll_values;
 
   for (int iter = 0; iter < n_iterations; ++iter) {
@@ -203,9 +220,17 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
     // Benchmark SIMULATE
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      arma::mat sims = wk.simulate(10, 42 + iter, X_pred);
+      arma::mat sims = wk.simulate(100, 42 + iter, X_pred);
       auto t1 = std::chrono::high_resolution_clock::now();
       simulate_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+    }
+
+    // Benchmark UPDATE
+    {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      wk.update(y_update, X_update);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      update_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
   }
 
@@ -214,6 +239,7 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
   print_stats("fit", compute_stats(fit_times));
   print_stats("predict", compute_stats(predict_times));
   print_stats("simulate", compute_stats(simulate_times));
+  print_stats("update", compute_stats(update_times));
 
   // Print LL summary
   auto ll_stats = compute_stats(ll_values);
