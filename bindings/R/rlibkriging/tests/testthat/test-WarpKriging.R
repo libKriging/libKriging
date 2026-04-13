@@ -271,7 +271,7 @@ test_that("logLikelihoodFun works with analytical gradient", {
                    parameters = list(max_iter_adam = "100"))
 
   th <- theta(k)
-  ll <- logLikelihoodFun(k, th, grad = TRUE)
+  ll <- logLikelihoodFun(k, th, return_grad = TRUE)
 
   expect_true(is.finite(ll$logLikelihood))
   expect_true(all(is.finite(ll$gradient)))
@@ -325,6 +325,43 @@ test_that("Summary and accessors work", {
   cat("  theta:", th, "\n")
   cat("  sigma2:", s2, "\n")
   cat("  warping:", ws, "\n")
+
+  expect_true(is_fitted(k))
+})
+
+# ===========================================================================
+#  Test 15: Predict with derivatives
+# ===========================================================================
+test_that("predict with deriv returns finite derivatives", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+
+  k <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                   parameters = list(max_iter_adam = "100"))
+
+  X_new <- as.matrix(seq(0.1, 0.9, length.out = 5))
+  p <- predict(k, X_new, return_stdev = TRUE, return_deriv = TRUE)
+  expect_true(!is.null(p$mean_deriv))
+  expect_true(!is.null(p$stdev_deriv))
+  expect_equal(dim(p$mean_deriv), c(5, 1))
+  expect_equal(dim(p$stdev_deriv), c(5, 1))
+  expect_true(all(is.finite(p$mean_deriv)))
+  expect_true(all(is.finite(p$stdev_deriv)))
+})
+
+# ===========================================================================
+#  Test 16: Getters (feature_dim)
+# ===========================================================================
+test_that("feature_dim getter works", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+
+  k <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                   parameters = list(max_iter_adam = "100"))
+
+  expect_true(feature_dim(k) > 0)
+  expect_true(all(theta(k) > 0))
+  expect_true(sigma2(k) > 0)
 })
 
 # ===========================================================================
@@ -337,61 +374,7 @@ test_that("warp helpers produce correct strings", {
   expect_equal(warp_kumaraswamy(), "kumaraswamy")
   expect_equal(warp_neural_mono(16), "neural_mono(16)")
   expect_equal(warp_mlp(c(16, 8), 3, "selu"), "mlp(16:8,3,selu)")
-  expect_equal(warp_mlp_joint(c(32, 16), 3, "tanh"), "mlp_joint(32:16,3,tanh)")
   expect_equal(warp_categorical(5, 2), "categorical(5,2)")
   expect_equal(warp_ordinal(4), "ordinal(4)")
 })
 
-# ===========================================================================
-#  Test 15: mlp_joint (Deep Kernel Learning — replaces NeuralKernelKriging)
-# ===========================================================================
-test_that("mlp_joint works (1D)", {
-  X <- as.matrix(seq(0.01, 0.99, length.out = 10))
-  y <- f1d(X)
-
-  k <- WarpKriging(y, X,
-                   warping = "mlp_joint(16:8,2,selu)",
-                   kernel = "gauss", normalize = TRUE,
-                   parameters = list(max_iter_adam = "300"))
-  cat(summary(k))
-
-  p <- predict(k, X, stdev = TRUE)
-  cat("  [1D] Max train error:", max(abs(p$mean - y)), "\n")
-  expect_true(all(is.finite(p$mean)))
-
-  ws <- warping(k)
-  expect_equal(ws, "mlp_joint(16:8,2,selu)")
-})
-
-test_that("mlp_joint works (Branin 2D)", {
-  branin <- function(x1, x2) {
-    a <- 1; b <- 5.1 / (4 * pi^2); cc <- 5 / pi
-    r <- 6; s <- 10; t <- 1 / (8 * pi)
-    a * (x2 - b * x1^2 + cc * x1 - r)^2 + s * (1 - t) * cos(x1) + s
-  }
-  set.seed(77)
-  n <- 20
-  X <- matrix(runif(n * 2), ncol = 2)
-  y <- mapply(function(i) branin(X[i, 1] * 15 - 5, X[i, 2] * 15), 1:n)
-
-  k <- WarpKriging(y, X,
-                   warping = "mlp_joint(32:16,3,selu)",
-                   kernel = "matern5_2", normalize = TRUE,
-                   parameters = list(max_iter_adam = "300"))
-  cat(summary(k))
-
-  X_test <- matrix(runif(10 * 2), ncol = 2)
-  p <- predict(k, X_test, stdev = TRUE)
-  expect_equal(length(p$mean), 10)
-  expect_true(all(is.finite(p$stdev)))
-
-  sims <- simulate(k, nsim = 20, seed = 42, x = X_test)
-  expect_equal(dim(sims), c(10, 20))
-  expect_true(all(is.finite(sims)))
-
-  # Update
-  X_new <- matrix(runif(3 * 2), ncol = 2)
-  y_new <- mapply(function(i) branin(X_new[i, 1] * 15 - 5, X_new[i, 2] * 15), 1:3)
-  update(k, y_new, X_new)
-  cat("  n after update:", length(predict(k, X_test)$mean), "predictions OK\n")
-})

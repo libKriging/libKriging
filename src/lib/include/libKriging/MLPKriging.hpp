@@ -1,0 +1,238 @@
+#ifndef LIBKRIGING_MLP_KRIGING_HPP
+#define LIBKRIGING_MLP_KRIGING_HPP
+
+/**
+ * @file MLPKriging.hpp
+ * @brief Kriging with a joint MLP feature map (≡ Deep Kernel Learning / NeuralKernelKriging).
+ *
+ * A single multi-layer perceptron Φ : ℝ^d → ℝ^{d_out} warps the FULL input
+ * vector jointly (cross-variable interactions), and a Gaussian process is
+ * fitted on the warped features Φ(x).
+ *
+ *     k(x, x') = σ² · k_base(Φ(x), Φ(x') ; θ)
+ *
+ * Unlike WarpKriging (which concatenates per-variable warps), MLPKriging
+ * uses one joint network — this is the \"mlp_joint\" variant extracted into
+ * its own class for clarity.
+ *
+ * The public API mirrors libKriging::Kriging:
+ *     fit(), predict(), simulate(), update(), summary(),
+ *     logLikelihood(), logLikelihoodFun()
+ */
+
+#include "libKriging/WarpKriging.hpp"  // for WarpMLPJoint, WarpBaseKernel
+#include "libKriging/libKriging_exports.h"
+#include "libKriging/utils/lk_armadillo.hpp"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <vector>
+
+namespace libKriging {
+
+// =========================================================================
+//  MLPKriging fit parameters (seed values)
+// =========================================================================
+struct MLPKrigingParameters {
+  std::optional<arma::vec> theta;        ///< θ seed (size d_out)
+  std::optional<arma::vec> warp_params;  ///< joint-MLP param seed (flat vec)
+};
+
+/**
+ * @brief Kriging with a joint MLP feature map.
+ *
+ * Model:
+ *     y(x) = f(Φ(x))^T β  +  ζ(x)
+ *     Φ(x) = MLP(x ; W)          // joint, cross-variable
+ *     Cov[ζ(x), ζ(x')] = σ² · k_base(Φ(x), Φ(x') ; θ)
+ *
+ * All parameters (W, θ, β, σ²) are optimised jointly by maximising the
+ * concentrated marginal log-likelihood.  σ² and β are profiled out.
+ */
+class MLPKriging {
+ public:
+  using Parameters = MLPKrigingParameters;
+
+  // -----------------------------------------------------------------------
+  //  Construction
+  // -----------------------------------------------------------------------
+
+  /**
+   * @brief Light constructor (architecture only — no data).
+   * @param hidden_dims  sizes of hidden layers, e.g. {32, 16}
+   * @param d_out        output dimensionality of Φ (and size of θ)
+   * @param activation   hidden activation ("selu", "relu", "tanh", "sigmoid", "elu")
+   * @param kernel       base kernel: "gauss", "matern3_2", "matern5_2", "exp"
+   */
+  LIBKRIGING_EXPORT MLPKriging(const std::vector<arma::uword>& hidden_dims,
+                                arma::uword d_out = 2,
+                                const std::string& activation = "selu",
+                                const std::string& kernel = "gauss");
+
+  /**
+   * @brief Full constructor with immediate fitting.
+   */
+  LIBKRIGING_EXPORT MLPKriging(const arma::vec& y,
+                                const arma::mat& X,
+                                const std::vector<arma::uword>& hidden_dims,
+                                arma::uword d_out,
+                                const std::string& activation,
+                                const std::string& kernel,
+                                const std::string& regmodel = "constant",
+                                bool normalize = false,
+                                const std::string& optim = "BFGS+Adam",
+                                const std::string& objective = "LL",
+                                const std::map<std::string, std::string>& parameters = {});
+
+  // -----------------------------------------------------------------------
+  //  Fitting
+  // -----------------------------------------------------------------------
+
+  LIBKRIGING_EXPORT void fit(const arma::vec& y,
+                             const arma::mat& X,
+                             const std::string& regmodel = "constant",
+                             bool normalize = false,
+                             const std::string& optim = "BFGS+Adam",
+                             const std::string& objective = "LL",
+                             const std::map<std::string, std::string>& parameters = {});
+
+  /// Typed-parameters overload: lets callers seed θ / warp params.
+  LIBKRIGING_EXPORT void fit(const arma::vec& y,
+                             const arma::mat& X,
+                             const std::string& regmodel,
+                             bool normalize,
+                             const std::string& optim,
+                             const std::string& objective,
+                             const Parameters& parameters);
+
+  // -----------------------------------------------------------------------
+  //  Prediction / simulation / update
+  // -----------------------------------------------------------------------
+
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& x_new,
+                                                                                              bool withStd = true,
+                                                                                              bool withCov = false,
+                                                                                              bool withDeriv
+                                                                                              = false) const;
+
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, uint64_t seed, const arma::mat& x_new) const;
+
+  LIBKRIGING_EXPORT void update(const arma::vec& y_new, const arma::mat& X_new);
+
+  // -----------------------------------------------------------------------
+  //  Log-likelihood
+  // -----------------------------------------------------------------------
+
+  LIBKRIGING_EXPORT double logLikelihood() const;
+
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta_gp,
+                                                                              bool withGrad = true,
+                                                                              bool withHess = false) const;
+
+  // -----------------------------------------------------------------------
+  //  Accessors
+  // -----------------------------------------------------------------------
+
+  LIBKRIGING_EXPORT std::string summary() const;
+
+  const arma::mat& X() const { return m_X; }
+  const arma::vec& y() const { return m_y; }
+  std::string kernel() const { return m_kernel_name; }
+  arma::vec theta() const { return m_theta; }
+  double sigma2() const { return m_sigma2; }
+  bool is_fitted() const { return m_fitted; }
+  arma::uword feature_dim() const { return m_d_out; }
+
+  /// Access to the underlying joint-MLP warping (for inspection).
+  const WarpMLPJoint& warp() const { return *m_joint_warp; }
+
+  /// Architecture accessors
+  const std::vector<arma::uword>& hidden_dims() const { return m_hidden_dims; }
+  arma::uword d_out() const { return m_d_out; }
+  const std::string& activation() const { return m_activation; }
+
+ private:
+  // ---- data ---------------------------------------------------------------
+  arma::vec m_y;
+  arma::mat m_X;
+  arma::mat m_Phi;   ///< warped design (n × d_out)
+  arma::mat m_dPhi;  ///< precomputed pairwise diffs (d_out × n*n)
+
+  // ---- joint warp (architecture + learned params) -------------------------
+  std::vector<arma::uword> m_hidden_dims;
+  arma::uword m_d_out = 2;
+  std::string m_activation = "selu";
+  std::unique_ptr<WarpMLPJoint> m_joint_warp;  ///< instantiated at fit() time (needs d_in)
+
+  // ---- normalisation ------------------------------------------------------
+  bool m_normalize = false;
+  arma::rowvec m_X_mean, m_X_std;
+  double m_y_mean = 0.0, m_y_std = 1.0;
+
+  // ---- trend --------------------------------------------------------------
+  std::string m_regmodel = "constant";
+  arma::mat m_F;
+  arma::vec m_beta;
+
+  // ---- kernel + hyper-params ----------------------------------------------
+  std::string m_kernel_name;
+  WarpBaseKernel m_base_kernel = WarpBaseKernel::Gauss;
+  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
+  void make_Cov(const std::string& kernel);
+  arma::vec m_theta;
+  double m_sigma2 = 1.0;
+
+  // ---- GP cache -----------------------------------------------------------
+  arma::mat m_R;      ///< correlation matrix (n×n)
+  arma::mat m_C;      ///< Cholesky(R + nugget), lower
+  arma::vec m_alpha;  ///< R^{-1}(y - Fβ)
+  double m_logdet = 0.0;
+
+  bool m_fitted = false;
+
+  // ---- optimiser knobs ----------------------------------------------------
+  arma::uword m_max_iter_bfgs = 100;
+  arma::uword m_max_iter_adam = 10;
+  double m_adam_lr = 1e-3;
+
+  // ---- private helpers ----------------------------------------------------
+  static WarpBaseKernel parse_kernel(const std::string& name);
+
+  arma::mat build_trend_matrix(const arma::mat& X) const;
+  arma::mat apply_warping(const arma::mat& X) const;
+
+  void compute_dPhi();
+  arma::mat build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const;
+
+  void refresh_cache();
+  void refresh_cache_theta_only();
+  void normalise_data();
+
+  double concentrated_ll() const;
+
+  arma::mat build_dR_dtheta_k(arma::uword k) const;
+  std::pair<double, arma::vec> concentrated_ll_and_grad_theta() const;
+
+  arma::mat dK_dPhi(const arma::mat& dL_dK) const;
+  arma::vec warp_gradient() const;
+
+  arma::uword total_warp_params() const;
+  arma::vec pack_warp_params() const;
+  void unpack_warp_params(const arma::vec& w);
+
+  void optimise_joint(const std::string& method);
+
+  MLPKriging clone_for_thread() const;
+
+  void ensure_joint_warp(arma::uword d_in);
+};
+
+}  // namespace libKriging
+
+#endif  // LIBKRIGING_MLP_KRIGING_HPP

@@ -318,3 +318,8 @@ target_link_libraries(WarpKrigingTest LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries WarpKrigingTest)
 add_test(NAME WarpKrigingTest COMMAND WarpKrigingTest)
 
+add_executable(MLPKrigingTest MLPKrigingTest.cpp)
+target_link_libraries(MLPKrigingTest LINK_PUBLIC Kriging)
+add_dependencies(all_test_binaries MLPKrigingTest)
+add_test(NAME MLPKrigingTest COMMAND MLPKrigingTest)
+

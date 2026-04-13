@@ -4,6 +4,7 @@
 #include "NuggetKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
+#include "MLPKriging_binding.hpp"
 #include "WarpKriging_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
@@ -351,6 +352,43 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::warping"_hash:
       return WarpKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "MLPKriging::new"_hash:
+      return MLPKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::delete"_hash:
+      return MLPKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::fit"_hash:
+      return MLPKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::predict"_hash:
+      return MLPKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::simulate"_hash:
+      return MLPKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::update"_hash:
+      return MLPKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::summary"_hash:
+      return MLPKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::logLikelihoodFun"_hash:
+      return MLPKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::logLikelihood"_hash:
+      return MLPKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::kernel"_hash:
+      return MLPKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::X"_hash:
+      return MLPKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::y"_hash:
+      return MLPKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::theta"_hash:
+      return MLPKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::sigma2"_hash:
+      return MLPKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::is_fitted"_hash:
+      return MLPKrigingBinding::is_fitted(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::feature_dim"_hash:
+      return MLPKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::hidden_dims"_hash:
+      return MLPKrigingBinding::hidden_dims(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::activation"_hash:
+      return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Optim::is_reparametrized"_hash:
       return OptimBinding::is_reparametrized(nlhs, plhs, nrhs - 1, prhs + 1);

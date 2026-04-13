@@ -1,6 +1,6 @@
-#include "WarpKriging_binding.hpp"
+#include "MLPKriging_binding.hpp"
 
-#include "libKriging/WarpKriging.hpp"
+#include "libKriging/MLPKriging.hpp"
 
 #include <map>
 #include <string>
@@ -8,7 +8,7 @@
 #include "tools/MxMapper.hpp"
 #include "tools/ObjectAccessor.hpp"
 
-using libKriging::WarpKriging;
+using libKriging::MLPKriging;
 
 // Convert a MATLAB struct to std::map<std::string, std::string>
 static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
@@ -26,7 +26,6 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
       continue;
     char* str = mxArrayToString(val);
     if (str == nullptr) {
-      // try numeric → string conversion
       if (mxIsNumeric(val) && mxGetNumberOfElements(val) == 1) {
         double dval = mxGetScalar(val);
         result[fname] = std::to_string(dval);
@@ -41,75 +40,49 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
   return result;
 }
 
-// Convert a MATLAB cell array of strings to std::vector<std::string>
-static std::vector<std::string> cellToStringVec(const mxArray* cell, const char* param_name) {
-  if (!mxIsCell(cell)) {
-    throw MxException(LOCATION(), "mLibKriging:badType", param_name, " must be a cell array of strings");
+// Convert an arma::vec of doubles (as given by the user) to std::vector<arma::uword>
+static std::vector<arma::uword> toUwordVec(const arma::vec& v) {
+  std::vector<arma::uword> out;
+  out.reserve(v.n_elem);
+  for (arma::uword i = 0; i < v.n_elem; ++i) {
+    out.push_back(static_cast<arma::uword>(v(i)));
   }
-  const mwSize n = mxGetNumberOfElements(cell);
-  std::vector<std::string> result(n);
-  for (mwSize i = 0; i < n; ++i) {
-    mxArray* elem = mxGetCell(cell, i);
-    if (elem == nullptr) {
-      throw MxException(LOCATION(), "mLibKriging:badType", param_name, " contains an empty cell element");
-    }
-    char* str = mxArrayToString(elem);
-    if (str == nullptr) {
-      throw MxException(LOCATION(), "mLibKriging:badType", param_name, " cell element is not a string");
-    }
-    result[i] = std::string(str);
-    mxFree(str);
-  }
-  return result;
+  return out;
 }
 
-// Convert std::vector<std::string> to a MATLAB cell array
-static mxArray* stringVecToCell(const std::vector<std::string>& vec) {
-  mxArray* cell = mxCreateCellMatrix(1, vec.size());
-  for (size_t i = 0; i < vec.size(); ++i) {
-    mxSetCell(cell, i, mxCreateString(vec[i].c_str()));
-  }
-  return cell;
+static mxArray* uwordVecToMat(const std::vector<arma::uword>& v) {
+  mxArray* a = mxCreateDoubleMatrix(1, v.size(), mxREAL);
+  double* p = mxGetPr(a);
+  for (size_t i = 0; i < v.size(); ++i)
+    p[i] = static_cast<double>(v[i]);
+  return a;
 }
 
-namespace WarpKrigingBinding {
+namespace MLPKrigingBinding {
 
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  // args: y, X, warping_cell, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct]
+  // args: y, X, hidden_dims, d_out, activation, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct]
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 9}};
+                 RequiresArg::Range{3, 11}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto y_vec = input.get<arma::vec>(0, "y vector");
   auto X_mat = input.get<arma::mat>(1, "X matrix");
-  auto warping = cellToStringVec(prhs[2], "warping");
-  auto kernel = input.getOptional<std::string>(3, "kernel").value_or("gauss");
-  auto regmodel = input.getOptional<std::string>(4, "regression model").value_or("constant");
-  auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
-  auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS+Adam");
-  auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
+  auto hidden_dims = toUwordVec(input.get<arma::vec>(2, "hidden_dims vector"));
+  auto d_out = static_cast<arma::uword>(input.getOptional<double>(3, "d_out").value_or(2.0));
+  auto activation = input.getOptional<std::string>(4, "activation").value_or("selu");
+  auto kernel = input.getOptional<std::string>(5, "kernel").value_or("gauss");
+  auto regmodel = input.getOptional<std::string>(6, "regression model").value_or("constant");
+  auto normalize = input.getOptional<bool>(7, "normalize").value_or(false);
+  auto optim = input.getOptional<std::string>(8, "optim").value_or("BFGS+Adam");
+  auto objective = input.getOptional<std::string>(9, "objective").value_or("LL");
   std::map<std::string, std::string> params;
-  if (nrhs > 8)
-    params = structToStringMap(prhs[8]);
-  auto wk = buildObject<WarpKriging>(y_vec, X_mat, warping, kernel, regmodel, normalize, optim, objective, params);
-  output.set(0, wk, "new object reference");
-}
-
-void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  MxMapper input{"Input",
-                 nrhs,
-                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  const auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  // Re-construct since WarpKriging is not copyable (contains unique_ptr)
-  auto wk_copy = buildObject<WarpKriging>(wk->warping_strings(), wk->kernel());
-  if (wk->is_fitted()) {
-    auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk_copy);
-    wk_ptr->fit(wk->y(), wk->X());
-  }
-  output.set(0, wk_copy, "copied object reference");
+  if (nrhs > 10)
+    params = structToStringMap(prhs[10]);
+  auto mk = buildObject<MLPKriging>(
+      y_vec, X_mat, hidden_dims, d_out, activation, kernel, regmodel, normalize, optim, objective, params);
+  output.set(0, mk, "new object reference");
 }
 
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -135,8 +108,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   std::map<std::string, std::string> params;
   if (nrhs > 7)
     params = structToStringMap(prhs[7]);
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->fit(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), regmodel, normalize, optim,
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  mk->fit(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), regmodel, normalize, optim,
           objective, params);
 }
 
@@ -146,14 +119,14 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{2, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
 
   const bool withStd = flag_output_compliance(input, 2, "with standard deviation", output, 1);
   const bool withCov = flag_output_compliance(input, 3, "with covariance", output, 2);
   const bool withDeriv = flag_output_compliance(input, 4, "with derivatives", output, 3);
 
   auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
-      = wk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
+      = mk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
   output.set(0, y_pred, "predicted y");
   if (withStd)
     output.set(1, stdev_pred, "predicted stdev");
@@ -171,10 +144,10 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
-  auto result = wk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"));
+  auto result = mk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"));
   output.set(0, result, "simulated values");
 }
 
@@ -184,8 +157,8 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{3}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"));
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  mk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"));
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -194,8 +167,8 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{0, 1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  auto desc = wk->summary();
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  auto desc = mk->summary();
   if (output.count() == 0) {
     mexPrintf("%s\n", desc.c_str());
   } else {
@@ -209,12 +182,12 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{2, 4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
 
   const bool withGrad = flag_output_compliance(input, 2, "with gradient", output, 1);
   const bool withHess = flag_output_compliance(input, 3, "with hessian", output, 2);
 
-  auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
+  auto [ll, grad, hess] = mk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
   output.set(0, ll, "log-likelihood value");
   if (withGrad)
     output.set(1, grad, "log-likelihood gradient");
@@ -228,8 +201,8 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->logLikelihood(), "log-likelihood value");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->logLikelihood(), "log-likelihood value");
 }
 
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -238,8 +211,8 @@ void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->kernel(), "kernel name");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->kernel(), "kernel name");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -248,8 +221,8 @@ void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->X(), "X matrix");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->X(), "X matrix");
 }
 
 void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -258,8 +231,8 @@ void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->y(), "y vector");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->y(), "y vector");
 }
 
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -268,8 +241,8 @@ void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->theta(), "theta vector");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->theta(), "theta vector");
 }
 
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -278,8 +251,8 @@ void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->sigma2(), "sigma2 value");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->sigma2(), "sigma2 value");
 }
 
 void is_fitted(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -288,8 +261,8 @@ void is_fitted(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, wk->is_fitted(), "is_fitted flag");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->is_fitted(), "is_fitted flag");
 }
 
 void feature_dim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -298,21 +271,30 @@ void feature_dim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, static_cast<double>(wk->feature_dim()), "feature dimension");
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, static_cast<double>(mk->feature_dim()), "feature dimension");
 }
 
-void warping(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void hidden_dims(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{1}};
-  // Output: we set directly since MxMapper doesn't handle cell arrays
   if (nlhs < 1) {
-    throw MxException(LOCATION(), "mLibKriging:badOutput", "warping requires at least one output");
+    throw MxException(LOCATION(), "mLibKriging:badOutput", "hidden_dims requires at least one output");
   }
-  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  plhs[0] = stringVecToCell(wk->warping_strings());
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  plhs[0] = uwordVecToMat(mk->hidden_dims());
 }
 
-}  // namespace WarpKrigingBinding
+void activation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->activation(), "activation name");
+}
+
+}  // namespace MLPKrigingBinding

@@ -114,3 +114,5 @@ add_python_test(NAME PyKrigingParametricTest FILENAME PyKriging_parametric_test.
 add_python_test(NAME KrigingCopyTest FILENAME PyKriging_copy_test.py)
 add_python_test(NAME binding_consistency FILENAME binding_consistency_test.py)
 add_python_test(NAME KrigingDemo FILENAME pylibkriging_demo.py)
+add_python_test(NAME WarpKriging FILENAME WarpKriging_test.py)
+add_python_test(NAME MLPKriging FILENAME MLPKriging_test.py)

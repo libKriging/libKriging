@@ -421,8 +421,12 @@ void* lk_warp_kriging_new_fit(const double* y,
                               const char* regmodel,
                               int normalize,
                               const char* optim,
-                              const char* objective);
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params);
 void lk_warp_kriging_delete(void* ptr);
+void* lk_warp_kriging_copy(void* ptr);
 
 int lk_warp_kriging_fit(void* ptr,
                         const double* y,
@@ -433,7 +437,10 @@ int lk_warp_kriging_fit(void* ptr,
                         const char* regmodel,
                         int normalize,
                         const char* optim,
-                        const char* objective);
+                        const char* objective,
+                        const char** param_keys,
+                        const char** param_vals,
+                        int n_params);
 
 int lk_warp_kriging_predict(void* ptr,
                             const double* X_n,
@@ -441,9 +448,12 @@ int lk_warp_kriging_predict(void* ptr,
                             int d,
                             int return_stdev,
                             int return_cov,
+                            int return_deriv,
                             double* mean_out,
                             double* stdev_out,
-                            double* cov_out);
+                            double* cov_out,
+                            double* mean_deriv_out,
+                            double* stdev_deriv_out);
 
 int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
 
@@ -469,6 +479,85 @@ int lk_warp_kriging_get_y(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_warp_kriging_get_sigma2(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
+
+/* --- MLPKriging --- */
+
+void* lk_mlp_kriging_new(const int* hidden_dims,
+                          int n_hidden,
+                          int d_out,
+                          const char* activation,
+                          const char* kernel);
+void* lk_mlp_kriging_new_fit(const double* y,
+                              int n,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const int* hidden_dims,
+                              int n_hidden,
+                              int d_out,
+                              const char* activation,
+                              const char* kernel,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params);
+void lk_mlp_kriging_delete(void* ptr);
+
+int lk_mlp_kriging_fit(void* ptr,
+                        const double* y,
+                        int n,
+                        const double* X,
+                        int nX,
+                        int d,
+                        const char* regmodel,
+                        int normalize,
+                        const char* optim,
+                        const char* objective,
+                        const char** param_keys,
+                        const char** param_vals,
+                        int n_params);
+
+int lk_mlp_kriging_predict(void* ptr,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int return_stdev,
+                            int return_cov,
+                            int return_deriv,
+                            double* mean_out,
+                            double* stdev_out,
+                            double* cov_out,
+                            double* mean_deriv_out,
+                            double* stdev_deriv_out);
+
+int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
+
+int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d);
+
+const char* lk_mlp_kriging_summary(void* ptr);
+double lk_mlp_kriging_log_likelihood(void* ptr);
+
+int lk_mlp_kriging_log_likelihood_fun(void* ptr,
+                                       const double* theta,
+                                       int theta_n,
+                                       int return_grad,
+                                       int return_hess,
+                                       double* ll_out,
+                                       double* grad_out,
+                                       double* hess_out);
+
+const char* lk_mlp_kriging_kernel(void* ptr);
+const char* lk_mlp_kriging_activation(void* ptr);
+int lk_mlp_kriging_is_fitted(void* ptr);
+int lk_mlp_kriging_feature_dim(void* ptr);
+int lk_mlp_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_mlp_kriging_get_y(void* ptr, double* out, int* n);
+int lk_mlp_kriging_get_theta(void* ptr, double* out, int* n);
+double lk_mlp_kriging_get_sigma2(void* ptr);
+int lk_mlp_kriging_get_hidden_dims(void* ptr, int* out, int* n);
 
 #ifdef __cplusplus
 }

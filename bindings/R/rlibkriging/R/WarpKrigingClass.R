@@ -51,17 +51,6 @@ warp_mlp <- function(hidden_dims, d_out = 2, activation = "selu") {
   paste0("mlp(", h, ",", d_out, ",", activation, ")")
 }
 
-#' @title Joint MLP warping (all inputs together, deep kernel learning)
-#' @param hidden_dims integer vector of hidden layer sizes
-#' @param d_out output dimensionality (default 2)
-#' @param activation activation function (default "selu")
-#' @return string e.g. \code{"mlp_joint(32:16,3,selu)"}
-#' @export
-warp_mlp_joint <- function(hidden_dims, d_out = 2, activation = "selu") {
-  h <- paste(as.integer(hidden_dims), collapse = ":")
-  paste0("mlp_joint(", h, ",", d_out, ",", activation, ")")
-}
-
 #' @title Categorical embedding
 #' @param n_levels number of levels (integer-coded 0..n_levels-1)
 #' @param embed_dim embedding dimensionality (default 2)
@@ -93,12 +82,10 @@ warp_ordinal <- function(n_levels) {
 #' @param y numeric vector of observations (n)
 #' @param X numeric matrix of inputs (n x d)
 #' @param warping character vector of warp specifications, one per column
-#'   of X (or a single \code{"mlp_joint(...)"} for joint mode).
-#'   Use \code{warp_*()} helpers or plain strings:
+#'   of X. Use \code{warp_*()} helpers or plain strings:
 #'   \code{"none"}, \code{"affine"}, \code{"boxcox"}, \code{"kumaraswamy"},
 #'   \code{"neural_mono(8)"}, \code{"mlp(16:8,2,selu)"},
-#'   \code{"mlp_joint(32:16,3,selu)"}, \code{"categorical(5,2)"},
-#'   \code{"ordinal(4)"}.
+#'   \code{"categorical(5,2)"}, \code{"ordinal(4)"}.
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise continuous inputs?
@@ -122,11 +109,6 @@ warp_ordinal <- function(n_levels) {
 #' k2 <- WarpKriging(y_mix, X_mix,
 #'          warping = c("mlp(16:8,2,selu)", "categorical(3,2)"),
 #'          kernel = "matern5_2")
-#'
-#' # Deep kernel learning (joint MLP on all inputs)
-#' k3 <- WarpKriging(y, X,
-#'          warping = "mlp_joint(32:16,3,selu)",
-#'          kernel = "gauss", normalize = TRUE)
 #'
 #' @export
 WarpKriging <- function(y, X, warping,
@@ -163,16 +145,52 @@ summary.WarpKriging <- function(object, ...) {
   warpKriging_summary(object$ptr)
 }
 
+#' @title Fit a WarpKriging model to data
+#'
+#' @description (Re-)fit an already-constructed WarpKriging object on new
+#'   data.  The warping specification and kernel are kept from construction.
+#'
+#' @param object WarpKriging object (created with the constructor or an
+#'   empty-kernel call)
+#' @param y numeric vector of observations (n)
+#' @param X numeric matrix of inputs (n x d)
+#' @param regmodel trend: "constant", "linear", "quadratic"
+#' @param normalize logical; normalise continuous inputs?
+#' @param optim optimiser
+#' @param objective "LL" (log-likelihood)
+#' @param parameters optional named list of tuning parameters
+#' @param ... ignored
+#'
+#' @return No return value. WarpKriging object argument is modified.
+#'
+#' @method fit WarpKriging
+#' @export
+fit.WarpKriging <- function(object, y, X,
+                            regmodel = "constant",
+                            normalize = FALSE,
+                            optim = "BFGS+Adam",
+                            objective = "LL",
+                            parameters = NULL, ...) {
+  warpKriging_fit(object$ptr,
+                  as.numeric(y), as.matrix(X),
+                  regmodel, normalize, optim, objective,
+                  parameters)
+  invisible(NULL)
+}
+
 #' @title Predict with a WarpKriging model
 #' @param object WarpKriging object
 #' @param x prediction matrix (m x d)
-#' @param stdev return standard deviations?
-#' @param cov return full covariance?
+#' @param return_stdev return standard deviations?
+#' @param return_cov return full covariance?
+#' @param return_deriv return derivatives of mean and stdev wrt x?
 #' @param ... ignored
-#' @return list with \code{mean}, \code{stdev}, \code{cov}
+#' @return list with \code{mean}, optionally \code{stdev}, \code{cov},
+#'   \code{mean_deriv}, \code{stdev_deriv}
 #' @export
-predict.WarpKriging <- function(object, x, stdev = TRUE, cov = FALSE, ...) {
-  warpKriging_predict(object$ptr, as.matrix(x), stdev, cov)
+predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
+                                return_deriv = FALSE, ...) {
+  warpKriging_predict(object$ptr, as.matrix(x), return_stdev, return_cov, return_deriv)
 }
 
 #' @title Simulate from a WarpKriging model
@@ -190,12 +208,12 @@ simulate.WarpKriging <- function(object, nsim = 1, seed = 123, x, ...) {
 
 #' @title Update a WarpKriging model with new observations
 #' @param object WarpKriging object
-#' @param y_new new observations
-#' @param X_new new input matrix
+#' @param y_u new observations
+#' @param X_u new input matrix
 #' @param ... ignored
 #' @export
-update.WarpKriging <- function(object, y_new, X_new, ...) {
-  warpKriging_update(object$ptr, as.numeric(y_new), as.matrix(X_new))
+update.WarpKriging <- function(object, y_u, X_u, ...) {
+  warpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u))
   invisible(object)
 }
 
@@ -208,12 +226,13 @@ logLikelihood.WarpKriging <- function(object, ...) {
 #' @title Evaluate log-likelihood at given theta
 #' @param object WarpKriging object
 #' @param theta range parameter vector
-#' @param grad return gradient?
+#' @param return_grad return gradient?
+#' @param return_hess return hessian?
 #' @param ... ignored
-#' @return list with \code{logLikelihood} and optionally \code{gradient}
+#' @return list with \code{logLikelihood} and optionally \code{gradient}, \code{hessian}
 #' @export
-logLikelihoodFun.WarpKriging <- function(object, theta, grad = TRUE, ...) {
-  warpKriging_logLikelihoodFun(object$ptr, theta, grad)
+logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
+  warpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
 }
 
 #' @export
@@ -250,4 +269,19 @@ warping <- function(object, ...) UseMethod("warping")
 #' @export
 warping.WarpKriging <- function(object, ...) {
   warpKriging_warping(object$ptr)
+}
+
+#' @title Get feature dimensionality of warped space
+#' @export
+feature_dim.WarpKriging <- function(object, ...) {
+  warpKriging_featureDim(object$ptr)
+}
+
+#' @title Check if the model has been fitted
+#' @export
+is_fitted <- function(object, ...) UseMethod("is_fitted")
+
+#' @export
+is_fitted.WarpKriging <- function(object, ...) {
+  warpKriging_isFitted(object$ptr)
 }

@@ -90,11 +90,13 @@ double PyWarpKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
-std::tuple<double, py::array_t<double>> PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta,
-                                                                        const bool return_grad) {
+std::tuple<double, py::array_t<double>, py::array_t<double>> PyWarpKriging::logLikelihoodFun(
+    const py::array_t<double>& theta,
+    const bool return_grad,
+    const bool want_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
-  return {ll, carma::col_to_arr(grad)};
+  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, want_hess);
+  return {ll, carma::col_to_arr(grad), {}};
 }
 
 std::string PyWarpKriging::kernel() {

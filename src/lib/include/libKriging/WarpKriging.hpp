@@ -475,6 +475,11 @@ class WarpKriging {
    */
   LIBKRIGING_EXPORT WarpKriging(const std::vector<std::string>& warping, const std::string& kernel = "gauss");
 
+  WarpKriging(WarpKriging&&) noexcept = default;
+  WarpKriging& operator=(WarpKriging&&) noexcept = default;
+  WarpKriging(const WarpKriging&) = delete;
+  WarpKriging& operator=(const WarpKriging&) = delete;
+
   /**
    * @brief Full constructor with string warping and immediate fitting.
    */
@@ -577,8 +582,6 @@ class WarpKriging {
   // ---- warping ------------------------------------------------------------
   std::vector<WarpSpec> m_warp_specs;
   std::vector<std::unique_ptr<IWarp>> m_warps;  ///< per-variable
-  std::unique_ptr<WarpMLPJoint> m_joint_warp;   ///< joint MLP (if any)
-  bool m_has_joint = false;
   arma::uword m_feature_dim = 0;
 
   // ---- normalisation ------------------------------------------------------

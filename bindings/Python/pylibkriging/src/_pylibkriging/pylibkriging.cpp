@@ -17,6 +17,7 @@
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
 #include "RandomGenerator.hpp"
+#include "MLPKriging_binding.hpp"
 #include "WarpKriging_binding.hpp"
 
 // To compare string at compile time (before latest C++)
@@ -335,10 +336,14 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
       .def("simulate", &PyWarpKriging::simulate, py::arg("nsim") = 1, py::arg("seed") = 123, py::arg("X"))
-      .def("update", &PyWarpKriging::update, py::arg("y"), py::arg("X"))
+      .def("update", &PyWarpKriging::update, py::arg("y_u"), py::arg("X_u"))
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
-      .def("logLikelihoodFun", &PyWarpKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = true)
+      .def("logLikelihoodFun",
+           &PyWarpKriging::logLikelihoodFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("return_hess") = false)
       .def("kernel", &PyWarpKriging::kernel)
       .def("X", &PyWarpKriging::X)
       .def("y", &PyWarpKriging::y)
@@ -347,6 +352,68 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_fitted", &PyWarpKriging::is_fitted)
       .def("feature_dim", &PyWarpKriging::feature_dim)
       .def("warping", &PyWarpKriging::warping);
+
+  py::class_<PyMLPKriging>(m, "WrappedPyMLPKriging")
+      .def(py::init<const std::vector<std::size_t>&, std::size_t, const std::string&, const std::string&>(),
+           py::arg("hidden_dims"),
+           py::arg("d_out") = 2,
+           py::arg("activation") = "selu",
+           py::arg("kernel") = "gauss")
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const std::vector<std::size_t>&,
+                    std::size_t,
+                    const std::string&,
+                    const std::string&,
+                    const std::string&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const py::dict&>(),
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("hidden_dims"),
+           py::arg("d_out") = 2,
+           py::arg("activation") = "selu",
+           py::arg("kernel") = "gauss",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_warp_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{})
+      .def("fit",
+           &PyMLPKriging::fit,
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_warp_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{})
+      .def("predict",
+           &PyMLPKriging::predict,
+           py::arg("X"),
+           py::arg("return_stdev") = true,
+           py::arg("return_cov") = false,
+           py::arg("return_deriv") = false)
+      .def("simulate", &PyMLPKriging::simulate, py::arg("nsim") = 1, py::arg("seed") = 123, py::arg("X"))
+      .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"))
+      .def("summary", &PyMLPKriging::summary)
+      .def("logLikelihood", &PyMLPKriging::logLikelihood)
+      .def("logLikelihoodFun",
+           &PyMLPKriging::logLikelihoodFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("return_hess") = false)
+      .def("kernel", &PyMLPKriging::kernel)
+      .def("X", &PyMLPKriging::X)
+      .def("y", &PyMLPKriging::y)
+      .def("theta", &PyMLPKriging::theta)
+      .def("sigma2", &PyMLPKriging::sigma2)
+      .def("is_fitted", &PyMLPKriging::is_fitted)
+      .def("feature_dim", &PyMLPKriging::feature_dim)
+      .def("hidden_dims", &PyMLPKriging::hidden_dims)
+      .def("activation", &PyMLPKriging::activation);
 
   // Optim class - static methods for optimization settings
   py::class_<Optim>(m, "Optim")

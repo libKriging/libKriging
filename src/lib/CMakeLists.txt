@@ -16,6 +16,7 @@ add_library(Kriging
         NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
         NoiseKriging.cpp include/libKriging/NoiseKriging.hpp
         WarpKriging.cpp include/libKriging/WarpKriging.hpp
+        MLPKriging.cpp include/libKriging/MLPKriging.hpp
         KrigingLoader.cpp include/libKriging/KrigingLoader.hpp
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp

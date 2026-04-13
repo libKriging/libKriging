@@ -31,6 +31,7 @@ add_mex_function(NAME mLibKriging
         NuggetKriging_binding.cpp NuggetKriging_binding.hpp
         NoiseKriging_binding.cpp NoiseKriging_binding.hpp
         WarpKriging_binding.cpp WarpKriging_binding.hpp
+        MLPKriging_binding.cpp MLPKriging_binding.hpp
         Optim_binding.cpp Optim_binding.hpp
         Params_binding.cpp Params_binding.hpp
         Params.cpp Params.hpp
@@ -46,6 +47,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/NuggetKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/NoiseKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/WarpKriging.m
+        ${CMAKE_CURRENT_SOURCE_DIR}/MLPKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Optim.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Params.m
         DESTINATION ${CMAKE_INSTALL_PREFIX}/bindings/${OCTAVE_BINDING_MODE}

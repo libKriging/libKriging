@@ -739,8 +739,6 @@ static void test_from_string_roundtrip() {
       "categorical(3,1)",
       "ordinal(4)",
       "ordinal(7)",
-      "mlp_joint(32:16,3,selu)",
-      "mlp_joint(64:32:16,4,tanh)",
   };
 
   for (const auto& s : inputs) {
@@ -771,21 +769,6 @@ static void test_from_string_roundtrip() {
     assert(s3.embed_dim == 2);
     std::cout << "  \"categorical(5)\" -> \"" << s3.to_string() << "\"  OK" << std::endl;
   }
-  {
-    WarpSpec s4 = WarpSpec::from_string("mlp_joint");
-    assert(s4.type == WarpType::MLPJoint);
-    assert(s4.hidden_dims.size() == 2);
-    assert(s4.d_out == 2);
-    std::cout << "  \"mlp_joint\" -> \"" << s4.to_string() << "\"  OK" << std::endl;
-  }
-  {
-    WarpSpec s5 = WarpSpec::from_string("mlp_joint(16:8)");
-    assert(s5.type == WarpType::MLPJoint);
-    assert(s5.d_out == 2);
-    assert(s5.activation == "selu");
-    std::cout << "  \"mlp_joint(16:8)\" -> \"" << s5.to_string() << "\"  OK" << std::endl;
-  }
-
   // Whitespace tolerance
   {
     WarpSpec s4 = WarpSpec::from_string("  kumaraswamy  ");
@@ -845,95 +828,6 @@ static void test_warping_strings_accessor() {
   for (arma::uword i = 0; i < ws.size(); ++i)
     std::cout << (i ? ", " : "") << "\"" << ws[i] << "\"";
   std::cout << "}" << std::endl;
-
-  std::cout << "  PASSED\n" << std::endl;
-}
-
-// ==========================================================================
-//  Test 16: mlp_joint — full-input MLP (≡ NeuralKernelKriging)
-// ==========================================================================
-static void test_mlp_joint() {
-  std::cout << "=== Test 16: mlp_joint (Deep Kernel Learning) ===" << std::endl;
-
-  // --- 16a: 1D function ---
-  {
-    arma::vec X_train = arma::linspace(0.01, 0.99, 10);
-    arma::mat X_mat(X_train.n_elem, 1);
-    X_mat.col(0) = X_train;
-    arma::vec y(X_train.n_elem);
-    for (arma::uword i = 0; i < X_train.n_elem; ++i)
-      y(i) = f1d(X_train(i));
-
-    WarpKriging model({"mlp_joint(16:8,2,selu)"}, "gauss");
-    model.fit(y, X_mat, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
-
-    std::cout << model.summary();
-
-    auto [mean_train, stdev_train, _c1b, _md1b, _sd1b] = model.predict(X_mat, true, false);
-    double max_err = arma::max(arma::abs(mean_train - y));
-    std::cout << "  [1D] Max train interp error:  " << max_err << std::endl;
-
-    arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
-    arma::mat xp(50, 1);
-    xp.col(0) = x_pred;
-    auto [mean, stdev, _c2b, _md2b, _sd2b] = model.predict(xp, true, false);
-    arma::vec ytrue(50);
-    for (arma::uword i = 0; i < 50; ++i)
-      ytrue(i) = f1d(x_pred(i));
-    double rmse = std::sqrt(arma::mean(arma::square(mean - ytrue)));
-    std::cout << "  [1D] RMSE on dense grid:      " << rmse << std::endl;
-
-    // Verify warping_strings
-    auto ws = model.warping_strings();
-    assert(ws.size() == 1);
-    assert(ws[0] == "mlp_joint(16:8,2,selu)");
-  }
-
-  // --- 16b: Branin 2D (exact equivalent of old NeuralKernelKriging test) ---
-  {
-    auto branin = [](double x1, double x2) -> double {
-      double a = 1.0, b = 5.1 / (4.0 * M_PI * M_PI);
-      double c = 5.0 / M_PI, r = 6.0, s = 10.0, t = 1.0 / (8.0 * M_PI);
-      return a * std::pow(x2 - b * x1 * x1 + c * x1 - r, 2) + s * (1.0 - t) * std::cos(x1) + s;
-    };
-
-    arma::uword n = 20;
-    arma::arma_rng::set_seed(77);
-    arma::mat X = arma::randu<arma::mat>(n, 2);
-    arma::vec y(n);
-    for (arma::uword i = 0; i < n; ++i)
-      y(i) = branin(X(i, 0) * 15.0 - 5.0, X(i, 1) * 15.0);
-
-    WarpKriging model({"mlp_joint(32:16,3,selu)"}, "matern5_2");
-    model.fit(y, X, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
-
-    std::cout << model.summary();
-
-    // Predict
-    arma::mat X_test = arma::randu<arma::mat>(10, 2);
-    auto [mean, stdev, _c3b, _md3b, _sd3b] = model.predict(X_test, true, false);
-    assert(mean.n_elem == 10);
-    assert(stdev.n_elem == 10);
-    assert(mean.is_finite());
-    assert(stdev.is_finite());
-
-    std::cout << "  [2D] Predicted mean range:  [" << arma::min(mean) << ", " << arma::max(mean) << "]" << std::endl;
-    std::cout << "  [2D] Predicted stdev range: [" << arma::min(stdev) << ", " << arma::max(stdev) << "]" << std::endl;
-
-    // Simulate
-    arma::mat sims = model.simulate(20, 42, X_test);
-    assert(sims.n_rows == 10 && sims.n_cols == 20);
-    assert(sims.is_finite());
-
-    // Update
-    arma::mat X_new = arma::randu<arma::mat>(3, 2);
-    arma::vec y_new(3);
-    for (arma::uword i = 0; i < 3; ++i)
-      y_new(i) = branin(X_new(i, 0) * 15.0 - 5.0, X_new(i, 1) * 15.0);
-    model.update(y_new, X_new);
-    std::cout << "  [2D] n after update: " << model.y().n_elem << std::endl;
-    assert(model.y().n_elem == n + 3);
-  }
 
   std::cout << "  PASSED\n" << std::endl;
 }
@@ -1153,22 +1047,6 @@ void test_predict_derivative() {
     check_deriv_vs_fd(model, X_new, {0}, "ordinal mixed, gauss");
   }
 
-  // ---- 17i: mlp_joint (2D, gauss) ------------------------------------------
-  {
-    arma::arma_rng::set_seed(88);
-    const arma::uword n = 20;
-    arma::mat X = arma::randu<arma::mat>(n, 2);
-    arma::vec y(n);
-    for (arma::uword i = 0; i < n; ++i)
-      y(i) = f2(X(i, 0), X(i, 1));
-
-    WarpKriging model({"mlp_joint(16:8,2,selu)"}, "gauss");
-    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
-
-    arma::mat X_new = arma::randu<arma::mat>(5, 2);
-    check_deriv_vs_fd(model, X_new, {0, 1}, "mlp_joint, gauss, 2D");
-  }
-
   // ---- 17j: mixed continuous warpings (kumaraswamy + none + affine, 3D) -----
   {
     arma::arma_rng::set_seed(111);
@@ -1283,7 +1161,6 @@ int main() {
     test_loglikelihood_fun();
     test_from_string_roundtrip();
     test_warping_strings_accessor();
-    test_mlp_joint();
     test_predict_derivative();
     test_parallel_multistart();
 

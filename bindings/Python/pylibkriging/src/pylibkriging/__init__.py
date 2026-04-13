@@ -48,4 +48,5 @@ Kriging = WrappedPyKriging
 NuggetKriging = WrappedPyNuggetKriging
 NoiseKriging = WrappedPyNoiseKriging
 WarpKriging = WrappedPyWarpKriging
+MLPKriging = WrappedPyMLPKriging
 LinearRegression = PyLinearRegression

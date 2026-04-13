@@ -1119,29 +1119,15 @@ std::unique_ptr<IWarp> WarpKriging::make_warp(const WarpSpec& spec) const {
 
 void WarpKriging::build_warps() {
   m_warps.clear();
-  m_joint_warp.reset();
-  m_has_joint = false;
   m_feature_dim = 0;
   m_is_continuous.clear();
 
-  // Check for MLPJoint — must be the only entry
-  if (m_warp_specs.size() == 1 && m_warp_specs[0].type == WarpType::MLPJoint) {
-    m_has_joint = true;
-    // d_in will be set at fit() time when we know X.n_cols
-    // For now just record the feature dim
-    m_feature_dim = m_warp_specs[0].d_out;
-    // mark all inputs as continuous for normalisation
-    // (actual count set at fit time)
-    return;
-  }
-
-  // Ensure no MLPJoint mixed with per-variable warps
   for (const auto& spec : m_warp_specs) {
     if (spec.type == WarpType::MLPJoint)
-      throw std::invalid_argument("mlp_joint must be the only warping entry (cannot mix with per-variable warps)");
+      throw std::invalid_argument(
+          "WarpKriging: mlp_joint is no longer supported here — use MLPKriging instead.");
   }
 
-  // Per-variable mode
   for (const auto& spec : m_warp_specs) {
     auto w = make_warp(spec);
     m_feature_dim += w->output_dim();
@@ -1206,15 +1192,9 @@ WarpKriging::WarpKriging(const arma::vec& y,
 }
 
 // -------------------------------------------------------------------------
-//  Apply warping:  X → Φ
-//  Two modes: per-variable concatenation or joint MLP
+//  Apply warping:  X → Φ  (per-variable concatenation)
 // -------------------------------------------------------------------------
 arma::mat WarpKriging::apply_warping(const arma::mat& X) const {
-  if (m_has_joint) {
-    return m_joint_warp->forward(X);  // (n × d_in) → (n × d_out)
-  }
-
-  // Per-variable mode
   const arma::uword n = X.n_rows;
   arma::mat Phi(n, m_feature_dim);
 
@@ -1271,7 +1251,7 @@ void WarpKriging::normalise_data() {
 
   if (m_normalize) {
     for (arma::uword j = 0; j < d; ++j) {
-      bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
+      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont) {
         m_X_mean(j) = arma::mean(m_X.col(j));
         m_X_std(j) = arma::stddev(m_X.col(j));
@@ -1502,23 +1482,17 @@ arma::vec WarpKriging::warp_gradient() const {
   arma::uword n_warp = total_warp_params();
   arma::vec grad(n_warp, arma::fill::zeros);
 
-  if (m_has_joint && m_joint_warp) {
-    arma::vec gw = m_joint_warp->backward(m_X, dLL_dPhi);
-    if (gw.n_elem > 0)
-      grad.head(gw.n_elem) = gw;
-  } else {
-    arma::uword col = 0, idx = 0;
-    for (arma::uword j = 0; j < m_warps.size(); ++j) {
-      arma::uword dj = m_warps[j]->output_dim();
-      arma::uword np = m_warps[j]->n_params();
-      if (np > 0) {
-        arma::mat dLL_dPhi_j = dLL_dPhi.cols(col, col + dj - 1);
-        arma::vec gw = m_warps[j]->backward(m_X.col(j), dLL_dPhi_j);
-        grad.subvec(idx, idx + np - 1) = gw;
-        idx += np;
-      }
-      col += dj;
+  arma::uword col = 0, idx = 0;
+  for (arma::uword j = 0; j < m_warps.size(); ++j) {
+    arma::uword dj = m_warps[j]->output_dim();
+    arma::uword np = m_warps[j]->n_params();
+    if (np > 0) {
+      arma::mat dLL_dPhi_j = dLL_dPhi.cols(col, col + dj - 1);
+      arma::vec gw = m_warps[j]->backward(m_X.col(j), dLL_dPhi_j);
+      grad.subvec(idx, idx + np - 1) = gw;
+      idx += np;
     }
+    col += dj;
   }
   return grad;
 }
@@ -1527,8 +1501,6 @@ arma::vec WarpKriging::warp_gradient() const {
 //  Warp param packing  (θ is NOT here — optimised separately)
 // -------------------------------------------------------------------------
 arma::uword WarpKriging::total_warp_params() const {
-  if (m_has_joint)
-    return m_joint_warp ? m_joint_warp->n_params() : 0;
   arma::uword total = 0;
   for (const auto& w : m_warps)
     total += w->n_params();
@@ -1541,15 +1513,11 @@ arma::vec WarpKriging::pack_warp_params() const {
     return {};
   arma::vec wp(n_warp);
   arma::uword idx = 0;
-  if (m_has_joint && m_joint_warp) {
-    wp = m_joint_warp->get_params();
-  } else {
-    for (const auto& w : m_warps) {
-      arma::uword np = w->n_params();
-      if (np > 0) {
-        wp.subvec(idx, idx + np - 1) = w->get_params();
-        idx += np;
-      }
+  for (const auto& w : m_warps) {
+    arma::uword np = w->n_params();
+    if (np > 0) {
+      wp.subvec(idx, idx + np - 1) = w->get_params();
+      idx += np;
     }
   }
   return wp;
@@ -1557,16 +1525,11 @@ arma::vec WarpKriging::pack_warp_params() const {
 
 void WarpKriging::unpack_warp_params(const arma::vec& wp) {
   arma::uword idx = 0;
-  if (m_has_joint && m_joint_warp) {
-    if (wp.n_elem > 0)
-      m_joint_warp->set_params(wp);
-  } else {
-    for (auto& w : m_warps) {
-      arma::uword np = w->n_params();
-      if (np > 0) {
-        w->set_params(wp.subvec(idx, idx + np - 1));
-        idx += np;
-      }
+  for (auto& w : m_warps) {
+    arma::uword np = w->n_params();
+    if (np > 0) {
+      w->set_params(wp.subvec(idx, idx + np - 1));
+      idx += np;
     }
   }
 }
@@ -1610,8 +1573,6 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_warps.clear();
   for (const auto& w : m_warps)
     c.m_warps.push_back(w->clone());
-  if (m_has_joint && m_joint_warp)
-    c.m_joint_warp = m_joint_warp->clone();
 
   return c;
 }
@@ -2006,8 +1967,7 @@ void WarpKriging::fit(const arma::vec& y,
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
-  // Column count check: in joint mode, 1 spec covers all columns
-  if (!m_has_joint && X.n_cols != m_warp_specs.size())
+  if (X.n_cols != m_warp_specs.size())
     throw std::invalid_argument("fit: X has " + std::to_string(X.n_cols) + " columns but "
                                 + std::to_string(m_warp_specs.size()) + " warp specs were given");
 
@@ -2017,16 +1977,6 @@ void WarpKriging::fit(const arma::vec& y,
   m_normalize = normalize;
 
   normalise_data();
-
-  // In joint mode, instantiate the WarpMLPJoint now that we know d_in
-  if (m_has_joint) {
-    const auto& spec = m_warp_specs[0];
-    auto hdims = spec.hidden_dims;
-    if (hdims.empty())
-      hdims = {32, 16};
-    m_joint_warp = std::make_unique<WarpMLPJoint>(X.n_cols, hdims, spec.d_out, WarpMLP::parse_act(spec.activation), 42);
-    m_feature_dim = spec.d_out;
-  }
 
   // θ seed: use caller-supplied value or default to 1.
   if (parameters.theta.has_value()) {
@@ -2069,7 +2019,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   arma::mat x_n = x_new;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
-      bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
+      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
         x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
     }
@@ -2229,7 +2179,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new)
   arma::mat x_n = x_new;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
-      bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
+      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
         x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
     }
@@ -2285,7 +2235,7 @@ void WarpKriging::update(const arma::vec& y_new, const arma::mat& X_new) {
   arma::vec y_all = arma::join_vert(m_y * m_y_std + m_y_mean, y_new);
   arma::mat X_all = m_X;
   for (arma::uword j = 0; j < X_all.n_cols; ++j) {
-    bool is_cont = m_has_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
+    bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
     if (is_cont)
       X_all.col(j) = X_all.col(j) * m_X_std(j) + m_X_mean(j);
   }
@@ -2315,13 +2265,9 @@ std::string WarpKriging::summary() const {
       << "  - d input:     " << m_X.n_cols << "\n"
       << "  - d features:  " << m_feature_dim << "\n";
 
-  if (m_has_joint && m_joint_warp) {
-    oss << "  - warping:     \"" << m_warp_specs[0].to_string() << "\"  →  " << m_joint_warp->describe() << "\n";
-  } else {
-    oss << "  - warpings:\n";
-    for (arma::uword j = 0; j < m_warps.size(); ++j) {
-      oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
-    }
+  oss << "  - warpings:\n";
+  for (arma::uword j = 0; j < m_warps.size(); ++j) {
+    oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
   }
 
   if (m_fitted) {

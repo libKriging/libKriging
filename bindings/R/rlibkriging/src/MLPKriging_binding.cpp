@@ -3,33 +3,32 @@
 #include <RcppArmadillo.h>
 // clang-format on
 
-#include "libKriging/WarpKriging.hpp"
+#include "libKriging/MLPKriging.hpp"
 
 using namespace libKriging;
 
-// Store C++ object via Rcpp::XPtr
-typedef Rcpp::XPtr<WarpKriging> WarpKrigingPtr;
+typedef Rcpp::XPtr<MLPKriging> MLPKrigingPtr;
 
 // ---------------------------------------------------------------------------
-//  Constructor:  warping is a character vector of spec strings
+//  Constructor
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-SEXP warpKriging_new(const arma::vec& y,
-                     const arma::mat& X,
-                     Rcpp::CharacterVector warping,
-                     std::string kernel,
-                     std::string regmodel = "constant",
-                     bool normalize = false,
-                     std::string optim = "BFGS+Adam",
-                     std::string objective = "LL",
-                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
-  // Convert R CharacterVector → std::vector<std::string>
-  std::vector<std::string> warp_strs;
-  for (int i = 0; i < warping.size(); ++i)
-    warp_strs.push_back(Rcpp::as<std::string>(warping[i]));
+SEXP mlpKriging_new(const arma::vec& y,
+                    const arma::mat& X,
+                    Rcpp::IntegerVector hidden_dims,
+                    int d_out = 2,
+                    std::string activation = "selu",
+                    std::string kernel = "gauss",
+                    std::string regmodel = "constant",
+                    bool normalize = false,
+                    std::string optim = "BFGS+Adam",
+                    std::string objective = "LL",
+                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+  std::vector<arma::uword> hd;
+  for (int i = 0; i < hidden_dims.size(); ++i)
+    hd.push_back(static_cast<arma::uword>(hidden_dims[i]));
 
-  // Parse optional parameters
   std::map<std::string, std::string> params;
   if (parameters.isNotNull()) {
     Rcpp::List plist(parameters);
@@ -38,9 +37,10 @@ SEXP warpKriging_new(const arma::vec& y,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  WarpKriging* model = new WarpKriging(y, X, warp_strs, kernel, regmodel, normalize, optim, objective, params);
+  MLPKriging* model = new MLPKriging(y, X, hd, static_cast<arma::uword>(d_out), activation, kernel,
+                                     regmodel, normalize, optim, objective, params);
 
-  return WarpKrigingPtr(model, true);
+  return MLPKrigingPtr(model, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -48,15 +48,15 @@ SEXP warpKriging_new(const arma::vec& y,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_fit(SEXP model_ptr,
-                     const arma::vec& y,
-                     const arma::mat& X,
-                     std::string regmodel = "constant",
-                     bool normalize = false,
-                     std::string optim = "BFGS+Adam",
-                     std::string objective = "LL",
-                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
-  WarpKrigingPtr model(model_ptr);
+void mlpKriging_fit(SEXP model_ptr,
+                    const arma::vec& y,
+                    const arma::mat& X,
+                    std::string regmodel = "constant",
+                    bool normalize = false,
+                    std::string optim = "BFGS+Adam",
+                    std::string objective = "LL",
+                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+  MLPKrigingPtr model(model_ptr);
 
   std::map<std::string, std::string> params;
   if (parameters.isNotNull()) {
@@ -74,12 +74,12 @@ void warpKriging_fit(SEXP model_ptr,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_predict(SEXP model_ptr,
-                               const arma::mat& x_new,
-                               bool withStd = true,
-                               bool withCov = false,
-                               bool withDeriv = false) {
-  WarpKrigingPtr model(model_ptr);
+Rcpp::List mlpKriging_predict(SEXP model_ptr,
+                              const arma::mat& x_new,
+                              bool withStd = true,
+                              bool withCov = false,
+                              bool withDeriv = false) {
+  MLPKrigingPtr model(model_ptr);
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model->predict(x_new, withStd, withCov, withDeriv);
 
   Rcpp::List result;
@@ -100,8 +100,8 @@ Rcpp::List warpKriging_predict(SEXP model_ptr,
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-arma::mat warpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::mat& x_new) {
-  WarpKrigingPtr model(model_ptr);
+arma::mat mlpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::mat& x_new) {
+  MLPKrigingPtr model(model_ptr);
   return model->simulate(nsim, static_cast<uint64_t>(seed), x_new);
 }
 
@@ -110,8 +110,8 @@ arma::mat warpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::m
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new) {
-  WarpKrigingPtr model(model_ptr);
+void mlpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new) {
+  MLPKrigingPtr model(model_ptr);
   model->update(y_new, X_new);
 }
 
@@ -120,15 +120,15 @@ void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat&
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-double warpKriging_logLikelihood(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+double mlpKriging_logLikelihood(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->logLikelihood();
 }
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp,
-                                        bool withGrad = true, bool withHess = false) {
-  WarpKrigingPtr model(model_ptr);
+Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp,
+                                       bool withGrad = true, bool withHess = false) {
+  MLPKrigingPtr model(model_ptr);
   auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
 
   Rcpp::List result;
@@ -145,47 +145,53 @@ Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_g
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-std::string warpKriging_summary(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+std::string mlpKriging_summary(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->summary();
 }
 
 // [[Rcpp::export]]
-arma::vec warpKriging_theta(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+arma::vec mlpKriging_theta(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->theta();
 }
 
 // [[Rcpp::export]]
-double warpKriging_sigma2(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+double mlpKriging_sigma2(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->sigma2();
 }
 
 // [[Rcpp::export]]
-std::string warpKriging_kernel(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+std::string mlpKriging_kernel(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->kernel();
 }
 
 // [[Rcpp::export]]
-int warpKriging_featureDim(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+int mlpKriging_featureDim(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return static_cast<int>(model->feature_dim());
 }
 
 // [[Rcpp::export]]
-Rcpp::CharacterVector warpKriging_warping(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
-  auto ws = model->warping_strings();
-  Rcpp::CharacterVector out(ws.size());
-  for (size_t i = 0; i < ws.size(); ++i)
-    out[i] = ws[i];
+Rcpp::IntegerVector mlpKriging_hiddenDims(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  const auto& hd = model->hidden_dims();
+  Rcpp::IntegerVector out(hd.size());
+  for (size_t i = 0; i < hd.size(); ++i)
+    out[i] = static_cast<int>(hd[i]);
   return out;
 }
 
 // [[Rcpp::export]]
-bool warpKriging_isFitted(SEXP model_ptr) {
-  WarpKrigingPtr model(model_ptr);
+std::string mlpKriging_activation(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->activation();
+}
+
+// [[Rcpp::export]]
+bool mlpKriging_isFitted(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
   return model->is_fitted();
 }

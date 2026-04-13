@@ -1,10 +1,10 @@
-#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_WARPKRIGING_BINDING_HPP
-#define LIBKRIGING_BINDINGS_PYTHON_SRC_WARPKRIGING_BINDING_HPP
+#ifndef LIBKRIGING_BINDINGS_PYTHON_SRC_MLPKRIGING_BINDING_HPP
+#define LIBKRIGING_BINDINGS_PYTHON_SRC_MLPKRIGING_BINDING_HPP
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <libKriging/WarpKriging.hpp>
+#include <libKriging/MLPKriging.hpp>
 
 #include <string>
 #include <tuple>
@@ -12,25 +12,28 @@
 
 namespace py = pybind11;
 
-class PyWarpKriging {
+class PyMLPKriging {
  private:
-  PyWarpKriging(std::unique_ptr<libKriging::WarpKriging>&& internal) : m_internal(std::move(internal)) {}
+  PyMLPKriging(std::unique_ptr<libKriging::MLPKriging>&& internal) : m_internal(std::move(internal)) {}
 
  public:
-  PyWarpKriging(const std::vector<std::string>& warping, const std::string& kernel);
-  PyWarpKriging(const py::array_t<double>& y,
-                const py::array_t<double>& X,
-                const std::vector<std::string>& warping,
-                const std::string& kernel,
-                const std::string& regmodel,
-                bool normalize,
-                const std::string& optim,
-                const std::string& objective,
-                const py::dict& parameters);
-  ~PyWarpKriging();
-  PyWarpKriging(PyWarpKriging&&) = default;
+  PyMLPKriging(const std::vector<std::size_t>& hidden_dims,
+               std::size_t d_out,
+               const std::string& activation,
+               const std::string& kernel);
 
-  [[nodiscard]] PyWarpKriging copy() const;
+  PyMLPKriging(const py::array_t<double>& y,
+               const py::array_t<double>& X,
+               const std::vector<std::size_t>& hidden_dims,
+               std::size_t d_out,
+               const std::string& activation,
+               const std::string& kernel,
+               const std::string& regmodel,
+               bool normalize,
+               const std::string& optim,
+               const std::string& objective,
+               const py::dict& parameters);
+  ~PyMLPKriging();
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
@@ -62,10 +65,11 @@ class PyWarpKriging {
   double sigma2();
   bool is_fitted();
   int feature_dim();
-  std::vector<std::string> warping();
+  std::vector<std::size_t> hidden_dims();
+  std::string activation();
 
  private:
-  std::unique_ptr<libKriging::WarpKriging> m_internal;
+  std::unique_ptr<libKriging::MLPKriging> m_internal;
 };
 
-#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_WARPKRIGING_BINDING_HPP
+#endif  // LIBKRIGING_BINDINGS_PYTHON_SRC_MLPKRIGING_BINDING_HPP
