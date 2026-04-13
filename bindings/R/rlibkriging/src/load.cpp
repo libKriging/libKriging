@@ -54,15 +54,15 @@ Rcpp::List nuggetkriging_load(std::string filename) {
 
 // [[Rcpp::export]]
 SEXP warpkriging_load(std::string filename) {
-  auto* wk = new WarpKriging(WarpKriging::load(filename));
-  Rcpp::XPtr<WarpKriging> ptr(wk);
+  auto* wk = new libKriging::WarpKriging(libKriging::WarpKriging::load(filename));
+  Rcpp::XPtr<libKriging::WarpKriging> ptr(wk);
   return ptr;
 }
 
 // [[Rcpp::export]]
 SEXP mlpkriging_load(std::string filename) {
-  auto* mk = new MLPKriging(MLPKriging::load(filename));
-  Rcpp::XPtr<MLPKriging> ptr(mk);
+  auto* mk = new libKriging::MLPKriging(libKriging::MLPKriging::load(filename));
+  Rcpp::XPtr<libKriging::MLPKriging> ptr(mk);
   return ptr;
 }
 
