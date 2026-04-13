@@ -308,6 +308,46 @@ static void test_categorical_predict_at_train() {
 }
 
 // ==========================================================================
+//  Test 3c: ordinal predict at training points (analogous to 3b)
+// ==========================================================================
+static void test_ordinal_predict_at_train() {
+  std::cout << "=== Test 3c: ordinal predict at training points ===" << std::endl;
+
+  // 4 ordinal levels with well-separated means → σ² >> 1
+  double mu[] = {2.0, 8.0, 20.0, 45.0};
+  arma::uword L = 4;
+  arma::uword n = 20;
+  arma::mat X(n, 1);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(42);
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::uword level = i % L;
+    X(i, 0) = static_cast<double>(level);
+    y(i) = mu[level] + 0.01 * arma::randn<arma::vec>(1)(0);
+  }
+
+  WarpKriging model({"ordinal(4)"}, "gauss");
+  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model.summary();
+
+  // Predict at training points — must recover training values
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X, true, false);
+
+  double max_mean_err = arma::max(arma::abs(mean - y));
+  double max_stdev = arma::max(stdev);
+  std::cout << "  sigma2 = " << model.sigma2() << std::endl;
+  std::cout << "  Max |pred_mean - y_train| = " << max_mean_err << std::endl;
+  std::cout << "  Max pred_stdev            = " << max_stdev << std::endl;
+
+  // With the nugget 1e-8 on diagonal, interpolation error should be tiny
+  assert(max_mean_err < 0.5 && "Ordinal: prediction at training points must interpolate y");
+  assert(max_stdev < 1.0 && "Ordinal: stdev at training points must be near zero");
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
 //  Test 4: mixed continuous + categorical
 // ==========================================================================
 static void test_mixed() {
@@ -1153,6 +1193,7 @@ int main() {
     test_categorical_predict_at_train();
     test_mixed();
     test_ordinal();
+    test_ordinal_predict_at_train();
     test_neural_mono();
     test_mlp_warp();
     test_simulate_mixed();
