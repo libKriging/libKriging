@@ -1124,8 +1124,7 @@ void WarpKriging::build_warps() {
 
   for (const auto& spec : m_warp_specs) {
     if (spec.type == WarpType::MLPJoint)
-      throw std::invalid_argument(
-          "WarpKriging: mlp_joint is no longer supported here — use MLPKriging instead.");
+      throw std::invalid_argument("WarpKriging: mlp_joint is no longer supported here — use MLPKriging instead.");
   }
 
   for (const auto& spec : m_warp_specs) {
@@ -1599,12 +1598,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
   theta_upper = arma::max(theta_lower * 2.0, theta_upper);
 
   // Honor Optim::reparametrize flag via local helpers.
-  auto to_gamma = [](const arma::vec& t) {
-    return Optim::reparametrize ? Optim::reparam_to(t) : t;
-  };
-  auto from_gamma = [](const arma::vec& g) {
-    return Optim::reparametrize ? Optim::reparam_from(g) : g;
-  };
+  auto to_gamma = [](const arma::vec& t) { return Optim::reparametrize ? Optim::reparam_to(t) : t; };
+  auto from_gamma = [](const arma::vec& g) { return Optim::reparametrize ? Optim::reparam_from(g) : g; };
   auto grad_theta_to_gamma = [](const arma::vec& theta, const arma::vec& g_theta) {
     return Optim::reparametrize ? Optim::reparam_from_deriv(theta, g_theta) : g_theta;
   };
@@ -1712,11 +1707,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
     arma::vec current_wp = wk.pack_warp_params();
     arma::vec current_gamma = to_gamma(wk.m_theta);
 
-    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](
-                      const arma::vec& x_outer,
-                      const arma::vec& x_inner,
-                      arma::vec* grad_outer,
-                      arma::vec* grad_inner) -> double {
+    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](const arma::vec& x_outer,
+                                                                        const arma::vec& x_inner,
+                                                                        arma::vec* grad_outer,
+                                                                        arma::vec* grad_inner) -> double {
       bool warp_changed = false;
       if (x_outer.n_elem > 0) {
         if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {

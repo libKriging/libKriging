@@ -69,24 +69,24 @@ class MLPKriging {
    * @param kernel       base kernel: "gauss", "matern3_2", "matern5_2", "exp"
    */
   LIBKRIGING_EXPORT MLPKriging(const std::vector<arma::uword>& hidden_dims,
-                                arma::uword d_out = 2,
-                                const std::string& activation = "selu",
-                                const std::string& kernel = "gauss");
+                               arma::uword d_out = 2,
+                               const std::string& activation = "selu",
+                               const std::string& kernel = "gauss");
 
   /**
    * @brief Full constructor with immediate fitting.
    */
   LIBKRIGING_EXPORT MLPKriging(const arma::vec& y,
-                                const arma::mat& X,
-                                const std::vector<arma::uword>& hidden_dims,
-                                arma::uword d_out,
-                                const std::string& activation,
-                                const std::string& kernel,
-                                const std::string& regmodel = "constant",
-                                bool normalize = false,
-                                const std::string& optim = "BFGS+Adam",
-                                const std::string& objective = "LL",
-                                const std::map<std::string, std::string>& parameters = {});
+                               const arma::mat& X,
+                               const std::vector<arma::uword>& hidden_dims,
+                               arma::uword d_out,
+                               const std::string& activation,
+                               const std::string& kernel,
+                               const std::string& regmodel = "constant",
+                               bool normalize = false,
+                               const std::string& optim = "BFGS+Adam",
+                               const std::string& objective = "LL",
+                               const std::map<std::string, std::string>& parameters = {});
 
   // -----------------------------------------------------------------------
   //  Fitting

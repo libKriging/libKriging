@@ -37,8 +37,8 @@ SEXP mlpKriging_new(const arma::vec& y,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  MLPKriging* model = new MLPKriging(y, X, hd, static_cast<arma::uword>(d_out), activation, kernel,
-                                     regmodel, normalize, optim, objective, params);
+  MLPKriging* model = new MLPKriging(
+      y, X, hd, static_cast<arma::uword>(d_out), activation, kernel, regmodel, normalize, optim, objective, params);
 
   return MLPKrigingPtr(model, true);
 }
@@ -126,8 +126,10 @@ double mlpKriging_logLikelihood(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp,
-                                       bool withGrad = true, bool withHess = false) {
+Rcpp::List mlpKriging_logLikelihoodFun(SEXP model_ptr,
+                                       const arma::vec& theta_gp,
+                                       bool withGrad = true,
+                                       bool withHess = false) {
   MLPKrigingPtr model(model_ptr);
   auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
 

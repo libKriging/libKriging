@@ -28,8 +28,10 @@ PyMLPKriging::PyMLPKriging(const std::vector<std::size_t>& hidden_dims,
                            std::size_t d_out,
                            const std::string& activation,
                            const std::string& kernel)
-    : m_internal{std::make_unique<lk::MLPKriging>(
-          to_arma_uwords(hidden_dims), static_cast<arma::uword>(d_out), activation, kernel)} {}
+    : m_internal{std::make_unique<lk::MLPKriging>(to_arma_uwords(hidden_dims),
+                                                  static_cast<arma::uword>(d_out),
+                                                  activation,
+                                                  kernel)} {}
 
 PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                            const py::array_t<double>& X,
@@ -74,8 +76,7 @@ void PyMLPKriging::fit(const py::array_t<double>& y,
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto [mean, stdev, cov, mean_deriv, stdev_deriv]
-      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
   return std::make_tuple(carma::col_to_arr(mean, true),
                          carma::col_to_arr(stdev, true),
                          carma::mat_to_arr(cov, true),
@@ -103,10 +104,8 @@ double PyMLPKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>> PyMLPKriging::logLikelihoodFun(
-    const py::array_t<double>& theta,
-    const bool return_grad,
-    const bool want_hess) {
+std::tuple<double, py::array_t<double>, py::array_t<double>>
+PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool want_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, want_hess);
   return {ll, carma::col_to_arr(grad), {}};

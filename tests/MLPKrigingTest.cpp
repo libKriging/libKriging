@@ -132,13 +132,13 @@ static void check_deriv_vs_fd(const MLPKriging& model,
       double stdev_err = std::abs(dstdev_num - dstdev_ana) / (std::abs(dstdev_num) + abs_tol);
 
       if (mean_err > rel_tol) {
-        std::cerr << "  [" << label << "] mean deriv mismatch at i=" << i << " dim=" << dim
-                  << ": num=" << dmean_num << " ana=" << dmean_ana << std::endl;
+        std::cerr << "  [" << label << "] mean deriv mismatch at i=" << i << " dim=" << dim << ": num=" << dmean_num
+                  << " ana=" << dmean_ana << std::endl;
         assert(false);
       }
       if (stdev_err > rel_tol) {
-        std::cerr << "  [" << label << "] stdev deriv mismatch at i=" << i << " dim=" << dim
-                  << ": num=" << dstdev_num << " ana=" << dstdev_ana << std::endl;
+        std::cerr << "  [" << label << "] stdev deriv mismatch at i=" << i << " dim=" << dim << ": num=" << dstdev_num
+                  << " ana=" << dstdev_ana << std::endl;
         assert(false);
       }
     }

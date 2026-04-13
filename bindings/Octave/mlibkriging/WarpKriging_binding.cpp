@@ -31,7 +31,8 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
         double dval = mxGetScalar(val);
         result[fname] = std::to_string(dval);
       } else {
-        throw MxException(LOCATION(), "mLibKriging:badType", "parameter value for '", fname, "' must be a string or scalar");
+        throw MxException(
+            LOCATION(), "mLibKriging:badType", "parameter value for '", fname, "' must be a string or scalar");
       }
     } else {
       result[fname] = std::string(str);
@@ -136,8 +137,13 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   if (nrhs > 7)
     params = structToStringMap(prhs[7]);
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->fit(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), regmodel, normalize, optim,
-          objective, params);
+  wk->fit(input.get<arma::vec>(1, "y vector"),
+          input.get<arma::mat>(2, "X matrix"),
+          regmodel,
+          normalize,
+          optim,
+          objective,
+          params);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -155,14 +161,10 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
       = wk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
   output.set(0, y_pred, "predicted y");
-  if (withStd)
-    output.set(1, stdev_pred, "predicted stdev");
-  if (withCov)
-    output.set(2, cov_pred, "predicted cov");
-  if (withDeriv) {
-    output.set(3, mean_deriv, "predicted mean derivative");
-    output.set(4, stdev_deriv, "predicted stdev derivative");
-  }
+  output.setOptional(1, stdev_pred, "predicted stdev");
+  output.setOptional(2, cov_pred, "predicted cov");
+  output.setOptional(3, mean_deriv, "predicted mean derivative");
+  output.setOptional(4, stdev_deriv, "predicted stdev derivative");
 }
 
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -216,10 +218,8 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
 
   auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
   output.set(0, ll, "log-likelihood value");
-  if (withGrad)
-    output.set(1, grad, "log-likelihood gradient");
-  if (withHess)
-    output.set(2, hess, "log-likelihood hessian");
+  output.setOptional(1, grad, "log-likelihood gradient");
+  output.setOptional(2, hess, "log-likelihood hessian");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

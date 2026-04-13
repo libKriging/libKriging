@@ -126,8 +126,10 @@ double warpKriging_logLikelihood(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr, const arma::vec& theta_gp,
-                                        bool withGrad = true, bool withHess = false) {
+Rcpp::List warpKriging_logLikelihoodFun(SEXP model_ptr,
+                                        const arma::vec& theta_gp,
+                                        bool withGrad = true,
+                                        bool withHess = false) {
   WarpKrigingPtr model(model_ptr);
   auto [ll, grad, hess] = model->logLikelihoodFun(theta_gp, withGrad, withHess);
 

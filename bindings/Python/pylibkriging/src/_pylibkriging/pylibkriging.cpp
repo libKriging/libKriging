@@ -14,10 +14,10 @@
 
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
+#include "MLPKriging_binding.hpp"
 #include "NoiseKriging_binding.hpp"
 #include "NuggetKriging_binding.hpp"
 #include "RandomGenerator.hpp"
-#include "MLPKriging_binding.hpp"
 #include "WarpKriging_binding.hpp"
 
 // To compare string at compile time (before latest C++)

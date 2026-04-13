@@ -30,7 +30,8 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
         double dval = mxGetScalar(val);
         result[fname] = std::to_string(dval);
       } else {
-        throw MxException(LOCATION(), "mLibKriging:badType", "parameter value for '", fname, "' must be a string or scalar");
+        throw MxException(
+            LOCATION(), "mLibKriging:badType", "parameter value for '", fname, "' must be a string or scalar");
       }
     } else {
       result[fname] = std::string(str);
@@ -40,8 +41,8 @@ static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
   return result;
 }
 
-// Convert an arma::vec of doubles (as given by the user) to std::vector<arma::uword>
-static std::vector<arma::uword> toUwordVec(const arma::vec& v) {
+// Convert an arma::rowvec of doubles (as given by the user) to std::vector<arma::uword>
+static std::vector<arma::uword> toUwordVec(const arma::rowvec& v) {
   std::vector<arma::uword> out;
   out.reserve(v.n_elem);
   for (arma::uword i = 0; i < v.n_elem; ++i) {
@@ -61,7 +62,8 @@ static mxArray* uwordVecToMat(const std::vector<arma::uword>& v) {
 namespace MLPKrigingBinding {
 
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  // args: y, X, hidden_dims, d_out, activation, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct]
+  // args: y, X, hidden_dims, d_out, activation, kernel, [regmodel], [normalize], [optim], [objective],
+  // [parameters_struct]
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -69,7 +71,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto y_vec = input.get<arma::vec>(0, "y vector");
   auto X_mat = input.get<arma::mat>(1, "X matrix");
-  auto hidden_dims = toUwordVec(input.get<arma::vec>(2, "hidden_dims vector"));
+  auto hidden_dims = toUwordVec(input.get<arma::rowvec>(2, "hidden_dims vector"));
   auto d_out = static_cast<arma::uword>(input.getOptional<double>(3, "d_out").value_or(2.0));
   auto activation = input.getOptional<std::string>(4, "activation").value_or("selu");
   auto kernel = input.getOptional<std::string>(5, "kernel").value_or("gauss");
@@ -109,8 +111,13 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   if (nrhs > 7)
     params = structToStringMap(prhs[7]);
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
-  mk->fit(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), regmodel, normalize, optim,
-          objective, params);
+  mk->fit(input.get<arma::vec>(1, "y vector"),
+          input.get<arma::mat>(2, "X matrix"),
+          regmodel,
+          normalize,
+          optim,
+          objective,
+          params);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -128,14 +135,10 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
       = mk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
   output.set(0, y_pred, "predicted y");
-  if (withStd)
-    output.set(1, stdev_pred, "predicted stdev");
-  if (withCov)
-    output.set(2, cov_pred, "predicted cov");
-  if (withDeriv) {
-    output.set(3, mean_deriv, "predicted mean derivative");
-    output.set(4, stdev_deriv, "predicted stdev derivative");
-  }
+  output.setOptional(1, stdev_pred, "predicted stdev");
+  output.setOptional(2, cov_pred, "predicted cov");
+  output.setOptional(3, mean_deriv, "predicted mean derivative");
+  output.setOptional(4, stdev_deriv, "predicted stdev derivative");
 }
 
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -189,10 +192,8 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
 
   auto [ll, grad, hess] = mk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
   output.set(0, ll, "log-likelihood value");
-  if (withGrad)
-    output.set(1, grad, "log-likelihood gradient");
-  if (withHess)
-    output.set(2, hess, "log-likelihood hessian");
+  output.setOptional(1, grad, "log-likelihood gradient");
+  output.setOptional(2, hess, "log-likelihood hessian");
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

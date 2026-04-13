@@ -94,8 +94,7 @@ MLPKriging::MLPKriging(const arma::vec& y,
 // -------------------------------------------------------------------------
 void MLPKriging::ensure_joint_warp(arma::uword d_in) {
   if (!m_joint_warp) {
-    m_joint_warp = std::make_unique<WarpMLPJoint>(
-        d_in, m_hidden_dims, m_d_out, WarpMLP::parse_act(m_activation), 42);
+    m_joint_warp = std::make_unique<WarpMLPJoint>(d_in, m_hidden_dims, m_d_out, WarpMLP::parse_act(m_activation), 42);
   }
 }
 
@@ -418,12 +417,8 @@ void MLPKriging::optimise_joint(const std::string& method) {
   theta_lower = arma::clamp(theta_lower, 1e-10, arma::datum::inf);
   theta_upper = arma::max(theta_lower * 2.0, theta_upper);
 
-  auto to_gamma = [](const arma::vec& t) {
-    return Optim::reparametrize ? Optim::reparam_to(t) : t;
-  };
-  auto from_gamma = [](const arma::vec& g) {
-    return Optim::reparametrize ? Optim::reparam_from(g) : g;
-  };
+  auto to_gamma = [](const arma::vec& t) { return Optim::reparametrize ? Optim::reparam_to(t) : t; };
+  auto from_gamma = [](const arma::vec& g) { return Optim::reparametrize ? Optim::reparam_from(g) : g; };
   auto grad_theta_to_gamma = [](const arma::vec& theta, const arma::vec& g_theta) {
     return Optim::reparametrize ? Optim::reparam_from_deriv(theta, g_theta) : g_theta;
   };
@@ -523,11 +518,10 @@ void MLPKriging::optimise_joint(const std::string& method) {
     arma::vec current_wp = wk.pack_warp_params();
     arma::vec current_gamma = to_gamma(wk.m_theta);
 
-    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](
-                      const arma::vec& x_outer,
-                      const arma::vec& x_inner,
-                      arma::vec* grad_outer,
-                      arma::vec* grad_inner) -> double {
+    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](const arma::vec& x_outer,
+                                                                        const arma::vec& x_inner,
+                                                                        arma::vec* grad_outer,
+                                                                        arma::vec* grad_inner) -> double {
       bool warp_changed = false;
       if (x_outer.n_elem > 0) {
         if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
@@ -773,8 +767,8 @@ void MLPKriging::fit(const arma::vec& y,
   if (parameters.theta.has_value()) {
     const arma::vec& t0 = *parameters.theta;
     if (t0.n_elem != m_d_out)
-      throw std::invalid_argument("fit: parameters.theta has " + std::to_string(t0.n_elem)
-                                  + " elements but d_out is " + std::to_string(m_d_out));
+      throw std::invalid_argument("fit: parameters.theta has " + std::to_string(t0.n_elem) + " elements but d_out is "
+                                  + std::to_string(m_d_out));
     m_theta = t0;
   } else {
     m_theta = arma::ones<arma::vec>(m_d_out);
@@ -912,8 +906,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
       Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * m_alpha).t();
 
       if (withStd) {
-        arma::mat DEcirc_n_i
-            = arma::solve(arma::trimatu(circ).t(), (DF_n_i - W_i.t() * Cinv_F).t());
+        arma::mat DEcirc_n_i = arma::solve(arma::trimatu(circ).t(), (DF_n_i - W_i.t() * Cinv_F).t());
         Dysd2_n.row(i) = -2.0 * v.col(i).t() * W_i + 2.0 * Ecirc_n.row(i) * DEcirc_n_i;
       }
     }

@@ -1726,9 +1726,15 @@ void* lk_warp_kriging_new_fit(const double* y,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    return new WarpKriging(
-        y_vec, X_mat, to_string_vec(warping, n_warping), kernel, regmodel, normalize != 0, optim, objective,
-        to_param_map(param_keys, param_vals, n_params));
+    return new WarpKriging(y_vec,
+                           X_mat,
+                           to_string_vec(warping, n_warping),
+                           kernel,
+                           regmodel,
+                           normalize != 0,
+                           optim,
+                           objective,
+                           to_param_map(param_keys, param_vals, n_params));
   }
   CATCH_RETURN_NULL
 }
@@ -1765,8 +1771,8 @@ int lk_warp_kriging_fit(void* ptr,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    static_cast<WarpKriging*>(ptr)->fit(y_vec, X_mat, regmodel, normalize != 0, optim, objective,
-                                        to_param_map(param_keys, param_vals, n_params));
+    static_cast<WarpKriging*>(ptr)->fit(
+        y_vec, X_mat, regmodel, normalize != 0, optim, objective, to_param_map(param_keys, param_vals, n_params));
     return 0;
   }
   CATCH_RETURN
@@ -1967,45 +1973,43 @@ static std::vector<arma::uword> to_uword_vec(const int* arr, int n) {
   return v;
 }
 
-void* lk_mlp_kriging_new(const int* hidden_dims,
-                          int n_hidden,
-                          int d_out,
-                          const char* activation,
-                          const char* kernel) {
+void* lk_mlp_kriging_new(const int* hidden_dims, int n_hidden, int d_out, const char* activation, const char* kernel) {
   try {
-    return new MLPKriging(to_uword_vec(hidden_dims, n_hidden),
-                          static_cast<arma::uword>(d_out),
-                          activation,
-                          kernel);
+    return new MLPKriging(to_uword_vec(hidden_dims, n_hidden), static_cast<arma::uword>(d_out), activation, kernel);
   }
   CATCH_RETURN_NULL
 }
 
 void* lk_mlp_kriging_new_fit(const double* y,
-                              int n,
-                              const double* X,
-                              int nX,
-                              int d,
-                              const int* hidden_dims,
-                              int n_hidden,
-                              int d_out,
-                              const char* activation,
-                              const char* kernel,
-                              const char* regmodel,
-                              int normalize,
-                              const char* optim,
-                              const char* objective,
-                              const char** param_keys,
-                              const char** param_vals,
-                              int n_params) {
+                             int n,
+                             const double* X,
+                             int nX,
+                             int d,
+                             const int* hidden_dims,
+                             int n_hidden,
+                             int d_out,
+                             const char* activation,
+                             const char* kernel,
+                             const char* regmodel,
+                             int normalize,
+                             const char* optim,
+                             const char* objective,
+                             const char** param_keys,
+                             const char** param_vals,
+                             int n_params) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    return new MLPKriging(y_vec, X_mat,
+    return new MLPKriging(y_vec,
+                          X_mat,
                           to_uword_vec(hidden_dims, n_hidden),
                           static_cast<arma::uword>(d_out),
-                          activation, kernel,
-                          regmodel, normalize != 0, optim, objective,
+                          activation,
+                          kernel,
+                          regmodel,
+                          normalize != 0,
+                          optim,
+                          objective,
                           to_param_map(param_keys, param_vals, n_params));
   }
   CATCH_RETURN_NULL
@@ -2016,40 +2020,40 @@ void lk_mlp_kriging_delete(void* ptr) {
 }
 
 int lk_mlp_kriging_fit(void* ptr,
-                        const double* y,
-                        int n,
-                        const double* X,
-                        int nX,
-                        int d,
-                        const char* regmodel,
-                        int normalize,
-                        const char* optim,
-                        const char* objective,
-                        const char** param_keys,
-                        const char** param_vals,
-                        int n_params) {
+                       const double* y,
+                       int n,
+                       const double* X,
+                       int nX,
+                       int d,
+                       const char* regmodel,
+                       int normalize,
+                       const char* optim,
+                       const char* objective,
+                       const char** param_keys,
+                       const char** param_vals,
+                       int n_params) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    static_cast<MLPKriging*>(ptr)->fit(y_vec, X_mat, regmodel, normalize != 0, optim, objective,
-                                       to_param_map(param_keys, param_vals, n_params));
+    static_cast<MLPKriging*>(ptr)->fit(
+        y_vec, X_mat, regmodel, normalize != 0, optim, objective, to_param_map(param_keys, param_vals, n_params));
     return 0;
   }
   CATCH_RETURN
 }
 
 int lk_mlp_kriging_predict(void* ptr,
-                            const double* X_n,
-                            int m,
-                            int d,
-                            int return_stdev,
-                            int return_cov,
-                            int return_deriv,
-                            double* mean_out,
-                            double* stdev_out,
-                            double* cov_out,
-                            double* mean_deriv_out,
-                            double* stdev_deriv_out) {
+                           const double* X_n,
+                           int m,
+                           int d,
+                           int return_stdev,
+                           int return_cov,
+                           int return_deriv,
+                           double* mean_out,
+                           double* stdev_out,
+                           double* cov_out,
+                           double* mean_deriv_out,
+                           double* stdev_deriv_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto [mean, stdev, cov, mean_deriv, stdev_deriv]
@@ -2107,13 +2111,13 @@ double lk_mlp_kriging_log_likelihood(void* ptr) {
 }
 
 int lk_mlp_kriging_log_likelihood_fun(void* ptr,
-                                       const double* theta,
-                                       int theta_n,
-                                       int return_grad,
-                                       int return_hess,
-                                       double* ll_out,
-                                       double* grad_out,
-                                       double* hess_out) {
+                                      const double* theta,
+                                      int theta_n,
+                                      int return_grad,
+                                      int return_hess,
+                                      double* ll_out,
+                                      double* grad_out,
+                                      double* hess_out) {
   try {
     arma::vec theta_vec(const_cast<double*>(theta), theta_n, false, true);
     auto [ll, grad, hess]

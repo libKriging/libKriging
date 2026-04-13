@@ -6,35 +6,35 @@
 
 #include "libKriging/Optim.hpp"
 
-#include "libKriging/utils/lk_armadillo.hpp"
 #include <cstdlib>
 #include <string>
+#include "libKriging/utils/lk_armadillo.hpp"
 
 // Helper function to read environment variables and convert to appropriate type
 namespace {
-  template<typename T>
-  T get_env_or_default(const char* var_name, T default_value) {
-    const char* env_value = std::getenv(var_name);
-    if (env_value == nullptr) {
-      return default_value;
-    }
-    
-    try {
-      if constexpr (std::is_same_v<T, int>) {
-        return std::stoi(env_value);
-      } else if constexpr (std::is_same_v<T, double>) {
-        return std::stod(env_value);
-      } else if constexpr (std::is_same_v<T, bool>) {
-        std::string val(env_value);
-        return (val == "1" || val == "true" || val == "TRUE" || val == "True");
-      }
-    } catch (...) {
-      // If parsing fails, return default
-      return default_value;
-    }
+template <typename T>
+T get_env_or_default(const char* var_name, T default_value) {
+  const char* env_value = std::getenv(var_name);
+  if (env_value == nullptr) {
     return default_value;
   }
+
+  try {
+    if constexpr (std::is_same_v<T, int>) {
+      return std::stoi(env_value);
+    } else if constexpr (std::is_same_v<T, double>) {
+      return std::stod(env_value);
+    } else if constexpr (std::is_same_v<T, bool>) {
+      std::string val(env_value);
+      return (val == "1" || val == "true" || val == "TRUE" || val == "True");
+    }
+  } catch (...) {
+    // If parsing fails, return default
+    return default_value;
+  }
+  return default_value;
 }
+}  // namespace
 
 bool Optim::reparametrize = get_env_or_default("LK_REPARAMETRIZE", true);
 
@@ -56,8 +56,8 @@ std::function<arma::vec(const arma::vec&)> Optim::reparam_to
 std::function<double(const double&)> Optim::reparam_from_ = [](const double& _gamma) { return std::exp(_gamma); };
 std::function<arma::vec(const arma::vec&)> Optim::reparam_from
     = [](const arma::vec& _gamma) { return arma::conv_to<arma::colvec>::from(arma::exp(_gamma)); };
-std::function<arma::vec(const arma::vec&, const arma::vec&)> Optim::reparam_from_deriv =
-    [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(_grad % _theta); };
+std::function<arma::vec(const arma::vec&, const arma::vec&)> Optim::reparam_from_deriv
+    = [](const arma::vec& _theta, const arma::vec& _grad) { return arma::conv_to<arma::colvec>::from(_grad % _theta); };
 std::function<arma::mat(const arma::vec&, const arma::vec&, const arma::mat&)> Optim::reparam_from_deriv2
     = [](const arma::vec& _theta, const arma::vec& _grad_theta, const arma::mat& _hess_theta) {
         // Returns gamma-space Hessian given theta-space grad and Hessian.
@@ -149,7 +149,7 @@ LIBKRIGING_EXPORT int Optim::get_thread_start_delay_ms() {
 };
 
 LIBKRIGING_EXPORT std::pair<std::string, int> Optim::parse_method(const std::string& method,
-                                                                   const std::string& prefix) {
+                                                                  const std::string& prefix) {
   if (method.rfind(prefix, 0) != 0)
     return {method, 1};
 

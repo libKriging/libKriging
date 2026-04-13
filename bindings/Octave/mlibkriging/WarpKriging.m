@@ -14,11 +14,16 @@ classdef WarpKriging < handle
 
     methods
         function obj = WarpKriging(varargin)
-            obj.ref = mLibKriging("WarpKriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                obj.ref = varargin{2};
+            else
+                obj.ref = mLibKriging("WarpKriging::new", varargin{:});
+            end
         end
 
-        function varargout = copy(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("WarpKriging::copy", obj.ref, varargin{:});
+        function k2 = copy(obj)
+            ref_copy = mLibKriging("WarpKriging::copy", obj.ref);
+            k2 = WarpKriging('__ref__', ref_copy);
         end
 
         function delete(obj, varargin)
