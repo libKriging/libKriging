@@ -12,7 +12,7 @@
 #                  Operation filter (fit/predict/simulate/update/update_simulate)
 #                  Default: kriging
 #   warping=NAME : WarpKriging warping filter (none/affine/boxcox/kumaraswamy/mlp/neural_mono/
-#                  mlp_joint/categorical/ordinal). Only used with warpkriging benchmark.
+#                  categorical/ordinal). Only used with warpkriging benchmark.
 #                  Default: all warpings.
 #
 # Examples:

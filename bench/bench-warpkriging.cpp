@@ -118,12 +118,6 @@ std::vector<WarpConfig> build_configs(arma::uword d) {
   configs.push_back({"mlp", repeat_warp("mlp", d), "BFGS+Adam", {}, false});
   configs.push_back({"neural_mono", repeat_warp("neural_mono", d), "BFGS+Adam", {}, false});
 
-  // Joint MLP: single warp over all dimensions, output dim = d
-  {
-    std::string spec = "mlp_joint(16:8," + std::to_string(d) + ",selu)";
-    configs.push_back({"mlp_joint", {spec}, "Adam", {}, false});
-  }
-
   // Categorical: first dim = categorical(5,2), rest = kumaraswamy
   {
     std::vector<std::string> w;
