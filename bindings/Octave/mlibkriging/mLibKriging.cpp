@@ -352,6 +352,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::warping"_hash:
       return WarpKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::save"_hash:
+      return WarpKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::load"_hash:
+      return WarpKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "MLPKriging::new"_hash:
       return MLPKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
@@ -389,6 +393,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::hidden_dims(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::activation"_hash:
       return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::copy"_hash:
+      return MLPKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::save"_hash:
+      return MLPKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::load"_hash:
+      return MLPKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Optim::is_reparametrized"_hash:
       return OptimBinding::is_reparametrized(nlhs, plhs, nrhs - 1, prhs + 1);

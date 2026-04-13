@@ -91,9 +91,9 @@ double PyWarpKriging::logLikelihood() {
 }
 
 std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool want_hess) {
+PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, want_hess);
+  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
   return {ll, carma::col_to_arr(grad), {}};
 }
 
@@ -127,4 +127,12 @@ int PyWarpKriging::feature_dim() {
 
 std::vector<std::string> PyWarpKriging::warping() {
   return m_internal->warping_strings();
+}
+
+void PyWarpKriging::save(const std::string filename) const {
+  return m_internal->save(filename);
+}
+
+PyWarpKriging PyWarpKriging::load(const std::string filename) {
+  return PyWarpKriging(std::make_unique<lk::WarpKriging>(lk::WarpKriging::load(filename)));
 }

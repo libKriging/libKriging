@@ -11,10 +11,16 @@
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 
+#include "libKriging/utils/jsonutils.hpp"
+#include "libKriging/utils/nlohmann/json.hpp"
+#include "libKriging/utils/utils.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <numeric>
@@ -2273,6 +2279,131 @@ std::string WarpKriging::summary() const {
     oss << "  ** model not yet fitted **\n";
   }
   return oss.str();
+}
+
+// -------------------------------------------------------------------------
+//  save / load
+// -------------------------------------------------------------------------
+void WarpKriging::save(const std::string filename) const {
+  nlohmann::json j;
+
+  j["version"] = 2;
+  j["content"] = "WarpKriging";
+
+  // Architecture
+  j["kernel"] = m_kernel_name;
+  std::vector<std::string> warp_strs;
+  for (const auto& s : m_warp_specs)
+    warp_strs.push_back(s.to_string());
+  j["warping"] = warp_strs;
+
+  // Training data
+  j["X"] = to_json(m_X);
+  j["y"] = to_json(m_y);
+
+  // Normalization
+  j["normalize"] = m_normalize;
+  j["X_mean"] = to_json(m_X_mean);
+  j["X_std"] = to_json(m_X_std);
+  j["y_mean"] = m_y_mean;
+  j["y_std"] = m_y_std;
+
+  // Per-variable continuous flags
+  j["is_continuous"] = m_is_continuous;
+
+  // Settings
+  j["regmodel"] = m_regmodel;
+  j["feature_dim"] = m_feature_dim;
+  j["max_iter_bfgs"] = m_max_iter_bfgs;
+  j["max_iter_adam"] = m_max_iter_adam;
+  j["adam_lr"] = m_adam_lr;
+
+  // State
+  j["fitted"] = m_fitted;
+
+  // GP hyperparameters
+  j["theta"] = to_json(m_theta);
+  j["sigma2"] = m_sigma2;
+
+  // GP cached data
+  j["beta"] = to_json(m_beta);
+  j["alpha"] = to_json(m_alpha);
+  j["F"] = to_json(m_F);
+  j["R"] = to_json(m_R);
+  j["C"] = to_json(m_C);
+  j["logdet"] = m_logdet;
+  j["Phi"] = to_json(m_Phi);
+  j["dPhi"] = to_json(m_dPhi);
+
+  // Warp parameters (all learnable params as flat vector)
+  j["warp_params"] = to_json(pack_warp_params());
+
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+WarpKriging WarpKriging::load(const std::string filename) {
+  std::ifstream f(filename);
+  nlohmann::json j = nlohmann::json::parse(f);
+
+  uint32_t version = j["version"].template get<uint32_t>();
+  if (version != 2) {
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
+  }
+  std::string content = j["content"].template get<std::string>();
+  if (content != "WarpKriging") {
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'WarpKriging'"));
+  }
+
+  // Reconstruct from architecture
+  auto warping = j["warping"].template get<std::vector<std::string>>();
+  std::string kernel = j["kernel"].template get<std::string>();
+  WarpKriging wk(warping, kernel);
+
+  // Training data
+  wk.m_X = mat_from_json(j["X"]);
+  wk.m_y = colvec_from_json(j["y"]);
+
+  // Normalization
+  wk.m_normalize = j["normalize"].template get<bool>();
+  wk.m_X_mean = rowvec_from_json(j["X_mean"]);
+  wk.m_X_std = rowvec_from_json(j["X_std"]);
+  wk.m_y_mean = j["y_mean"].template get<double>();
+  wk.m_y_std = j["y_std"].template get<double>();
+
+  // Per-variable continuous flags
+  wk.m_is_continuous = j["is_continuous"].template get<std::vector<bool>>();
+
+  // Settings
+  wk.m_regmodel = j["regmodel"].template get<std::string>();
+  wk.m_feature_dim = j["feature_dim"].template get<arma::uword>();
+  wk.m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
+  wk.m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
+  wk.m_adam_lr = j["adam_lr"].template get<double>();
+
+  // State
+  wk.m_fitted = j["fitted"].template get<bool>();
+
+  // GP hyperparameters
+  wk.m_theta = colvec_from_json(j["theta"]);
+  wk.m_sigma2 = j["sigma2"].template get<double>();
+
+  // GP cached data
+  wk.m_beta = colvec_from_json(j["beta"]);
+  wk.m_alpha = colvec_from_json(j["alpha"]);
+  wk.m_F = mat_from_json(j["F"]);
+  wk.m_R = mat_from_json(j["R"]);
+  wk.m_C = mat_from_json(j["C"]);
+  wk.m_logdet = j["logdet"].template get<double>();
+  wk.m_Phi = mat_from_json(j["Phi"]);
+  wk.m_dPhi = mat_from_json(j["dPhi"]);
+
+  // Restore warp parameters
+  arma::vec wp = colvec_from_json(j["warp_params"]);
+  wk.unpack_warp_params(wp);
+
+  return wk;
 }
 
 }  // namespace libKriging

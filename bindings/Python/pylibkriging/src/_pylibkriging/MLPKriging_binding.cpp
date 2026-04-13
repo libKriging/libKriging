@@ -33,6 +33,17 @@ PyMLPKriging::PyMLPKriging(const std::vector<std::size_t>& hidden_dims,
                                                   activation,
                                                   kernel)} {}
 
+PyMLPKriging PyMLPKriging::copy() const {
+  // MLPKriging is not copyable (contains unique_ptr members),
+  // so we re-fit from the stored data.
+  auto clone = std::make_unique<lk::MLPKriging>(
+      m_internal->hidden_dims(), m_internal->d_out(), m_internal->activation(), m_internal->kernel());
+  if (m_internal->is_fitted()) {
+    clone->fit(m_internal->y(), m_internal->X());
+  }
+  return PyMLPKriging(std::move(clone));
+}
+
 PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                            const py::array_t<double>& X,
                            const std::vector<std::size_t>& hidden_dims,
@@ -105,9 +116,9 @@ double PyMLPKriging::logLikelihood() {
 }
 
 std::tuple<double, py::array_t<double>, py::array_t<double>>
-PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool want_hess) {
+PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, want_hess);
+  auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
   return {ll, carma::col_to_arr(grad), {}};
 }
 
@@ -150,4 +161,12 @@ std::vector<std::size_t> PyMLPKriging::hidden_dims() {
 
 std::string PyMLPKriging::activation() {
   return m_internal->activation();
+}
+
+void PyMLPKriging::save(const std::string filename) const {
+  return m_internal->save(filename);
+}
+
+PyMLPKriging PyMLPKriging::load(const std::string filename) {
+  return PyMLPKriging(std::make_unique<lk::MLPKriging>(lk::MLPKriging::load(filename)));
 }

@@ -23,6 +23,9 @@ void is_fitted(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void feature_dim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void hidden_dims(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void activation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace MLPKrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_MLPKRIGING_BINDING_HPP

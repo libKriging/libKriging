@@ -91,5 +91,16 @@ classdef WarpKriging < handle
         function varargout = warping(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::warping", obj.ref, varargin{:});
         end
+
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::save", obj.ref, varargin{:});
+        end
+    end
+
+    methods (Static = true)
+        function obj = load(varargin)
+            ref = mLibKriging("WarpKriging::load", varargin{:});
+            obj = WarpKriging('__ref__', ref);
+        end
     end
 end

@@ -197,3 +197,32 @@ bool mlpKriging_isFitted(SEXP model_ptr) {
   MLPKrigingPtr model(model_ptr);
   return model->is_fitted();
 }
+
+// [[Rcpp::export]]
+arma::mat mlpKriging_X(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->X();
+}
+
+// [[Rcpp::export]]
+arma::vec mlpKriging_y(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->y();
+}
+
+// [[Rcpp::export]]
+SEXP mlpKriging_copy(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  auto* clone = new MLPKriging(model->hidden_dims(), model->d_out(), model->activation(), model->kernel());
+  if (model->is_fitted()) {
+    clone->fit(model->y(), model->X());
+  }
+  Rcpp::XPtr<MLPKriging> clone_ptr(clone);
+  return clone_ptr;
+}
+
+// [[Rcpp::export]]
+void mlpKriging_save(SEXP model_ptr, std::string filename) {
+  MLPKrigingPtr model(model_ptr);
+  model->save(filename);
+}

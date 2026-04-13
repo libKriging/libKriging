@@ -11,9 +11,15 @@
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 
+#include "libKriging/utils/jsonutils.hpp"
+#include "libKriging/utils/nlohmann/json.hpp"
+#include "libKriging/utils/utils.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -1024,6 +1030,125 @@ std::string MLPKriging::summary() const {
     oss << "  ** model not yet fitted **\n";
   }
   return oss.str();
+}
+
+// -------------------------------------------------------------------------
+//  save / load
+// -------------------------------------------------------------------------
+void MLPKriging::save(const std::string filename) const {
+  nlohmann::json j;
+
+  j["version"] = 2;
+  j["content"] = "MLPKriging";
+
+  // Architecture
+  j["kernel"] = m_kernel_name;
+  j["hidden_dims"] = std::vector<arma::uword>(m_hidden_dims.begin(), m_hidden_dims.end());
+  j["d_out"] = m_d_out;
+  j["activation"] = m_activation;
+
+  // Training data
+  j["X"] = to_json(m_X);
+  j["y"] = to_json(m_y);
+
+  // Normalization
+  j["normalize"] = m_normalize;
+  j["X_mean"] = to_json(m_X_mean);
+  j["X_std"] = to_json(m_X_std);
+  j["y_mean"] = m_y_mean;
+  j["y_std"] = m_y_std;
+
+  // Settings
+  j["regmodel"] = m_regmodel;
+  j["max_iter_bfgs"] = m_max_iter_bfgs;
+  j["max_iter_adam"] = m_max_iter_adam;
+  j["adam_lr"] = m_adam_lr;
+
+  // State
+  j["fitted"] = m_fitted;
+
+  // GP hyperparameters
+  j["theta"] = to_json(m_theta);
+  j["sigma2"] = m_sigma2;
+
+  // GP cached data
+  j["beta"] = to_json(m_beta);
+  j["alpha"] = to_json(m_alpha);
+  j["F"] = to_json(m_F);
+  j["R"] = to_json(m_R);
+  j["C"] = to_json(m_C);
+  j["logdet"] = m_logdet;
+  j["Phi"] = to_json(m_Phi);
+  j["dPhi"] = to_json(m_dPhi);
+
+  // MLP warp parameters
+  j["warp_params"] = to_json(pack_warp_params());
+
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+MLPKriging MLPKriging::load(const std::string filename) {
+  std::ifstream f(filename);
+  nlohmann::json j = nlohmann::json::parse(f);
+
+  uint32_t version = j["version"].template get<uint32_t>();
+  if (version != 2) {
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
+  }
+  std::string content = j["content"].template get<std::string>();
+  if (content != "MLPKriging") {
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'MLPKriging'"));
+  }
+
+  // Reconstruct from architecture
+  auto hd = j["hidden_dims"].template get<std::vector<arma::uword>>();
+  arma::uword d_out_val = j["d_out"].template get<arma::uword>();
+  std::string activation = j["activation"].template get<std::string>();
+  std::string kernel = j["kernel"].template get<std::string>();
+  MLPKriging mk(hd, d_out_val, activation, kernel);
+
+  // Training data
+  mk.m_X = mat_from_json(j["X"]);
+  mk.m_y = colvec_from_json(j["y"]);
+
+  // Normalization
+  mk.m_normalize = j["normalize"].template get<bool>();
+  mk.m_X_mean = rowvec_from_json(j["X_mean"]);
+  mk.m_X_std = rowvec_from_json(j["X_std"]);
+  mk.m_y_mean = j["y_mean"].template get<double>();
+  mk.m_y_std = j["y_std"].template get<double>();
+
+  // Settings
+  mk.m_regmodel = j["regmodel"].template get<std::string>();
+  mk.m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
+  mk.m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
+  mk.m_adam_lr = j["adam_lr"].template get<double>();
+
+  // State
+  mk.m_fitted = j["fitted"].template get<bool>();
+
+  // GP hyperparameters
+  mk.m_theta = colvec_from_json(j["theta"]);
+  mk.m_sigma2 = j["sigma2"].template get<double>();
+
+  // GP cached data
+  mk.m_beta = colvec_from_json(j["beta"]);
+  mk.m_alpha = colvec_from_json(j["alpha"]);
+  mk.m_F = mat_from_json(j["F"]);
+  mk.m_R = mat_from_json(j["R"]);
+  mk.m_C = mat_from_json(j["C"]);
+  mk.m_logdet = j["logdet"].template get<double>();
+  mk.m_Phi = mat_from_json(j["Phi"]);
+  mk.m_dPhi = mat_from_json(j["dPhi"]);
+
+  // Restore MLP warp parameters — need to instantiate the joint warp first
+  mk.ensure_joint_warp(mk.m_X.n_cols);
+  arma::vec wp = colvec_from_json(j["warp_params"]);
+  mk.unpack_warp_params(wp);
+
+  return mk;
 }
 
 }  // namespace libKriging

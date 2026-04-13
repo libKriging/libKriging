@@ -869,6 +869,16 @@ function Base.copy(wk::WarpKriging)
     return WarpKriging(_check_ptr(ptr))
 end
 
+function save(wk::WarpKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_save), Cint, (Ptr{Nothing}, Cstring), wk.ptr, filename)
+    _check_error(ret)
+end
+
+function load_warp_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_warp_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return WarpKriging(_check_ptr(ptr))
+end
+
 function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Float64};
               regmodel::String="constant",
               normalize::Bool=false,
@@ -1216,11 +1226,26 @@ function get_hidden_dims(mk::MLPKriging)
     return Int.(out)
 end
 
+function Base.copy(mk::MLPKriging)
+    ptr = ccall(dlsym(_lk(), :lk_mlp_kriging_copy), Ptr{Nothing}, (Ptr{Nothing},), mk.ptr)
+    return MLPKriging(_check_ptr(ptr))
+end
+
+function save(mk::MLPKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_mlp_kriging_save), Cint, (Ptr{Nothing}, Cstring), mk.ptr, filename)
+    _check_error(ret)
+end
+
+function load_mlp_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_mlp_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return MLPKriging(_check_ptr(ptr))
+end
+
 # ─── Exports ──────────────────────────────────────────────────────
 
 export LinearRegression, Kriging, NuggetKriging, NoiseKriging, WarpKriging, MLPKriging
 export fit!, predict, simulate, update!, update_simulate, save, summary
-export load_kriging, load_nugget_kriging, load_noise_kriging
+export load_kriging, load_nugget_kriging, load_noise_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat

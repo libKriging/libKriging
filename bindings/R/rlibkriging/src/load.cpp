@@ -9,10 +9,12 @@
 #include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingLoader.hpp"
 #include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/MLPKriging.hpp"
 #include "libKriging/NoiseKriging.hpp"
 #include "libKriging/NuggetKriging.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
+#include "libKriging/WarpKriging.hpp"
 
 #include <optional>
 #include "retrofit_utils.hpp"
@@ -48,6 +50,20 @@ Rcpp::List nuggetkriging_load(std::string filename) {
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NuggetKriging";
   return obj;
+}
+
+// [[Rcpp::export]]
+SEXP warpkriging_load(std::string filename) {
+  auto* wk = new WarpKriging(WarpKriging::load(filename));
+  Rcpp::XPtr<WarpKriging> ptr(wk);
+  return ptr;
+}
+
+// [[Rcpp::export]]
+SEXP mlpkriging_load(std::string filename) {
+  auto* mk = new MLPKriging(MLPKriging::load(filename));
+  Rcpp::XPtr<MLPKriging> ptr(mk);
+  return ptr;
 }
 
 // [[Rcpp::export]]

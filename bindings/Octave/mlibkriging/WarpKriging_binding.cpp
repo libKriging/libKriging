@@ -154,12 +154,12 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
 
-  const bool withStd = flag_output_compliance(input, 2, "with standard deviation", output, 1);
-  const bool withCov = flag_output_compliance(input, 3, "with covariance", output, 2);
-  const bool withDeriv = flag_output_compliance(input, 4, "with derivatives", output, 3);
+  const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
+  const bool return_cov = flag_output_compliance(input, 3, "return_cov", output, 2);
+  const bool return_deriv = flag_output_compliance(input, 4, "return_deriv", output, 3);
 
   auto [y_pred, stdev_pred, cov_pred, mean_deriv, stdev_deriv]
-      = wk->predict(input.get<arma::mat>(1, "X_n matrix"), withStd, withCov, withDeriv);
+      = wk->predict(input.get<arma::mat>(1, "X_n matrix"), return_stdev, return_cov, return_deriv);
   output.set(0, y_pred, "predicted y");
   output.setOptional(1, stdev_pred, "predicted stdev");
   output.setOptional(2, cov_pred, "predicted cov");
@@ -213,10 +213,10 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
 
-  const bool withGrad = flag_output_compliance(input, 2, "with gradient", output, 1);
-  const bool withHess = flag_output_compliance(input, 3, "with hessian", output, 2);
+  const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
+  const bool return_hess = flag_output_compliance(input, 3, "return_hess", output, 2);
 
-  auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), withGrad, withHess);
+  auto [ll, grad, hess] = wk->logLikelihoodFun(input.get<arma::vec>(1, "theta vector"), return_grad, return_hess);
   output.set(0, ll, "log-likelihood value");
   output.setOptional(1, grad, "log-likelihood gradient");
   output.setOptional(2, hess, "log-likelihood hessian");
@@ -313,6 +313,28 @@ void warping(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   }
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   plhs[0] = stringVecToCell(wk->warping_strings());
+}
+
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  const auto filename = input.get<std::string>(1, "filename");
+  wk->save(filename);
+}
+
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto filename = input.get<std::string>(0, "filename");
+  auto wk = buildObject<WarpKriging>(WarpKriging::load(filename));
+  output.set(0, wk, "new object reference");
 }
 
 }  // namespace WarpKrigingBinding

@@ -15,7 +15,11 @@ classdef MLPKriging < handle
 
     methods
         function obj = MLPKriging(varargin)
-            obj.ref = mLibKriging("MLPKriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                obj.ref = varargin{2};
+            else
+                obj.ref = mLibKriging("MLPKriging::new", varargin{:});
+            end
         end
 
         function delete(obj, varargin)
@@ -86,6 +90,22 @@ classdef MLPKriging < handle
 
         function varargout = activation(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("MLPKriging::activation", obj.ref, varargin{:});
+        end
+
+        function k2 = copy(obj)
+            ref_copy = mLibKriging("MLPKriging::copy", obj.ref);
+            k2 = MLPKriging('__ref__', ref_copy);
+        end
+
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::save", obj.ref, varargin{:});
+        end
+    end
+
+    methods (Static = true)
+        function obj = load(varargin)
+            ref = mLibKriging("MLPKriging::load", varargin{:});
+            obj = MLPKriging('__ref__', ref);
         end
     end
 end

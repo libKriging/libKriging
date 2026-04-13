@@ -138,7 +138,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def_static("load", &PyKriging::load)
       .def("leaveOneOutFun", &PyKriging::leaveOneOutFun)
       .def("leaveOneOutVec", &PyKriging::leaveOneOutVec)
-      .def("logLikelihoodFun", &PyKriging::logLikelihoodFun)
+      .def("logLikelihoodFun",
+           &PyKriging::logLikelihoodFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           py::arg("return_hess") = false)
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
       .def("logMargPost", &PyKriging::logMargPost)
@@ -320,6 +324,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{})
       .def("copy", &PyWarpKriging::copy)
+      .def("save", &PyWarpKriging::save)
+      .def_static("load", &PyWarpKriging::load)
       .def("fit",
            &PyWarpKriging::fit,
            py::arg("y"),
@@ -413,7 +419,10 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_fitted", &PyMLPKriging::is_fitted)
       .def("feature_dim", &PyMLPKriging::feature_dim)
       .def("hidden_dims", &PyMLPKriging::hidden_dims)
-      .def("activation", &PyMLPKriging::activation);
+      .def("activation", &PyMLPKriging::activation)
+      .def("copy", &PyMLPKriging::copy)
+      .def("save", &PyMLPKriging::save)
+      .def_static("load", &PyMLPKriging::load);
 
   // Optim class - static methods for optimization settings
   py::class_<Optim>(m, "Optim")

@@ -148,3 +148,26 @@ test_that("MLPKriging is_fitted and getters work", {
   expect_true(all(theta(k) > 0))
   expect_true(sigma2(k) > 0)
 })
+
+# ===========================================================================
+#  Test 6: Predict with covariance
+# ===========================================================================
+test_that("MLPKriging predict with cov returns finite covariance", {
+  set.seed(88)
+  n <- 20
+  X <- matrix(runif(n * 2), ncol = 2)
+  f2 <- function(x1, x2) sin(3 * x1) + cos(4 * x2) + 0.5 * x1 * x2
+  y <- mapply(function(i) f2(X[i, 1], X[i, 2]), 1:n)
+
+  k <- MLPKriging(y, X,
+                  hidden_dims = c(16, 8), d_out = 2,
+                  activation = "selu", kernel = "gauss",
+                  parameters = list(max_iter_adam = "100"))
+
+  X_new <- matrix(runif(5 * 2), ncol = 2)
+  p <- predict(k, X_new, return_stdev = TRUE, return_cov = TRUE)
+  expect_true(!is.null(p$cov))
+  expect_equal(dim(p$cov), c(5, 5))
+  expect_true(all(is.finite(p$cov)))
+  expect_true(max(abs(p$cov - t(p$cov))) < 1e-10)
+})

@@ -23,6 +23,8 @@ void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void is_fitted(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void feature_dim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void warping(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace WarpKrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_WARPKRIGING_BINDING_HPP

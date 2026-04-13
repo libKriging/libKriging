@@ -56,7 +56,7 @@ class PyMLPKriging {
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
                                                                                 const bool return_grad,
-                                                                                const bool want_hess);
+                                                                                const bool return_hess);
 
   std::string kernel();
   py::array_t<double> X();
@@ -67,6 +67,11 @@ class PyMLPKriging {
   int feature_dim();
   std::vector<std::size_t> hidden_dims();
   std::string activation();
+
+  [[nodiscard]] PyMLPKriging copy() const;
+
+  void save(const std::string filename) const;
+  static PyMLPKriging load(const std::string filename);
 
  private:
   std::unique_ptr<libKriging::MLPKriging> m_internal;

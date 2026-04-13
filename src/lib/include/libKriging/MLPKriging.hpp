@@ -155,6 +155,12 @@ class MLPKriging {
   arma::uword d_out() const { return m_d_out; }
   const std::string& activation() const { return m_activation; }
 
+  /** Dump current MLPKriging object into a file */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a new MLPKriging object from a file */
+  LIBKRIGING_EXPORT static MLPKriging load(const std::string filename);
+
  private:
   // ---- data ---------------------------------------------------------------
   arma::vec m_y;

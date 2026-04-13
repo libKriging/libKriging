@@ -191,3 +191,32 @@ bool warpKriging_isFitted(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
   return model->is_fitted();
 }
+
+// [[Rcpp::export]]
+arma::mat warpKriging_X(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->X();
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_y(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->y();
+}
+
+// [[Rcpp::export]]
+SEXP warpKriging_copy(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  auto clone = new WarpKriging(model->warping_strings(), model->kernel());
+  if (model->is_fitted()) {
+    clone->fit(model->y(), model->X());
+  }
+  Rcpp::XPtr<WarpKriging> clone_ptr(clone);
+  return clone_ptr;
+}
+
+// [[Rcpp::export]]
+void warpKriging_save(SEXP model_ptr, std::string filename) {
+  WarpKrigingPtr model(model_ptr);
+  model->save(filename);
+}

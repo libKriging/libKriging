@@ -285,3 +285,60 @@ is_fitted <- function(object, ...) UseMethod("is_fitted")
 is_fitted.WarpKriging <- function(object, ...) {
   warpKriging_isFitted(object$ptr)
 }
+
+#' @title Get training input matrix
+#' @param object WarpKriging object
+#' @param ... ignored
+#' @return matrix of training inputs
+#' @export
+X.WarpKriging <- function(object, ...) {
+  warpKriging_X(object$ptr)
+}
+
+#' @title Get training output vector
+#' @param object WarpKriging object
+#' @param ... ignored
+#' @return vector of training outputs
+#' @export
+y.WarpKriging <- function(object, ...) {
+  warpKriging_y(object$ptr)
+}
+
+#' @title Deep copy of WarpKriging model
+#' @param object WarpKriging object
+#' @param ... ignored
+#' @return a new independent WarpKriging object
+#' @method copy WarpKriging
+#' @export
+copy.WarpKriging <- function(object, ...) {
+  ptr_copy <- warpKriging_copy(object$ptr)
+  obj <- list(ptr = ptr_copy)
+  class(obj) <- "WarpKriging"
+  obj
+}
+
+#' @title Save a WarpKriging model to file
+#' @param object WarpKriging object
+#' @param filename path to save file
+#' @param ... ignored
+#' @export
+save.WarpKriging <- function(object, filename, ...) {
+  if (!is.character(filename))
+    stop("'filename' must be a string")
+  warpKriging_save(object$ptr, filename)
+  invisible(NULL)
+}
+
+#' @title Load a WarpKriging model from file
+#' @param filename path to saved file
+#' @param ... ignored
+#' @return WarpKriging object
+#' @export
+load.WarpKriging <- function(filename, ...) {
+  if (!is.character(filename))
+    stop("'filename' must be a string")
+  ptr <- warpkriging_load(filename)
+  obj <- list(ptr = ptr)
+  class(obj) <- "WarpKriging"
+  obj
+}

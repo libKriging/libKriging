@@ -32,6 +32,9 @@ class PyWarpKriging {
 
   [[nodiscard]] PyWarpKriging copy() const;
 
+  void save(const std::string filename) const;
+  static PyWarpKriging load(const std::string filename);
+
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
            const std::string& regmodel,
@@ -53,7 +56,7 @@ class PyWarpKriging {
 
   std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
                                                                                 const bool return_grad,
-                                                                                const bool want_hess);
+                                                                                const bool return_hess);
 
   std::string kernel();
   py::array_t<double> X();

@@ -2019,6 +2019,18 @@ void lk_mlp_kriging_delete(void* ptr) {
   delete static_cast<MLPKriging*>(ptr);
 }
 
+void* lk_mlp_kriging_copy(void* ptr) {
+  try {
+    auto* mk = static_cast<MLPKriging*>(ptr);
+    auto* clone = new MLPKriging(mk->hidden_dims(), mk->d_out(), mk->activation(), mk->kernel());
+    if (mk->is_fitted()) {
+      clone->fit(mk->y(), mk->X());
+    }
+    return clone;
+  }
+  CATCH_RETURN_NULL
+}
+
 int lk_mlp_kriging_fit(void* ptr,
                        const double* y,
                        int n,
@@ -2224,4 +2236,36 @@ int lk_mlp_kriging_get_hidden_dims(void* ptr, int* out, int* n) {
     return 0;
   }
   CATCH_RETURN
+}
+
+int lk_warp_kriging_save(void* ptr, const char* filename) {
+  try {
+    auto* wk = static_cast<WarpKriging*>(ptr);
+    wk->save(filename);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_warp_kriging_load(const char* filename) {
+  try {
+    return new WarpKriging(WarpKriging::load(filename));
+  }
+  CATCH_RETURN_NULL
+}
+
+int lk_mlp_kriging_save(void* ptr, const char* filename) {
+  try {
+    auto* mk = static_cast<MLPKriging*>(ptr);
+    mk->save(filename);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_mlp_kriging_load(const char* filename) {
+  try {
+    return new MLPKriging(MLPKriging::load(filename));
+  }
+  CATCH_RETURN_NULL
 }

@@ -216,6 +216,21 @@ end
         @test all(isfinite.(result.stdev_deriv))
     end
 
+    @testset "Predict with covariance" begin
+        X = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
+        y = [f_test(x) for x in X[:, 1]]
+
+        k = WarpKriging(y, X, ["affine"], "gauss";
+                        parameters=Dict("max_iter_adam" => "100"))
+
+        X_new = reshape([0.1, 0.3, 0.5, 0.7, 0.9], :, 1)
+        result = predict(k, X_new; return_stdev=true, return_cov=true)
+        @test result.cov !== nothing
+        @test size(result.cov) == (5, 5)
+        @test all(isfinite.(result.cov))
+        @test maximum(abs.(result.cov - result.cov')) < 1e-10
+    end
+
     @testset "Accessors and summary" begin
         X = reshape(collect(range(0.01, 0.99; length=6)), :, 1)
         y = [f_test(x) for x in X[:, 1]]

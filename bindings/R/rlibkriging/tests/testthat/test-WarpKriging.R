@@ -365,6 +365,25 @@ test_that("feature_dim getter works", {
 })
 
 # ===========================================================================
+#  Test 17: Predict with covariance
+# ===========================================================================
+test_that("predict with cov returns finite covariance matrix", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+
+  k <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                   parameters = list(max_iter_adam = "100"))
+
+  X_new <- as.matrix(seq(0.1, 0.9, length.out = 5))
+  p <- predict(k, X_new, return_stdev = TRUE, return_cov = TRUE)
+  expect_true(!is.null(p$cov))
+  expect_equal(dim(p$cov), c(5, 5))
+  expect_true(all(is.finite(p$cov)))
+  # Covariance matrix should be symmetric positive semi-definite
+  expect_true(max(abs(p$cov - t(p$cov))) < 1e-10)
+})
+
+# ===========================================================================
 #  Test 14: warp_*() helper functions return correct strings
 # ===========================================================================
 test_that("warp helpers produce correct strings", {
@@ -376,5 +395,24 @@ test_that("warp helpers produce correct strings", {
   expect_equal(warp_mlp(c(16, 8), 3, "selu"), "mlp(16:8,3,selu)")
   expect_equal(warp_categorical(5, 2), "categorical(5,2)")
   expect_equal(warp_ordinal(4), "ordinal(4)")
+})
+
+# ===========================================================================
+#  Test 18: Copy
+# ===========================================================================
+test_that("copy creates an independent WarpKriging model", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+
+  k <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                   parameters = list(max_iter_adam = "100"))
+
+  k2 <- copy(k)
+  expect_s3_class(k2, "WarpKriging")
+
+  p1 <- predict(k, X, stdev = TRUE)
+  p2 <- predict(k2, X, stdev = TRUE)
+  expect_equal(p1$mean, p2$mean, tolerance = 1e-6)
+  expect_equal(theta(k), theta(k2), tolerance = 1e-6)
 })
 

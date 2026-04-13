@@ -572,6 +572,12 @@ class WarpKriging {
   /// Access a specific warp function (e.g. to inspect embeddings)
   const IWarp& warp(arma::uword dim) const { return *m_warps[dim]; }
 
+  /** Dump current WarpKriging object into a file */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a new WarpKriging object from a file */
+  LIBKRIGING_EXPORT static WarpKriging load(const std::string filename);
+
  private:
   // ---- data ---------------------------------------------------------------
   arma::vec m_y;

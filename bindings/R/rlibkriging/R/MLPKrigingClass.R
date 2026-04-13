@@ -196,3 +196,60 @@ activation.MLPKriging <- function(object, ...) {
 is_fitted.MLPKriging <- function(object, ...) {
   mlpKriging_isFitted(object$ptr)
 }
+
+#' @title Get training input matrix
+#' @param object MLPKriging object
+#' @param ... ignored
+#' @return matrix of training inputs
+#' @export
+X.MLPKriging <- function(object, ...) {
+  mlpKriging_X(object$ptr)
+}
+
+#' @title Get training output vector
+#' @param object MLPKriging object
+#' @param ... ignored
+#' @return vector of training outputs
+#' @export
+y.MLPKriging <- function(object, ...) {
+  mlpKriging_y(object$ptr)
+}
+
+#' @title Deep copy of MLPKriging model
+#' @param object MLPKriging object
+#' @param ... ignored
+#' @return a new independent MLPKriging object
+#' @method copy MLPKriging
+#' @export
+copy.MLPKriging <- function(object, ...) {
+  ptr_copy <- mlpKriging_copy(object$ptr)
+  obj <- list(ptr = ptr_copy)
+  class(obj) <- "MLPKriging"
+  obj
+}
+
+#' @title Save an MLPKriging model to file
+#' @param object MLPKriging object
+#' @param filename path to save file
+#' @param ... ignored
+#' @export
+save.MLPKriging <- function(object, filename, ...) {
+  if (!is.character(filename))
+    stop("'filename' must be a string")
+  mlpKriging_save(object$ptr, filename)
+  invisible(NULL)
+}
+
+#' @title Load an MLPKriging model from file
+#' @param filename path to saved file
+#' @param ... ignored
+#' @return MLPKriging object
+#' @export
+load.MLPKriging <- function(filename, ...) {
+  if (!is.character(filename))
+    stop("'filename' must be a string")
+  ptr <- mlpkriging_load(filename)
+  obj <- list(ptr = ptr)
+  class(obj) <- "MLPKriging"
+  obj
+}

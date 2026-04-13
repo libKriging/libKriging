@@ -480,6 +480,9 @@ int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_warp_kriging_get_sigma2(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
 
+int lk_warp_kriging_save(void* ptr, const char* filename);
+void* lk_warp_kriging_load(const char* filename);
+
 /* --- MLPKriging --- */
 
 void* lk_mlp_kriging_new(const int* hidden_dims, int n_hidden, int d_out, const char* activation, const char* kernel);
@@ -501,6 +504,7 @@ void* lk_mlp_kriging_new_fit(const double* y,
                              const char** param_vals,
                              int n_params);
 void lk_mlp_kriging_delete(void* ptr);
+void* lk_mlp_kriging_copy(void* ptr);
 
 int lk_mlp_kriging_fit(void* ptr,
                        const double* y,
@@ -554,6 +558,9 @@ int lk_mlp_kriging_get_y(void* ptr, double* out, int* n);
 int lk_mlp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_mlp_kriging_get_sigma2(void* ptr);
 int lk_mlp_kriging_get_hidden_dims(void* ptr, int* out, int* n);
+
+int lk_mlp_kriging_save(void* ptr, const char* filename);
+void* lk_mlp_kriging_load(const char* filename);
 
 #ifdef __cplusplus
 }
