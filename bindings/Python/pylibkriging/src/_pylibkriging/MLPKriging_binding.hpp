@@ -48,7 +48,7 @@ class PyMLPKriging {
 
   py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n);
 
-  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
+  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit = true);
 
   std::string summary() const;
 

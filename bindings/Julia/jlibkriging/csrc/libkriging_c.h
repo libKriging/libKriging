@@ -535,7 +535,7 @@ int lk_mlp_kriging_predict(void* ptr,
 
 int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
 
-int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d);
+int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
 
 const char* lk_mlp_kriging_summary(void* ptr);
 double lk_mlp_kriging_log_likelihood(void* ptr);

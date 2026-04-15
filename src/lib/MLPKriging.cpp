@@ -204,6 +204,61 @@ arma::mat MLPKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Ph
 }
 
 // -------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+//  populate_Model / make_Model  (mirrors WarpKriging / Kriging pattern)
+// -------------------------------------------------------------------------
+void MLPKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
+  const arma::uword n = m_y.n_elem;
+  arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
+
+  // Cholesky update detection (same logic as Kriging::populate_Model)
+  bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
+                   && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
+
+  if (do_update) {
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget, m_T, m_R);
+  } else {
+    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget);
+  }
+
+  m.Rinv = LinearAlgebra::inv_sympd(m.L);
+
+  // Whitened trend and observations
+  m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
+  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
+
+  // Gram matrix
+  arma::mat FtRinvF = m.Fstar.t() * m.Fstar;
+  m.Rstar = LinearAlgebra::chol_upper(FtRinvF);
+
+  // GLS beta
+  arma::vec FtRinvy = m.Fstar.t() * m.ystar;
+  m.betahat = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), FtRinvy));
+
+  // Whitened residual
+  arma::vec residual = m_y - m_F * m.betahat;
+  m.Estar = LinearAlgebra::solve_lower(m.L, residual);
+  m.SSEstar = arma::dot(m.Estar, m.Estar);
+}
+
+MLPKriging::WKModel MLPKriging::make_Model(const arma::vec& theta) const {
+  const arma::uword n = m_y.n_elem;
+  const arma::uword p = m_F.n_cols;
+  WKModel m;
+  m.R = arma::mat(n, n, arma::fill::none);
+  m.L = arma::mat(n, n, arma::fill::none);
+  m.Rinv = arma::mat();
+  m.Fstar = arma::mat(n, p, arma::fill::none);
+  m.ystar = arma::vec(n, arma::fill::none);
+  m.Rstar = arma::mat(p, p, arma::fill::none);
+  m.Estar = arma::vec(n, arma::fill::none);
+  m.SSEstar = 0;
+  m.betahat = arma::vec(p, arma::fill::none);
+  populate_Model(m, theta);
+  return m;
+}
+
+// -------------------------------------------------------------------------
 //  refresh_cache
 // -------------------------------------------------------------------------
 void MLPKriging::refresh_cache() {
@@ -214,26 +269,18 @@ void MLPKriging::refresh_cache() {
 
 void MLPKriging::refresh_cache_theta_only() {
   const arma::uword n = m_y.n_elem;
-
-  m_R.set_size(n, n);
-  arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
-  m_T = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
-  m_Rinv = LinearAlgebra::inv_sympd(m_T);
-  m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
-
   m_F = build_trend_matrix(m_X);
-  m_M = LinearAlgebra::solve_lower(m_T, m_F);              // Fstar = C⁻¹ F
-  arma::vec ystar = LinearAlgebra::solve_lower(m_T, m_y);   // C⁻¹ y
+  WKModel m = make_Model(m_theta);
 
-  arma::mat FtRinvF = m_M.t() * m_M;
-  m_circ = LinearAlgebra::chol_upper(FtRinvF);              // chol(F'R⁻¹F)
-
-  arma::vec FtRinvy = m_M.t() * ystar;
-  m_beta = LinearAlgebra::solve_upper(m_circ, LinearAlgebra::solve_lower(m_circ.t(), FtRinvy));
-
-  arma::vec residual = m_y - m_F * m_beta;
-  m_z = LinearAlgebra::solve_lower(m_T, residual);
-  m_sigma2 = std::max(arma::dot(m_z, m_z) / n, 1e-20);
+  m_R = std::move(m.R);
+  m_T = std::move(m.L);
+  m_Rinv = std::move(m.Rinv);
+  m_M = std::move(m.Fstar);
+  m_circ = std::move(m.Rstar);
+  m_beta = std::move(m.betahat);
+  m_z = std::move(m.Estar);
+  m_sigma2 = std::max(m.SSEstar / n, 1e-20);
+  m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
 }
 
 // -------------------------------------------------------------------------
@@ -988,25 +1035,57 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
-void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new) {
+void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new, const bool refit) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
-  arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
-  arma::mat X_all = m_X;
-  for (arma::uword j = 0; j < X_all.n_cols; ++j)
-    X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
-  X_all = arma::join_vert(X_all, X_new);
+  if (refit) {
+    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
+    arma::mat X_all = m_X;
+    for (arma::uword j = 0; j < X_all.n_cols; ++j)
+      X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
+    X_all = arma::join_vert(X_all, X_new);
 
-  m_y = y_all;
-  m_X = X_all;
-  normalise_data();
-  refresh_cache();
+    m_y = y_all;
+    m_X = X_all;
+    normalise_data();
+    refresh_cache();
 
-  arma::uword saved_adam = m_max_iter_adam;
-  m_max_iter_adam /= 5;
-  optimise_joint("BFGS+Adam");
-  m_max_iter_adam = saved_adam;
+    arma::uword saved_adam = m_max_iter_adam;
+    m_max_iter_adam /= 5;
+    optimise_joint("BFGS+Adam");
+    m_max_iter_adam = saved_adam;
+  } else {
+    // Fast incremental update: keep all hyperparameters fixed, use Cholesky update
+    arma::mat Xn_u = X_new;
+    for (arma::uword j = 0; j < Xn_u.n_cols; ++j)
+      Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
+    arma::vec yn_u = (y_new - m_centerY) / m_scaleY;
+
+    m_X = arma::join_cols(m_X, Xn_u);
+    m_y = arma::join_cols(m_y, yn_u);
+
+    // Recompute warped features and pairwise diffs (MLP params unchanged)
+    m_Phi = apply_warping(m_X);
+    compute_dPhi();
+
+    m_F = build_trend_matrix(m_X);
+
+    const arma::uword n = m_y.n_elem;
+
+    // make_Model detects theta unchanged + n > m_T.n_rows → Cholesky block update
+    WKModel m = make_Model(m_theta);
+
+    m_R = std::move(m.R);
+    m_T = std::move(m.L);
+    m_Rinv = std::move(m.Rinv);
+    m_M = std::move(m.Fstar);
+    m_circ = std::move(m.Rstar);
+    m_beta = std::move(m.betahat);
+    m_z = std::move(m.Estar);
+    m_sigma2 = std::max(m.SSEstar / n, 1e-20);
+    m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
+  }
 }
 
 // -------------------------------------------------------------------------

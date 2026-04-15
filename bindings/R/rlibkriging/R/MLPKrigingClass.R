@@ -133,9 +133,10 @@ simulate.MLPKriging <- function(object, nsim = 1, seed = 123, x, ...) {
 }
 
 #' @title Update an MLPKriging model with new observations
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is TRUE).
 #' @export
-update.MLPKriging <- function(object, y_u, X_u, ...) {
-  mlpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u))
+update.MLPKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
+  mlpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u), as.logical(refit))
   invisible(object)
 }
 

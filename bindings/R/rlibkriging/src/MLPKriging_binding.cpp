@@ -110,9 +110,9 @@ arma::mat mlpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::ma
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void mlpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new) {
+void mlpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new, bool refit = true) {
   MLPKrigingPtr model(model_ptr);
-  model->update(y_new, X_new);
+  model->update(y_new, X_new, refit);
 }
 
 // ---------------------------------------------------------------------------

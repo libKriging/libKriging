@@ -409,7 +409,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
       .def("simulate", &PyMLPKriging::simulate, py::arg("nsim") = 1, py::arg("seed") = 123, py::arg("X"))
-      .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"))
+      .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyMLPKriging::summary)
       .def("logLikelihood", &PyMLPKriging::logLikelihood)
       .def("logLikelihoodFun",

@@ -101,10 +101,10 @@ py::array_t<double> PyMLPKriging::simulate(const int nsim, const int seed, const
   return carma::mat_to_arr(result, true);
 }
 
-void PyMLPKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
+void PyMLPKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit) {
   arma::colvec mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
-  m_internal->update(mat_y, mat_X);
+  m_internal->update(mat_y, mat_X, refit);
 }
 
 std::string PyMLPKriging::summary() const {
