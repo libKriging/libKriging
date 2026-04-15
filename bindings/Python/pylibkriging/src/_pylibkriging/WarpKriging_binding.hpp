@@ -63,7 +63,18 @@ class PyWarpKriging {
 
   std::string kernel();
   py::array_t<double> X();
+  py::array_t<double> centerX();
+  py::array_t<double> scaleX();
   py::array_t<double> y();
+  double centerY();
+  double scaleY();
+  bool normalize();
+  std::string regmodel();
+  py::array_t<double> F();
+  py::array_t<double> T();
+  py::array_t<double> M();
+  py::array_t<double> z();
+  py::array_t<double> beta();
   py::array_t<double> theta();
   double sigma2();
   bool is_fitted();

@@ -113,8 +113,52 @@ py::array_t<double> PyWarpKriging::X() {
   return carma::mat_to_arr(m_internal->X());
 }
 
+py::array_t<double> PyWarpKriging::centerX() {
+  return carma::row_to_arr(m_internal->centerX());
+}
+
+py::array_t<double> PyWarpKriging::scaleX() {
+  return carma::row_to_arr(m_internal->scaleX());
+}
+
 py::array_t<double> PyWarpKriging::y() {
   return carma::col_to_arr(m_internal->y());
+}
+
+double PyWarpKriging::centerY() {
+  return m_internal->centerY();
+}
+
+double PyWarpKriging::scaleY() {
+  return m_internal->scaleY();
+}
+
+bool PyWarpKriging::normalize() {
+  return m_internal->normalize();
+}
+
+std::string PyWarpKriging::regmodel() {
+  return m_internal->regmodel();
+}
+
+py::array_t<double> PyWarpKriging::F() {
+  return carma::mat_to_arr(m_internal->F());
+}
+
+py::array_t<double> PyWarpKriging::T() {
+  return carma::mat_to_arr(m_internal->T());
+}
+
+py::array_t<double> PyWarpKriging::M() {
+  return carma::mat_to_arr(m_internal->M());
+}
+
+py::array_t<double> PyWarpKriging::z() {
+  return carma::col_to_arr(m_internal->z());
+}
+
+py::array_t<double> PyWarpKriging::beta() {
+  return carma::col_to_arr(m_internal->beta());
 }
 
 py::array_t<double> PyWarpKriging::theta() {

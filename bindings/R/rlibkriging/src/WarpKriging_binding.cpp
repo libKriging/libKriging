@@ -205,9 +205,75 @@ arma::mat warpKriging_X(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
+arma::vec warpKriging_centerX(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return arma::vec(model->centerX().t());
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_scaleX(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return arma::vec(model->scaleX().t());
+}
+
+// [[Rcpp::export]]
 arma::vec warpKriging_y(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
   return model->y();
+}
+
+// [[Rcpp::export]]
+double warpKriging_centerY(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->centerY();
+}
+
+// [[Rcpp::export]]
+double warpKriging_scaleY(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->scaleY();
+}
+
+// [[Rcpp::export]]
+bool warpKriging_normalize(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->normalize();
+}
+
+// [[Rcpp::export]]
+std::string warpKriging_regmodel(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->regmodel();
+}
+
+// [[Rcpp::export]]
+arma::mat warpKriging_F(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->F();
+}
+
+// [[Rcpp::export]]
+arma::mat warpKriging_T(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->T();
+}
+
+// [[Rcpp::export]]
+arma::mat warpKriging_M(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->M();
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_z(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->z();
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_beta(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->beta();
 }
 
 // [[Rcpp::export]]

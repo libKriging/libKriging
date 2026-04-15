@@ -138,8 +138,52 @@ py::array_t<double> PyMLPKriging::X() {
   return carma::mat_to_arr(m_internal->X());
 }
 
+py::array_t<double> PyMLPKriging::centerX() {
+  return carma::row_to_arr(m_internal->centerX());
+}
+
+py::array_t<double> PyMLPKriging::scaleX() {
+  return carma::row_to_arr(m_internal->scaleX());
+}
+
 py::array_t<double> PyMLPKriging::y() {
   return carma::col_to_arr(m_internal->y());
+}
+
+double PyMLPKriging::centerY() {
+  return m_internal->centerY();
+}
+
+double PyMLPKriging::scaleY() {
+  return m_internal->scaleY();
+}
+
+bool PyMLPKriging::normalize() {
+  return m_internal->normalize();
+}
+
+std::string PyMLPKriging::regmodel() {
+  return m_internal->regmodel();
+}
+
+py::array_t<double> PyMLPKriging::F() {
+  return carma::mat_to_arr(m_internal->F());
+}
+
+py::array_t<double> PyMLPKriging::T() {
+  return carma::mat_to_arr(m_internal->T());
+}
+
+py::array_t<double> PyMLPKriging::M() {
+  return carma::mat_to_arr(m_internal->M());
+}
+
+py::array_t<double> PyMLPKriging::z() {
+  return carma::col_to_arr(m_internal->z());
+}
+
+py::array_t<double> PyMLPKriging::beta() {
+  return carma::col_to_arr(m_internal->beta());
 }
 
 py::array_t<double> PyMLPKriging::theta() {

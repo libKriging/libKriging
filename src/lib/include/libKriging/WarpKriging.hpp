@@ -560,7 +560,18 @@ class WarpKriging {
   LIBKRIGING_EXPORT std::string summary() const;
 
   const arma::mat& X() const { return m_X; }
+  const arma::rowvec& centerX() const { return m_centerX; }
+  const arma::rowvec& scaleX() const { return m_scaleX; }
   const arma::vec& y() const { return m_y; }
+  const double& centerY() const { return m_centerY; }
+  const double& scaleY() const { return m_scaleY; }
+  const bool& normalize() const { return m_normalize; }
+  const std::string& regmodel() const { return m_regmodel; }
+  const arma::mat& F() const { return m_F; }
+  const arma::mat& T() const { return m_T; }
+  const arma::mat& M() const { return m_M; }
+  const arma::vec& z() const { return m_z; }
+  const arma::vec& beta() const { return m_beta; }
   std::string kernel() const { return m_kernel_name; }
   arma::vec theta() const { return m_theta; }
   double sigma2() const { return m_sigma2; }

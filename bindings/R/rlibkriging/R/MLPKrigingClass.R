@@ -230,6 +230,61 @@ y.MLPKriging <- function(object, ...) {
   mlpKriging_y(object$ptr)
 }
 
+#' @export
+centerX.MLPKriging <- function(object, ...) {
+  mlpKriging_centerX(object$ptr)
+}
+
+#' @export
+scaleX.MLPKriging <- function(object, ...) {
+  mlpKriging_scaleX(object$ptr)
+}
+
+#' @export
+centerY.MLPKriging <- function(object, ...) {
+  mlpKriging_centerY(object$ptr)
+}
+
+#' @export
+scaleY.MLPKriging <- function(object, ...) {
+  mlpKriging_scaleY(object$ptr)
+}
+
+#' @export
+normalize.MLPKriging <- function(object, ...) {
+  mlpKriging_normalize(object$ptr)
+}
+
+#' @export
+regmodel.MLPKriging <- function(object, ...) {
+  mlpKriging_regmodel(object$ptr)
+}
+
+#' @export
+F_.MLPKriging <- function(object, ...) {
+  mlpKriging_F(object$ptr)
+}
+
+#' @export
+T_.MLPKriging <- function(object, ...) {
+  mlpKriging_T(object$ptr)
+}
+
+#' @export
+M.MLPKriging <- function(object, ...) {
+  mlpKriging_M(object$ptr)
+}
+
+#' @export
+z.MLPKriging <- function(object, ...) {
+  mlpKriging_z(object$ptr)
+}
+
+#' @export
+beta.MLPKriging <- function(object, ...) {
+  mlpKriging_beta(object$ptr)
+}
+
 #' @title Deep copy of MLPKriging model
 #' @param object MLPKriging object
 #' @param ... ignored

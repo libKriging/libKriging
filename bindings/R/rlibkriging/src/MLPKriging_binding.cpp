@@ -215,9 +215,75 @@ arma::mat mlpKriging_X(SEXP model_ptr) {
 }
 
 // [[Rcpp::export]]
+arma::vec mlpKriging_centerX(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return arma::vec(model->centerX().t());
+}
+
+// [[Rcpp::export]]
+arma::vec mlpKriging_scaleX(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return arma::vec(model->scaleX().t());
+}
+
+// [[Rcpp::export]]
 arma::vec mlpKriging_y(SEXP model_ptr) {
   MLPKrigingPtr model(model_ptr);
   return model->y();
+}
+
+// [[Rcpp::export]]
+double mlpKriging_centerY(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->centerY();
+}
+
+// [[Rcpp::export]]
+double mlpKriging_scaleY(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->scaleY();
+}
+
+// [[Rcpp::export]]
+bool mlpKriging_normalize(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->normalize();
+}
+
+// [[Rcpp::export]]
+std::string mlpKriging_regmodel(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->regmodel();
+}
+
+// [[Rcpp::export]]
+arma::mat mlpKriging_F(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->F();
+}
+
+// [[Rcpp::export]]
+arma::mat mlpKriging_T(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->T();
+}
+
+// [[Rcpp::export]]
+arma::mat mlpKriging_M(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->M();
+}
+
+// [[Rcpp::export]]
+arma::vec mlpKriging_z(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->z();
+}
+
+// [[Rcpp::export]]
+arma::vec mlpKriging_beta(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->beta();
 }
 
 // [[Rcpp::export]]

@@ -327,6 +327,105 @@ y.WarpKriging <- function(object, ...) {
   warpKriging_y(object$ptr)
 }
 
+#' @title Get input centering vector
+#' @export
+centerX <- function(object, ...) UseMethod("centerX")
+
+#' @export
+centerX.WarpKriging <- function(object, ...) {
+  warpKriging_centerX(object$ptr)
+}
+
+#' @title Get input scaling vector
+#' @export
+scaleX <- function(object, ...) UseMethod("scaleX")
+
+#' @export
+scaleX.WarpKriging <- function(object, ...) {
+  warpKriging_scaleX(object$ptr)
+}
+
+#' @title Get output centering value
+#' @export
+centerY <- function(object, ...) UseMethod("centerY")
+
+#' @export
+centerY.WarpKriging <- function(object, ...) {
+  warpKriging_centerY(object$ptr)
+}
+
+#' @title Get output scaling value
+#' @export
+scaleY <- function(object, ...) UseMethod("scaleY")
+
+#' @export
+scaleY.WarpKriging <- function(object, ...) {
+  warpKriging_scaleY(object$ptr)
+}
+
+#' @title Get normalize flag
+#' @export
+normalize <- function(object, ...) UseMethod("normalize")
+
+#' @export
+normalize.WarpKriging <- function(object, ...) {
+  warpKriging_normalize(object$ptr)
+}
+
+#' @title Get regression model type
+#' @export
+regmodel <- function(object, ...) UseMethod("regmodel")
+
+#' @export
+regmodel.WarpKriging <- function(object, ...) {
+  warpKriging_regmodel(object$ptr)
+}
+
+#' @title Get trend matrix F
+#' @export
+F_ <- function(object, ...) UseMethod("F_")
+
+#' @export
+F_.WarpKriging <- function(object, ...) {
+  warpKriging_F(object$ptr)
+}
+
+#' @title Get Cholesky factor T
+#' @export
+T_ <- function(object, ...) UseMethod("T_")
+
+#' @export
+T_.WarpKriging <- function(object, ...) {
+  warpKriging_T(object$ptr)
+}
+
+#' @title Get whitened trend matrix M
+#' @export
+M <- function(object, ...) UseMethod("M")
+
+#' @export
+M.WarpKriging <- function(object, ...) {
+  warpKriging_M(object$ptr)
+}
+
+#' @title Get whitened residuals z
+#' @export
+z <- function(object, ...) UseMethod("z")
+
+#' @export
+z.WarpKriging <- function(object, ...) {
+  warpKriging_z(object$ptr)
+}
+
+#' @title Get trend coefficients beta
+#' @export
+beta <- function(object, ...) UseMethod("beta")
+
+#' @export
+beta.WarpKriging <- function(object, ...) {
+  warpKriging_beta(object$ptr)
+}
+
 #' @title Deep copy of WarpKriging model
 #' @param object WarpKriging object
 #' @param ... ignored

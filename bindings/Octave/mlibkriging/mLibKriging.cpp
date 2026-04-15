@@ -344,6 +344,28 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::y"_hash:
       return WarpKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::centerX"_hash:
+      return WarpKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::scaleX"_hash:
+      return WarpKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::centerY"_hash:
+      return WarpKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::scaleY"_hash:
+      return WarpKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::normalize"_hash:
+      return WarpKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::regmodel"_hash:
+      return WarpKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::F"_hash:
+      return WarpKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::T"_hash:
+      return WarpKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::M"_hash:
+      return WarpKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::z"_hash:
+      return WarpKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::beta"_hash:
+      return WarpKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::theta"_hash:
       return WarpKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::sigma2"_hash:
@@ -385,6 +407,28 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::y"_hash:
       return MLPKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::centerX"_hash:
+      return MLPKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::scaleX"_hash:
+      return MLPKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::centerY"_hash:
+      return MLPKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::scaleY"_hash:
+      return MLPKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::normalize"_hash:
+      return MLPKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::regmodel"_hash:
+      return MLPKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::F"_hash:
+      return MLPKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::T"_hash:
+      return MLPKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::M"_hash:
+      return MLPKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::z"_hash:
+      return MLPKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::beta"_hash:
+      return MLPKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::theta"_hash:
       return MLPKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::sigma2"_hash:
