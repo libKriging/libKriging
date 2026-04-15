@@ -1962,9 +1962,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
     lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
                                    arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
 
-    arma::mat Linv_on = LinearAlgebra::solve_lower(lastsim_L_on, arma::mat(n_o + n_n, n_o + n_n, arma::fill::eye));
-    t0 = Bench::toc(nullptr, "Linv_on     ", t0);
-    lastsim_Rinv_on = Linv_on.t() * Linv_on;
+    lastsim_Rinv_on = LinearAlgebra::inv_sympd(lastsim_L_on);
     t0 = Bench::toc(nullptr, "Rinv_on     ", t0);
 
     lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
