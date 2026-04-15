@@ -287,18 +287,24 @@ is_fitted.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get training input matrix
-#' @param object WarpKriging object
+#' @param object A fitted model object
 #' @param ... ignored
 #' @return matrix of training inputs
+#' @export
+X <- function(object, ...) UseMethod("X")
+
 #' @export
 X.WarpKriging <- function(object, ...) {
   warpKriging_X(object$ptr)
 }
 
 #' @title Get training output vector
-#' @param object WarpKriging object
+#' @param object A fitted model object
 #' @param ... ignored
 #' @return vector of training outputs
+#' @export
+y <- function(object, ...) UseMethod("y")
+
 #' @export
 y.WarpKriging <- function(object, ...) {
   warpKriging_y(object$ptr)
