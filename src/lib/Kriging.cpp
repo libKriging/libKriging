@@ -168,32 +168,35 @@ void Kriging::populate_Model(KModel& m, const arma::vec& theta, std::map<std::st
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, 1, Kriging::ones);
   t0 = Bench::toc(bench, "R = _Cov(dX)  &L = Chol(R)", t0);
 
-  // Compute intermediate useful matrices
-  // Force evaluation of join_rows to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
-  arma::mat Fy = arma::join_rows(m_F, m_y);
-  arma::mat Fystar = LinearAlgebra::solve(m.L, Fy);
-  t0 = Bench::toc(bench, "Fy* = L \\ [F,y]", t0);
-  m.Fstar = Fystar.head_cols(p);
-  m.ystar = Fystar.tail_cols(1);
+  // Direct GLS: compute whitened matrices using triangular solves
+  m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
+  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
+  t0 = Bench::toc(bench, "F* = L \\ F, y* = L \\ y", t0);
 
-  arma::mat Q_qr;
-  arma::mat R_qr;
-  arma::qr_econ(Q_qr, R_qr, Fystar);
-  t0 = Bench::toc(bench, "Q_qr,R_qr = QR(Fy*)", t0);
+  // Gram matrix and its upper Cholesky
+  arma::mat FtRinvF = m.Fstar.t() * m.Fstar;
+  m.Rstar = LinearAlgebra::chol_upper(FtRinvF);
+  t0 = Bench::toc(bench, "R* = chol(F*'F*)", t0);
 
-  m.Rstar = R_qr.head_cols(p);
-  m.Qstar = Q_qr.head_cols(p);
-  m.Estar = Q_qr.tail_cols(1) * R_qr.at(p, p);
-  m.SSEstar = R_qr.at(p, p) * R_qr.at(p, p);
+  // Qstar is computed on demand in gradient/LOO functions when needed
+  m.Qstar = arma::mat();
+
+  // Always compute GLS beta for residual and SSE (even when beta is fixed)
+  arma::vec betahat_gls
+      = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), m.Fstar.t() * m.ystar));
+  t0 = Bench::toc(bench, "^b = R*^-1 R*'^-1 F*'y*", t0);
 
   if (m_est_beta) {
-    // Force evaluation of tail_cols view to avoid LAPACK issues
-    arma::mat R_qr_last = R_qr.tail_cols(1);
-    m.betahat = LinearAlgebra::solve(m.Rstar, R_qr_last);
-    t0 = Bench::toc(bench, "^b = R* \\ R_qr[1:p, p+1]", t0);
+    m.betahat = betahat_gls;
   } else {
-    m.betahat = arma::vec(p, arma::fill::zeros);  // whatever: not used
+    m.betahat = arma::vec(p, arma::fill::zeros);  // not used externally
   }
+
+  // Compute residual in whitened space using GLS beta
+  arma::vec residual = m_y - m_F * betahat_gls;
+  m.Estar = LinearAlgebra::solve_lower(m.L, residual);
+  m.SSEstar = arma::dot(m.Estar, m.Estar);
+  t0 = Bench::toc(bench, "z = L \\ (y - F*b), SSE = z'z", t0);
 }
 
 Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const {
@@ -268,15 +271,10 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);  // useful if (hess_out != nullptr)
 
-    if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
-      m.Linv = LinearAlgebra::solve(m.L, arma::mat(n, n, arma::fill::eye));
-      t0 = Bench::toc(bench, "L ^-1", t0);
-    }
+    arma::mat Rinv = LinearAlgebra::inv_sympd(m.L);
+    t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
 
-    arma::mat Rinv = LinearAlgebra::crossprod(m.Linv);
-    t0 = Bench::toc(bench, "R^-1 = t(L^-1) * L^-1", t0);
-
-    arma::mat x = LinearAlgebra::solve(m.L.t(), m.Estar);
+    arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
     // Optimized gradient computation: compute on-the-fly without storing full gradR cube
@@ -321,6 +319,19 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     // This is only computed when hess_out != nullptr (rare)
     if (hess_out != nullptr) {
       t0 = Bench::tic();
+
+      // Compute Qstar on demand for Hessian (not stored in populate_Model)
+      arma::mat Qstar_h;
+      arma::mat Rstar_tmp;
+      LinearAlgebra::qr_econ(Qstar_h, Rstar_tmp, m.Fstar);
+
+      // Compute Linv on demand for Hessian
+      if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
+        m.Linv = LinearAlgebra::solve_lower(m.L, arma::mat(n, n, arma::fill::eye));
+      }
+      t0 = Bench::toc(bench, "Qstar,Linv for Hessian", t0);
+
+      t0 = Bench::tic();
       arma::cube gradR = arma::cube(n, n, d, arma::fill::none);
       const arma::vec zeros = arma::vec(d, arma::fill::zeros);
       for (arma::uword i = 0; i < n; i++) {
@@ -355,7 +366,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
         //   }
         // }
         t0 = Bench::tic();
-        arma::mat H = LinearAlgebra::tcrossprod(m.Qstar);
+        arma::mat H = LinearAlgebra::tcrossprod(Qstar_h);
         t0 = Bench::toc(bench, "H =  Q* * t(Q*)", t0);
 
         for (arma::uword l = 0; l <= k; l++) {
@@ -505,12 +516,16 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 
   auto t0 = Bench::tic();
   if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L))) {
-    m.Linv = LinearAlgebra::solve(m.L, arma::mat(n, n, arma::fill::eye));
+    m.Linv = LinearAlgebra::solve_lower(m.L, arma::mat(n, n, arma::fill::eye));
     t0 = Bench::toc(bench, "L ^-1", t0);
   }
   arma::mat By = m.Linv.t() * m.Estar;
   t0 = Bench::toc(bench, "By = L^-1 * E*", t0);
-  arma::mat A = m.Qstar.t() * m.Linv;
+  // Compute Qstar on demand (not stored in populate_Model)
+  arma::mat Qstar_loo;
+  arma::mat Rstar_tmp;
+  LinearAlgebra::qr_econ(Qstar_loo, Rstar_tmp, m.Fstar);
+  arma::mat A = Qstar_loo.t() * m.Linv;
   t0 = Bench::toc(bench, "A = Q* * L^-1", t0);
   arma::mat B = LinearAlgebra::crossprod(m.Linv) - LinearAlgebra::crossprod(A);
   t0 = Bench::toc(bench, "B = t(L^-1) * L^-1 - t(A) * A", t0);
@@ -689,7 +704,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   // m.Fstar : fd->M = solve(L, X, LinearAlgebra::default_solve_opts);
 
   // arma::mat Rinv_X = solve(trans(L), fd->M, LinearAlgebra::default_solve_opts);
-  arma::mat Rinv_X = LinearAlgebra::solve(m.L.t(), m.Fstar);
+  arma::mat Rinv_X = LinearAlgebra::solve_upper(m.L.t(), m.Fstar);
 
   // arma::mat Xt_Rinv_X = trans(X) * Rinv_X;  // Xt%*%R.inv%*%X
   arma::mat Xt_Rinv_X = m_F.t() * Rinv_X;
@@ -704,11 +719,11 @@ double Kriging::_logMargPost(const arma::vec& _theta,
   //                LinearAlgebra::default_solve_opts));  // compute  Rinv_X_Xt_Rinv_X_inv_Xt_Rinv through one forward
   arma::mat Rinv_X_Xt_Rinv_X_inv_Xt_Rinv
       = Rinv_X
-        * (LinearAlgebra::solve(
-            trans(LX),
-            LinearAlgebra::solve(LX, trans(Rinv_X))));  // compute  Rinv_X_Xt_Rinv_X_inv_Xt_Rinv through one forward
+        * (LinearAlgebra::solve_upper(
+            LX.t(),
+            LinearAlgebra::solve_lower(LX, Rinv_X.t())));  // compute  Rinv_X_Xt_Rinv_X_inv_Xt_Rinv through one forward
 
-  arma::mat yt_Rinv = trans(solve(trans(m.L), m.ystar));
+  arma::mat yt_Rinv = LinearAlgebra::solve_upper(m.L.t(), m.ystar).t();
   t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);
 
   arma::mat S_2 = (yt_Rinv * m_y - trans(m_y) * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv * m_y);
@@ -788,7 +803,7 @@ double Kriging::_logMargPost(const arma::vec& _theta,
         }
         t0 = Bench::toc(bench, "gradR_k [optimized]", t0);
 
-        Wb_k = trans(LinearAlgebra::solve(trans(m.L), LinearAlgebra::solve(m.L, gradR_k)))
+        Wb_k = LinearAlgebra::solve_upper(m.L.t(), LinearAlgebra::solve_lower(m.L, gradR_k)).t()
                - gradR_k * Rinv_X_Xt_Rinv_X_inv_Xt_Rinv;
         t0 = Bench::toc(bench, "Wb_k = gradR_k \\ L \\ Tt - gradR_k * RiFFtRiFiFtRi", t0);
 
@@ -1726,7 +1741,7 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 #endif
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
-  arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
+  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
   t0 = Bench::toc(nullptr, "Rstar_on   ", t0);
 
   yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
@@ -1737,7 +1752,7 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 
   arma::mat Fhat_n = trans(Rstar_on) * m_M;
   arma::mat E_n = F_n - Fhat_n;
-  arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
+  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (return_stdev) {
@@ -1818,13 +1833,13 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                          / (2 * h);
       t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
 
-      arma::mat W_i = LinearAlgebra::solve(m_T, DR_on_i);
+      arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
       t0 = Bench::toc(nullptr, "W_i        ", t0);
       Dyhat_n.row(i) = trans(DF_n_i * m_beta + trans(W_i) * m_z);
       t0 = Bench::toc(nullptr, "Dyhat_n    ", t0);
 
       if (return_stdev) {
-        arma::mat DEcirc_n_i = LinearAlgebra::solve(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
+        arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), trans(DF_n_i - W_i.t() * m_M));
         Dysd2_n.row(i) = -2 * Rstar_on.col(i).t() * W_i + 2 * Ecirc_n.row(i) * DEcirc_n_i;
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
@@ -1889,18 +1904,14 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
   LinearAlgebra::covMat_rect(&R_on, Xn_o, Xn_n, m_theta, _Cov);
   t0 = Bench::toc(nullptr, "R_on        ", t0);
 
-  arma::mat Rstar_on = LinearAlgebra::solve(m_T, R_on);
-  t0 = Bench::toc(nullptr, "Rstar_on   ", t0);
-  // arma::cout << "Rstar_on:" << Rstar_on << arma::endl;
+  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
 
   arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
   t0 = Bench::toc(nullptr, "yhat_n        ", t0);
 
   arma::mat Fhat_n = trans(Rstar_on) * m_M;
   arma::mat E_n = F_n - Fhat_n;
-  arma::mat Ecirc_n = LinearAlgebra::rsolve(m_circ, E_n);
-  t0 = Bench::toc(nullptr, "Ecirc_n       ", t0);
-  // arma::cout << "eig(R_nn):" << arma::eig_sym(R_nn) << arma::endl;
+  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
 
   // arma::cout << "t(Rstar_on)*Rstar_on:" <<  trans(Rstar_on) * Rstar_on << arma::endl;
 
@@ -1941,22 +1952,22 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
     lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
                                    arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
 
-    arma::mat Linv_on = LinearAlgebra::solve(lastsim_L_on, arma::mat(n_o + n_n, n_o + n_n, arma::fill::eye));
+    arma::mat Linv_on = LinearAlgebra::solve_lower(lastsim_L_on, arma::mat(n_o + n_n, n_o + n_n, arma::fill::eye));
     t0 = Bench::toc(nullptr, "Linv_on     ", t0);
     lastsim_Rinv_on = Linv_on.t() * Linv_on;
     t0 = Bench::toc(nullptr, "Rinv_on     ", t0);
 
     lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
-    lastsim_Fstar_on = LinearAlgebra::solve(lastsim_L_on, lastsim_F_on);
+    lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
     t0 = Bench::toc(nullptr, "Fstar_on     ", t0);
     arma::mat Q_Fstar_on;
-    arma::qr(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
-    lastsim_Fcirc_on = LinearAlgebra::rsolve(lastsim_circ_on, lastsim_F_on);
+    arma::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
+    lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
     t0 = Bench::toc(nullptr, "Fcirc_on     ", t0);
 
     lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
     t0 = Bench::toc(nullptr, "Fhat_nKo     ", t0);
-    lastsim_Ecirc_nKo = LinearAlgebra::rsolve(m_circ, F_n - lastsim_Fhat_nKo);
+    lastsim_Ecirc_nKo = LinearAlgebra::rsolve_upper(m_circ, F_n - lastsim_Fhat_nKo);
     t0 = Bench::toc(nullptr, "Ecirc_nKo     ", t0);
   }
 
@@ -2040,10 +2051,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 
   if (!use_lastsimup) {
     arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
-    arma::mat Rstar_onCu = LinearAlgebra::solve(lastsim_L_on, R_onCu);
+    arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
     t0 = Bench::toc(nullptr, "Rstar_onCu          ", t0);
 
-    arma::mat Ecirc_uKon = LinearAlgebra::rsolve(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
+    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
     t0 = Bench::toc(nullptr, "Ecirc_uKon          ", t0);
 
     arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
@@ -2068,11 +2079,11 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
   // ======================================================================
 
   if (!use_lastsimup) {
-    arma::mat Rstar_ou = LinearAlgebra::solve(m_T, lastsimup_R_uo.t());
+    arma::mat Rstar_ou = LinearAlgebra::solve_lower(m_T, lastsimup_R_uo.t());
     t0 = Bench::toc(nullptr, "Rstar_ou          ", t0);
 
     arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve(m_circ, F_u - Fhat_uKo);
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Fhat_uKo);
     t0 = Bench::toc(nullptr, "Ecirc_uKo          ", t0);
 
     arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
@@ -2102,31 +2113,166 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
-  // rebuild starting parameters
-  Parameters parameters;
-  if (refit) {  // re-fit with parameter optimization
-    if (m_est_beta)
-      parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
-                              this->m_est_sigma2,
-                              std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                              this->m_est_theta,
-                              std::make_optional(arma::ones<arma::vec>(0)),
-                              true};
-    else
-      parameters = Parameters{std::make_optional(this->m_sigma2 * this->m_scaleY * this->m_scaleY),
-                              this->m_est_sigma2,
-                              std::make_optional(trans(this->m_theta) % this->m_scaleX),
-                              this->m_est_theta,
-                              std::make_optional(trans(this->m_beta) * this->m_scaleY),
-                              false};
-    this->fit(arma::join_cols(m_y * this->m_scaleY + this->m_centerY,
-                              y_u),  // de-normalize previous data according to suite unnormed new data
-              arma::join_cols((m_X.each_row() % this->m_scaleX).each_row() + this->m_centerX, X_u),
-              m_regmodel,
-              m_normalize,
-              m_optim,
-              m_objective,
-              parameters);
+  if (refit) {  // Warm restart: extend data and run single BFGS from current theta
+    // Normalize new data using existing normalization
+    arma::mat Xn_u = X_u;
+    Xn_u.each_row() -= m_centerX;
+    Xn_u.each_row() /= m_scaleX;
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+
+    // Extend training data
+    m_X = arma::join_cols(m_X, Xn_u);
+    m_y = arma::join_cols(m_y, yn_u);
+
+    const arma::uword n = m_X.n_rows;
+    const arma::uword d = m_X.n_cols;
+
+    // Update distance matrix
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+
+    // Update trend matrix
+    m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+    // Set up objective function based on current objective
+    std::function<double(const arma::vec&, arma::vec*, arma::mat*, Kriging::KModel*)> fit_ofn;
+    if (m_objective == "LL") {
+      if (Optim::reparametrize) {
+        fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
+          const arma::vec _theta = Optim::reparam_from(_gamma);
+          double ll = this->_logLikelihood(_theta, grad_out, hess_out, km_data, nullptr);
+          if (hess_out != nullptr && grad_out != nullptr)
+            *hess_out = -Optim::reparam_from_deriv2(_theta, *grad_out, *hess_out);
+          if (grad_out != nullptr)
+            *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+          return -ll;
+        };
+      } else {
+        fit_ofn = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* hess_out, Kriging::KModel* km_data) {
+          double ll = this->_logLikelihood(_gamma, grad_out, hess_out, km_data, nullptr);
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out;
+          if (hess_out != nullptr)
+            *hess_out = -*hess_out;
+          return -ll;
+        };
+      }
+    } else if (m_objective == "LOO") {
+      if (Optim::reparametrize) {
+        fit_ofn
+            = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+                const arma::vec _theta = Optim::reparam_from(_gamma);
+                double loo = this->_leaveOneOut(_theta, grad_out, nullptr, km_data, nullptr);
+                if (grad_out != nullptr)
+                  *grad_out = Optim::reparam_from_deriv(_theta, *grad_out);
+                return loo;
+              };
+      } else {
+        fit_ofn
+            = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+                return this->_leaveOneOut(_gamma, grad_out, nullptr, km_data, nullptr);
+              };
+      }
+    } else if (m_objective == "LMP") {
+      if (Optim::reparametrize) {
+        fit_ofn
+            = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+                const arma::vec _theta = Optim::reparam_from(_gamma);
+                double lmp = this->_logMargPost(_theta, grad_out, km_data, nullptr);
+                if (grad_out != nullptr)
+                  *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+                return -lmp;
+              };
+      } else {
+        fit_ofn
+            = [this](const arma::vec& _gamma, arma::vec* grad_out, arma::mat* /*hess_out*/, Kriging::KModel* km_data) {
+                double lmp = this->_logMargPost(_gamma, grad_out, km_data, nullptr);
+                if (grad_out != nullptr)
+                  *grad_out = -*grad_out;
+                return -lmp;
+              };
+      }
+    } else {
+      throw std::invalid_argument("Unsupported objective in update: " + m_objective);
+    }
+
+    // Compute theta bounds for the extended dataset
+    auto theta_bounds_pair = Optim::theta_bounds(m_maxdX, m_dX, m_y, n);
+    arma::vec theta_lower = theta_bounds_pair.first;
+    arma::vec theta_upper = theta_bounds_pair.second;
+
+    arma::vec gamma_start = m_theta;
+    arma::vec gamma_lower = theta_lower;
+    arma::vec gamma_upper = theta_upper;
+    if (Optim::reparametrize) {
+      gamma_start = Optim::reparam_to(m_theta);
+      gamma_lower = Optim::reparam_to(theta_lower);
+      gamma_upper = Optim::reparam_to(theta_upper);
+    }
+    gamma_lower = arma::min(gamma_start, gamma_lower);
+    gamma_upper = arma::max(gamma_start, gamma_upper);
+
+    // Preallocate KModel
+    arma::uword p = m_F.n_cols;
+    Kriging::KModel km;
+    km.R = arma::mat(n, n, arma::fill::none);
+    km.L = arma::mat(n, n, arma::fill::none);
+    km.Linv = arma::mat();
+    km.Fstar = arma::mat(n, p, arma::fill::none);
+    km.ystar = arma::vec(n, arma::fill::none);
+    km.Rstar = arma::mat(p, p, arma::fill::none);
+    km.Qstar = arma::mat();
+    km.Estar = arma::vec(n, arma::fill::none);
+    km.betahat = arma::vec(p, arma::fill::none);
+    km.SSEstar = 0.0;
+
+    populate_Model(km, m_theta, nullptr);
+
+    // Run single BFGS from current theta (warm restart)
+    lbfgsb::Optimizer optimizer{d};
+    optimizer.iprint = Optim::log_level - 2;
+    optimizer.max_iter = Optim::max_iteration;
+    optimizer.pgtol
+        = m_objective == "LOO" ? Optim::gradient_tolerance / (n * n) : Optim::gradient_tolerance;
+    optimizer.factr = m_objective == "LOO" ? Optim::objective_rel_tolerance / 1E-13 / (n * n)
+                                           : Optim::objective_rel_tolerance / 1E-13;
+    arma::ivec bounds_type{d, arma::fill::value(2)};
+
+    arma::vec gamma_tmp = gamma_start;
+    optimizer.minimize(
+        [&km, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+          return fit_ofn(vals_inp, &grad_out, nullptr, &km);
+        },
+        gamma_tmp,
+        gamma_lower.memptr(),
+        gamma_upper.memptr(),
+        bounds_type.memptr());
+
+    // Final evaluation at best point
+    fit_ofn(gamma_tmp, nullptr, nullptr, &km);
+
+    // Update member variables
+    m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
+    m_est_theta = true;
+    m_is_empty = false;
+    m_T = std::move(km.L);
+    m_R = std::move(km.R);
+    m_M = std::move(km.Fstar);
+    m_circ = std::move(km.Rstar);
+    m_star = std::move(km.Qstar);
+
+    if (m_est_beta) {
+      m_beta = std::move(km.betahat);
+      m_z = std::move(km.Estar);
+    } else {
+      m_z = std::move(km.ystar) - m_M * m_beta;
+    }
+
+    if (m_est_sigma2) {
+      m_sigma2 = km.SSEstar / n;
+      if (m_objective == "LMP")
+        m_sigma2 = km.SSEstar / (n - m_F.n_cols);
+    }
   } else {  // incremental update without parameter re-optimization
     // Normalize new data using existing normalization parameters
     arma::mat Xn_u = X_u;

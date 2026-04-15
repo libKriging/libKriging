@@ -323,3 +323,8 @@ target_link_libraries(MLPKrigingTest LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries MLPKrigingTest)
 add_test(NAME MLPKrigingTest COMMAND MLPKrigingTest)
 
+add_executable(KrigingWarmRestartTest KrigingWarmRestartTest.cpp)
+target_link_libraries(KrigingWarmRestartTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingWarmRestartTest)
+add_test(NAME KrigingWarmRestartTest COMMAND KrigingWarmRestartTest)
+

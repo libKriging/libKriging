@@ -615,7 +615,9 @@ class WarpKriging {
   // ---- GP cache -----------------------------------------------------------
   arma::mat m_R;      ///< correlation matrix (n×n)
   arma::mat m_C;      ///< Cholesky(R + nugget), lower
-  arma::vec m_alpha;  ///< R^{-1}(y - Fβ)
+  arma::mat m_M;      ///< C⁻¹ F  (whitened trend basis, ≡ Kriging's m_M)
+  arma::mat m_circ;   ///< chol_upper(F'R⁻¹F)  (≡ Kriging's m_circ)
+  arma::vec m_z;      ///< C⁻¹(y - Fβ)  (whitened residuals)
   double m_logdet = 0.0;
 
   bool m_fitted = false;

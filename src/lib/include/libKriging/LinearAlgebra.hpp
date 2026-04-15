@@ -96,6 +96,13 @@ class LinearAlgebra {
   // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
   // Avoids explicit matrix multiplication
   LIBKRIGING_EXPORT static double trace_prod(const arma::mat& A, const arma::mat& B);
+
+  LIBKRIGING_EXPORT static arma::mat solve_lower(const arma::mat& L, const arma::mat& B);
+  LIBKRIGING_EXPORT static arma::mat solve_upper(const arma::mat& U, const arma::mat& B);
+  LIBKRIGING_EXPORT static arma::mat rsolve_upper(const arma::mat& U, const arma::mat& B);
+  LIBKRIGING_EXPORT static arma::mat inv_sympd(const arma::mat& L);
+  LIBKRIGING_EXPORT static arma::mat chol_upper(const arma::mat& A);
+  LIBKRIGING_EXPORT static void qr_econ(arma::mat& Q, arma::mat& R, const arma::mat& A);
 };
 
 #endif  // LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
