@@ -171,13 +171,24 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{4}};
+                 RequiresArg::Exactly{5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
-  auto result = wk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"));
+  auto result = wk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"),
+                              input.get<bool>(4, "will_update"));
   output.set(0, result, "simulated values");
+}
+
+void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  wk->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
 }
 
 void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

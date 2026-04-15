@@ -2173,57 +2173,191 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
 //  Cholesky, then denormalizes.  This is more numerically robust than
 //  doing Cholesky on the full-scale covariance matrix.
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) const {
+arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new, const bool will_update) {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
-  const arma::uword n_n = x_new.n_rows;
+  arma::uword n_n = x_new.n_rows;
+  arma::uword n_o = m_X.n_rows;
+
+  if (x_new.n_cols != m_X.n_cols)
+    throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(x_new.n_cols) + " instead of "
+                             + std::to_string(m_X.n_cols));
 
   // Normalize new inputs
-  arma::mat x_n = x_new;
+  arma::mat Xn_n = x_new;
   if (m_normalize) {
-    for (arma::uword j = 0; j < x_n.n_cols; ++j) {
+    for (arma::uword j = 0; j < Xn_n.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
-        x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
+        Xn_n.col(j) = (Xn_n.col(j) - m_centerX(j)) / m_scaleX(j);
     }
   }
 
-  arma::mat Phi_new = apply_warping(x_n);
-  arma::mat F_new = build_trend_matrix(x_n);
+  arma::mat Phi_n = apply_warping(Xn_n);
+  arma::mat F_n = build_trend_matrix(Xn_n);
 
-  // R_nn: correlation between new points (at correlation scale)
+  // Covariance between new points
   arma::mat R_nn(n_n, n_n);
-  LinearAlgebra::covMat_sym_X(&R_nn, Phi_new.t(), m_theta, _Cov);
+  LinearAlgebra::covMat_sym_X(&R_nn, Phi_n.t(), m_theta, _Cov);
 
-  // R_on: cross-correlation (n_train × n_new)
-  arma::mat Rcross = build_Rcross(Phi_new, m_Phi);  // n_new × n_train
+  // Cross-covariance between training and new points (n_o × n_n)
+  arma::mat R_on(n_o, n_n);
+  LinearAlgebra::covMat_rect(&R_on, m_Phi.t(), Phi_n.t(), m_theta, _Cov, 1.0);
 
-  // v = C⁻¹ Rcross'  (C is lower-Cholesky of R_train)
-  arma::mat v = LinearAlgebra::solve_lower(m_T, Rcross.t());
+  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
 
-  // Kriging mean (normalized scale)
-  arma::vec yhat_n = F_new * m_beta + v.t() * m_z;
+  arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
 
-  // Conditional covariance at correlation scale (including trend uncertainty)
-  arma::mat Fhat_n = v.t() * m_M;
-  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, F_new - Fhat_n);
+  arma::mat Fhat_n = trans(Rstar_on) * m_M;
+  arma::mat E_n = F_n - Fhat_n;
+  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
 
-  arma::mat Sigma_nKo = R_nn - v.t() * v + Ecirc_n * Ecirc_n.t();
+  arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on;
 
-  // Cholesky at correlation scale — more robust than on the full-scale covariance
-  arma::mat LSigma = LinearAlgebra::safe_chol_lower(Sigma_nKo);
+  arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
 
-  // Generate simulations: mean + L * Z * sqrt(σ²), then denormalize
-  arma::mat y_n(n_n, nsim);
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
+
+  arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
   Random::reset_seed(seed);
-  y_n += LSigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
+  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
   // Denormalize
   y_n = m_centerY + m_scaleY * y_n;
 
+  if (will_update) {
+    lastsimup_Xn_u.clear();  // force reset to force update_simulate consider new data
+    lastsim_y_n = y_n;
+
+    lastsim_Xn_n = trans(Xn_n);
+    lastsim_Phi_n = Phi_n;
+    lastsim_seed = seed;
+    lastsim_nsim = nsim;
+
+    lastsim_R_nn = R_nn;
+    lastsim_F_n = F_n;
+
+    lastsim_L_oCn = Rstar_on;
+    lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
+
+    lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
+                                   arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
+
+    lastsim_Rinv_on = LinearAlgebra::inv_sympd(lastsim_L_on);
+
+    lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
+    lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
+    arma::mat Q_Fstar_on;
+    LinearAlgebra::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
+    lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
+
+    lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
+    lastsim_Ecirc_nKo = LinearAlgebra::rsolve_upper(m_circ, F_n - lastsim_Fhat_nKo);
+  }
+
   return y_n;
+}
+
+// -------------------------------------------------------------------------
+//  update_simulate()  — FOXY algorithm, ported from Kriging::update_simulate
+// -------------------------------------------------------------------------
+LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+
+  if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
+    throw std::runtime_error("No previous simulation data available");
+
+  arma::uword n_n = lastsim_Xn_n.n_cols;
+  arma::uword n_o = m_X.n_rows;
+
+  arma::uword n_on = n_o + n_n;
+  arma::mat F_on = arma::join_cols(m_F, lastsim_F_n);
+
+  arma::uword n_u = X_u.n_rows;
+
+  // Normalize X_u
+  arma::mat Xn_u = X_u;
+  if (m_normalize) {
+    for (arma::uword j = 0; j < Xn_u.n_cols; ++j) {
+      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
+      if (is_cont)
+        Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
+    }
+  }
+
+  // Warp new update points and build trend matrix
+  arma::mat Phi_u = apply_warping(Xn_u);
+  arma::mat F_u = build_trend_matrix(Xn_u);
+
+  Xn_u = trans(Xn_u);
+
+  bool use_lastsimup
+      = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
+  if (!use_lastsimup) {
+    lastsimup_Xn_u = Xn_u;
+
+    // Covariance between update points
+    lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
+    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Phi_u.t(), m_theta, _Cov);
+
+    // Covariance between update and training points
+    lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
+    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Phi_u.t(), m_Phi.t(), m_theta, _Cov, 1.0);
+
+    // Covariance between update and simulation points
+    lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
+    LinearAlgebra::covMat_rect(&lastsimup_R_un, Phi_u.t(), lastsim_Phi_n.t(), m_theta, _Cov, 1.0);
+  }
+
+  // ======================================================================
+  // FOXY step #1: Extend the simulation to the design 'X_u'
+  // ======================================================================
+
+  if (!use_lastsimup) {
+    arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
+    arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
+
+    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
+
+    arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
+
+    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
+
+    arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
+
+    arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
+    arma::mat M_u = arma::repmat(m_u, 1, lastsim_nsim) + W_uCon.tail_cols(n_n) * lastsim_y_n;
+
+    Random::reset_seed(lastsim_seed);
+    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);
+  }
+
+  // ======================================================================
+  // FOXY step #2: Update the simulated paths on 'X_n'
+  // ======================================================================
+
+  if (!use_lastsimup) {
+    arma::mat Rstar_ou = LinearAlgebra::solve_lower(m_T, lastsimup_R_uo.t());
+
+    arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Fhat_uKo);
+
+    arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
+
+    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
+
+    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
+  }
+
+  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u);
 }
 
 // -------------------------------------------------------------------------

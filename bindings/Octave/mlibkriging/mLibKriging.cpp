@@ -328,6 +328,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::simulate"_hash:
       return WarpKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::update_simulate"_hash:
+      return WarpKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::update"_hash:
       return WarpKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::summary"_hash:

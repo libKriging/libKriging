@@ -44,6 +44,10 @@ classdef WarpKriging < handle
             [varargout{1:nargout}] = mLibKriging("WarpKriging::simulate", obj.ref, varargin{:});
         end
 
+        function varargout = update_simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::update_simulate", obj.ref, varargin{:});
+        end
+
         function varargout = update(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::update", obj.ref, varargin{:});
         end

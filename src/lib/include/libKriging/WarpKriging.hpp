@@ -528,7 +528,14 @@ class WarpKriging {
   //  Simulation
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, uint64_t seed, const arma::mat& x_new) const;
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, uint64_t seed, const arma::mat& x_new, bool will_update = false);
+
+  /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
+   * @param y_u is n length column vector of new output
+   * @param X_u is n*d matrix of new input
+   * @return matrix of simulated output (for X_n given previously)
+   */
+  LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
 
   // -----------------------------------------------------------------------
   //  Update
@@ -619,6 +626,34 @@ class WarpKriging {
   arma::mat m_circ;   ///< chol_upper(F'R⁻¹F)  (≡ Kriging's m_circ)
   arma::vec m_z;      ///< C⁻¹(y - Fβ)  (whitened residuals)
   arma::mat m_Rinv;   ///< R⁻¹ = C⁻ᵀ C⁻¹, cached from refresh_cache
+
+  // ---- Simulation cached data (FOXY algorithm) ----------------------------
+  arma::mat lastsim_Xn_n;
+  arma::mat lastsim_Phi_n;   // WarpKriging-specific: warped features of sim points
+  arma::mat lastsim_y_n;
+  int lastsim_nsim{};
+  uint64_t lastsim_seed{};
+  arma::mat lastsim_F_n;
+  arma::mat lastsim_R_nn;
+  arma::mat lastsim_L_oCn;
+  arma::mat lastsim_L_nCn;
+  arma::mat lastsim_L_on;
+  arma::mat lastsim_Rinv_on;
+  arma::mat lastsim_F_on;
+  arma::mat lastsim_Fstar_on;
+  arma::mat lastsim_circ_on;
+  arma::mat lastsim_Fcirc_on;
+  arma::mat lastsim_Fhat_nKo;
+  arma::mat lastsim_Ecirc_nKo;
+
+  // Updated simulation cached data
+  arma::mat lastsimup_Xn_u;
+  arma::mat lastsimup_y_u;
+  arma::mat lastsimup_Wtild_nKu;
+  arma::mat lastsimup_R_uo;
+  arma::mat lastsimup_R_un;
+  arma::mat lastsimup_R_uu;
+
   double m_logdet = 0.0;
 
   bool m_fitted = false;
