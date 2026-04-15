@@ -102,7 +102,7 @@ Rcpp::List warpKriging_predict(SEXP model_ptr,
 // [[Rcpp::export]]
 arma::mat warpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::mat& x_new, bool will_update = false) {
   WarpKrigingPtr model(model_ptr);
-  return model->simulate(nsim, static_cast<uint64_t>(seed), x_new, will_update);
+  return model->simulate(nsim, seed, x_new, will_update);
 }
 
 // [[Rcpp::export]]
@@ -116,9 +116,9 @@ arma::mat warpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, cons
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new, bool refit = true) {
+void warpKriging_update(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_u, bool refit = true) {
   WarpKrigingPtr model(model_ptr);
-  model->update(y_new, X_new, refit);
+  model->update(y_u, X_u, refit);
 }
 
 // ---------------------------------------------------------------------------

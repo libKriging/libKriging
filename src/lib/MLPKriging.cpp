@@ -297,17 +297,17 @@ double MLPKriging::logLikelihood() const {
   return concentrated_ll();
 }
 
-std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta_gp,
-                                                                      bool withGrad,
-                                                                      bool /*withHess*/) const {
+std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta,
+                                                                      bool return_grad,
+                                                                      bool /*return_hess*/) const {
   auto* self = const_cast<MLPKriging*>(this);
   arma::vec old_theta = m_theta;
-  self->m_theta = theta_gp;
+  self->m_theta = theta;
   self->refresh_cache();
 
   double ll = concentrated_ll();
   arma::vec grad;
-  if (withGrad) {
+  if (return_grad) {
     auto [ll2, g] = concentrated_ll_and_grad_theta();
     grad = g;
     (void)ll2;
@@ -856,15 +856,15 @@ void MLPKriging::fit(const arma::vec& y,
 // -------------------------------------------------------------------------
 //  predict()
 // -------------------------------------------------------------------------
-std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::predict(const arma::mat& x_new,
-                                                                                      bool withStd,
-                                                                                      bool withCov,
-                                                                                      bool withDeriv) const {
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::predict(const arma::mat& X_n,
+                                                                                      bool return_stdev,
+                                                                                      bool return_cov,
+                                                                                      bool return_deriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
 
-  const arma::uword d = x_new.n_cols;
-  arma::mat x_n = x_new;
+  const arma::uword d = X_n.n_cols;
+  arma::mat x_n = X_n;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j)
       x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
@@ -888,10 +888,10 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
   arma::mat v;
   arma::vec ysd2_n;
 
-  if (withStd || withCov || withDeriv) {
+  if (return_stdev || return_cov || return_deriv) {
     v = Rstar_on;
 
-    if (withCov) {
+    if (return_cov) {
       arma::mat R_new(n_n, n_n);
       LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
       cov = R_new - v.t() * v;
@@ -913,12 +913,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
       }
       ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
       ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
-      if (withStd)
+      if (return_stdev)
         stdev = arma::sqrt(ysd2_n);
     }
   }
 
-  if (withDeriv) {
+  if (return_deriv) {
     const double h = 1.0E-5;
     const double sigma2 = m_sigma2;
 
@@ -927,7 +927,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
     arma::mat Dysd2_n(n_n, d, arma::fill::zeros);
 
     arma::mat Ecirc_n;
-    if (withStd) {
+    if (return_stdev) {
       arma::mat Fhat_n = v.t() * m_M;
       arma::mat E_n = F_new - Fhat_n;
       Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
@@ -966,7 +966,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
       arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
       Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * alpha).t();
 
-      if (withStd) {
+      if (return_stdev) {
         arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
         Dysd2_n.row(i) = -2.0 * v.col(i).t() * W_i + 2.0 * Ecirc_n.row(i) * DEcirc_n_i;
       }
@@ -974,7 +974,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
     Dyhat_n *= m_scaleY;
     Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
 
-    if (withStd) {
+    if (return_stdev) {
       Dystdev_n.set_size(n_n, d);
       for (arma::uword i = 0; i < n_n; i++) {
         double sd_i = std::sqrt(ysd2_n(i));
@@ -992,13 +992,13 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
 // -------------------------------------------------------------------------
 //  simulate()
 // -------------------------------------------------------------------------
-arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) const {
+arma::mat MLPKriging::simulate(int nsim, int seed, const arma::mat& X_n) const {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
-  const arma::uword n_n = x_new.n_rows;
+  const arma::uword n_n = X_n.n_rows;
 
-  arma::mat x_n = x_new;
+  arma::mat x_n = X_n;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j)
       x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
@@ -1024,7 +1024,7 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
 
   arma::mat y_n(n_n, nsim);
   y_n.each_col() = yhat_n;
-  Random::reset_seed(seed);
+  Random::reset_seed(static_cast<uint64_t>(seed));
   y_n += LSigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
   y_n = m_centerY + m_scaleY * y_n;
@@ -1035,16 +1035,16 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
-void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new, const bool refit) {
+void MLPKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
   if (refit) {
-    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
+    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_u);
     arma::mat X_all = m_X;
     for (arma::uword j = 0; j < X_all.n_cols; ++j)
       X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
-    X_all = arma::join_vert(X_all, X_new);
+    X_all = arma::join_vert(X_all, X_u);
 
     m_y = y_all;
     m_X = X_all;
@@ -1057,10 +1057,10 @@ void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new, const bo
     m_max_iter_adam = saved_adam;
   } else {
     // Fast incremental update: keep all hyperparameters fixed, use Cholesky update
-    arma::mat Xn_u = X_new;
+    arma::mat Xn_u = X_u;
     for (arma::uword j = 0; j < Xn_u.n_cols; ++j)
       Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
-    arma::vec yn_u = (y_new - m_centerY) / m_scaleY;
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
 
     m_X = arma::join_cols(m_X, Xn_u);
     m_y = arma::join_cols(m_y, yn_u);

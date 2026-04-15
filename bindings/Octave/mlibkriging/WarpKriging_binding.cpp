@@ -176,7 +176,7 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
-  auto result = wk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"),
+  auto result = wk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"),
                               input.get<bool>(4, "will_update"));
   output.set(0, result, "simulated values");
 }

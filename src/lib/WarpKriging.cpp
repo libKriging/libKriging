@@ -1417,17 +1417,17 @@ double WarpKriging::logLikelihood() const {
   return concentrated_ll();
 }
 
-std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta_gp,
-                                                                       bool withGrad,
-                                                                       bool /*withHess*/) const {
+std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arma::vec& theta,
+                                                                       bool return_grad,
+                                                                       bool /*return_hess*/) const {
   auto* self = const_cast<WarpKriging*>(this);
   arma::vec old_theta = m_theta;
-  self->m_theta = theta_gp;
+  self->m_theta = theta;
   self->refresh_cache();
 
   double ll = concentrated_ll();
   arma::vec grad;
-  if (withGrad) {
+  if (return_grad) {
     auto [ll2, g] = concentrated_ll_and_grad_theta();
     grad = g;
     (void)ll2;
@@ -2066,15 +2066,15 @@ void WarpKriging::fit(const arma::vec& y,
 // -------------------------------------------------------------------------
 //  predict()
 // -------------------------------------------------------------------------
-std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::predict(const arma::mat& x_new,
-                                                                                       bool withStd,
-                                                                                       bool withCov,
-                                                                                       bool withDeriv) const {
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::predict(const arma::mat& X_n,
+                                                                                       bool return_stdev,
+                                                                                       bool return_cov,
+                                                                                       bool return_deriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
 
-  const arma::uword d = x_new.n_cols;
-  arma::mat x_n = x_new;
+  const arma::uword d = X_n.n_cols;
+  arma::mat x_n = X_n;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
@@ -2103,12 +2103,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   // Reuse Rstar_on (= C⁻¹ Rcross') computed above for mean
   arma::vec ysd2_n;
 
-  if (withStd || withCov || withDeriv) {
+  if (return_stdev || return_cov || return_deriv) {
     arma::mat Fhat_n = Rstar_on.t() * m_M;
     arma::mat E_n = F_new - Fhat_n;
     arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
 
-    if (withCov) {
+    if (return_cov) {
       arma::mat R_new(n_n, n_n);
       LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
       cov = R_new - Rstar_on.t() * Rstar_on;
@@ -2126,12 +2126,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       }
       ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
       ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
-      if (withStd)
+      if (return_stdev)
         stdev = arma::sqrt(ysd2_n);
     }
   }
 
-  if (withDeriv) {
+  if (return_deriv) {
     const double h = 1.0E-5;
     const double sigma2 = m_sigma2;
 
@@ -2141,7 +2141,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
 
     // Ecirc_n needed for stdev derivative
     arma::mat Ecirc_n_d;
-    if (withStd) {
+    if (return_stdev) {
       arma::mat Fhat_n = Rstar_on.t() * m_M;
       arma::mat E_n = F_new - Fhat_n;
       Ecirc_n_d = LinearAlgebra::rsolve_upper(m_circ, E_n);
@@ -2186,7 +2186,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       // Mean derivative: dŷ/dx = dF/dx · β + dR/dxᵀ · z  (using m_z = C⁻¹(y-Fβ))
       Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * LinearAlgebra::solve_upper(m_T.t(), m_z)).t();
 
-      if (withStd) {
+      if (return_stdev) {
         // dvar/dx = -2 vᵢᵀ Wᵢ + 2 Ecirc_i · circ⁻ᵀ(DF_i - Wᵢᵀ m_M)ᵀ
         arma::mat DEcirc_n_i
             = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
@@ -2196,7 +2196,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
     Dyhat_n *= m_scaleY;
     Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
 
-    if (withStd) {
+    if (return_stdev) {
       // Dystdev = d(sqrt(var))/dx = dvar/dx / (2·stdev)
       Dystdev_n.set_size(n_n, d);
       for (arma::uword i = 0; i < n_n; i++) {
@@ -2219,19 +2219,19 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
 //  Cholesky, then denormalizes.  This is more numerically robust than
 //  doing Cholesky on the full-scale covariance matrix.
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new, const bool will_update) {
+arma::mat WarpKriging::simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update) {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
-  arma::uword n_n = x_new.n_rows;
+  arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
 
-  if (x_new.n_cols != m_X.n_cols)
-    throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(x_new.n_cols) + " instead of "
+  if (X_n.n_cols != m_X.n_cols)
+    throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
                              + std::to_string(m_X.n_cols));
 
   // Normalize new inputs
-  arma::mat Xn_n = x_new;
+  arma::mat Xn_n = X_n;
   if (m_normalize) {
     for (arma::uword j = 0; j < Xn_n.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
@@ -2267,7 +2267,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new,
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
   y_n.each_col() = yhat_n;
-  Random::reset_seed(seed);
+  Random::reset_seed(static_cast<uint64_t>(seed));
   y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
   // Denormalize
@@ -2279,7 +2279,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new,
 
     lastsim_Xn_n = trans(Xn_n);
     lastsim_Phi_n = Phi_n;
-    lastsim_seed = seed;
+    lastsim_seed = static_cast<uint64_t>(seed);
     lastsim_nsim = nsim;
 
     lastsim_R_nn = R_nn;
@@ -2409,20 +2409,20 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u, c
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
-void WarpKriging::update(const arma::vec& y_new, const arma::mat& X_new, const bool refit) {
+void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
   if (refit) {
     // Current behavior: de-normalise, append, re-normalise, re-optimise
-    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
+    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_u);
     arma::mat X_all = m_X;
     for (arma::uword j = 0; j < X_all.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
         X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
     }
-    X_all = arma::join_vert(X_all, X_new);
+    X_all = arma::join_vert(X_all, X_u);
 
     m_y = y_all;
     m_X = X_all;
@@ -2435,14 +2435,14 @@ void WarpKriging::update(const arma::vec& y_new, const arma::mat& X_new, const b
     m_max_iter_adam = saved_adam;
   } else {
     // Fast incremental update: keep all hyperparameters fixed, use Cholesky update
-    arma::mat Xn_u = X_new;
+    arma::mat Xn_u = X_u;
     for (arma::uword j = 0; j < Xn_u.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont) {
         Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
       }
     }
-    arma::vec yn_u = (y_new - m_centerY) / m_scaleY;
+    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
 
     m_X = arma::join_cols(m_X, Xn_u);
     m_y = arma::join_cols(m_y, yn_u);

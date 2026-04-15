@@ -1812,7 +1812,7 @@ int lk_warp_kriging_predict(void* ptr,
 int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, static_cast<uint64_t>(seed), X_mat);
+    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;
@@ -2088,7 +2088,7 @@ int lk_mlp_kriging_predict(void* ptr,
 int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, static_cast<uint64_t>(seed), X_mat);
+    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;

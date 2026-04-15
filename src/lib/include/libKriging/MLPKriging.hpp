@@ -113,15 +113,15 @@ class MLPKriging {
   //  Prediction / simulation / update
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& x_new,
-                                                                                              bool withStd = true,
-                                                                                              bool withCov = false,
-                                                                                              bool withDeriv
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict(const arma::mat& X_n,
+                                                                                              bool return_stdev = true,
+                                                                                              bool return_cov = false,
+                                                                                              bool return_deriv
                                                                                               = false) const;
 
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, uint64_t seed, const arma::mat& x_new) const;
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n) const;
 
-  LIBKRIGING_EXPORT void update(const arma::vec& y_new, const arma::mat& X_new, const bool refit = true);
+  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit = true);
 
   // -----------------------------------------------------------------------
   //  Log-likelihood
@@ -129,9 +129,9 @@ class MLPKriging {
 
   LIBKRIGING_EXPORT double logLikelihood() const;
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta_gp,
-                                                                              bool withGrad = true,
-                                                                              bool withHess = false) const;
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
+                                                                              bool return_grad = true,
+                                                                              bool return_hess = false) const;
 
   // -----------------------------------------------------------------------
   //  Accessors

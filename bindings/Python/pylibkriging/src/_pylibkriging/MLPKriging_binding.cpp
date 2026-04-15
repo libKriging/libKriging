@@ -97,7 +97,7 @@ PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool re
 
 py::array_t<double> PyMLPKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, static_cast<uint64_t>(seed), mat_X);
+  auto result = m_internal->simulate(nsim, seed, mat_X);
   return carma::mat_to_arr(result, true);
 }
 

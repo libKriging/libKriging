@@ -150,7 +150,7 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
-  auto result = mk->simulate(nsim, static_cast<uint64_t>(seed), input.get<arma::mat>(3, "X_n matrix"));
+  auto result = mk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"));
   output.set(0, result, "simulated values");
 }
 
