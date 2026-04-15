@@ -116,9 +116,9 @@ arma::mat warpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, cons
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new) {
+void warpKriging_update(SEXP model_ptr, const arma::vec& y_new, const arma::mat& X_new, bool refit = true) {
   WarpKrigingPtr model(model_ptr);
-  model->update(y_new, X_new);
+  model->update(y_new, X_new, refit);
 }
 
 // ---------------------------------------------------------------------------

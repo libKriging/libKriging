@@ -51,7 +51,7 @@ class PyWarpKriging {
 
   py::array_t<double> update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
 
-  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
+  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit = true);
 
   std::string summary() const;
 

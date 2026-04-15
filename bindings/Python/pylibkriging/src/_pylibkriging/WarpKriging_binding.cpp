@@ -84,10 +84,10 @@ py::array_t<double> PyWarpKriging::update_simulate(const py::array_t<double>& y_
   return carma::mat_to_arr(result, true);
 }
 
-void PyWarpKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
+void PyWarpKriging::update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit) {
   arma::colvec mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
-  m_internal->update(mat_y, mat_X);
+  m_internal->update(mat_y, mat_X, refit);
 }
 
 std::string PyWarpKriging::summary() const {

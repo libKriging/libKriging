@@ -225,10 +225,12 @@ update_simulate.WarpKriging <- function(object, y_u, X_u, ...) {
 #' @param object WarpKriging object
 #' @param y_u new observations
 #' @param X_u new input matrix
+#' @param refit logical; if TRUE (default), re-optimise hyperparameters
 #' @param ... ignored
 #' @export
-update.WarpKriging <- function(object, y_u, X_u, ...) {
-  warpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u))
+update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
+  warpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u),
+                     as.logical(refit))
   invisible(object)
 }
 

@@ -541,7 +541,7 @@ class WarpKriging {
   //  Update
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT void update(const arma::vec& y_new, const arma::mat& X_new);
+  LIBKRIGING_EXPORT void update(const arma::vec& y_new, const arma::mat& X_new, const bool refit = true);
 
   // -----------------------------------------------------------------------
   //  Log-likelihood
@@ -619,6 +619,23 @@ class WarpKriging {
   arma::vec m_theta;
   double m_sigma2 = 1.0;
 
+  // ---- WKModel (mirrors Kriging::KModel) ----------------------------------
+ public:
+  struct WKModel {
+    arma::mat R;        ///< correlation matrix
+    arma::mat L;        ///< Cholesky lower
+    arma::mat Rinv;     ///< R⁻¹
+    arma::mat Fstar;    ///< L \ F  (whitened trend, ≡ m_M)
+    arma::vec ystar;    ///< L \ y
+    arma::mat Rstar;    ///< chol_upper(F'R⁻¹F)  (≡ m_circ)
+    arma::vec Estar;    ///< L \ (y - Fβ̂)  (whitened residual, ≡ m_z)
+    double SSEstar;     ///< Estar'Estar
+    arma::vec betahat;
+  };
+  WKModel make_Model(const arma::vec& theta) const;
+  void populate_Model(WKModel& m, const arma::vec& theta) const;
+
+ private:
   // ---- GP cache -----------------------------------------------------------
   arma::mat m_R;      ///< correlation matrix (n×n)
   arma::mat m_T;      ///< Cholesky(R + nugget), lower

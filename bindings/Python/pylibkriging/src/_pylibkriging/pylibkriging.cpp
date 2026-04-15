@@ -348,7 +348,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("X"),
            py::arg("will_update") = false)
       .def("update_simulate", &PyWarpKriging::update_simulate, py::arg("y_u"), py::arg("X_u"))
-      .def("update", &PyWarpKriging::update, py::arg("y_u"), py::arg("X_u"))
+      .def("update", &PyWarpKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
       .def("logLikelihoodFun",

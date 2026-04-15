@@ -195,10 +195,10 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{3}};
+                 RequiresArg::Exactly{4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"));
+  wk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), input.get<bool>(3, "refit"));
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

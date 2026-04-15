@@ -1820,11 +1820,11 @@ int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, i
   CATCH_RETURN
 }
 
-int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d) {
+int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit) {
   try {
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
-    static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat);
+    static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat, refit != 0);
     return 0;
   }
   CATCH_RETURN
