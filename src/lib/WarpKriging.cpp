@@ -1251,28 +1251,28 @@ arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
 // -------------------------------------------------------------------------
 void WarpKriging::normalise_data() {
   arma::uword d = m_X.n_cols;
-  m_X_mean = arma::zeros<arma::rowvec>(d);
-  m_X_std = arma::ones<arma::rowvec>(d);
+  m_centerX = arma::zeros<arma::rowvec>(d);
+  m_scaleX = arma::ones<arma::rowvec>(d);
 
   if (m_normalize) {
     for (arma::uword j = 0; j < d; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont) {
-        m_X_mean(j) = arma::mean(m_X.col(j));
-        m_X_std(j) = arma::stddev(m_X.col(j));
-        if (m_X_std(j) < 1e-12)
-          m_X_std(j) = 1.0;
-        m_X.col(j) = (m_X.col(j) - m_X_mean(j)) / m_X_std(j);
+        m_centerX(j) = arma::mean(m_X.col(j));
+        m_scaleX(j) = arma::stddev(m_X.col(j));
+        if (m_scaleX(j) < 1e-12)
+          m_scaleX(j) = 1.0;
+        m_X.col(j) = (m_X.col(j) - m_centerX(j)) / m_scaleX(j);
       }
     }
-    m_y_mean = arma::mean(m_y);
-    m_y_std = arma::stddev(m_y);
-    if (m_y_std < 1e-12)
-      m_y_std = 1.0;
-    m_y = (m_y - m_y_mean) / m_y_std;
+    m_centerY = arma::mean(m_y);
+    m_scaleY = arma::stddev(m_y);
+    if (m_scaleY < 1e-12)
+      m_scaleY = 1.0;
+    m_y = (m_y - m_centerY) / m_scaleY;
   } else {
-    m_y_mean = 0.0;
-    m_y_std = 1.0;
+    m_centerY = 0.0;
+    m_scaleY = 1.0;
   }
 }
 
@@ -1337,13 +1337,13 @@ void WarpKriging::refresh_cache_theta_only() {
 
   m_R.set_size(n, n);
   arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
-  m_C = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
-  m_Rinv = LinearAlgebra::inv_sympd(m_C);
-  m_logdet = 2.0 * arma::sum(arma::log(m_C.diag()));
+  m_T = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
+  m_Rinv = LinearAlgebra::inv_sympd(m_T);
+  m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
 
   m_F = build_trend_matrix(m_X);
-  m_M = LinearAlgebra::solve_lower(m_C, m_F);
-  arma::vec ystar = LinearAlgebra::solve_lower(m_C, m_y);
+  m_M = LinearAlgebra::solve_lower(m_T, m_F);
+  arma::vec ystar = LinearAlgebra::solve_lower(m_T, m_y);
 
   arma::mat FtRinvF = m_M.t() * m_M;
   m_circ = LinearAlgebra::chol_upper(FtRinvF);
@@ -1352,7 +1352,7 @@ void WarpKriging::refresh_cache_theta_only() {
   m_beta = LinearAlgebra::solve_upper(m_circ, LinearAlgebra::solve_lower(m_circ.t(), FtRinvy));
 
   arma::vec residual = m_y - m_F * m_beta;
-  m_z = LinearAlgebra::solve_lower(m_C, residual);
+  m_z = LinearAlgebra::solve_lower(m_T, residual);
   m_sigma2 = std::max(arma::dot(m_z, m_z) / n, 1e-20);
 }
 
@@ -1425,7 +1425,7 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
   const arma::uword n = m_y.n_elem;
   const arma::uword d = m_theta.n_elem;
 
-  arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);
+  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
   const arma::mat& Rinv = m_Rinv;  // Use cached
 
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
@@ -1479,7 +1479,7 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) con
 
 arma::vec WarpKriging::warp_gradient() const {
   arma::mat Kinv = (1.0 / m_sigma2) * m_Rinv;  // Use cached
-  arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);
+  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
   arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
 
   arma::mat dLL_dPhi = dK_dPhi(m_Phi, dLL_dK);
@@ -1551,10 +1551,10 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_X = m_X;
   c.m_F = m_F;
   c.m_normalize = m_normalize;
-  c.m_X_mean = m_X_mean;
-  c.m_X_std = m_X_std;
-  c.m_y_mean = m_y_mean;
-  c.m_y_std = m_y_std;
+  c.m_centerX = m_centerX;
+  c.m_scaleX = m_scaleX;
+  c.m_centerY = m_centerY;
+  c.m_scaleY = m_scaleY;
   c.m_is_continuous = m_is_continuous;
   c.m_regmodel = m_regmodel;
   c.m_feature_dim = m_feature_dim;
@@ -1571,7 +1571,7 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_M = m_M;
   c.m_circ = m_circ;
   c.m_R = m_R;
-  c.m_C = m_C;
+  c.m_T = m_T;
   c.m_Rinv = m_Rinv;
   c.m_logdet = m_logdet;
   c.m_Phi = m_Phi;
@@ -1788,7 +1788,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     r.z = wk.m_z;
     r.M = wk.m_M;
     r.circ = wk.m_circ;
-    r.C = wk.m_C;
+    r.C = wk.m_T;
     r.Rinv = wk.m_Rinv;
     r.R = wk.m_R;
     r.Phi = wk.m_Phi;
@@ -1808,7 +1808,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     m_z = r.z;
     m_M = r.M;
     m_circ = r.circ;
-    m_C = r.C;
+    m_T = r.C;
     m_Rinv = r.Rinv;
     m_R = r.R;
     m_Phi = r.Phi;
@@ -2033,7 +2033,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
-        x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
+        x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
     }
   }
 
@@ -2041,13 +2041,13 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   const arma::uword n_o = m_Phi.n_rows;
   arma::mat Phi_new = apply_warping(x_n);
   arma::mat F_new = build_trend_matrix(x_n);
-  // Use correlation cross-matrix (not covariance K = σ²R), because m_C is
+  // Use correlation cross-matrix (not covariance K = σ²R), because m_T is
   // the Cholesky of R and m_z = C⁻¹(y − Fβ).
   arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
 
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_C, Rcross.t());
+  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, Rcross.t());
   arma::vec mean = F_new * m_beta + Rstar_on.t() * m_z;
-  mean = mean * m_y_std + m_y_mean;
+  mean = mean * m_scaleY + m_centerY;
 
   arma::vec stdev;
   arma::mat cov;
@@ -2067,7 +2067,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
       cov = R_new - Rstar_on.t() * Rstar_on;
       cov += Ecirc_n * Ecirc_n.t();
-      cov *= (m_sigma2 * m_y_std * m_y_std);
+      cov *= (m_sigma2 * m_scaleY * m_scaleY);
       cov = 0.5 * (cov + cov.t());
       cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
       stdev = arma::sqrt(cov.diag());
@@ -2078,7 +2078,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
         ysd2_n(i) = std::max(0.0, 1.0 - arma::dot(Rstar_on.col(i), Rstar_on.col(i)));
         ysd2_n(i) += arma::dot(Ecirc_n.row(i), Ecirc_n.row(i));
       }
-      ysd2_n *= (m_sigma2 * m_y_std * m_y_std);
+      ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
       ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
       if (withStd)
         stdev = arma::sqrt(ysd2_n);
@@ -2135,10 +2135,10 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       }
 
       // W_i = C⁻¹ DR_on_i  (n_o × d)
-      arma::mat W_i = LinearAlgebra::solve_lower(m_C, DR_on_i);
+      arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
 
       // Mean derivative: dŷ/dx = dF/dx · β + dR/dxᵀ · z  (using m_z = C⁻¹(y-Fβ))
-      Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * LinearAlgebra::solve_upper(m_C.t(), m_z)).t();
+      Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * LinearAlgebra::solve_upper(m_T.t(), m_z)).t();
 
       if (withStd) {
         // dvar/dx = -2 vᵢᵀ Wᵢ + 2 Ecirc_i · circ⁻ᵀ(DF_i - Wᵢᵀ m_M)ᵀ
@@ -2147,8 +2147,8 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
         Dysd2_n.row(i) = -2.0 * Rstar_on.col(i).t() * W_i + 2.0 * Ecirc_n_d.row(i) * DEcirc_n_i;
       }
     }
-    Dyhat_n *= m_y_std;
-    Dysd2_n *= sigma2 * m_y_std * m_y_std;
+    Dyhat_n *= m_scaleY;
+    Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
 
     if (withStd) {
       // Dystdev = d(sqrt(var))/dx = dvar/dx / (2·stdev)
@@ -2185,7 +2185,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new)
     for (arma::uword j = 0; j < x_n.n_cols; ++j) {
       bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
       if (is_cont)
-        x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
+        x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
     }
   }
 
@@ -2200,7 +2200,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new)
   arma::mat Rcross = build_Rcross(Phi_new, m_Phi);  // n_new × n_train
 
   // v = C⁻¹ Rcross'  (C is lower-Cholesky of R_train)
-  arma::mat v = LinearAlgebra::solve_lower(m_C, Rcross.t());
+  arma::mat v = LinearAlgebra::solve_lower(m_T, Rcross.t());
 
   // Kriging mean (normalized scale)
   arma::vec yhat_n = F_new * m_beta + v.t() * m_z;
@@ -2221,7 +2221,7 @@ arma::mat WarpKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new)
   y_n += LSigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
   // Denormalize
-  y_n = m_y_mean + m_y_std * y_n;
+  y_n = m_centerY + m_scaleY * y_n;
 
   return y_n;
 }
@@ -2234,12 +2234,12 @@ void WarpKriging::update(const arma::vec& y_new, const arma::mat& X_new) {
     throw std::runtime_error("update: model not fitted");
 
   // De-normalise stored data, append, re-normalise
-  arma::vec y_all = arma::join_vert(m_y * m_y_std + m_y_mean, y_new);
+  arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
   arma::mat X_all = m_X;
   for (arma::uword j = 0; j < X_all.n_cols; ++j) {
     bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
     if (is_cont)
-      X_all.col(j) = X_all.col(j) * m_X_std(j) + m_X_mean(j);
+      X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
   }
   X_all = arma::join_vert(X_all, X_new);
 
@@ -2305,10 +2305,10 @@ void WarpKriging::save(const std::string filename) const {
 
   // Normalization
   j["normalize"] = m_normalize;
-  j["X_mean"] = to_json(m_X_mean);
-  j["X_std"] = to_json(m_X_std);
-  j["y_mean"] = m_y_mean;
-  j["y_std"] = m_y_std;
+  j["X_mean"] = to_json(m_centerX);
+  j["X_std"] = to_json(m_scaleX);
+  j["y_mean"] = m_centerY;
+  j["y_std"] = m_scaleY;
 
   // Per-variable continuous flags
   j["is_continuous"] = m_is_continuous;
@@ -2334,7 +2334,7 @@ void WarpKriging::save(const std::string filename) const {
   j["circ"] = to_json(m_circ);
   j["F"] = to_json(m_F);
   j["R"] = to_json(m_R);
-  j["C"] = to_json(m_C);
+  j["C"] = to_json(m_T);
   j["Rinv"] = to_json(m_Rinv);
   j["logdet"] = m_logdet;
   j["Phi"] = to_json(m_Phi);
@@ -2372,10 +2372,10 @@ WarpKriging WarpKriging::load(const std::string filename) {
 
   // Normalization
   wk.m_normalize = j["normalize"].template get<bool>();
-  wk.m_X_mean = rowvec_from_json(j["X_mean"]);
-  wk.m_X_std = rowvec_from_json(j["X_std"]);
-  wk.m_y_mean = j["y_mean"].template get<double>();
-  wk.m_y_std = j["y_std"].template get<double>();
+  wk.m_centerX = rowvec_from_json(j["X_mean"]);
+  wk.m_scaleX = rowvec_from_json(j["X_std"]);
+  wk.m_centerY = j["y_mean"].template get<double>();
+  wk.m_scaleY = j["y_std"].template get<double>();
 
   // Per-variable continuous flags
   wk.m_is_continuous = j["is_continuous"].template get<std::vector<bool>>();
@@ -2401,7 +2401,7 @@ WarpKriging WarpKriging::load(const std::string filename) {
   wk.m_circ = mat_from_json(j["circ"]);
   wk.m_F = mat_from_json(j["F"]);
   wk.m_R = mat_from_json(j["R"]);
-  wk.m_C = mat_from_json(j["C"]);
+  wk.m_T = mat_from_json(j["C"]);
   wk.m_Rinv = mat_from_json(j["Rinv"]);
   wk.m_logdet = j["logdet"].template get<double>();
   wk.m_Phi = mat_from_json(j["Phi"]);

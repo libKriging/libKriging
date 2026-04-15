@@ -592,8 +592,8 @@ class WarpKriging {
 
   // ---- normalisation ------------------------------------------------------
   bool m_normalize = false;
-  arma::rowvec m_X_mean, m_X_std;
-  double m_y_mean = 0.0, m_y_std = 1.0;
+  arma::rowvec m_centerX, m_scaleX;
+  double m_centerY = 0.0, m_scaleY = 1.0;
   // Per-variable normalisation (only continuous variables)
   std::vector<bool> m_is_continuous;
 
@@ -614,7 +614,7 @@ class WarpKriging {
 
   // ---- GP cache -----------------------------------------------------------
   arma::mat m_R;      ///< correlation matrix (n×n)
-  arma::mat m_C;      ///< Cholesky(R + nugget), lower
+  arma::mat m_T;      ///< Cholesky(R + nugget), lower
   arma::mat m_M;      ///< C⁻¹ F  (whitened trend basis, ≡ Kriging's m_M)
   arma::mat m_circ;   ///< chol_upper(F'R⁻¹F)  (≡ Kriging's m_circ)
   arma::vec m_z;      ///< C⁻¹(y - Fβ)  (whitened residuals)

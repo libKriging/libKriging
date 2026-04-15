@@ -148,25 +148,25 @@ arma::mat MLPKriging::build_trend_matrix(const arma::mat& X) const {
 // -------------------------------------------------------------------------
 void MLPKriging::normalise_data() {
   arma::uword d = m_X.n_cols;
-  m_X_mean = arma::zeros<arma::rowvec>(d);
-  m_X_std = arma::ones<arma::rowvec>(d);
+  m_centerX = arma::zeros<arma::rowvec>(d);
+  m_scaleX = arma::ones<arma::rowvec>(d);
 
   if (m_normalize) {
     for (arma::uword j = 0; j < d; ++j) {
-      m_X_mean(j) = arma::mean(m_X.col(j));
-      m_X_std(j) = arma::stddev(m_X.col(j));
-      if (m_X_std(j) < 1e-12)
-        m_X_std(j) = 1.0;
-      m_X.col(j) = (m_X.col(j) - m_X_mean(j)) / m_X_std(j);
+      m_centerX(j) = arma::mean(m_X.col(j));
+      m_scaleX(j) = arma::stddev(m_X.col(j));
+      if (m_scaleX(j) < 1e-12)
+        m_scaleX(j) = 1.0;
+      m_X.col(j) = (m_X.col(j) - m_centerX(j)) / m_scaleX(j);
     }
-    m_y_mean = arma::mean(m_y);
-    m_y_std = arma::stddev(m_y);
-    if (m_y_std < 1e-12)
-      m_y_std = 1.0;
-    m_y = (m_y - m_y_mean) / m_y_std;
+    m_centerY = arma::mean(m_y);
+    m_scaleY = arma::stddev(m_y);
+    if (m_scaleY < 1e-12)
+      m_scaleY = 1.0;
+    m_y = (m_y - m_centerY) / m_scaleY;
   } else {
-    m_y_mean = 0.0;
-    m_y_std = 1.0;
+    m_centerY = 0.0;
+    m_scaleY = 1.0;
   }
 }
 
@@ -217,13 +217,13 @@ void MLPKriging::refresh_cache_theta_only() {
 
   m_R.set_size(n, n);
   arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
-  m_C = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
-  m_Rinv = LinearAlgebra::inv_sympd(m_C);
-  m_logdet = 2.0 * arma::sum(arma::log(m_C.diag()));
+  m_T = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
+  m_Rinv = LinearAlgebra::inv_sympd(m_T);
+  m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
 
   m_F = build_trend_matrix(m_X);
-  m_M = LinearAlgebra::solve_lower(m_C, m_F);              // Fstar = C⁻¹ F
-  arma::vec ystar = LinearAlgebra::solve_lower(m_C, m_y);   // C⁻¹ y
+  m_M = LinearAlgebra::solve_lower(m_T, m_F);              // Fstar = C⁻¹ F
+  arma::vec ystar = LinearAlgebra::solve_lower(m_T, m_y);   // C⁻¹ y
 
   arma::mat FtRinvF = m_M.t() * m_M;
   m_circ = LinearAlgebra::chol_upper(FtRinvF);              // chol(F'R⁻¹F)
@@ -232,7 +232,7 @@ void MLPKriging::refresh_cache_theta_only() {
   m_beta = LinearAlgebra::solve_upper(m_circ, LinearAlgebra::solve_lower(m_circ.t(), FtRinvy));
 
   arma::vec residual = m_y - m_F * m_beta;
-  m_z = LinearAlgebra::solve_lower(m_C, residual);
+  m_z = LinearAlgebra::solve_lower(m_T, residual);
   m_sigma2 = std::max(arma::dot(m_z, m_z) / n, 1e-20);
 }
 
@@ -298,7 +298,7 @@ std::pair<double, arma::vec> MLPKriging::concentrated_ll_and_grad_theta() const 
   const arma::uword n = m_y.n_elem;
   const arma::uword d = m_theta.n_elem;
 
-  arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);  // R⁻¹(y - Fβ)
+  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);  // R⁻¹(y - Fβ)
   const arma::mat& Rinv = m_Rinv;  // Use cached
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
@@ -342,7 +342,7 @@ arma::mat MLPKriging::dK_dPhi(const arma::mat& dL_dK) const {
 
 arma::vec MLPKriging::warp_gradient() const {
   arma::mat Kinv = (1.0 / m_sigma2) * m_Rinv;  // Use cached
-  arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);
+  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
   arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
   arma::mat dLL_dPhi = dK_dPhi(dLL_dK);
 
@@ -383,10 +383,10 @@ MLPKriging MLPKriging::clone_for_thread() const {
   c.m_X = m_X;
   c.m_F = m_F;
   c.m_normalize = m_normalize;
-  c.m_X_mean = m_X_mean;
-  c.m_X_std = m_X_std;
-  c.m_y_mean = m_y_mean;
-  c.m_y_std = m_y_std;
+  c.m_centerX = m_centerX;
+  c.m_scaleX = m_scaleX;
+  c.m_centerY = m_centerY;
+  c.m_scaleY = m_scaleY;
   c.m_regmodel = m_regmodel;
   c.m_max_iter_bfgs = m_max_iter_bfgs;
   c.m_max_iter_adam = m_max_iter_adam;
@@ -400,7 +400,7 @@ MLPKriging MLPKriging::clone_for_thread() const {
   c.m_M = m_M;
   c.m_circ = m_circ;
   c.m_R = m_R;
-  c.m_C = m_C;
+  c.m_T = m_T;
   c.m_Rinv = m_Rinv;
   c.m_logdet = m_logdet;
   c.m_Phi = m_Phi;
@@ -597,7 +597,7 @@ void MLPKriging::optimise_joint(const std::string& method) {
     r.z = wk.m_z;
     r.M = wk.m_M;
     r.circ = wk.m_circ;
-    r.C = wk.m_C;
+    r.C = wk.m_T;
     r.Rinv = wk.m_Rinv;
     r.R = wk.m_R;
     r.Phi = wk.m_Phi;
@@ -616,7 +616,7 @@ void MLPKriging::optimise_joint(const std::string& method) {
     m_z = r.z;
     m_M = r.M;
     m_circ = r.circ;
-    m_C = r.C;
+    m_T = r.C;
     m_Rinv = r.Rinv;
     m_R = r.R;
     m_Phi = r.Phi;
@@ -820,7 +820,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
   arma::mat x_n = x_new;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j)
-      x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
+      x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
   }
 
   const arma::uword n_n = x_n.n_rows;
@@ -829,9 +829,9 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
   arma::mat F_new = build_trend_matrix(x_n);
   arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
 
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_C, Rcross.t());
+  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, Rcross.t());
   arma::vec mean = F_new * m_beta + Rstar_on.t() * m_z;
-  mean = mean * m_y_std + m_y_mean;
+  mean = mean * m_scaleY + m_centerY;
 
   arma::vec stdev;
   arma::mat cov;
@@ -851,7 +851,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
       arma::mat H = F_new.t() - m_M.t() * v;
       arma::mat Hcirc = LinearAlgebra::rsolve_upper(m_circ, H.t());
       cov += Hcirc * Hcirc.t();
-      cov *= (m_sigma2 * m_y_std * m_y_std);
+      cov *= (m_sigma2 * m_scaleY * m_scaleY);
       cov = 0.5 * (cov + cov.t());
       cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
       stdev = arma::sqrt(cov.diag());
@@ -864,7 +864,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
         arma::mat r_circ = LinearAlgebra::solve_lower(m_circ.t(), r_i);
         ysd2_n(i) += arma::dot(r_circ, r_circ);
       }
-      ysd2_n *= (m_sigma2 * m_y_std * m_y_std);
+      ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
       ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
       if (withStd)
         stdev = arma::sqrt(ysd2_n);
@@ -914,9 +914,9 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
         DR_on_i.row(j) = Rcross(i, j) * (dlnCovDx.t() * J_warp);
       }
 
-      arma::mat W_i = LinearAlgebra::solve_lower(m_C, DR_on_i);
+      arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
 
-      arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);
+      arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
       Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * alpha).t();
 
       if (withStd) {
@@ -924,8 +924,8 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::pr
         Dysd2_n.row(i) = -2.0 * v.col(i).t() * W_i + 2.0 * Ecirc_n.row(i) * DEcirc_n_i;
       }
     }
-    Dyhat_n *= m_y_std;
-    Dysd2_n *= sigma2 * m_y_std * m_y_std;
+    Dyhat_n *= m_scaleY;
+    Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
 
     if (withStd) {
       Dystdev_n.set_size(n_n, d);
@@ -954,7 +954,7 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
   arma::mat x_n = x_new;
   if (m_normalize) {
     for (arma::uword j = 0; j < x_n.n_cols; ++j)
-      x_n.col(j) = (x_n.col(j) - m_X_mean(j)) / m_X_std(j);
+      x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
   }
 
   arma::mat Phi_new = apply_warping(x_n);
@@ -965,7 +965,7 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
 
   arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
 
-  arma::mat v = LinearAlgebra::solve_lower(m_C, Rcross.t());
+  arma::mat v = LinearAlgebra::solve_lower(m_T, Rcross.t());
 
   arma::vec yhat_n = F_new * m_beta + v.t() * m_z;
 
@@ -980,7 +980,7 @@ arma::mat MLPKriging::simulate(int nsim, uint64_t seed, const arma::mat& x_new) 
   Random::reset_seed(seed);
   y_n += LSigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
 
-  y_n = m_y_mean + m_y_std * y_n;
+  y_n = m_centerY + m_scaleY * y_n;
 
   return y_n;
 }
@@ -992,10 +992,10 @@ void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
-  arma::vec y_all = arma::join_vert(m_y * m_y_std + m_y_mean, y_new);
+  arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_new);
   arma::mat X_all = m_X;
   for (arma::uword j = 0; j < X_all.n_cols; ++j)
-    X_all.col(j) = X_all.col(j) * m_X_std(j) + m_X_mean(j);
+    X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
   X_all = arma::join_vert(X_all, X_new);
 
   m_y = y_all;
@@ -1058,10 +1058,10 @@ void MLPKriging::save(const std::string filename) const {
 
   // Normalization
   j["normalize"] = m_normalize;
-  j["X_mean"] = to_json(m_X_mean);
-  j["X_std"] = to_json(m_X_std);
-  j["y_mean"] = m_y_mean;
-  j["y_std"] = m_y_std;
+  j["X_mean"] = to_json(m_centerX);
+  j["X_std"] = to_json(m_scaleX);
+  j["y_mean"] = m_centerY;
+  j["y_std"] = m_scaleY;
 
   // Settings
   j["regmodel"] = m_regmodel;
@@ -1083,7 +1083,7 @@ void MLPKriging::save(const std::string filename) const {
   j["circ"] = to_json(m_circ);
   j["F"] = to_json(m_F);
   j["R"] = to_json(m_R);
-  j["C"] = to_json(m_C);
+  j["C"] = to_json(m_T);
   j["Rinv"] = to_json(m_Rinv);
   j["logdet"] = m_logdet;
   j["Phi"] = to_json(m_Phi);
@@ -1123,10 +1123,10 @@ MLPKriging MLPKriging::load(const std::string filename) {
 
   // Normalization
   mk.m_normalize = j["normalize"].template get<bool>();
-  mk.m_X_mean = rowvec_from_json(j["X_mean"]);
-  mk.m_X_std = rowvec_from_json(j["X_std"]);
-  mk.m_y_mean = j["y_mean"].template get<double>();
-  mk.m_y_std = j["y_std"].template get<double>();
+  mk.m_centerX = rowvec_from_json(j["X_mean"]);
+  mk.m_scaleX = rowvec_from_json(j["X_std"]);
+  mk.m_centerY = j["y_mean"].template get<double>();
+  mk.m_scaleY = j["y_std"].template get<double>();
 
   // Settings
   mk.m_regmodel = j["regmodel"].template get<std::string>();
@@ -1148,7 +1148,7 @@ MLPKriging MLPKriging::load(const std::string filename) {
   mk.m_circ = mat_from_json(j["circ"]);
   mk.m_F = mat_from_json(j["F"]);
   mk.m_R = mat_from_json(j["R"]);
-  mk.m_C = mat_from_json(j["C"]);
+  mk.m_T = mat_from_json(j["C"]);
   mk.m_Rinv = mat_from_json(j["Rinv"]);
   mk.m_logdet = j["logdet"].template get<double>();
   mk.m_Phi = mat_from_json(j["Phi"]);
