@@ -369,6 +369,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::simulate"_hash:
       return MLPKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::update_simulate"_hash:
+      return MLPKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::update"_hash:
       return MLPKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::summary"_hash:

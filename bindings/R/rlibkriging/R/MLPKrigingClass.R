@@ -127,9 +127,23 @@ predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALS
 #' @param ... ignored
 #' @return matrix (m x nsim)
 #' @export
-simulate.MLPKriging <- function(object, nsim = 1, seed = 123, x, ...) {
+simulate.MLPKriging <- function(object, nsim = 1, seed = 123, x,
+                                 will_update = FALSE, ...) {
   mlpKriging_simulate(object$ptr, as.integer(nsim),
-                      as.integer(seed), as.matrix(x))
+                      as.integer(seed), as.matrix(x),
+                      as.logical(will_update))
+}
+
+#' @title Update simulated paths with new observations (FOXY algorithm)
+#' @param object MLPKriging object (must have called simulate with will_update=TRUE)
+#' @param y_u new observations
+#' @param X_u new input matrix
+#' @param ... ignored
+#' @return matrix (m x nsim) of updated simulated paths
+#' @method update_simulate MLPKriging
+#' @export
+update_simulate.MLPKriging <- function(object, y_u, X_u, ...) {
+  mlpKriging_update_simulate(object$ptr, as.numeric(y_u), as.matrix(X_u))
 }
 
 #' @title Update an MLPKriging model with new observations

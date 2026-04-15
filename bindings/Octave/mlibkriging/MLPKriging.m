@@ -40,6 +40,10 @@ classdef MLPKriging < handle
             [varargout{1:nargout}] = mLibKriging("MLPKriging::simulate", obj.ref, varargin{:});
         end
 
+        function varargout = update_simulate(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::update_simulate", obj.ref, varargin{:});
+        end
+
         function varargout = update(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("MLPKriging::update", obj.ref, varargin{:});
         end

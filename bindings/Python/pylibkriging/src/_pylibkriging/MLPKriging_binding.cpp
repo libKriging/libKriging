@@ -95,9 +95,17 @@ PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool re
                          carma::mat_to_arr(stdev_deriv, true));
 }
 
-py::array_t<double> PyMLPKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n) {
+py::array_t<double> PyMLPKriging::simulate(const int nsim, const int seed, const py::array_t<double>& X_n,
+                                           const bool will_update) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto result = m_internal->simulate(nsim, seed, mat_X);
+  auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
+  return carma::mat_to_arr(result, true);
+}
+
+py::array_t<double> PyMLPKriging::update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
+  arma::colvec mat_y = carma::arr_to_col<double>(y_u);
+  arma::mat mat_X = carma::arr_to_mat<double>(X_u);
+  auto result = m_internal->update_simulate(mat_y, mat_X);
   return carma::mat_to_arr(result, true);
 }
 

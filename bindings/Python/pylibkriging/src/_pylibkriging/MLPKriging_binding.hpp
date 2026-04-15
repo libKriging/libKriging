@@ -46,7 +46,10 @@ class PyMLPKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv = false);
 
-  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n);
+  py::array_t<double> simulate(const int nsim, const int seed, const py::array_t<double>& X_n,
+                               const bool will_update = false);
+
+  py::array_t<double> update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
 
   void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit = true);
 
