@@ -82,6 +82,7 @@ class NoiseKriging {
   arma::mat m_star;
   arma::mat m_circ;
   arma::vec m_z;
+  arma::mat m_Rinv;
   arma::vec m_beta;
   bool m_est_beta{};
   arma::vec m_theta;

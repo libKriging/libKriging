@@ -350,13 +350,13 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
       arma::mat dRdv = m.R / _alpha;
       dRdv.diag().zeros();
       double _terme1 = -as_scalar((trans(x) * dRdv) * x) / (_sigma2 + _nugget);
-      double _terme2 = arma::accu(arma::dot(Rinv, dRdv));
+      double _terme2 = arma::dot(Rinv, dRdv);
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
     } else if (m_est_sigma2 && !m_est_nugget) {
       arma::mat dRdv = m.R / _alpha;
       dRdv.diag().ones();
       double _terme1 = -as_scalar((trans(x) * dRdv) * x) / ((_sigma2 + _nugget) * (_sigma2 + _nugget));
-      double _terme2 = arma::accu(arma::dot(Rinv / (_sigma2 + _nugget), dRdv));
+      double _terme2 = arma::dot(Rinv / (_sigma2 + _nugget), dRdv);
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2) * _nugget / (1 - _alpha) / (1 - _alpha);
     } else                    // we do not support explicitely the case where nugget is estimated and sigma2 is fixed
       (*grad_out).at(d) = 0;  // if sigma2 and nugget are defined & fixed by user
@@ -868,6 +868,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
+    m_Rinv = std::move(m.Rinv);
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
       m_z = std::move(m.Estar);
@@ -1025,6 +1026,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       arma::mat Fstar;
       arma::mat Rstar;
       arma::mat Qstar;
+      arma::mat Rinv;
       arma::vec Estar;
       arma::vec ystar;
       double SSEstar;
@@ -1188,6 +1190,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
         result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
         result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
         result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
+        result.Rinv = arma::mat(m.Rinv);    // Force copy constructor
         result.Estar = arma::vec(m.Estar);  // Force copy constructor
         result.ystar = arma::vec(m.ystar);  // Force copy constructor
         result.SSEstar = m.SSEstar;
@@ -1303,6 +1306,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       m_M = best.Fstar;
       m_circ = best.Rstar;
       m_star = best.Qstar;
+      m_Rinv = best.Rinv;
 
       if (m_est_beta) {
         m_beta = best.betahat;
@@ -1658,7 +1662,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim,
     lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
     t0 = Bench::toc(nullptr, "Fstar_on     ", t0);
     arma::mat Q_Fstar_on;
-    arma::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
+    LinearAlgebra::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
     lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
     t0 = Bench::toc(nullptr, "Fcirc_on     ", t0);
 
@@ -1905,6 +1909,7 @@ LIBKRIGING_EXPORT void NuggetKriging::update(const arma::vec& y_u, const arma::m
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
+    m_Rinv = std::move(m.Rinv);
 
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
@@ -1998,6 +2003,7 @@ void NuggetKriging::save(const std::string filename) const {
   j["star"] = to_json(m_star);
   j["circ"] = to_json(m_circ);
   j["z"] = to_json(m_z);
+  j["Rinv"] = to_json(m_Rinv);
   j["beta"] = to_json(m_beta);
   j["est_beta"] = m_est_beta;
   j["theta"] = to_json(m_theta);
@@ -2051,6 +2057,7 @@ NuggetKriging NuggetKriging::load(const std::string filename) {
   kr.m_star = mat_from_json(j["star"]);
   kr.m_circ = mat_from_json(j["circ"]);
   kr.m_z = colvec_from_json(j["z"]);
+  kr.m_Rinv = mat_from_json(j["Rinv"]);
   kr.m_beta = colvec_from_json(j["beta"]);
   kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
   kr.m_theta = colvec_from_json(j["theta"]);

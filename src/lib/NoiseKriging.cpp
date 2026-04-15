@@ -310,7 +310,7 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
     if (m_est_sigma2) {
       arma::mat dCdv = (m.R - arma::diagmat(m_noise)) / _sigma2;
       double _terme1 = -as_scalar((trans(x) * dCdv) * x);
-      double _terme2 = arma::accu(arma::dot(Cinv, dCdv));
+      double _terme2 = arma::dot(Cinv, dCdv);
       (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
     } else
       (*grad_out).at(d) = 0;  // if sigma2 is defined & fixed by user
@@ -490,6 +490,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
+    m_Rinv = std::move(m.Rinv);
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
       m_z = std::move(m.Estar);
@@ -673,6 +674,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       arma::mat Fstar;
       arma::mat Rstar;
       arma::mat Qstar;
+      arma::mat Rinv;
       arma::vec Estar;
       arma::vec ystar;
       double SSEstar;
@@ -809,6 +811,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
         result.Fstar = arma::mat(m.Fstar);  // Force copy constructor
         result.Rstar = arma::mat(m.Rstar);  // Force copy constructor
         result.Qstar = arma::mat(m.Qstar);  // Force copy constructor
+        result.Rinv = arma::mat(m.Rinv);    // Force copy constructor
         result.Estar = arma::vec(m.Estar);  // Force copy constructor
         result.ystar = arma::vec(m.ystar);  // Force copy constructor
         result.SSEstar = m.SSEstar;
@@ -924,6 +927,7 @@ LIBKRIGING_EXPORT void NoiseKriging::fit(const arma::vec& y,
       m_M = best.Fstar;
       m_circ = best.Rstar;
       m_star = best.Qstar;
+      m_Rinv = best.Rinv;
 
       if (m_est_beta) {
         m_beta = best.betahat;
@@ -1475,6 +1479,7 @@ LIBKRIGING_EXPORT void NoiseKriging::update(const arma::vec& y_u,
     m_M = std::move(m.Fstar);
     m_circ = std::move(m.Rstar);
     m_star = std::move(m.Qstar);
+    m_Rinv = std::move(m.Rinv);
 
     if (m_est_beta) {
       m_beta = std::move(m.betahat);
@@ -1566,6 +1571,7 @@ void NoiseKriging::save(const std::string filename) const {
   j["star"] = to_json(m_star);
   j["circ"] = to_json(m_circ);
   j["z"] = to_json(m_z);
+  j["Rinv"] = to_json(m_Rinv);
   j["beta"] = to_json(m_beta);
   j["est_beta"] = m_est_beta;
   j["theta"] = to_json(m_theta);
@@ -1618,6 +1624,7 @@ NoiseKriging NoiseKriging::load(const std::string filename) {
   kr.m_star = mat_from_json(j["star"]);
   kr.m_circ = mat_from_json(j["circ"]);
   kr.m_z = colvec_from_json(j["z"]);
+  kr.m_Rinv = mat_from_json(j["Rinv"]);
   kr.m_beta = colvec_from_json(j["beta"]);
   kr.m_est_beta = j["est_beta"].template get<decltype(kr.m_est_beta)>();
   kr.m_theta = colvec_from_json(j["theta"]);
