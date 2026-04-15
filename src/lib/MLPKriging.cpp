@@ -207,7 +207,7 @@ arma::mat MLPKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Ph
 // -------------------------------------------------------------------------
 //  populate_Model / make_Model  (mirrors WarpKriging / Kriging pattern)
 // -------------------------------------------------------------------------
-void MLPKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
+void MLPKriging::populate_Model(MLPKModel& m, const arma::vec& theta) const {
   const arma::uword n = m_y.n_elem;
   arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
 
@@ -241,10 +241,10 @@ void MLPKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
   m.SSEstar = arma::dot(m.Estar, m.Estar);
 }
 
-MLPKriging::WKModel MLPKriging::make_Model(const arma::vec& theta) const {
+MLPKriging::MLPKModel MLPKriging::make_Model(const arma::vec& theta) const {
   const arma::uword n = m_y.n_elem;
   const arma::uword p = m_F.n_cols;
-  WKModel m;
+  MLPKModel m;
   m.R = arma::mat(n, n, arma::fill::none);
   m.L = arma::mat(n, n, arma::fill::none);
   m.Rinv = arma::mat();
@@ -270,7 +270,7 @@ void MLPKriging::refresh_cache() {
 void MLPKriging::refresh_cache_theta_only() {
   const arma::uword n = m_y.n_elem;
   m_F = build_trend_matrix(m_X);
-  WKModel m = make_Model(m_theta);
+  MLPKModel m = make_Model(m_theta);
 
   m_R = std::move(m.R);
   m_T = std::move(m.L);
@@ -1074,7 +1074,7 @@ void MLPKriging::update(const arma::vec& y_new, const arma::mat& X_new, const bo
     const arma::uword n = m_y.n_elem;
 
     // make_Model detects theta unchanged + n > m_T.n_rows → Cholesky block update
-    WKModel m = make_Model(m_theta);
+    MLPKModel m = make_Model(m_theta);
 
     m_R = std::move(m.R);
     m_T = std::move(m.L);

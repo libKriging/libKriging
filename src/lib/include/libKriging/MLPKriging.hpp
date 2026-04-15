@@ -194,9 +194,9 @@ class MLPKriging {
   arma::vec m_theta;
   double m_sigma2 = 1.0;
 
-  // ---- WKModel (mirrors Kriging::KModel) ----------------------------------
+  // ---- MLPKModel (mirrors Kriging::KModel) --------------------------------
  public:
-  struct WKModel {
+  struct MLPKModel {
     arma::mat R;        ///< correlation matrix
     arma::mat L;        ///< Cholesky lower
     arma::mat Rinv;     ///< R⁻¹
@@ -207,8 +207,8 @@ class MLPKriging {
     double SSEstar;     ///< Estar'Estar
     arma::vec betahat;
   };
-  WKModel make_Model(const arma::vec& theta) const;
-  void populate_Model(WKModel& m, const arma::vec& theta) const;
+  MLPKModel make_Model(const arma::vec& theta) const;
+  void populate_Model(MLPKModel& m, const arma::vec& theta) const;
 
  private:
   // ---- GP cache -----------------------------------------------------------
