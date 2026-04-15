@@ -171,6 +171,9 @@ void NuggetKriging::populate_Model(KModel& m,
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, alpha, NuggetKriging::ones);
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
+  m.Rinv = LinearAlgebra::inv_sympd(m.L);
+  t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+
   // Compute intermediate useful matrices (direct GLS approach)
   // Force evaluation of join_rows to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
   arma::mat Fy = arma::join_rows(m_F, m_y);
@@ -205,6 +208,7 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   arma::mat R;
   arma::mat L;
   arma::mat Linv;
+  arma::mat Rinv;
   arma::mat Fstar;
   arma::vec ystar;
   arma::mat Rstar;
@@ -212,7 +216,7 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   arma::vec Estar;
   double SSEstar{};
   arma::vec betahat;
-  NuggetKriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
+  NuggetKriging::KModel m{R, L, Linv, Rinv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
 
   arma::uword n = m_X.n_rows;
   arma::uword p = m_F.n_cols;
@@ -221,6 +225,7 @@ NuggetKriging::KModel NuggetKriging::make_Model(const arma::vec& theta,
   m.R = arma::mat(n, n, arma::fill::none);
   m.L = arma::mat(n, n, arma::fill::none);
   m.Linv = arma::mat();  // Empty matrix, will be filled on demand in gradient computation
+  m.Rinv = arma::mat();  // Will be computed in populate_Model
   m.Fstar = arma::mat(n, p, arma::fill::none);
   m.ystar = arma::vec(n, arma::fill::none);
   m.Rstar = arma::mat(p, p, arma::fill::none);
@@ -292,8 +297,7 @@ double NuggetKriging::_logLikelihood(const arma::vec& _theta_alpha,
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);
 
-    arma::mat Rinv = LinearAlgebra::inv_sympd(m.L);
-    t0 = Bench::toc(bench, "R^-1 = inv_sympd(L)", t0);
+    const arma::mat& Rinv = m.Rinv;  // Use cached Rinv from populate_Model
 
     arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
@@ -997,6 +1001,7 @@ LIBKRIGING_EXPORT void NuggetKriging::fit(const arma::vec& y,
       m.R = arma::mat(n_data, n_data, arma::fill::none);
       m.L = arma::mat(n_data, n_data, arma::fill::none);
       m.Linv = arma::mat();  // Empty matrix
+      m.Rinv = arma::mat(n_data, n_data, arma::fill::none);
       m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
       m.ystar = arma::vec(n_data, arma::fill::none);
       m.Rstar = arma::mat(p_data, p_data, arma::fill::none);

@@ -128,6 +128,7 @@ class Kriging {
     arma::mat R;
     arma::mat L;
     arma::mat Linv;
+    arma::mat Rinv;  // R⁻¹ = L⁻ᵀ L⁻¹, cached from populate_Model
     arma::mat Fstar;
     arma::vec ystar;
     arma::mat Rstar;

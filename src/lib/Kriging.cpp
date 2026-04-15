@@ -168,6 +168,9 @@ void Kriging::populate_Model(KModel& m, const arma::vec& theta, std::map<std::st
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, 1, Kriging::ones);
   t0 = Bench::toc(bench, "R = _Cov(dX)  &L = Chol(R)", t0);
 
+  m.Rinv = LinearAlgebra::inv_sympd(m.L);
+  t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+
   // Direct GLS: compute whitened matrices using triangular solves
   m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
   m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
@@ -210,7 +213,8 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
   arma::vec Estar;
   double SSEstar{};
   arma::vec betahat;
-  Kriging::KModel m{R, L, Linv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
+  arma::mat Rinv;
+  Kriging::KModel m{R, L, Linv, Rinv, Fstar, ystar, Rstar, Qstar, Estar, SSEstar, betahat};
 
   arma::uword n = m_X.n_rows;
   arma::uword p = m_F.n_cols;
@@ -219,6 +223,7 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
   m.R = arma::mat(n, n, arma::fill::none);
   m.L = arma::mat(n, n, arma::fill::none);
   m.Linv = arma::mat();  // Empty matrix, will be filled on demand in gradient computation
+  m.Rinv = arma::mat();  // Will be computed in populate_Model
   m.Fstar = arma::mat(n, p, arma::fill::none);
   m.ystar = arma::vec(n, arma::fill::none);
   m.Rstar = arma::mat(p, p, arma::fill::none);
@@ -271,8 +276,7 @@ double Kriging::_logLikelihood(const arma::vec& _theta,
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);  // useful if (hess_out != nullptr)
 
-    arma::mat Rinv = LinearAlgebra::inv_sympd(m.L);
-    t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+    const arma::mat& Rinv = m.Rinv;  // Use cached Rinv from populate_Model
 
     arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
@@ -1276,6 +1280,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m.R = arma::mat(n_data, n_data, arma::fill::none);
         m.L = arma::mat(n_data, n_data, arma::fill::none);
         m.Linv = arma::mat();  // Empty matrix
+        m.Rinv = arma::mat(n_data, n_data, arma::fill::none);
         m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
         m.ystar = arma::vec(n_data, arma::fill::none);
         m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
@@ -2218,6 +2223,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     km.R = arma::mat(n, n, arma::fill::none);
     km.L = arma::mat(n, n, arma::fill::none);
     km.Linv = arma::mat();
+    km.Rinv = arma::mat(n, n, arma::fill::none);
     km.Fstar = arma::mat(n, p, arma::fill::none);
     km.ystar = arma::vec(n, arma::fill::none);
     km.Rstar = arma::mat(p, p, arma::fill::none);
@@ -2247,9 +2253,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
         gamma_lower.memptr(),
         gamma_upper.memptr(),
         bounds_type.memptr());
-
-    // Final evaluation at best point
-    fit_ofn(gamma_tmp, nullptr, nullptr, &km);
 
     // Update member variables
     m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
