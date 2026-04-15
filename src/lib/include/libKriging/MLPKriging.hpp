@@ -200,6 +200,7 @@ class MLPKriging {
   arma::mat m_M;      ///< C⁻¹ F  (whitened trend basis)
   arma::mat m_circ;   ///< chol_upper(F'R⁻¹F)
   arma::vec m_z;      ///< C⁻¹(y - Fβ)  (whitened residuals)
+  arma::mat m_Rinv;   ///< R⁻¹ = C⁻ᵀ C⁻¹, cached
   double m_logdet = 0.0;
 
   bool m_fitted = false;

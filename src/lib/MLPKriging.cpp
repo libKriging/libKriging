@@ -218,6 +218,7 @@ void MLPKriging::refresh_cache_theta_only() {
   m_R.set_size(n, n);
   arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
   m_C = LinearAlgebra::cholCov(&m_R, m_dPhi, m_theta, _Cov, 1, diag_with_nugget);
+  m_Rinv = LinearAlgebra::inv_sympd(m_C);
   m_logdet = 2.0 * arma::sum(arma::log(m_C.diag()));
 
   m_F = build_trend_matrix(m_X);
@@ -298,7 +299,7 @@ std::pair<double, arma::vec> MLPKriging::concentrated_ll_and_grad_theta() const 
   const arma::uword d = m_theta.n_elem;
 
   arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);  // R⁻¹(y - Fβ)
-  arma::mat Rinv = LinearAlgebra::inv_sympd(m_C);
+  const arma::mat& Rinv = m_Rinv;  // Use cached
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
   arma::vec grad_theta(d, arma::fill::zeros);
@@ -340,7 +341,7 @@ arma::mat MLPKriging::dK_dPhi(const arma::mat& dL_dK) const {
 }
 
 arma::vec MLPKriging::warp_gradient() const {
-  arma::mat Kinv = (1.0 / m_sigma2) * LinearAlgebra::inv_sympd(m_C);
+  arma::mat Kinv = (1.0 / m_sigma2) * m_Rinv;  // Use cached
   arma::vec alpha = LinearAlgebra::solve_upper(m_C.t(), m_z);
   arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
   arma::mat dLL_dPhi = dK_dPhi(dLL_dK);
@@ -400,6 +401,7 @@ MLPKriging MLPKriging::clone_for_thread() const {
   c.m_circ = m_circ;
   c.m_R = m_R;
   c.m_C = m_C;
+  c.m_Rinv = m_Rinv;
   c.m_logdet = m_logdet;
   c.m_Phi = m_Phi;
   c.m_dPhi = m_dPhi;
@@ -577,6 +579,7 @@ void MLPKriging::optimise_joint(const std::string& method) {
     arma::mat M;
     arma::mat circ;
     arma::mat C;
+    arma::mat Rinv;
     arma::mat R;
     arma::mat Phi;
     arma::mat dPhi;
@@ -595,6 +598,7 @@ void MLPKriging::optimise_joint(const std::string& method) {
     r.M = wk.m_M;
     r.circ = wk.m_circ;
     r.C = wk.m_C;
+    r.Rinv = wk.m_Rinv;
     r.R = wk.m_R;
     r.Phi = wk.m_Phi;
     r.dPhi = wk.m_dPhi;
@@ -613,6 +617,7 @@ void MLPKriging::optimise_joint(const std::string& method) {
     m_M = r.M;
     m_circ = r.circ;
     m_C = r.C;
+    m_Rinv = r.Rinv;
     m_R = r.R;
     m_Phi = r.Phi;
     m_dPhi = r.dPhi;
@@ -1079,6 +1084,7 @@ void MLPKriging::save(const std::string filename) const {
   j["F"] = to_json(m_F);
   j["R"] = to_json(m_R);
   j["C"] = to_json(m_C);
+  j["Rinv"] = to_json(m_Rinv);
   j["logdet"] = m_logdet;
   j["Phi"] = to_json(m_Phi);
   j["dPhi"] = to_json(m_dPhi);
@@ -1143,6 +1149,7 @@ MLPKriging MLPKriging::load(const std::string filename) {
   mk.m_F = mat_from_json(j["F"]);
   mk.m_R = mat_from_json(j["R"]);
   mk.m_C = mat_from_json(j["C"]);
+  mk.m_Rinv = mat_from_json(j["Rinv"]);
   mk.m_logdet = j["logdet"].template get<double>();
   mk.m_Phi = mat_from_json(j["Phi"]);
   mk.m_dPhi = mat_from_json(j["dPhi"]);
