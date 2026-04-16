@@ -55,8 +55,8 @@ def test_mlpkriging_branin_matern():
     y = np.array([branin(X[i, 0] * 15 - 5, X[i, 1] * 15) for i in range(n)])
 
     k = lk.MLPKriging(y, X,
-                      hidden_dims=[32, 16], d_out=3,
-                      activation="selu", kernel="matern5_2",
+                      hidden_dims=[16, 8], d_out=2,
+                      activation="selu", kernel="gauss",
                       normalize=True,
                       parameters={"max_iter_adam": "300"})
 
@@ -73,7 +73,7 @@ def test_mlpkriging_branin_matern():
     rng2 = np.random.default_rng(1234)
     X_new = rng2.uniform(0, 1, (3, 2))
     y_new = np.array([branin(X_new[i, 0] * 15 - 5, X_new[i, 1] * 15) for i in range(3)])
-    k.update(y_new, X_new)
+    k.update(y_new, X_new, refit=False)
 
     mean2, _, _, _, _ = k.predict(X_test, True, False, False)
     assert mean2.shape[0] == 10

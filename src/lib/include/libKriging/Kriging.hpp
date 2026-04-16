@@ -230,7 +230,7 @@ class Kriging {
    * @param y_u is m length column vector of new output
    * @param X_u is m*d matrix of new input
    * @return
-   * 
+   *
    * put is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);

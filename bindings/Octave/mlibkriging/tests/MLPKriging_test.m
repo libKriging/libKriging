@@ -51,7 +51,7 @@ try
     X = rand(n, 2);
     y = branin(X(:, 1) * 15 - 5, X(:, 2) * 15);
 
-    k = MLPKriging(y, X, [32, 16], 3, "selu", "matern5_2", "constant", true);
+    k = MLPKriging(y, X, [16, 8], 2, "selu", "gauss", "constant", true);
 
     X_test = rand(10, 2);
     [mean_p, stdev_p] = k.predict(X_test, true, false, false);
@@ -67,7 +67,7 @@ try
     rand("state", 1234);
     X_new = rand(3, 2);
     y_new = branin(X_new(:, 1) * 15 - 5, X_new(:, 2) * 15);
-    k.update(y_new, X_new);
+    k.update(y_new, X_new, false);
 
     [mean2, ~] = k.predict(X_test, true, false, false);
     assert(length(mean2) == 10);

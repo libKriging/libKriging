@@ -2121,7 +2121,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
-  if (refit) {  // Warm restart: extend data and run single BFGS from current theta
+  if (refit && m_optim != "none") {  // Warm restart: extend data and run single BFGS from current theta
     // Normalize new data using existing normalization
     arma::mat Xn_u = X_u;
     Xn_u.each_row() -= m_centerX;
@@ -2241,8 +2241,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     lbfgsb::Optimizer optimizer{d};
     optimizer.iprint = Optim::log_level - 2;
     optimizer.max_iter = Optim::max_iteration;
-    optimizer.pgtol
-        = m_objective == "LOO" ? Optim::gradient_tolerance / (n * n) : Optim::gradient_tolerance;
+    optimizer.pgtol = m_objective == "LOO" ? Optim::gradient_tolerance / (n * n) : Optim::gradient_tolerance;
     optimizer.factr = m_objective == "LOO" ? Optim::objective_rel_tolerance / 1E-13 / (n * n)
                                            : Optim::objective_rel_tolerance / 1E-13;
     arma::ivec bounds_type{d, arma::fill::value(2)};

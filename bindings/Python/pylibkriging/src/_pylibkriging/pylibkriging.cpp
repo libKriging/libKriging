@@ -419,7 +419,11 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
-      .def("simulate", &PyMLPKriging::simulate, py::arg("nsim") = 1, py::arg("seed") = 123, py::arg("X"),
+      .def("simulate",
+           &PyMLPKriging::simulate,
+           py::arg("nsim") = 1,
+           py::arg("seed") = 123,
+           py::arg("X"),
            py::arg("will_update") = false)
       .def("update_simulate", &PyMLPKriging::update_simulate, py::arg("y_u"), py::arg("X_u"))
       .def("update", &PyMLPKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)

@@ -145,12 +145,13 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{5}};
+                 RequiresArg::Range{4, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   auto nsim = input.get<int32_t>(1, "nsim");
   auto seed = input.get<int32_t>(2, "seed");
-  auto result = mk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"), input.get<bool>(4, "will_update"));
+  bool will_update = input.getOptional<bool>(4, "will_update").value_or(false);
+  auto result = mk->simulate(nsim, seed, input.get<arma::mat>(3, "X_n matrix"), will_update);
   output.set(0, result, "simulated values");
 }
 
@@ -169,10 +170,11 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{4}};
+                 RequiresArg::Range{3, 4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
-  mk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), input.get<bool>(3, "refit"));
+  bool refit = input.getOptional<bool>(3, "refit").value_or(true);
+  mk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), refit);
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

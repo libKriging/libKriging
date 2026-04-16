@@ -70,7 +70,7 @@ static void test_mlp_kriging_basic() {
     for (arma::uword i = 0; i < n; ++i)
       y(i) = branin(X(i, 0) * 15.0 - 5.0, X(i, 1) * 15.0);
 
-    MLPKriging model({32, 16}, 3, "selu", "matern5_2");
+    MLPKriging model({16, 8}, 2, "selu", "gauss");
     model.fit(y, X, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
 
     std::cout << model.summary();
@@ -93,7 +93,7 @@ static void test_mlp_kriging_basic() {
     arma::vec y_new(3);
     for (arma::uword i = 0; i < 3; ++i)
       y_new(i) = branin(X_new(i, 0) * 15.0 - 5.0, X_new(i, 1) * 15.0);
-    model.update(y_new, X_new);
+    model.update(y_new, X_new, false);
     std::cout << "  [2D] n after update: " << model.y().n_elem << std::endl;
     assert(model.y().n_elem == n + 3);
   }

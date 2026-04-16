@@ -210,14 +210,14 @@ class MLPKriging {
   // ---- MLPKModel (mirrors Kriging::KModel) --------------------------------
  public:
   struct MLPKModel {
-    arma::mat R;        ///< correlation matrix
-    arma::mat L;        ///< Cholesky lower
-    arma::mat Rinv;     ///< R⁻¹
-    arma::mat Fstar;    ///< L \ F  (whitened trend, ≡ m_M)
-    arma::vec ystar;    ///< L \ y
-    arma::mat Rstar;    ///< chol_upper(F'R⁻¹F)  (≡ m_circ)
-    arma::vec Estar;    ///< L \ (y - Fβ̂)  (whitened residual, ≡ m_z)
-    double SSEstar;     ///< Estar'Estar
+    arma::mat R;      ///< correlation matrix
+    arma::mat L;      ///< Cholesky lower
+    arma::mat Rinv;   ///< R⁻¹
+    arma::mat Fstar;  ///< L \ F  (whitened trend, ≡ m_M)
+    arma::vec ystar;  ///< L \ y
+    arma::mat Rstar;  ///< chol_upper(F'R⁻¹F)  (≡ m_circ)
+    arma::vec Estar;  ///< L \ (y - Fβ̂)  (whitened residual, ≡ m_z)
+    double SSEstar;   ///< Estar'Estar
     arma::vec betahat;
   };
   MLPKModel make_Model(const arma::vec& theta) const;
@@ -225,12 +225,12 @@ class MLPKriging {
 
  private:
   // ---- GP cache -----------------------------------------------------------
-  arma::mat m_R;      ///< correlation matrix (n×n)
-  arma::mat m_T;      ///< Cholesky(R + nugget), lower
-  arma::mat m_M;      ///< C⁻¹ F  (whitened trend basis)
-  arma::mat m_circ;   ///< chol_upper(F'R⁻¹F)
-  arma::vec m_z;      ///< C⁻¹(y - Fβ)  (whitened residuals)
-  arma::mat m_Rinv;   ///< R⁻¹ = C⁻ᵀ C⁻¹, cached
+  arma::mat m_R;     ///< correlation matrix (n×n)
+  arma::mat m_T;     ///< Cholesky(R + nugget), lower
+  arma::mat m_M;     ///< C⁻¹ F  (whitened trend basis)
+  arma::mat m_circ;  ///< chol_upper(F'R⁻¹F)
+  arma::vec m_z;     ///< C⁻¹(y - Fβ)  (whitened residuals)
+  arma::mat m_Rinv;  ///< R⁻¹ = C⁻ᵀ C⁻¹, cached
   double m_logdet = 0.0;
 
   bool m_fitted = false;
