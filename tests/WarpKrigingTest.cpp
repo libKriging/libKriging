@@ -14,8 +14,8 @@
  *  8. Incremental update
  */
 
-#include "libKriging/WarpKriging.hpp"
 #include "libKriging/Kriging.hpp"
+#include "libKriging/WarpKriging.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -1180,7 +1180,6 @@ void test_parallel_multistart() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
-
 // ==========================================================================
 //  Test 19: Level names in categorical/ordinal specs
 // ==========================================================================
@@ -1232,8 +1231,7 @@ static void test_level_names() {
       X(i, 1) = 0.1 * (i + 1);  // continuous
       y(i) = X(i, 0) * 2.0 + std::sin(X(i, 1)) + 0.01 * (i % 7);
     }
-    WarpKriging model(
-        {R"(categorical(["red","green","blue"],2))", "kumaraswamy"}, "gauss");
+    WarpKriging model({R"(categorical(["red","green","blue"],2))", "kumaraswamy"}, "gauss");
     model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "50"}});
     std::string s = model.summary();
     std::cout << s;
@@ -1321,7 +1319,7 @@ static void test_level_names() {
     WarpKriging model({R"(categorical(["x","y","z"],2))"}, "gauss");
     model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "20"}});
 
-    std::string tmpfile = "/tmp/wk_level_names_test.json";
+    std::string tmpfile = "wk_level_names_test.json";
     model.save(tmpfile);
     WarpKriging loaded = WarpKriging::load(tmpfile);
     auto ws = loaded.warping_strings();
@@ -1333,7 +1331,6 @@ static void test_level_names() {
 
   std::cout << "  PASSED\n" << std::endl;
 }
-
 
 // ==========================================================================
 //  Test 20: WarpKriging(none) vs Kriging LL equivalence
@@ -1398,8 +1395,8 @@ static void test_none_warp_vs_kriging_ll() {
       // in the gradient by ~κ(R). Still tighter than pre-fix by ~5 orders.
       double grad_diff = arma::norm(wk_grad - kr_grad) / (arma::norm(kr_grad) + 1e-12);
       if (grad_diff >= 1e-8) {
-        std::cerr << "\n  FAIL grad at theta=" << tv << ": rel_diff=" << grad_diff
-                  << " WK_grad=" << wk_grad.t() << " K_grad=" << kr_grad.t() << std::endl;
+        std::cerr << "\n  FAIL grad at theta=" << tv << ": rel_diff=" << grad_diff << " WK_grad=" << wk_grad.t()
+                  << " K_grad=" << kr_grad.t() << std::endl;
       }
       assert(grad_diff < 1e-8);
     }
