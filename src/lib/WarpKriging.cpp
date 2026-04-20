@@ -1453,16 +1453,17 @@ arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& P
 // -------------------------------------------------------------------------
 void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
   const arma::uword n = m_y.n_elem;
-  arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
 
   // Cholesky update detection (same logic as Kriging::populate_Model)
   bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
                    && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
 
+  // Empty diag: cholCov sets R's diagonal to 1.0. Ill-conditioning is handled
+  // by safe_chol_lower_retry via LinearAlgebra::num_nugget, matching Kriging.
   if (do_update) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget, m_T, m_R);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, arma::vec(), m_T, m_R);
   } else {
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget);
+    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, arma::vec());
   }
 
   m.Rinv = LinearAlgebra::inv_sympd(m.L);
