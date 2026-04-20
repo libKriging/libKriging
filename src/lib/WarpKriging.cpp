@@ -190,8 +190,8 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
   // Helper: parse a bracket-delimited list of quoted strings, e.g.
   //   '["red","green","blue"]'  →  {"red", "green", "blue"}
   // Returns the names and the position just past the closing ']'.
-  auto parse_name_list = [&](const std::string& s,
-                             std::size_t start) -> std::pair<std::vector<std::string>, std::size_t> {
+  auto parse_name_list
+      = [&](const std::string& s, std::size_t start) -> std::pair<std::vector<std::string>, std::size_t> {
     if (start >= s.size() || s[start] != '[')
       throw std::invalid_argument("WarpSpec::from_string: expected '[' at position " + std::to_string(start));
     auto close = s.find(']', start);
@@ -204,8 +204,7 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
     while (std::getline(iss, tok, ',')) {
       tok = trim(tok);
       // Strip quotes (single or double)
-      if (tok.size() >= 2
-          && ((tok.front() == '"' && tok.back() == '"') || (tok.front() == '\'' && tok.back() == '\'')))
+      if (tok.size() >= 2 && ((tok.front() == '"' && tok.back() == '"') || (tok.front() == '\'' && tok.back() == '\'')))
         tok = tok.substr(1, tok.size() - 2);
       if (!tok.empty())
         names.push_back(tok);
@@ -1458,12 +1457,17 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
   bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
                    && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
 
-  // Empty diag: cholCov sets R's diagonal to 1.0. Ill-conditioning is handled
-  // by safe_chol_lower_retry via LinearAlgebra::num_nugget, matching Kriging.
+  // Preemptive nugget: Embedding/Ordinal warpings can collapse same-level
+  // training rows in Phi, making R rank-deficient in a way Kriging never
+  // encounters. Add LinearAlgebra::num_nugget (default 1e-10, configurable
+  // via set_num_nugget()) on the diagonal to stabilize Cholesky and its
+  // derivative. Set num_nugget=0 to get exact Kriging equivalence at
+  // warping="none".
+  arma::vec diag(n, arma::fill::value(1.0 + LinearAlgebra::num_nugget));
   if (do_update) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, arma::vec(), m_T, m_R);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag, m_T, m_R);
   } else {
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, arma::vec());
+    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag);
   }
 
   m.Rinv = LinearAlgebra::inv_sympd(m.L);
@@ -2319,8 +2323,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
 
       if (return_stdev) {
         // dvar/dx = -2 vᵢᵀ Wᵢ + 2 Ecirc_i · circ⁻ᵀ(DF_i - Wᵢᵀ m_M)ᵀ
-        arma::mat DEcirc_n_i
-            = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
+        arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
         Dysd2_n.row(i) = -2.0 * Rstar_on.col(i).t() * W_i + 2.0 * Ecirc_n_d.row(i) * DEcirc_n_i;
       }
     }
