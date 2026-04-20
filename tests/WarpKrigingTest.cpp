@@ -15,6 +15,7 @@
  */
 
 #include "libKriging/WarpKriging.hpp"
+#include "libKriging/Kriging.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -1180,6 +1181,76 @@ void test_parallel_multistart() {
 }
 
 // ==========================================================================
+//  Test 20: WarpKriging(none) vs Kriging LL equivalence
+// ==========================================================================
+static void test_none_warp_vs_kriging_ll() {
+  std::cout << "=== Test 20: WarpKriging(none) vs Kriging LL function equivalence ===" << std::endl;
+
+  // WarpKriging adds a constant 1e-8 nugget on the diagonal of R for numerical
+  // stability; Kriging does not. With warping="none", WK should otherwise
+  // reduce exactly to Kriging, so the two LL functions must agree up to that
+  // nugget's effect. At well-conditioned θ values, the difference is tiny.
+  struct TestCase {
+    std::string kernel;
+    arma::uword d;
+    std::string regmodel;
+  };
+  std::vector<TestCase> cases = {
+      {"gauss", 1, "constant"},
+      {"gauss", 2, "constant"},
+      {"matern3_2", 1, "constant"},
+      {"matern5_2", 2, "constant"},
+  };
+
+  for (const auto& tc : cases) {
+    arma::arma_rng::set_seed(42);
+    arma::uword n = 10;
+    // Wide X range so nearest-neighbour distances are large enough that
+    // moderate θ keeps R well-conditioned (off-diagonals well below 1).
+    arma::mat X = 10.0 * arma::randu<arma::mat>(n, tc.d);
+    arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+
+    std::vector<std::string> warp_specs(tc.d, "none");
+
+    // Fit with BFGS just to initialise state. The LL *function* we test below
+    // recomputes everything at arbitrary θ, so the fitted optimum is irrelevant.
+    WarpKriging wk(warp_specs, tc.kernel);
+    wk.fit(y, X, tc.regmodel, false, "BFGS", "LL");
+
+    Kriging kr(tc.kernel);
+    kr.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+    // θ values chosen so pairwise correlations stay low (R nearly identity)
+    // where the 1e-8 nugget in WarpKriging contributes negligibly.
+    std::vector<double> theta_vals = {0.2, 0.3, 0.5};
+    std::cout << "  [" << tc.kernel << ", " << tc.d << "D]";
+
+    for (double tv : theta_vals) {
+      arma::vec th = arma::ones<arma::vec>(tc.d) * tv;
+      auto [wk_ll, wk_grad, wk_hess] = wk.logLikelihoodFun(th, true, false);
+      auto [kr_ll, kr_grad, kr_hess] = kr.logLikelihoodFun(th, true, false, false);
+
+      double ll_diff = std::abs(wk_ll - kr_ll);
+      if (ll_diff >= 1e-4) {
+        std::cerr << "\n  FAIL at theta=" << tv << ": WK_LL=" << wk_ll << " K_LL=" << kr_ll << " diff=" << ll_diff
+                  << std::endl;
+      }
+      assert(ll_diff < 1e-4);
+
+      double grad_diff = arma::norm(wk_grad - kr_grad) / (arma::norm(kr_grad) + 1e-8);
+      if (grad_diff >= 1e-3) {
+        std::cerr << "\n  FAIL grad at theta=" << tv << ": rel_diff=" << grad_diff
+                  << " WK_grad=" << wk_grad.t() << " K_grad=" << kr_grad.t() << std::endl;
+      }
+      assert(grad_diff < 1e-3);
+    }
+    std::cout << "  LL+grad match at " << theta_vals.size() << " theta points  OK" << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
 int main() {
   std::cout << "============================================\n"
             << "  WarpKriging test suite\n"
@@ -1206,6 +1277,7 @@ int main() {
     test_warping_strings_accessor();
     test_predict_derivative();
     test_parallel_multistart();
+    test_none_warp_vs_kriging_ll();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"
