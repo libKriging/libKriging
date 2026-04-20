@@ -105,7 +105,9 @@ enum class WarpType {
  *   "neural_mono(H)"         — monotone network, H hidden     [3H+1 params]
  *   "mlp(h1:h2,q,act)"       — MLP with layers h1→h2→q, activation act
  *   "categorical(L,q)"       — L levels embedded in ℝ^q
+ *   'categorical(["a","b","c"],q)' — named levels embedded in ℝ^q
  *   "ordinal(L)"             — L ordered levels               [L−1 params]
+ *   'ordinal(["low","med","high"])' — named ordered levels
  *
  * Defaults when arguments are omitted:
  *   "neural_mono"   ⟹  "neural_mono(8)"
@@ -125,6 +127,11 @@ struct WarpSpec {
   std::vector<arma::uword> hidden_dims = {};  ///< hidden layer sizes
   arma::uword d_out = 1;                      ///< output dim (MLP only)
   std::string activation = "selu";            ///< activation function (MLP only)
+
+  /// Optional level names for categorical/ordinal variables.
+  /// When non-empty, level_names[i] is the label for integer code i.
+  /// n_levels is inferred from level_names.size().
+  std::vector<std::string> level_names = {};
 
   // ---- String parsing / serialisation ------------------------------------
 
@@ -695,6 +702,10 @@ class WarpKriging {
   static WarpBaseKernel parse_kernel(const std::string& name);
   std::unique_ptr<IWarp> make_warp(const WarpSpec& spec) const;
   void build_warps();
+
+  /// Validate that discrete (categorical/ordinal) columns of X contain only
+  /// non-negative integers in [0, n_levels).  Called from fit/predict/simulate/update.
+  void validate_discrete_columns(const arma::mat& X, const std::string& caller) const;
 
   arma::mat build_trend_matrix(const arma::mat& X) const;
   arma::mat apply_warping(const arma::mat& X) const;

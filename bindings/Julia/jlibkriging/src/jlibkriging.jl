@@ -1015,6 +1015,96 @@ function get_warping(wk::WarpKriging)
     return [unsafe_string(p) for p in ptrs]
 end
 
+# ─── WarpKriging: String column encoding helpers ─────────────────
+
+"""
+    encode_string_columns(X::Matrix, warping::Vector{String})
+
+Detect string columns in a mixed-type matrix, encode them as integers
+0..L-1, and rewrite warping specs to include level names.
+Returns `(X_num::Matrix{Float64}, warping_out::Vector{String})`.
+"""
+function encode_string_columns(X::Matrix, warping::Vector{String})
+    n, d = size(X)
+    X_num = Matrix{Float64}(undef, n, d)
+    warping_out = copy(warping)
+
+    for j in 1:d
+        col = X[:, j]
+        if eltype(col) <: AbstractString || any(x -> x isa AbstractString, col)
+            str_vals = String.(col)
+            labels = sort(unique(str_vals))
+            label_map = Dict(lab => i - 1 for (i, lab) in enumerate(labels))
+            X_num[:, j] = Float64[label_map[v] for v in str_vals]
+
+            spec = strip(warping_out[j])
+            spec_lower = lowercase(spec)
+            names_str = "[" * join(["\"$lab\"" for lab in labels], ",") * "]"
+
+            if startswith(spec_lower, "categorical")
+                embed_dim = 2
+                m = match(r"\(([^)]*)\)", spec)
+                if m !== nothing && !isempty(m.captures[1])
+                    parts = strip.(split(m.captures[1], ","))
+                    if length(parts) >= 2
+                        embed_dim = parse(Int, parts[end])
+                    end
+                end
+                warping_out[j] = "categorical($(names_str),$(embed_dim))"
+            elseif startswith(spec_lower, "ordinal")
+                warping_out[j] = "ordinal($(names_str))"
+            else
+                error("Column $j contains strings but warping spec '$spec' is not 'categorical' or 'ordinal'")
+            end
+        else
+            X_num[:, j] = Float64.(col)
+        end
+    end
+
+    return X_num, warping_out
+end
+
+function _has_string_columns(X::Matrix)
+    for j in 1:size(X, 2)
+        if any(x -> x isa AbstractString, X[:, j])
+            return true
+        end
+    end
+    return false
+end
+
+# Constructor accepting mixed-type Matrix{Any}
+function WarpKriging(y::Vector{Float64}, X::Matrix{Any},
+                     warping::Vector{String}, kernel::String="gauss";
+                     kwargs...)
+    X_num, warping_enc = encode_string_columns(X, warping)
+    return WarpKriging(y, X_num, warping_enc, kernel; kwargs...)
+end
+
+# fit! accepting mixed-type Matrix{Any}
+function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Any}; kwargs...)
+    X_num, _ = encode_string_columns(X, get_warping(wk))
+    return fit!(wk, y, X_num; kwargs...)
+end
+
+# predict accepting mixed-type Matrix{Any}
+function predict(wk::WarpKriging, X_n::Matrix{Any}; kwargs...)
+    X_num, _ = encode_string_columns(X_n, get_warping(wk))
+    return predict(wk, X_num; kwargs...)
+end
+
+# simulate accepting mixed-type Matrix{Any}
+function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Any})
+    X_num, _ = encode_string_columns(X_n, get_warping(wk))
+    return simulate(wk, nsim, seed, X_num)
+end
+
+# update! accepting mixed-type Matrix{Any}
+function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Any})
+    X_num, _ = encode_string_columns(X_u, get_warping(wk))
+    return update!(wk, y_u, X_num)
+end
+
 # ─── MLPKriging ──────────────────────────────────────────────────
 
 mutable struct MLPKriging

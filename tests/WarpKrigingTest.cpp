@@ -1180,6 +1180,161 @@ void test_parallel_multistart() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+
+// ==========================================================================
+//  Test 19: Level names in categorical/ordinal specs
+// ==========================================================================
+static void test_level_names() {
+  std::cout << "=== Test 19: Level names (categorical/ordinal) ===" << std::endl;
+
+  // --- from_string / to_string round-trip with names ---
+  {
+    WarpSpec s = WarpSpec::from_string(R"(categorical(["red","green","blue"],2))");
+    assert(s.type == WarpType::Embedding);
+    assert(s.n_levels == 3);
+    assert(s.embed_dim == 2);
+    assert(s.level_names.size() == 3);
+    assert(s.level_names[0] == "red");
+    assert(s.level_names[1] == "green");
+    assert(s.level_names[2] == "blue");
+    std::string rt = s.to_string();
+    assert(rt == R"(categorical(["red","green","blue"],2))");
+    std::cout << "  categorical with names round-trip: \"" << rt << "\"  OK" << std::endl;
+  }
+  {
+    // Default embed_dim when omitted with names
+    WarpSpec s = WarpSpec::from_string(R"(categorical(["a","b","c","d"]))");
+    assert(s.n_levels == 4);
+    assert(s.embed_dim == 2);
+    assert(s.level_names.size() == 4);
+    std::cout << "  categorical with names (default embed_dim): \"" << s.to_string() << "\"  OK" << std::endl;
+  }
+  {
+    WarpSpec s = WarpSpec::from_string(R"(ordinal(["low","med","high"]))");
+    assert(s.type == WarpType::Ordinal);
+    assert(s.n_levels == 3);
+    assert(s.level_names.size() == 3);
+    assert(s.level_names[0] == "low");
+    assert(s.level_names[1] == "med");
+    assert(s.level_names[2] == "high");
+    std::string rt = s.to_string();
+    assert(rt == R"(ordinal(["low","med","high"]))");
+    std::cout << "  ordinal with names round-trip: \"" << rt << "\"  OK" << std::endl;
+  }
+
+  // --- Fit with named levels ---
+  {
+    arma::uword n = 30;
+    arma::vec y(n);
+    arma::mat X(n, 2);
+    for (arma::uword i = 0; i < n; ++i) {
+      X(i, 0) = i % 3;          // categorical: 0, 1, 2
+      X(i, 1) = 0.1 * (i + 1);  // continuous
+      y(i) = X(i, 0) * 2.0 + std::sin(X(i, 1)) + 0.01 * (i % 7);
+    }
+    WarpKriging model(
+        {R"(categorical(["red","green","blue"],2))", "kumaraswamy"}, "gauss");
+    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "50"}});
+    std::string s = model.summary();
+    std::cout << s;
+    // Check summary contains level names
+    assert(s.find("0=\"red\"") != std::string::npos);
+    assert(s.find("1=\"green\"") != std::string::npos);
+    assert(s.find("2=\"blue\"") != std::string::npos);
+    std::cout << "  fit + summary with named categorical  OK" << std::endl;
+  }
+
+  // --- Validate: non-integer in categorical column should throw ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = 0.5;
+      arma::vec y = {1.0};
+      WarpKriging model({R"(categorical(["a","b"],1))"}, "gauss");
+      model.fit(y, X, "constant", false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("non-integer") != std::string::npos);
+      std::cout << "  non-integer categorical throws: " << msg << "  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Validate: out-of-range level with names shows valid names ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = 5.0;
+      arma::vec y = {1.0};
+      WarpKriging model({R"(categorical(["a","b","c"],1))"}, "gauss");
+      model.fit(y, X, "constant", false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("valid names") != std::string::npos);
+      assert(msg.find("\"a\"") != std::string::npos);
+      std::cout << "  out-of-range with names shows valid names  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Validate: negative value in ordinal column should throw ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = -1.0;
+      arma::vec y = {1.0};
+      WarpKriging model({"ordinal(3)"}, "gauss");
+      model.fit(y, X, "constant", false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("non-integer") != std::string::npos);
+      std::cout << "  negative ordinal throws: " << msg << "  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Numeric-only specs still work with validation ---
+  {
+    arma::uword n = 15;
+    arma::mat X(n, 1);
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 0) = i % 3;
+    arma::vec y = arma::randn<arma::vec>(n);
+    WarpKriging model({"categorical(3,2)"}, "gauss");
+    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "20"}});
+    std::cout << "  numeric-only categorical still works  OK" << std::endl;
+  }
+
+  // --- Save/load preserves level names ---
+  {
+    arma::uword n = 15;
+    arma::mat X(n, 1);
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 0) = i % 3;
+    arma::vec y = arma::randn<arma::vec>(n);
+    WarpKriging model({R"(categorical(["x","y","z"],2))"}, "gauss");
+    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "20"}});
+
+    std::string tmpfile = "/tmp/wk_level_names_test.json";
+    model.save(tmpfile);
+    WarpKriging loaded = WarpKriging::load(tmpfile);
+    auto ws = loaded.warping_strings();
+    assert(ws.size() == 1);
+    assert(ws[0] == R"(categorical(["x","y","z"],2))");
+    std::cout << "  save/load preserves level names: \"" << ws[0] << "\"  OK" << std::endl;
+    std::remove(tmpfile.c_str());
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+
 // ==========================================================================
 //  Test 20: WarpKriging(none) vs Kriging LL equivalence
 // ==========================================================================
@@ -1277,6 +1432,7 @@ int main() {
     test_warping_strings_accessor();
     test_predict_derivative();
     test_parallel_multistart();
+    test_level_names();
     test_none_warp_vs_kriging_ll();
 
     std::cout << "============================================\n"

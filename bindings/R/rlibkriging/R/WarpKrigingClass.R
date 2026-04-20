@@ -69,6 +69,83 @@ warp_ordinal <- function(n_levels) {
 }
 
 # -----------------------------------------------------------------------
+#  String / factor column encoding helper
+# -----------------------------------------------------------------------
+
+# Detect character or factor columns in X (data.frame, matrix, or vector),
+# encode them as integers 0..L-1, and rewrite the warping spec to include
+# level names.  Returns list(X = numeric_matrix, warping = updated_specs).
+.encode_string_columns <- function(X, warping) {
+  if (is.data.frame(X)) {
+    d <- ncol(X)
+  } else {
+    X <- as.matrix(X)
+    d <- ncol(X)
+  }
+  warping <- as.character(warping)
+  if (length(warping) == 1 && d > 1)
+    warping <- rep(warping, d)
+
+  X_num <- matrix(NA_real_, nrow = nrow(X), ncol = d)
+  warping_out <- warping
+
+  for (j in seq_len(d)) {
+    col <- if (is.data.frame(X)) X[[j]] else X[, j]
+    if (is.factor(col) || is.character(col)) {
+      col <- as.character(col)
+      labels <- sort(unique(col))
+      label_map <- setNames(seq_along(labels) - 1L, labels)
+      X_num[, j] <- as.numeric(label_map[col])
+
+      # Parse and rewrite warping spec
+      spec <- trimws(warping_out[j])
+      spec_lower <- tolower(spec)
+      names_str <- paste0('[', paste0('"', labels, '"', collapse = ','), ']')
+
+      if (grepl('^categorical', spec_lower)) {
+        # Extract embed_dim if present
+        embed_dim <- 2L
+        m <- regmatches(spec, regexec('\\(([^)]*)\\)', spec))[[1]]
+        if (length(m) == 2 && nchar(m[2]) > 0) {
+          parts <- trimws(strsplit(m[2], ',')[[1]])
+          if (length(parts) >= 2)
+            embed_dim <- as.integer(parts[length(parts)])
+        }
+        warping_out[j] <- paste0('categorical(', names_str, ',', embed_dim, ')')
+      } else if (grepl('^ordinal', spec_lower)) {
+        warping_out[j] <- paste0('ordinal(', names_str, ')')
+      } else {
+        stop(sprintf(
+          "Column %d contains strings/factors but warping spec '%s' is not 'categorical' or 'ordinal'",
+          j, spec))
+      }
+    } else {
+      X_num[, j] <- as.numeric(col)
+    }
+  }
+
+  list(X = X_num, warping = warping_out)
+}
+
+# Check whether X has any string or factor columns.
+.has_string_columns <- function(X) {
+  if (is.data.frame(X)) {
+    any(vapply(X, function(col) is.character(col) || is.factor(col), logical(1)))
+  } else {
+    is.character(X)
+  }
+}
+
+# Encode X using level names already stored in warping specs.
+# Used by predict/simulate/update after the model is fitted.
+.encode_X_from_warping <- function(X, warping) {
+  if (!.has_string_columns(X))
+    return(as.matrix(X))
+  res <- .encode_string_columns(X, warping)
+  res$X
+}
+
+# -----------------------------------------------------------------------
 #  Constructor
 # -----------------------------------------------------------------------
 
@@ -119,8 +196,15 @@ WarpKriging <- function(y, X, warping,
                         objective = "LL",
                         parameters = NULL) {
   y <- as.numeric(y)
-  X <- as.matrix(X)
   warping <- as.character(warping)
+
+  if (.has_string_columns(X)) {
+    enc <- .encode_string_columns(X, warping)
+    X <- enc$X
+    warping <- enc$warping
+  } else {
+    X <- as.matrix(X)
+  }
 
   ptr <- warpKriging_new(y, X, warping, kernel,
                          regmodel, normalize, optim, objective,
@@ -171,8 +255,10 @@ fit.WarpKriging <- function(object, y, X,
                             optim = "BFGS+Adam",
                             objective = "LL",
                             parameters = NULL, ...) {
+  warping <- warpKriging_warping(object$ptr)
+  X <- .encode_X_from_warping(X, warping)
   warpKriging_fit(object$ptr,
-                  as.numeric(y), as.matrix(X),
+                  as.numeric(y), X,
                   regmodel, normalize, optim, objective,
                   parameters)
   invisible(NULL)
@@ -190,7 +276,8 @@ fit.WarpKriging <- function(object, y, X,
 #' @export
 predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
                                 return_deriv = FALSE, ...) {
-  warpKriging_predict(object$ptr, as.matrix(x), return_stdev, return_cov, return_deriv)
+  x <- .encode_X_from_warping(x, warpKriging_warping(object$ptr))
+  warpKriging_predict(object$ptr, x, return_stdev, return_cov, return_deriv)
 }
 
 #' @title Simulate from a WarpKriging model
@@ -204,8 +291,9 @@ predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FAL
 #' @export
 simulate.WarpKriging <- function(object, nsim = 1, seed = 123, x,
                                  will_update = FALSE, ...) {
+  x <- .encode_X_from_warping(x, warpKriging_warping(object$ptr))
   warpKriging_simulate(object$ptr, as.integer(nsim),
-                       as.integer(seed), as.matrix(x),
+                       as.integer(seed), x,
                        as.logical(will_update))
 }
 
@@ -218,7 +306,8 @@ simulate.WarpKriging <- function(object, nsim = 1, seed = 123, x,
 #' @method update_simulate WarpKriging
 #' @export
 update_simulate.WarpKriging <- function(object, y_u, X_u, ...) {
-  warpKriging_update_simulate(object$ptr, as.numeric(y_u), as.matrix(X_u))
+  X_u <- .encode_X_from_warping(X_u, warpKriging_warping(object$ptr))
+  warpKriging_update_simulate(object$ptr, as.numeric(y_u), X_u)
 }
 
 #' @title Update a WarpKriging model with new observations
@@ -229,7 +318,8 @@ update_simulate.WarpKriging <- function(object, y_u, X_u, ...) {
 #' @param ... ignored
 #' @export
 update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
-  warpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u),
+  X_u <- .encode_X_from_warping(X_u, warpKriging_warping(object$ptr))
+  warpKriging_update(object$ptr, as.numeric(y_u), X_u,
                      as.logical(refit))
   invisible(object)
 }

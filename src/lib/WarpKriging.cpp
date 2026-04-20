@@ -187,10 +187,56 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
     return WarpSpec::mlp(hdims, dout, act);
   }
 
+  // Helper: parse a bracket-delimited list of quoted strings, e.g.
+  //   '["red","green","blue"]'  →  {"red", "green", "blue"}
+  // Returns the names and the position just past the closing ']'.
+  auto parse_name_list = [&](const std::string& s,
+                             std::size_t start) -> std::pair<std::vector<std::string>, std::size_t> {
+    if (start >= s.size() || s[start] != '[')
+      throw std::invalid_argument("WarpSpec::from_string: expected '[' at position " + std::to_string(start));
+    auto close = s.find(']', start);
+    if (close == std::string::npos)
+      throw std::invalid_argument("WarpSpec::from_string: unmatched '[' in: " + str);
+    std::string inner = s.substr(start + 1, close - start - 1);
+    std::vector<std::string> names;
+    std::istringstream iss(inner);
+    std::string tok;
+    while (std::getline(iss, tok, ',')) {
+      tok = trim(tok);
+      // Strip quotes (single or double)
+      if (tok.size() >= 2
+          && ((tok.front() == '"' && tok.back() == '"') || (tok.front() == '\'' && tok.back() == '\'')))
+        tok = tok.substr(1, tok.size() - 2);
+      if (!tok.empty())
+        names.push_back(tok);
+    }
+    return {names, close + 1};
+  };
+
   if (type_str == "categorical") {
     if (args_str.empty())
       throw std::invalid_argument(
-          "WarpSpec::from_string: categorical requires n_levels, e.g. 'categorical(5)' or 'categorical(5,2)'");
+          "WarpSpec::from_string: categorical requires n_levels, e.g. 'categorical(5)' or 'categorical(5,2)'"
+          " or 'categorical([\"a\",\"b\",\"c\"],2)'");
+    // Check for bracket-delimited level names
+    if (args_str.front() == '[') {
+      auto [names, pos] = parse_name_list(args_str, 0);
+      if (names.empty())
+        throw std::invalid_argument("WarpSpec::from_string: categorical level name list is empty");
+      arma::uword nl = static_cast<arma::uword>(names.size());
+      arma::uword ed = 2;  // default embed_dim
+      // Parse optional embed_dim after the '],'
+      if (pos < args_str.size()) {
+        std::string rest = trim(args_str.substr(pos));
+        if (!rest.empty() && rest.front() == ',')
+          rest = trim(rest.substr(1));
+        if (!rest.empty())
+          ed = static_cast<arma::uword>(std::stoul(rest));
+      }
+      auto spec = WarpSpec::categorical(nl, ed);
+      spec.level_names = std::move(names);
+      return spec;
+    }
     auto parts = split(args_str, ',');
     arma::uword nl = static_cast<arma::uword>(std::stoul(parts[0]));
     arma::uword ed = (parts.size() >= 2) ? static_cast<arma::uword>(std::stoul(parts[1])) : 2;
@@ -199,7 +245,19 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
 
   if (type_str == "ordinal") {
     if (args_str.empty())
-      throw std::invalid_argument("WarpSpec::from_string: ordinal requires n_levels, e.g. 'ordinal(4)'");
+      throw std::invalid_argument(
+          "WarpSpec::from_string: ordinal requires n_levels, e.g. 'ordinal(4)'"
+          " or 'ordinal([\"low\",\"med\",\"high\"])'");
+    // Check for bracket-delimited level names
+    if (args_str.front() == '[') {
+      auto [names, pos] = parse_name_list(args_str, 0);
+      if (names.empty())
+        throw std::invalid_argument("WarpSpec::from_string: ordinal level name list is empty");
+      arma::uword nl = static_cast<arma::uword>(names.size());
+      auto spec = WarpSpec::ordinal(nl);
+      spec.level_names = std::move(names);
+      return spec;
+    }
     arma::uword nl = static_cast<arma::uword>(std::stoul(args_str));
     return WarpSpec::ordinal(nl);
   }
@@ -260,10 +318,38 @@ std::string WarpSpec::to_string() const {
       s += "," + std::to_string(d_out) + "," + activation + ")";
       return s;
     }
-    case WarpType::Embedding:
-      return "categorical(" + std::to_string(n_levels) + "," + std::to_string(embed_dim) + ")";
-    case WarpType::Ordinal:
-      return "ordinal(" + std::to_string(n_levels) + ")";
+    case WarpType::Embedding: {
+      std::string s = "categorical(";
+      if (!level_names.empty()) {
+        s += "[";
+        for (arma::uword i = 0; i < level_names.size(); ++i) {
+          if (i > 0)
+            s += ",";
+          s += "\"" + level_names[i] + "\"";
+        }
+        s += "]";
+      } else {
+        s += std::to_string(n_levels);
+      }
+      s += "," + std::to_string(embed_dim) + ")";
+      return s;
+    }
+    case WarpType::Ordinal: {
+      std::string s = "ordinal(";
+      if (!level_names.empty()) {
+        s += "[";
+        for (arma::uword i = 0; i < level_names.size(); ++i) {
+          if (i > 0)
+            s += ",";
+          s += "\"" + level_names[i] + "\"";
+        }
+        s += "]";
+      } else {
+        s += std::to_string(n_levels);
+      }
+      s += ")";
+      return s;
+    }
     case WarpType::MLPJoint: {
       std::string s = "mlp_joint(";
       for (arma::uword i = 0; i < hidden_dims.size(); ++i) {
@@ -1138,6 +1224,46 @@ void WarpKriging::build_warps() {
     m_feature_dim += w->output_dim();
     m_warps.push_back(std::move(w));
     m_is_continuous.push_back(spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal);
+  }
+}
+
+// -------------------------------------------------------------------------
+//  Validate discrete (categorical / ordinal) columns of X
+// -------------------------------------------------------------------------
+void WarpKriging::validate_discrete_columns(const arma::mat& X, const std::string& caller) const {
+  for (arma::uword j = 0; j < m_warp_specs.size(); ++j) {
+    const auto& spec = m_warp_specs[j];
+    if (spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal)
+      continue;
+
+    const arma::vec& col = X.col(j);
+    for (arma::uword i = 0; i < col.n_elem; ++i) {
+      double v = col(i);
+      // Check that value is a non-negative integer
+      if (v < 0.0 || v != std::floor(v) || !std::isfinite(v)) {
+        std::string type_name = (spec.type == WarpType::Embedding) ? "categorical" : "ordinal";
+        throw std::invalid_argument(caller + ": column " + std::to_string(j) + " (" + type_name
+                                    + ") contains non-integer value " + std::to_string(v) + " at row "
+                                    + std::to_string(i));
+      }
+      arma::uword level = static_cast<arma::uword>(v);
+      if (level >= spec.n_levels) {
+        std::string type_name = (spec.type == WarpType::Embedding) ? "categorical" : "ordinal";
+        std::string msg = caller + ": column " + std::to_string(j) + " (" + type_name + ") has level "
+                          + std::to_string(level) + " at row " + std::to_string(i) + " but n_levels is "
+                          + std::to_string(spec.n_levels);
+        if (!spec.level_names.empty()) {
+          msg += " (valid names: ";
+          for (arma::uword k = 0; k < spec.level_names.size(); ++k) {
+            if (k > 0)
+              msg += ", ";
+            msg += std::to_string(k) + "=\"" + spec.level_names[k] + "\"";
+          }
+          msg += ")";
+        }
+        throw std::invalid_argument(msg);
+      }
+    }
   }
 }
 
@@ -2029,6 +2155,8 @@ void WarpKriging::fit(const arma::vec& y,
     throw std::invalid_argument("fit: X has " + std::to_string(X.n_cols) + " columns but "
                                 + std::to_string(m_warp_specs.size()) + " warp specs were given");
 
+  validate_discrete_columns(X, "fit");
+
   m_y = y;
   m_X = X;
   m_regmodel = regmodel;
@@ -2072,6 +2200,8 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                                                                                        bool return_deriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
+
+  validate_discrete_columns(X_n, "predict");
 
   const arma::uword d = X_n.n_cols;
   arma::mat x_n = X_n;
@@ -2229,6 +2359,8 @@ arma::mat WarpKriging::simulate(int nsim, int seed, const arma::mat& X_n, const 
   if (X_n.n_cols != m_X.n_cols)
     throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
                              + std::to_string(m_X.n_cols));
+
+  validate_discrete_columns(X_n, "simulate");
 
   // Normalize new inputs
   arma::mat Xn_n = X_n;
@@ -2413,6 +2545,8 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
+  validate_discrete_columns(X_u, "update");
+
   if (refit) {
     // Current behavior: de-normalise, append, re-normalise, re-optimise
     arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_u);
@@ -2486,6 +2620,15 @@ std::string WarpKriging::summary() const {
   oss << "  - warpings:\n";
   for (arma::uword j = 0; j < m_warps.size(); ++j) {
     oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
+    if (!m_warp_specs[j].level_names.empty()) {
+      oss << "             levels: {";
+      for (arma::uword k = 0; k < m_warp_specs[j].level_names.size(); ++k) {
+        if (k > 0)
+          oss << ", ";
+        oss << k << "=\"" << m_warp_specs[j].level_names[k] << "\"";
+      }
+      oss << "}\n";
+    }
   }
 
   if (m_fitted) {
