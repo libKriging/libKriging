@@ -221,10 +221,10 @@ def test_loglikelihood_fun_gradient():
     X = _as_col(np.linspace(0.01, 0.99, 8))
     y = f1d(X)
 
-    k = lk.WarpKriging(y, X, ["affine"], "gauss",
-                       parameters={"max_iter_adam": "100"})
+    k = lk.WarpKriging(y, X, ["affine"], "gauss", optim="none")
 
-    th = k.theta()
+    # Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
+    th = np.full_like(k.theta(), 0.3)
     ll, grad, _ = k.logLikelihoodFun(th, return_grad=True)
     assert np.isfinite(ll)
     assert np.all(np.isfinite(grad))
@@ -242,7 +242,7 @@ def test_loglikelihood_fun_gradient():
 
     rel = float(np.linalg.norm(grad.ravel() - grad_num.ravel())
                 / (np.linalg.norm(grad_num) + 1e-12))
-    assert rel < 1e-2
+    assert rel < 1e-4
 
 
 def test_accessors_summary():

@@ -2099,6 +2099,11 @@ void WarpKriging::optimise_joint(const std::string& method) {
       restore_best(results[best_idx]);
   };
 
+  if (base_method == "none") {
+    // --- Skip optimisation: keep current θ and warp params as-is ---
+    return;
+  }
+
   if (base_method == "BFGS" || n_warp == 0) {
     // --- Joint L-BFGS-B (with multistart) ---
     if (multistart <= 1) {

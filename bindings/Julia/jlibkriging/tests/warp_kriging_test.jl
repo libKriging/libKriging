@@ -256,10 +256,10 @@ end
         X = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
         y = [f_test(x) for x in X[:, 1]]
 
-        k = WarpKriging(y, X, ["affine"], "gauss";
-                        parameters=Dict("max_iter_adam" => "100"))
+        k = WarpKriging(y, X, ["affine"], "gauss"; optim="none")
 
-        th = get_theta(k)
+        # Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
+        th = fill(0.3, length(get_theta(k)))
         ll_res = log_likelihood_fun(k, th; return_grad=true)
         @test isfinite(ll_res.ll)
         @test all(isfinite.(ll_res.grad))
@@ -278,7 +278,7 @@ end
         end
 
         rel = sqrt(sum((ll_res.grad .- grad_num).^2)) / (sqrt(sum(grad_num.^2)) + 1e-12)
-        @test rel < 1e-2
+        @test rel < 1e-4
     end
 
     @testset "Empty constructor then fit" begin

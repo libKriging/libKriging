@@ -267,15 +267,15 @@ test_that("logLikelihoodFun works with analytical gradient", {
   X <- as.matrix(seq(0.01, 0.99, length.out = 8))
   y <- f1d(X)
 
-  k <- WarpKriging(y, X, "affine", "gauss",
-                   parameters = list(max_iter_adam = "100"))
+  k <- WarpKriging(y, X, "affine", "gauss", optim = "none")
 
-  th <- theta(k)
+  # Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
+  th <- rep(0.3, length(theta(k)))
   ll <- logLikelihoodFun(k, th, return_grad = TRUE)
 
   expect_true(is.finite(ll$logLikelihood))
   expect_true(all(is.finite(ll$gradient)))
-  cat("  LL at theta:", ll$logLikelihood, "\n")
+  cat("  LL at theta=0.3:", ll$logLikelihood, "\n")
   cat("  Gradient norm:", sqrt(sum(ll$gradient^2)), "\n")
 
   # FD check
@@ -290,6 +290,7 @@ test_that("logLikelihoodFun works with analytical gradient", {
   rel <- sqrt(sum((ll$gradient - grad_num)^2)) /
          (sqrt(sum(grad_num^2)) + 1e-12)
   cat("  Gradient FD check error:", rel, "\n")
+  expect_lt(rel, 1e-4)
 })
 
 # ===========================================================================

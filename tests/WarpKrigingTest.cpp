@@ -15,6 +15,7 @@
  */
 
 #include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/WarpKriging.hpp"
 
 #include <cassert>
@@ -734,17 +735,19 @@ static void test_loglikelihood_fun() {
     y(i) = f1d(X_train(i));
 
   WarpKriging model({"affine"}, "gauss");
-  model.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+  model.fit(y, X_mat, "constant", false, "none", "LL");
 
-  arma::vec theta = model.theta();
+  // Evaluate gradient at a fixed, benign theta away from any optimum so the FD
+  // check is well-conditioned (avoids truncation-noise at large-theta plateaus
+  // where a stochastic optimizer may stop).
+  arma::vec theta = {0.3};
   auto [ll, grad, hess] = model.logLikelihoodFun(theta, true, false);
 
-  std::cout << "  LL at optimum theta:    " << ll << std::endl;
-  std::cout << "  Gradient norm at opt:   " << arma::norm(grad) << std::endl;
+  std::cout << "  LL at theta=0.3:        " << ll << std::endl;
+  std::cout << "  Gradient norm:          " << arma::norm(grad) << std::endl;
   assert(std::isfinite(ll));
   assert(grad.is_finite());
 
-  // Check gradient by finite differences
   const double h = 1e-5;
   arma::vec grad_num(theta.n_elem);
   for (arma::uword k = 0; k < theta.n_elem; ++k) {
@@ -757,6 +760,7 @@ static void test_loglikelihood_fun() {
   }
   double rel = arma::norm(grad - grad_num) / (arma::norm(grad_num) + 1e-12);
   std::cout << "  Gradient FD check err:  " << rel << std::endl;
+  assert(rel < 1e-4);
   std::cout << "  PASSED\n" << std::endl;
 }
 

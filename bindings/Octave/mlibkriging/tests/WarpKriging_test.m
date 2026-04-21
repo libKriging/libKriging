@@ -263,9 +263,10 @@ end
 try
     X = linspace(0.01, 0.99, 8)';
     y = f1d(X);
-    k = WarpKriging(y, X, {"affine"}, "gauss");
+    k = WarpKriging(y, X, {"affine"}, "gauss", "constant", false, "none");
 
-    th = k.theta();
+    % Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
+    th = 0.3 * ones(size(k.theta()));
     [ll, grad] = k.logLikelihoodFun(th, true, false);
     assert(isfinite(ll));
     assert(all(isfinite(grad)));
@@ -281,7 +282,7 @@ try
         grad_num(i) = (lp - lm) / (2 * h);
     end
     rel = norm(grad(:) - grad_num(:)) / (norm(grad_num(:)) + 1e-12);
-    assert(rel < 1e-2, sprintf("grad FD rel error %.3g", rel));
+    assert(rel < 1e-4, sprintf("grad FD rel error %.3g", rel));
     fprintf("  Test 12 logLikelihoodFun FD OK (rel=%.3g)\n", rel);
 catch err
     fprintf("  Test 12 FAILED: %s\n", err.message);
