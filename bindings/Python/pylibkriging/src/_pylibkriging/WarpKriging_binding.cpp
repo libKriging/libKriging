@@ -4,6 +4,7 @@
 
 #include <carma>
 
+#include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
 
 namespace lk = libKriging;
@@ -31,8 +32,15 @@ PyWarpKriging::PyWarpKriging(const py::array_t<double>& y,
                              const py::dict& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal = std::make_unique<lk::WarpKriging>(
-      mat_y, mat_X, warping, kernel, regmodel, normalize, optim, objective, dict_to_string_map(parameters));
+  m_internal = std::make_unique<lk::WarpKriging>(mat_y,
+                                                 mat_X,
+                                                 warping,
+                                                 kernel,
+                                                 Trend::fromString(regmodel),
+                                                 normalize,
+                                                 optim,
+                                                 objective,
+                                                 dict_to_string_map(parameters));
 }
 
 PyWarpKriging::~PyWarpKriging() {}
@@ -56,7 +64,7 @@ void PyWarpKriging::fit(const py::array_t<double>& y,
                         const py::dict& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(mat_y, mat_X, regmodel, normalize, optim, objective, dict_to_string_map(parameters));
+  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
@@ -140,7 +148,7 @@ bool PyWarpKriging::normalize() {
 }
 
 std::string PyWarpKriging::regmodel() {
-  return m_internal->regmodel();
+  return Trend::toString(m_internal->regmodel());
 }
 
 py::array_t<double> PyWarpKriging::F() {

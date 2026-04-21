@@ -20,6 +20,7 @@
  *     logLikelihood(), logLikelihoodFun()
  */
 
+#include "libKriging/Trend.hpp"
 #include "libKriging/WarpKriging.hpp"  // for WarpMLPJoint, WarpBaseKernel
 #include "libKriging/libKriging_exports.h"
 #include "libKriging/utils/lk_armadillo.hpp"
@@ -82,7 +83,7 @@ class MLPKriging {
                                arma::uword d_out,
                                const std::string& activation,
                                const std::string& kernel,
-                               const std::string& regmodel = "constant",
+                               const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                bool normalize = false,
                                const std::string& optim = "BFGS+Adam",
                                const std::string& objective = "LL",
@@ -94,7 +95,7 @@ class MLPKriging {
 
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
-                             const std::string& regmodel = "constant",
+                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
                              const std::string& optim = "BFGS+Adam",
                              const std::string& objective = "LL",
@@ -103,7 +104,7 @@ class MLPKriging {
   /// Typed-parameters overload: lets callers seed θ / warp params.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
-                             const std::string& regmodel,
+                             const Trend::RegressionModel& regmodel,
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
@@ -148,7 +149,7 @@ class MLPKriging {
   const double& centerY() const { return m_centerY; }
   const double& scaleY() const { return m_scaleY; }
   const bool& normalize() const { return m_normalize; }
-  const std::string& regmodel() const { return m_regmodel; }
+  const Trend::RegressionModel& regmodel() const { return m_regmodel; }
   const arma::mat& F() const { return m_F; }
   const arma::mat& T() const { return m_T; }
   const arma::mat& M() const { return m_M; }
@@ -193,7 +194,7 @@ class MLPKriging {
   double m_centerY = 0.0, m_scaleY = 1.0;
 
   // ---- trend --------------------------------------------------------------
-  std::string m_regmodel = "constant";
+  Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
   arma::mat m_F;
   arma::vec m_beta;
 

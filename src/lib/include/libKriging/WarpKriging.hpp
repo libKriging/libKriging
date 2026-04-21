@@ -42,6 +42,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/Trend.hpp"
 #include "libKriging/libKriging_exports.h"
 
 #include <cstdint>
@@ -494,7 +495,7 @@ class WarpKriging {
                                 const arma::mat& X,
                                 const std::vector<std::string>& warping,
                                 const std::string& kernel,
-                                const std::string& regmodel = "constant",
+                                const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                 bool normalize = false,
                                 const std::string& optim = "BFGS+Adam",
                                 const std::string& objective = "LL",
@@ -506,7 +507,7 @@ class WarpKriging {
 
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
-                             const std::string& regmodel = "constant",
+                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              bool normalize = false,
                              const std::string& optim = "BFGS+Adam",
                              const std::string& objective = "LL",
@@ -515,7 +516,7 @@ class WarpKriging {
   /// Typed-parameters overload: lets callers seed θ / warp params.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
-                             const std::string& regmodel,
+                             const Trend::RegressionModel& regmodel,
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
@@ -573,7 +574,7 @@ class WarpKriging {
   const double& centerY() const { return m_centerY; }
   const double& scaleY() const { return m_scaleY; }
   const bool& normalize() const { return m_normalize; }
-  const std::string& regmodel() const { return m_regmodel; }
+  const Trend::RegressionModel& regmodel() const { return m_regmodel; }
   const arma::mat& F() const { return m_F; }
   const arma::mat& T() const { return m_T; }
   const arma::mat& M() const { return m_M; }
@@ -623,7 +624,7 @@ class WarpKriging {
   std::vector<bool> m_is_continuous;
 
   // ---- trend --------------------------------------------------------------
-  std::string m_regmodel = "constant";
+  Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
   arma::mat m_F;
   arma::vec m_beta;
 

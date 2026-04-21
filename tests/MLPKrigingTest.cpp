@@ -36,7 +36,7 @@ static void test_mlp_kriging_basic() {
       y(i) = f1d(X_train(i));
 
     MLPKriging model({16, 8}, 2, "selu", "gauss");
-    model.fit(y, X_mat, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
+    model.fit(y, X_mat, Trend::RegressionModel::Constant, true, "Adam", "LL", {{"max_iter_adam", "300"}});
 
     std::cout << model.summary();
 
@@ -71,7 +71,7 @@ static void test_mlp_kriging_basic() {
       y(i) = branin(X(i, 0) * 15.0 - 5.0, X(i, 1) * 15.0);
 
     MLPKriging model({16, 8}, 2, "selu", "gauss");
-    model.fit(y, X, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
+    model.fit(y, X, Trend::RegressionModel::Constant, true, "Adam", "LL", {{"max_iter_adam", "300"}});
 
     std::cout << model.summary();
 
@@ -157,7 +157,7 @@ static void test_predict_derivative() {
     y(i) = f2(X(i, 0), X(i, 1));
 
   MLPKriging model({16, 8}, 2, "selu", "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
   arma::mat X_new = arma::randu<arma::mat>(5, 2);
   check_deriv_vs_fd(model, X_new, {0, 1}, "MLPKriging 2D gauss");

@@ -4,6 +4,7 @@
 // clang-format on
 
 #include "libKriging/MLPKriging.hpp"
+#include "libKriging/Trend.hpp"
 
 using namespace libKriging;
 
@@ -37,8 +38,17 @@ SEXP mlpKriging_new(const arma::vec& y,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  MLPKriging* model = new MLPKriging(
-      y, X, hd, static_cast<arma::uword>(d_out), activation, kernel, regmodel, normalize, optim, objective, params);
+  MLPKriging* model = new MLPKriging(y,
+                                     X,
+                                     hd,
+                                     static_cast<arma::uword>(d_out),
+                                     activation,
+                                     kernel,
+                                     Trend::fromString(regmodel),
+                                     normalize,
+                                     optim,
+                                     objective,
+                                     params);
 
   return MLPKrigingPtr(model, true);
 }
@@ -66,7 +76,7 @@ void mlpKriging_fit(SEXP model_ptr,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  model->fit(y, X, regmodel, normalize, optim, objective, params);
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +263,7 @@ bool mlpKriging_normalize(SEXP model_ptr) {
 // [[Rcpp::export]]
 std::string mlpKriging_regmodel(SEXP model_ptr) {
   MLPKrigingPtr model(model_ptr);
-  return model->regmodel();
+  return Trend::toString(model->regmodel());
 }
 
 // [[Rcpp::export]]

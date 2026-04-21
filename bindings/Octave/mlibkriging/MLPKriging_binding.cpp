@@ -1,6 +1,7 @@
 #include "MLPKriging_binding.hpp"
 
 #include "libKriging/MLPKriging.hpp"
+#include "libKriging/Trend.hpp"
 
 #include <map>
 #include <string>
@@ -82,8 +83,17 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   std::map<std::string, std::string> params;
   if (nrhs > 10)
     params = structToStringMap(prhs[10]);
-  auto mk = buildObject<MLPKriging>(
-      y_vec, X_mat, hidden_dims, d_out, activation, kernel, regmodel, normalize, optim, objective, params);
+  auto mk = buildObject<MLPKriging>(y_vec,
+                                    X_mat,
+                                    hidden_dims,
+                                    d_out,
+                                    activation,
+                                    kernel,
+                                    libKriging::Trend::fromString(regmodel),
+                                    normalize,
+                                    optim,
+                                    objective,
+                                    params);
   output.set(0, mk, "new object reference");
 }
 
@@ -113,7 +123,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   mk->fit(input.get<arma::vec>(1, "y vector"),
           input.get<arma::mat>(2, "X matrix"),
-          regmodel,
+          libKriging::Trend::fromString(regmodel),
           normalize,
           optim,
           objective,
@@ -306,7 +316,7 @@ void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
-  output.set(0, mk->regmodel(), "regmodel");
+  output.set(0, libKriging::Trend::toString(mk->regmodel()), "regmodel");
 }
 
 void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

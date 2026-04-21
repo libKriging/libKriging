@@ -1312,7 +1312,7 @@ WarpKriging::WarpKriging(const arma::vec& y,
                          const arma::mat& X,
                          const std::vector<std::string>& warping,
                          const std::string& kernel,
-                         const std::string& regmodel,
+                         const Trend::RegressionModel& regmodel,
                          bool normalize,
                          const std::string& optim,
                          const std::string& objective,
@@ -1339,36 +1339,10 @@ arma::mat WarpKriging::apply_warping(const arma::mat& X) const {
 }
 
 // -------------------------------------------------------------------------
-//  Trend matrix
+//  Trend matrix — built on warped features Φ(X) so it scales with feature_dim
 // -------------------------------------------------------------------------
 arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
-  const arma::uword n = X.n_rows;
-  if (m_regmodel == "constant")
-    return arma::ones<arma::mat>(n, 1);
-
-  // For linear/quadratic, use the warped features rather than raw X
-  arma::mat Phi = apply_warping(X);
-  arma::uword d = Phi.n_cols;
-
-  if (m_regmodel == "linear") {
-    arma::mat F(n, 1 + d);
-    F.col(0) = arma::ones<arma::vec>(n);
-    F.cols(1, d) = Phi;
-    return F;
-  }
-  if (m_regmodel == "quadratic") {
-    arma::uword p = 1 + d + d * (d + 1) / 2;
-    arma::mat F(n, p);
-    F.col(0) = arma::ones<arma::vec>(n);
-    arma::uword c = 1;
-    for (arma::uword j = 0; j < d; ++j)
-      F.col(c++) = Phi.col(j);
-    for (arma::uword j = 0; j < d; ++j)
-      for (arma::uword k = j; k < d; ++k)
-        F.col(c++) = Phi.col(j) % Phi.col(k);
-    return F;
-  }
-  throw std::invalid_argument("Unknown regmodel: " + m_regmodel);
+  return Trend::regressionModelMatrix(m_regmodel, apply_warping(X));
 }
 
 // -------------------------------------------------------------------------
@@ -2132,7 +2106,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
 // -------------------------------------------------------------------------
 void WarpKriging::fit(const arma::vec& y,
                       const arma::mat& X,
-                      const std::string& regmodel,
+                      const Trend::RegressionModel& regmodel,
                       bool normalize,
                       const std::string& optim,
                       const std::string& objective,
@@ -2153,7 +2127,7 @@ void WarpKriging::fit(const arma::vec& y,
 // -------------------------------------------------------------------------
 void WarpKriging::fit(const arma::vec& y,
                       const arma::mat& X,
-                      const std::string& regmodel,
+                      const Trend::RegressionModel& regmodel,
                       bool normalize,
                       const std::string& optim,
                       const std::string& /*objective*/,
@@ -2620,7 +2594,7 @@ std::string WarpKriging::summary() const {
   std::ostringstream oss;
   oss << "* WarpKriging\n"
       << "  - kernel:      " << m_kernel_name << "\n"
-      << "  - regmodel:    " << m_regmodel << "\n"
+      << "  - regmodel:    " << Trend::toString(m_regmodel) << "\n"
       << "  - normalize:   " << (m_normalize ? "true" : "false") << "\n"
       << "  - n obs:       " << m_y.n_elem << "\n"
       << "  - d input:     " << m_X.n_cols << "\n"
@@ -2682,7 +2656,7 @@ void WarpKriging::save(const std::string filename) const {
   j["is_continuous"] = m_is_continuous;
 
   // Settings
-  j["regmodel"] = m_regmodel;
+  j["regmodel"] = Trend::toString(m_regmodel);
   j["feature_dim"] = m_feature_dim;
   j["max_iter_bfgs"] = m_max_iter_bfgs;
   j["max_iter_adam"] = m_max_iter_adam;
@@ -2749,7 +2723,7 @@ WarpKriging WarpKriging::load(const std::string filename) {
   wk.m_is_continuous = j["is_continuous"].template get<std::vector<bool>>();
 
   // Settings
-  wk.m_regmodel = j["regmodel"].template get<std::string>();
+  wk.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
   wk.m_feature_dim = j["feature_dim"].template get<arma::uword>();
   wk.m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
   wk.m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();

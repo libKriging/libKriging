@@ -1730,7 +1730,7 @@ void* lk_warp_kriging_new_fit(const double* y,
                            X_mat,
                            to_string_vec(warping, n_warping),
                            kernel,
-                           regmodel,
+                           Trend::fromString(regmodel ? regmodel : "constant"),
                            normalize != 0,
                            optim,
                            objective,
@@ -1771,8 +1771,13 @@ int lk_warp_kriging_fit(void* ptr,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    static_cast<WarpKriging*>(ptr)->fit(
-        y_vec, X_mat, regmodel, normalize != 0, optim, objective, to_param_map(param_keys, param_vals, n_params));
+    static_cast<WarpKriging*>(ptr)->fit(y_vec,
+                                        X_mat,
+                                        Trend::fromString(regmodel ? regmodel : "constant"),
+                                        normalize != 0,
+                                        optim,
+                                        objective,
+                                        to_param_map(param_keys, param_vals, n_params));
     return 0;
   }
   CATCH_RETURN
@@ -2006,7 +2011,7 @@ void* lk_mlp_kriging_new_fit(const double* y,
                           static_cast<arma::uword>(d_out),
                           activation,
                           kernel,
-                          regmodel,
+                          Trend::fromString(regmodel ? regmodel : "constant"),
                           normalize != 0,
                           optim,
                           objective,
@@ -2047,8 +2052,13 @@ int lk_mlp_kriging_fit(void* ptr,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    static_cast<MLPKriging*>(ptr)->fit(
-        y_vec, X_mat, regmodel, normalize != 0, optim, objective, to_param_map(param_keys, param_vals, n_params));
+    static_cast<MLPKriging*>(ptr)->fit(y_vec,
+                                       X_mat,
+                                       Trend::fromString(regmodel ? regmodel : "constant"),
+                                       normalize != 0,
+                                       optim,
+                                       objective,
+                                       to_param_map(param_keys, param_vals, n_params));
     return 0;
   }
   CATCH_RETURN

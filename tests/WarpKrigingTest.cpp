@@ -194,7 +194,7 @@ static void test_continuous_kumaraswamy() {
     y(i) = f1d(X_train(i));
 
   WarpKriging model({"kumaraswamy"}, "gauss");
-  model.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
 
   std::cout << model.summary();
 
@@ -233,7 +233,7 @@ static void test_categorical_only() {
   }
 
   WarpKriging model({"categorical(3,2)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
 
   std::cout << model.summary();
 
@@ -289,7 +289,7 @@ static void test_categorical_predict_at_train() {
   }
 
   WarpKriging model({"categorical(3,2)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << model.summary();
 
@@ -329,7 +329,7 @@ static void test_ordinal_predict_at_train() {
   }
 
   WarpKriging model({"ordinal(4)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << model.summary();
 
@@ -377,7 +377,7 @@ static void test_mixed() {
       },
       "matern5_2");
 
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << model.summary();
 
@@ -421,7 +421,7 @@ static void test_ordinal() {
   }
 
   WarpKriging model({"ordinal(5)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
 
   std::cout << model.summary();
 
@@ -453,7 +453,7 @@ static void test_neural_mono() {
     y(i) = f1d(X_train(i));
 
   WarpKriging model({"neural_mono(8)"}, "gauss");
-  model.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
 
   std::cout << model.summary();
 
@@ -479,7 +479,7 @@ static void test_mlp_warp() {
     y(i) = f1d(X_train(i));
 
   WarpKriging model1d({"mlp(16:8,3,selu)"}, "gauss");
-  model1d.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model1d.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << model1d.summary();
 
@@ -518,7 +518,7 @@ static void test_mlp_warp() {
       },
       "matern5_2");
 
-  model_mix.fit(y_mix, X_mix, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model_mix.fit(y_mix, X_mix, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << "  [Mixed MLP+cat] summary:\n" << model_mix.summary();
 
@@ -556,7 +556,7 @@ static void test_simulate_mixed() {
   }
 
   WarpKriging model({"affine", "categorical(2,2)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
 
   arma::mat X_sim(10, 2);
   X_sim.col(0) = arma::linspace(0.1, 0.9, 10);
@@ -583,7 +583,7 @@ static void test_update() {
   arma::vec y0 = {1.0, 3.0, 0.5};
 
   WarpKriging model({"none", "categorical(2,1)"}, "gauss");
-  model.fit(y0, X0, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+  model.fit(y0, X0, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
   std::cout << "  n before update: " << model.y().n_elem << std::endl;
 
@@ -644,7 +644,7 @@ static void test_branin_2d_mlp() {
   // Each continuous input gets its own MLP warp → ℝ²
   WarpKriging model({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "matern5_2");
 
-  model.fit(y, X, "constant", true, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, true, "Adam", "LL", {{"max_iter_adam", "300"}});
 
   std::cout << model.summary();
 
@@ -696,19 +696,19 @@ static void test_none_vs_mlp() {
 
   // Model A: no warping (baseline, like standard Kriging)
   WarpKriging model_none({"none"}, "gauss");
-  model_none.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model_none.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
   auto [mean_none, sd_none, _c1, _md1, _sd1] = model_none.predict(xp, true, false);
   double rmse_none = std::sqrt(arma::mean(arma::square(mean_none - ytrue)));
 
   // Model B: MLP warping
   WarpKriging model_mlp({"mlp(16:8,2,selu)"}, "gauss");
-  model_mlp.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  model_mlp.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
   auto [mean_mlp, sd_mlp, _c2, _md2, _sd2] = model_mlp.predict(xp, true, false);
   double rmse_mlp = std::sqrt(arma::mean(arma::square(mean_mlp - ytrue)));
 
   // Model C: Kumaraswamy warping
   WarpKriging model_kuma({"kumaraswamy"}, "gauss");
-  model_kuma.fit(y, X_mat, "constant", false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  model_kuma.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
   auto [mean_kuma, sd_kuma, _c3, _md3, _sd3] = model_kuma.predict(xp, true, false);
   double rmse_kuma = std::sqrt(arma::mean(arma::square(mean_kuma - ytrue)));
 
@@ -735,7 +735,7 @@ static void test_loglikelihood_fun() {
     y(i) = f1d(X_train(i));
 
   WarpKriging model({"affine"}, "gauss");
-  model.fit(y, X_mat, "constant", false, "none", "LL");
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "none", "LL");
 
   // Evaluate gradient at a fixed, benign theta away from any optimum so the FD
   // check is well-conditioned (avoids truncation-noise at large-theta plateaus
@@ -861,7 +861,7 @@ static void test_warping_strings_accessor() {
   arma::vec y = arma::randn<arma::vec>(10);
 
   WarpKriging model({"kumaraswamy", "categorical(3,2)", "ordinal(4)"}, "gauss");
-  model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "50"}});
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
 
   auto ws = model.warping_strings();
   assert(ws.size() == 3);
@@ -959,7 +959,7 @@ void test_predict_derivative() {
       y(i) = f2(X(i, 0), X(i, 1));
 
     WarpKriging model({"none", "none"}, "gauss");
-    model.fit(y, X, "constant", false, "BFGS", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
 
     arma::mat X_new = arma::randu<arma::mat>(5, 2);
     check_deriv_vs_fd(model, X_new, {0, 1}, "none, gauss, 2D");
@@ -975,7 +975,7 @@ void test_predict_derivative() {
       y(i) = f1(X(i, 0));
 
     WarpKriging model({"affine"}, "matern3_2");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new = arma::randu<arma::mat>(5, 1);
     check_deriv_vs_fd(model, X_new, {0}, "affine, matern3_2");
@@ -992,7 +992,7 @@ void test_predict_derivative() {
       y(i) = f1(X(i, 0));
 
     WarpKriging model({"boxcox"}, "gauss");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new = 0.15 + 0.7 * arma::randu<arma::mat>(5, 1);
     check_deriv_vs_fd(model, X_new, {0}, "boxcox, gauss");
@@ -1008,7 +1008,7 @@ void test_predict_derivative() {
       y(i) = f1(X(i, 0));
 
     WarpKriging model({"kumaraswamy"}, "matern5_2");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 1);
     check_deriv_vs_fd(model, X_new, {0}, "kumaraswamy, matern5_2");
@@ -1024,7 +1024,7 @@ void test_predict_derivative() {
       y(i) = f1(X(i, 0));
 
     WarpKriging model({"neural_mono(8)"}, "gauss");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new = arma::randu<arma::mat>(5, 1);
     check_deriv_vs_fd(model, X_new, {0}, "neural_mono, gauss");
@@ -1040,7 +1040,7 @@ void test_predict_derivative() {
       y(i) = f2(X(i, 0), X(i, 1));
 
     WarpKriging model({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "matern5_2");
-    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
     arma::mat X_new = arma::randu<arma::mat>(5, 2);
     check_deriv_vs_fd(model, X_new, {0, 1}, "mlp, matern5_2, 2D");
@@ -1061,7 +1061,7 @@ void test_predict_derivative() {
       y(i) = std::sin(4.0 * X(i, 0)) + 0.5 * X(i, 1);
 
     WarpKriging model({"none", "categorical(3,2)"}, "gauss");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     // Test points: continuous in [0,1], categorical fixed at level 1
     arma::mat X_new(5, 2);
@@ -1084,7 +1084,7 @@ void test_predict_derivative() {
       y(i) = std::sin(4.0 * X(i, 0)) + 0.3 * X(i, 1);
 
     WarpKriging model({"none", "ordinal(4)"}, "gauss");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new(5, 2);
     X_new.col(0) = arma::randu<arma::vec>(5);
@@ -1102,7 +1102,7 @@ void test_predict_derivative() {
       y(i) = std::sin(3.0 * X(i, 0)) + std::cos(4.0 * X(i, 1)) + 0.5 * X(i, 2);
 
     WarpKriging model({"kumaraswamy", "none", "affine"}, "matern5_2");
-    model.fit(y, X, "constant", false, "BFGS+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
 
     arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 3);
     check_deriv_vs_fd(model, X_new, {0, 1, 2}, "kuma+none+affine, matern5_2, 3D");
@@ -1119,7 +1119,7 @@ void test_predict_derivative() {
 
     for (const auto& kern : {"exp", "matern3_2", "matern5_2", "gauss"}) {
       WarpKriging model({"none"}, kern);
-      model.fit(y, X, "constant", false, "BFGS", "LL");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
 
       arma::mat X_new = arma::randu<arma::mat>(5, 1);
       check_deriv_vs_fd(model, X_new, {0}, std::string("none, ") + kern);
@@ -1143,13 +1143,13 @@ void test_parallel_multistart() {
   // Test BFGS3 (joint BFGS with 3 starts, parallel)
   {
     WarpKriging model({"kumaraswamy"}, "gauss");
-    model.fit(y, X, "constant", true, "BFGS3", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
     double ll_multi = model.logLikelihood();
     std::cout << "  BFGS3 LL: " << ll_multi << ", theta: " << model.theta().t();
 
     // Compare with single start
     WarpKriging model_single({"kumaraswamy"}, "gauss");
-    model_single.fit(y, X, "constant", true, "BFGS", "LL");
+    model_single.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS", "LL");
     double ll_single = model_single.logLikelihood();
     std::cout << "  BFGS  LL: " << ll_single << std::endl;
 
@@ -1162,7 +1162,7 @@ void test_parallel_multistart() {
   // Test BFGS3+Adam (Adam+BFGS with 3 starts, parallel)
   {
     WarpKriging model({"kumaraswamy"}, "gauss");
-    model.fit(y, X, "constant", true, "BFGS3+Adam", "LL");
+    model.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3+Adam", "LL");
     double ll = model.logLikelihood();
     std::cout << "  BFGS3+Adam LL: " << ll << ", theta: " << model.theta().t();
     assert(std::isfinite(ll));
@@ -1175,7 +1175,7 @@ void test_parallel_multistart() {
     arma::vec y2 = arma::sin(X2.col(0) * 4) % arma::cos(X2.col(1) * 3) + 0.05 * arma::randn(25);
 
     WarpKriging model({"none", "affine"}, "matern5_2");
-    model.fit(y2, X2, "constant", true, "BFGS3", "LL");
+    model.fit(y2, X2, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
     double ll = model.logLikelihood();
     std::cout << "  2D BFGS3 LL: " << ll << std::endl;
     assert(std::isfinite(ll));
@@ -1236,7 +1236,7 @@ static void test_level_names() {
       y(i) = X(i, 0) * 2.0 + std::sin(X(i, 1)) + 0.01 * (i % 7);
     }
     WarpKriging model({R"(categorical(["red","green","blue"],2))", "kumaraswamy"}, "gauss");
-    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "50"}});
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
     std::string s = model.summary();
     std::cout << s;
     // Check summary contains level names
@@ -1254,7 +1254,7 @@ static void test_level_names() {
       X(0, 0) = 0.5;
       arma::vec y = {1.0};
       WarpKriging model({R"(categorical(["a","b"],1))"}, "gauss");
-      model.fit(y, X, "constant", false, "none", "LL");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
     } catch (const std::invalid_argument& e) {
       caught = true;
       std::string msg = e.what();
@@ -1272,7 +1272,7 @@ static void test_level_names() {
       X(0, 0) = 5.0;
       arma::vec y = {1.0};
       WarpKriging model({R"(categorical(["a","b","c"],1))"}, "gauss");
-      model.fit(y, X, "constant", false, "none", "LL");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
     } catch (const std::invalid_argument& e) {
       caught = true;
       std::string msg = e.what();
@@ -1291,7 +1291,7 @@ static void test_level_names() {
       X(0, 0) = -1.0;
       arma::vec y = {1.0};
       WarpKriging model({"ordinal(3)"}, "gauss");
-      model.fit(y, X, "constant", false, "none", "LL");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
     } catch (const std::invalid_argument& e) {
       caught = true;
       std::string msg = e.what();
@@ -1309,7 +1309,7 @@ static void test_level_names() {
       X(i, 0) = i % 3;
     arma::vec y = arma::randn<arma::vec>(n);
     WarpKriging model({"categorical(3,2)"}, "gauss");
-    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "20"}});
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "20"}});
     std::cout << "  numeric-only categorical still works  OK" << std::endl;
   }
 
@@ -1321,7 +1321,7 @@ static void test_level_names() {
       X(i, 0) = i % 3;
     arma::vec y = arma::randn<arma::vec>(n);
     WarpKriging model({R"(categorical(["x","y","z"],2))"}, "gauss");
-    model.fit(y, X, "constant", false, "Adam", "LL", {{"max_iter_adam", "20"}});
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "20"}});
 
     std::string tmpfile = "wk_level_names_test.json";
     model.save(tmpfile);
@@ -1350,13 +1350,13 @@ static void test_none_warp_vs_kriging_ll() {
   struct TestCase {
     std::string kernel;
     arma::uword d;
-    std::string regmodel;
+    Trend::RegressionModel regmodel;
   };
   std::vector<TestCase> cases = {
-      {"gauss", 1, "constant"},
-      {"gauss", 2, "constant"},
-      {"matern3_2", 1, "constant"},
-      {"matern5_2", 2, "constant"},
+      {"gauss", 1, Trend::RegressionModel::Constant},
+      {"gauss", 2, Trend::RegressionModel::Constant},
+      {"matern3_2", 1, Trend::RegressionModel::Constant},
+      {"matern5_2", 2, Trend::RegressionModel::Constant},
   };
 
   for (const auto& tc : cases) {

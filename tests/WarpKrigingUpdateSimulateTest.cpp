@@ -40,7 +40,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
   SECTION("update_simulate gives same distribution as update then simulate (none warping)") {
     // Build wk1 with "none" warping (should behave like plain Kriging)
     WarpKriging wk1({"none"}, "gauss");
-    wk1.fit(y_old, X_old, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk1.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
     // Simulation points
     const arma::uword n_sim_points = 8;
@@ -56,7 +56,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
     WarpKriging wk2({"none"}, "gauss");
     arma::mat X_full = arma::join_cols(X_old, X_new);
     arma::colvec y_full = arma::join_cols(y_old, y_new);
-    wk2.fit(y_full, X_full, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk2.fit(y_full, X_full, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
     arma::mat sims2 = wk2.simulate(n_sims, static_cast<uint64_t>(seed), X_sim);
 
     // Check dimensions
@@ -82,7 +82,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
 
   SECTION("update_simulate gives same distribution as update then simulate (affine warping)") {
     WarpKriging wk1({"affine"}, "gauss");
-    wk1.fit(y_old, X_old, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk1.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
     const arma::uword n_sim_points = 8;
     arma::mat X_sim(n_sim_points, d, arma::fill::randu);
@@ -95,7 +95,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
     WarpKriging wk2({"affine"}, "gauss");
     arma::mat X_full = arma::join_cols(X_old, X_new);
     arma::colvec y_full = arma::join_cols(y_old, y_new);
-    wk2.fit(y_full, X_full, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk2.fit(y_full, X_full, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
     arma::mat sims2 = wk2.simulate(n_sims, static_cast<uint64_t>(seed), X_sim);
 
     REQUIRE(sims1.n_rows == n_sim_points);
@@ -124,7 +124,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
       INFO("Testing kernel: " << kernel);
 
       WarpKriging wk1({"none"}, kernel);
-      wk1.fit(y_old, X_old, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+      wk1.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
       arma::mat X_sim(5, d, arma::fill::randu);
       const int n_sims = 1000;
@@ -136,7 +136,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
       WarpKriging wk2({"none"}, kernel);
       arma::mat X_full = arma::join_cols(X_old, X_new);
       arma::colvec y_full = arma::join_cols(y_old, y_new);
-      wk2.fit(y_full, X_full, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+      wk2.fit(y_full, X_full, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
       arma::mat sims2 = wk2.simulate(n_sims, static_cast<uint64_t>(seed), X_sim);
 
       REQUIRE(sims1.is_finite());
@@ -159,7 +159,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
 
   SECTION("Smoke test: simulate without will_update still works") {
     WarpKriging wk({"none"}, "gauss");
-    wk.fit(y_old, X_old, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
     arma::mat X_sim(5, d, arma::fill::randu);
     arma::mat sims = wk.simulate(10, 42, X_sim);  // will_update defaults to false
@@ -170,7 +170,7 @@ TEST_CASE("WarpKrigingUpdateSimulateTest - Update simulate equals updated model 
 
   SECTION("Error: update_simulate without prior simulate throws") {
     WarpKriging wk({"none"}, "gauss");
-    wk.fit(y_old, X_old, "constant", false, "Adam", "LL", {{"max_iter_adam", "100"}});
+    wk.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
 
     REQUIRE_THROWS_WITH(wk.update_simulate(y_new, X_new), Catch::Contains("No previous simulation data"));
   }

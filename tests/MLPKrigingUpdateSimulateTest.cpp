@@ -39,7 +39,7 @@ TEST_CASE("MLPKrigingUpdateSimulateTest - Update simulate equals updated model s
 
   SECTION("update_simulate gives same distribution as update then simulate") {
     MLPKriging mk1({8}, 2, "tanh", "gauss");
-    mk1.fit(y_old, X_old, "constant", false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
+    mk1.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
 
     // Simulation points
     const arma::uword n_sim_points = 8;
@@ -55,7 +55,7 @@ TEST_CASE("MLPKrigingUpdateSimulateTest - Update simulate equals updated model s
     MLPKriging mk2({8}, 2, "tanh", "gauss");
     arma::mat X_full = arma::join_cols(X_old, X_new);
     arma::colvec y_full = arma::join_cols(y_old, y_new);
-    mk2.fit(y_full, X_full, "constant", false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
+    mk2.fit(y_full, X_full, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
     arma::mat sims2 = mk2.simulate(n_sims, seed, X_sim);
 
     // Check dimensions
@@ -66,7 +66,7 @@ TEST_CASE("MLPKrigingUpdateSimulateTest - Update simulate equals updated model s
 
   SECTION("Smoke test: simulate without will_update still works") {
     MLPKriging mk({8}, 2, "tanh", "gauss");
-    mk.fit(y_old, X_old, "constant", false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
+    mk.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
 
     arma::mat X_sim(5, d, arma::fill::randu);
     arma::mat sims = mk.simulate(10, 42, X_sim);  // will_update defaults to false
@@ -77,7 +77,7 @@ TEST_CASE("MLPKrigingUpdateSimulateTest - Update simulate equals updated model s
 
   SECTION("Error: update_simulate without prior simulate throws") {
     MLPKriging mk({8}, 2, "tanh", "gauss");
-    mk.fit(y_old, X_old, "constant", false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
+    mk.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "100"}});
 
     REQUIRE_THROWS_WITH(mk.update_simulate(y_new, X_new), Catch::Contains("No previous simulation data"));
   }

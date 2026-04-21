@@ -3,6 +3,7 @@
 #include <RcppArmadillo.h>
 // clang-format on
 
+#include "libKriging/Trend.hpp"
 #include "libKriging/WarpKriging.hpp"
 
 using namespace libKriging;
@@ -38,7 +39,8 @@ SEXP warpKriging_new(const arma::vec& y,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  WarpKriging* model = new WarpKriging(y, X, warp_strs, kernel, regmodel, normalize, optim, objective, params);
+  WarpKriging* model
+      = new WarpKriging(y, X, warp_strs, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
 
   return WarpKrigingPtr(model, true);
 }
@@ -66,7 +68,7 @@ void warpKriging_fit(SEXP model_ptr,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  model->fit(y, X, regmodel, normalize, optim, objective, params);
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +245,7 @@ bool warpKriging_normalize(SEXP model_ptr) {
 // [[Rcpp::export]]
 std::string warpKriging_regmodel(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
-  return model->regmodel();
+  return Trend::toString(model->regmodel());
 }
 
 // [[Rcpp::export]]
