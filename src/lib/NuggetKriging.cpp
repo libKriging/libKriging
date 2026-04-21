@@ -513,7 +513,8 @@ double NuggetKriging::_logMargPost(const arma::vec& _theta_alpha,
       = Rinv_X
         * (LinearAlgebra::solve_upper(
             LX.t(),
-            LinearAlgebra::solve_lower(LX, trans(Rinv_X))));  // compute  Rinv_X_Xt_Rinv_X_inv_Xt_Rinv through one forward
+            LinearAlgebra::solve_lower(LX,
+                                       trans(Rinv_X))));  // compute  Rinv_X_Xt_Rinv_X_inv_Xt_Rinv through one forward
 
   arma::mat yt_Rinv = trans(LinearAlgebra::solve_upper(m.L.t(), m.ystar));
   t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);

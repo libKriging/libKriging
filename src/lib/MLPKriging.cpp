@@ -346,7 +346,7 @@ std::pair<double, arma::vec> MLPKriging::concentrated_ll_and_grad_theta() const 
   const arma::uword d = m_theta.n_elem;
 
   arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);  // R⁻¹(y - Fβ)
-  const arma::mat& Rinv = m_Rinv;  // Use cached
+  const arma::mat& Rinv = m_Rinv;                              // Use cached
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
   arma::vec grad_theta(d, arma::fill::zeros);
