@@ -157,6 +157,9 @@ void NoiseKriging::populate_Model(KModel& m,
   auto t0 = Bench::tic();
   // Invalidate cached Linv so gradient code recomputes it for the new L
   m.Linv = arma::mat();
+  // Normalized covariance matrix: C̃_ij = ρ(x_i,x_j) off-diagonal, C̃_ii = 1 + noise_i/σ².
+  // Full covariance is σ²·C̃; σ² is factored out and reapplied post-hoc.
+  const arma::vec diag_norm = 1.0 + m_noise / sigma2;
   // Reuse existing m.R allocation
   // check if we want to recompute model for same theta, for augmented Xy (using cholesky fast update).
   bool update = false;
@@ -164,9 +167,9 @@ void NoiseKriging::populate_Model(KModel& m,
     update = (m_sigma2 == sigma2) && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
              && (this->m_T.memptr() != nullptr) && (n > this->m_T.n_rows);
   if (update) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise, m_T, m_R);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, 1.0, diag_norm, m_T, m_R);
   } else
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, sigma2, sigma2 + m_noise);
+    m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, 1.0, diag_norm);
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
   m.Rinv = LinearAlgebra::inv_sympd(m.L);
@@ -257,21 +260,22 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
 
   arma::uword n = m_X.n_rows;
 
-  // this L matrix is already multplied by sigma2
-  double ll = -0.5 * (n * log(2 * M_PI) + 2 * sum(log(m.L.diag())) + as_scalar(LinearAlgebra::crossprod(m.Estar)));
+  // Normalized form: full C = σ²·C̃, so log|C| = n·log(σ²) + log|C̃| and
+  // residual'·C⁻¹·residual = SSEstar / σ² where SSEstar = Ẽstar'·Ẽstar is computed
+  // on the normalized L̃ stored in m.L.
+  double ll = -0.5 * (n * log(2 * M_PI * _sigma2) + 2 * sum(log(m.L.diag())) + m.SSEstar / _sigma2);
 
   if (grad_out != nullptr) {
     auto t0 = Bench::tic();
     arma::vec terme1 = arma::vec(d);
 
-    const arma::mat& Cinv = m.Rinv;  // Use cached Rinv from populate_Model
+    const arma::mat& Rinv = m.Rinv;  // cached C̃⁻¹ from populate_Model
 
-    arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
+    arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);  // x = C̃⁻¹·residual
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
 
-    // Optimized gradient computation: compute on-the-fly without storing full gradC cube
-    // This eliminates expensive tube() operations and reduces memory usage
-
+    // ∂ll/∂θ_k = -0.5·trace(C̃⁻¹·∂C̃/∂θ_k) + 0.5/σ²·x'·∂C̃/∂θ_k·x
+    // Since C̃ has unit-derivative-free diagonal, only off-diagonals contribute.
     // Initialize gradient accumulators
     arma::vec term1_vec(d, arma::fill::zeros);
     arma::vec term2_vec(d, arma::fill::zeros);
@@ -282,36 +286,41 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
       for (arma::uword j = 0; j < i; j++) {
         // Compute gradient vector once for this (i,j) pair
         arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), _theta);
-        double R_ij = m.R.at(i, j);
+        double R_ij = m.R.at(i, j);  // off-diagonal ρ(x_i,x_j) (factor=1 normalization)
         double x_i = x.at(i);
         double x_j = x.at(j);
-        double Cinv_ij = Cinv.at(i, j);
+        double Rinv_ij = Rinv.at(i, j);
 
         // Accumulate contributions for all dimensions
         for (arma::uword k = 0; k < d; k++) {
-          double gradC_k_ij = R_ij * dlnCov.at(k);
+          double gradR_k_ij = R_ij * dlnCov.at(k);
 
-          // terme1: x.t() * gradC_k * x (factor of 2 for symmetry)
-          term1_vec.at(k) += 2.0 * x_i * gradC_k_ij * x_j;
+          // term1: x.t() * gradR_k * x (factor of 2 for symmetry)
+          term1_vec.at(k) += 2.0 * x_i * gradR_k_ij * x_j;
 
-          // terme2: -trace(Cinv * gradC_k) (factor of 2 for symmetry)
-          term2_vec.at(k) -= 2.0 * Cinv_ij * gradC_k_ij;
+          // term2: -trace(C̃⁻¹ * gradR_k) (factor of 2 for symmetry)
+          term2_vec.at(k) -= 2.0 * Rinv_ij * gradR_k_ij;
         }
       }
     }
     t0 = Bench::toc(bench, "gradC computation [optimized]", t0);
 
-    // Finalize gradients
+    // Finalize gradients: divide term1 by σ² to account for C̃ normalization
     for (arma::uword k = 0; k < d; k++) {
-      terme1.at(k) = term1_vec.at(k);
+      terme1.at(k) = term1_vec.at(k) / _sigma2;
       (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
     }
 
     if (m_est_sigma2) {
-      arma::mat dCdv = (m.R - arma::diagmat(m_noise)) / _sigma2;
-      double _terme1 = -as_scalar((trans(x) * dCdv) * x);
-      double _terme2 = arma::dot(Cinv, dCdv);
-      (*grad_out).at(d) = -0.5 * (_terme1 + _terme2);
+      // ∂C̃/∂σ² = -diag(noise)/σ⁴, off-diagonal = 0
+      // ∂ll/∂σ² = -0.5·[ n/σ² - sum(noise_i·C̃⁻¹_ii)/σ⁴
+      //                  + sum(noise_i·x_i²)/σ⁶ - SSEstar/σ⁴ ]
+      double sigma2_sq = _sigma2 * _sigma2;
+      double noise_Rinv = arma::dot(m_noise, Rinv.diag());
+      double noise_x2 = arma::dot(m_noise, x % x);
+      (*grad_out).at(d) = -0.5
+                          * (n / _sigma2 - noise_Rinv / sigma2_sq + noise_x2 / (sigma2_sq * _sigma2)
+                             - m.SSEstar / sigma2_sq);
     } else
       (*grad_out).at(d) = 0;  // if sigma2 is defined & fixed by user
 
@@ -1004,7 +1013,8 @@ NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, 
 #ifdef _OPENMP
   }
 #endif
-  R_on *= m_sigma2;
+  // Normalized form: R_on is pure correlation ρ(X_o, X_n). σ² is reapplied
+  // on the variance/cov outputs below.
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -1022,20 +1032,20 @@ NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, 
   t0 = Bench::toc(nullptr, "Ecirc_n    ", t0);
 
   if (return_stdev) {
-    ysd2_n = m_sigma2 - sum(Rstar_on % Rstar_on, 0).as_col() + sum(Ecirc_n % Ecirc_n, 1).as_col();
+    ysd2_n = 1.0 - sum(Rstar_on % Rstar_on, 0).as_col() + sum(Ecirc_n % Ecirc_n, 1).as_col();
     ysd2_n.transform([](double val) { return (std::isnan(val) || val < 0 ? 0.0 : val); });
-    ysd2_n *= m_scaleY * m_scaleY;
+    ysd2_n *= m_sigma2 * m_scaleY * m_scaleY;
     t0 = Bench::toc(nullptr, "ysd2_n     ", t0);
   }
 
   if (return_cov) {
-    // Compute the covariance matrix between new data points
+    // Compute the correlation matrix between new data points (factor=1, diag=1)
     arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-    LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov, m_sigma2);
+    LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov, 1.0);
     t0 = Bench::toc(nullptr, "R_nn       ", t0);
 
     Sigma_n = R_nn - trans(Rstar_on) * Rstar_on + Ecirc_n * trans(Ecirc_n);
-    Sigma_n *= m_scaleY * m_scaleY;
+    Sigma_n *= m_sigma2 * m_scaleY * m_scaleY;
     t0 = Bench::toc(nullptr, "Sigma_n    ", t0);
   }
 
@@ -1111,7 +1121,7 @@ NoiseKriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, 
       }
     }
     Dyhat_n *= m_scaleY;
-    Dysd2_n *= m_scaleY * m_scaleY;
+    Dysd2_n *= m_sigma2 * m_scaleY * m_scaleY;
   }
 
   return std::make_tuple(std::move(yhat_n),
@@ -1166,14 +1176,13 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim,
   Xn_n = trans(Xn_n);
 
   auto t0 = Bench::tic();
-  // Compute covariance between new data
+  // Normalized form: R_nn, R_on are pure correlations; σ² is reapplied when sampling.
   arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
-  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov, m_sigma2);
+  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov, 1.0);
   t0 = Bench::toc(nullptr, "R_nn          ", t0);
 
-  // Compute covariance between training data and new data to predict
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-  LinearAlgebra::covMat_rect(&R_on, Xn_o, Xn_n, m_theta, _Cov, m_sigma2);
+  LinearAlgebra::covMat_rect(&R_on, Xn_o, Xn_n, m_theta, _Cov, 1.0);
   t0 = Bench::toc(nullptr, "R_on        ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -1191,8 +1200,7 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::simulate(const int nsim,
   arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
   t0 = Bench::toc(nullptr, "Sigma_nKo     ", t0);
 
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(
-      Sigma_nKo / m_sigma2);  // normalization to keep same diag inc (+=1e-10) than other Kriging
+  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
   t0 = Bench::toc(nullptr, "LSigma_nKo     ", t0);
 
   arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
@@ -1301,20 +1309,18 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec& y_u,
   if (!use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
 
-    // Compute covariance between updated data
+    // Normalized form: factor=1 for off-diagonals, diag_uu = 1 + noise_u/σ²
     lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
-    arma::vec diag_uu = m_sigma2 + noise_u;
-    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Xn_u, m_theta, _Cov, m_sigma2, diag_uu);
+    arma::vec diag_uu = 1.0 + noise_u / m_sigma2;
+    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Xn_u, m_theta, _Cov, 1.0, diag_uu);
     t0 = Bench::toc(nullptr, "R_uu          ", t0);
 
-    // Compute covariance between updated/old data
     lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Xn_u, Xn_o, m_theta, _Cov, m_sigma2);
+    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Xn_u, Xn_o, m_theta, _Cov, 1.0);
     t0 = Bench::toc(nullptr, "R_uo          ", t0);
 
-    // Compute covariance between updated/new data
     lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_un, Xn_u, Xn_n, m_theta, _Cov, m_sigma2);
+    LinearAlgebra::covMat_rect(&lastsimup_R_un, Xn_u, Xn_n, m_theta, _Cov, 1.0);
     t0 = Bench::toc(nullptr, "R_un          ", t0);
   }
 
@@ -1337,15 +1343,14 @@ LIBKRIGING_EXPORT arma::mat NoiseKriging::update_simulate(const arma::vec& y_u,
     arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
     t0 = Bench::toc(nullptr, "Rstar_onCu          ", t0);
 
-    arma::mat Ecirc_uKon
-        = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on) * std::sqrt(m_sigma2);
+    // Normalized form: Ecirc_uKon stays pure (no √σ² rescale); σ² is reapplied when sampling.
+    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
     t0 = Bench::toc(nullptr, "Ecirc_uKon          ", t0);
 
     arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
     t0 = Bench::toc(nullptr, "Sigma_uKon          ", t0);
 
-    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(
-        Sigma_uKon / m_sigma2);  // normalization to keep same diag inc (+=1e-10) than other Kriging
+    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
     t0 = Bench::toc(nullptr, "LSigma_uKon          ", t0);
 
     arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
