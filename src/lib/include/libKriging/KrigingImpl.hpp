@@ -61,10 +61,15 @@ class KrigingImpl {
 
   LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
 
-  /// Optional feature map Φ : (n × d_in) → (n × d_out).  Used by simulate_impl
-  /// and update_simulate_impl to transform normalized inputs to the kernel space
-  /// before covariance computations.  Empty (default) = identity (no transform).
+  /// Optional feature map Φ : (n × d_in) → (n × d_out).  Used by simulate_impl,
+  /// update_simulate_impl, and predict_impl to transform normalized inputs to the
+  /// kernel space before covariance computations.  Empty = identity (no transform).
   using FeatureMap = std::function<arma::mat(const arma::mat&)>;
+
+  /// Optional Jacobian of Φ : (d_in,) → (d_out × d_in).  Used by predict_impl
+  /// to chain-rule derivatives from feature space back to input space.
+  /// Empty (default) = identity Jacobian (only valid when d_in == d_out).
+  using FeatureJacobian = std::function<arma::mat(const arma::vec&)>;
 
   static arma::vec ones;
 
@@ -184,6 +189,12 @@ class KrigingImpl {
   ///   * `var_scale`: σ² multiplier applied to the variance/cov/derivative
   ///     outputs (K: σ² with optional LMP correction; Nug: σ²/α with LMP;
   ///     Noise: m_sigma2 — LMP unsupported).
+  ///   * `phi`: optional feature map applied after normalization.  When set,
+  ///     m_X must already store Φ(X_normalized); the kernel operates in that
+  ///     feature space.  Pass {} for K/Nug/Noise (identity).
+  ///   * `jac`: optional Jacobian of phi at a normalized input point (d_phi×d_in).
+  ///     When set, derivatives are chain-ruled from feature space to input space.
+  ///     Pass {} when phi is not set or when d_phi == d_in and no chain rule needed.
   std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> predict_impl(const arma::mat& X_n,
                                                                                  bool return_stdev,
                                                                                  bool return_cov,
@@ -191,7 +202,9 @@ class KrigingImpl {
                                                                                  double R_on_factor,
                                                                                  double R_nn_factor,
                                                                                  const arma::vec& R_nn_diag,
-                                                                                 double var_scale);
+                                                                                 double var_scale,
+                                                                                 const FeatureMap& phi = {},
+                                                                                 const FeatureJacobian& jac = {}) const;
 
   /// Unified simulate scaffolding shared by the three variants.  Builds R_nn,
   /// R_on, draws y_n ~ N(yhat_n, σ² · Sigma/Sigma_divisor), and (when

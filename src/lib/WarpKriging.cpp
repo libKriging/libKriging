@@ -2271,145 +2271,41 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                                                                                        bool return_deriv) const {
   if (!m_fitted)
     throw std::runtime_error("predict: model not fitted");
-
   validate_discrete_columns(X_n, "predict");
 
-  const arma::uword d = X_n.n_cols;
-  arma::mat x_n = X_n;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < x_n.n_cols; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
-      if (is_cont)
-        x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
-    }
-  }
+  // phi_fn: apply warping to normalized inputs (n × d_input) → (n × d_phi)
+  // Base normalization (centerX/scaleX with 0/1 for non-continuous) is equivalent to
+  // Warp's per-dim continuous-only normalization — see W-2 key insight in refactor_table.md.
+  auto phi_fn = [this](const arma::mat& Xnorm) -> arma::mat { return apply_warping(Xnorm); };
 
-  const arma::uword n_n = x_n.n_rows;
-  const arma::uword n_o = m_X.n_rows;
-  arma::mat Phi_new = apply_warping(x_n);
-  arma::mat F_new = build_trend_matrix(x_n);
-  // Use correlation cross-matrix (not covariance K = σ²R), because m_T is
-  // the Cholesky of R and m_z = C⁻¹(y − Fβ).
-  arma::mat Rcross = build_Rcross(Phi_new, m_X);
-
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, Rcross.t());
-  arma::vec mean = F_new * m_beta + Rstar_on.t() * m_z;
-  mean = mean * m_scaleY + m_centerY;
-
-  arma::vec stdev;
-  arma::mat cov;
-  arma::mat Dyhat_n;
-  arma::mat Dystdev_n;
-
-  // Reuse Rstar_on (= C⁻¹ Rcross') computed above for mean
-  arma::vec ysd2_n;
-
-  if (return_stdev || return_cov || return_deriv) {
-    arma::mat Fhat_n = Rstar_on.t() * m_M;
-    arma::mat E_n = F_new - Fhat_n;
-    arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
-
-    if (return_cov) {
-      arma::mat R_new(n_n, n_n);
-      LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
-      cov = R_new - Rstar_on.t() * Rstar_on;
-      cov += Ecirc_n * Ecirc_n.t();
-      cov *= (m_sigma2 * m_scaleY * m_scaleY);
-      cov = 0.5 * (cov + cov.t());
-      cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
-      stdev = arma::sqrt(cov.diag());
-      ysd2_n = cov.diag();
-    } else {
-      ysd2_n.set_size(n_n);
-      for (arma::uword i = 0; i < n_n; ++i) {
-        ysd2_n(i) = std::max(0.0, 1.0 - arma::dot(Rstar_on.col(i), Rstar_on.col(i)));
-        ysd2_n(i) += arma::dot(Ecirc_n.row(i), Ecirc_n.row(i));
-      }
-      ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
-      ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
-      if (return_stdev)
-        stdev = arma::sqrt(ysd2_n);
-    }
-  }
-
-  if (return_deriv) {
+  // jac_fn: FD Jacobian dΦ/dx at a normalized input column (d_input,) → (d_phi × d_input)
+  auto jac_fn = [this](const arma::vec& x_norm_col) -> arma::mat {
     const double h = 1.0E-5;
-    const double sigma2 = m_sigma2;
-
-    Dyhat_n.set_size(n_n, d);
-    Dyhat_n.zeros();
-    arma::mat Dysd2_n(n_n, d, arma::fill::zeros);
-
-    // Ecirc_n needed for stdev derivative
-    arma::mat Ecirc_n_d;
-    if (return_stdev) {
-      arma::mat Fhat_n = Rstar_on.t() * m_M;
-      arma::mat E_n = F_new - Fhat_n;
-      Ecirc_n_d = LinearAlgebra::rsolve_upper(m_circ, E_n);
+    const arma::uword d_in = x_norm_col.n_elem;
+    arma::mat x_perturbed(2 * d_in, d_in);
+    for (arma::uword k = 0; k < d_in; k++) {
+      x_perturbed.row(k) = x_norm_col.t();
+      x_perturbed.row(d_in + k) = x_norm_col.t();
+      x_perturbed(k, k) += h;
+      x_perturbed(d_in + k, k) -= h;
     }
+    arma::mat Phi_p = apply_warping(x_perturbed);
+    arma::mat J(m_feature_dim, d_in);
+    for (arma::uword k = 0; k < d_in; k++)
+      J.col(k) = (Phi_p.row(k) - Phi_p.row(d_in + k)).t() / (2.0 * h);
+    return J;
+  };
 
-    for (arma::uword i = 0; i < n_n; i++) {
-      // Build perturbed points for finite-difference Jacobian (2d points)
-      arma::mat x_perturbed(2 * d, d);
-      for (arma::uword k = 0; k < d; k++) {
-        x_perturbed.row(k) = x_n.row(i);
-        x_perturbed.row(d + k) = x_n.row(i);
-        x_perturbed(k, k) += h;
-        x_perturbed(d + k, k) -= h;
-      }
-
-      // Warping Jacobian: dΦ/dx  (feature_dim × d)
-      arma::mat Phi_perturbed = apply_warping(x_perturbed);
-      arma::mat J_warp(m_feature_dim, d);
-      for (arma::uword k = 0; k < d; k++) {
-        J_warp.col(k) = (Phi_perturbed.row(k) - Phi_perturbed.row(d + k)).t() / (2.0 * h);
-      }
-
-      // Trend derivative: dF/dx  (d × p) via finite differences  [same layout as Kriging]
-      arma::mat F_perturbed = build_trend_matrix(x_perturbed);
-      arma::mat DF_n_i(d, F_new.n_cols);
-      for (arma::uword k = 0; k < d; k++) {
-        DF_n_i.row(k) = (F_perturbed.row(k) - F_perturbed.row(d + k)) / (2.0 * h);
-      }
-
-      // DR_on_i: derivative of cross-correlation w.r.t. x  (n_o × d)
-      // dR(Φ_new, Φ_train)/dx = R * DlnCovDx(ΔΦ, θ)ᵀ · J_warp
-      arma::mat DR_on_i(n_o, d);
-      for (arma::uword j = 0; j < n_o; j++) {
-        arma::vec dPhi = Phi_new.row(i).t() - m_X.row(j).t();
-        arma::vec dlnCovDx = _DlnCovDx(dPhi, m_theta);
-        DR_on_i.row(j) = Rcross(i, j) * (dlnCovDx.t() * J_warp);
-      }
-
-      // W_i = C⁻¹ DR_on_i  (n_o × d)
-      arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
-
-      // Mean derivative: dŷ/dx = dF/dx · β + dR/dxᵀ · z  (using m_z = C⁻¹(y-Fβ))
-      Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * LinearAlgebra::solve_upper(m_T.t(), m_z)).t();
-
-      if (return_stdev) {
-        // dvar/dx = -2 vᵢᵀ Wᵢ + 2 Ecirc_i · circ⁻ᵀ(DF_i - Wᵢᵀ m_M)ᵀ
-        arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
-        Dysd2_n.row(i) = -2.0 * Rstar_on.col(i).t() * W_i + 2.0 * Ecirc_n_d.row(i) * DEcirc_n_i;
-      }
-    }
-    Dyhat_n *= m_scaleY;
-    Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
-
-    if (return_stdev) {
-      // Dystdev = d(sqrt(var))/dx = dvar/dx / (2·stdev)
-      Dystdev_n.set_size(n_n, d);
-      for (arma::uword i = 0; i < n_n; i++) {
-        double sd_i = std::sqrt(ysd2_n(i));
-        if (sd_i > 0)
-          Dystdev_n.row(i) = Dysd2_n.row(i) / (2.0 * sd_i);
-        else
-          Dystdev_n.row(i).zeros();
-      }
-    }
-  }
-
-  return {mean, stdev, cov, Dyhat_n, Dystdev_n};
+  return predict_impl(X_n,
+                      return_stdev,
+                      return_cov,
+                      return_deriv,
+                      /*R_on_factor=*/1.0,
+                      /*R_nn_factor=*/1.0,
+                      /*R_nn_diag=*/{},
+                      /*var_scale=*/m_sigma2,
+                      phi_fn,
+                      jac_fn);
 }
 
 // -------------------------------------------------------------------------

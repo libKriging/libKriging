@@ -140,28 +140,44 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
                                                                                             double R_on_factor,
                                                                                             double R_nn_factor,
                                                                                             const arma::vec& R_nn_diag,
-                                                                                            double var_scale) {
+                                                                                            double var_scale,
+                                                                                            const FeatureMap& phi,
+                                                                                            const FeatureJacobian& jac) const {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
-  arma::uword d = m_X.n_cols;
-  if (X_n.n_cols != d)
+  arma::uword d = m_X.n_cols;  // kernel/feature space dim
+  arma::uword d_input = jac ? X_n.n_cols : d;
+  if (!phi && X_n.n_cols != d)
     throw std::runtime_error("Predict locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
                              + std::to_string(d));
 
   arma::vec yhat_n = arma::vec(n_n, arma::fill::none);
   arma::vec ysd2_n = arma::vec(n_n, arma::fill::zeros);
   arma::mat Sigma_n = arma::mat(n_n, n_n, arma::fill::zeros);
-  arma::mat Dyhat_n = arma::mat(n_n, d, arma::fill::zeros);
-  arma::mat Dysd2_n = arma::mat(n_n, d, arma::fill::zeros);
+  arma::mat Dyhat_n = arma::mat(n_n, d_input, arma::fill::zeros);
+  arma::mat Dysd2_n = arma::mat(n_n, d_input, arma::fill::zeros);
 
-  arma::mat Xn_o = trans(m_X);  // already normalized if needed
+  arma::mat Xn_o = trans(m_X);  // already in feature space (normalized)
   arma::mat Xn_n = X_n;
-  // Normalize X_n
+  // Normalize X_n (row-vector form; equivalent to Warp's per-dim mask when centerX/scaleX
+  // are 0/1 for non-continuous dims — see W-2 key insight in refactor_table.md)
   Xn_n.each_row() -= m_centerX;
   Xn_n.each_row() /= m_scaleX;
 
-  arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
-  Xn_n = trans(Xn_n);
+  // Apply feature map phi if provided; trend is in feature space.
+  // Keep input-space copy (d_input × n_n, transposed) for jac_fn calls in deriv loop.
+  arma::mat Xn_n_input;  // d_input × n_n; only used when jac is set
+  arma::mat F_n;
+  if (phi) {
+    if (jac)
+      Xn_n_input = trans(Xn_n);   // save input-space before overwriting with phi-space
+    arma::mat Xn_n_feat = phi(Xn_n);  // n_n × d
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n_feat);
+    Xn_n = trans(Xn_n_feat);          // d × n_n  (phi-space from here on)
+  } else {
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+    Xn_n = trans(Xn_n);               // d × n_n
+  }
 
   auto t0 = Bench::tic();
   arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
@@ -228,20 +244,31 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 
   if (return_deriv) {
     const double h = 1.0E-5;
+    // Perturbations in feature space (d × d); when jac is set we chain-rule to input space.
     arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
 
     for (arma::uword i = 0; i < n_n; i++) {
+      // dR_on / dPhi_k — (n_o × d) in feature space
       arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
       for (arma::uword j = 0; j < n_o; j++) {
         DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
+      // dF / dPhi_k — (d × p) in feature space
       arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));
       arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
                           - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
                          / (2 * h);
       t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
+
+      // Chain rule: dR_on/dx = dR_on/dPhi * J,  dF/dx = J.t() * dF/dPhi   (d_input cols)
+      // jac receives the normalized INPUT-space point (before phi), not phi-space.
+      if (jac) {
+        arma::mat J_i = jac(Xn_n_input.col(i));  // d_phi × d_input
+        DR_on_i = DR_on_i * J_i;                 // n_o × d_input
+        DF_n_i = J_i.t() * DF_n_i;              // d_input × p
+      }
 
       arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
       t0 = Bench::toc(nullptr, "W_i        ", t0);
@@ -262,7 +289,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
                          std::move(arma::sqrt(ysd2_n)),
                          std::move(Sigma_n),
                          std::move(Dyhat_n),
-                         std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d, arma::fill::ones))));
+                         std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d_input, arma::fill::ones))));
 }
 
 arma::mat KrigingImpl::simulate_impl(int nsim,
