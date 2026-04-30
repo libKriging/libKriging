@@ -10,8 +10,6 @@
 #include "libKriging/KrigingLoader.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/MLPKriging.hpp"
-#include "libKriging/NoiseKriging.hpp"
-#include "libKriging/NuggetKriging.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 #include "libKriging/WarpKriging.hpp"
@@ -32,10 +30,10 @@ Rcpp::List kriging_load(std::string filename) {
 
 // [[Rcpp::export]]
 Rcpp::List noisekriging_load(std::string filename) {
-  NoiseKriging ok = NoiseKriging::load(filename);
+  Kriging ok = Kriging::load(filename);
 
   Rcpp::List obj;
-  Rcpp::XPtr<NoiseKriging> impl_copy(new NoiseKriging(ok, ExplicitCopySpecifier{}));
+  Rcpp::XPtr<Kriging> impl_copy(new Kriging(ok, ExplicitCopySpecifier{}));
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NoiseKriging";
   return obj;
@@ -43,10 +41,10 @@ Rcpp::List noisekriging_load(std::string filename) {
 
 // [[Rcpp::export]]
 Rcpp::List nuggetkriging_load(std::string filename) {
-  NuggetKriging ok = NuggetKriging::load(filename);
+  Kriging ok = Kriging::load(filename);
 
   Rcpp::List obj;
-  Rcpp::XPtr<NuggetKriging> impl_copy(new NuggetKriging(ok, ExplicitCopySpecifier{}));
+  Rcpp::XPtr<Kriging> impl_copy(new Kriging(ok, ExplicitCopySpecifier{}));
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NuggetKriging";
   return obj;

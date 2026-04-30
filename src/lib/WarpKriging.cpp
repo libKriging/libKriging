@@ -1212,10 +1212,20 @@ void WarpKriging::build_warps() {
   m_warps.clear();
   m_feature_dim = 0;
   m_is_continuous.clear();
+  m_is_joint = false;
+  m_joint_warp.reset();
+
+  // MLPJoint: single joint MLP taking all inputs together — no per-variable warps.
+  if (m_warp_specs.size() == 1 && m_warp_specs[0].type == WarpType::MLPJoint) {
+    m_is_joint = true;
+    m_feature_dim = m_warp_specs[0].d_out;
+    // m_joint_warp is instantiated later in ensure_joint_warp() (needs d_in from X).
+    return;
+  }
 
   for (const auto& spec : m_warp_specs) {
     if (spec.type == WarpType::MLPJoint)
-      throw std::invalid_argument("WarpKriging: mlp_joint is no longer supported here — use MLPKriging instead.");
+      throw std::invalid_argument("WarpKriging: mlp_joint must be the only warp spec");
   }
 
   for (const auto& spec : m_warp_specs) {
@@ -1226,10 +1236,20 @@ void WarpKriging::build_warps() {
   }
 }
 
+void WarpKriging::ensure_joint_warp(arma::uword d_in) {
+  if (m_joint_warp && m_joint_warp->input_dim() == d_in)
+    return;
+  const auto& spec = m_warp_specs[0];
+  m_joint_warp = std::make_unique<WarpMLPJoint>(d_in, spec.hidden_dims, spec.d_out,
+                                                 WarpMLP::parse_act(spec.activation));
+}
+
 // -------------------------------------------------------------------------
 //  Validate discrete (categorical / ordinal) columns of X
 // -------------------------------------------------------------------------
 void WarpKriging::validate_discrete_columns(const arma::mat& X, const std::string& caller) const {
+  if (m_is_joint)
+    return;
   for (arma::uword j = 0; j < m_warp_specs.size(); ++j) {
     const auto& spec = m_warp_specs[j];
     if (spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal)
@@ -1290,15 +1310,21 @@ void WarpKriging::make_Cov(const std::string& kernel) {
   else if (s == "matern52")
     s = "matern5_2";
 
-  auto cov = Covariance::resolve(s);
-  _Cov = std::move(cov.Cov);
-  _DlnCovDtheta = std::move(cov.DlnCovDtheta);
-  _DlnCovDx = std::move(cov.DlnCovDx);
+  KrigingImpl::make_Cov(s);
 }
 
 void WarpKriging::init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel) {
+  // Inherited members default-initialise to zero/empty; restore the safe
+  // defaults the previous WarpKriging-owned members provided (especially
+  // m_scaleY=1, m_regmodel=Constant) so accessors are well-defined pre-fit.
+  m_normalize = false;
+  m_centerY = 0.0;
+  m_scaleY = 1.0;
+  m_sigma2 = 1.0;
+  m_regmodel = Trend::RegressionModel::Constant;
+
   m_warp_specs = specs;
-  m_kernel_name = kernel;
+  m_covType = kernel;
   m_base_kernel = parse_kernel(kernel);
   make_Cov(kernel);
   build_warps();
@@ -1325,6 +1351,11 @@ WarpKriging::WarpKriging(const arma::vec& y,
 //  Apply warping:  X → Φ  (per-variable concatenation)
 // -------------------------------------------------------------------------
 arma::mat WarpKriging::apply_warping(const arma::mat& X) const {
+  if (m_is_joint) {
+    if (!m_joint_warp)
+      throw std::runtime_error("apply_warping: joint warp not initialized (call ensure_joint_warp first)");
+    return m_joint_warp->forward(X);
+  }
   const arma::uword n = X.n_rows;
   arma::mat Phi(n, m_feature_dim);
 
@@ -1349,19 +1380,19 @@ arma::mat WarpKriging::build_trend_matrix(const arma::mat& X) const {
 //  Data normalisation  (only continuous variables are normalised)
 // -------------------------------------------------------------------------
 void WarpKriging::normalise_data() {
-  arma::uword d = m_X.n_cols;
+  arma::uword d = m_X_raw.n_cols;
   m_centerX = arma::zeros<arma::rowvec>(d);
   m_scaleX = arma::ones<arma::rowvec>(d);
 
   if (m_normalize) {
     for (arma::uword j = 0; j < d; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
+      bool is_cont = m_is_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
       if (is_cont) {
-        m_centerX(j) = arma::mean(m_X.col(j));
-        m_scaleX(j) = arma::stddev(m_X.col(j));
+        m_centerX(j) = arma::mean(m_X_raw.col(j));
+        m_scaleX(j) = arma::stddev(m_X_raw.col(j));
         if (m_scaleX(j) < 1e-12)
           m_scaleX(j) = 1.0;
-        m_X.col(j) = (m_X.col(j) - m_centerX(j)) / m_scaleX(j);
+        m_X_raw.col(j) = (m_X_raw.col(j) - m_centerX(j)) / m_scaleX(j);
       }
     }
     m_centerY = arma::mean(m_y);
@@ -1386,31 +1417,6 @@ void WarpKriging::normalise_data() {
 // -------------------------------------------------------------------------
 //  Correlation function  (R_ij = corr(φ_i, φ_j; θ),  R_ii = 1,  σ² factored out)
 // -------------------------------------------------------------------------
-// -------------------------------------------------------------------------
-//  Precomputed pairwise differences (like Kriging's compute_dX)
-// -------------------------------------------------------------------------
-void WarpKriging::compute_dPhi() {
-  const arma::uword n = m_Phi.n_rows;
-  const arma::uword d = m_Phi.n_cols;
-  m_dPhi.set_size(d, n * n);
-  m_dPhi.zeros();
-
-  const double* Phi_mem = m_Phi.memptr();
-  double* dPhi_mem = m_dPhi.memptr();
-
-  for (arma::uword i = 0; i < n; ++i) {
-    for (arma::uword j = i + 1; j < n; ++j) {
-      arma::uword ij = i * n + j;
-      arma::uword ji = j * n + i;
-      for (arma::uword k = 0; k < d; ++k) {
-        double diff = Phi_mem[i + k * n] - Phi_mem[j + k * n];
-        dPhi_mem[k + ij * d] = diff;
-        dPhi_mem[k + ji * d] = diff;
-      }
-    }
-  }
-}
-
 arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
   const arma::uword m = Phi_new.n_rows;
   const arma::uword n = Phi_train.n_rows;
@@ -1424,12 +1430,12 @@ arma::mat WarpKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& P
 // -------------------------------------------------------------------------
 //  WKModel factory
 // -------------------------------------------------------------------------
-void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
+void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta, double sigma2) const {
   const arma::uword n = m_y.n_elem;
 
   // Cholesky update detection (same logic as Kriging::populate_Model)
-  bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
-                   && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
+  const bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
+                         && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
 
   // Preemptive nugget: Embedding/Ordinal warpings can collapse same-level
   // training rows in Phi, making R rank-deficient in a way Kriging never
@@ -1437,83 +1443,105 @@ void WarpKriging::populate_Model(WKModel& m, const arma::vec& theta) const {
   // via set_num_nugget()) on the diagonal to stabilize Cholesky and its
   // derivative. Set num_nugget=0 to get exact Kriging equivalence at
   // warping="none".
+  //
+  // When m_noise is non-empty, the normalized covariance becomes
+  //   C̃ = R_off-diag + diag(1 + nug + noise_i/σ²)
+  // so the same cholCov(factor=1, diag) path carries observation-noise.
   arma::vec diag(n, arma::fill::value(1.0 + LinearAlgebra::num_nugget));
-  if (do_update) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag, m_T, m_R);
-  } else {
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag);
+  if (!m_noise.is_empty()) {
+    diag += m_noise / sigma2;
   }
 
-  m.Rinv = LinearAlgebra::inv_sympd(m.L);
-
-  // Whitened trend and observations
-  m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
-  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
-
-  // Gram matrix
-  arma::mat FtRinvF = m.Fstar.t() * m.Fstar;
-  m.Rstar = LinearAlgebra::chol_upper(FtRinvF);
-
-  // GLS beta
-  arma::vec FtRinvy = m.Fstar.t() * m.ystar;
-  m.betahat = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), FtRinvy));
-
-  // Whitened residual
-  arma::vec residual = m_y - m_F * m.betahat;
-  m.Estar = LinearAlgebra::solve_lower(m.L, residual);
-  m.SSEstar = arma::dot(m.Estar, m.Estar);
+  KrigingImpl::populate_Model(m, theta, /*alpha=*/1.0, diag, do_update, /*bench=*/nullptr);
 }
 
-WarpKriging::WKModel WarpKriging::make_Model(const arma::vec& theta) const {
-  const arma::uword n = m_y.n_elem;
-  const arma::uword p = m_F.n_cols;
-  WKModel m;
-  m.R = arma::mat(n, n, arma::fill::none);
-  m.L = arma::mat(n, n, arma::fill::none);
-  m.Rinv = arma::mat();
-  m.Fstar = arma::mat(n, p, arma::fill::none);
-  m.ystar = arma::vec(n, arma::fill::none);
-  m.Rstar = arma::mat(p, p, arma::fill::none);
-  m.Estar = arma::vec(n, arma::fill::none);
-  m.SSEstar = 0;
-  m.betahat = arma::vec(p, arma::fill::none);
-  populate_Model(m, theta);
+WarpKriging::WKModel WarpKriging::make_Model(const arma::vec& theta, double sigma2) const {
+  WKModel m = KrigingImpl::allocate_KModel();
+  populate_Model(m, theta, sigma2);
   return m;
 }
 
 //  refresh_cache  — rebuild Φ, R, Cholesky, β̂ (GLS), σ̂² (MLE), α
 // -------------------------------------------------------------------------
 void WarpKriging::refresh_cache() {
-  m_Phi = apply_warping(m_X);
-  compute_dPhi();
+  m_X = apply_warping(m_X_raw);
+  m_dX = LinearAlgebra::compute_dX(m_X);
+  m_maxdX = arma::max(arma::abs(m_dX), 1);
   refresh_cache_theta_only();
 }
 
-/// Rebuild R, Cholesky, β̂, σ̂², α from current m_Phi and m_theta.
-/// Skips recomputing m_Phi and m_dPhi — use when only θ changed.
+/// Rebuild R, Cholesky, β̂, σ̂², α from current m_X and m_theta.
+/// Skips recomputing m_X and m_dX — use when only θ changed.
+///
+/// Without noise: σ² admits the closed-form MLE σ² = SSEstar / n and the
+/// populate_Model diagonal is independent of σ², so a single factorization
+/// suffices.  With per-observation noise the diagonal depends on σ² (via
+/// noise_i/σ²), breaking the closed form.  We then run a 1D golden-section
+/// search on log(σ²) minimizing -ll(σ² | θ), with 20-30 extra Cholesky
+/// factorizations per refresh.  The θ-gradient remains correct by the
+/// envelope theorem (σ² sits at its MLE given θ).
 void WarpKriging::refresh_cache_theta_only() {
   const arma::uword n = m_y.n_elem;
-  m_F = build_trend_matrix(m_X);
-  WKModel m = make_Model(m_theta);
+  m_F = build_trend_matrix(m_X_raw);
 
-  m_R = std::move(m.R);
-  m_T = std::move(m.L);
-  m_Rinv = std::move(m.Rinv);
-  m_M = std::move(m.Fstar);
-  m_circ = std::move(m.Rstar);
-  m_beta = std::move(m.betahat);
-  m_z = std::move(m.Estar);
-  m_sigma2 = std::max(m.SSEstar / n, 1e-20);
+  if (m_noise.is_empty()) {
+    // Closed-form concentrated σ² (unchanged no-noise path).
+    WKModel m = make_Model(m_theta, 1.0);
+    m_sigma2 = std::max(m.SSEstar / n, 1e-20);
+    KrigingImpl::commit_model(m);
+    m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
+    return;
+  }
+
+  // Noise present: minimize neg_ll over σ² in log-space via golden-section.
+  auto neg_ll = [&](double sigma2) -> double {
+    WKModel m = make_Model(m_theta, sigma2);
+    double logdet = 2.0 * arma::sum(arma::log(m.L.diag()));
+    return 0.5 * (n * std::log(2.0 * arma::datum::pi * sigma2) + logdet + m.SSEstar / sigma2);
+  };
+
+  const double var_y = std::max(arma::var(m_y), 1e-10);
+  double a = std::log(var_y * 1e-6);
+  double b = std::log(var_y * 1e3);
+  const double phi = 0.5 * (std::sqrt(5.0) - 1.0);
+  double x1 = b - phi * (b - a), x2 = a + phi * (b - a);
+  double f1 = neg_ll(std::exp(x1)), f2 = neg_ll(std::exp(x2));
+  for (int iter = 0; iter < 100 && (b - a) > 1e-6; ++iter) {
+    if (f1 < f2) {
+      b = x2;
+      x2 = x1;
+      f2 = f1;
+      x1 = b - phi * (b - a);
+      f1 = neg_ll(std::exp(x1));
+    } else {
+      a = x1;
+      x1 = x2;
+      f1 = f2;
+      x2 = a + phi * (b - a);
+      f2 = neg_ll(std::exp(x2));
+    }
+  }
+  const double sigma2_opt = std::exp(0.5 * (a + b));
+  WKModel m = make_Model(m_theta, sigma2_opt);
+  m_sigma2 = sigma2_opt;
+  KrigingImpl::commit_model(m);
   m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
 }
 
 // -------------------------------------------------------------------------
 //  Concentrated profile log-likelihood
-//    LL(θ) = -n/2 [1 + log(2π) + log(σ̂²)] - ½ log|R|
+//    Without noise: σ² = SSEstar/n closed-form, so SSEstar/σ² = n and
+//      LL(θ) = -n/2 [1 + log(2π) + log(σ̂²)] - ½ log|R|
+//    With noise:  σ² sits at its inner-Brent MLE; SSEstar/σ² is NOT n:
+//      LL(θ, σ²) = -n/2 log(2π σ²) - ½ log|R̃| - ½ SSEstar / σ²
 // -------------------------------------------------------------------------
 double WarpKriging::concentrated_ll() const {
   const double n = static_cast<double>(m_y.n_elem);
-  return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2)) - 0.5 * m_logdet;
+  if (m_noise.is_empty()) {
+    return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2)) - 0.5 * m_logdet;
+  }
+  const double SSEstar = arma::dot(m_z, m_z);
+  return -0.5 * (n * std::log(2.0 * arma::datum::pi * m_sigma2) + m_logdet + SSEstar / m_sigma2);
 }
 
 double WarpKriging::logLikelihood() const {
@@ -1547,12 +1575,12 @@ std::tuple<double, arma::vec, arma::mat> WarpKriging::logLikelihoodFun(const arm
 //  ∂R/∂θ_k  (analytical, n×n matrix)
 // -------------------------------------------------------------------------
 arma::mat WarpKriging::build_dR_dtheta_k(const arma::mat& /*Phi*/, arma::uword k) const {
-  const arma::uword n = m_Phi.n_rows;
+  const arma::uword n = m_X.n_rows;
   arma::mat dR(n, n, arma::fill::zeros);
 
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = i + 1; j < n; ++j) {
-      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
+      arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), m_theta);
       double dR_ij = m_R(i, j) * dlnCov(k);
       dR(i, j) = dR_ij;
       dR(j, i) = dR_ij;
@@ -1588,7 +1616,7 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = i + 1; j < n; ++j) {
       // Use _DlnCovDtheta like Kriging: ∂R_ij/∂θ_k = R_ij * DlnCovDtheta_k
-      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
+      arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), m_theta);
       double R_ij = m_R(i, j);
       double w = 2.0 * dLL_dR(i, j);  // symmetry: (i,j) + (j,i)
 
@@ -1620,7 +1648,7 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) con
         continue;
 
       double K_ij = m_sigma2 * m_R(i, j);
-      arma::vec dlnCdx = _DlnCovDx(m_dPhi.col(i * n + j), m_theta);
+      arma::vec dlnCdx = _DlnCovDx(m_dX.col(i * n + j), m_theta);
       // ∂K_ij/∂Φ_i_k = K_ij * dlnCdx_k
       dL_dPhi.row(i) += coeff * K_ij * dlnCdx.t();
     }
@@ -1633,7 +1661,13 @@ arma::vec WarpKriging::warp_gradient() const {
   arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
   arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
 
-  arma::mat dLL_dPhi = dK_dPhi(m_Phi, dLL_dK);
+  arma::mat dLL_dPhi = dK_dPhi(m_X, dLL_dK);
+
+  if (m_is_joint) {
+    if (!m_joint_warp)
+      return {};
+    return m_joint_warp->backward(m_X_raw, dLL_dPhi);
+  }
 
   arma::uword n_warp = total_warp_params();
   arma::vec grad(n_warp, arma::fill::zeros);
@@ -1644,7 +1678,7 @@ arma::vec WarpKriging::warp_gradient() const {
     arma::uword np = m_warps[j]->n_params();
     if (np > 0) {
       arma::mat dLL_dPhi_j = dLL_dPhi.cols(col, col + dj - 1);
-      arma::vec gw = m_warps[j]->backward(m_X.col(j), dLL_dPhi_j);
+      arma::vec gw = m_warps[j]->backward(m_X_raw.col(j), dLL_dPhi_j);
       grad.subvec(idx, idx + np - 1) = gw;
       idx += np;
     }
@@ -1657,6 +1691,8 @@ arma::vec WarpKriging::warp_gradient() const {
 //  Warp param packing  (θ is NOT here — optimised separately)
 // -------------------------------------------------------------------------
 arma::uword WarpKriging::total_warp_params() const {
+  if (m_is_joint)
+    return m_joint_warp ? m_joint_warp->n_params() : 0;
   arma::uword total = 0;
   for (const auto& w : m_warps)
     total += w->n_params();
@@ -1664,6 +1700,8 @@ arma::uword WarpKriging::total_warp_params() const {
 }
 
 arma::vec WarpKriging::pack_warp_params() const {
+  if (m_is_joint)
+    return m_joint_warp ? m_joint_warp->get_params() : arma::vec();
   arma::uword n_warp = total_warp_params();
   if (n_warp == 0)
     return {};
@@ -1680,6 +1718,11 @@ arma::vec WarpKriging::pack_warp_params() const {
 }
 
 void WarpKriging::unpack_warp_params(const arma::vec& wp) {
+  if (m_is_joint) {
+    if (m_joint_warp)
+      m_joint_warp->set_params(wp);
+    return;
+  }
   arma::uword idx = 0;
   for (auto& w : m_warps) {
     arma::uword np = w->n_params();
@@ -1695,11 +1738,11 @@ void WarpKriging::unpack_warp_params(const arma::vec& wp) {
 // -------------------------------------------------------------------------
 WarpKriging WarpKriging::clone_for_thread() const {
   // Use the light constructor (warping strings + kernel, no data)
-  WarpKriging c(warping_strings(), m_kernel_name);
+  WarpKriging c(warping_strings(), m_covType);
 
   // Copy immutable data
   c.m_y = m_y;
-  c.m_X = m_X;
+  c.m_X_raw = m_X_raw;
   c.m_F = m_F;
   c.m_normalize = m_normalize;
   c.m_centerX = m_centerX;
@@ -1709,6 +1752,7 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_is_continuous = m_is_continuous;
   c.m_regmodel = m_regmodel;
   c.m_feature_dim = m_feature_dim;
+  c.m_is_joint = m_is_joint;
   c.m_max_iter_bfgs = m_max_iter_bfgs;
   c.m_max_iter_adam = m_max_iter_adam;
   c.m_adam_lr = m_adam_lr;
@@ -1717,6 +1761,7 @@ WarpKriging WarpKriging::clone_for_thread() const {
   // Copy mutable GP state
   c.m_theta = m_theta;
   c.m_sigma2 = m_sigma2;
+  c.m_noise = m_noise;
   c.m_beta = m_beta;
   c.m_z = m_z;
   c.m_M = m_M;
@@ -1725,13 +1770,18 @@ WarpKriging WarpKriging::clone_for_thread() const {
   c.m_T = m_T;
   c.m_Rinv = m_Rinv;
   c.m_logdet = m_logdet;
-  c.m_Phi = m_Phi;
-  c.m_dPhi = m_dPhi;
+  c.m_X = m_X;
+  c.m_dX = m_dX;
 
   // Deep-copy warp objects
-  c.m_warps.clear();
-  for (const auto& w : m_warps)
-    c.m_warps.push_back(w->clone());
+  if (m_is_joint) {
+    if (m_joint_warp)
+      c.m_joint_warp = m_joint_warp->clone();
+  } else {
+    c.m_warps.clear();
+    for (const auto& w : m_warps)
+      c.m_warps.push_back(w->clone());
+  }
 
   return c;
 }
@@ -1750,8 +1800,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
   arma::vec wp0 = pack_warp_params();
 
   // Data-driven θ bounds from feature-space pairwise diffs (shared helper).
-  arma::vec maxdPhi = arma::max(arma::abs(m_dPhi), 1);
-  auto theta_bounds_pair = Optim::theta_bounds(maxdPhi, m_dPhi, m_y, m_y.n_elem);
+  arma::vec maxdPhi = arma::max(arma::abs(m_dX), 1);
+  auto theta_bounds_pair = Optim::theta_bounds(maxdPhi, m_dX, m_y, m_y.n_elem);
   arma::vec theta_lower = theta_bounds_pair.first;
   arma::vec theta_upper = theta_bounds_pair.second;
   theta_lower = arma::clamp(theta_lower, 1e-10, arma::datum::inf);
@@ -1942,8 +1992,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
     r.C = wk.m_T;
     r.Rinv = wk.m_Rinv;
     r.R = wk.m_R;
-    r.Phi = wk.m_Phi;
-    r.dPhi = wk.m_dPhi;
+    r.Phi = wk.m_X;
+    r.dPhi = wk.m_dX;
     r.logdet = wk.m_logdet;
     r.success = true;
     return r;
@@ -1962,8 +2012,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
     m_T = r.C;
     m_Rinv = r.Rinv;
     m_R = r.R;
-    m_Phi = r.Phi;
-    m_dPhi = r.dPhi;
+    m_X = r.Phi;
+    m_dX = r.dPhi;
     m_logdet = r.logdet;
   };
 
@@ -2135,18 +2185,43 @@ void WarpKriging::fit(const arma::vec& y,
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
-  if (X.n_cols != m_warp_specs.size())
+  if (!m_is_joint && X.n_cols != m_warp_specs.size())
     throw std::invalid_argument("fit: X has " + std::to_string(X.n_cols) + " columns but "
                                 + std::to_string(m_warp_specs.size()) + " warp specs were given");
 
-  validate_discrete_columns(X, "fit");
+  if (!m_is_joint)
+    validate_discrete_columns(X, "fit");
 
   m_y = y;
-  m_X = X;
+  m_X_raw = X;
   m_regmodel = regmodel;
   m_normalize = normalize;
 
+  // Per-observation noise (optional). When set, populate_Model carries
+  // noise_i/σ² on the diagonal and refresh_cache_theta_only runs an inner
+  // 1D MLE for σ² (no closed form with noise).
+  if (parameters.noise.has_value()) {
+    const arma::vec& nv = *parameters.noise;
+    if (nv.n_elem != y.n_elem)
+      throw std::invalid_argument("fit: parameters.noise has " + std::to_string(nv.n_elem)
+                                  + " elements but y has " + std::to_string(y.n_elem));
+    if (arma::any(nv < 0))
+      throw std::invalid_argument("fit: parameters.noise contains negative values");
+    m_noise = nv;
+  } else {
+    m_noise.reset();
+  }
+
+  // For joint MLP, instantiate the network now that d_in is known.
+  if (m_is_joint)
+    ensure_joint_warp(X.n_cols);
+
   normalise_data();
+
+  // Scale noise to normalized-y space (matches NoiseKriging::fit).
+  if (!m_noise.is_empty() && m_normalize) {
+    m_noise /= (m_scaleY * m_scaleY);
+  }
 
   // θ seed: use caller-supplied value or default to 1.
   if (parameters.theta.has_value()) {
@@ -2169,9 +2244,21 @@ void WarpKriging::fit(const arma::vec& y,
     unpack_warp_params(wp);
   }
 
+  // Set base "estim" flags so KrigingImpl helpers (e.g. update_no_refit_impl)
+  // commit β̂/σ² consistently with Warp's semantics:
+  //   - β is estimated via GLS unless regmodel=None;
+  //   - σ² is estimated by closed-form MLE only when no per-point noise
+  //     is supplied (with noise it's set by the inner 1D MLE in
+  //     refresh_cache_theta_only and must not be overwritten on extension).
+  m_est_beta = (m_regmodel != Trend::RegressionModel::None);
+  m_est_theta = true;
+  m_est_sigma2 = m_noise.is_empty();
+
   // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
   optimise_joint(optim);
+  m_optim = optim;
+  m_objective = "LL";
   m_fitted = true;
 }
 
@@ -2198,12 +2285,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   }
 
   const arma::uword n_n = x_n.n_rows;
-  const arma::uword n_o = m_Phi.n_rows;
+  const arma::uword n_o = m_X.n_rows;
   arma::mat Phi_new = apply_warping(x_n);
   arma::mat F_new = build_trend_matrix(x_n);
   // Use correlation cross-matrix (not covariance K = σ²R), because m_T is
   // the Cholesky of R and m_z = C⁻¹(y − Fβ).
-  arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
+  arma::mat Rcross = build_Rcross(Phi_new, m_X);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, Rcross.t());
   arma::vec mean = F_new * m_beta + Rstar_on.t() * m_z;
@@ -2289,7 +2376,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       // dR(Φ_new, Φ_train)/dx = R * DlnCovDx(ΔΦ, θ)ᵀ · J_warp
       arma::mat DR_on_i(n_o, d);
       for (arma::uword j = 0; j < n_o; j++) {
-        arma::vec dPhi = Phi_new.row(i).t() - m_Phi.row(j).t();
+        arma::vec dPhi = Phi_new.row(i).t() - m_X.row(j).t();
         arma::vec dlnCovDx = _DlnCovDx(dPhi, m_theta);
         DR_on_i.row(j) = Rcross(i, j) * (dlnCovDx.t() * J_warp);
       }
@@ -2332,218 +2419,160 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
 //  Cholesky, then denormalizes.  This is more numerically robust than
 //  doing Cholesky on the full-scale covariance matrix.
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update) {
+arma::mat WarpKriging::simulate(int nsim,
+                                int seed,
+                                const arma::mat& X_n,
+                                const bool will_update,
+                                const arma::vec& with_noise) {
   if (!m_fitted)
     throw std::runtime_error("simulate: model not fitted");
 
-  arma::uword n_n = X_n.n_rows;
-  arma::uword n_o = m_X.n_rows;
+  const arma::uword n_n = X_n.n_rows;
 
-  if (X_n.n_cols != m_X.n_cols)
+  if (X_n.n_cols != m_X_raw.n_cols)
     throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
-                             + std::to_string(m_X.n_cols));
+                             + std::to_string(m_X_raw.n_cols));
 
-  validate_discrete_columns(X_n, "simulate");
+  if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
+    throw std::runtime_error("Noise vector should have same length as X_n: " + std::to_string(with_noise.n_elem)
+                             + " instead of " + std::to_string(n_n));
+  if (arma::any(with_noise < 0))
+    throw std::runtime_error("simulate: with_noise contains negative values");
 
-  // Normalize new inputs
-  arma::mat Xn_n = X_n;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < Xn_n.n_cols; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
-      if (is_cont)
-        Xn_n.col(j) = (Xn_n.col(j) - m_centerX(j)) / m_scaleX(j);
-    }
-  }
+  if (!m_is_joint)
+    validate_discrete_columns(X_n, "simulate");
 
-  arma::mat Phi_n = apply_warping(Xn_n);
-  arma::mat F_n = build_trend_matrix(Xn_n);
-
-  // Covariance between new points
-  arma::mat R_nn(n_n, n_n);
-  LinearAlgebra::covMat_sym_X(&R_nn, Phi_n.t(), m_theta, _Cov);
-
-  // Cross-covariance between training and new points (n_o × n_n)
-  arma::mat R_on(n_o, n_n);
-  LinearAlgebra::covMat_rect(&R_on, m_Phi.t(), Phi_n.t(), m_theta, _Cov, 1.0);
-
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
-
-  arma::vec yhat_n = F_n * m_beta + trans(Rstar_on) * m_z;
-
-  arma::mat Fhat_n = trans(Rstar_on) * m_M;
-  arma::mat E_n = F_n - Fhat_n;
-  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
-
-  arma::mat SigmaNoTrend_nKo = R_nn - trans(Rstar_on) * Rstar_on;
-
-  arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * trans(Ecirc_n);
-
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
-
-  arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
-  y_n.each_col() = yhat_n;
-  Random::reset_seed(static_cast<uint64_t>(seed));
-  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
-
-  // Denormalize
-  y_n = m_centerY + m_scaleY * y_n;
+  // Route through KrigingImpl::simulate_impl with the warping as a feature-map callback.
+  // The base normalises X_n, applies phi (warp), builds R_nn/R_on in phi-space, draws samples.
+  auto phi_fn = [this](const arma::mat& Xn) { return apply_warping(Xn); };
+  arma::mat y_n = simulate_impl(nsim, seed, X_n, will_update,
+                                 /*R_on_factor=*/1.0, /*R_on_coincident_to_one=*/false,
+                                 /*R_nn_factor=*/1.0, /*R_nn_diag=*/{},
+                                 /*Sigma_divisor=*/1.0, /*use_qr_for_circ=*/true, phi_fn);
 
   if (will_update) {
-    lastsimup_Xn_u.clear();  // force reset to force update_simulate consider new data
-    lastsim_y_n = y_n;
-
-    lastsim_Xn_n = trans(Xn_n);
-    lastsim_Phi_n = Phi_n;
-    lastsim_seed = static_cast<uint64_t>(seed);
-    lastsim_nsim = nsim;
-
-    lastsim_R_nn = R_nn;
-    lastsim_F_n = F_n;
-
-    lastsim_L_oCn = Rstar_on;
-    lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
-
-    lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
-                                   arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
-
-    lastsim_Rinv_on = LinearAlgebra::inv_sympd(lastsim_L_on);
-
-    lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
-    lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
-    arma::mat Q_Fstar_on;
-    LinearAlgebra::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
-    lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
-
-    lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
-    lastsim_Ecirc_nKo = LinearAlgebra::rsolve_upper(m_circ, F_n - lastsim_Fhat_nKo);
+    lastsimup_noise_u.clear();  // invalidate noise cache so update_simulate recomputes
+    lastsim_with_noise = with_noise;
   }
 
-  return y_n;
+  // Optional observation noise (std-dev in raw y-space, applied after denormalisation).
+  arma::mat eps(n_n, nsim, arma::fill::zeros);
+  if (with_noise.n_elem == 1) {
+    eps = with_noise.at(0) * Random::randn_mat(n_n, nsim);
+  } else if (with_noise.n_elem == n_n) {
+    eps.each_col() = with_noise;
+    eps = eps % Random::randn_mat(n_n, nsim);
+  }
+
+  return y_n + eps;
 }
 
 // -------------------------------------------------------------------------
 //  update_simulate()  — FOXY algorithm, ported from Kriging::update_simulate
 // -------------------------------------------------------------------------
-LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
+                                                          const arma::mat& X_u,
+                                                          const arma::vec& noise_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
 
-  if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+  if (X_u.n_cols != m_X_raw.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X_raw.n_cols)
                              + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
 
   if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
     throw std::runtime_error("No previous simulation data available");
 
-  arma::uword n_n = lastsim_Xn_n.n_cols;
-  arma::uword n_o = m_X.n_rows;
-
-  arma::uword n_on = n_o + n_n;
-  arma::mat F_on = arma::join_cols(m_F, lastsim_F_n);
-
-  arma::uword n_u = X_u.n_rows;
-
-  // Normalize X_u
-  arma::mat Xn_u = X_u;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < Xn_u.n_cols; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
-      if (is_cont)
-        Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
-    }
+  const bool has_model_noise = !m_noise.is_empty();
+  if (has_model_noise) {
+    if (noise_u.n_elem != X_u.n_rows)
+      throw std::runtime_error("update_simulate: model fit with noise requires noise_u of length "
+                               + std::to_string(X_u.n_rows) + " (got " + std::to_string(noise_u.n_elem) + ")");
+    if (arma::any(noise_u < 0))
+      throw std::runtime_error("update_simulate: noise_u contains negative values");
+  } else if (!noise_u.is_empty()) {
+    throw std::runtime_error("update_simulate: model fit without noise but noise_u was provided");
   }
 
-  // Warp new update points and build trend matrix
-  arma::mat Phi_u = apply_warping(Xn_u);
-  arma::mat F_u = build_trend_matrix(Xn_u);
+  arma::vec noise_u_norm;
+  if (has_model_noise)
+    noise_u_norm = noise_u / (m_scaleY * m_scaleY);
 
-  Xn_u = trans(Xn_u);
+  const arma::vec diag_uu = has_model_noise ? arma::vec(1.0 + noise_u_norm / m_sigma2) : arma::vec{};
 
-  bool use_lastsimup
-      = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
-  if (!use_lastsimup) {
-    lastsimup_Xn_u = Xn_u;
+  // Noise must also match for cache reuse; X_u match is checked by base internally.
+  const bool noise_ok = (lastsimup_noise_u.n_elem == noise_u_norm.n_elem)
+      && (noise_u_norm.is_empty()
+          || arma::approx_equal(lastsimup_noise_u, noise_u_norm, "absdiff", arma::datum::eps));
 
-    // Covariance between update points
-    lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
-    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Phi_u.t(), m_theta, _Cov);
+  auto phi_fn = [this](const arma::mat& Xn) { return apply_warping(Xn); };
+  arma::mat y_n = update_simulate_impl(y_u, X_u, noise_ok,
+                                        /*R_uu_factor=*/1.0, diag_uu,
+                                        /*R_uo_factor=*/1.0, /*R_un_factor=*/1.0,
+                                        /*R_un_coincident_to_one=*/false,
+                                        /*Sigma_divisor=*/1.0, phi_fn);
 
-    // Covariance between update and training points
-    lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Phi_u.t(), m_Phi.t(), m_theta, _Cov, 1.0);
+  lastsimup_noise_u = noise_u_norm;
 
-    // Covariance between update and simulation points
-    lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_un, Phi_u.t(), lastsim_Phi_n.t(), m_theta, _Cov, 1.0);
+  const arma::uword n_n = y_n.n_rows;
+  arma::mat eps(n_n, lastsim_nsim, arma::fill::zeros);
+  if (lastsim_with_noise.n_elem == 1) {
+    eps = lastsim_with_noise.at(0) * Random::randn_mat(n_n, lastsim_nsim);
+  } else if (lastsim_with_noise.n_elem == n_n) {
+    eps.each_col() = lastsim_with_noise;
+    eps = eps % Random::randn_mat(n_n, lastsim_nsim);
   }
 
-  // ======================================================================
-  // FOXY step #1: Extend the simulation to the design 'X_u'
-  // ======================================================================
-
-  if (!use_lastsimup) {
-    arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
-    arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
-
-    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
-
-    arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
-
-    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
-
-    arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
-
-    arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
-    arma::mat M_u = arma::repmat(m_u, 1, lastsim_nsim) + W_uCon.tail_cols(n_n) * lastsim_y_n;
-
-    Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);
-  }
-
-  // ======================================================================
-  // FOXY step #2: Update the simulated paths on 'X_n'
-  // ======================================================================
-
-  if (!use_lastsimup) {
-    arma::mat Rstar_ou = LinearAlgebra::solve_lower(m_T, lastsimup_R_uo.t());
-
-    arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Fhat_uKo);
-
-    arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
-
-    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
-
-    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
-  }
-
-  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u);
+  return y_n + eps;
 }
 
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
-void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+void WarpKriging::update(const arma::vec& y_u,
+                         const arma::mat& X_u,
+                         const bool refit,
+                         const arma::vec& noise_u) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
   validate_discrete_columns(X_u, "update");
 
+  // Noise consistency check
+  const bool has_model_noise = !m_noise.is_empty();
+  if (has_model_noise) {
+    if (noise_u.n_elem != y_u.n_elem)
+      throw std::runtime_error("update: model fit with noise requires noise_u of length "
+                               + std::to_string(y_u.n_elem) + " (got " + std::to_string(noise_u.n_elem) + ")");
+    if (arma::any(noise_u < 0))
+      throw std::runtime_error("update: noise_u contains negative values");
+  } else if (!noise_u.is_empty()) {
+    throw std::runtime_error("update: model fit without noise but noise_u was provided");
+  }
+
   if (refit) {
-    // Current behavior: de-normalise, append, re-normalise, re-optimise
+    // De-normalise, append, re-normalise, re-optimise
     arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_u);
-    arma::mat X_all = m_X;
+    arma::mat X_all = m_X_raw;
     for (arma::uword j = 0; j < X_all.n_cols; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
+      bool is_cont = m_is_joint || (j < m_is_continuous.size() && m_is_continuous[j]);
       if (is_cont)
         X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
     }
     X_all = arma::join_vert(X_all, X_u);
 
+    // De-normalise noise, append, it will be re-normalised below after stddev recompute.
+    arma::vec noise_all;
+    if (has_model_noise)
+      noise_all = arma::join_vert(m_noise * m_scaleY * m_scaleY, noise_u);
+
     m_y = y_all;
-    m_X = X_all;
+    m_X_raw = X_all;
+    m_noise = noise_all;  // empty if no model noise
     normalise_data();
+    if (!m_noise.is_empty() && m_normalize)
+      m_noise /= (m_scaleY * m_scaleY);
     refresh_cache();
 
     arma::uword saved_adam = m_max_iter_adam;
@@ -2551,78 +2580,153 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
     optimise_joint("BFGS+Adam");
     m_max_iter_adam = saved_adam;
   } else {
-    // Fast incremental update: keep all hyperparameters fixed, use Cholesky update
-    arma::mat Xn_u = X_u;
-    for (arma::uword j = 0; j < Xn_u.n_cols; ++j) {
-      bool is_cont = j < m_is_continuous.size() && m_is_continuous[j];
-      if (is_cont) {
-        Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
-      }
-    }
-    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+    // Fast incremental update: keep all hyperparameters fixed, use Cholesky
+    // update via KrigingImpl::update_no_refit_impl. Warp's per-dim
+    // normalization (continuous-only) is equivalent to base's rowvec
+    // normalization here because normalise_data leaves m_centerX(j)=0,
+    // m_scaleX(j)=1 for non-continuous dims, so the rowvec arithmetic is a
+    // no-op on those columns.
+    //
+    // The extend_class_data hook is responsible for:
+    //   * extending m_X_raw with the same per-dim-normalized values base
+    //     just appended to m_X (kept in sync so apply_warping works);
+    //   * extending m_noise (Warp-specific channel);
+    //   * overwriting m_X with apply_warping(m_X_raw) — base appended raw
+    //     normalized X_u to its m_X, which is the Φ-space slot for Warp,
+    //     so we must re-warp before base's compute_dX runs.
+    KrigingImpl::update_no_refit_impl(
+        y_u,
+        X_u,
+        /*extend_class_data=*/
+        [&]() {
+          // Mirror base's normalization to extend m_X_raw (base also did this
+          // arithmetic on Xn_u before appending to m_X).
+          arma::mat Xn_u = X_u;
+          Xn_u.each_row() -= m_centerX;
+          Xn_u.each_row() /= m_scaleX;
+          m_X_raw = arma::join_cols(m_X_raw, Xn_u);
 
-    m_X = arma::join_cols(m_X, Xn_u);
-    m_y = arma::join_cols(m_y, yn_u);
+          if (has_model_noise) {
+            arma::vec noise_u_norm = noise_u / (m_scaleY * m_scaleY);
+            m_noise = arma::join_cols(m_noise, noise_u_norm);
+          }
 
-    // Recompute warped features and pairwise diffs (warp params unchanged)
-    m_Phi = apply_warping(m_X);
-    compute_dPhi();
+          // Replace base's (corrupted) Φ slot with the actual warped design.
+          m_X = apply_warping(m_X_raw);
+        },
+        /*build_model=*/
+        [&]() { return make_Model(m_theta, m_sigma2); });
 
-    m_F = build_trend_matrix(m_X);
-
-    const arma::uword n = m_y.n_elem;
-
-    // make_Model detects theta unchanged + n > m_T.n_rows → Cholesky block update
-    WKModel m = make_Model(m_theta);
-
-    m_R = std::move(m.R);
-    m_T = std::move(m.L);
-    m_Rinv = std::move(m.Rinv);
-    m_M = std::move(m.Fstar);
-    m_circ = std::move(m.Rstar);
-    m_beta = std::move(m.betahat);
-    m_z = std::move(m.Estar);
-    m_sigma2 = std::max(m.SSEstar / n, 1e-20);
     m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
   }
 }
 
-// -------------------------------------------------------------------------
 //  summary()
 // -------------------------------------------------------------------------
 std::string WarpKriging::summary() const {
   std::ostringstream oss;
-  oss << "* WarpKriging\n"
-      << "  - kernel:      " << m_kernel_name << "\n"
-      << "  - regmodel:    " << Trend::toString(m_regmodel) << "\n"
-      << "  - normalize:   " << (m_normalize ? "true" : "false") << "\n"
-      << "  - n obs:       " << m_y.n_elem << "\n"
-      << "  - d input:     " << m_X.n_cols << "\n"
-      << "  - d features:  " << m_feature_dim << "\n";
-
-  oss << "  - warpings:\n";
-  for (arma::uword j = 0; j < m_warps.size(); ++j) {
-    oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
-    if (!m_warp_specs[j].level_names.empty()) {
-      oss << "             levels: {";
-      for (arma::uword k = 0; k < m_warp_specs[j].level_names.size(); ++k) {
-        if (k > 0)
-          oss << ", ";
-        oss << k << "=\"" << m_warp_specs[j].level_names[k] << "\"";
+  oss << "* WarpKriging\n";
+  if (summary_top(oss, &m_X_raw)) {
+    if (m_feature_dim != m_X_raw.n_cols)
+      oss << "  * features: " << m_feature_dim << "\n";
+    oss << "  * warpings:\n";
+    if (m_is_joint) {
+      oss << "      joint: \"" << m_warp_specs[0].to_string() << "\"";
+      if (m_joint_warp)
+        oss << "  →  " << m_joint_warp->describe();
+      oss << "\n";
+    } else {
+      for (arma::uword j = 0; j < m_warps.size(); ++j) {
+        oss << "      x" << j << ": \"" << m_warp_specs[j].to_string() << "\"  →  " << m_warps[j]->describe() << "\n";
+        if (!m_warp_specs[j].level_names.empty()) {
+          oss << "             levels: {";
+          for (arma::uword k = 0; k < m_warp_specs[j].level_names.size(); ++k) {
+            if (k > 0)
+              oss << ", ";
+            oss << k << "=\"" << m_warp_specs[j].level_names[k] << "\"";
+          }
+          oss << "}\n";
+        }
       }
-      oss << "}\n";
     }
-  }
-
-  if (m_fitted) {
-    oss << "  - sigma2:      " << m_sigma2 << "\n"
-        << "  - theta:       " << m_theta.t() << "  - beta:        " << m_beta.t()
-        << "  - LL:          " << logLikelihood() << "\n"
-        << "  - total warp params: " << total_warp_params() << "\n";
-  } else {
-    oss << "  ** model not yet fitted **\n";
+    if (m_fitted)
+      oss << "  * total warp params: " << total_warp_params() << "\n";
+    summary_bottom(oss);
   }
   return oss.str();
+}
+
+// -------------------------------------------------------------------------
+//  save / load helpers (shared with MLPKriging facade)
+// -------------------------------------------------------------------------
+void WarpKriging::dump_to_json(nlohmann::json& j) const {
+  // Warp-specific fields not in base
+  std::vector<std::string> warp_strs;
+  for (const auto& s : m_warp_specs)
+    warp_strs.push_back(s.to_string());
+  j["warping"] = warp_strs;
+  j["X_raw"] = to_json(m_X_raw);  // base writes m_X (=Phi) as "X"
+  j["is_continuous"] = m_is_continuous;
+  j["feature_dim"] = m_feature_dim;
+  j["max_iter_bfgs"] = m_max_iter_bfgs;
+  j["max_iter_adam"] = m_max_iter_adam;
+  j["adam_lr"] = m_adam_lr;
+  j["fitted"] = m_fitted;
+  j["logdet"] = m_logdet;
+  j["warp_params"] = to_json(pack_warp_params());
+  // Shared base fields: covType, X (=Phi), X_raw omitted (we write it above),
+  // centerX/Y, scaleX/Y, normalize, regmodel, optim, objective,
+  // dX, maxdX, F, T, R, M, star, circ, z, Rinv,
+  // beta/est_beta, theta/est_theta, sigma2/est_sigma2, noise
+  dump_common_to_json(j);
+}
+
+void WarpKriging::load_from_json(const nlohmann::json& j) {
+  if (j.contains("covType")) {
+    // v3: field names match the base schema
+    load_common_from_json(j);           // sets m_X (=Phi), m_centerX, m_y, …
+    m_X_raw = mat_from_json(j["X_raw"]);
+  } else {
+    // v2 legacy: translate old field names
+    m_X_raw = mat_from_json(j["X"]);
+    m_y = colvec_from_json(j["y"]);
+    m_normalize = j["normalize"].template get<bool>();
+    m_centerX = rowvec_from_json(j["X_mean"]);
+    m_scaleX = rowvec_from_json(j["X_std"]);
+    m_centerY = j["y_mean"].template get<double>();
+    m_scaleY = j["y_std"].template get<double>();
+    m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
+    m_theta = colvec_from_json(j["theta"]);
+    m_sigma2 = j["sigma2"].template get<double>();
+    if (j.contains("noise"))
+      m_noise = colvec_from_json(j["noise"]);
+    m_beta = colvec_from_json(j["beta"]);
+    m_z = colvec_from_json(j["z"]);
+    m_M = mat_from_json(j["M"]);
+    m_circ = mat_from_json(j["circ"]);
+    m_F = mat_from_json(j["F"]);
+    m_R = mat_from_json(j["R"]);
+    m_T = mat_from_json(j["C"]);
+    m_Rinv = mat_from_json(j["Rinv"]);
+    m_X = mat_from_json(j["Phi"]);
+    m_dX = mat_from_json(j["dPhi"]);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+    m_is_empty = false;
+  }
+  // Warp-specific extras (present in both v2 and v3)
+  m_logdet = j["logdet"].template get<double>();
+  if (j.contains("is_continuous"))
+    m_is_continuous = j["is_continuous"].template get<std::vector<bool>>();
+  if (j.contains("feature_dim"))
+    m_feature_dim = j["feature_dim"].template get<arma::uword>();
+  m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
+  m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
+  m_adam_lr = j["adam_lr"].template get<double>();
+  m_fitted = j["fitted"].template get<bool>();
+  if (m_is_joint)
+    ensure_joint_warp(m_X_raw.n_cols);
+  arma::vec wp = colvec_from_json(j["warp_params"]);
+  unpack_warp_params(wp);
 }
 
 // -------------------------------------------------------------------------
@@ -2630,61 +2734,9 @@ std::string WarpKriging::summary() const {
 // -------------------------------------------------------------------------
 void WarpKriging::save(const std::string filename) const {
   nlohmann::json j;
-
-  j["version"] = 2;
+  j["version"] = 3;
   j["content"] = "WarpKriging";
-
-  // Architecture
-  j["kernel"] = m_kernel_name;
-  std::vector<std::string> warp_strs;
-  for (const auto& s : m_warp_specs)
-    warp_strs.push_back(s.to_string());
-  j["warping"] = warp_strs;
-
-  // Training data
-  j["X"] = to_json(m_X);
-  j["y"] = to_json(m_y);
-
-  // Normalization
-  j["normalize"] = m_normalize;
-  j["X_mean"] = to_json(m_centerX);
-  j["X_std"] = to_json(m_scaleX);
-  j["y_mean"] = m_centerY;
-  j["y_std"] = m_scaleY;
-
-  // Per-variable continuous flags
-  j["is_continuous"] = m_is_continuous;
-
-  // Settings
-  j["regmodel"] = Trend::toString(m_regmodel);
-  j["feature_dim"] = m_feature_dim;
-  j["max_iter_bfgs"] = m_max_iter_bfgs;
-  j["max_iter_adam"] = m_max_iter_adam;
-  j["adam_lr"] = m_adam_lr;
-
-  // State
-  j["fitted"] = m_fitted;
-
-  // GP hyperparameters
-  j["theta"] = to_json(m_theta);
-  j["sigma2"] = m_sigma2;
-
-  // GP cached data
-  j["beta"] = to_json(m_beta);
-  j["z"] = to_json(m_z);
-  j["M"] = to_json(m_M);
-  j["circ"] = to_json(m_circ);
-  j["F"] = to_json(m_F);
-  j["R"] = to_json(m_R);
-  j["C"] = to_json(m_T);
-  j["Rinv"] = to_json(m_Rinv);
-  j["logdet"] = m_logdet;
-  j["Phi"] = to_json(m_Phi);
-  j["dPhi"] = to_json(m_dPhi);
-
-  // Warp parameters (all learnable params as flat vector)
-  j["warp_params"] = to_json(pack_warp_params());
-
+  dump_to_json(j);
   std::ofstream f(filename);
   f << std::setw(4) << j;
 }
@@ -2694,65 +2746,19 @@ WarpKriging WarpKriging::load(const std::string filename) {
   nlohmann::json j = nlohmann::json::parse(f);
 
   uint32_t version = j["version"].template get<uint32_t>();
-  if (version != 2) {
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
-  }
+  if (version < 2 || version > 3)
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   std::string content = j["content"].template get<std::string>();
-  if (content != "WarpKriging") {
+  if (content != "WarpKriging")
     throw std::runtime_error(
         asString("Bad content to load from '", filename, "'; found '", content, "', requires 'WarpKriging'"));
-  }
 
-  // Reconstruct from architecture
   auto warping = j["warping"].template get<std::vector<std::string>>();
-  std::string kernel = j["kernel"].template get<std::string>();
+  // v3 uses "covType" (base name); v2 used "kernel"
+  std::string kernel = j.contains("covType") ? j["covType"].template get<std::string>()
+                                              : j["kernel"].template get<std::string>();
   WarpKriging wk(warping, kernel);
-
-  // Training data
-  wk.m_X = mat_from_json(j["X"]);
-  wk.m_y = colvec_from_json(j["y"]);
-
-  // Normalization
-  wk.m_normalize = j["normalize"].template get<bool>();
-  wk.m_centerX = rowvec_from_json(j["X_mean"]);
-  wk.m_scaleX = rowvec_from_json(j["X_std"]);
-  wk.m_centerY = j["y_mean"].template get<double>();
-  wk.m_scaleY = j["y_std"].template get<double>();
-
-  // Per-variable continuous flags
-  wk.m_is_continuous = j["is_continuous"].template get<std::vector<bool>>();
-
-  // Settings
-  wk.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
-  wk.m_feature_dim = j["feature_dim"].template get<arma::uword>();
-  wk.m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
-  wk.m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
-  wk.m_adam_lr = j["adam_lr"].template get<double>();
-
-  // State
-  wk.m_fitted = j["fitted"].template get<bool>();
-
-  // GP hyperparameters
-  wk.m_theta = colvec_from_json(j["theta"]);
-  wk.m_sigma2 = j["sigma2"].template get<double>();
-
-  // GP cached data
-  wk.m_beta = colvec_from_json(j["beta"]);
-  wk.m_z = colvec_from_json(j["z"]);
-  wk.m_M = mat_from_json(j["M"]);
-  wk.m_circ = mat_from_json(j["circ"]);
-  wk.m_F = mat_from_json(j["F"]);
-  wk.m_R = mat_from_json(j["R"]);
-  wk.m_T = mat_from_json(j["C"]);
-  wk.m_Rinv = mat_from_json(j["Rinv"]);
-  wk.m_logdet = j["logdet"].template get<double>();
-  wk.m_Phi = mat_from_json(j["Phi"]);
-  wk.m_dPhi = mat_from_json(j["dPhi"]);
-
-  // Restore warp parameters
-  arma::vec wp = colvec_from_json(j["warp_params"]);
-  wk.unpack_warp_params(wp);
-
+  wk.load_from_json(j);
   return wk;
 }
 

@@ -149,7 +149,7 @@ void benchmark_mlpkriging(const MLPConfig& config, arma::uword n_train, arma::uw
     libKriging::MLPKriging mk(config.hidden_dims, config.d_out, config.activation, "gauss");
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      mk.fit(y_train, X_train, "constant", false, config.optim, "LL", config.parameters);
+      mk.fit(y_train, X_train, Trend::RegressionModel::Constant, false, config.optim, "LL", config.parameters);
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }

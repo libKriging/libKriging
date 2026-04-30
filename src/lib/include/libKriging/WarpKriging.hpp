@@ -42,6 +42,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/KrigingImpl.hpp"
 #include "libKriging/Trend.hpp"
 #include "libKriging/libKriging_exports.h"
 
@@ -66,6 +67,10 @@ struct WarpKrigingParameters {
   /// Optional packed warp-params seed. When set, it is unpacked into the
   /// warp objects before optimisation starts (first multistart seed).
   std::optional<arma::vec> warp_params;
+  /// Optional per-observation noise variances (length n). When set, the
+  /// model uses the NoiseKriging likelihood: diag(C) = σ² + noise_i.
+  /// When empty, the standard concentrated profile likelihood is used.
+  std::optional<arma::vec> noise;
 };
 
 // =========================================================================
@@ -467,7 +472,7 @@ enum class WarpBaseKernel { Gauss, Matern32, Matern52, Exp };
  *
  * Public interface mirrors libKriging::Kriging.
  */
-class WarpKriging {
+class WarpKriging : protected KrigingImpl {
  public:
   using Parameters = WarpKrigingParameters;
 
@@ -536,20 +541,43 @@ class WarpKriging {
   //  Simulation
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, bool will_update = false);
+  /** Draw observed trajectories of kriging at given points X_n.
+   * @param with_noise   optional per-point observation noise standard deviation
+   *                     in raw y-space (length n_n, or length 1 for a common
+   *                     noise, or empty for noiseless sampling). Independent of
+   *                     m_noise. Matches NoiseKriging::simulate convention.
+   */
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       bool will_update = false,
+                                       const arma::vec& with_noise = {});
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is n length column vector of new output
    * @param X_u is n*d matrix of new input
+   * @param noise_u optional per-point noise variance at update points (length
+   *                n_u). Required when the model was fit with noise; otherwise
+   *                must be empty (treated as zero). Influences how the update
+   *                points condition the GP.
    * @return matrix of simulated output (for X_n given previously)
    */
-  LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
+  LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u,
+                                              const arma::mat& X_u,
+                                              const arma::vec& noise_u = {});
 
   // -----------------------------------------------------------------------
   //  Update
   // -----------------------------------------------------------------------
 
-  LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit = true);
+  /** Add new conditional data points to previous (X, y).
+   * @param noise_u optional per-point noise variance for update points (length
+   *                n_u). Required when the model was fit with noise.
+   */
+  LIBKRIGING_EXPORT void update(const arma::vec& y_u,
+                                const arma::mat& X_u,
+                                const bool refit = true,
+                                const arma::vec& noise_u = {});
 
   // -----------------------------------------------------------------------
   //  Log-likelihood
@@ -567,7 +595,7 @@ class WarpKriging {
 
   LIBKRIGING_EXPORT std::string summary() const;
 
-  const arma::mat& X() const { return m_X; }
+  const arma::mat& X() const { return m_X_raw; }
   const arma::rowvec& centerX() const { return m_centerX; }
   const arma::rowvec& scaleX() const { return m_scaleX; }
   const arma::vec& y() const { return m_y; }
@@ -580,9 +608,10 @@ class WarpKriging {
   const arma::mat& M() const { return m_M; }
   const arma::vec& z() const { return m_z; }
   const arma::vec& beta() const { return m_beta; }
-  std::string kernel() const { return m_kernel_name; }
+  std::string kernel() const { return m_covType; }
   arma::vec theta() const { return m_theta; }
   double sigma2() const { return m_sigma2; }
+  const arma::vec& noise() const { return m_noise; }
   bool is_fitted() const { return m_fitted; }
   arma::uword feature_dim() const { return m_feature_dim; }
   const std::vector<WarpSpec>& warping() const { return m_warp_specs; }
@@ -598,6 +627,9 @@ class WarpKriging {
   /// Access a specific warp function (e.g. to inspect embeddings)
   const IWarp& warp(arma::uword dim) const { return *m_warps[dim]; }
 
+  /// Access the joint MLP warp (only valid when constructed with mlp_joint spec).
+  const WarpMLPJoint* joint_warp() const { return m_joint_warp.get(); }
+
   /** Dump current WarpKriging object into a file */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
@@ -606,89 +638,51 @@ class WarpKriging {
 
  private:
   // ---- data ---------------------------------------------------------------
-  arma::vec m_y;
-  arma::mat m_X;
-  arma::mat m_Phi;   ///< warped design (n × feature_dim)
-  arma::mat m_dPhi;  ///< precomputed pairwise diffs (feature_dim × n*n), like Kriging's m_dX
+  // m_y, m_X (Φ-space), m_dX (pairwise diffs), m_centerX/Y, m_scaleX/Y,
+  // m_normalize, m_regmodel, m_F, m_beta, m_theta, m_sigma2 are all inherited
+  // from KrigingImpl. Under Option A, m_X holds the warped Φ(X_normalized)
+  // and m_dX holds the per-feature pairwise differences in Φ-space.
+  arma::mat m_X_raw;  ///< original (un-warped, un-normalized) design
 
   // ---- warping ------------------------------------------------------------
   std::vector<WarpSpec> m_warp_specs;
-  std::vector<std::unique_ptr<IWarp>> m_warps;  ///< per-variable
+  std::vector<std::unique_ptr<IWarp>> m_warps;  ///< per-variable (empty for joint)
   arma::uword m_feature_dim = 0;
+  bool m_is_joint = false;                       ///< true when warping = mlp_joint(...)
+  std::unique_ptr<WarpMLPJoint> m_joint_warp;    ///< instantiated at fit() time (needs d_in)
 
   // ---- normalisation ------------------------------------------------------
-  bool m_normalize = false;
-  arma::rowvec m_centerX, m_scaleX;
-  double m_centerY = 0.0, m_scaleY = 1.0;
   // Per-variable normalisation (only continuous variables)
   std::vector<bool> m_is_continuous;
 
-  // ---- trend --------------------------------------------------------------
-  Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
-  arma::mat m_F;
-  arma::vec m_beta;
-
   // ---- kernel + hyper-params -----------------------------------------------
-  std::string m_kernel_name;
+  // m_covType, _Cov, _DlnCovDtheta, _DlnCovDx inherited from KrigingImpl.
   WarpBaseKernel m_base_kernel = WarpBaseKernel::Gauss;
-  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
   void make_Cov(const std::string& kernel);
-  arma::vec m_theta;
-  double m_sigma2 = 1.0;
+  // m_noise inherited from KrigingImpl (empty when no per-point noise).
 
-  // ---- WKModel (mirrors Kriging::KModel) ----------------------------------
+  // ---- WKModel (alias for KrigingImpl::KModel) ----------------------------
  public:
-  struct WKModel {
-    arma::mat R;      ///< correlation matrix
-    arma::mat L;      ///< Cholesky lower
-    arma::mat Rinv;   ///< R⁻¹
-    arma::mat Fstar;  ///< L \ F  (whitened trend, ≡ m_M)
-    arma::vec ystar;  ///< L \ y
-    arma::mat Rstar;  ///< chol_upper(F'R⁻¹F)  (≡ m_circ)
-    arma::vec Estar;  ///< L \ (y - Fβ̂)  (whitened residual, ≡ m_z)
-    double SSEstar;   ///< Estar'Estar
-    arma::vec betahat;
-  };
-  WKModel make_Model(const arma::vec& theta) const;
-  void populate_Model(WKModel& m, const arma::vec& theta) const;
+  using WKModel = KrigingImpl::KModel;
+  WKModel make_Model(const arma::vec& theta, double sigma2 = 1.0) const;
+  void populate_Model(WKModel& m, const arma::vec& theta, double sigma2 = 1.0) const;
 
  private:
   // ---- GP cache -----------------------------------------------------------
-  arma::mat m_R;     ///< correlation matrix (n×n)
-  arma::mat m_T;     ///< Cholesky(R + nugget), lower
-  arma::mat m_M;     ///< C⁻¹ F  (whitened trend basis, ≡ Kriging's m_M)
-  arma::mat m_circ;  ///< chol_upper(F'R⁻¹F)  (≡ Kriging's m_circ)
-  arma::vec m_z;     ///< C⁻¹(y - Fβ)  (whitened residuals)
-  arma::mat m_Rinv;  ///< R⁻¹ = C⁻ᵀ C⁻¹, cached from refresh_cache
+  // m_R, m_T, m_M, m_circ, m_z, m_Rinv inherited from KrigingImpl.
 
-  // ---- Simulation cached data (FOXY algorithm) ----------------------------
-  arma::mat lastsim_Xn_n;
-  arma::mat lastsim_Phi_n;  // WarpKriging-specific: warped features of sim points
-  arma::mat lastsim_y_n;
-  int lastsim_nsim{};
-  uint64_t lastsim_seed{};
-  arma::mat lastsim_F_n;
-  arma::mat lastsim_R_nn;
-  arma::mat lastsim_L_oCn;
-  arma::mat lastsim_L_nCn;
-  arma::mat lastsim_L_on;
-  arma::mat lastsim_Rinv_on;
-  arma::mat lastsim_F_on;
-  arma::mat lastsim_Fstar_on;
-  arma::mat lastsim_circ_on;
-  arma::mat lastsim_Fcirc_on;
-  arma::mat lastsim_Fhat_nKo;
-  arma::mat lastsim_Ecirc_nKo;
+  // ---- Simulation cached data (WarpKriging-specific) -----------------------
+  // All standard lastsim_*/lastsimup_* caches live in the KrigingImpl base.
+  // WarpKriging only needs the two fields below that the base does not carry.
+  arma::vec lastsim_with_noise;  ///< per-point sampling noise stdev cached from simulate()
+  arma::vec lastsimup_noise_u;   ///< normalized per-point noise at update points (for cache check)
 
-  // Updated simulation cached data
-  arma::mat lastsimup_Xn_u;
-  arma::mat lastsimup_y_u;
-  arma::mat lastsimup_Wtild_nKu;
-  arma::mat lastsimup_R_uo;
-  arma::mat lastsimup_R_un;
-  arma::mat lastsimup_R_uu;
+  // MLPKriging is a thin facade that needs access to private members for save/load.
+  friend class MLPKriging;
+
+  // Helpers used by save()/load() and delegated to by MLPKriging::save()/load().
+  void dump_to_json(nlohmann::json& j) const;
+  void load_from_json(const nlohmann::json& j);
 
   double m_logdet = 0.0;
 
@@ -711,9 +705,8 @@ class WarpKriging {
   arma::mat build_trend_matrix(const arma::mat& X) const;
   arma::mat apply_warping(const arma::mat& X) const;
 
-  // ---- Precomputed pairwise differences -----------------------------------
-  /// Compute m_dPhi from m_Phi (feature_dim × n*n layout, like Kriging's m_dX)
-  void compute_dPhi();
+  /// Instantiate m_joint_warp for the given input dimension (no-op if already set).
+  void ensure_joint_warp(arma::uword d_in);
 
   // ---- Correlation matrix (σ²=1) -----------------------------------------
   /// Build cross-correlation  r(Φ_new, Φ_train)  →  (m × n)

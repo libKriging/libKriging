@@ -54,7 +54,7 @@ TEST_CASE("workflow") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-    return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false, false));
+    return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));
   });
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("save & reload") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-    return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false, false));
+    return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false));
   });
 }
 
@@ -95,7 +95,7 @@ TEST_CASE("logLikelihoodFun benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodFun#" + std::to_string(i)) {
-      return std::get<0>(ok.logLikelihoodFun(theta_vec, false, false, false));  //
+      return std::get<0>(ok.logLikelihoodFun(theta_vec, false, false));  //
     };
   });
 }
@@ -110,7 +110,7 @@ TEST_CASE("logLikelihoodGrad benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodGrad#" + std::to_string(i)) {
-      return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false, false));  //
+      return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));  //
     };
   });
 }
@@ -364,7 +364,7 @@ TEST_CASE("Kriging fit with given parameters - BFGS1") {
 
   Kriging ok = Kriging("gauss");
   // Provide starting values for sigma2 and theta, optimize all
-  Kriging::Parameters parameters{sigma2_start, true, theta_start, true, std::nullopt, true};
+  Kriging::Parameters parameters; parameters.sigma2 = sigma2_start; parameters.theta = theta_start; parameters.is_theta_estim = true;;
   ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
   // Check that optimization ran (parameters should be different from starting values)
@@ -452,7 +452,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       if (optim != "none") {
         SECTION("Fix sigma2, estimate theta and beta") {
           Kriging kr("gauss");
-          Kriging::Parameters params{sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          Kriging::Parameters params; params.sigma2 = sigma2_val; params.is_sigma2_estim = false;;
           kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(kr.sigma2() == sigma2_val);
           CHECK(kr.theta().n_elem == d);
@@ -476,7 +476,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       // Combination 4: Fix both sigma2 and theta, estimate beta (only "none" truly fixes theta)
       SECTION("Fix sigma2 and theta, estimate beta") {
         Kriging kr("gauss");
-        Kriging::Parameters params{sigma2_val, false, theta_val, false, std::nullopt, true};
+        Kriging::Parameters params; params.sigma2 = sigma2_val; params.is_sigma2_estim = false; params.theta = theta_val; params.is_theta_estim = false;;
         kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
         CHECK(kr.sigma2() == sigma2_val);
         if (optim == "none") {
@@ -491,7 +491,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       if (optim == "BFGS20") {
         SECTION("Multistart with theta starting points") {
           Kriging kr("gauss");
-          Kriging::Parameters params{sigma2_val, true, theta_starts, true, std::nullopt, true};
+          Kriging::Parameters params; params.sigma2 = sigma2_val; params.theta = theta_starts;;
           kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(kr.sigma2() > 0);
           CHECK(kr.theta().n_elem == d);

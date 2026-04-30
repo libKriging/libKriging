@@ -1386,7 +1386,7 @@ static void test_none_warp_vs_kriging_ll() {
     for (double tv : theta_vals) {
       arma::vec th = arma::ones<arma::vec>(tc.d) * tv;
       auto [wk_ll, wk_grad, wk_hess] = wk.logLikelihoodFun(th, true, false);
-      auto [kr_ll, kr_grad, kr_hess] = kr.logLikelihoodFun(th, true, false, false);
+      auto [kr_ll, kr_grad] = kr.logLikelihoodFun(th, true, false);
 
       double ll_diff = std::abs(wk_ll - kr_ll);
       if (ll_diff >= 1e-5) {
@@ -1409,6 +1409,181 @@ static void test_none_warp_vs_kriging_ll() {
 }
 
 // ==========================================================================
+//  Test 21: WarpKriging(none, noise=v) vs NoiseKriging LL function equivalence
+// ==========================================================================
+static void test_none_warp_with_noise_vs_noise_kriging_ll() {
+  std::cout << "=== Test 21: WarpKriging(none, noise) vs NoiseKriging LL equivalence ===" << std::endl;
+
+  // With warping="none" and a per-observation noise vector, WarpKriging
+  // should match NoiseKriging's likelihood FUNCTION up to the small
+  // preemptive nugget (LinearAlgebra::num_nugget, default 1e-10) on R's
+  // diagonal.  The two optimisers can land at different local optima on
+  // small data, so we don't compare the fitted LL directly; instead we:
+  //   (1) evaluate NK's LL at WK's fitted (θ, σ²) — must match WK's LL
+  //   (2) evaluate WK's LL at NK's fitted θ (WK re-MLEs σ²) — must be
+  //       ≥ NK's LL at (θ, σ²) since WK's σ² is already MLE'd given θ
+  struct TestCase {
+    std::string kernel;
+    arma::uword d;
+  };
+  std::vector<TestCase> cases = {
+      {"gauss", 1},
+      {"matern5_2", 2},
+  };
+
+  for (const auto& tc : cases) {
+    arma::arma_rng::set_seed(42);
+    arma::uword n = 12;
+    arma::mat X = 10.0 * arma::randu<arma::mat>(n, tc.d);
+    arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+    arma::vec noise = 0.05 + 0.05 * arma::randu<arma::vec>(n);
+
+    std::vector<std::string> warp_specs(tc.d, "none");
+    WarpKriging wk(warp_specs, tc.kernel);
+    WarpKriging::Parameters wk_params;
+    wk_params.noise = noise;
+    wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", wk_params);
+
+    Kriging nk(tc.kernel, Kriging::NoiseModel::Heterogeneous);
+    nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+
+    std::cout << "  [" << tc.kernel << ", " << tc.d << "D]";
+
+    // The two models optimise over different parameter sets (WK profiles
+    // σ² via inner 1D, NK optimises σ² jointly), so the final fits can
+    // land at different local optima on a small n=12 problem.  Instead we
+    // verify the LIKELIHOOD FUNCTION agrees: evaluate NK LL at WK's fitted
+    // (θ, σ²) and vice versa — both should match to preemptive-nugget tol.
+    arma::vec wk_th = wk.theta();
+    double wk_s2 = wk.sigma2();
+    arma::vec wk_ts = arma::vec(wk_th.n_elem + 1);
+    wk_ts.head(wk_th.n_elem) = wk_th;
+    wk_ts(wk_th.n_elem) = wk_s2;
+    auto [nk_ll_at_wk, nk_g_at_wk] = nk.logLikelihoodFun(wk_ts, false, false);
+    double wk_ll_at_wk = wk.logLikelihood();
+    double func_diff = std::abs(nk_ll_at_wk - wk_ll_at_wk);
+    if (func_diff >= 1e-5) {
+      std::cerr << "\n  FAIL LL-function mismatch @ WK params (theta=" << wk_th.t()
+                << ", sigma2=" << wk_s2 << "): WK=" << wk_ll_at_wk << " NK=" << nk_ll_at_wk << " diff=" << func_diff
+                << std::endl;
+    }
+    assert(func_diff < 1e-5);
+
+    // Also check at NK's fitted params.
+    arma::vec nk_th = nk.theta();
+    double nk_s2 = nk.sigma2();
+    arma::vec nk_ts(nk_th.n_elem + 1);
+    nk_ts.head(nk_th.n_elem) = nk_th;
+    nk_ts(nk_th.n_elem) = nk_s2;
+    auto [nk_ll_at_nk, nk_g_at_nk] = nk.logLikelihoodFun(nk_ts, false, false);
+    auto [wk_ll_at_nk, wk_g_at_nk, wk_h_at_nk] = wk.logLikelihoodFun(nk_th, false, false);
+    // Note: WK's logLikelihoodFun re-does inner Brent, so it returns the
+    // concentrated-σ² LL — which should be ≥ NK's LL at the given (θ, σ²=s2_fix).
+    // Stricter check: WK at (θ, σ²_MLE(θ)) ≥ NK at (θ, any σ²).
+    if (wk_ll_at_nk + 1e-5 < nk_ll_at_nk) {
+      std::cerr << "\n  FAIL: WK LL(θ)=" << wk_ll_at_nk << " < NK LL(θ, σ²)=" << nk_ll_at_nk
+                << " (θ=" << nk_th.t() << ", σ²=" << nk_s2 << ")" << std::endl;
+    }
+    assert(wk_ll_at_nk + 1e-5 >= nk_ll_at_nk);
+
+    std::cout << "  func_diff=" << func_diff << " @ WK params  OK" << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+// Test 22: simulate(with_noise) + update_simulate(noise_u) basic sanity
+static void test_simulate_and_update_simulate_with_noise() {
+  std::cout << "=== Test 22: simulate + update_simulate with noise ===" << std::endl;
+
+  arma::arma_rng::set_seed(7);
+  arma::uword n = 10;
+  arma::mat X = 5.0 * arma::randu<arma::mat>(n, 1);
+  arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+  arma::vec noise = 0.05 * arma::ones<arma::vec>(n);
+
+  WarpKriging wk({"none"}, "gauss");
+  WarpKriging::Parameters wk_params;
+  wk_params.noise = noise;
+  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", wk_params);
+
+  // Simulation points.
+  arma::uword m = 6;
+  arma::mat X_n = arma::linspace<arma::vec>(0.1, 4.9, m);
+
+  // Case A: no sampling noise at X_n.
+  int nsim = 4;
+  arma::mat sim0 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{});
+  assert(sim0.n_rows == m);
+  assert(sim0.n_cols == (arma::uword)nsim);
+  assert(sim0.is_finite());
+
+  // Case B: scalar sampling std-dev at X_n, with_noise = 0.1.
+  arma::mat sim1 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{0.1});
+  assert(sim1.n_rows == m);
+  assert(sim1.is_finite());
+
+  // Case C: per-point std-dev vector.
+  arma::vec per_point_sd = 0.05 + 0.05 * arma::randu<arma::vec>(m);
+  arma::mat sim2 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, per_point_sd);
+  assert(sim2.n_rows == m);
+  assert(sim2.is_finite());
+
+  // update_simulate: assimilate 2 new points (noise_u required since model has noise).
+  arma::mat X_u(2, 1);
+  X_u(0, 0) = 2.0;
+  X_u(1, 0) = 3.5;
+  arma::vec y_u = arma::sin(X_u.col(0));
+  arma::vec noise_u = 0.05 * arma::ones<arma::vec>(2);
+
+  arma::mat usim = wk.update_simulate(y_u, X_u, noise_u);
+  assert(usim.n_rows == m);
+  assert(usim.n_cols == (arma::uword)nsim);
+  assert(usim.is_finite());
+
+  // Cache reuse determinism: use a noise-free simulate so no fresh eps draw is
+  // made inside update_simulate (lastsim_with_noise empty).  Then same-args
+  // update_simulate calls must return identical output.
+  wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{});
+  arma::mat usim_a = wk.update_simulate(y_u, X_u, noise_u);
+  arma::mat usim_b = wk.update_simulate(y_u, X_u, noise_u);
+  double reuse_diff = arma::norm(usim_a - usim_b, "fro");
+  if (reuse_diff > 1e-8) {
+    std::cerr << "\n  FAIL: update_simulate cache reuse produced different output (diff=" << reuse_diff << ")\n";
+  }
+  assert(reuse_diff < 1e-8);
+
+  // Missing noise_u when model has noise should throw.
+  bool threw_empty = false;
+  try {
+    wk.update_simulate(y_u, X_u, arma::vec{});
+  } catch (const std::runtime_error&) {
+    threw_empty = true;
+  }
+  assert(threw_empty);
+
+  // Negative noise_u should throw.
+  bool threw_neg = false;
+  try {
+    arma::vec bad(2);
+    bad(0) = 0.05;
+    bad(1) = -0.01;
+    wk.update_simulate(y_u, X_u, bad);
+  } catch (const std::runtime_error&) {
+    threw_neg = true;
+  }
+  assert(threw_neg);
+
+  // update() with refit=false must also accept noise_u when model has noise.
+  arma::uword n_before = wk.X().n_rows;
+  wk.update(y_u, X_u, /*refit=*/false, noise_u);
+  assert(wk.X().n_rows == n_before + 2);
+  assert(wk.noise().n_elem == n_before + 2);
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 int main() {
   std::cout << "============================================\n"
             << "  WarpKriging test suite\n"
@@ -1437,6 +1612,8 @@ int main() {
     test_parallel_multistart();
     test_level_names();
     test_none_warp_vs_kriging_ll();
+    test_none_warp_with_noise_vs_noise_kriging_ll();
+    test_simulate_and_update_simulate_with_noise();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

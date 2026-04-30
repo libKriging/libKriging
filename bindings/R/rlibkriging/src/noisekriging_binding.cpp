@@ -7,7 +7,7 @@
 
 #include "libKriging/Covariance.hpp"
 #include "libKriging/LinearAlgebra.hpp"
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/Trend.hpp"
 
@@ -16,9 +16,9 @@
 
 // [[Rcpp::export]]
 Rcpp::List new_NoiseKriging(std::string kernel) {
-  NoiseKriging* ok = new NoiseKriging(kernel);
+  Kriging* ok = new Kriging(kernel, Kriging::NoiseModel::Heterogeneous);
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(ok);
+  Rcpp::XPtr<Kriging> impl_ptr(ok);
 
   Rcpp::List obj;
   obj.attr("object") = impl_ptr;
@@ -100,24 +100,23 @@ Rcpp::List new_NoiseKrigingFit(arma::vec y,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  NoiseKriging* ok = new NoiseKriging(
-      std::move(y),
-      std::move(noise),
-      std::move(X),
-      kernel,
-      Trend::fromString(regmodel),
-      normalize,
-      optim,
-      objective,
-      NoiseKriging::Parameters{
-          (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
-          _parameters["is_sigma2_estim"],
-          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-          _parameters["is_theta_estim"],
-          (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
-          _parameters["is_beta_estim"]});
+  Kriging* ok = new Kriging(kernel, Kriging::NoiseModel::Heterogeneous);
+  ok->fit(std::move(y),
+          std::move(noise),
+          std::move(X),
+          Trend::fromString(regmodel),
+          normalize,
+          optim,
+          objective,
+          Kriging::Parameters{
+              (_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
+              _parameters["is_sigma2_estim"],
+              (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+              _parameters["is_theta_estim"],
+              (_parameters["has_beta"]) ? make_optional0<arma::colvec>(_parameters["beta"]) : std::nullopt,
+              _parameters["is_beta_estim"]});
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(ok);
+  Rcpp::XPtr<Kriging> impl_ptr(ok);
 
   Rcpp::List obj;
   obj.attr("object") = impl_ptr;
@@ -139,7 +138,7 @@ void noisekriging_fit(Rcpp::List k,
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
@@ -208,8 +207,8 @@ void noisekriging_fit(Rcpp::List k,
                 normalize,
                 optim,
                 objective,
-                NoiseKriging::Parameters{
-                    (_parameters["has_sigma2"]) ? make_optional0<arma::vec>(_parameters["sigma2"]) : std::nullopt,
+                Kriging::Parameters{
+                    (_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
                     _parameters["is_sigma2_estim"],
                     (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
                     _parameters["is_theta_estim"],
@@ -222,10 +221,10 @@ Rcpp::List noisekriging_copy(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   Rcpp::List obj;
-  Rcpp::XPtr<NoiseKriging> impl_copy(new NoiseKriging(*impl_ptr, ExplicitCopySpecifier{}));
+  Rcpp::XPtr<Kriging> impl_copy(new Kriging(*impl_ptr, ExplicitCopySpecifier{}));
   obj.attr("object") = impl_copy;
   obj.attr("class") = "NoiseKriging";
   return obj;
@@ -237,7 +236,7 @@ Rcpp::List noisekriging_model(Rcpp::List k) {
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   Rcpp::List ret = Rcpp::List(21);
 
@@ -273,7 +272,7 @@ std::string noisekriging_summary(Rcpp::List k) {
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   return impl_ptr->summary();
 }
@@ -288,7 +287,7 @@ Rcpp::List noisekriging_predict(Rcpp::List k,
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   int d = impl_ptr->X().n_cols;
   if (d != X_n.n_cols)
@@ -322,7 +321,7 @@ arma::mat noisekriging_simulate(Rcpp::List k,
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   int d = impl_ptr->X().n_cols;
   if (d != X_n.n_cols)
@@ -337,7 +336,7 @@ arma::mat noisekriging_update_simulate(Rcpp::List k, arma::vec y_u, arma::vec no
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   int d = impl_ptr->X().n_cols;
   if (d != X_u.n_cols)
@@ -358,7 +357,7 @@ void noisekriging_update(Rcpp::List k, arma::vec y_u, arma::vec noise_u, arma::m
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   int d = impl_ptr->X().n_cols;
   if (d != X_u.n_cols)
@@ -384,7 +383,7 @@ void noisekriging_save(Rcpp::List k, std::string filename) {
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   return impl_ptr->save(filename);
 }
@@ -395,7 +394,7 @@ arma::mat noisekriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   int d = impl_ptr->X().n_cols;
   if (d != X1.n_cols)
@@ -415,7 +414,7 @@ Rcpp::List noisekriging_logLikelihoodFun(Rcpp::List k,
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   if (theta_sigma2.n_elem != impl_ptr->theta().n_elem + 1)
     Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem + 1) + ")");
@@ -436,7 +435,7 @@ double noisekriging_logLikelihood(Rcpp::List k) {
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
 
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
 
   return impl_ptr->logLikelihood();
 }
@@ -448,7 +447,7 @@ std::string noisekriging_kernel(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->kernel();
 }
 
@@ -457,7 +456,7 @@ std::string noisekriging_optim(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->optim();
 }
 
@@ -466,7 +465,7 @@ std::string noisekriging_objective(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->objective();
 }
 
@@ -475,7 +474,7 @@ arma::mat noisekriging_X(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->X();
 }
 
@@ -484,7 +483,7 @@ arma::vec noisekriging_centerX(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->centerX();
 }
 
@@ -493,7 +492,7 @@ arma::vec noisekriging_scaleX(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->scaleX();
 }
 
@@ -502,7 +501,7 @@ arma::vec noisekriging_y(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->y();
 }
 
@@ -511,7 +510,7 @@ arma::vec noisekriging_noise(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->noise();
 }
 
@@ -520,7 +519,7 @@ double noisekriging_centerY(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->centerY();
 }
 
@@ -529,7 +528,7 @@ double noisekriging_scaleY(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->scaleY();
 }
 
@@ -538,7 +537,7 @@ bool noisekriging_normalize(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->normalize();
 }
 
@@ -547,7 +546,7 @@ std::string noisekriging_regmodel(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return Trend::toString(impl_ptr->regmodel());
 }
 
@@ -556,7 +555,7 @@ arma::mat noisekriging_F(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->F();
 }
 
@@ -565,7 +564,7 @@ arma::mat noisekriging_T(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->T();
 }
 
@@ -574,7 +573,7 @@ arma::mat noisekriging_M(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->M();
 }
 
@@ -583,7 +582,7 @@ arma::vec noisekriging_z(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->z();
 }
 
@@ -592,7 +591,7 @@ arma::vec noisekriging_beta(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->beta();
 }
 
@@ -601,7 +600,7 @@ bool noisekriging_is_beta_estim(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->is_beta_estim();
 }
 
@@ -610,7 +609,7 @@ arma::vec noisekriging_theta(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->theta();
 }
 
@@ -619,7 +618,7 @@ bool noisekriging_is_theta_estim(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->is_theta_estim();
 }
 
@@ -628,7 +627,7 @@ double noisekriging_sigma2(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->sigma2();
 }
 
@@ -637,6 +636,6 @@ bool noisekriging_is_sigma2_estim(Rcpp::List k) {
   if (!k.inherits("NoiseKriging"))
     Rcpp::stop("Input must be a NoiseKriging object.");
   SEXP impl = k.attr("object");
-  Rcpp::XPtr<NoiseKriging> impl_ptr(impl);
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->is_sigma2_estim();
 }

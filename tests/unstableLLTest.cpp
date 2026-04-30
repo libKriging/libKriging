@@ -105,12 +105,12 @@ TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable]
 
     // Test LL evaluation with rcond checking
     LinearAlgebra::check_chol_rcond(true);
-    auto result_with_check = k.logLikelihoodFun(theta_test, false, false, false);
+    auto result_with_check = k.logLikelihoodFun(theta_test, false, false);
     double ll_with_check = std::get<0>(result_with_check);
 
     // Test LL evaluation without rcond checking
     LinearAlgebra::check_chol_rcond(false);
-    auto result_no_check = k.logLikelihoodFun(theta_test, false, false, false);
+    auto result_no_check = k.logLikelihoodFun(theta_test, false, false);
     double ll_no_check = std::get<0>(result_no_check);
 
     INFO("LL with rcond check: " << ll_with_check);

@@ -202,7 +202,7 @@ void benchmark_warpkriging(const WarpConfig& config, arma::uword n_train, arma::
     libKriging::WarpKriging wk(config.warping, "gauss");
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      wk.fit(y_train, X_train, "constant", false, config.optim, "LL", config.parameters);
+      wk.fit(y_train, X_train, Trend::RegressionModel::Constant, false, config.optim, "LL", config.parameters);
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }

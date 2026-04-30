@@ -1,66 +1,34 @@
 /**
  * @file MLPKriging.cpp
- * @brief Kriging with a joint MLP feature map (Deep Kernel Learning).
- * See MLPKriging.hpp for documentation.
+ * @brief Thin facade over WarpKriging({"mlp_joint(…)"}, kernel).
  */
 
 #include "libKriging/MLPKriging.hpp"
-#include "libKriging/AdamBFGS.hpp"
-#include "libKriging/Covariance.hpp"
-#include "libKriging/LinearAlgebra.hpp"
-#include "libKriging/Optim.hpp"
-#include "libKriging/Random.hpp"
-
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
-#include <algorithm>
-#include <atomic>
-#include <cmath>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
-#include <mutex>
 #include <sstream>
 #include <stdexcept>
-#include <thread>
 
 namespace libKriging {
 
 // -------------------------------------------------------------------------
-//  parse_kernel / make_Cov  (identical to WarpKriging)
+//  Helper: build the "mlp_joint(h1:h2,d_out,act)" spec string
 // -------------------------------------------------------------------------
-WarpBaseKernel MLPKriging::parse_kernel(const std::string& name) {
-  std::string s = name;
-  std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-  if (s == "gauss" || s == "rbf")
-    return WarpBaseKernel::Gauss;
-  if (s == "matern3_2" || s == "matern32")
-    return WarpBaseKernel::Matern32;
-  if (s == "matern5_2" || s == "matern52")
-    return WarpBaseKernel::Matern52;
-  if (s == "exp" || s == "exponential")
-    return WarpBaseKernel::Exp;
-  throw std::invalid_argument("Unknown kernel: " + name);
-}
-
-void MLPKriging::make_Cov(const std::string& kernel) {
-  std::string s = kernel;
-  std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-  if (s == "rbf")
-    s = "gauss";
-  else if (s == "exponential")
-    s = "exp";
-  else if (s == "matern32")
-    s = "matern3_2";
-  else if (s == "matern52")
-    s = "matern5_2";
-
-  auto cov = Covariance::resolve(s);
-  _Cov = std::move(cov.Cov);
-  _DlnCovDtheta = std::move(cov.DlnCovDtheta);
-  _DlnCovDx = std::move(cov.DlnCovDx);
+std::string MLPKriging::make_warp_spec(const std::vector<arma::uword>& hidden_dims,
+                                       arma::uword d_out,
+                                       const std::string& activation) {
+  std::string s = "mlp_joint(";
+  for (arma::uword i = 0; i < hidden_dims.size(); ++i) {
+    if (i > 0)
+      s += ":";
+    s += std::to_string(hidden_dims[i]);
+  }
+  s += "," + std::to_string(d_out) + "," + activation + ")";
+  return s;
 }
 
 // -------------------------------------------------------------------------
@@ -70,15 +38,10 @@ MLPKriging::MLPKriging(const std::vector<arma::uword>& hidden_dims,
                        arma::uword d_out,
                        const std::string& activation,
                        const std::string& kernel)
-    : m_hidden_dims(hidden_dims), m_d_out(d_out), m_activation(activation) {
-  if (m_hidden_dims.empty())
-    m_hidden_dims = {32, 16};
-  if (m_d_out == 0)
-    throw std::invalid_argument("MLPKriging: d_out must be >= 1");
-  m_kernel_name = kernel;
-  m_base_kernel = parse_kernel(kernel);
-  make_Cov(kernel);
-}
+    : m_impl({make_warp_spec(hidden_dims, d_out, activation)}, kernel),
+      m_hidden_dims(hidden_dims),
+      m_d_out(d_out),
+      m_activation(activation) {}
 
 MLPKriging::MLPKriging(const arma::vec& y,
                        const arma::mat& X,
@@ -96,672 +59,7 @@ MLPKriging::MLPKriging(const arma::vec& y,
 }
 
 // -------------------------------------------------------------------------
-//  ensure_joint_warp  — instantiate WarpMLPJoint now that d_in is known
-// -------------------------------------------------------------------------
-void MLPKriging::ensure_joint_warp(arma::uword d_in) {
-  if (!m_joint_warp) {
-    m_joint_warp = std::make_unique<WarpMLPJoint>(d_in, m_hidden_dims, m_d_out, WarpMLP::parse_act(m_activation), 42);
-  }
-}
-
-// -------------------------------------------------------------------------
-//  apply_warping:  X → Φ
-// -------------------------------------------------------------------------
-arma::mat MLPKriging::apply_warping(const arma::mat& X) const {
-  return m_joint_warp->forward(X);  // (n × d_in) → (n × d_out)
-}
-
-// -------------------------------------------------------------------------
-//  Trend matrix — built on warped features Φ(X) so it scales with d_out
-// -------------------------------------------------------------------------
-arma::mat MLPKriging::build_trend_matrix(const arma::mat& X) const {
-  return Trend::regressionModelMatrix(m_regmodel, apply_warping(X));
-}
-
-// -------------------------------------------------------------------------
-//  Data normalisation  (all inputs are continuous → normalise all columns)
-// -------------------------------------------------------------------------
-void MLPKriging::normalise_data() {
-  arma::uword d = m_X.n_cols;
-  m_centerX = arma::zeros<arma::rowvec>(d);
-  m_scaleX = arma::ones<arma::rowvec>(d);
-
-  if (m_normalize) {
-    for (arma::uword j = 0; j < d; ++j) {
-      m_centerX(j) = arma::mean(m_X.col(j));
-      m_scaleX(j) = arma::stddev(m_X.col(j));
-      if (m_scaleX(j) < 1e-12)
-        m_scaleX(j) = 1.0;
-      m_X.col(j) = (m_X.col(j) - m_centerX(j)) / m_scaleX(j);
-    }
-    m_centerY = arma::mean(m_y);
-    m_scaleY = arma::stddev(m_y);
-    if (m_scaleY < 1e-12)
-      m_scaleY = 1.0;
-    m_y = (m_y - m_centerY) / m_scaleY;
-  } else {
-    m_centerY = 0.0;
-    m_scaleY = 1.0;
-  }
-}
-
-// -------------------------------------------------------------------------
-//  compute_dPhi  (identical)
-// -------------------------------------------------------------------------
-void MLPKriging::compute_dPhi() {
-  const arma::uword n = m_Phi.n_rows;
-  const arma::uword d = m_Phi.n_cols;
-  m_dPhi.set_size(d, n * n);
-  m_dPhi.zeros();
-
-  const double* Phi_mem = m_Phi.memptr();
-  double* dPhi_mem = m_dPhi.memptr();
-
-  for (arma::uword i = 0; i < n; ++i) {
-    for (arma::uword j = i + 1; j < n; ++j) {
-      arma::uword ij = i * n + j;
-      arma::uword ji = j * n + i;
-      for (arma::uword k = 0; k < d; ++k) {
-        double diff = Phi_mem[i + k * n] - Phi_mem[j + k * n];
-        dPhi_mem[k + ij * d] = diff;
-        dPhi_mem[k + ji * d] = diff;
-      }
-    }
-  }
-}
-
-arma::mat MLPKriging::build_Rcross(const arma::mat& Phi_new, const arma::mat& Phi_train) const {
-  const arma::uword m = Phi_new.n_rows;
-  const arma::uword n = Phi_train.n_rows;
-  arma::mat Rc(m, n);
-  LinearAlgebra::covMat_rect(&Rc, Phi_new.t(), Phi_train.t(), m_theta, _Cov, 1.0);
-  return Rc;
-}
-
-// -------------------------------------------------------------------------
-// -------------------------------------------------------------------------
-//  populate_Model / make_Model  (mirrors WarpKriging / Kriging pattern)
-// -------------------------------------------------------------------------
-void MLPKriging::populate_Model(MLPKModel& m, const arma::vec& theta) const {
-  const arma::uword n = m_y.n_elem;
-  arma::vec diag_with_nugget(n, arma::fill::value(1.0 + 1e-8));
-
-  // Cholesky update detection (same logic as Kriging::populate_Model)
-  bool do_update = m_fitted && (m_theta.size() == theta.size()) && (theta - m_theta).is_zero()
-                   && (m_T.memptr() != nullptr) && (n > m_T.n_rows);
-
-  if (do_update) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget, m_T, m_R);
-  } else {
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dPhi, theta, _Cov, 1, diag_with_nugget);
-  }
-
-  m.Rinv = LinearAlgebra::inv_sympd(m.L);
-
-  // Whitened trend and observations
-  m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
-  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
-
-  // Gram matrix
-  arma::mat FtRinvF = m.Fstar.t() * m.Fstar;
-  m.Rstar = LinearAlgebra::chol_upper(FtRinvF);
-
-  // GLS beta
-  arma::vec FtRinvy = m.Fstar.t() * m.ystar;
-  m.betahat = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), FtRinvy));
-
-  // Whitened residual
-  arma::vec residual = m_y - m_F * m.betahat;
-  m.Estar = LinearAlgebra::solve_lower(m.L, residual);
-  m.SSEstar = arma::dot(m.Estar, m.Estar);
-}
-
-MLPKriging::MLPKModel MLPKriging::make_Model(const arma::vec& theta) const {
-  const arma::uword n = m_y.n_elem;
-  const arma::uword p = m_F.n_cols;
-  MLPKModel m;
-  m.R = arma::mat(n, n, arma::fill::none);
-  m.L = arma::mat(n, n, arma::fill::none);
-  m.Rinv = arma::mat();
-  m.Fstar = arma::mat(n, p, arma::fill::none);
-  m.ystar = arma::vec(n, arma::fill::none);
-  m.Rstar = arma::mat(p, p, arma::fill::none);
-  m.Estar = arma::vec(n, arma::fill::none);
-  m.SSEstar = 0;
-  m.betahat = arma::vec(p, arma::fill::none);
-  populate_Model(m, theta);
-  return m;
-}
-
-// -------------------------------------------------------------------------
-//  refresh_cache
-// -------------------------------------------------------------------------
-void MLPKriging::refresh_cache() {
-  m_Phi = apply_warping(m_X);
-  compute_dPhi();
-  refresh_cache_theta_only();
-}
-
-void MLPKriging::refresh_cache_theta_only() {
-  const arma::uword n = m_y.n_elem;
-  m_F = build_trend_matrix(m_X);
-  MLPKModel m = make_Model(m_theta);
-
-  m_R = std::move(m.R);
-  m_T = std::move(m.L);
-  m_Rinv = std::move(m.Rinv);
-  m_M = std::move(m.Fstar);
-  m_circ = std::move(m.Rstar);
-  m_beta = std::move(m.betahat);
-  m_z = std::move(m.Estar);
-  m_sigma2 = std::max(m.SSEstar / n, 1e-20);
-  m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
-}
-
-// -------------------------------------------------------------------------
-//  Concentrated LL
-// -------------------------------------------------------------------------
-double MLPKriging::concentrated_ll() const {
-  const double n = static_cast<double>(m_y.n_elem);
-  return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2)) - 0.5 * m_logdet;
-}
-
-double MLPKriging::logLikelihood() const {
-  if (!m_fitted)
-    throw std::runtime_error("MLPKriging: model not fitted");
-  return concentrated_ll();
-}
-
-std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta,
-                                                                      bool return_grad,
-                                                                      bool /*return_hess*/) const {
-  auto* self = const_cast<MLPKriging*>(this);
-  arma::vec old_theta = m_theta;
-  self->m_theta = theta;
-  self->refresh_cache();
-
-  double ll = concentrated_ll();
-  arma::vec grad;
-  if (return_grad) {
-    auto [ll2, g] = concentrated_ll_and_grad_theta();
-    grad = g;
-    (void)ll2;
-  }
-
-  self->m_theta = old_theta;
-  self->refresh_cache();
-  return {ll, grad, arma::mat()};
-}
-
-// -------------------------------------------------------------------------
-//  ∂R/∂θ_k
-// -------------------------------------------------------------------------
-arma::mat MLPKriging::build_dR_dtheta_k(arma::uword k) const {
-  const arma::uword n = m_Phi.n_rows;
-  arma::mat dR(n, n, arma::fill::zeros);
-
-  for (arma::uword i = 0; i < n; ++i) {
-    for (arma::uword j = i + 1; j < n; ++j) {
-      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
-      double dR_ij = m_R(i, j) * dlnCov(k);
-      dR(i, j) = dR_ij;
-      dR(j, i) = dR_ij;
-    }
-  }
-  return dR;
-}
-
-// -------------------------------------------------------------------------
-//  Concentrated LL + analytical gradient in θ-space
-// -------------------------------------------------------------------------
-std::pair<double, arma::vec> MLPKriging::concentrated_ll_and_grad_theta() const {
-  double ll = concentrated_ll();
-
-  const arma::uword n = m_y.n_elem;
-  const arma::uword d = m_theta.n_elem;
-
-  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);  // R⁻¹(y - Fβ)
-  const arma::mat& Rinv = m_Rinv;                              // Use cached
-  arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
-
-  arma::vec grad_theta(d, arma::fill::zeros);
-  for (arma::uword i = 0; i < n; ++i) {
-    for (arma::uword j = i + 1; j < n; ++j) {
-      arma::vec dlnCov = _DlnCovDtheta(m_dPhi.col(i * n + j), m_theta);
-      double R_ij = m_R(i, j);
-      double w = 2.0 * dLL_dR(i, j);
-      for (arma::uword k = 0; k < d; ++k) {
-        grad_theta(k) += w * R_ij * dlnCov(k);
-      }
-    }
-  }
-  return {ll, grad_theta};
-}
-
-// -------------------------------------------------------------------------
-//  Warp gradient (backprop through the joint MLP)
-// -------------------------------------------------------------------------
-arma::mat MLPKriging::dK_dPhi(const arma::mat& dL_dK) const {
-  const arma::uword n = m_Phi.n_rows;
-  const arma::uword d = m_Phi.n_cols;
-  arma::mat dL_dPhi(n, d, arma::fill::zeros);
-
-  for (arma::uword i = 0; i < n; ++i) {
-    for (arma::uword j = 0; j < n; ++j) {
-      if (i == j)
-        continue;
-      double coeff = dL_dK(i, j);
-      if (std::abs(coeff) < 1e-15)
-        continue;
-
-      double K_ij = m_sigma2 * m_R(i, j);
-      arma::vec dlnCdx = _DlnCovDx(m_dPhi.col(i * n + j), m_theta);
-      dL_dPhi.row(i) += coeff * K_ij * dlnCdx.t();
-    }
-  }
-  return dL_dPhi;
-}
-
-arma::vec MLPKriging::warp_gradient() const {
-  arma::mat Kinv = (1.0 / m_sigma2) * m_Rinv;  // Use cached
-  arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
-  arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
-  arma::mat dLL_dPhi = dK_dPhi(dLL_dK);
-
-  arma::uword n_warp = total_warp_params();
-  arma::vec grad(n_warp, arma::fill::zeros);
-  if (m_joint_warp && n_warp > 0) {
-    arma::vec gw = m_joint_warp->backward(m_X, dLL_dPhi);
-    if (gw.n_elem > 0)
-      grad.head(gw.n_elem) = gw;
-  }
-  return grad;
-}
-
-// -------------------------------------------------------------------------
-//  Warp param pack/unpack
-// -------------------------------------------------------------------------
-arma::uword MLPKriging::total_warp_params() const {
-  return m_joint_warp ? m_joint_warp->n_params() : 0;
-}
-
-arma::vec MLPKriging::pack_warp_params() const {
-  if (!m_joint_warp || m_joint_warp->n_params() == 0)
-    return {};
-  return m_joint_warp->get_params();
-}
-
-void MLPKriging::unpack_warp_params(const arma::vec& wp) {
-  if (m_joint_warp && wp.n_elem > 0)
-    m_joint_warp->set_params(wp);
-}
-
-// -------------------------------------------------------------------------
-//  clone_for_thread
-// -------------------------------------------------------------------------
-MLPKriging MLPKriging::clone_for_thread() const {
-  MLPKriging c(m_hidden_dims, m_d_out, m_activation, m_kernel_name);
-  c.m_y = m_y;
-  c.m_X = m_X;
-  c.m_F = m_F;
-  c.m_normalize = m_normalize;
-  c.m_centerX = m_centerX;
-  c.m_scaleX = m_scaleX;
-  c.m_centerY = m_centerY;
-  c.m_scaleY = m_scaleY;
-  c.m_regmodel = m_regmodel;
-  c.m_max_iter_bfgs = m_max_iter_bfgs;
-  c.m_max_iter_adam = m_max_iter_adam;
-  c.m_adam_lr = m_adam_lr;
-  c.m_fitted = true;
-
-  c.m_theta = m_theta;
-  c.m_sigma2 = m_sigma2;
-  c.m_beta = m_beta;
-  c.m_z = m_z;
-  c.m_M = m_M;
-  c.m_circ = m_circ;
-  c.m_R = m_R;
-  c.m_T = m_T;
-  c.m_Rinv = m_Rinv;
-  c.m_logdet = m_logdet;
-  c.m_Phi = m_Phi;
-  c.m_dPhi = m_dPhi;
-
-  if (m_joint_warp)
-    c.m_joint_warp = m_joint_warp->clone();
-
-  return c;
-}
-
-// -------------------------------------------------------------------------
-//  Joint optimisation (bi-level or joint L-BFGS-B) with multistart
-// -------------------------------------------------------------------------
-void MLPKriging::optimise_joint(const std::string& method) {
-  arma::uword n_warp = total_warp_params();
-  arma::uword d_theta = m_theta.n_elem;
-
-  arma::vec maxdPhi = arma::max(arma::abs(m_dPhi), 1);
-  auto theta_bounds_pair = Optim::theta_bounds(maxdPhi, m_dPhi, m_y, m_y.n_elem);
-  arma::vec theta_lower = theta_bounds_pair.first;
-  arma::vec theta_upper = theta_bounds_pair.second;
-  theta_lower = arma::clamp(theta_lower, 1e-10, arma::datum::inf);
-  theta_upper = arma::max(theta_lower * 2.0, theta_upper);
-
-  auto to_gamma = [](const arma::vec& t) { return Optim::reparametrize ? Optim::reparam_to(t) : t; };
-  auto from_gamma = [](const arma::vec& g) { return Optim::reparametrize ? Optim::reparam_from(g) : g; };
-  auto grad_theta_to_gamma = [](const arma::vec& theta, const arma::vec& g_theta) {
-    return Optim::reparametrize ? Optim::reparam_from_deriv(theta, g_theta) : g_theta;
-  };
-
-  arma::vec gamma_lower = to_gamma(theta_lower);
-  arma::vec gamma_upper = to_gamma(theta_upper);
-
-  auto parsed = Optim::parse_method(method, "BFGS");
-  const std::string base_method = parsed.first;
-  const int multistart = parsed.second;
-
-  auto run_joint_bfgs = [&](MLPKriging& wk) -> double {
-    arma::uword nw = wk.total_warp_params();
-    arma::uword dt = wk.m_theta.n_elem;
-    arma::uword n_total = nw + dt;
-    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(n_total)};
-    optimizer.iprint = -1;
-    optimizer.max_iter = Optim::max_iteration;
-    optimizer.pgtol = Optim::gradient_tolerance;
-    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
-
-    arma::vec theta0 = wk.m_theta;
-    arma::vec wp_init = (nw > 0) ? wk.pack_warp_params() : arma::vec();
-
-    arma::vec x0(n_total);
-    if (nw > 0)
-      x0.head(nw) = wp_init;
-    x0.tail(dt) = to_gamma(theta0);
-
-    arma::vec lb(n_total), ub(n_total);
-    arma::ivec btype(n_total);
-    if (nw > 0) {
-      lb.head(nw).fill(-1e20);
-      ub.head(nw).fill(1e20);
-      btype.head(nw).fill(0);
-    }
-    lb.tail(dt) = gamma_lower;
-    ub.tail(dt) = gamma_upper;
-    btype.tail(dt).fill(2);
-
-    auto obj_fn = [&](const arma::vec& x, arma::vec& grad) -> double {
-      if (nw > 0)
-        wk.unpack_warp_params(x.head(nw));
-      wk.m_theta = from_gamma(x.tail(dt));
-      wk.refresh_cache();
-
-      auto [ll, g_theta] = wk.concentrated_ll_and_grad_theta();
-      grad.tail(dt) = -grad_theta_to_gamma(wk.m_theta, g_theta);
-      if (nw > 0)
-        grad.head(nw) = -wk.warp_gradient();
-      return -ll;
-    };
-
-    int retry = 0;
-    double best_f = std::numeric_limits<double>::infinity();
-    arma::vec best_x = x0;
-    arma::vec x = x0;
-    while (retry <= Optim::max_restart) {
-      auto res = optimizer.minimize(obj_fn, x, lb.memptr(), ub.memptr(), btype.memptr());
-      if (res.f_opt < best_f) {
-        best_f = res.f_opt;
-        best_x = x;
-      }
-      arma::vec theta_cur = from_gamma(x.tail(dt));
-      double sol_to_lb = arma::min(arma::abs(theta_cur - theta_lower));
-      if ((retry < Optim::max_restart)
-          && ((res.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0) || (res.num_iters <= 2)
-              || (sol_to_lb < arma::datum::eps) || (res.f_opt > best_f))) {
-        arma::vec theta_restart = (theta0 + theta_lower) / std::pow(2.0, retry + 1);
-        x.tail(dt) = to_gamma(theta_restart);
-        if (nw > 0)
-          x.head(nw) = wp_init;
-        retry++;
-      } else {
-        break;
-      }
-    }
-
-    if (nw > 0)
-      wk.unpack_warp_params(best_x.head(nw));
-    wk.m_theta = from_gamma(best_x.tail(dt));
-    wk.refresh_cache();
-    return best_f;
-  };
-
-  auto run_adam_bfgs = [&](MLPKriging& wk) -> double {
-    arma::uword nw = wk.total_warp_params();
-    arma::uword dt = wk.m_theta.n_elem;
-    AdamBFGS opt(nw, dt);
-    opt.max_iter_adam = wk.m_max_iter_adam;
-    opt.adam_lr = wk.m_adam_lr;
-    opt.max_iter_bfgs = Optim::max_iteration;
-    opt.bfgs_pgtol = Optim::gradient_tolerance;
-    opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
-    opt.maximize = true;
-
-    arma::vec current_wp = wk.pack_warp_params();
-    arma::vec current_gamma = to_gamma(wk.m_theta);
-
-    auto obj_fn = [&wk, &current_wp, &from_gamma, &grad_theta_to_gamma](const arma::vec& x_outer,
-                                                                        const arma::vec& x_inner,
-                                                                        arma::vec* grad_outer,
-                                                                        arma::vec* grad_inner) -> double {
-      bool warp_changed = false;
-      if (x_outer.n_elem > 0) {
-        if (current_wp.n_elem != x_outer.n_elem || arma::any(current_wp != x_outer)) {
-          wk.unpack_warp_params(x_outer);
-          current_wp = x_outer;
-          warp_changed = true;
-        }
-      }
-
-      wk.m_theta = from_gamma(x_inner);
-
-      if (warp_changed)
-        wk.refresh_cache();
-      else
-        wk.refresh_cache_theta_only();
-
-      double ll = wk.concentrated_ll();
-
-      if (grad_inner) {
-        auto [ll2, g_theta] = wk.concentrated_ll_and_grad_theta();
-        *grad_inner = grad_theta_to_gamma(wk.m_theta, g_theta);
-        (void)ll2;
-      }
-      if (grad_outer && x_outer.n_elem > 0) {
-        *grad_outer = wk.warp_gradient();
-      }
-      return ll;
-    };
-
-    auto result = opt.optimize(current_wp, current_gamma, gamma_lower, gamma_upper, obj_fn);
-
-    if (nw > 0)
-      wk.unpack_warp_params(result.x_outer);
-    wk.m_theta = from_gamma(result.x_inner);
-    wk.refresh_cache();
-    return -wk.concentrated_ll();
-  };
-
-  struct OptimizationResult {
-    double neg_ll = std::numeric_limits<double>::infinity();
-    arma::vec theta;
-    arma::vec warp_params;
-    double sigma2 = 0;
-    arma::vec beta;
-    arma::vec z;
-    arma::mat M;
-    arma::mat circ;
-    arma::mat C;
-    arma::mat Rinv;
-    arma::mat R;
-    arma::mat Phi;
-    arma::mat dPhi;
-    double logdet = 0;
-    bool success = false;
-  };
-
-  auto extract_result = [](MLPKriging& wk, double neg_ll) -> OptimizationResult {
-    OptimizationResult r;
-    r.neg_ll = neg_ll;
-    r.theta = wk.m_theta;
-    r.warp_params = wk.pack_warp_params();
-    r.sigma2 = wk.m_sigma2;
-    r.beta = wk.m_beta;
-    r.z = wk.m_z;
-    r.M = wk.m_M;
-    r.circ = wk.m_circ;
-    r.C = wk.m_T;
-    r.Rinv = wk.m_Rinv;
-    r.R = wk.m_R;
-    r.Phi = wk.m_Phi;
-    r.dPhi = wk.m_dPhi;
-    r.logdet = wk.m_logdet;
-    r.success = true;
-    return r;
-  };
-
-  auto restore_best = [&](const OptimizationResult& r) {
-    if (n_warp > 0)
-      unpack_warp_params(r.warp_params);
-    m_theta = r.theta;
-    m_sigma2 = r.sigma2;
-    m_beta = r.beta;
-    m_z = r.z;
-    m_M = r.M;
-    m_circ = r.circ;
-    m_T = r.C;
-    m_Rinv = r.Rinv;
-    m_R = r.R;
-    m_Phi = r.Phi;
-    m_dPhi = r.dPhi;
-    m_logdet = r.logdet;
-  };
-
-  auto run_parallel_multistart = [&](auto& optimizer_fn) {
-    arma::mat theta0_rand(multistart, d_theta);
-    for (int i = 0; i < multistart; ++i)
-      theta0_rand.row(i) = arma::trans(theta_lower + arma::randu<arma::vec>(d_theta) % (theta_upper - theta_lower));
-    theta0_rand.row(0) = m_theta.t();
-
-    arma::vec wp_init = pack_warp_params();
-
-    std::vector<OptimizationResult> results(multistart);
-    std::mutex results_mutex;
-
-    std::vector<MLPKriging> clones;
-    clones.reserve(multistart);
-    for (int i = 0; i < multistart; ++i)
-      clones.push_back(clone_for_thread());
-
-    auto worker = [&](int task_id) {
-      try {
-        MLPKriging& wk = clones[task_id];
-        if (n_warp > 0)
-          wk.unpack_warp_params(wp_init);
-        wk.m_theta = theta0_rand.row(task_id).t();
-        wk.refresh_cache();
-
-        double neg_ll = optimizer_fn(wk);
-
-        OptimizationResult r = extract_result(wk, neg_ll);
-        std::lock_guard<std::mutex> lock(results_mutex);
-        results[task_id] = std::move(r);
-      } catch (const std::exception& e) {
-        if (Optim::log_level > Optim::log_none) {
-          std::lock_guard<std::mutex> lock(results_mutex);
-          arma::cout << "Warning: MLPKriging multistart " << (task_id + 1) << " failed: " << e.what() << arma::endl;
-        }
-      }
-    };
-
-    if (multistart == 1) {
-      worker(0);
-    } else {
-      unsigned int n_cpu = std::thread::hardware_concurrency();
-      int pool_size = Optim::thread_pool_size;
-      if (pool_size <= 0)
-        pool_size = std::max(1u, n_cpu);
-      pool_size = std::min(pool_size, multistart);
-
-      if (Optim::log_level > Optim::log_none) {
-        arma::cout << "MLPKriging thread pool: " << pool_size << " workers (ncpu=" << n_cpu
-                   << ", multistart=" << multistart << ")" << arma::endl;
-      }
-
-      std::atomic<int> next_task(0);
-      std::vector<std::thread> threads;
-      threads.reserve(pool_size);
-
-      struct ThreadJoiner {
-        std::vector<std::thread>& threads_ref;
-        explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
-        ~ThreadJoiner() {
-          for (auto& t : threads_ref)
-            if (t.joinable())
-              t.join();
-        }
-      };
-
-      for (int worker_id = 0; worker_id < pool_size; worker_id++) {
-        threads.emplace_back([&]() {
-          while (true) {
-            int task_id = next_task.fetch_add(1);
-            if (task_id >= multistart)
-              break;
-
-            int delay_ms = task_id * Optim::thread_start_delay_ms;
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-
-            worker(task_id);
-          }
-        });
-      }
-
-      ThreadJoiner joiner(threads);
-    }
-
-    int best_idx = -1;
-    double best_neg_ll = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < multistart; ++i) {
-      if (results[i].success && results[i].neg_ll < best_neg_ll) {
-        best_neg_ll = results[i].neg_ll;
-        best_idx = i;
-      }
-    }
-    if (best_idx >= 0)
-      restore_best(results[best_idx]);
-  };
-
-  if (base_method == "BFGS" || n_warp == 0) {
-    if (multistart <= 1) {
-      run_joint_bfgs(*this);
-    } else {
-      run_parallel_multistart(run_joint_bfgs);
-    }
-  } else {
-    if (multistart <= 1) {
-      run_adam_bfgs(*this);
-    } else {
-      run_parallel_multistart(run_adam_bfgs);
-    }
-
-    if (base_method == "BFGS+Adam+BFGS" && n_warp > 0) {
-      run_joint_bfgs(*this);
-    }
-  }
-}
-
-// -------------------------------------------------------------------------
-//  fit() — map-based overload
+//  fit
 // -------------------------------------------------------------------------
 void MLPKriging::fit(const arma::vec& y,
                      const arma::mat& X,
@@ -770,524 +68,86 @@ void MLPKriging::fit(const arma::vec& y,
                      const std::string& optim,
                      const std::string& objective,
                      const std::map<std::string, std::string>& parameters) {
-  for (const auto& [key, val] : parameters) {
-    if (key == "adam_lr")
-      m_adam_lr = std::stod(val);
-    if (key == "max_iter_adam")
-      m_max_iter_adam = std::stoul(val);
-    if (key == "max_iter_bfgs")
-      m_max_iter_bfgs = std::stoul(val);
-  }
-  fit(y, X, regmodel, normalize, optim, objective, Parameters{});
+  m_impl.fit(y, X, regmodel, normalize, optim, objective, parameters);
 }
 
-// -------------------------------------------------------------------------
-//  fit() — typed-parameters overload
-// -------------------------------------------------------------------------
 void MLPKriging::fit(const arma::vec& y,
                      const arma::mat& X,
                      const Trend::RegressionModel& regmodel,
                      bool normalize,
                      const std::string& optim,
-                     const std::string& /*objective*/,
+                     const std::string& objective,
                      const Parameters& parameters) {
-  if (y.n_elem != X.n_rows)
-    throw std::invalid_argument("fit: y/X size mismatch");
-
-  m_y = y;
-  m_X = X;
-  m_regmodel = regmodel;
-  m_normalize = normalize;
-
-  normalise_data();
-
-  // Instantiate joint warp now that d_in is known
-  ensure_joint_warp(X.n_cols);
-
-  if (parameters.theta.has_value()) {
-    const arma::vec& t0 = *parameters.theta;
-    if (t0.n_elem != m_d_out)
-      throw std::invalid_argument("fit: parameters.theta has " + std::to_string(t0.n_elem) + " elements but d_out is "
-                                  + std::to_string(m_d_out));
-    m_theta = t0;
-  } else {
-    m_theta = arma::ones<arma::vec>(m_d_out);
-  }
-
-  if (parameters.warp_params.has_value() && parameters.warp_params->n_elem > 0) {
-    const arma::vec& wp = *parameters.warp_params;
-    arma::uword nw = total_warp_params();
-    if (wp.n_elem != nw)
-      throw std::invalid_argument("fit: parameters.warp_params has " + std::to_string(wp.n_elem)
-                                  + " elements but total_warp_params is " + std::to_string(nw));
-    unpack_warp_params(wp);
-  }
-
-  refresh_cache();
-  optimise_joint(optim);
-  m_fitted = true;
+  WarpKrigingParameters wp;
+  wp.theta = parameters.theta;
+  wp.warp_params = parameters.warp_params;
+  m_impl.fit(y, X, regmodel, normalize, optim, objective, wp);
 }
 
 // -------------------------------------------------------------------------
-//  predict()
+//  predict / simulate / update
 // -------------------------------------------------------------------------
 std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::predict(const arma::mat& X_n,
-                                                                                      bool return_stdev,
-                                                                                      bool return_cov,
-                                                                                      bool return_deriv) const {
-  if (!m_fitted)
-    throw std::runtime_error("predict: model not fitted");
-
-  const arma::uword d = X_n.n_cols;
-  arma::mat x_n = X_n;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < x_n.n_cols; ++j)
-      x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
-  }
-
-  const arma::uword n_n = x_n.n_rows;
-  const arma::uword n_o = m_Phi.n_rows;
-  arma::mat Phi_new = apply_warping(x_n);
-  arma::mat F_new = build_trend_matrix(x_n);
-  arma::mat Rcross = build_Rcross(Phi_new, m_Phi);
-
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, Rcross.t());
-  arma::vec mean = F_new * m_beta + Rstar_on.t() * m_z;
-  mean = mean * m_scaleY + m_centerY;
-
-  arma::vec stdev;
-  arma::mat cov;
-  arma::mat Dyhat_n;
-  arma::mat Dystdev_n;
-
-  arma::mat v;
-  arma::vec ysd2_n;
-
-  if (return_stdev || return_cov || return_deriv) {
-    v = Rstar_on;
-
-    if (return_cov) {
-      arma::mat R_new(n_n, n_n);
-      LinearAlgebra::covMat_sym_X(&R_new, Phi_new.t(), m_theta, _Cov);
-      cov = R_new - v.t() * v;
-      arma::mat H = F_new.t() - m_M.t() * v;
-      arma::mat Hcirc = LinearAlgebra::rsolve_upper(m_circ, H.t());
-      cov += Hcirc * Hcirc.t();
-      cov *= (m_sigma2 * m_scaleY * m_scaleY);
-      cov = 0.5 * (cov + cov.t());
-      cov.diag() = arma::clamp(cov.diag(), 0.0, arma::datum::inf);
-      stdev = arma::sqrt(cov.diag());
-      ysd2_n = cov.diag();
-    } else {
-      ysd2_n.set_size(n_n);
-      for (arma::uword i = 0; i < n_n; ++i) {
-        ysd2_n(i) = std::max(0.0, 1.0 - arma::dot(v.col(i), v.col(i)));
-        arma::vec r_i = F_new.row(i).t() - m_M.t() * v.col(i);
-        arma::mat r_circ = LinearAlgebra::solve_lower(m_circ.t(), r_i);
-        ysd2_n(i) += arma::dot(r_circ, r_circ);
-      }
-      ysd2_n *= (m_sigma2 * m_scaleY * m_scaleY);
-      ysd2_n = arma::clamp(ysd2_n, 0.0, arma::datum::inf);
-      if (return_stdev)
-        stdev = arma::sqrt(ysd2_n);
-    }
-  }
-
-  if (return_deriv) {
-    const double h = 1.0E-5;
-    const double sigma2 = m_sigma2;
-
-    Dyhat_n.set_size(n_n, d);
-    Dyhat_n.zeros();
-    arma::mat Dysd2_n(n_n, d, arma::fill::zeros);
-
-    arma::mat Ecirc_n;
-    if (return_stdev) {
-      arma::mat Fhat_n = v.t() * m_M;
-      arma::mat E_n = F_new - Fhat_n;
-      Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
-    }
-
-    for (arma::uword i = 0; i < n_n; i++) {
-      arma::mat x_perturbed(2 * d, d);
-      for (arma::uword k = 0; k < d; k++) {
-        x_perturbed.row(k) = x_n.row(i);
-        x_perturbed.row(d + k) = x_n.row(i);
-        x_perturbed(k, k) += h;
-        x_perturbed(d + k, k) -= h;
-      }
-
-      arma::mat Phi_perturbed = apply_warping(x_perturbed);
-      arma::mat J_warp(m_d_out, d);
-      for (arma::uword k = 0; k < d; k++) {
-        J_warp.col(k) = (Phi_perturbed.row(k) - Phi_perturbed.row(d + k)).t() / (2.0 * h);
-      }
-
-      arma::mat F_perturbed = build_trend_matrix(x_perturbed);
-      arma::mat DF_n_i(d, F_new.n_cols);
-      for (arma::uword k = 0; k < d; k++) {
-        DF_n_i.row(k) = (F_perturbed.row(k) - F_perturbed.row(d + k)) / (2.0 * h);
-      }
-
-      arma::mat DR_on_i(n_o, d);
-      for (arma::uword j = 0; j < n_o; j++) {
-        arma::vec dPhi = Phi_new.row(i).t() - m_Phi.row(j).t();
-        arma::vec dlnCovDx = _DlnCovDx(dPhi, m_theta);
-        DR_on_i.row(j) = Rcross(i, j) * (dlnCovDx.t() * J_warp);
-      }
-
-      arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
-
-      arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
-      Dyhat_n.row(i) = (DF_n_i * m_beta + DR_on_i.t() * alpha).t();
-
-      if (return_stdev) {
-        arma::mat DEcirc_n_i = LinearAlgebra::solve_lower(m_circ.t(), (DF_n_i - W_i.t() * m_M).t());
-        Dysd2_n.row(i) = -2.0 * v.col(i).t() * W_i + 2.0 * Ecirc_n.row(i) * DEcirc_n_i;
-      }
-    }
-    Dyhat_n *= m_scaleY;
-    Dysd2_n *= sigma2 * m_scaleY * m_scaleY;
-
-    if (return_stdev) {
-      Dystdev_n.set_size(n_n, d);
-      for (arma::uword i = 0; i < n_n; i++) {
-        double sd_i = std::sqrt(ysd2_n(i));
-        if (sd_i > 0)
-          Dystdev_n.row(i) = Dysd2_n.row(i) / (2.0 * sd_i);
-        else
-          Dystdev_n.row(i).zeros();
-      }
-    }
-  }
-
-  return {mean, stdev, cov, Dyhat_n, Dystdev_n};
+                                                                                       bool return_stdev,
+                                                                                       bool return_cov,
+                                                                                       bool return_deriv) const {
+  return m_impl.predict(X_n, return_stdev, return_cov, return_deriv);
 }
 
-// -------------------------------------------------------------------------
-//  simulate()
-// -------------------------------------------------------------------------
-arma::mat MLPKriging::simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update) {
-  if (!m_fitted)
-    throw std::runtime_error("simulate: model not fitted");
-
-  const arma::uword n_n = X_n.n_rows;
-  const arma::uword n_o = m_X.n_rows;
-
-  if (X_n.n_cols != m_X.n_cols)
-    throw std::runtime_error("Simulate locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
-                             + std::to_string(m_X.n_cols));
-
-  arma::mat x_n = X_n;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < x_n.n_cols; ++j)
-      x_n.col(j) = (x_n.col(j) - m_centerX(j)) / m_scaleX(j);
-  }
-
-  arma::mat Phi_n = apply_warping(x_n);
-  arma::mat F_n = build_trend_matrix(x_n);
-
-  arma::mat R_nn(n_n, n_n);
-  LinearAlgebra::covMat_sym_X(&R_nn, Phi_n.t(), m_theta, _Cov);
-
-  // R_on: cross-covariance (n_o × n_n) between training and new
-  arma::mat R_on(n_o, n_n);
-  LinearAlgebra::covMat_rect(&R_on, m_Phi.t(), Phi_n.t(), m_theta, _Cov, 1.0);
-
-  arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
-
-  arma::vec yhat_n = F_n * m_beta + Rstar_on.t() * m_z;
-
-  arma::mat Fhat_n = Rstar_on.t() * m_M;
-  arma::mat E_n = F_n - Fhat_n;
-  arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, E_n);
-
-  arma::mat SigmaNoTrend_nKo = R_nn - Rstar_on.t() * Rstar_on;
-
-  arma::mat Sigma_nKo = SigmaNoTrend_nKo + Ecirc_n * Ecirc_n.t();
-
-  arma::mat LSigma_nKo = LinearAlgebra::safe_chol_lower(Sigma_nKo);
-
-  arma::mat y_n(n_n, nsim, arma::fill::none);
-  y_n.each_col() = yhat_n;
-  Random::reset_seed(static_cast<uint64_t>(seed));
-  y_n += LSigma_nKo * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
-
-  // Denormalize
-  y_n = m_centerY + m_scaleY * y_n;
-
-  if (will_update) {
-    lastsimup_Xn_u.clear();  // force reset
-    lastsim_y_n = y_n;
-
-    lastsim_Xn_n = x_n.t();
-    lastsim_Phi_n = Phi_n;
-    lastsim_seed = static_cast<uint64_t>(seed);
-    lastsim_nsim = nsim;
-
-    lastsim_R_nn = R_nn;
-    lastsim_F_n = F_n;
-
-    lastsim_L_oCn = Rstar_on;
-    lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
-
-    lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
-                                   arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
-
-    lastsim_Rinv_on = LinearAlgebra::inv_sympd(lastsim_L_on);
-
-    lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
-    lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
-    arma::mat Q_Fstar_on;
-    LinearAlgebra::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
-    lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
-
-    lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
-    lastsim_Ecirc_nKo = LinearAlgebra::rsolve_upper(m_circ, F_n - lastsim_Fhat_nKo);
-  }
-
-  return y_n;
+arma::mat MLPKriging::simulate(int nsim, int seed, const arma::mat& X_n, bool will_update) {
+  return m_impl.simulate(nsim, seed, X_n, will_update, /*with_noise=*/{});
 }
 
-// -------------------------------------------------------------------------
-//  update_simulate()  — FOXY algorithm
-// -------------------------------------------------------------------------
 arma::mat MLPKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
-  if (y_u.n_elem != X_u.n_rows)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
-                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
-
-  if (X_u.n_cols != m_X.n_cols)
-    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
-                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
-
-  if (lastsim_y_n.is_empty() || lastsim_y_n.n_rows == 0)
-    throw std::runtime_error("No previous simulation data available");
-
-  arma::uword n_n = lastsim_Xn_n.n_cols;
-  arma::uword n_o = m_X.n_rows;
-
-  arma::uword n_on = n_o + n_n;
-  arma::mat F_on = arma::join_cols(m_F, lastsim_F_n);
-
-  arma::uword n_u = X_u.n_rows;
-
-  // Normalize X_u
-  arma::mat Xn_u = X_u;
-  if (m_normalize) {
-    for (arma::uword j = 0; j < Xn_u.n_cols; ++j)
-      Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
-  }
-
-  // Warp new update points and build trend matrix
-  arma::mat Phi_u = apply_warping(Xn_u);
-  arma::mat F_u = build_trend_matrix(Xn_u);
-
-  Xn_u = Xn_u.t();
-
-  bool use_lastsimup
-      = (!lastsimup_Xn_u.is_empty()) && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
-  if (!use_lastsimup) {
-    lastsimup_Xn_u = Xn_u;
-
-    // Covariance between update points
-    lastsimup_R_uu = arma::mat(n_u, n_u, arma::fill::none);
-    LinearAlgebra::covMat_sym_X(&lastsimup_R_uu, Phi_u.t(), m_theta, _Cov);
-
-    // Covariance between update and training points
-    lastsimup_R_uo = arma::mat(n_u, n_o, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_uo, Phi_u.t(), m_Phi.t(), m_theta, _Cov, 1.0);
-
-    // Covariance between update and simulation points
-    lastsimup_R_un = arma::mat(n_u, n_n, arma::fill::none);
-    LinearAlgebra::covMat_rect(&lastsimup_R_un, Phi_u.t(), lastsim_Phi_n.t(), m_theta, _Cov, 1.0);
-  }
-
-  // ======================================================================
-  // FOXY step #1: Extend the simulation to the design 'X_u'
-  // ======================================================================
-
-  if (!use_lastsimup) {
-    arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
-    arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
-
-    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
-
-    arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
-
-    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon);
-
-    arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
-
-    arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
-    arma::mat M_u = arma::repmat(m_u, 1, lastsim_nsim) + W_uCon.tail_cols(n_n) * lastsim_y_n;
-
-    Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);
-  }
-
-  // ======================================================================
-  // FOXY step #2: Update the simulated paths on 'X_n'
-  // ======================================================================
-
-  if (!use_lastsimup) {
-    arma::mat Rstar_ou = LinearAlgebra::solve_lower(m_T, lastsimup_R_uo.t());
-
-    arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Fhat_uKo);
-
-    arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
-
-    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
-
-    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
-  }
-
-  (void)n_on;
-  (void)F_on;
-
-  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u);
+  return m_impl.update_simulate(y_u, X_u, /*noise_u=*/{});
 }
 
-// -------------------------------------------------------------------------
-//  update()
-// -------------------------------------------------------------------------
 void MLPKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
-  if (!m_fitted)
-    throw std::runtime_error("update: model not fitted");
-
-  if (refit) {
-    arma::vec y_all = arma::join_vert(m_y * m_scaleY + m_centerY, y_u);
-    arma::mat X_all = m_X;
-    for (arma::uword j = 0; j < X_all.n_cols; ++j)
-      X_all.col(j) = X_all.col(j) * m_scaleX(j) + m_centerX(j);
-    X_all = arma::join_vert(X_all, X_u);
-
-    m_y = y_all;
-    m_X = X_all;
-    normalise_data();
-    refresh_cache();
-
-    arma::uword saved_adam = m_max_iter_adam;
-    m_max_iter_adam /= 5;
-    optimise_joint("BFGS+Adam");
-    m_max_iter_adam = saved_adam;
-  } else {
-    // Fast incremental update: keep all hyperparameters fixed, use Cholesky update
-    arma::mat Xn_u = X_u;
-    for (arma::uword j = 0; j < Xn_u.n_cols; ++j)
-      Xn_u.col(j) = (Xn_u.col(j) - m_centerX(j)) / m_scaleX(j);
-    arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
-
-    m_X = arma::join_cols(m_X, Xn_u);
-    m_y = arma::join_cols(m_y, yn_u);
-
-    // Recompute warped features and pairwise diffs (MLP params unchanged)
-    m_Phi = apply_warping(m_X);
-    compute_dPhi();
-
-    m_F = build_trend_matrix(m_X);
-
-    const arma::uword n = m_y.n_elem;
-
-    // make_Model detects theta unchanged + n > m_T.n_rows → Cholesky block update
-    MLPKModel m = make_Model(m_theta);
-
-    m_R = std::move(m.R);
-    m_T = std::move(m.L);
-    m_Rinv = std::move(m.Rinv);
-    m_M = std::move(m.Fstar);
-    m_circ = std::move(m.Rstar);
-    m_beta = std::move(m.betahat);
-    m_z = std::move(m.Estar);
-    m_sigma2 = std::max(m.SSEstar / n, 1e-20);
-    m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
-  }
+  m_impl.update(y_u, X_u, refit, /*noise_u=*/{});
 }
 
 // -------------------------------------------------------------------------
-//  summary()
+//  Log-likelihood
+// -------------------------------------------------------------------------
+double MLPKriging::logLikelihood() const {
+  return m_impl.logLikelihood();
+}
+
+std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta,
+                                                                       bool return_grad,
+                                                                       bool return_hess) const {
+  return m_impl.logLikelihoodFun(theta, return_grad, return_hess);
+}
+
+// -------------------------------------------------------------------------
+//  summary
 // -------------------------------------------------------------------------
 std::string MLPKriging::summary() const {
-  std::ostringstream oss;
-  oss << "* MLPKriging\n"
-      << "  - kernel:      " << m_kernel_name << "\n"
-      << "  - regmodel:    " << Trend::toString(m_regmodel) << "\n"
-      << "  - normalize:   " << (m_normalize ? "true" : "false") << "\n"
-      << "  - n obs:       " << m_y.n_elem << "\n"
-      << "  - d input:     " << m_X.n_cols << "\n"
-      << "  - d features:  " << m_d_out << "\n";
-
-  if (m_joint_warp) {
-    oss << "  - warping:     " << m_joint_warp->describe() << "\n";
-  }
-
-  if (m_fitted) {
-    oss << "  - sigma2:      " << m_sigma2 << "\n"
-        << "  - theta:       " << m_theta.t() << "  - beta:        " << m_beta.t()
-        << "  - LL:          " << logLikelihood() << "\n"
-        << "  - total warp params: " << total_warp_params() << "\n";
-  } else {
-    oss << "  ** model not yet fitted **\n";
-  }
-  return oss.str();
+  std::string s = m_impl.summary();
+  // Replace the "* WarpKriging" header with "* MLPKriging"
+  const std::string from = "* WarpKriging";
+  const std::string to   = "* MLPKriging";
+  auto pos = s.find(from);
+  if (pos != std::string::npos)
+    s.replace(pos, from.size(), to);
+  return s;
 }
 
 // -------------------------------------------------------------------------
-//  save / load
+//  save / load  — maintain exact MLPKriging JSON schema (backward compat)
 // -------------------------------------------------------------------------
 void MLPKriging::save(const std::string filename) const {
   nlohmann::json j;
-
-  j["version"] = 2;
+  j["version"] = 3;
   j["content"] = "MLPKriging";
-
-  // Architecture
-  j["kernel"] = m_kernel_name;
   j["hidden_dims"] = std::vector<arma::uword>(m_hidden_dims.begin(), m_hidden_dims.end());
   j["d_out"] = m_d_out;
   j["activation"] = m_activation;
-
-  // Training data
-  j["X"] = to_json(m_X);
-  j["y"] = to_json(m_y);
-
-  // Normalization
-  j["normalize"] = m_normalize;
-  j["X_mean"] = to_json(m_centerX);
-  j["X_std"] = to_json(m_scaleX);
-  j["y_mean"] = m_centerY;
-  j["y_std"] = m_scaleY;
-
-  // Settings
-  j["regmodel"] = Trend::toString(m_regmodel);
-  j["max_iter_bfgs"] = m_max_iter_bfgs;
-  j["max_iter_adam"] = m_max_iter_adam;
-  j["adam_lr"] = m_adam_lr;
-
-  // State
-  j["fitted"] = m_fitted;
-
-  // GP hyperparameters
-  j["theta"] = to_json(m_theta);
-  j["sigma2"] = m_sigma2;
-
-  // GP cached data
-  j["beta"] = to_json(m_beta);
-  j["z"] = to_json(m_z);
-  j["M"] = to_json(m_M);
-  j["circ"] = to_json(m_circ);
-  j["F"] = to_json(m_F);
-  j["R"] = to_json(m_R);
-  j["C"] = to_json(m_T);
-  j["Rinv"] = to_json(m_Rinv);
-  j["logdet"] = m_logdet;
-  j["Phi"] = to_json(m_Phi);
-  j["dPhi"] = to_json(m_dPhi);
-
-  // MLP warp parameters
-  j["warp_params"] = to_json(pack_warp_params());
-
+  m_impl.dump_to_json(j);
+  // MLPKriging schema omits these WarpKriging-only fields
+  j.erase("warping");
+  j.erase("is_continuous");
+  j.erase("feature_dim");
   std::ofstream f(filename);
   f << std::setw(4) << j;
 }
@@ -1297,64 +157,20 @@ MLPKriging MLPKriging::load(const std::string filename) {
   nlohmann::json j = nlohmann::json::parse(f);
 
   uint32_t version = j["version"].template get<uint32_t>();
-  if (version != 2) {
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
-  }
+  if (version < 2 || version > 3)
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   std::string content = j["content"].template get<std::string>();
-  if (content != "MLPKriging") {
+  if (content != "MLPKriging")
     throw std::runtime_error(
         asString("Bad content to load from '", filename, "'; found '", content, "', requires 'MLPKriging'"));
-  }
 
-  // Reconstruct from architecture
   auto hd = j["hidden_dims"].template get<std::vector<arma::uword>>();
   arma::uword d_out_val = j["d_out"].template get<arma::uword>();
   std::string activation = j["activation"].template get<std::string>();
-  std::string kernel = j["kernel"].template get<std::string>();
+  std::string kernel = j.contains("covType") ? j["covType"].template get<std::string>()
+                                             : j["kernel"].template get<std::string>();
   MLPKriging mk(hd, d_out_val, activation, kernel);
-
-  // Training data
-  mk.m_X = mat_from_json(j["X"]);
-  mk.m_y = colvec_from_json(j["y"]);
-
-  // Normalization
-  mk.m_normalize = j["normalize"].template get<bool>();
-  mk.m_centerX = rowvec_from_json(j["X_mean"]);
-  mk.m_scaleX = rowvec_from_json(j["X_std"]);
-  mk.m_centerY = j["y_mean"].template get<double>();
-  mk.m_scaleY = j["y_std"].template get<double>();
-
-  // Settings
-  mk.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
-  mk.m_max_iter_bfgs = j["max_iter_bfgs"].template get<arma::uword>();
-  mk.m_max_iter_adam = j["max_iter_adam"].template get<arma::uword>();
-  mk.m_adam_lr = j["adam_lr"].template get<double>();
-
-  // State
-  mk.m_fitted = j["fitted"].template get<bool>();
-
-  // GP hyperparameters
-  mk.m_theta = colvec_from_json(j["theta"]);
-  mk.m_sigma2 = j["sigma2"].template get<double>();
-
-  // GP cached data
-  mk.m_beta = colvec_from_json(j["beta"]);
-  mk.m_z = colvec_from_json(j["z"]);
-  mk.m_M = mat_from_json(j["M"]);
-  mk.m_circ = mat_from_json(j["circ"]);
-  mk.m_F = mat_from_json(j["F"]);
-  mk.m_R = mat_from_json(j["R"]);
-  mk.m_T = mat_from_json(j["C"]);
-  mk.m_Rinv = mat_from_json(j["Rinv"]);
-  mk.m_logdet = j["logdet"].template get<double>();
-  mk.m_Phi = mat_from_json(j["Phi"]);
-  mk.m_dPhi = mat_from_json(j["dPhi"]);
-
-  // Restore MLP warp parameters — need to instantiate the joint warp first
-  mk.ensure_joint_warp(mk.m_X.n_cols);
-  arma::vec wp = colvec_from_json(j["warp_params"]);
-  mk.unpack_warp_params(wp);
-
+  mk.m_impl.load_from_json(j);
   return mk;
 }
 
