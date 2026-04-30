@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[update][nuggetkriging]") {
@@ -41,15 +41,15 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
 
   SECTION("Update with refit equals combined fit") {
     // Fit model on old data
-    NuggetKriging nk_updated("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_updated("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_updated.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Update with new data
     nk_updated.update(y_new, X_new, true);
     
     // Fit model on combined data
-    NuggetKriging nk_combined("gauss");
+    Kriging nk_combined("gauss", Kriging::NoiseModel::Nugget);
     nk_combined.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Compare parameters
@@ -97,8 +97,8 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
 
   SECTION("Multiple updates equal combined fit") {
     // Fit model on old data
-    NuggetKriging nk_updated("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_updated("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_updated.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Update one point at a time
@@ -109,7 +109,7 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
     }
     
     // Fit model on combined data
-    NuggetKriging nk_combined("gauss");
+    Kriging nk_combined("gauss", Kriging::NoiseModel::Nugget);
     nk_combined.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Test predictions
@@ -130,13 +130,13 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
       INFO("Testing kernel: " << kernel);
       
       // Fit and update
-      NuggetKriging nk_updated(kernel);
-      NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging nk_updated(kernel, Kriging::NoiseModel::Nugget);
+      Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       nk_updated.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
       nk_updated.update(y_new, X_new, true);
       
       // Combined fit
-      NuggetKriging nk_combined(kernel);
+      Kriging nk_combined(kernel, Kriging::NoiseModel::Nugget);
       nk_combined.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
       
       // Test predictions
@@ -159,13 +159,13 @@ TEST_CASE("NuggetKrigingUpdateTest - Updated model equals combined fit", "[updat
       INFO("Testing trend model");
       
       // Fit and update
-      NuggetKriging nk_updated("gauss");
-      NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging nk_updated("gauss", Kriging::NoiseModel::Nugget);
+      Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       nk_updated.fit(y_old, X_old, trend, false, "BFGS", "LL", params);
       nk_updated.update(y_new, X_new, true);
       
       // Combined fit
-      NuggetKriging nk_combined("gauss");
+      Kriging nk_combined("gauss", Kriging::NoiseModel::Nugget);
       nk_combined.fit(y_combined, X_combined, trend, false, "BFGS", "LL", params);
       
       // Test predictions

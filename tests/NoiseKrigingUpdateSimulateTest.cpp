@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 #include "ks_test.hpp"
 #include <sstream>
 // clang-format on
@@ -44,10 +44,10 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     double sigma2_fixed = 100.0;
     arma::vec theta_fixed = arma::vec(d).fill(1.0);
     arma::vec beta_fixed = {10.0};
-    NoiseKriging::Parameters params_fixed{arma::vec(1).fill(sigma2_fixed), false, arma::mat(theta_fixed), false, beta_fixed, false};
+    Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed, .is_sigma2_estim = false, .theta = arma::mat(theta_fixed), .is_theta_estim = false, .beta = beta_fixed, .is_beta_estim = false};
 
     // Build nk1 with fixed parameters
-    NoiseKriging nk1("gauss");
+    Kriging nk1("gauss", Kriging::NoiseModel::Heterogeneous);
     nk1.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
 
     // Simulation points
@@ -61,7 +61,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
     
     // Method 2: Build nk2 with same fixed parameters on full data
-    NoiseKriging nk2("gauss");
+    Kriging nk2("gauss", Kriging::NoiseModel::Heterogeneous);
     arma::mat X_full = arma::join_cols(X_old, X_new);
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
@@ -96,10 +96,10 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     double sigma2_fixed = 100.0;
     arma::vec theta_fixed = arma::vec(d).fill(1.0);
     arma::vec beta_fixed = {10.0};
-    NoiseKriging::Parameters params_fixed{arma::vec(1).fill(sigma2_fixed), false, arma::mat(theta_fixed), false, beta_fixed, false};
+    Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed, .is_sigma2_estim = false, .theta = arma::mat(theta_fixed), .is_theta_estim = false, .beta = beta_fixed, .is_beta_estim = false};
     
     // Build nk1 with fixed parameters
-    NoiseKriging nk1("gauss");
+    Kriging nk1("gauss", Kriging::NoiseModel::Heterogeneous);
     nk1.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
     
     // Simulation points
@@ -114,7 +114,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
     arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
     
     // Build nk2 with same fixed parameters on full data
-    NoiseKriging nk2("gauss");
+    Kriging nk2("gauss", Kriging::NoiseModel::Heterogeneous);
     arma::mat X_full = arma::join_cols(X_old, X_new);
     arma::colvec y_full = arma::join_cols(y_old, y_new);
     arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
@@ -149,10 +149,10 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       double sigma2_fixed = 100.0;
       arma::vec theta_fixed = arma::vec(d).fill(1.0);
       arma::vec beta_fixed = {10.0};
-      NoiseKriging::Parameters params_fixed{arma::vec(1).fill(sigma2_fixed), false, arma::mat(theta_fixed), false, beta_fixed, false};
+      Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed, .is_sigma2_estim = false, .theta = arma::mat(theta_fixed), .is_theta_estim = false, .beta = beta_fixed, .is_beta_estim = false};
       
       // Build nk1 with fixed parameters
-      NoiseKriging nk1(kernel);
+      Kriging nk1(kernel, Kriging::NoiseModel::Heterogeneous);
       nk1.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "none", "LL", params_fixed);
       
       arma::mat X_sim(5, d, arma::fill::randu);
@@ -163,7 +163,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
       
       // Build nk2 with same fixed parameters on full data
-      NoiseKriging nk2(kernel);
+      Kriging nk2(kernel, Kriging::NoiseModel::Heterogeneous);
       arma::mat X_full = arma::join_cols(X_old, X_new);
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);
@@ -210,10 +210,10 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       } else {  // Quadratic
         beta_fixed = {10.0, 10.0, 10.0, 1.0, 1.0, 1.0};  // intercept + 2 linear + 3 quadratic terms for d=2
       }
-      NoiseKriging::Parameters params_fixed{arma::vec(1).fill(sigma2_fixed), false, arma::mat(theta_fixed), false, beta_fixed, false};
+      Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed, .is_sigma2_estim = false, .theta = arma::mat(theta_fixed), .is_theta_estim = false, .beta = beta_fixed, .is_beta_estim = false};
       
       // Build nk1 with fixed parameters
-      NoiseKriging nk1("gauss");
+      Kriging nk1("gauss", Kriging::NoiseModel::Heterogeneous);
       nk1.fit(y_old, noise_old, X_old, trend, false, "none", "LL", params_fixed);
       
       arma::mat X_sim(5, d, arma::fill::randu);
@@ -224,7 +224,7 @@ TEST_CASE("NoiseKrigingUpdateSimulateTest - Update simulate equals updated model
       arma::mat sims1 = nk1.update_simulate(y_new, noise_new, X_new);
       
       // Build nk2 with same fixed parameters on full data
-      NoiseKriging nk2("gauss");
+      Kriging nk2("gauss", Kriging::NoiseModel::Heterogeneous);
       arma::mat X_full = arma::join_cols(X_old, X_new);
       arma::colvec y_full = arma::join_cols(y_old, y_new);
       arma::colvec noise_full = arma::join_cols(noise_old, noise_new);

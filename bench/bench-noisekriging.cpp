@@ -4,7 +4,7 @@
 #include <cmath>
 // clang-format on
 
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/Bench.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -117,8 +117,8 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     {
       auto t0 = std::chrono::high_resolution_clock::now();
 
-      NoiseKriging kr("gauss");
-      NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true};
+      Kriging kr("gauss", Kriging::NoiseModel::Heterogeneous);
+      Kriging::Parameters params{std::nullopt, true, std::nullopt, true};
       // BFGS, no parallelization (multistart=1)
       kr.fit(y_train, noise_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
@@ -128,8 +128,8 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     }
 
     // Create a fitted model for subsequent operations
-    NoiseKriging kr("gauss");
-    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true};
+    Kriging kr("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true};
     kr.fit(y_train, noise_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
     // Benchmark PREDICT
@@ -170,7 +170,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 
     // Benchmark UPDATE + SIMULATE
     // Create fresh model for this test
-    NoiseKriging kr2("gauss");
+    Kriging kr2("gauss", Kriging::NoiseModel::Heterogeneous);
     kr2.fit(y_train, noise_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
     // First simulate to prepare the model

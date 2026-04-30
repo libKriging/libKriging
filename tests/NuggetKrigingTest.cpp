@@ -7,7 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <libKriging/NuggetKriging.hpp>
+#include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Trend.hpp>
 #include <libKriging/Optim.hpp>
@@ -51,8 +51,8 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   y += 0.05 * arma::randn(n);  // Add noise for nugget effect
 
   SECTION("Basic fit") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
     CHECK(ok.theta().n_elem == d);
@@ -67,8 +67,8 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("BFGS20 multistart") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
 
     CHECK(ok.theta().n_elem == d);
@@ -83,12 +83,12 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("BFGS vs BFGS20 comparison") {
-    NuggetKriging ok_single = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok_single("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok_single.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
     double ll_single = ok_single.logLikelihood();
 
-    NuggetKriging ok_multi = NuggetKriging("gauss");
+    Kriging ok_multi("gauss", Kriging::NoiseModel::Nugget);
     ok_multi.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
     double ll_multi = ok_multi.logLikelihood();
 
@@ -124,15 +124,15 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
 
     for (int run = 0; run < n_runs; ++run) {
       auto start10 = high_resolution_clock::now();
-      NuggetKriging ok10 = NuggetKriging("gauss");
-      NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging ok10("gauss", Kriging::NoiseModel::Nugget);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       ok10.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", parameters);
       auto end10 = high_resolution_clock::now();
       double time10 = duration_cast<milliseconds>(end10 - start10).count();
       times10.push_back(time10);
 
       auto start20 = high_resolution_clock::now();
-      NuggetKriging ok20 = NuggetKriging("gauss");
+      Kriging ok20("gauss", Kriging::NoiseModel::Nugget);
       ok20.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
       auto end20 = high_resolution_clock::now();
       double time20 = duration_cast<milliseconds>(end20 - start20).count();
@@ -180,8 +180,8 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread pool configuration") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
     // Test with explicit thread pool size
     INFO("Testing with thread_pool_size=2");
@@ -203,8 +203,8 @@ TEST_CASE("NuggetKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread startup delay") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
     // Test with different delays
     INFO("Testing with thread_start_delay_ms=1");
@@ -239,8 +239,8 @@ TEST_CASE("NuggetKriging with LMP objective") {
   y += 0.05 * arma::randn(n);
 
   SECTION("LMP single-start") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", parameters);
 
     CHECK(ok.theta().n_elem == d);
@@ -249,8 +249,8 @@ TEST_CASE("NuggetKriging with LMP objective") {
   }
 
   SECTION("LMP multi-start") {
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LMP", parameters);
 
     CHECK(ok.theta().n_elem == d);
@@ -275,8 +275,8 @@ TEST_CASE("NuggetKriging intensive stress test", "[intensive][multistart]") {
       arma::colvec y = arma::sin(5.0 * X.col(0)) % arma::cos(3.0 * X.col(1));
       y += 0.1 * arma::randn(n);
 
-      NuggetKriging ok = NuggetKriging("gauss");
-      NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       
       try {
         ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
@@ -332,8 +332,8 @@ TEST_CASE("NuggetKriging intensive stress test", "[intensive][multistart]") {
 
     INFO("Testing large dataset (n=" << n << ", d=" << d << ") with BFGS20");
     
-    NuggetKriging ok = NuggetKriging("gauss");
-    NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
     
@@ -361,8 +361,8 @@ TEST_CASE("NuggetKriging intensive stress test", "[intensive][multistart]") {
       arma::colvec y = arma::sin(5.0 * X.col(0) + 3.0 * X.col(1));
       y += 0.1 * arma::randn(n);
 
-      NuggetKriging ok = NuggetKriging("gauss");
-      NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging ok("gauss", Kriging::NoiseModel::Nugget);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       
       ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
       
@@ -385,8 +385,8 @@ TEST_CASE("NuggetKriging intensive stress test", "[intensive][multistart]") {
     for (const auto& kernel : kernels) {
       INFO("Testing kernel: " << kernel);
       
-      NuggetKriging ok = NuggetKriging(kernel);
-      NuggetKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging ok(kernel, Kriging::NoiseModel::Nugget);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
       
       ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
       
@@ -417,9 +417,12 @@ TEST_CASE("NuggetKriging fit with given parameters - BFGS1") {
   arma::vec nugget_start(1);
   nugget_start(0) = 0.01;
 
-  NuggetKriging nk = NuggetKriging("gauss");
+  Kriging nk("gauss", Kriging::NoiseModel::Nugget);
   // Provide starting values, optimize all
-  NuggetKriging::Parameters parameters{nugget_start, true, sigma2_start, true, theta_start, true, std::nullopt, true};
+  Kriging::Parameters parameters;
+  parameters.sigma2 = sigma2_start(0); parameters.is_sigma2_estim = true;
+  parameters.theta = theta_start; parameters.is_theta_estim = true;
+  parameters.nugget = nugget_start(0); parameters.is_nugget_estim = true;
   nk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
   // Check that optimization ran
@@ -456,9 +459,12 @@ TEST_CASE("NuggetKriging fit with given parameters - BFGS20") {
   arma::vec nugget_start(1);
   nugget_start(0) = 0.01;
 
-  NuggetKriging nk = NuggetKriging("gauss");
+  Kriging nk("gauss", Kriging::NoiseModel::Nugget);
   // Provide starting values, optimize all
-  NuggetKriging::Parameters parameters{nugget_start, true, sigma2_start, true, theta_starts, true, std::nullopt, true};
+  Kriging::Parameters parameters;
+  parameters.sigma2 = sigma2_start(0); parameters.is_sigma2_estim = true;
+  parameters.theta = theta_starts; parameters.is_theta_estim = true;
+  parameters.nugget = nugget_start(0); parameters.is_nugget_estim = true;
   nk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
 
   // Check that optimization ran
@@ -505,8 +511,8 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 1: Estimate all parameters (not valid for "none")
       if (optim != "none") {
         SECTION("Estimate all (nugget, sigma2, theta, beta)") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() > 0);
@@ -517,8 +523,9 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 2: Fix nugget, estimate others (not valid for "none")
       if (optim != "none") {
         SECTION("Fix nugget, estimate sigma2, theta, beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{nugget_val, false, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params;
+          params.nugget = nugget_val(0); params.is_nugget_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() == nugget_val(0));
           CHECK(nk.sigma2() > 0);
@@ -529,8 +536,9 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 3: Fix sigma2, estimate others (not valid for "none" without theta)
       if (optim != "none") {
         SECTION("Estimate nugget, fix sigma2, estimate theta and beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{std::nullopt, true, sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() == sigma2_val(0));
@@ -541,8 +549,8 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 4: Fix theta, estimate others (not valid for "none" - can't estimate variance params)
       if (optim != "none") {
         SECTION("Estimate nugget and sigma2, fix theta, estimate beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, theta_val, false, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params{.theta = theta_val, .is_theta_estim = false};
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() > 0);
@@ -553,8 +561,10 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 5: Fix nugget and sigma2, estimate theta and beta (not valid for "none")
       if (optim != "none") {
         SECTION("Fix nugget and sigma2, estimate theta and beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{nugget_val, false, sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;
+          params.nugget = nugget_val(0); params.is_nugget_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() == nugget_val(0));
           CHECK(nk.sigma2() == sigma2_val(0));
@@ -565,8 +575,10 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 6: Fix nugget and theta, estimate sigma2 and beta (not valid for "none")
       if (optim != "none") {
         SECTION("Fix nugget and theta, estimate sigma2 and beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{nugget_val, false, std::nullopt, true, theta_val, false, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params;
+          params.nugget = nugget_val(0); params.is_nugget_estim = false;
+          params.theta = theta_val; params.is_theta_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() == nugget_val(0));
           CHECK(nk.sigma2() > 0);
@@ -577,8 +589,10 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 7: Fix sigma2 and theta, estimate nugget and beta (not valid for "none")
       if (optim != "none") {
         SECTION("Estimate nugget, fix sigma2 and theta, estimate beta") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{std::nullopt, true, sigma2_val, false, theta_val, false, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;
+          params.theta = theta_val; params.is_theta_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() == sigma2_val(0));
@@ -588,8 +602,11 @@ TEST_CASE("NuggetKriging all parameter combinations") {
 
       // Combination 8: Fix all variance parameters, estimate beta only
       SECTION("Fix nugget, sigma2 and theta, estimate beta only") {
-        NuggetKriging nk("gauss");
-        NuggetKriging::Parameters params{nugget_val, false, sigma2_val, false, theta_val, false, std::nullopt, true};
+        Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+        Kriging::Parameters params;
+        params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;
+        params.theta = theta_val; params.is_theta_estim = false;
+        params.nugget = nugget_val(0); params.is_nugget_estim = false;
         nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
         CHECK(nk.nugget() == nugget_val(0));
         CHECK(nk.sigma2() == sigma2_val(0));
@@ -603,8 +620,8 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       // Combination 9: Multistart with theta starting points (BFGS20 only)
       if (optim == "BFGS20") {
         SECTION("Multistart with theta starting points") {
-          NuggetKriging nk("gauss");
-          NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, theta_starts, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+          Kriging::Parameters params{.theta = theta_starts};
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() > 0);
@@ -615,8 +632,8 @@ TEST_CASE("NuggetKriging all parameter combinations") {
   }
 
   // Verify predictions work for a representative case
-  NuggetKriging nk_final("gauss");
-  NuggetKriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  Kriging nk_final("gauss", Kriging::NoiseModel::Nugget);
+  Kriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
   nk_final.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
   
   arma::mat X_new(1, d);

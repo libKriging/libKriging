@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][noisekriging]") {
@@ -29,8 +29,8 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
 
   SECTION("LL - BFGS should find better or equal LL than grid search") {
     // First fit a NoiseKriging model
-    NoiseKriging nk_grid("gauss");
-    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_grid("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_grid.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Grid search over theta using logLikelihoodFun
@@ -62,8 +62,8 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
     INFO("Best grid LL: " << best_ll_grid << " at theta_sigma2 = " << best_theta_sigma2_grid);
     
     // BFGS optimization
-    NoiseKriging nk_bfgs("gauss");
-    NoiseKriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_bfgs("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_bfgs.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_bfgs);
     
     double ll_bfgs = nk_bfgs.logLikelihood();

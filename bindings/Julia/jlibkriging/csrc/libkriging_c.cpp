@@ -3,8 +3,8 @@
 #include <libKriging/Kriging.hpp>
 #include <libKriging/LinearRegression.hpp>
 #include <libKriging/MLPKriging.hpp>
-#include <libKriging/NoiseKriging.hpp>
-#include <libKriging/NuggetKriging.hpp>
+
+
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
 #include <libKriging/utils/ExplicitCopySpecifier.hpp>
@@ -299,13 +299,11 @@ int lk_kriging_log_likelihood_fun(void* ptr,
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad, hess] = k->logLikelihoodFun(theta_v, return_grad != 0, return_hess != 0, false);
+    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
       std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
-    if (hess_out && return_hess)
-      std::memcpy(hess_out, hess.memptr(), hess.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -628,7 +626,7 @@ int lk_kriging_is_sigma2_estim(void* ptr) {
 
 void* lk_nugget_kriging_new(const char* kernel) {
   try {
-    return new NuggetKriging(kernel);
+    return new Kriging(kernel ? kernel : "matern3_2", Kriging::NoiseModel::Nugget);
   }
   CATCH_RETURN_NULL
 }
@@ -659,9 +657,9 @@ void* lk_nugget_kriging_new_fit(const double* y,
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
 
-    NuggetKriging::Parameters params;
+    Kriging::Parameters params;
     if (sigma2 && sigma2_n > 0)
-      params.sigma2 = arma::vec(const_cast<double*>(sigma2), sigma2_n, false, true);
+      params.sigma2 = sigma2[0];
     params.is_sigma2_estim = is_sigma2_estim != 0;
     if (theta && theta_n > 0)
       params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
@@ -670,29 +668,30 @@ void* lk_nugget_kriging_new_fit(const double* y,
       params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
     params.is_beta_estim = is_beta_estim != 0;
     if (nugget && nugget_n > 0)
-      params.nugget = arma::vec(const_cast<double*>(nugget), nugget_n, false, true);
+      params.nugget = nugget[0];
     params.is_nugget_estim = is_nugget_estim != 0;
 
-    return new NuggetKriging(y_v,
-                             X_m,
-                             kernel ? kernel : "matern3_2",
-                             Trend::fromString(regmodel ? regmodel : "constant"),
-                             normalize != 0,
-                             optim ? optim : "BFGS",
-                             objective ? objective : "LL",
-                             params);
+    auto* kr = new Kriging(kernel ? kernel : "matern3_2", Kriging::NoiseModel::Nugget);
+    kr->fit(y_v,
+            X_m,
+            Trend::fromString(regmodel ? regmodel : "constant"),
+            normalize != 0,
+            optim ? optim : "BFGS",
+            objective ? objective : "LL",
+            params);
+    return kr;
   }
   CATCH_RETURN_NULL
 }
 
 void lk_nugget_kriging_delete(void* ptr) {
-  delete static_cast<NuggetKriging*>(ptr);
+  delete static_cast<Kriging*>(ptr);
 }
 
 void* lk_nugget_kriging_copy(void* ptr) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
-    return new NuggetKriging(*k, ExplicitCopySpecifier{});
+    auto* k = static_cast<Kriging*>(ptr);
+    return new Kriging(*k, ExplicitCopySpecifier{});
   }
   CATCH_RETURN_NULL
 }
@@ -708,7 +707,7 @@ int lk_nugget_kriging_fit(void* ptr,
                           const char* optim,
                           const char* objective) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
     k->fit(y_v,
@@ -735,7 +734,7 @@ int lk_nugget_kriging_predict(void* ptr,
                               double* mean_deriv_out,
                               double* stdev_deriv_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     auto [mean_v, stdev_v, cov_m, mean_deriv_m, stdev_deriv_m]
         = k->predict(X_m, return_stdev != 0, return_cov != 0, return_deriv != 0);
@@ -764,7 +763,7 @@ int lk_nugget_kriging_simulate(void* ptr,
                                int will_update,
                                double* sim_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     arma::mat sim = k->simulate(nsim, seed, X_m, with_nugget != 0, will_update != 0);
     if (sim_out)
@@ -776,7 +775,7 @@ int lk_nugget_kriging_simulate(void* ptr,
 
 int lk_nugget_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y_u), n, false, true);
     arma::mat X_m(const_cast<double*>(X_u), nX, d, false, true);
     k->update(y_v, X_m, refit != 0);
@@ -795,7 +794,7 @@ int lk_nugget_kriging_update_simulate(void* ptr,
                                       int* nsim_out,
                                       int* m_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y_u), n, false, true);
     arma::mat X_m(const_cast<double*>(X_u), nX, d, false, true);
     arma::mat sim = k->update_simulate(y_v, X_m);
@@ -812,7 +811,7 @@ int lk_nugget_kriging_update_simulate(void* ptr,
 
 int lk_nugget_kriging_save(void* ptr, const char* filename) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     k->save(filename);
     return 0;
   }
@@ -821,14 +820,14 @@ int lk_nugget_kriging_save(void* ptr, const char* filename) {
 
 void* lk_nugget_kriging_load(const char* filename) {
   try {
-    return new NuggetKriging(NuggetKriging::load(filename));
+    return new Kriging(Kriging::load(filename));
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_nugget_kriging_summary(void* ptr) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     static thread_local std::string buf;
     buf = k->summary();
     return buf.c_str();
@@ -845,7 +844,7 @@ int lk_nugget_kriging_log_likelihood_fun(void* ptr,
                                          double* grad_out,
                                          double* hess_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
     // NuggetKriging::logLikelihoodFun does not support hessian output
     auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
@@ -867,7 +866,7 @@ int lk_nugget_kriging_log_marg_post_fun(void* ptr,
                                         double* lmp_out,
                                         double* grad_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
     auto [lmp, grad] = k->logMargPostFun(theta_v, return_grad != 0, false);
     if (lmp_out)
@@ -881,14 +880,14 @@ int lk_nugget_kriging_log_marg_post_fun(void* ptr,
 
 double lk_nugget_kriging_log_likelihood(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->logLikelihood();
+    return static_cast<Kriging*>(ptr)->logLikelihood();
   }
   CATCH_RETURN_NAN
 }
 
 double lk_nugget_kriging_log_marg_post(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->logMargPost();
+    return static_cast<Kriging*>(ptr)->logMargPost();
   }
   CATCH_RETURN_NAN
 }
@@ -902,7 +901,7 @@ int lk_nugget_kriging_cov_mat(void* ptr,
                               int d2,
                               double* cov_out) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X1_m(const_cast<double*>(X1), n1, d1, false, true);
     arma::mat X2_m(const_cast<double*>(X2), n2, d2, false, true);
     arma::mat cov = k->covMat(X1_m, X2_m);
@@ -917,28 +916,28 @@ int lk_nugget_kriging_cov_mat(void* ptr,
 
 const char* lk_nugget_kriging_kernel(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->kernel().c_str();
+    return static_cast<Kriging*>(ptr)->kernel().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_nugget_kriging_optim(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->optim().c_str();
+    return static_cast<Kriging*>(ptr)->optim().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_nugget_kriging_objective(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->objective().c_str();
+    return static_cast<Kriging*>(ptr)->objective().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 int lk_nugget_kriging_is_normalize(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->normalize() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->normalize() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -947,7 +946,7 @@ int lk_nugget_kriging_is_normalize(void* ptr) {
 const char* lk_nugget_kriging_regmodel(void* ptr) {
   try {
     static thread_local std::string buf;
-    buf = Trend::toString(static_cast<NuggetKriging*>(ptr)->regmodel());
+    buf = Trend::toString(static_cast<Kriging*>(ptr)->regmodel());
     return buf.c_str();
   }
   CATCH_RETURN_NULL
@@ -957,7 +956,7 @@ const char* lk_nugget_kriging_regmodel(void* ptr) {
 
 int lk_nugget_kriging_get_X(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->X();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -972,7 +971,7 @@ int lk_nugget_kriging_get_X(void* ptr, double* out, int* n, int* d) {
 
 int lk_nugget_kriging_get_centerX(void* ptr, double* out, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::rowvec& v = k->centerX();
     if (d)
       *d = static_cast<int>(v.n_elem);
@@ -985,7 +984,7 @@ int lk_nugget_kriging_get_centerX(void* ptr, double* out, int* d) {
 
 int lk_nugget_kriging_get_scaleX(void* ptr, double* out, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::rowvec& v = k->scaleX();
     if (d)
       *d = static_cast<int>(v.n_elem);
@@ -998,7 +997,7 @@ int lk_nugget_kriging_get_scaleX(void* ptr, double* out, int* d) {
 
 int lk_nugget_kriging_get_y(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->y();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1011,21 +1010,21 @@ int lk_nugget_kriging_get_y(void* ptr, double* out, int* n) {
 
 double lk_nugget_kriging_get_centerY(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->centerY();
+    return static_cast<Kriging*>(ptr)->centerY();
   }
   CATCH_RETURN_NAN
 }
 
 double lk_nugget_kriging_get_scaleY(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->scaleY();
+    return static_cast<Kriging*>(ptr)->scaleY();
   }
   CATCH_RETURN_NAN
 }
 
 int lk_nugget_kriging_get_F(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->F();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1040,7 +1039,7 @@ int lk_nugget_kriging_get_F(void* ptr, double* out, int* n, int* d) {
 
 int lk_nugget_kriging_get_T(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->T();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1055,7 +1054,7 @@ int lk_nugget_kriging_get_T(void* ptr, double* out, int* n, int* d) {
 
 int lk_nugget_kriging_get_M(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->M();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1070,7 +1069,7 @@ int lk_nugget_kriging_get_M(void* ptr, double* out, int* n, int* d) {
 
 int lk_nugget_kriging_get_z(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->z();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1083,7 +1082,7 @@ int lk_nugget_kriging_get_z(void* ptr, double* out, int* n) {
 
 int lk_nugget_kriging_get_beta(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->beta();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1096,7 +1095,7 @@ int lk_nugget_kriging_get_beta(void* ptr, double* out, int* n) {
 
 int lk_nugget_kriging_is_beta_estim(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->is_beta_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_beta_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1104,7 +1103,7 @@ int lk_nugget_kriging_is_beta_estim(void* ptr) {
 
 int lk_nugget_kriging_get_theta(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NuggetKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->theta();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1117,7 +1116,7 @@ int lk_nugget_kriging_get_theta(void* ptr, double* out, int* n) {
 
 int lk_nugget_kriging_is_theta_estim(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->is_theta_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_theta_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1125,14 +1124,14 @@ int lk_nugget_kriging_is_theta_estim(void* ptr) {
 
 double lk_nugget_kriging_get_sigma2(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->sigma2();
+    return static_cast<Kriging*>(ptr)->sigma2();
   }
   CATCH_RETURN_NAN
 }
 
 int lk_nugget_kriging_is_sigma2_estim(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->is_sigma2_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_sigma2_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1140,14 +1139,14 @@ int lk_nugget_kriging_is_sigma2_estim(void* ptr) {
 
 double lk_nugget_kriging_get_nugget(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->nugget();
+    return static_cast<Kriging*>(ptr)->nugget();
   }
   CATCH_RETURN_NAN
 }
 
 int lk_nugget_kriging_is_nugget_estim(void* ptr) {
   try {
-    return static_cast<NuggetKriging*>(ptr)->is_nugget_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_nugget_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1159,7 +1158,7 @@ int lk_nugget_kriging_is_nugget_estim(void* ptr) {
 
 void* lk_noise_kriging_new(const char* kernel) {
   try {
-    return new NoiseKriging(kernel);
+    return new Kriging(kernel ? kernel : "matern3_2", Kriging::NoiseModel::Heterogeneous);
   }
   CATCH_RETURN_NULL
 }
@@ -1190,9 +1189,9 @@ void* lk_noise_kriging_new_fit(const double* y,
     arma::vec noise_v(const_cast<double*>(noise), noise_n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
 
-    NoiseKriging::Parameters params;
+    Kriging::Parameters params;
     if (sigma2 && sigma2_n > 0)
-      params.sigma2 = arma::vec(const_cast<double*>(sigma2), sigma2_n, false, true);
+      params.sigma2 = sigma2[0];
     params.is_sigma2_estim = is_sigma2_estim != 0;
     if (theta && theta_n > 0)
       params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
@@ -1201,27 +1200,28 @@ void* lk_noise_kriging_new_fit(const double* y,
       params.beta = arma::vec(const_cast<double*>(beta), beta_n, false, true);
     params.is_beta_estim = is_beta_estim != 0;
 
-    return new NoiseKriging(y_v,
-                            noise_v,
-                            X_m,
-                            kernel ? kernel : "matern3_2",
-                            Trend::fromString(regmodel ? regmodel : "constant"),
-                            normalize != 0,
-                            optim ? optim : "BFGS",
-                            objective ? objective : "LL",
-                            params);
+    auto* kr = new Kriging(kernel ? kernel : "matern3_2", Kriging::NoiseModel::Heterogeneous);
+    kr->fit(y_v,
+            noise_v,
+            X_m,
+            Trend::fromString(regmodel ? regmodel : "constant"),
+            normalize != 0,
+            optim ? optim : "BFGS",
+            objective ? objective : "LL",
+            params);
+    return kr;
   }
   CATCH_RETURN_NULL
 }
 
 void lk_noise_kriging_delete(void* ptr) {
-  delete static_cast<NoiseKriging*>(ptr);
+  delete static_cast<Kriging*>(ptr);
 }
 
 void* lk_noise_kriging_copy(void* ptr) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
-    return new NoiseKriging(*k, ExplicitCopySpecifier{});
+    auto* k = static_cast<Kriging*>(ptr);
+    return new Kriging(*k, ExplicitCopySpecifier{});
   }
   CATCH_RETURN_NULL
 }
@@ -1239,7 +1239,7 @@ int lk_noise_kriging_fit(void* ptr,
                          const char* optim,
                          const char* objective) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::vec noise_v(const_cast<double*>(noise), noise_n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
@@ -1268,7 +1268,7 @@ int lk_noise_kriging_predict(void* ptr,
                              double* mean_deriv_out,
                              double* stdev_deriv_out) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     auto [mean_v, stdev_v, cov_m, mean_deriv_m, stdev_deriv_m]
         = k->predict(X_m, return_stdev != 0, return_cov != 0, return_deriv != 0);
@@ -1298,7 +1298,7 @@ int lk_noise_kriging_simulate(void* ptr,
                               int will_update,
                               double* sim_out) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     arma::vec noise_v(const_cast<double*>(with_noise), noise_n, false, true);
     arma::mat sim = k->simulate(nsim, seed, X_m, noise_v, will_update != 0);
@@ -1319,7 +1319,7 @@ int lk_noise_kriging_update(void* ptr,
                             int d,
                             int refit) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y_u), n, false, true);
     arma::vec noise_v(const_cast<double*>(noise_u), noise_n, false, true);
     arma::mat X_m(const_cast<double*>(X_u), nX, d, false, true);
@@ -1341,7 +1341,7 @@ int lk_noise_kriging_update_simulate(void* ptr,
                                      int* nsim_out,
                                      int* m_out) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y_u), n, false, true);
     arma::vec noise_v(const_cast<double*>(noise_u), noise_n, false, true);
     arma::mat X_m(const_cast<double*>(X_u), nX, d, false, true);
@@ -1359,7 +1359,7 @@ int lk_noise_kriging_update_simulate(void* ptr,
 
 int lk_noise_kriging_save(void* ptr, const char* filename) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     k->save(filename);
     return 0;
   }
@@ -1368,14 +1368,14 @@ int lk_noise_kriging_save(void* ptr, const char* filename) {
 
 void* lk_noise_kriging_load(const char* filename) {
   try {
-    return new NoiseKriging(NoiseKriging::load(filename));
+    return new Kriging(Kriging::load(filename));
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_noise_kriging_summary(void* ptr) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     static thread_local std::string buf;
     buf = k->summary();
     return buf.c_str();
@@ -1392,7 +1392,7 @@ int lk_noise_kriging_log_likelihood_fun(void* ptr,
                                         double* grad_out,
                                         double* hess_out) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
     // NoiseKriging::logLikelihoodFun does not support hessian output
     auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
@@ -1409,7 +1409,7 @@ int lk_noise_kriging_log_likelihood_fun(void* ptr,
 
 double lk_noise_kriging_log_likelihood(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->logLikelihood();
+    return static_cast<Kriging*>(ptr)->logLikelihood();
   }
   CATCH_RETURN_NAN
 }
@@ -1423,7 +1423,7 @@ int lk_noise_kriging_cov_mat(void* ptr,
                              int d2,
                              double* cov_out) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     arma::mat X1_m(const_cast<double*>(X1), n1, d1, false, true);
     arma::mat X2_m(const_cast<double*>(X2), n2, d2, false, true);
     arma::mat cov = k->covMat(X1_m, X2_m);
@@ -1438,28 +1438,28 @@ int lk_noise_kriging_cov_mat(void* ptr,
 
 const char* lk_noise_kriging_kernel(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->kernel().c_str();
+    return static_cast<Kriging*>(ptr)->kernel().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_noise_kriging_optim(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->optim().c_str();
+    return static_cast<Kriging*>(ptr)->optim().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 const char* lk_noise_kriging_objective(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->objective().c_str();
+    return static_cast<Kriging*>(ptr)->objective().c_str();
   }
   CATCH_RETURN_NULL
 }
 
 int lk_noise_kriging_is_normalize(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->normalize() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->normalize() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1468,7 +1468,7 @@ int lk_noise_kriging_is_normalize(void* ptr) {
 const char* lk_noise_kriging_regmodel(void* ptr) {
   try {
     static thread_local std::string buf;
-    buf = Trend::toString(static_cast<NoiseKriging*>(ptr)->regmodel());
+    buf = Trend::toString(static_cast<Kriging*>(ptr)->regmodel());
     return buf.c_str();
   }
   CATCH_RETURN_NULL
@@ -1478,7 +1478,7 @@ const char* lk_noise_kriging_regmodel(void* ptr) {
 
 int lk_noise_kriging_get_X(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->X();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1493,7 +1493,7 @@ int lk_noise_kriging_get_X(void* ptr, double* out, int* n, int* d) {
 
 int lk_noise_kriging_get_centerX(void* ptr, double* out, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::rowvec& v = k->centerX();
     if (d)
       *d = static_cast<int>(v.n_elem);
@@ -1506,7 +1506,7 @@ int lk_noise_kriging_get_centerX(void* ptr, double* out, int* d) {
 
 int lk_noise_kriging_get_scaleX(void* ptr, double* out, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::rowvec& v = k->scaleX();
     if (d)
       *d = static_cast<int>(v.n_elem);
@@ -1519,7 +1519,7 @@ int lk_noise_kriging_get_scaleX(void* ptr, double* out, int* d) {
 
 int lk_noise_kriging_get_y(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->y();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1532,21 +1532,21 @@ int lk_noise_kriging_get_y(void* ptr, double* out, int* n) {
 
 double lk_noise_kriging_get_centerY(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->centerY();
+    return static_cast<Kriging*>(ptr)->centerY();
   }
   CATCH_RETURN_NAN
 }
 
 double lk_noise_kriging_get_scaleY(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->scaleY();
+    return static_cast<Kriging*>(ptr)->scaleY();
   }
   CATCH_RETURN_NAN
 }
 
 int lk_noise_kriging_get_noise(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->noise();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1559,7 +1559,7 @@ int lk_noise_kriging_get_noise(void* ptr, double* out, int* n) {
 
 int lk_noise_kriging_get_F(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->F();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1574,7 +1574,7 @@ int lk_noise_kriging_get_F(void* ptr, double* out, int* n, int* d) {
 
 int lk_noise_kriging_get_T(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->T();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1589,7 +1589,7 @@ int lk_noise_kriging_get_T(void* ptr, double* out, int* n, int* d) {
 
 int lk_noise_kriging_get_M(void* ptr, double* out, int* n, int* d) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->M();
     if (n)
       *n = static_cast<int>(v.n_rows);
@@ -1604,7 +1604,7 @@ int lk_noise_kriging_get_M(void* ptr, double* out, int* n, int* d) {
 
 int lk_noise_kriging_get_z(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->z();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1617,7 +1617,7 @@ int lk_noise_kriging_get_z(void* ptr, double* out, int* n) {
 
 int lk_noise_kriging_get_beta(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->beta();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1630,7 +1630,7 @@ int lk_noise_kriging_get_beta(void* ptr, double* out, int* n) {
 
 int lk_noise_kriging_is_beta_estim(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->is_beta_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_beta_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1638,7 +1638,7 @@ int lk_noise_kriging_is_beta_estim(void* ptr) {
 
 int lk_noise_kriging_get_theta(void* ptr, double* out, int* n) {
   try {
-    auto* k = static_cast<NoiseKriging*>(ptr);
+    auto* k = static_cast<Kriging*>(ptr);
     const arma::vec& v = k->theta();
     if (n)
       *n = static_cast<int>(v.n_elem);
@@ -1651,7 +1651,7 @@ int lk_noise_kriging_get_theta(void* ptr, double* out, int* n) {
 
 int lk_noise_kriging_is_theta_estim(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->is_theta_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_theta_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }
@@ -1659,14 +1659,14 @@ int lk_noise_kriging_is_theta_estim(void* ptr) {
 
 double lk_noise_kriging_get_sigma2(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->sigma2();
+    return static_cast<Kriging*>(ptr)->sigma2();
   }
   CATCH_RETURN_NAN
 }
 
 int lk_noise_kriging_is_sigma2_estim(void* ptr) {
   try {
-    return static_cast<NoiseKriging*>(ptr)->is_sigma2_estim() ? 1 : 0;
+    return static_cast<Kriging*>(ptr)->is_sigma2_estim() ? 1 : 0;
   } catch (...) {
     return -1;
   }

@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[fit][nuggetkriging]") {
@@ -28,8 +28,8 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
 
   SECTION("LL - BFGS should find better or equal LL than grid search") {
     // First fit a NuggetKriging model
-    NuggetKriging nk_grid("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_grid("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_grid.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Grid search over theta_alpha = [theta(1), theta(2), alpha]
@@ -66,8 +66,8 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     INFO("Best grid LL: " << best_ll_grid << " at theta_alpha = " << best_theta_alpha_grid.t());
     
     // BFGS optimization
-    NuggetKriging nk_bfgs("gauss");
-    NuggetKriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_bfgs("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_bfgs);
     
     double ll_bfgs = nk_bfgs.logLikelihood();
@@ -82,8 +82,8 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
 
   SECTION("LMP - BFGS should find better or equal LMP than grid search") {
     // First fit a NuggetKriging model
-    NuggetKriging nk_grid("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, false, std::nullopt, true, std::nullopt, true};
+    Kriging nk_grid("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, false, std::nullopt, true, std::nullopt, true};
     nk_grid.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", params);
     
     // Grid search over theta_alpha = [theta(1), theta(2), alpha]
@@ -119,8 +119,8 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
     INFO("Best grid LMP: " << best_lmp_grid << " at theta_alpha = " << best_theta_alpha_grid.t());
     
     // BFGS optimization
-    NuggetKriging nk_bfgs("gauss");
-    NuggetKriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_bfgs("gauss", Kriging::NoiseModel::Nugget);
+    Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", params_bfgs);
     
     double lmp_bfgs = nk_bfgs.logMargPost();

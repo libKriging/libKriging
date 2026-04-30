@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update][noisekriging]") {
@@ -46,15 +46,15 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
 
   SECTION("Update with refit equals combined fit") {
     // Fit model on old data
-    NoiseKriging nk_updated("gauss");
-    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_updated("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_updated.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Update with new data
     nk_updated.update(y_new, noise_new, X_new, true);
     
     // Fit model on combined data
-    NoiseKriging nk_combined("gauss");
+    Kriging nk_combined("gauss", Kriging::NoiseModel::Heterogeneous);
     nk_combined.fit(y_combined, noise_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Compare parameters
@@ -93,8 +93,8 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
 
   SECTION("Multiple updates equal combined fit") {
     // Fit model on old data
-    NoiseKriging nk_updated("gauss");
-    NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_updated("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_updated.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Update one point at a time
@@ -106,7 +106,7 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
     }
     
     // Fit model on combined data
-    NoiseKriging nk_combined("gauss");
+    Kriging nk_combined("gauss", Kriging::NoiseModel::Heterogeneous);
     nk_combined.fit(y_combined, noise_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
     
     // Test predictions
@@ -127,13 +127,13 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
       INFO("Testing kernel: " << kernel);
       
       // Fit and update
-      NoiseKriging nk_updated(kernel);
-      NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging nk_updated(kernel, Kriging::NoiseModel::Heterogeneous);
+      Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
       nk_updated.fit(y_old, noise_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
       nk_updated.update(y_new, noise_new, X_new, true);
       
       // Combined fit
-      NoiseKriging nk_combined(kernel);
+      Kriging nk_combined(kernel, Kriging::NoiseModel::Heterogeneous);
       nk_combined.fit(y_combined, noise_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
       
       // Test predictions
@@ -156,13 +156,13 @@ TEST_CASE("NoiseKrigingUpdateTest - Updated model equals combined fit", "[update
       INFO("Testing trend model");
       
       // Fit and update
-      NoiseKriging nk_updated("gauss");
-      NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging nk_updated("gauss", Kriging::NoiseModel::Heterogeneous);
+      Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
       nk_updated.fit(y_old, noise_old, X_old, trend, false, "BFGS", "LL", params);
       nk_updated.update(y_new, noise_new, X_new, true);
       
       // Combined fit
-      NoiseKriging nk_combined("gauss");
+      Kriging nk_combined("gauss", Kriging::NoiseModel::Heterogeneous);
       nk_combined.fit(y_combined, noise_combined, X_combined, trend, false, "BFGS", "LL", params);
       
       // Test predictions

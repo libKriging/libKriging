@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NoiseKrigingPredictTest - Check gradient vs finite differences", "[predict][noisekriging]") {
@@ -27,8 +27,8 @@ TEST_CASE("NoiseKrigingPredictTest - Check gradient vs finite differences", "[pr
   }
 
   // Fit NoiseKriging model
-  NoiseKriging nk("gauss");
-  NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+  Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
   // Test points for prediction

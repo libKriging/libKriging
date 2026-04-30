@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Kriging.hpp"
 
 // clang-format on
 
@@ -20,14 +20,14 @@ TEST_CASE("NuggetKriging gradient verification with fixed parameters", "[gradien
   arma::vec y = {0.0, 1.0, 1.0, 2.0, 1.0, 0.8};
   
   // Fit the model WITHOUT optimization - use fixed parameters
-  NuggetKriging nk("gauss");
-  NuggetKriging::Parameters parameters;
+  Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+  Kriging::Parameters parameters;
   parameters.theta = arma::mat{{0.5, 0.5}};  // Fixed theta
   parameters.is_theta_estim = false;         // Don't optimize theta
   parameters.is_beta_estim = true;
-  parameters.sigma2 = arma::vec{0.5};        // Fixed sigma2
+  parameters.sigma2 = 0.5;        // Fixed sigma2
   parameters.is_sigma2_estim = false;
-  parameters.nugget = arma::vec{0.1};        // Fixed nugget
+  parameters.nugget = 0.1;        // Fixed nugget
   parameters.is_nugget_estim = false;        // Don't optimize nugget
   
   nk.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", parameters);
@@ -142,16 +142,16 @@ TEST_CASE("NuggetKriging gradient verification 1D case", "[gradient][loglik][nug
   
   arma::vec y = {0.0, 0.5, 1.0, 0.5, 0.0};
   
-  NuggetKriging nk("gauss");
-  NuggetKriging::Parameters parameters;
+  Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+  Kriging::Parameters parameters;
   arma::mat theta_init(1, 1);
   theta_init(0, 0) = 0.5;
   parameters.theta = theta_init;            // Fixed theta
   parameters.is_theta_estim = false;
   parameters.is_beta_estim = true;
-  parameters.sigma2 = arma::vec{0.3};       // Fixed sigma2
+  parameters.sigma2 = 0.3;       // Fixed sigma2
   parameters.is_sigma2_estim = false;
-  parameters.nugget = arma::vec{0.05};      // Fixed nugget
+  parameters.nugget = 0.05;      // Fixed nugget
   parameters.is_nugget_estim = false;
   
   nk.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", parameters);

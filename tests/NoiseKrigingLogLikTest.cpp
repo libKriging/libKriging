@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NoiseKriging.hpp"
+#include "libKriging/Kriging.hpp"
 
 // clang-format on
 
@@ -21,12 +21,12 @@ TEST_CASE("NoiseKriging gradient verification with fixed parameters", "[gradient
   arma::vec noise = {0.01, 0.01, 0.01, 0.01, 0.01, 0.01};  // Small noise
   
   // Fit the model WITHOUT optimization - use fixed parameters
-  NoiseKriging nk("gauss");
-  NoiseKriging::Parameters parameters;
+  Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+  Kriging::Parameters parameters;
   parameters.theta = arma::mat{{0.5, 0.5}};  // Fixed theta
   parameters.is_theta_estim = false;         // Don't optimize theta
   parameters.is_beta_estim = true;
-  parameters.sigma2 = arma::vec{0.5};        // Fixed sigma2
+  parameters.sigma2 = 0.5;        // Fixed sigma2
   parameters.is_sigma2_estim = false;
   
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "none", "LL", parameters);
@@ -137,14 +137,14 @@ TEST_CASE("NoiseKriging gradient verification 1D case", "[gradient][loglik][nois
   arma::vec y = {0.0, 0.5, 1.0, 0.5, 0.0};
   arma::vec noise = {0.01, 0.01, 0.01, 0.01, 0.01};
   
-  NoiseKriging nk("gauss");
-  NoiseKriging::Parameters parameters;
+  Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+  Kriging::Parameters parameters;
   arma::mat theta_init(1, 1);
   theta_init(0, 0) = 0.5;
   parameters.theta = theta_init;            // Fixed theta
   parameters.is_theta_estim = false;
   parameters.is_beta_estim = true;
-  parameters.sigma2 = arma::vec{0.3};       // Fixed sigma2
+  parameters.sigma2 = 0.3;       // Fixed sigma2
   parameters.is_sigma2_estim = false;
   
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "none", "LL", parameters);

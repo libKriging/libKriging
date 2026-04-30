@@ -6,6 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/KrigingImpl.hpp"
 #include "libKriging/Trend.hpp"
 #include "libKriging/utils/ExplicitCopySpecifier.hpp"
 
@@ -21,129 +22,45 @@ struct KrigingParameters {
   bool is_theta_estim = true;
   std::optional<arma::vec> beta;
   bool is_beta_estim = true;
+  // Nugget mode only:
+  std::optional<double> nugget;
+  bool is_nugget_estim = true;
 };
 
 /** Ordinary kriging regression
  * @ingroup Regression
  */
-class Kriging {
+class Kriging : public KrigingImpl {
   Kriging() = delete;
   Kriging(const Kriging& other) = default;  // Should be specialized if non default copy constructor is required
 
  public:
   using Parameters = KrigingParameters;
+  using KModel = KrigingImpl::KModel;
 
-  [[nodiscard]] const std::string& kernel() const { return m_covType; };
-  [[nodiscard]] const std::string& optim() const { return m_optim; };
-  [[nodiscard]] const std::string& objective() const { return m_objective; };
-  [[nodiscard]] const arma::mat& X() const { return m_X; };
-  [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
-  [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
-  [[nodiscard]] const arma::vec& y() const { return m_y; };
-  [[nodiscard]] const double& centerY() const { return m_centerY; };
-  [[nodiscard]] const double& scaleY() const { return m_scaleY; };
-  [[nodiscard]] const bool& normalize() const { return m_normalize; };
-  [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
-  [[nodiscard]] const arma::mat& F() const { return m_F; };
-  [[nodiscard]] const arma::mat& T() const { return m_T; };
-  [[nodiscard]] const arma::mat& M() const { return m_M; };
-  [[nodiscard]] const arma::vec& z() const { return m_z; };
-  [[nodiscard]] const arma::vec& beta() const { return m_beta; };
-  [[nodiscard]] const bool& is_beta_estim() const { return m_est_beta; };
-  [[nodiscard]] const arma::vec& theta() const { return m_theta; };
-  [[nodiscard]] const bool& is_theta_estim() const { return m_est_theta; };
-  [[nodiscard]] const double& sigma2() const { return m_sigma2; };
-  [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
-
-  static arma::vec ones;
-
- private:
-  // Main model data
-  std::string m_covType;
-  arma::mat m_X;
-  arma::rowvec m_centerX;
-  arma::rowvec m_scaleX;
-  arma::vec m_y;
-  double m_centerY{};
-  double m_scaleY{};
-  bool m_normalize{};
-  Trend::RegressionModel m_regmodel;
-  std::string m_optim;
-  std::string m_objective;
-
-  // Auxiliary data
-  arma::mat m_dX;
-  arma::vec m_maxdX;
-  arma::mat m_F;
-  arma::mat m_T;
-  arma::mat m_R;  // required for the "update" methods
-  arma::mat m_M;
-  arma::mat m_star;
-  arma::mat m_circ;
-  arma::vec m_z;
-  arma::mat m_Rinv;
-  arma::vec m_beta;
-  bool m_est_beta{};
-  arma::vec m_theta;
-  bool m_est_theta{};
-  double m_sigma2{};
-  bool m_est_sigma2{};
-  bool m_is_empty = true;  // this will force the model to be make from scratch first time (no update)
-
-  // Simulation stored data
-  arma::mat lastsim_Xn_n;
-  arma::mat lastsim_y_n;
-  int lastsim_nsim{};
-  int lastsim_seed{};
-  arma::mat lastsim_F_n;
-  arma::mat lastsim_R_nn;
-  arma::mat lastsim_L_oCn;
-  arma::mat lastsim_L_nCn;
-  arma::mat lastsim_L_on;
-  arma::mat lastsim_Rinv_on;
-  arma::mat lastsim_F_on;
-  arma::mat lastsim_Fstar_on;
-  arma::mat lastsim_circ_on;
-  arma::mat lastsim_Fcirc_on;
-  arma::mat lastsim_Fhat_nKo;
-  arma::mat lastsim_Ecirc_nKo;
-
-  // Updated simulation stored data
-  arma::mat lastsimup_Xn_u;
-  arma::mat lastsimup_y_u;
-  arma::mat lastsimup_Wtild_nKu;
-  arma::mat lastsimup_R_uo;
-  arma::mat lastsimup_R_un;
-  arma::mat lastsimup_R_uu;
-
-  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
-  double _Cov_pow{};
-
-  // This will create the dist(xi,xj) function above. Need to parse "kernel".
-  void make_Cov(const std::string& covType);
-
- public:
-  struct KModel {
-    arma::mat R;
-    arma::mat L;
-    arma::mat Linv;
-    arma::mat Rinv;  // R⁻¹ = L⁻ᵀ L⁻¹, cached from populate_Model
-    arma::mat Fstar;
-    arma::vec ystar;
-    arma::mat Rstar;
-    arma::mat Qstar;
-    arma::vec Estar;
-    double SSEstar;
-    arma::vec betahat;
+  /// Which noise treatment is in use.
+  enum class NoiseModel {
+    None,           ///< pure GP: R = corr(theta)
+    Nugget,         ///< homogeneous nugget: R = alpha*corr + (1-alpha)*I
+    Heterogeneous,  ///< known per-obs noise: R = corr + diag(noise/sigma2)
   };
+
+  // populate_Model with member-state extra_param (alpha or sigma2)
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
 
-  double _logLikelihood(const arma::vec& _theta,
+  // populate_Model with explicit extra_param (used during optimization)
+  Kriging::KModel make_Model(const arma::vec& theta,
+                             double extra_param,
+                             std::map<std::string, double>* bench) const;
+  void populate_Model(Kriging::KModel& m,
+                      const arma::vec& theta,
+                      double extra_param,
+                      std::map<std::string, double>* bench) const;
+
+  // gamma = [theta] for None, [theta, alpha] for Nugget, [theta, sigma2] for Heterogeneous
+  double _logLikelihood(const arma::vec& _gamma,
                         arma::vec* grad_out,
-                        arma::mat* hess_out,
                         Kriging::KModel* okm_data,
                         std::map<std::string, double>* bench) const;
   double _leaveOneOut(const arma::vec& _theta,
@@ -151,13 +68,14 @@ class Kriging {
                       arma::mat* yhat_out,
                       Kriging::KModel* okm_data,
                       std::map<std::string, double>* bench) const;
-  double _logMargPost(const arma::vec& _theta,
+  double _logMargPost(const arma::vec& _gamma,
                       arma::vec* grad_out,
                       Kriging::KModel* okm_data,
                       std::map<std::string, double>* bench) const;
 
   // at least, just call make_dist(kernel)
   LIBKRIGING_EXPORT Kriging(const std::string& covType);
+  LIBKRIGING_EXPORT Kriging(const std::string& covType, NoiseModel noise_model);
 
   Kriging(Kriging&&) = default;
 
@@ -172,7 +90,10 @@ class Kriging {
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
-  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
+  [[nodiscard]] NoiseModel noise_model() const { return m_noise_model; }
+  [[nodiscard]] double nugget() const { return m_nugget; }
+  [[nodiscard]] bool is_nugget_estim() const { return m_est_nugget; }
+  [[nodiscard]] const arma::vec& noise() const { return m_noise; }
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -190,10 +111,19 @@ class Kriging {
                              const std::string& objective = "LL",
                              const Parameters& parameters = {});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& theta,
-                                                                              bool return_grad,
-                                                                              bool return_hess,
-                                                                              bool bench);
+  // Heterogeneous-noise variant: noise is known per-observation
+  LIBKRIGING_EXPORT void fit(const arma::vec& y,
+                             const arma::vec& noise,
+                             const arma::mat& X,
+                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
+                             bool normalize = false,
+                             const std::string& optim = "BFGS",
+                             const std::string& objective = "LL",
+                             const Parameters& parameters = {});
+
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
+                                                                   bool return_grad,
+                                                                   bool bench);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool return_grad, bool bench);
 
@@ -225,6 +155,18 @@ class Kriging {
    * @return output is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, const bool will_update = false);
+  // Nugget-mode variant: with_nugget controls whether nugget variance is included
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const bool with_nugget,
+                                       const bool will_update);
+  // Heterogeneous-mode variant: with_noise is per-observation noise to add to simulations
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const arma::vec& with_noise,
+                                       const bool will_update = false);
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
@@ -234,6 +176,8 @@ class Kriging {
    * put is m*nsim matrix of simulations at X_n
    */
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);
+  // Heterogeneous-mode variant: noise_u is per-observation noise for new points
+  LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::vec& noise_u, const arma::mat& X_u);
 
   /** Add new conditional data points to previous (X,y)
    * @param y_u is m length column vector of new output
@@ -241,6 +185,11 @@ class Kriging {
    * @param refit is true if re-fit the model after data update
    */
   LIBKRIGING_EXPORT void update(const arma::vec& y_u, const arma::mat& X_u, const bool refit = true);
+  // Heterogeneous-mode variant: noise_u is per-observation noise for new points
+  LIBKRIGING_EXPORT void update(const arma::vec& y_u,
+                                const arma::vec& noise_u,
+                                const arma::mat& X_u,
+                                const bool refit = true);
 
   LIBKRIGING_EXPORT std::string summary() const;
 
@@ -253,6 +202,23 @@ class Kriging {
    * @param filename
    */
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);
+
+ private:
+  NoiseModel m_noise_model = NoiseModel::None;
+  double m_nugget = 0.0;
+  bool m_est_nugget = false;
+  double m_alpha = 1.0;  // sigma2/(sigma2+nugget) — only meaningful in Nugget mode
+  // Simulate state for Nugget/Heterogeneous modes (mirrors NuggetKriging/NoiseKriging)
+  bool m_lastsim_with_nugget = false;
+  arma::vec m_lastsim_with_noise;
+
+  using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
+  FitOfn make_fit_objective(const std::string& objective) const;
+
+  // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
+  arma::uword gamma_dim() const;
+  // Build current gamma from member state
+  arma::vec current_gamma() const;
 };
 
 #endif  // LIBKRIGING_KRIGING_HPP

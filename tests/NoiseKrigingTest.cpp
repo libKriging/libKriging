@@ -6,7 +6,7 @@
 #include <cmath>
 #include <fstream>
 #include <vector>
-#include <libKriging/NoiseKriging.hpp>
+#include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Trend.hpp>
 #include <libKriging/Optim.hpp>
@@ -52,8 +52,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   noise.fill(0.01);  // Known noise variance
 
   SECTION("Basic fit") {
-    NoiseKriging nk = NoiseKriging("gauss");
-    NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
     CHECK(nk.theta().n_elem == d);
@@ -67,8 +67,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("BFGS20 multistart") {
-    NoiseKriging nk = NoiseKriging("gauss");
-    NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
 
     CHECK(nk.theta().n_elem == d);
@@ -82,12 +82,12 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("BFGS vs BFGS20 comparison") {
-    NoiseKriging nk_single = NoiseKriging("gauss");
-    NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk_single("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
     nk_single.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
     double ll_single = nk_single.logLikelihood();
 
-    NoiseKriging nk_multi = NoiseKriging("gauss");
+    Kriging nk_multi("gauss", Kriging::NoiseModel::Heterogeneous);
     nk_multi.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
     double ll_multi = nk_multi.logLikelihood();
 
@@ -120,15 +120,15 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
 
     for (int run = 0; run < n_runs; ++run) {
       auto start10 = high_resolution_clock::now();
-      NoiseKriging nk10 = NoiseKriging("gauss");
-      NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+      Kriging nk10("gauss", Kriging::NoiseModel::Heterogeneous);
+      Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
       nk10.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", parameters);
       auto end10 = high_resolution_clock::now();
       double time10 = duration_cast<milliseconds>(end10 - start10).count();
       times10.push_back(time10);
 
       auto start20 = high_resolution_clock::now();
-      NoiseKriging nk20 = NoiseKriging("gauss");
+      Kriging nk20("gauss", Kriging::NoiseModel::Heterogeneous);
       nk20.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
       auto end20 = high_resolution_clock::now();
       double time20 = duration_cast<milliseconds>(end20 - start20).count();
@@ -175,8 +175,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread pool configuration") {
-    NoiseKriging nk = NoiseKriging("gauss");
-    NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
     // Test with explicit thread pool size
     INFO("Testing with thread_pool_size=2");
@@ -198,8 +198,8 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   }
 
   SECTION("Thread startup delay") {
-    NoiseKriging nk = NoiseKriging("gauss");
-    NoiseKriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+    Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
 
     // Test with different delays
     INFO("Testing with thread_start_delay_ms=1");
@@ -242,9 +242,9 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS1") {
   arma::vec sigma2_start(1);
   sigma2_start(0) = 0.1;
 
-  NoiseKriging nk = NoiseKriging("gauss");
+  Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
   // Provide starting values, optimize all
-  NoiseKriging::Parameters parameters{sigma2_start, true, theta_start, true, std::nullopt, true};
+  Kriging::Parameters parameters; parameters.sigma2 = sigma2_start(0); parameters.theta = theta_start; parameters.is_theta_estim = true;;
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
   // Check that optimization ran
@@ -281,9 +281,9 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS20") {
   arma::vec sigma2_start(1);
   sigma2_start(0) = 0.1;
 
-  NoiseKriging nk = NoiseKriging("gauss");
+  Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
   // Provide starting values, optimize all
-  NoiseKriging::Parameters parameters{sigma2_start, true, theta_starts, true, std::nullopt, true};
+  Kriging::Parameters parameters; parameters.sigma2 = sigma2_start(0); parameters.theta = theta_starts; parameters.is_theta_estim = true;;
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
 
   // Check that optimization ran
@@ -332,8 +332,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       // Combination 1: Estimate all parameters (not valid for "none")
       if (optim != "none") {
         SECTION("Estimate all (sigma2, theta, beta)") {
-          NoiseKriging nk("gauss");
-          NoiseKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+          Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true};
           nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.sigma2() > 0);
           CHECK(nk.theta().n_elem == d);
@@ -343,8 +343,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       // Combination 2: Fix sigma2, estimate theta and beta (not valid for "none")
       if (optim != "none") {
         SECTION("Fix sigma2, estimate theta and beta") {
-          NoiseKriging nk("gauss");
-          NoiseKriging::Parameters params{sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+          Kriging::Parameters params; params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;;
           nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.sigma2() == sigma2_val(0));
           CHECK(nk.theta().n_elem == d);
@@ -354,8 +354,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       // Combination 3: Estimate sigma2, fix theta, estimate beta (not valid for "none")
       if (optim != "none") {
         SECTION("Estimate sigma2, fix theta, estimate beta") {
-          NoiseKriging nk("gauss");
-          NoiseKriging::Parameters params{std::nullopt, true, theta_val, false, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+          Kriging::Parameters params{std::nullopt, true, theta_val, false, std::nullopt, true};
           nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.sigma2() > 0);
           CHECK(nk.theta().n_elem == d);
@@ -364,8 +364,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
 
       // Combination 4: Fix both sigma2 and theta, estimate beta
       SECTION("Fix sigma2 and theta, estimate beta") {
-        NoiseKriging nk("gauss");
-        NoiseKriging::Parameters params{sigma2_val, false, theta_val, false, std::nullopt, true};
+        Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+        Kriging::Parameters params; params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false; params.theta = theta_val; params.is_theta_estim = false;;
         nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
         CHECK(nk.sigma2() == sigma2_val(0));
         if (optim == "none") {
@@ -378,8 +378,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       // Combination 5: Multistart with theta starting points (BFGS20 only)
       if (optim == "BFGS20") {
         SECTION("Multistart with theta starting points") {
-          NoiseKriging nk("gauss");
-          NoiseKriging::Parameters params{std::nullopt, true, theta_starts, true, std::nullopt, true};
+          Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
+          Kriging::Parameters params{std::nullopt, true, theta_starts, true, std::nullopt, true};
           nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.sigma2() > 0);
           CHECK(nk.theta().n_elem == d);
@@ -389,8 +389,8 @@ TEST_CASE("NoiseKriging all parameter combinations") {
   }
 
   // Verify predictions work for a representative case
-  NoiseKriging nk_final("gauss");
-  NoiseKriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  Kriging nk_final("gauss", Kriging::NoiseModel::Heterogeneous);
+  Kriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
   nk_final.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
   
   arma::mat X_new(1, d);

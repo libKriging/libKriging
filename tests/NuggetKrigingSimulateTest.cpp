@@ -4,7 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-#include "libKriging/NuggetKriging.hpp"
+#include "libKriging/Kriging.hpp"
 // clang-format on
 
 TEST_CASE("NuggetKrigingSimulateTest - Check predict is consistent with simulate", "[simulate][nuggetkriging]") {
@@ -24,8 +24,8 @@ TEST_CASE("NuggetKrigingSimulateTest - Check predict is consistent with simulate
   }
 
   // Fit NuggetKriging model
-  NuggetKriging nk("gauss");
-  NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+  Kriging nk("gauss", Kriging::NoiseModel::Nugget);
+  Kriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
   nk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
   // Test points for prediction/simulation

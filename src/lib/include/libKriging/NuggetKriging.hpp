@@ -6,6 +6,7 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include "libKriging/KrigingImpl.hpp"
 #include "libKriging/Trend.hpp"
 #include "libKriging/utils/ExplicitCopySpecifier.hpp"
 
@@ -28,7 +29,7 @@ struct NuggetKrigingParameters {
 /** Ordinary kriging regression
  * @ingroup Regression
  */
-class NuggetKriging {
+class NuggetKriging : public KrigingImpl {
  private:
   NuggetKriging() = delete;
   NuggetKriging(const NuggetKriging& other)
@@ -36,116 +37,20 @@ class NuggetKriging {
 
  public:
   using Parameters = NuggetKrigingParameters;
+  using KModel = KrigingImpl::KModel;
 
-  [[nodiscard]] const std::string& kernel() const { return m_covType; };
-  [[nodiscard]] const std::string& optim() const { return m_optim; };
-  [[nodiscard]] const std::string& objective() const { return m_objective; };
-  [[nodiscard]] const arma::mat& X() const { return m_X; };
-  [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
-  [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
-  [[nodiscard]] const arma::vec& y() const { return m_y; };
-  [[nodiscard]] const double& centerY() const { return m_centerY; };
-  [[nodiscard]] const double& scaleY() const { return m_scaleY; };
-  [[nodiscard]] const bool& normalize() const { return m_normalize; };
-  [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; };
-  [[nodiscard]] const arma::mat& F() const { return m_F; };
-  [[nodiscard]] const arma::mat& T() const { return m_T; };
-  [[nodiscard]] const arma::mat& M() const { return m_M; };
-  [[nodiscard]] const arma::vec& z() const { return m_z; };
-  [[nodiscard]] const arma::vec& beta() const { return m_beta; };
-  [[nodiscard]] const bool& is_beta_estim() const { return m_est_beta; };
-  [[nodiscard]] const arma::vec& theta() const { return m_theta; };
-  [[nodiscard]] const bool& is_theta_estim() const { return m_est_theta; };
-  [[nodiscard]] const double& sigma2() const { return m_sigma2; };
-  [[nodiscard]] const bool& is_sigma2_estim() const { return m_est_sigma2; };
   [[nodiscard]] const double& nugget() const { return m_nugget; };
   [[nodiscard]] const bool& is_nugget_estim() const { return m_est_nugget; };
 
-  static arma::vec ones;
-
  private:
-  // Main model data
-  std::string m_covType;
-  arma::mat m_X;
-  arma::rowvec m_centerX;
-  arma::rowvec m_scaleX;
-  arma::vec m_y;
-  double m_centerY{};
-  double m_scaleY{};
-  bool m_normalize{};
-  Trend::RegressionModel m_regmodel;
-  std::string m_optim;
-  std::string m_objective;
-  // Auxiliary data
-  arma::mat m_dX;
-  arma::vec m_maxdX;
-  arma::mat m_F;
-  arma::mat m_T;
-  arma::mat m_R;  // required for the "update" methods
-  arma::mat m_M;
-  arma::mat m_star;
-  arma::mat m_circ;
-  arma::vec m_z;
-  arma::mat m_Rinv;
-  arma::vec m_beta;
-  bool m_est_beta{};
-  arma::vec m_theta;
-  bool m_est_theta{};
-  double m_sigma2{};
-  bool m_est_sigma2{};
+  // Nugget-specific state
   double m_nugget{};
   bool m_est_nugget{};
-  bool m_is_empty = true;  // this will force the model to be make from scratch first time (no update)
 
-  // Simulation stored data
-  arma::mat lastsim_Xn_n;
-  arma::mat lastsim_y_n;
-  int lastsim_nsim{};
-  int lastsim_seed{};
+  // Nugget-specific simulation cache
   bool lastsim_with_nugget{};
-  arma::mat lastsim_F_n;
-  arma::mat lastsim_R_nn;
-  arma::mat lastsim_L_oCn;
-  arma::mat lastsim_L_nCn;
-  arma::mat lastsim_L_on;
-  arma::mat lastsim_Rinv_on;
-  arma::mat lastsim_F_on;
-  arma::mat lastsim_Fstar_on;
-  arma::mat lastsim_circ_on;
-  arma::mat lastsim_Fcirc_on;
-  arma::mat lastsim_Fhat_nKo;
-  arma::mat lastsim_Ecirc_nKo;
-
-  // Updated simulation stored data
-  arma::mat lastsimup_Xn_u;
-  arma::mat lastsimup_y_u;
-  arma::mat lastsimup_Wtild_nKu;
-  arma::mat lastsimup_R_uo;
-  arma::mat lastsimup_R_un;
-  arma::mat lastsimup_R_uu;
-
-  std::function<double(const arma::vec&, const arma::vec&)> _Cov;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
-  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
-  double _Cov_pow{};
-
-  // This will create the dist(xi,xj) function above. Need to parse "kernel".
-  void make_Cov(const std::string& covType);
 
  public:
-  struct KModel {
-    arma::mat R;
-    arma::mat L;
-    arma::mat Linv;
-    arma::mat Rinv;  // R⁻¹ = L⁻ᵀ L⁻¹, cached from populate_Model
-    arma::mat Fstar;
-    arma::vec ystar;
-    arma::mat Rstar;
-    arma::mat Qstar;
-    arma::vec Estar;
-    double SSEstar;
-    arma::vec betahat;
-  };
   void populate_Model(KModel& m,
                       const arma::vec& theta,
                       const double alpha,
@@ -185,8 +90,6 @@ class NuggetKriging {
 
   static double alpha_lower;
   static double alpha_upper;
-
-  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
