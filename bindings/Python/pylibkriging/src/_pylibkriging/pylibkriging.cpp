@@ -142,7 +142,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            &PyKriging::logLikelihoodFun,
            py::arg("theta"),
            py::arg("return_grad") = false,
-           py::arg("return_hess") = false)
+           py::arg("bench") = false)
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
       .def("logMargPost", &PyKriging::logMargPost)
