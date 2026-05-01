@@ -332,10 +332,7 @@ class KrigingImpl {
   /// optional benchmark timing.  `fn(grad_out, bench_out)` must return the
   /// objective value and write the gradient into *grad_out when non-null.
   template <typename Fn>
-  static std::tuple<double, arma::vec> eval_objective(arma::uword n_params,
-                                                      bool return_grad,
-                                                      bool bench,
-                                                      Fn&& fn) {
+  static std::tuple<double, arma::vec> eval_objective(arma::uword n_params, bool return_grad, bool bench, Fn&& fn) {
     double val = -1;
     arma::vec grad;
     if (bench) {

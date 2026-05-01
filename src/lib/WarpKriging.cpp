@@ -1240,8 +1240,8 @@ void WarpKriging::ensure_joint_warp(arma::uword d_in) {
   if (m_joint_warp && m_joint_warp->input_dim() == d_in)
     return;
   const auto& spec = m_warp_specs[0];
-  m_joint_warp = std::make_unique<WarpMLPJoint>(d_in, spec.hidden_dims, spec.d_out,
-                                                 WarpMLP::parse_act(spec.activation));
+  m_joint_warp
+      = std::make_unique<WarpMLPJoint>(d_in, spec.hidden_dims, spec.d_out, WarpMLP::parse_act(spec.activation));
 }
 
 // -------------------------------------------------------------------------
@@ -2203,8 +2203,8 @@ void WarpKriging::fit(const arma::vec& y,
   if (parameters.noise.has_value()) {
     const arma::vec& nv = *parameters.noise;
     if (nv.n_elem != y.n_elem)
-      throw std::invalid_argument("fit: parameters.noise has " + std::to_string(nv.n_elem)
-                                  + " elements but y has " + std::to_string(y.n_elem));
+      throw std::invalid_argument("fit: parameters.noise has " + std::to_string(nv.n_elem) + " elements but y has "
+                                  + std::to_string(y.n_elem));
     if (arma::any(nv < 0))
       throw std::invalid_argument("fit: parameters.noise contains negative values");
     m_noise = nv;
@@ -2341,10 +2341,17 @@ arma::mat WarpKriging::simulate(int nsim,
   // Route through KrigingImpl::simulate_impl with the warping as a feature-map callback.
   // The base normalises X_n, applies phi (warp), builds R_nn/R_on in phi-space, draws samples.
   auto phi_fn = [this](const arma::mat& Xn) { return apply_warping(Xn); };
-  arma::mat y_n = simulate_impl(nsim, seed, X_n, will_update,
-                                 /*R_on_factor=*/1.0, /*R_on_coincident_to_one=*/false,
-                                 /*R_nn_factor=*/1.0, /*R_nn_diag=*/{},
-                                 /*Sigma_divisor=*/1.0, /*use_qr_for_circ=*/true, phi_fn);
+  arma::mat y_n = simulate_impl(nsim,
+                                seed,
+                                X_n,
+                                will_update,
+                                /*R_on_factor=*/1.0,
+                                /*R_on_coincident_to_one=*/false,
+                                /*R_nn_factor=*/1.0,
+                                /*R_nn_diag=*/{},
+                                /*Sigma_divisor=*/1.0,
+                                /*use_qr_for_circ=*/true,
+                                phi_fn);
 
   if (will_update) {
     lastsimup_noise_u.clear();  // invalidate noise cache so update_simulate recomputes
@@ -2367,8 +2374,8 @@ arma::mat WarpKriging::simulate(int nsim,
 //  update_simulate()  — FOXY algorithm, ported from Kriging::update_simulate
 // -------------------------------------------------------------------------
 LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
-                                                          const arma::mat& X_u,
-                                                          const arma::vec& noise_u) {
+                                                         const arma::mat& X_u,
+                                                         const arma::vec& noise_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -2399,15 +2406,20 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
 
   // Noise must also match for cache reuse; X_u match is checked by base internally.
   const bool noise_ok = (lastsimup_noise_u.n_elem == noise_u_norm.n_elem)
-      && (noise_u_norm.is_empty()
-          || arma::approx_equal(lastsimup_noise_u, noise_u_norm, "absdiff", arma::datum::eps));
+                        && (noise_u_norm.is_empty()
+                            || arma::approx_equal(lastsimup_noise_u, noise_u_norm, "absdiff", arma::datum::eps));
 
   auto phi_fn = [this](const arma::mat& Xn) { return apply_warping(Xn); };
-  arma::mat y_n = update_simulate_impl(y_u, X_u, noise_ok,
-                                        /*R_uu_factor=*/1.0, diag_uu,
-                                        /*R_uo_factor=*/1.0, /*R_un_factor=*/1.0,
-                                        /*R_un_coincident_to_one=*/false,
-                                        /*Sigma_divisor=*/1.0, phi_fn);
+  arma::mat y_n = update_simulate_impl(y_u,
+                                       X_u,
+                                       noise_ok,
+                                       /*R_uu_factor=*/1.0,
+                                       diag_uu,
+                                       /*R_uo_factor=*/1.0,
+                                       /*R_un_factor=*/1.0,
+                                       /*R_un_coincident_to_one=*/false,
+                                       /*Sigma_divisor=*/1.0,
+                                       phi_fn);
 
   lastsimup_noise_u = noise_u_norm;
 
@@ -2426,10 +2438,7 @@ LIBKRIGING_EXPORT arma::mat WarpKriging::update_simulate(const arma::vec& y_u,
 // -------------------------------------------------------------------------
 //  update()
 // -------------------------------------------------------------------------
-void WarpKriging::update(const arma::vec& y_u,
-                         const arma::mat& X_u,
-                         const bool refit,
-                         const arma::vec& noise_u) {
+void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit, const arma::vec& noise_u) {
   if (!m_fitted)
     throw std::runtime_error("update: model not fitted");
 
@@ -2439,8 +2448,8 @@ void WarpKriging::update(const arma::vec& y_u,
   const bool has_model_noise = !m_noise.is_empty();
   if (has_model_noise) {
     if (noise_u.n_elem != y_u.n_elem)
-      throw std::runtime_error("update: model fit with noise requires noise_u of length "
-                               + std::to_string(y_u.n_elem) + " (got " + std::to_string(noise_u.n_elem) + ")");
+      throw std::runtime_error("update: model fit with noise requires noise_u of length " + std::to_string(y_u.n_elem)
+                               + " (got " + std::to_string(noise_u.n_elem) + ")");
     if (arma::any(noise_u < 0))
       throw std::runtime_error("update: noise_u contains negative values");
   } else if (!noise_u.is_empty()) {
@@ -2580,7 +2589,7 @@ void WarpKriging::dump_to_json(nlohmann::json& j) const {
 void WarpKriging::load_from_json(const nlohmann::json& j) {
   if (j.contains("covType")) {
     // v3: field names match the base schema
-    load_common_from_json(j);           // sets m_X (=Phi), m_centerX, m_y, …
+    load_common_from_json(j);  // sets m_X (=Phi), m_centerX, m_y, …
     m_X_raw = mat_from_json(j["X_raw"]);
   } else {
     // v2 legacy: translate old field names
@@ -2643,7 +2652,8 @@ WarpKriging WarpKriging::load(const std::string filename) {
 
   uint32_t version = j["version"].template get<uint32_t>();
   if (version < 2 || version > 3)
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
+    throw std::runtime_error(
+        asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   std::string content = j["content"].template get<std::string>();
   if (content != "WarpKriging")
     throw std::runtime_error(
@@ -2651,8 +2661,8 @@ WarpKriging WarpKriging::load(const std::string filename) {
 
   auto warping = j["warping"].template get<std::vector<std::string>>();
   // v3 uses "covType" (base name); v2 used "kernel"
-  std::string kernel = j.contains("covType") ? j["covType"].template get<std::string>()
-                                              : j["kernel"].template get<std::string>();
+  std::string kernel
+      = j.contains("covType") ? j["covType"].template get<std::string>() : j["kernel"].template get<std::string>();
   WarpKriging wk(warping, kernel);
   wk.load_from_json(j);
   return wk;

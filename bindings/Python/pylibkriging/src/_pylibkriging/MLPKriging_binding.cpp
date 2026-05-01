@@ -82,7 +82,8 @@ void PyMLPKriging::fit(const py::array_t<double>& y,
                        const py::dict& parameters) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+  m_internal->fit(
+      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>

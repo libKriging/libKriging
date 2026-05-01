@@ -1135,8 +1135,7 @@ LIBKRIGING_EXPORT arma::mat NuggetKriging::simulate(const int nsim,
 
 LIBKRIGING_EXPORT arma::mat NuggetKriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   const double alpha = m_sigma2 / (m_sigma2 + m_nugget);
-  const arma::vec diag_uu
-      = lastsim_with_nugget ? arma::vec(X_u.n_rows, arma::fill::ones) : arma::vec();
+  const arma::vec diag_uu = lastsim_with_nugget ? arma::vec(X_u.n_rows, arma::fill::ones) : arma::vec();
   return update_simulate_impl(y_u,
                               X_u,
                               /*allow_cache=*/true,

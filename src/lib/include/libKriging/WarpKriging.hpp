@@ -648,8 +648,8 @@ class WarpKriging : protected KrigingImpl {
   std::vector<WarpSpec> m_warp_specs;
   std::vector<std::unique_ptr<IWarp>> m_warps;  ///< per-variable (empty for joint)
   arma::uword m_feature_dim = 0;
-  bool m_is_joint = false;                       ///< true when warping = mlp_joint(...)
-  std::unique_ptr<WarpMLPJoint> m_joint_warp;    ///< instantiated at fit() time (needs d_in)
+  bool m_is_joint = false;                     ///< true when warping = mlp_joint(...)
+  std::unique_ptr<WarpMLPJoint> m_joint_warp;  ///< instantiated at fit() time (needs d_in)
 
   // ---- normalisation ------------------------------------------------------
   // Per-variable normalisation (only continuous variables)

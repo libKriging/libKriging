@@ -4,7 +4,6 @@
 #include <libKriging/LinearRegression.hpp>
 #include <libKriging/MLPKriging.hpp>
 
-
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
 #include <libKriging/utils/ExplicitCopySpecifier.hpp>

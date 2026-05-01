@@ -93,8 +93,7 @@ LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType) {
   make_Cov(covType);
 }
 
-LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType, NoiseModel noise_model)
-    : m_noise_model(noise_model) {
+LIBKRIGING_EXPORT Kriging::Kriging(const std::string& covType, NoiseModel noise_model) : m_noise_model(noise_model) {
   make_Cov(covType);
 }
 
@@ -231,8 +230,7 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
       }
     }
     double total_var = _sigma2_loc + _nugget_loc;
-    ll = -0.5 * (n * log(2 * M_PI * total_var) + 2 * arma::sum(log(m.L.diag()))
-                 + m.SSEstar / total_var);
+    ll = -0.5 * (n * log(2 * M_PI * total_var) + 2 * arma::sum(log(m.L.diag())) + m.SSEstar / total_var);
     sigma2_grad = total_var;
 
   } else if (m_noise_model == NoiseModel::Heterogeneous) {
@@ -250,8 +248,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
       ll = -0.5 * (n * log(2 * M_PI * sigma2_grad) + 2 * arma::sum(log(m.L.diag())) + n);
     } else {
       sigma2_grad = m_sigma2;
-      ll = -0.5 * (n * log(2 * M_PI * sigma2_grad) + 2 * arma::sum(log(m.L.diag()))
-                   + as_scalar(LinearAlgebra::crossprod(m.Estar)) / sigma2_grad);
+      ll = -0.5
+           * (n * log(2 * M_PI * sigma2_grad) + 2 * arma::sum(log(m.L.diag()))
+              + as_scalar(LinearAlgebra::crossprod(m.Estar)) / sigma2_grad);
     }
   }
 
@@ -299,8 +298,7 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
           double s2sq = _sigma2 * _sigma2;
           double noise_Rinv = arma::dot(m_noise, Rinv.diag());
           double noise_x2 = arma::dot(m_noise, x % x);
-          (*grad_out).at(d) = -0.5 * (n / _sigma2 - noise_Rinv / s2sq + noise_x2 / (s2sq * _sigma2)
-                                      - m.SSEstar / s2sq);
+          (*grad_out).at(d) = -0.5 * (n / _sigma2 - noise_Rinv / s2sq + noise_x2 / (s2sq * _sigma2) - m.SSEstar / s2sq);
         }
       }
     }
@@ -311,9 +309,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodFun(const arma::vec& _theta,
                                                                           const bool _grad,
                                                                           const bool _bench) {
-  return eval_objective(
-      _theta.n_elem, _grad, _bench,
-      [&](arma::vec* g, std::map<std::string, double>* b) { return _logLikelihood(_theta, g, nullptr, b); });
+  return eval_objective(_theta.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
+    return _logLikelihood(_theta, g, nullptr, b);
+  });
 }
 
 // Objective function for fit : -LOO
@@ -539,10 +537,7 @@ double Kriging::_logMargPost(const arma::vec& _gamma,
   arma::mat LX = LinearAlgebra::safe_chol_lower(Xt_Rinv_X);
 
   arma::mat Rinv_X_Xt_Rinv_X_inv_Xt_Rinv
-      = Rinv_X
-        * (LinearAlgebra::solve_upper(
-            LX.t(),
-            LinearAlgebra::solve_lower(LX, Rinv_X.t())));
+      = Rinv_X * (LinearAlgebra::solve_upper(LX.t(), LinearAlgebra::solve_lower(LX, Rinv_X.t())));
 
   arma::mat yt_Rinv = LinearAlgebra::solve_upper(m.L.t(), m.ystar).t();
   t0 = Bench::toc(bench, "YtRi = Yt \\ Tt", t0);
@@ -646,7 +641,6 @@ LIBKRIGING_EXPORT double Kriging::logMargPost() {
   return std::get<0>(Kriging::logMargPostFun(m_theta, false, false));
 }
 
-
 // alpha reparametrization for Nugget mode:
 //   gamma_alpha = -log(1 + alpha_lower - alpha)   [alpha in [alpha_lower, 1] -> gamma_alpha in [0, inf)]
 //   alpha       = 1 + alpha_lower - exp(-gamma_alpha)
@@ -692,7 +686,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
-          if (grad_out != nullptr) *grad_out = -*grad_out;
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out;
           return -ll;
         };
       }
@@ -709,7 +704,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
-          if (grad_out != nullptr) *grad_out = -*grad_out;
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out;
           return -ll;
         };
       }
@@ -726,7 +722,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
-          if (grad_out != nullptr) *grad_out = -*grad_out;
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out;
           return -ll;
         };
       }
@@ -762,7 +759,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           double lmp = this->_logMargPost(_gamma, grad_out, km_data, nullptr);
-          if (grad_out != nullptr) *grad_out = -*grad_out;
+          if (grad_out != nullptr)
+            *grad_out = -*grad_out;
           return -lmp;
         };
       }
@@ -777,7 +775,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
     } else {
       return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
         double lmp = this->_logMargPost(_gamma, grad_out, km_data, nullptr);
-        if (grad_out != nullptr) *grad_out = -*grad_out;
+        if (grad_out != nullptr)
+          *grad_out = -*grad_out;
         return -lmp;
       };
     }
@@ -829,13 +828,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     } else
       m_est_sigma2 = true;
 
-    double extra_param;  // alpha for Nugget, sigma2 for Heterogeneous, unused for None
+    double extra_param;         // alpha for Nugget, sigma2 for Heterogeneous, unused for None
     double nugget_param = 0.0;  // only used for Nugget mode
     if (m_noise_model == NoiseModel::Nugget) {
       m_est_nugget = parameters.is_nugget_estim;
       if (parameters.nugget.has_value()) {
         nugget_param = parameters.nugget.value();
-        if (m_normalize) nugget_param /= (scaleY * scaleY);
+        if (m_normalize)
+          nugget_param /= (scaleY * scaleY);
       }
       if (sigma2 > 0 && (sigma2 + nugget_param) > 0)
         m_alpha = sigma2 / (sigma2 + nugget_param);
@@ -848,9 +848,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       extra_param = m_sigma2;  // ignored by 2-param populate_Model for None
     }
 
-    Kriging::KModel m = (m_noise_model != NoiseModel::None)
-                            ? make_Model(m_theta, extra_param, nullptr)
-                            : make_Model(m_theta, nullptr);
+    Kriging::KModel m = (m_noise_model != NoiseModel::None) ? make_Model(m_theta, extra_param, nullptr)
+                                                            : make_Model(m_theta, nullptr);
     m_is_empty = false;
     m_T = std::move(m.L);
     m_R = std::move(m.R);
@@ -942,17 +941,21 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         if (parameters.sigma2.has_value() && parameters.nugget.has_value()) {
           double s = parameters.sigma2.value(), nu = parameters.nugget.value();
           extra0 = arma::vec(1);
-          extra0.at(0) = (s > 0 && (s + nu) > 0) ? s / (s + nu)
-                                                   : extra_lower_val + (extra_upper_val - extra_lower_val) * 0.5;
+          extra0.at(0)
+              = (s > 0 && (s + nu) > 0) ? s / (s + nu) : extra_lower_val + (extra_upper_val - extra_lower_val) * 0.5;
         } else {
-          extra0 = extra_lower_val + (extra_upper_val - extra_lower_val) * (1.0 - arma::pow(Random::randu_vec(theta0.n_rows), 3.0));
+          extra0 = extra_lower_val
+                   + (extra_upper_val - extra_lower_val) * (1.0 - arma::pow(Random::randu_vec(theta0.n_rows), 3.0));
         }
       } else if (m_noise_model == NoiseModel::Heterogeneous) {
         // sigma2 bounds from variogram
         arma::vec dy2(n * n, arma::fill::zeros);
         for (arma::uword ij = 0; ij < dy2.n_elem; ij++) {
           arma::uword i = ij % n, j = ij / n;
-          if (i != j) { dy2[ij] = m_y[i] - m_y[j]; dy2[ij] *= dy2[ij]; }
+          if (i != j) {
+            dy2[ij] = m_y[i] - m_y[j];
+            dy2[ij] *= dy2[ij];
+          }
         }
         arma::vec dX2 = arma::sum(m_dX % m_dX, 0).t();
         double sigma2_variogram = 0.5 * arma::mean(dy2.elem(arma::find(dX2 >= arma::median(dX2))));
@@ -960,7 +963,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         extra_upper_val = 10.0 * (sigma2_variogram - arma::min(m_noise));
         if (parameters.sigma2.has_value()) {
           extra0 = arma::vec{parameters.sigma2.value()};
-          if (m_normalize) extra0 /= scaleY;
+          if (m_normalize)
+            extra0 /= scaleY;
         } else {
           extra0 = extra_lower_val + (extra_upper_val - extra_lower_val) * Random::randu_vec(theta0.n_rows);
         }
@@ -1003,7 +1007,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m_est_nugget = parameters.is_nugget_estim;
         if ((!m_est_nugget) && parameters.nugget.has_value()) {
           m_nugget = parameters.nugget.value();
-          if (m_normalize) m_nugget /= (scaleY * scaleY);
+          if (m_normalize)
+            m_nugget /= (scaleY * scaleY);
         } else {
           m_est_nugget = true;
         }
@@ -1149,10 +1154,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
             // check theta part for distance to bounds
             arma::vec theta_part = (m_noise_model != NoiseModel::None && Optim::reparametrize)
-                                       ? (m_noise_model == NoiseModel::Nugget
-                                              ? nugget_reparam_from(gamma_tmp).head(d)
-                                              : Optim::reparam_from(gamma_tmp).head(d))
-                                   : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
+                                       ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
+                                                                              : Optim::reparam_from(gamma_tmp).head(d))
+                                       : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
             double sol_to_lb = arma::min(arma::abs(theta_part - theta_lower));
             double sol_to_ub = arma::min(arma::abs(theta_part - theta_upper));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
@@ -1410,8 +1414,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   const arma::uword n_o = m_X.n_rows;
-  const double lmp_scale
-      = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
+  const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
     const double sigma2 = m_sigma2 * lmp_scale;
     const double alpha = m_alpha;
@@ -1461,10 +1464,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
-                                             int seed,
-                                             const arma::mat& X_n,
-                                             const bool with_nugget,
-                                             const bool will_update) {
+                                              int seed,
+                                              const arma::mat& X_n,
+                                              const bool with_nugget,
+                                              const bool will_update) {
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
   arma::mat y_n = simulate_impl(nsim,
@@ -1477,15 +1480,16 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_nn_diag=*/diag_nn,
                                 /*Sigma_divisor=*/alpha,
                                 /*use_qr_for_circ=*/true);
-  if (will_update) m_lastsim_with_nugget = with_nugget;
+  if (will_update)
+    m_lastsim_with_nugget = with_nugget;
   return y_n;
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
-                                             int seed,
-                                             const arma::mat& X_n,
-                                             const arma::vec& with_noise,
-                                             const bool will_update) {
+                                              int seed,
+                                              const arma::mat& X_n,
+                                              const arma::vec& with_noise,
+                                              const bool will_update) {
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
@@ -1499,7 +1503,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_nn_diag=*/arma::vec(),
                                 /*Sigma_divisor=*/1.0,
                                 /*use_qr_for_circ=*/false);
-  if (will_update) m_lastsim_with_noise = with_noise;
+  if (will_update)
+    m_lastsim_with_noise = with_noise;
   arma::mat eps(n_n, nsim, arma::fill::none);
   if (with_noise.n_elem == 1)
     eps = with_noise.at(0) * Random::randn_mat(n_n, nsim);
@@ -1523,8 +1528,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
-                                                    const arma::vec& noise_u,
-                                                    const arma::mat& X_u) {
+                                                     const arma::vec& noise_u,
+                                                     const arma::mat& X_u) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension mismatch: y_u and X_u");
   if (X_u.n_cols != m_X.n_cols)
@@ -1679,14 +1684,12 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     arma::ivec bounds_type{gd, arma::fill::value(2)};
 
     arma::vec gamma_tmp = gamma_start;
-    optimizer.minimize(
-        [&km, &fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-          return fit_ofn(vals_inp, &grad_out, &km);
-        },
-        gamma_tmp,
-        gamma_lower.memptr(),
-        gamma_upper.memptr(),
-        bounds_type.memptr());
+    optimizer.minimize([&km, &fit_ofn](const arma::vec& vals_inp,
+                                       arma::vec& grad_out) -> double { return fit_ofn(vals_inp, &grad_out, &km); },
+                       gamma_tmp,
+                       gamma_lower.memptr(),
+                       gamma_upper.memptr(),
+                       bounds_type.memptr());
 
     // Extract theta and extra param from optimized gamma
     if (m_noise_model == NoiseModel::Nugget) {
@@ -1710,7 +1713,8 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     } else if (m_noise_model == NoiseModel::Heterogeneous) {
       arma::vec theta_sigma2 = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
       m_theta = theta_sigma2.head(d);
-      if (m_est_sigma2) m_sigma2 = theta_sigma2.at(d);
+      if (m_est_sigma2)
+        m_sigma2 = theta_sigma2.at(d);
     } else {
       m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp;
     }
@@ -1784,15 +1788,20 @@ LIBKRIGING_EXPORT std::string Kriging::summary() const {
 
 static std::string noise_model_to_string(Kriging::NoiseModel nm) {
   switch (nm) {
-    case Kriging::NoiseModel::Nugget: return "Nugget";
-    case Kriging::NoiseModel::Heterogeneous: return "Heterogeneous";
-    default: return "None";
+    case Kriging::NoiseModel::Nugget:
+      return "Nugget";
+    case Kriging::NoiseModel::Heterogeneous:
+      return "Heterogeneous";
+    default:
+      return "None";
   }
 }
 
 static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
-  if (s == "Nugget") return Kriging::NoiseModel::Nugget;
-  if (s == "Heterogeneous") return Kriging::NoiseModel::Heterogeneous;
+  if (s == "Nugget")
+    return Kriging::NoiseModel::Nugget;
+  if (s == "Heterogeneous")
+    return Kriging::NoiseModel::Heterogeneous;
   return Kriging::NoiseModel::None;
 }
 
@@ -1825,7 +1834,7 @@ Kriging Kriging::load(const std::string filename) {
         asString("Bad content to load from '", filename, "'; found '", content, "', requires 'Kriging'"));
 
   NoiseModel nm = j.contains("noise_model") ? noise_model_from_string(j["noise_model"].template get<std::string>())
-                                             : NoiseModel::None;
+                                            : NoiseModel::None;
   Kriging kr(j["covType"].template get<std::string>(), nm);  // _Cov_pow & std::function embedded by make_Cov
   kr.load_common_from_json(j);
   if (nm == NoiseModel::Nugget) {

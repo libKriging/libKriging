@@ -133,16 +133,17 @@ KrigingImpl::KModel KrigingImpl::allocate_KModel() const {
   return m;
 }
 
-std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::predict_impl(const arma::mat& X_n,
-                                                                                            bool return_stdev,
-                                                                                            bool return_cov,
-                                                                                            bool return_deriv,
-                                                                                            double R_on_factor,
-                                                                                            double R_nn_factor,
-                                                                                            const arma::vec& R_nn_diag,
-                                                                                            double var_scale,
-                                                                                            const FeatureMap& phi,
-                                                                                            const FeatureJacobian& jac) const {
+std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::predict_impl(
+    const arma::mat& X_n,
+    bool return_stdev,
+    bool return_cov,
+    bool return_deriv,
+    double R_on_factor,
+    double R_nn_factor,
+    const arma::vec& R_nn_diag,
+    double var_scale,
+    const FeatureMap& phi,
+    const FeatureJacobian& jac) const {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   arma::uword d = m_X.n_cols;  // kernel/feature space dim
@@ -170,13 +171,13 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   arma::mat F_n;
   if (phi) {
     if (jac)
-      Xn_n_input = trans(Xn_n);   // save input-space before overwriting with phi-space
+      Xn_n_input = trans(Xn_n);       // save input-space before overwriting with phi-space
     arma::mat Xn_n_feat = phi(Xn_n);  // n_n × d
     F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n_feat);
-    Xn_n = trans(Xn_n_feat);          // d × n_n  (phi-space from here on)
+    Xn_n = trans(Xn_n_feat);  // d × n_n  (phi-space from here on)
   } else {
     F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
-    Xn_n = trans(Xn_n);               // d × n_n
+    Xn_n = trans(Xn_n);  // d × n_n
   }
 
   auto t0 = Bench::tic();
@@ -267,7 +268,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
       if (jac) {
         arma::mat J_i = jac(Xn_n_input.col(i));  // d_phi × d_input
         DR_on_i = DR_on_i * J_i;                 // n_o × d_input
-        DF_n_i = J_i.t() * DF_n_i;              // d_input × p
+        DF_n_i = J_i.t() * DF_n_i;               // d_input × p
       }
 
       arma::mat W_i = LinearAlgebra::solve_lower(m_T, DR_on_i);
@@ -470,9 +471,8 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
   Xn_u = trans(Xn_u);
   t0 = Bench::toc(nullptr, "Xn_u.t()      ", t0);
 
-  const bool use_lastsimup
-      = allow_cache && (!lastsimup_Xn_u.is_empty())
-        && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
+  const bool use_lastsimup = allow_cache && (!lastsimup_Xn_u.is_empty())
+                             && arma::approx_equal(lastsimup_Xn_u, Xn_u, "absdiff", arma::datum::eps);
   if (!use_lastsimup) {
     lastsimup_Xn_u = Xn_u;
 
@@ -787,8 +787,7 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
   m_est_beta = is_beta_estim && (m_regmodel != Trend::RegressionModel::None);
-  if (!m_est_beta && beta.has_value()
-      && beta.value().n_elem > 0) {  // Force beta fixed (not estimated, no variance)
+  if (!m_est_beta && beta.has_value() && beta.value().n_elem > 0) {  // Force beta fixed (not estimated, no variance)
     m_est_beta = false;
     m_beta = beta.value();
     if (m_normalize)

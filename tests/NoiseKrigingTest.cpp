@@ -5,11 +5,11 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
-#include <vector>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
-#include <libKriging/Trend.hpp>
 #include <libKriging/Optim.hpp>
+#include <libKriging/Trend.hpp>
+#include <vector>
 
 // Cross-platform environment variable functions
 #ifdef _WIN32
@@ -33,9 +33,7 @@ inline int unsetenv_portable(const char* name) {
 #endif
 
 // Simple 1D test function
-auto simple_f = [](double x) {
-  return std::sin(3.0 * x) + 0.5 * std::cos(7.0 * x);
-};
+auto simple_f = [](double x) { return std::sin(3.0 * x) + 0.5 * std::cos(7.0 * x); };
 
 TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
   arma::arma_rng::set_seed(123);
@@ -182,7 +180,7 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
     INFO("Testing with thread_pool_size=2");
     Optim::set_thread_pool_size(2);
     CHECK(Optim::get_thread_pool_size() == 2);
-    
+
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
     CHECK(nk.sigma2() > 0);
@@ -191,7 +189,7 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
     INFO("Testing with thread_pool_size=0 (auto)");
     Optim::set_thread_pool_size(0);
     CHECK(Optim::get_thread_pool_size() == 0);
-    
+
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
     CHECK(nk.sigma2() > 0);
@@ -205,14 +203,14 @@ TEST_CASE("NoiseKriging multistart and parallel tests", "[multistart]") {
     INFO("Testing with thread_start_delay_ms=1");
     Optim::set_thread_start_delay_ms(1);
     CHECK(Optim::get_thread_start_delay_ms() == 1);
-    
+
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
 
     INFO("Testing with thread_start_delay_ms=20");
     Optim::set_thread_start_delay_ms(20);
     CHECK(Optim::get_thread_start_delay_ms() == 20);
-    
+
     nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS5", "LL", parameters);
     CHECK(nk.theta().n_elem == d);
 
@@ -231,7 +229,7 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS1") {
   for (arma::uword k = 0; k < n; ++k)
     y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
   y += 0.05 * arma::randn(n);
-  
+
   arma::colvec noise(n);
   noise.fill(0.01);
 
@@ -244,7 +242,11 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS1") {
 
   Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
   // Provide starting values, optimize all
-  Kriging::Parameters parameters; parameters.sigma2 = sigma2_start(0); parameters.theta = theta_start; parameters.is_theta_estim = true;;
+  Kriging::Parameters parameters;
+  parameters.sigma2 = sigma2_start(0);
+  parameters.theta = theta_start;
+  parameters.is_theta_estim = true;
+  ;
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
   // Check that optimization ran
@@ -269,7 +271,7 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS20") {
   for (arma::uword k = 0; k < n; ++k)
     y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
   y += 0.05 * arma::randn(n);
-  
+
   arma::colvec noise(n);
   noise.fill(0.01);
 
@@ -283,7 +285,11 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS20") {
 
   Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
   // Provide starting values, optimize all
-  Kriging::Parameters parameters; parameters.sigma2 = sigma2_start(0); parameters.theta = theta_starts; parameters.is_theta_estim = true;;
+  Kriging::Parameters parameters;
+  parameters.sigma2 = sigma2_start(0);
+  parameters.theta = theta_starts;
+  parameters.is_theta_estim = true;
+  ;
   nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
 
   // Check that optimization ran
@@ -298,8 +304,6 @@ TEST_CASE("NoiseKriging fit with given parameters - BFGS20") {
   CHECK(std::get<1>(pred).n_elem == 1);
 }
 
-
-
 TEST_CASE("NoiseKriging all parameter combinations") {
   arma::arma_rng::set_seed(123);
   const arma::uword n = 20;
@@ -310,7 +314,7 @@ TEST_CASE("NoiseKriging all parameter combinations") {
   for (arma::uword k = 0; k < n; ++k)
     y(k) = simple_f(X(k, 0)) * simple_f(X(k, 1));
   y += 0.05 * arma::randn(n);
-  
+
   arma::colvec noise(n);
   noise.fill(0.01);
 
@@ -326,7 +330,7 @@ TEST_CASE("NoiseKriging all parameter combinations") {
 
   // Test all combinations with different optimizers
   std::vector<std::string> optims = {"none", "BFGS", "BFGS20"};
-  
+
   for (const auto& optim : optims) {
     DYNAMIC_SECTION("Optim: " << optim) {
       // Combination 1: Estimate all parameters (not valid for "none")
@@ -344,7 +348,10 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       if (optim != "none") {
         SECTION("Fix sigma2, estimate theta and beta") {
           Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
-          Kriging::Parameters params; params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false;;
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val(0);
+          params.is_sigma2_estim = false;
+          ;
           nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.sigma2() == sigma2_val(0));
           CHECK(nk.theta().n_elem == d);
@@ -365,7 +372,12 @@ TEST_CASE("NoiseKriging all parameter combinations") {
       // Combination 4: Fix both sigma2 and theta, estimate beta
       SECTION("Fix sigma2 and theta, estimate beta") {
         Kriging nk("gauss", Kriging::NoiseModel::Heterogeneous);
-        Kriging::Parameters params; params.sigma2 = sigma2_val(0); params.is_sigma2_estim = false; params.theta = theta_val; params.is_theta_estim = false;;
+        Kriging::Parameters params;
+        params.sigma2 = sigma2_val(0);
+        params.is_sigma2_estim = false;
+        params.theta = theta_val;
+        params.is_theta_estim = false;
+        ;
         nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
         CHECK(nk.sigma2() == sigma2_val(0));
         if (optim == "none") {
@@ -392,7 +404,7 @@ TEST_CASE("NoiseKriging all parameter combinations") {
   Kriging nk_final("gauss", Kriging::NoiseModel::Heterogeneous);
   Kriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
   nk_final.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
-  
+
   arma::mat X_new(1, d);
   X_new.fill(0.5);
   auto pred = nk_final.predict(X_new, true, false, false);

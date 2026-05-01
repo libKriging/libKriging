@@ -88,9 +88,9 @@ void MLPKriging::fit(const arma::vec& y,
 //  predict / simulate / update
 // -------------------------------------------------------------------------
 std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> MLPKriging::predict(const arma::mat& X_n,
-                                                                                       bool return_stdev,
-                                                                                       bool return_cov,
-                                                                                       bool return_deriv) const {
+                                                                                      bool return_stdev,
+                                                                                      bool return_cov,
+                                                                                      bool return_deriv) const {
   return m_impl.predict(X_n, return_stdev, return_cov, return_deriv);
 }
 
@@ -114,8 +114,8 @@ double MLPKriging::logLikelihood() const {
 }
 
 std::tuple<double, arma::vec, arma::mat> MLPKriging::logLikelihoodFun(const arma::vec& theta,
-                                                                       bool return_grad,
-                                                                       bool return_hess) const {
+                                                                      bool return_grad,
+                                                                      bool return_hess) const {
   return m_impl.logLikelihoodFun(theta, return_grad, return_hess);
 }
 
@@ -126,7 +126,7 @@ std::string MLPKriging::summary() const {
   std::string s = m_impl.summary();
   // Replace the "* WarpKriging" header with "* MLPKriging"
   const std::string from = "* WarpKriging";
-  const std::string to   = "* MLPKriging";
+  const std::string to = "* MLPKriging";
   auto pos = s.find(from);
   if (pos != std::string::npos)
     s.replace(pos, from.size(), to);
@@ -158,7 +158,8 @@ MLPKriging MLPKriging::load(const std::string filename) {
 
   uint32_t version = j["version"].template get<uint32_t>();
   if (version < 2 || version > 3)
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
+    throw std::runtime_error(
+        asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   std::string content = j["content"].template get<std::string>();
   if (content != "MLPKriging")
     throw std::runtime_error(
@@ -167,8 +168,8 @@ MLPKriging MLPKriging::load(const std::string filename) {
   auto hd = j["hidden_dims"].template get<std::vector<arma::uword>>();
   arma::uword d_out_val = j["d_out"].template get<arma::uword>();
   std::string activation = j["activation"].template get<std::string>();
-  std::string kernel = j.contains("covType") ? j["covType"].template get<std::string>()
-                                             : j["kernel"].template get<std::string>();
+  std::string kernel
+      = j.contains("covType") ? j["covType"].template get<std::string>() : j["kernel"].template get<std::string>();
   MLPKriging mk(hd, d_out_val, activation, kernel);
   mk.m_impl.load_from_json(j);
   return mk;

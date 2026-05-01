@@ -1463,9 +1463,8 @@ static void test_none_warp_with_noise_vs_noise_kriging_ll() {
     double wk_ll_at_wk = wk.logLikelihood();
     double func_diff = std::abs(nk_ll_at_wk - wk_ll_at_wk);
     if (func_diff >= 1e-5) {
-      std::cerr << "\n  FAIL LL-function mismatch @ WK params (theta=" << wk_th.t()
-                << ", sigma2=" << wk_s2 << "): WK=" << wk_ll_at_wk << " NK=" << nk_ll_at_wk << " diff=" << func_diff
-                << std::endl;
+      std::cerr << "\n  FAIL LL-function mismatch @ WK params (theta=" << wk_th.t() << ", sigma2=" << wk_s2
+                << "): WK=" << wk_ll_at_wk << " NK=" << nk_ll_at_wk << " diff=" << func_diff << std::endl;
     }
     assert(func_diff < 1e-5);
 
@@ -1481,8 +1480,8 @@ static void test_none_warp_with_noise_vs_noise_kriging_ll() {
     // concentrated-σ² LL — which should be ≥ NK's LL at the given (θ, σ²=s2_fix).
     // Stricter check: WK at (θ, σ²_MLE(θ)) ≥ NK at (θ, any σ²).
     if (wk_ll_at_nk + 1e-5 < nk_ll_at_nk) {
-      std::cerr << "\n  FAIL: WK LL(θ)=" << wk_ll_at_nk << " < NK LL(θ, σ²)=" << nk_ll_at_nk
-                << " (θ=" << nk_th.t() << ", σ²=" << nk_s2 << ")" << std::endl;
+      std::cerr << "\n  FAIL: WK LL(θ)=" << wk_ll_at_nk << " < NK LL(θ, σ²)=" << nk_ll_at_nk << " (θ=" << nk_th.t()
+                << ", σ²=" << nk_s2 << ")" << std::endl;
     }
     assert(wk_ll_at_nk + 1e-5 >= nk_ll_at_nk);
 

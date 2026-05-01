@@ -11,13 +11,8 @@
 TEST_CASE("Fit: unstable LL (long range with 1D Gauss kernel)", "[fit][unstable][loglik]") {
   // 1D function, small design, but not stationary
   arma::mat X(7, 1);
-  X << 0.0 << arma::endr
-    << 0.25 << arma::endr
-    << 0.33 << arma::endr
-    << 0.45 << arma::endr
-    << 0.5 << arma::endr
-    << 0.75 << arma::endr
-    << 1.0 << arma::endr;
+  X << 0.0 << arma::endr << 0.25 << arma::endr << 0.33 << arma::endr << 0.45 << arma::endr << 0.5 << arma::endr << 0.75
+    << arma::endr << 1.0 << arma::endr;
 
   // Function: f(x) = 1 - 1/2 * (sin(4*x) / (1+x) + 2*cos(12*x)*x^6 + 0.7)
   arma::vec y(7);

@@ -199,9 +199,8 @@ double NoiseKriging::_logLikelihood(const arma::vec& _theta_sigma2,
       double sigma2_sq = _sigma2 * _sigma2;
       double noise_Rinv = arma::dot(m_noise, Rinv.diag());
       double noise_x2 = arma::dot(m_noise, x % x);
-      (*grad_out).at(d) = -0.5
-                          * (n / _sigma2 - noise_Rinv / sigma2_sq + noise_x2 / (sigma2_sq * _sigma2)
-                             - m.SSEstar / sigma2_sq);
+      (*grad_out).at(d)
+          = -0.5 * (n / _sigma2 - noise_Rinv / sigma2_sq + noise_x2 / (sigma2_sq * _sigma2) - m.SSEstar / sigma2_sq);
     } else
       (*grad_out).at(d) = 0;  // if sigma2 is defined & fixed by user
 

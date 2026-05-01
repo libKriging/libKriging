@@ -50,9 +50,7 @@ class Kriging : public KrigingImpl {
   void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
 
   // populate_Model with explicit extra_param (used during optimization)
-  Kriging::KModel make_Model(const arma::vec& theta,
-                             double extra_param,
-                             std::map<std::string, double>* bench) const;
+  Kriging::KModel make_Model(const arma::vec& theta, double extra_param, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m,
                       const arma::vec& theta,
                       double extra_param,

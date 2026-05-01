@@ -95,7 +95,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   if (nrhs > 8)
     params = structToStringMap(prhs[8]);
   auto wk = buildObject<WarpKriging>(
-      y_vec, X_mat, warping, kernel, libKriging::Trend::fromString(regmodel), normalize, optim, objective, params);
+      y_vec, X_mat, warping, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
   output.set(0, wk, "new object reference");
 }
 
@@ -141,7 +141,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   wk->fit(input.get<arma::vec>(1, "y vector"),
           input.get<arma::mat>(2, "X matrix"),
-          libKriging::Trend::fromString(regmodel),
+          Trend::fromString(regmodel),
           normalize,
           optim,
           objective,
@@ -334,7 +334,7 @@ void regmodel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  output.set(0, libKriging::Trend::toString(wk->regmodel()), "regmodel");
+  output.set(0, Trend::toString(wk->regmodel()), "regmodel");
 }
 
 void F(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

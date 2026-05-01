@@ -4,17 +4,17 @@
 #include <cmath>
 // clang-format on
 
-#include "libKriging/Kriging.hpp"
 #include "libKriging/Bench.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
-#include <chrono>
-#include <iostream>
-#include <iomanip>
-#include <vector>
-#include <numeric>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <numeric>
+#include <vector>
 
 // Statistics computation
 struct Stats {
