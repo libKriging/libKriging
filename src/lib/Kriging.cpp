@@ -547,17 +547,13 @@ double Kriging::_logMargPost(const arma::vec& _gamma,
 
   double sigma2;
   if (m_noise_model == NoiseModel::Nugget) {
-    double total_var;
     if (m_est_sigma2 && m_est_nugget) {
-      total_var = S_2(0, 0) / (n - p);
-    } else if (m_est_sigma2) {
-      total_var = m_sigma2 / _alpha;
-    } else if (m_est_nugget) {
-      total_var = m_sigma2 / _alpha;
+      sigma2 = S_2(0, 0) / (n - p);
+    } else if (m_est_sigma2 || m_est_nugget) {
+      sigma2 = m_sigma2 / _alpha;
     } else {
-      total_var = (m_sigma2 + m_nugget);
+      sigma2 = m_sigma2 + m_nugget;
     }
-    sigma2 = _alpha * total_var;
   } else if (m_est_sigma2) {
     sigma2 = S_2(0, 0) / (n - p);
   } else {

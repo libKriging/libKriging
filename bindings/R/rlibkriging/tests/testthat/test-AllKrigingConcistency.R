@@ -42,10 +42,10 @@ lk = Kriging(y = matrix(y_o, ncol = 1),
               parameters = list(theta = matrix(0.1), sigma2 = sigma2))
 
 test_that("Consistency between Noise(0)Kriging and Kriging", {
-    expect_equal(lk$T(), lk_no$T()/sqrt(sigma2))
-    expect_equal(lk$M(), lk_no$M()*sqrt(sigma2))
+    expect_equal(lk$T(), lk_no$T())
+    expect_equal(lk$M(), lk_no$M())
     expect_equal(lk$beta(), lk_no$beta())
-    expect_equal(lk$z(), lk_no$z()*sqrt(sigma2))
+    expect_equal(lk$z(), lk_no$z())
 })
 
 test_that("Consistency between Nugget(0)Kriging and Kriging", {
@@ -198,10 +198,10 @@ lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
 
 
 test_that("Consistency between Noise(0)Kriging and Kriging", {
-    expect_equal(lk_nu$T(), lk_no$T()/sqrt(noise+sigma2))
-    expect_equal(lk_nu$M(), lk_no$M()*sqrt(noise+sigma2))
+    expect_equal(lk_nu$T(), lk_no$T())
+    expect_equal(lk_nu$M(), lk_no$M())
     expect_equal(lk_nu$beta(), lk_no$beta())
-    expect_equal(lk_nu$z(), lk_no$z()*sqrt(noise+sigma2))
+    expect_equal(lk_nu$z(), lk_no$z())
 })
 
 

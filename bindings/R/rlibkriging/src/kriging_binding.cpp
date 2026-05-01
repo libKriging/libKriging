@@ -390,7 +390,11 @@ arma::mat kriging_covMat(Rcpp::List k, arma::mat X1, arma::mat X2) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool return_grad = false, bool bench = false) {
+Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
+                                    arma::vec theta,
+                                    bool return_grad = false,
+                                    bool return_hess = false,
+                                    bool bench = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -405,6 +409,9 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k, arma::vec theta, bool return_g
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (return_grad) {
     ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
+  }
+  if (return_hess) {
+    ret.push_back(arma::mat(), "logLikelihoodHess");
   }
 
   return ret;
