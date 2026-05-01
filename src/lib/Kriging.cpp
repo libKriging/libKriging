@@ -296,9 +296,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
       LinearAlgebra::qr_econ(Qstar_h, Rstar_h, m.Fstar);
 
       hess_out->set_size(d, d);
+      arma::mat H = LinearAlgebra::tcrossprod(Qstar_h);
       for (arma::uword k = 0; k < d; k++) {
         arma::mat gradR_k = gradR.slice(k);
-        arma::mat H = LinearAlgebra::tcrossprod(Qstar_h);
         for (arma::uword l = 0; l <= k; l++) {
           arma::mat gradR_l = gradR.slice(l);
           arma::mat aux = gradR_k * Rinv * gradR_l;
