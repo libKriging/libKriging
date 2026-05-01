@@ -188,9 +188,10 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{3}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  auto result = wk->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  output.set(0, result, "updated simulated values");
 }
 
 void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

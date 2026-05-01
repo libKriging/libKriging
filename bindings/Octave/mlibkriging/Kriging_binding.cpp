@@ -136,9 +136,10 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{3}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  auto result = km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  output.set(0, result, "updated simulated values");
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -212,15 +213,13 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+                 RequiresArg::Range{2, 3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool want_hess = flag_output_compliance(input, 3, "want_hess", output, 2);
-  auto [ll, llgrad, llhess] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, want_hess, false);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, false);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
-  output.setOptional(2, llhess, "llhess");  // FIXME better name
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

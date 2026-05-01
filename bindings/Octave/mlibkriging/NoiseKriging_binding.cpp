@@ -160,10 +160,11 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Exactly{4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<NoiseKriging>(0, "NoiseKriging reference");
-  km->update_simulate(
+  auto result = km->update_simulate(
       input.get<arma::vec>(1, "y_u"), input.get<arma::vec>(2, "noise_u"), input.get<arma::mat>(3, "X_u"));
+  output.set(0, result, "updated simulated values");
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
