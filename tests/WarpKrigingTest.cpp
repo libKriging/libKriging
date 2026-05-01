@@ -1386,7 +1386,7 @@ static void test_none_warp_vs_kriging_ll() {
     for (double tv : theta_vals) {
       arma::vec th = arma::ones<arma::vec>(tc.d) * tv;
       auto [wk_ll, wk_grad, wk_hess] = wk.logLikelihoodFun(th, true, false);
-      auto [kr_ll, kr_grad] = kr.logLikelihoodFun(th, true, false);
+      auto [kr_ll, kr_grad, kr_hess] = kr.logLikelihoodFun(th, true, false, false);
 
       double ll_diff = std::abs(wk_ll - kr_ll);
       if (ll_diff >= 1e-5) {
@@ -1459,7 +1459,7 @@ static void test_none_warp_with_noise_vs_noise_kriging_ll() {
     arma::vec wk_ts = arma::vec(wk_th.n_elem + 1);
     wk_ts.head(wk_th.n_elem) = wk_th;
     wk_ts(wk_th.n_elem) = wk_s2;
-    auto [nk_ll_at_wk, nk_g_at_wk] = nk.logLikelihoodFun(wk_ts, false, false);
+    auto [nk_ll_at_wk, nk_g_at_wk, nk_h_at_wk] = nk.logLikelihoodFun(wk_ts, false, false, false);
     double wk_ll_at_wk = wk.logLikelihood();
     double func_diff = std::abs(nk_ll_at_wk - wk_ll_at_wk);
     if (func_diff >= 1e-5) {
@@ -1474,7 +1474,7 @@ static void test_none_warp_with_noise_vs_noise_kriging_ll() {
     arma::vec nk_ts(nk_th.n_elem + 1);
     nk_ts.head(nk_th.n_elem) = nk_th;
     nk_ts(nk_th.n_elem) = nk_s2;
-    auto [nk_ll_at_nk, nk_g_at_nk] = nk.logLikelihoodFun(nk_ts, false, false);
+    auto [nk_ll_at_nk, nk_g_at_nk, nk_h_at_nk2] = nk.logLikelihoodFun(nk_ts, false, false, false);
     auto [wk_ll_at_nk, wk_g_at_nk, wk_h_at_nk] = wk.logLikelihoodFun(nk_th, false, false);
     // Note: WK's logLikelihoodFun re-does inner Brent, so it returns the
     // concentrated-σ² LL — which should be ≥ NK's LL at the given (θ, σ²=s2_fix).

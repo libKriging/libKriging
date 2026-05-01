@@ -55,7 +55,7 @@ TEST_CASE("NuggetKrigingFitTest - BFGS finds better LL/LMP than grid search", "[
           theta_alpha(d) = alpha_min + ia * (alpha_max - alpha_min) / (grid_size_alpha - 1);
 
           // Evaluate LL at this theta_alpha
-          auto [ll, grad] = nk_grid.logLikelihoodFun(theta_alpha, false, false);
+          auto [ll, grad, hess_unused] = nk_grid.logLikelihoodFun(theta_alpha, false, false, false);
           if (ll > best_ll_grid) {
             best_ll_grid = ll;
             best_theta_alpha_grid = theta_alpha;
