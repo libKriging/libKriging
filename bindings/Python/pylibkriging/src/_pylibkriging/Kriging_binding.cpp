@@ -100,10 +100,10 @@ void PyKriging::update(const py::array_t<double>& y_u, const py::array_t<double>
   m_internal->update(mat_y, mat_X, refit);
 }
 
-void PyKriging::update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
-  arma::mat mat_y = carma::arr_to_col<double>(y_u);
+py::array_t<double> PyKriging::update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u) {
+  arma::vec mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
-  m_internal->update_simulate(mat_y, mat_X);
+  return carma::mat_to_arr(m_internal->update_simulate(mat_y, mat_X), true);
 }
 
 std::string PyKriging::summary() const {

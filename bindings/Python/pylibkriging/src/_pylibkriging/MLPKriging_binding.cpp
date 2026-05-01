@@ -130,7 +130,7 @@ std::tuple<double, py::array_t<double>, py::array_t<double>>
 PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
-  return {ll, carma::col_to_arr(grad), {}};
+  return {ll, carma::col_to_arr(grad), carma::mat_to_arr(hess)};
 }
 
 std::string PyMLPKriging::kernel() {
