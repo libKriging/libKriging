@@ -321,10 +321,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
           }
           arma::mat xk = m.Linv * gradR_k * x;
           arma::mat xl = (k == l) ? xk : m.Linv * gradR_l * x;
-          double h_lk
-              = (2.0 * as_scalar(xk.t() * H * xl) / sigma2_grad
-                 + as_scalar(x.t() * (hessR_k_l - 2.0 * aux) * x) / sigma2_grad
-                 + arma::trace(Rinv * aux) - arma::trace(Rinv * hessR_k_l));
+          double h_lk = (2.0 * as_scalar(xk.t() * H * xl) / sigma2_grad
+                         + as_scalar(x.t() * (hessR_k_l - 2.0 * aux) * x) / sigma2_grad + arma::trace(Rinv * aux)
+                         - arma::trace(Rinv * hessR_k_l));
           if (m_est_sigma2)
             h_lk += terme1.at(k) * terme1.at(l) / n;
           (*hess_out).at(l, k) = (*hess_out).at(k, l) = h_lk / 2.0;
@@ -371,9 +370,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodFun(const arma::vec& _theta,
-                                                                                      const bool _grad,
-                                                                                      const bool _hess,
-                                                                                      const bool _bench) {
+                                                                                     const bool _grad,
+                                                                                     const bool _hess,
+                                                                                     const bool _bench) {
   double val = -1;
   arma::vec grad;
   arma::mat hess;
