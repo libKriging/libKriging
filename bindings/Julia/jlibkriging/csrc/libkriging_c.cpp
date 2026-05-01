@@ -298,7 +298,7 @@ int lk_kriging_log_likelihood_fun(void* ptr,
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
+    auto [ll, grad, llhess] = k->logLikelihoodFun(theta_v, return_grad != 0, false, false);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
@@ -846,7 +846,7 @@ int lk_nugget_kriging_log_likelihood_fun(void* ptr,
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
     // NuggetKriging::logLikelihoodFun does not support hessian output
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
+    auto [ll, grad, llhess] = k->logLikelihoodFun(theta_v, return_grad != 0, false, false);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)
@@ -1394,7 +1394,7 @@ int lk_noise_kriging_log_likelihood_fun(void* ptr,
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec theta_v(const_cast<double*>(theta), theta_n, false, true);
     // NoiseKriging::logLikelihoodFun does not support hessian output
-    auto [ll, grad] = k->logLikelihoodFun(theta_v, return_grad != 0, false);
+    auto [ll, grad, llhess] = k->logLikelihoodFun(theta_v, return_grad != 0, false, false);
     if (ll_out)
       *ll_out = ll;
     if (grad_out && return_grad)

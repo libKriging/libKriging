@@ -121,7 +121,7 @@ void bench_adambfgs(const arma::vec& y, const arma::mat& X) {
                             arma::vec* /*grad_outer*/,
                             arma::vec* grad_inner) -> double {
       arma::vec theta = arma::exp(x_inner);
-      auto [ll, grad_theta] = kr_ref.logLikelihoodFun(theta, grad_inner != nullptr, false);
+      auto [ll, grad_theta, ll_hess] = kr_ref.logLikelihoodFun(theta, grad_inner != nullptr, false, false);
       if (grad_inner) {
         // Chain rule: ∂LL/∂(log θ) = ∂LL/∂θ · θ
         *grad_inner = grad_theta % theta;
@@ -170,7 +170,7 @@ void bench_adambfgs(const arma::vec& y, const arma::mat& X) {
       arma::vec log_theta = arma::join_cols(x_outer, x_inner);
       arma::vec theta = arma::exp(log_theta);
       bool need_grad = (grad_outer != nullptr || grad_inner != nullptr);
-      auto [ll, grad_theta] = kr_ref.logLikelihoodFun(theta, need_grad, false);
+      auto [ll, grad_theta, ll_hess2] = kr_ref.logLikelihoodFun(theta, need_grad, false, false);
       if (need_grad) {
         arma::vec grad_log = grad_theta % theta;
         if (grad_outer)

@@ -179,6 +179,7 @@ Kriging::KModel Kriging::make_Model(const arma::vec& theta, std::map<std::string
 
 double Kriging::_logLikelihood(const arma::vec& _gamma,
                                arma::vec* grad_out,
+                               arma::mat* hess_out,
                                Kriging::KModel* model,
                                std::map<std::string, double>* bench) const {
   arma::uword n = m_X.n_rows;
@@ -266,8 +267,71 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
     compute_ll_grad_theta_vecs(m.R, Rinv, x, _theta, term1_vec, term2_vec);
     t0 = Bench::toc(bench, "gradR computation [optimized]", t0);
 
-    for (arma::uword k = 0; k < d; k++)
-      (*grad_out).at(k) = (term1_vec.at(k) / sigma2_grad + term2_vec.at(k)) / 2.0;
+    arma::vec terme1(d);  // needed for Hessian: terme1[k] = term1_vec[k] / sigma2
+    for (arma::uword k = 0; k < d; k++) {
+      terme1.at(k) = term1_vec.at(k) / sigma2_grad;
+      (*grad_out).at(k) = (terme1.at(k) + term2_vec.at(k)) / 2.0;
+    }
+
+    // Hessian computation (None noise model only, following O. Roustant's formula)
+    if (hess_out != nullptr && m_noise_model == NoiseModel::None) {
+      t0 = Bench::tic();
+      arma::cube gradR(n, n, d, arma::fill::none);
+      const arma::vec zeros_d = arma::vec(d, arma::fill::zeros);
+      for (arma::uword i = 0; i < n; i++) {
+        gradR.tube(i, i) = zeros_d;
+        for (arma::uword j = 0; j < i; j++) {
+          gradR.tube(i, j) = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), _theta);
+          gradR.tube(j, i) = gradR.tube(i, j);
+        }
+      }
+      t0 = Bench::toc(bench, "gradR cube for Hessian", t0);
+
+      if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L)))
+        m.Linv = LinearAlgebra::solve_lower(m.L, arma::mat(n, n, arma::fill::eye));
+
+      // Compute Qstar for H = Qstar * Qstar^t
+      arma::mat Qstar_h;
+      arma::mat Rstar_h;
+      LinearAlgebra::qr_econ(Qstar_h, Rstar_h, m.Fstar);
+
+      hess_out->set_size(d, d);
+      for (arma::uword k = 0; k < d; k++) {
+        arma::mat gradR_k = gradR.slice(k);
+        arma::mat H = LinearAlgebra::tcrossprod(Qstar_h);
+        for (arma::uword l = 0; l <= k; l++) {
+          arma::mat gradR_l = gradR.slice(l);
+          arma::mat aux = gradR_k * Rinv * gradR_l;
+          arma::mat hessR_k_l(n, n, arma::fill::none);
+          if (k == l) {
+            for (arma::uword i = 0; i < n; i++) {
+              hessR_k_l.at(i, i) = 0;
+              for (arma::uword j = 0; j < i; j++) {
+                double dln_k = gradR_k.at(i, j);
+                hessR_k_l.at(i, j) = hessR_k_l.at(j, i)
+                    = dln_k * (dln_k / m.R.at(i, j) - (_Cov_pow + 1) / _theta.at(k));
+              }
+            }
+          } else {
+            for (arma::uword i = 0; i < n; i++) {
+              hessR_k_l.at(i, i) = 0;
+              for (arma::uword j = 0; j < i; j++)
+                hessR_k_l.at(i, j) = hessR_k_l.at(j, i) = gradR_k.at(i, j) * gradR_l.at(i, j) / m.R.at(i, j);
+            }
+          }
+          arma::mat xk = m.Linv * gradR_k * x;
+          arma::mat xl = (k == l) ? xk : m.Linv * gradR_l * x;
+          double h_lk
+              = (2.0 * as_scalar(xk.t() * H * xl) / sigma2_grad
+                 + as_scalar(x.t() * (hessR_k_l - 2.0 * aux) * x) / sigma2_grad
+                 + arma::trace(Rinv * aux) - arma::trace(Rinv * hessR_k_l));
+          if (m_est_sigma2)
+            h_lk += terme1.at(k) * terme1.at(l) / n;
+          (*hess_out).at(l, k) = (*hess_out).at(k, l) = h_lk / 2.0;
+          t0 = Bench::toc(bench, "hess_ll[l,k] = ...", t0);
+        }
+      }
+    }
 
     // Extra gradient dimension for Nugget / Heterogeneous
     if (grad_out->n_elem > d) {
@@ -306,12 +370,29 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
   return ll;
 }
 
-LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodFun(const arma::vec& _theta,
-                                                                          const bool _grad,
-                                                                          const bool _bench) {
-  return eval_objective(_theta.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
-    return _logLikelihood(_theta, g, nullptr, b);
-  });
+LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> Kriging::logLikelihoodFun(const arma::vec& _theta,
+                                                                                      const bool _grad,
+                                                                                      const bool _hess,
+                                                                                      const bool _bench) {
+  double val = -1;
+  arma::vec grad;
+  arma::mat hess;
+  std::map<std::string, double> bench_map;
+  std::map<std::string, double>* bench_ptr = _bench ? &bench_map : nullptr;
+  if (_grad || _hess) {
+    grad = arma::vec(_theta.n_elem);
+    if (_hess) {
+      hess = arma::mat(_theta.n_elem, _theta.n_elem, arma::fill::none);
+      val = _logLikelihood(_theta, &grad, &hess, nullptr, bench_ptr);
+    } else {
+      val = _logLikelihood(_theta, &grad, nullptr, nullptr, bench_ptr);
+    }
+  } else {
+    val = _logLikelihood(_theta, nullptr, nullptr, nullptr, bench_ptr);
+  }
+  if (_bench)
+    print_bench(bench_map);
+  return {val, std::move(grad), std::move(hess)};
 }
 
 // Objective function for fit : -LOO
@@ -674,14 +755,14 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       if (Optim::reparametrize) {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           const arma::vec _theta_alpha = nugget_reparam_from(_gamma);
-          double ll = this->_logLikelihood(_theta_alpha, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_theta_alpha, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -nugget_reparam_from_deriv(_theta_alpha, *grad_out);
           return -ll;
         };
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
-          double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_gamma, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -*grad_out;
           return -ll;
@@ -692,14 +773,14 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       if (Optim::reparametrize) {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           const arma::vec _theta_sigma2 = Optim::reparam_from(_gamma);
-          double ll = this->_logLikelihood(_theta_sigma2, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_theta_sigma2, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -Optim::reparam_from_deriv(_theta_sigma2, *grad_out);
           return -ll;
         };
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
-          double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_gamma, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -*grad_out;
           return -ll;
@@ -710,14 +791,14 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       if (Optim::reparametrize) {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
           const arma::vec _theta = Optim::reparam_from(_gamma);
-          double ll = this->_logLikelihood(_theta, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_theta, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
           return -ll;
         };
       } else {
         return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
-          double ll = this->_logLikelihood(_gamma, grad_out, km_data, nullptr);
+          double ll = this->_logLikelihood(_gamma, grad_out, nullptr, km_data, nullptr);
           if (grad_out != nullptr)
             *grad_out = -*grad_out;
           return -ll;

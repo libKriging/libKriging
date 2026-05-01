@@ -450,11 +450,11 @@ Rcpp::List nuggetkriging_logLikelihoodFun(Rcpp::List k,
   if (theta_alpha.n_elem != impl_ptr->theta().n_elem + 1)
     Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem + 1) + ")");
 
-  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta_alpha, return_grad, bench);
+  auto [ll_val, ll_grad, ll_hess] = impl_ptr->logLikelihoodFun(theta_alpha, return_grad, false, bench);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = ll_val);
   if (return_grad) {
-    ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
+    ret.push_back(ll_grad, "logLikelihoodGrad");
   }
 
   return ret;
