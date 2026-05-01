@@ -752,14 +752,14 @@ logLikelihoodFun.Kriging <- function(object, theta,
                 logLikelihoodHess = array(NA, dim = c(n, d, d)))
     for (i in 1:n) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    return_grad = isTRUE(return_grad) || isTRUE(return_hess),
+                                    return_grad = isTRUE(return_grad),
                                     return_hess = isTRUE(return_hess),
                                     bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
-        if (isTRUE(return_grad) || isTRUE(return_hess)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
+        if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
         if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
-    if (!isTRUE(return_grad) && !isTRUE(return_hess)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
     if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
