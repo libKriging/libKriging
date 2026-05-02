@@ -18,7 +18,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -94,6 +94,7 @@ classKriging <- function(nk) {
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
+                    noise = NULL,
                     regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
@@ -103,12 +104,35 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
+
+    # Determine noise_model from noise argument:
+    #   NULL        -> "none" (pure Kriging)
+    #   "nugget"    -> "nugget" (estimated homoscedastic nugget)
+    #   numeric     -> "heterogeneous" (known per-point noise variance)
+    if (is.null(noise)) {
+        noise_model <- "none"
+        noise_vec <- NULL
+    } else if (is.character(noise) && tolower(noise) == "nugget") {
+        noise_model <- "nugget"
+        noise_vec <- NULL
+    } else if (is.numeric(noise)) {
+        noise_model <- "heterogeneous"
+        if (length(noise) == 1)
+            noise_vec <- rep(noise, NROW(y))
+        else
+            noise_vec <- noise
+    } else {
+        stop("'noise' must be NULL, \"nugget\", or a numeric scalar/vector")
+    }
+
     if (is.character(y) && is.null(X) && is.null(kernel)) # just first arg for kernel, without naming
-        nk <- new_Kriging(kernel = y)
+        nk <- new_Kriging(kernel = y, noise_model = noise_model)
     else if (is.null(y) && is.null(X) && !is.null(kernel))
-        nk <- new_Kriging(kernel = kernel)
+        nk <- new_Kriging(kernel = kernel, noise_model = noise_model)
     else
         nk <- new_KrigingFit(y = y, X = X, kernel = kernel,
+                      noise_model = noise_model,
+                      noise = noise_vec,
                       regmodel = regmodel,
                       normalize = normalize,
                       optim = optim,
@@ -353,6 +377,7 @@ print.Kriging <- function(x, ...) {
 #' fit(k,y,X)
 #' print(k)
 fit.Kriging <- function(object, y, X,
+                    noise = NULL,
                     regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "Newton", "none"),
@@ -365,6 +390,7 @@ fit.Kriging <- function(object, y, X,
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
 
     kriging_fit(object, y, X,
+                    noise = noise,
                     regmodel,
                     normalize,
                     optim ,
@@ -478,13 +504,13 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALSE, ...) {
+simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(kriging_simulate(object, nsim = nsim, seed = seed, X_n = x, will_update = will_update))
+    return(kriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_noise = with_noise, will_update = will_update))
 }
 
 #' Update previous simulation of a \code{Kriging} model object.
@@ -532,14 +558,14 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, will_update = FALS
 #' lines(x, su[ , 1], col = "blue", lty=2)
 #' lines(x, su[ , 2], col = "blue", lty=2)
 #' lines(x, su[ , 3], col = "blue", lty=2)
-update_simulate.Kriging <- function(object, y_u, X_u, ...) {
+update_simulate.Kriging <- function(object, y_u, X_u, noise_u = NULL, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
     if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
     if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
     ## Modify 'object' in the parent environment
-    return(kriging_update_simulate(object, y_u, X_u))
+    return(kriging_update_simulate(object, y_u, noise_u = noise_u, X_u))
 }
 
 #' Update a \code{Kriging} model object with new points
@@ -593,14 +619,14 @@ update_simulate.Kriging <- function(object, y_u, X_u, ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, X_u, refit=TRUE,...) {
+update.Kriging <- function(object, y_u, X_u, noise_u=NULL, refit=TRUE,...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
     if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
     if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
     ## Modify 'object' in the parent environment
-    kriging_update(object, y_u, X_u, refit)
+    kriging_update(object, y_u, X_u, noise_u = noise_u, refit)
 
     invisible(NULL)
 }

@@ -95,22 +95,14 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                     optim = c("BFGS", "none"),
                     objective = c("LL"),
                     parameters = NULL) {
-
-    regmodel <- match.arg(regmodel)
-    objective <- match.arg(objective)
-    if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
-    if (is.character(y) && is.null(X) && is.null(noise) && is.null(kernel)) # just first arg for kernel, without naming
-        nk <- new_NoiseKriging(kernel = y)
-    else if (is.null(y) && is.null(X) && !is.null(kernel))
-        nk <- new_NoiseKriging(kernel = kernel)
-    else
-        nk <- new_NoiseKrigingFit(y = y, noise = noise, X = X, kernel = kernel,
-                      regmodel = regmodel,
-                      normalize = normalize,
-                      optim = optim,
-                      objective = objective,
-                      parameters = parameters)
-    return(classNoiseKriging(nk))
+    .Deprecated("Kriging", msg = "NoiseKriging() is deprecated. Use Kriging(..., noise=<vector>) instead.")
+    Kriging(y = y, X = X, kernel = kernel,
+            noise = noise,
+            regmodel = regmodel,
+            normalize = normalize,
+            optim = optim,
+            objective = objective,
+            parameters = parameters)
 }
 
 
