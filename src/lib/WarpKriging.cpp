@@ -979,6 +979,31 @@ arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) c
   return grad;
 }
 
+arma::mat WarpMLPJoint::jacobian_input(const arma::rowvec& x) const {
+  const arma::uword L = m_W.size();
+
+  // Forward pass — cache pre-activations Z_l for derivative computation
+  std::vector<arma::mat> Z_cache(L);
+  arma::mat H(1, x.n_elem);
+  H.row(0) = x;
+  for (arma::uword l = 0; l < L; ++l) {
+    arma::mat Z = H * m_W[l];
+    Z.each_row() += m_b[l].t();
+    Z_cache[l] = Z;
+    if (l + 1 < L)
+      H = WarpMLP::apply_act(Z, m_act);
+  }
+
+  // Backward pass: J = W_{L-1}^T · diag(σ'(z_{L-2})) · W_{L-2}^T · ... · diag(σ'(z_0)) · W_0^T
+  arma::mat J = m_W[L - 1].t();  // (d_out × w_{L-1})
+  for (int l = static_cast<int>(L) - 2; l >= 0; --l) {
+    arma::mat act_d = WarpMLP::act_deriv(Z_cache[l], m_act);  // (1 × w_{l+1})
+    J.each_row() %= act_d;
+    J = J * m_W[l].t();
+  }
+  return J;  // (d_out × d_in)
+}
+
 std::string WarpMLPJoint::describe() const {
   std::ostringstream s;
   s << "MLPJoint(" << m_d_in;
@@ -2278,8 +2303,13 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   // Warp's per-dim continuous-only normalization — see W-2 key insight in refactor_table.md.
   auto phi_fn = [this](const arma::mat& Xnorm) -> arma::mat { return apply_warping(Xnorm); };
 
-  // jac_fn: FD Jacobian dΦ/dx at a normalized input column (d_input,) → (d_phi × d_input)
+  // jac_fn: Jacobian dΦ/dx at a normalized input column (d_input,) → (d_phi × d_input)
   auto jac_fn = [this](const arma::vec& x_norm_col) -> arma::mat {
+    if (m_is_joint && m_joint_warp) {
+      // Analytical backpropagation through the MLP
+      return m_joint_warp->jacobian_input(x_norm_col.t());
+    }
+    // Fallback: FD Jacobian for per-dimension warps
     const double h = 1.0E-5;
     const arma::uword d_in = x_norm_col.n_elem;
     arma::mat x_perturbed(2 * d_in, d_in);

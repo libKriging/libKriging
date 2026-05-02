@@ -400,6 +400,9 @@ class LIBKRIGING_EXPORT WarpMLPJoint {
   /// Backward: given dL/dΦ (n × d_out), compute dL/d(params)
   arma::vec backward(const arma::mat& X, const arma::mat& dL_dPhi) const;
 
+  /// Analytical Jacobian ∂Φ/∂x for a single input row → (d_out × d_in)
+  arma::mat jacobian_input(const arma::rowvec& x) const;
+
   std::string describe() const;
 
   /// Deep copy

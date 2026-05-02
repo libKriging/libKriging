@@ -108,23 +108,27 @@ static void check_deriv_vs_fd(const MLPKriging& model,
                               const arma::mat& X_new,
                               const std::vector<arma::uword>& check_dims,
                               const std::string& label,
-                              double h = 1e-6,
-                              double rel_tol = 0.2,
+                              double h = 1e-4,
+                              double rel_tol = 0.15,
                               double abs_tol = 0.1) {
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X_new, true, false, true);
 
   const arma::uword n_n = X_new.n_rows;
   for (arma::uword i = 0; i < n_n; ++i) {
     for (arma::uword dim : check_dims) {
-      arma::mat Xp = X_new;
-      arma::mat Xm = X_new;
-      Xp(i, dim) += h;
-      Xm(i, dim) -= h;
+      // Use single-point predictions to avoid numerical noise from multi-point
+      // triangular solves on ill-conditioned correlation matrices.
+      arma::mat Xp(1, X_new.n_cols);
+      arma::mat Xm(1, X_new.n_cols);
+      Xp.row(0) = X_new.row(i);
+      Xm.row(0) = X_new.row(i);
+      Xp(0, dim) += h;
+      Xm(0, dim) -= h;
       auto [mp, sp, _cp, _mdp, _sdp] = model.predict(Xp, true, false);
       auto [mm, sm, _cm, _mdm, _sdm] = model.predict(Xm, true, false);
 
-      double dmean_num = (mp(i) - mm(i)) / (2.0 * h);
-      double dstdev_num = (sp(i) - sm(i)) / (2.0 * h);
+      double dmean_num = (mp(0) - mm(0)) / (2.0 * h);
+      double dstdev_num = (sp(0) - sm(0)) / (2.0 * h);
       double dmean_ana = mean_deriv(i, dim);
       double dstdev_ana = stdev_deriv(i, dim);
 
@@ -133,12 +137,12 @@ static void check_deriv_vs_fd(const MLPKriging& model,
 
       if (mean_err > rel_tol) {
         std::cerr << "  [" << label << "] mean deriv mismatch at i=" << i << " dim=" << dim << ": num=" << dmean_num
-                  << " ana=" << dmean_ana << std::endl;
+                  << " ana=" << dmean_ana << " err=" << mean_err << std::endl;
         assert(false);
       }
       if (stdev_err > rel_tol) {
         std::cerr << "  [" << label << "] stdev deriv mismatch at i=" << i << " dim=" << dim << ": num=" << dstdev_num
-                  << " ana=" << dstdev_ana << std::endl;
+                  << " ana=" << dstdev_ana << " err=" << stdev_err << std::endl;
         assert(false);
       }
     }
