@@ -171,6 +171,22 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::is_sigma2_estim ", obj.ref, varargin{:});
         end
 
+        function varargout = noise_model(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::noise_model", obj.ref, varargin{:});
+        end
+
+        function varargout = nugget(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::nugget", obj.ref, varargin{:});
+        end
+
+        function varargout = is_nugget_estim(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::is_nugget_estim", obj.ref, varargin{:});
+        end
+
+        function varargout = noise(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::noise", obj.ref, varargin{:});
+        end
+
     end
 
     methods (Static = true)
