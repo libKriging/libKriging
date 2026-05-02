@@ -371,6 +371,10 @@ arma::mat WarpNone::forward(const arma::vec& x) const {
   return arma::mat(x);  // (n × 1)
 }
 
+arma::vec WarpNone::deriv_input(double /*x_val*/) const {
+  return {1.0};
+}
+
 arma::vec WarpNone::backward(const arma::vec& /*x*/, const arma::mat& /*dL_dPhi*/) const {
   return {};  // no params → empty gradient
 }
@@ -392,6 +396,10 @@ void WarpAffine::set_params(const arma::vec& p) {
 
 arma::mat WarpAffine::forward(const arma::vec& x) const {
   return arma::mat(m_a * x + m_b);
+}
+
+arma::vec WarpAffine::deriv_input(double /*x_val*/) const {
+  return {m_a};
 }
 
 arma::vec WarpAffine::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -433,6 +441,13 @@ arma::mat WarpBoxCox::forward(const arma::vec& x) const {
       out(i) = (std::pow(xi, m_lambda) - 1.0) / m_lambda;
   }
   return arma::mat(out);
+}
+
+arma::vec WarpBoxCox::deriv_input(double x_val) const {
+  double xi = std::max(x_val, 1e-10);
+  if (std::abs(m_lambda) < 1e-6)
+    return {1.0 / xi};
+  return {std::pow(xi, m_lambda - 1.0)};
 }
 
 arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -483,6 +498,15 @@ arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
     out(i) = 1.0 - std::pow(1.0 - std::pow(xi, a), b);
   }
   return arma::mat(out);
+}
+
+arma::vec WarpKumaraswamy::deriv_input(double x_val) const {
+  double a = std::exp(m_log_a);
+  double b = std::exp(m_log_b);
+  double xi = std::clamp(x_val, 1e-10, 1.0 - 1e-10);
+  double xa = std::pow(xi, a);
+  double u = 1.0 - xa;
+  return {a * b * std::pow(xi, a - 1.0) * std::pow(u, b - 1.0)};
 }
 
 arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -577,6 +601,20 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
     out(i) = arma::dot(W2, h) + m_b2;
   }
   return arma::mat(out);
+}
+
+arma::vec WarpNeuralMono::deriv_input(double x_val) const {
+  arma::vec W1 = arma::exp(m_raw_W1);
+  arma::vec W2 = arma::exp(m_raw_W2);
+  // out = W2 · softplus(W1*x + b1) + b2
+  // ∂out/∂x = W2 · sigmoid(W1*x + b1) · W1 = Σ_j W2_j * σ(W1_j*x + b1_j) * W1_j
+  arma::vec z = W1 * x_val + m_b1;
+  double deriv = 0.0;
+  for (arma::uword j = 0; j < m_H; ++j) {
+    double sig_j = 1.0 / (1.0 + std::exp(-z(j)));
+    deriv += W2(j) * sig_j * W1(j);
+  }
+  return {deriv};
 }
 
 arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -799,6 +837,31 @@ arma::mat WarpMLP::forward(const arma::vec& x) const {
       H = Z;
   }
   return H;  // (n × d_out)
+}
+
+arma::vec WarpMLP::deriv_input(double x_val) const {
+  const arma::uword L = m_W.size();
+
+  // Forward pass for single scalar input — cache pre-activations
+  std::vector<arma::mat> Z_cache(L);
+  arma::mat H(1, 1);
+  H(0, 0) = x_val;
+  for (arma::uword l = 0; l < L; ++l) {
+    arma::mat Z = H * m_W[l];
+    Z.each_row() += m_b[l].t();
+    Z_cache[l] = Z;
+    if (l + 1 < L)
+      H = apply_act(Z, m_act);
+  }
+
+  // Backward: J = W_{L-1}^T · diag(σ'(z_{L-2})) · ... · W_0^T → (d_out × 1)
+  arma::mat J = m_W[L - 1].t();  // (d_out × w_{L-1})
+  for (int l = static_cast<int>(L) - 2; l >= 0; --l) {
+    arma::mat act_d = act_deriv(Z_cache[l], m_act);  // (1 × w_{l+1})
+    J.each_row() %= act_d;
+    J = J * m_W[l].t();
+  }
+  return J.col(0);  // (d_out)-vector (d_in=1 for per-dim warp)
 }
 
 // -- backward ---------------------------------------------------------------
@@ -1049,6 +1112,10 @@ arma::mat WarpEmbedding::forward(const arma::vec& x) const {
   return out;
 }
 
+arma::vec WarpEmbedding::deriv_input(double /*x_val*/) const {
+  return arma::vec(m_embed_dim, arma::fill::zeros);
+}
+
 arma::vec WarpEmbedding::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
   arma::mat dE(m_n_levels, m_embed_dim, arma::fill::zeros);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
@@ -1102,6 +1169,10 @@ arma::mat WarpOrdinal::forward(const arma::vec& x) const {
     out(i) = positions(level);
   }
   return arma::mat(out);
+}
+
+arma::vec WarpOrdinal::deriv_input(double /*x_val*/) const {
+  return {0.0};
 }
 
 arma::vec WarpOrdinal::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -2306,23 +2377,19 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
   // jac_fn: Jacobian dΦ/dx at a normalized input column (d_input,) → (d_phi × d_input)
   auto jac_fn = [this](const arma::vec& x_norm_col) -> arma::mat {
     if (m_is_joint && m_joint_warp) {
-      // Analytical backpropagation through the MLP
+      // Analytical backpropagation through the joint MLP
       return m_joint_warp->jacobian_input(x_norm_col.t());
     }
-    // Fallback: FD Jacobian for per-dimension warps
-    const double h = 1.0E-5;
+    // Analytical per-dimension warp derivatives (block-diagonal Jacobian)
     const arma::uword d_in = x_norm_col.n_elem;
-    arma::mat x_perturbed(2 * d_in, d_in);
+    arma::mat J(m_feature_dim, d_in, arma::fill::zeros);
+    arma::uword row = 0;
     for (arma::uword k = 0; k < d_in; k++) {
-      x_perturbed.row(k) = x_norm_col.t();
-      x_perturbed.row(d_in + k) = x_norm_col.t();
-      x_perturbed(k, k) += h;
-      x_perturbed(d_in + k, k) -= h;
+      arma::vec dw = m_warps[k]->deriv_input(x_norm_col(k));
+      arma::uword d_out_k = m_warps[k]->output_dim();
+      J.submat(row, k, row + d_out_k - 1, k) = dw;
+      row += d_out_k;
     }
-    arma::mat Phi_p = apply_warping(x_perturbed);
-    arma::mat J(m_feature_dim, d_in);
-    for (arma::uword k = 0; k < d_in; k++)
-      J.col(k) = (Phi_p.row(k) - Phi_p.row(d_in + k)).t() / (2.0 * h);
     return J;
   };
 

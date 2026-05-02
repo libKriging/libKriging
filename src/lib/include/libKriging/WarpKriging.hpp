@@ -212,6 +212,10 @@ class LIBKRIGING_EXPORT IWarp {
   /// Forward:  warp a column of n scalar values → (n × d_out) matrix
   virtual arma::mat forward(const arma::vec& x) const = 0;
 
+  /// Analytical derivative ∂φ/∂x at a single scalar input value → (d_out)-vector.
+  /// For discrete warps (Embedding, Ordinal) returns zeros.
+  virtual arma::vec deriv_input(double x_val) const = 0;
+
   /// Gradient of the output w.r.t. the parameters (for a batch)
   /// Given dL/dΦ (n × d_out), returns dL/d(params)
   virtual arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const = 0;
@@ -232,6 +236,7 @@ class LIBKRIGING_EXPORT WarpNone final : public IWarp {
   arma::vec get_params() const override { return {}; }
   void set_params(const arma::vec&) override {}
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override { return "None (identity)"; }
   std::unique_ptr<IWarp> clone() const override { return std::make_unique<WarpNone>(); }
@@ -245,6 +250,7 @@ class LIBKRIGING_EXPORT WarpAffine final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -261,6 +267,7 @@ class LIBKRIGING_EXPORT WarpBoxCox final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -277,6 +284,7 @@ class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -293,6 +301,7 @@ class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -344,6 +353,7 @@ class LIBKRIGING_EXPORT WarpMLP final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -424,6 +434,7 @@ class LIBKRIGING_EXPORT WarpEmbedding final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
@@ -442,6 +453,7 @@ class LIBKRIGING_EXPORT WarpOrdinal final : public IWarp {
   arma::vec get_params() const override;
   void set_params(const arma::vec& p) override;
   arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
   arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;

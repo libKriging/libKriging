@@ -244,10 +244,6 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   }
 
   if (return_deriv) {
-    const double h = 1.0E-5;
-    // Perturbations in feature space (d × d); when jac is set we chain-rule to input space.
-    arma::mat h_eye_d = h * arma::mat(d, d, arma::fill::eye);
-
     for (arma::uword i = 0; i < n_n; i++) {
       // dR_on / dPhi_k — (n_o × d) in feature space
       arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
@@ -256,11 +252,8 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
-      // dF / dPhi_k — (d × p) in feature space
-      arma::mat tXn_n_repd_i = arma::trans(Xn_n.col(i) * arma::mat(1, d, arma::fill::ones));
-      arma::mat DF_n_i = (Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i + h_eye_d)
-                          - Trend::regressionModelMatrix(m_regmodel, tXn_n_repd_i - h_eye_d))
-                         / (2 * h);
+      // dF / dPhi_k — (d × p) in feature space (analytical)
+      arma::mat DF_n_i = Trend::regressionModelDerivative(m_regmodel, Xn_n.col(i));
       t0 = Bench::toc(nullptr, "DF_n_i     ", t0);
 
       // Chain rule: dR_on/dx = dR_on/dPhi * J,  dF/dx = J.t() * dF/dPhi   (d_input cols)
