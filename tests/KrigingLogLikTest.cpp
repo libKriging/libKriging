@@ -133,7 +133,7 @@ TEST_CASE("Gradient FD check at non-fitted theta", "[gradient][loglik]") {
   SECTION("Gradient at test theta via FD") {
     arma::vec theta_test = {0.4, 0.6};
 
-    auto [ll, grad, hess] = kr.logLikelihoodFun(theta_test, true, false, false);
+    auto [ll, grad] = kr.logLikelihoodFun(theta_test, true, false);
 
     double eps = 1e-6;
     for (arma::uword i = 0; i < theta_test.n_elem; i++) {

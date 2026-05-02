@@ -741,26 +741,20 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(object$X()))
-    d <- ncol(theta)
-    n <- nrow(theta)
-    out <- list(logLikelihood = matrix(NA, nrow = n),
-                logLikelihoodGrad = matrix(NA, nrow = n, ncol = d),
-                logLikelihoodHess = array(NA, dim = c(n, d, d)))
-    for (i in 1:n) {
+    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
+                logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
+                                           ncol = ncol(theta)))
+    for (i in 1:nrow(theta)) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    return_grad = isTRUE(return_grad),
-                                    return_hess = isTRUE(return_hess),
-                                    bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad), bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
-        if (isTRUE(return_hess)) out$logLikelihoodHess[i, , ] <- ll$logLikelihoodHess
     }
     if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
-    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }

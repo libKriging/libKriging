@@ -404,14 +404,14 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
   if (theta.n_elem != impl_ptr->theta().n_elem)
     Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
 
-  auto [ll_val, ll_grad, ll_hess] = impl_ptr->logLikelihoodFun(theta, return_grad, return_hess, bench);
+  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
 
-  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = ll_val);
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (return_grad) {
-    ret.push_back(ll_grad, "logLikelihoodGrad");
+    ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
   }
   if (return_hess) {
-    ret.push_back(ll_hess, "logLikelihoodHess");
+    ret.push_back(arma::mat(), "logLikelihoodHess");
   }
 
   return ret;

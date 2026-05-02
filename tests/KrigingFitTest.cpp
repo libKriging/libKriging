@@ -46,7 +46,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
         theta(1) = theta_min + i2 * (theta_max - theta_min) / (grid_size - 1);
 
         // Evaluate LL at this theta
-        auto [ll, grad, hess_unused] = kr_grid.logLikelihoodFun(theta, false, false, false);
+        auto [ll, grad] = kr_grid.logLikelihoodFun(theta, false, false);
         if (ll > best_ll_grid) {
           best_ll_grid = ll;
           best_theta_grid = theta.t();

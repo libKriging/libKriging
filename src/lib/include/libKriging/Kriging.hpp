@@ -59,7 +59,6 @@ class Kriging : public KrigingImpl {
   // gamma = [theta] for None, [theta, alpha] for Nugget, [theta, sigma2] for Heterogeneous
   double _logLikelihood(const arma::vec& _gamma,
                         arma::vec* grad_out,
-                        arma::mat* hess_out,
                         Kriging::KModel* okm_data,
                         std::map<std::string, double>* bench) const;
   double _leaveOneOut(const arma::vec& _theta,
@@ -120,10 +119,9 @@ class Kriging : public KrigingImpl {
                              const std::string& objective = "LL",
                              const Parameters& parameters = {});
 
-  LIBKRIGING_EXPORT std::tuple<double, arma::vec, arma::mat> logLikelihoodFun(const arma::vec& gamma,
-                                                                              bool return_grad,
-                                                                              bool return_hess = false,
-                                                                              bool bench = false);
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
+                                                                   bool return_grad,
+                                                                   bool bench);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool return_grad, bool bench);
 

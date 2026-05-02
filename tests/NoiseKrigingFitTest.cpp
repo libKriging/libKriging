@@ -51,7 +51,7 @@ TEST_CASE("NoiseKrigingFitTest - BFGS finds better LL than grid search", "[fit][
         theta_sigma2(d) = nk_grid.sigma2();  // Use fitted sigma2 from initial fit
 
         // Evaluate LL at this theta_sigma2
-        auto [ll, grad, hess_unused] = nk_grid.logLikelihoodFun(theta_sigma2, false, false, false);
+        auto [ll, grad] = nk_grid.logLikelihoodFun(theta_sigma2, false, false);
         if (ll > best_ll_grid) {
           best_ll_grid = ll;
           best_theta_sigma2_grid = theta_sigma2.t();

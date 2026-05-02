@@ -139,11 +139,10 @@ double PyKriging::leaveOneOut() {
 std::tuple<double, py::array_t<double>, py::array_t<double>> PyKriging::logLikelihoodFun(
     const py::array_t<double>& theta,
     const bool return_grad,
-    const bool want_hess) {
+    const bool /*want_hess*/) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
-  auto [llo, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, want_hess, false);
-  arma::vec hess_vec = arma::vectorise(hess);
-  return {llo, carma::col_to_arr(grad), carma::col_to_arr(hess_vec)};
+  auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
+  return {llo, carma::col_to_arr(grad), {}};
 }
 
 double PyKriging::logLikelihood() {
