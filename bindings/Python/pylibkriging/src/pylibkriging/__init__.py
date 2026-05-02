@@ -45,10 +45,32 @@ from _pylibkriging import __version__, __build_type__
 
 # Type alias to switch to the right binding
 Kriging = WrappedPyKriging
-NuggetKriging = WrappedPyNuggetKriging
-NoiseKriging = WrappedPyNoiseKriging
 MLPKriging = WrappedPyMLPKriging
 LinearRegression = PyLinearRegression
+
+import warnings as _warnings
+
+
+def _deprecated_alias(old_name, new_api_hint):
+    """Create a deprecation wrapper that raises on construction."""
+
+    def _factory(*args, **kwargs):
+        raise ImportError(
+            f"{old_name} has been removed. "
+            f"Use Kriging with the 'noise' parameter instead. {new_api_hint}"
+        )
+
+    return _factory
+
+
+NuggetKriging = _deprecated_alias(
+    "NuggetKriging",
+    "e.g. Kriging(y, X, kernel, noise='nugget')"
+)
+NoiseKriging = _deprecated_alias(
+    "NoiseKriging",
+    "e.g. Kriging(y, X, kernel, noise=noise_vec)"
+)
 
 import re as _re
 import numpy as _np
