@@ -14,8 +14,6 @@ add_library(Kriging
         Covariance.cpp include/libKriging/Covariance.hpp
         KrigingImpl.cpp include/libKriging/KrigingImpl.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
-        NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
-        NoiseKriging.cpp include/libKriging/NoiseKriging.hpp
         WarpKriging.cpp include/libKriging/WarpKriging.hpp
         MLPKriging.cpp include/libKriging/MLPKriging.hpp
         KrigingLoader.cpp include/libKriging/KrigingLoader.hpp

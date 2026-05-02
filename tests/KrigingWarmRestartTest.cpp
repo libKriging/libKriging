@@ -6,7 +6,6 @@
 #include <catch2/catch.hpp>
 #include <chrono>
 #include "libKriging/Kriging.hpp"
-#include "libKriging/NuggetKriging.hpp"
 // clang-format on
 
 // Test function: sum of squares
@@ -136,13 +135,13 @@ TEST_CASE("NuggetKrigingWarmRestartTest - Warm restart passes current params", "
   arma::colvec y_combined = arma::join_cols(y_old, y_new);
 
   SECTION("Warm restart produces close predictions") {
-    NuggetKriging kr("gauss");
-    NuggetKriging::Parameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
+    Kriging kr("gauss", Kriging::NoiseModel::Nugget);
+    KrigingParameters params{std::nullopt, true, std::nullopt, true, std::nullopt, true, std::nullopt, true};
     kr.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
     kr.update(y_new, X_new, true);
 
-    NuggetKriging kr_ref("gauss");
+    Kriging kr_ref("gauss", Kriging::NoiseModel::Nugget);
     kr_ref.fit(y_combined, X_combined, Trend::RegressionModel::Constant, false, "BFGS", "LL", params);
 
     arma::mat X_test(10, d, arma::fill::randu);
