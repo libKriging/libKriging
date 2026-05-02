@@ -4,7 +4,7 @@ using jlibkriging
 
 f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 0.7)
 
-@testset "NoiseKriging" begin
+@testset "Kriging with noise=vector (heterogeneous)" begin
     # Training data with known noise
     X_train_vec = collect(range(0.0, 1.0; length=20))
     n_train = length(X_train_vec)
@@ -19,21 +19,29 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     X_test = reshape(X_test_vec, :, 1)
 
     @testset "Construction with kernel" begin
-        nk = NoiseKriging("matern3_2")
+        nk = Kriging("matern3_2"; noise="heterogeneous")
         @test kernel(nk) == "matern3_2"
+        @test noise_model(nk) == "heterogeneous"
     end
 
-    @testset "Construction with data" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+    @testset "Construction with data (vector noise)" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         @test kernel(nk) == "matern5_2"
         @test optim(nk) == "BFGS"
         @test objective(nk) == "LL"
         @test regmodel(nk) == "constant"
+        @test noise_model(nk) == "heterogeneous"
+    end
+
+    @testset "Construction with data (scalar noise)" begin
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_level^2)
+        @test kernel(nk) == "matern5_2"
+        @test noise_model(nk) == "heterogeneous"
     end
 
     @testset "Fit and predict" begin
-        nk = NoiseKriging("matern5_2")
-        fit!(nk, y_train, noise_vec, X_train)
+        nk = Kriging("matern5_2"; noise="heterogeneous")
+        fit!(nk, y_train, X_train; noise=noise_vec)
 
         result = predict(nk, X_test)
         @test length(result.mean) == n_test
@@ -43,7 +51,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     end
 
     @testset "Predict with covariance and derivatives" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
 
         result = predict(nk, X_test; return_cov=true, return_deriv=true)
         @test size(result.cov) == (n_test, n_test)
@@ -52,47 +60,47 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     end
 
     @testset "Simulate with noise" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         nsim = 5
         noise_sim = fill(noise_level^2, n_test)
 
-        sim = simulate(nk, nsim, 123, X_test, noise_sim)
+        sim = simulate(nk, nsim, 123, X_test; with_noise=noise_sim)
         @test size(sim) == (n_test, nsim)
         @test all(isfinite.(sim))
     end
 
     @testset "Simulate with zero noise" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         nsim = 5
         noise_zero = fill(0.0, n_test)
 
-        sim = simulate(nk, nsim, 123, X_test, noise_zero)
+        sim = simulate(nk, nsim, 123, X_test; with_noise=noise_zero)
         @test size(sim) == (n_test, nsim)
         @test all(isfinite.(sim))
     end
 
     @testset "Update" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         p_before = predict(nk, X_test)
 
         X_new = reshape([0.35], :, 1)
         y_new = [f_test(0.35)]
         noise_new = [noise_level^2]
-        update!(nk, y_new, noise_new, X_new)
+        update!(nk, y_new, X_new; noise_u=noise_new)
 
         p_after = predict(nk, X_test)
         @test p_before.mean != p_after.mean
     end
 
     @testset "Summary" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         s = jlibkriging.summary(nk)
         @test isa(s, String)
         @test length(s) > 0
     end
 
     @testset "Getters" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
 
         @test size(get_X(nk)) == (n_train, 1)
         @test length(get_y(nk)) == n_train
@@ -113,10 +121,11 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test isa(is_theta_estim(nk), Bool)
         @test isa(is_sigma2_estim(nk), Bool)
         @test isa(is_normalize(nk), Bool)
+        @test noise_model(nk) == "heterogeneous"
     end
 
     @testset "Log-likelihood" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         theta = get_theta(nk)
 
         ll = log_likelihood(nk)
@@ -132,7 +141,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     end
 
     @testset "Covariance matrix" begin
-        nk = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         C = cov_mat(nk, X_test, X_test)
         @test size(C) == (n_test, n_test)
         @test all(isfinite.(C))
@@ -140,7 +149,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     end
 
     @testset "Copy" begin
-        nk1 = NoiseKriging(y_train, noise_vec, X_train, "matern5_2")
+        nk1 = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
         nk2 = copy(nk1)
         @test nk1.ptr != nk2.ptr
 
