@@ -52,10 +52,10 @@ class PyKriging {
 
   // with_noise: None => plain, True => with nugget, array => heterogeneous noise
   py::array_t<double> simulate(const int nsim,
-                                const int seed,
-                                const py::array_t<double>& X_n,
-                                const bool will_update,
-                                const py::object& with_noise);
+                               const int seed,
+                               const py::array_t<double>& X_n,
+                               const bool will_update,
+                               const py::object& with_noise);
 
   // noise_u: py::none() for None/Nugget, array for Heterogeneous
   void update(const py::array_t<double>& y_u,
@@ -64,8 +64,8 @@ class PyKriging {
               const py::object& noise_u);
 
   py::array_t<double> update_simulate(const py::array_t<double>& y_u,
-                                       const py::array_t<double>& X_u,
-                                       const py::object& noise_u);
+                                      const py::array_t<double>& X_u,
+                                      const py::object& noise_u);
 
   std::string summary() const;
 
@@ -77,10 +77,9 @@ class PyKriging {
 
   std::tuple<py::array_t<double>, py::array_t<double>> leaveOneOutVec(const py::array_t<double>& theta);
 
-  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(
-      const py::array_t<double>& theta,
-      const bool return_grad,
-      const bool want_hess = false);
+  std::tuple<double, py::array_t<double>, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta,
+                                                                                const bool return_grad,
+                                                                                const bool want_hess = false);
 
   std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
 

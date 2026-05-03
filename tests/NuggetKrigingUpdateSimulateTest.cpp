@@ -43,14 +43,15 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
     double sigma2_fixed = 100.0;
     arma::vec theta_fixed = arma::vec(d).fill(1.0);
     arma::vec beta_fixed = {10.0};
-    Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed,
-                                     .is_sigma2_estim = false,
-                                     .theta = arma::mat(theta_fixed),
-                                     .is_theta_estim = false,
-                                     .beta = beta_fixed,
-                                     .is_beta_estim = false,
-                                     .nugget = nugget_fixed,
-                                     .is_nugget_estim = false};
+    Kriging::Parameters params_fixed;
+    params_fixed.sigma2 = sigma2_fixed;
+    params_fixed.is_sigma2_estim = false;
+    params_fixed.theta = arma::mat(theta_fixed);
+    params_fixed.is_theta_estim = false;
+    params_fixed.beta = beta_fixed;
+    params_fixed.is_beta_estim = false;
+    params_fixed.nugget = nugget_fixed;
+    params_fixed.is_nugget_estim = false;
 
     // Build nk1 with fixed parameters
     Kriging nk1("gauss", Kriging::NoiseModel::Nugget);
@@ -101,14 +102,15 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
     double sigma2_fixed = 100.0;
     arma::vec theta_fixed = arma::vec(d).fill(1.0);
     arma::vec beta_fixed = {10.0};
-    Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed,
-                                     .is_sigma2_estim = false,
-                                     .theta = arma::mat(theta_fixed),
-                                     .is_theta_estim = false,
-                                     .beta = beta_fixed,
-                                     .is_beta_estim = false,
-                                     .nugget = nugget_fixed,
-                                     .is_nugget_estim = false};
+    Kriging::Parameters params_fixed;
+    params_fixed.sigma2 = sigma2_fixed;
+    params_fixed.is_sigma2_estim = false;
+    params_fixed.theta = arma::mat(theta_fixed);
+    params_fixed.is_theta_estim = false;
+    params_fixed.beta = beta_fixed;
+    params_fixed.is_beta_estim = false;
+    params_fixed.nugget = nugget_fixed;
+    params_fixed.is_nugget_estim = false;
 
     // Build nk1 with fixed parameters
     Kriging nk1("gauss", Kriging::NoiseModel::Nugget);
@@ -160,14 +162,15 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
       double sigma2_fixed = 100.0;
       arma::vec theta_fixed = arma::vec(d).fill(1.0);
       arma::vec beta_fixed = {10.0};
-      Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed,
-                                       .is_sigma2_estim = false,
-                                       .theta = arma::mat(theta_fixed),
-                                       .is_theta_estim = false,
-                                       .beta = beta_fixed,
-                                       .is_beta_estim = false,
-                                       .nugget = nugget_fixed,
-                                       .is_nugget_estim = false};
+      Kriging::Parameters params_fixed;
+      params_fixed.sigma2 = sigma2_fixed;
+      params_fixed.is_sigma2_estim = false;
+      params_fixed.theta = arma::mat(theta_fixed);
+      params_fixed.is_theta_estim = false;
+      params_fixed.beta = beta_fixed;
+      params_fixed.is_beta_estim = false;
+      params_fixed.nugget = nugget_fixed;
+      params_fixed.is_nugget_estim = false;
 
       // Build nk1 with fixed parameters
       Kriging nk1(kernel, Kriging::NoiseModel::Nugget);
@@ -224,14 +227,15 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
       } else {                                           // Quadratic
         beta_fixed = {10.0, 10.0, 10.0, 1.0, 1.0, 1.0};  // intercept + 2 linear + 3 quadratic terms for d=2
       }
-      Kriging::Parameters params_fixed{.sigma2 = sigma2_fixed,
-                                       .is_sigma2_estim = false,
-                                       .theta = arma::mat(theta_fixed),
-                                       .is_theta_estim = false,
-                                       .beta = beta_fixed,
-                                       .is_beta_estim = false,
-                                       .nugget = nugget_fixed,
-                                       .is_nugget_estim = false};
+      Kriging::Parameters params_fixed;
+      params_fixed.sigma2 = sigma2_fixed;
+      params_fixed.is_sigma2_estim = false;
+      params_fixed.theta = arma::mat(theta_fixed);
+      params_fixed.is_theta_estim = false;
+      params_fixed.beta = beta_fixed;
+      params_fixed.is_beta_estim = false;
+      params_fixed.nugget = nugget_fixed;
+      params_fixed.is_nugget_estim = false;
 
       // Build nk1 with fixed parameters
       Kriging nk1("gauss", Kriging::NoiseModel::Nugget);

@@ -204,8 +204,8 @@ void PyKriging::update(const py::array_t<double>& y_u,
 // --- update_simulate ---
 
 py::array_t<double> PyKriging::update_simulate(const py::array_t<double>& y_u,
-                                                const py::array_t<double>& X_u,
-                                                const py::object& noise_u) {
+                                               const py::array_t<double>& X_u,
+                                               const py::object& noise_u) {
   arma::vec mat_y = carma::arr_to_col<double>(y_u);
   arma::mat mat_X = carma::arr_to_mat<double>(X_u);
 
@@ -256,10 +256,8 @@ double PyKriging::leaveOneOut() {
   return m_internal->leaveOneOut();
 }
 
-std::tuple<double, py::array_t<double>, py::array_t<double>> PyKriging::logLikelihoodFun(
-    const py::array_t<double>& theta,
-    const bool return_grad,
-    const bool /*want_hess*/) {
+std::tuple<double, py::array_t<double>, py::array_t<double>>
+PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool /*want_hess*/) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
   return {llo, carma::col_to_arr(grad), {}};

@@ -94,6 +94,9 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                     objective = c("LL", "LMP"),
                     parameters = NULL) {
     .Deprecated("Kriging", msg = "NuggetKriging() is deprecated. Use Kriging(..., noise=\"nugget\") instead.")
+    regmodel <- match.arg(regmodel)
+    objective <- match.arg(objective)
+    if (is.character(optim)) optim <- optim[1]
     Kriging(y = y, X = X, kernel = kernel,
             noise = "nugget",
             regmodel = regmodel,

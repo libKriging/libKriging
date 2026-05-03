@@ -96,6 +96,9 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
                     objective = c("LL"),
                     parameters = NULL) {
     .Deprecated("Kriging", msg = "NoiseKriging() is deprecated. Use Kriging(..., noise=<vector>) instead.")
+    regmodel <- match.arg(regmodel)
+    objective <- match.arg(objective)
+    if (is.character(optim)) optim <- optim[1]
     Kriging(y = y, X = X, kernel = kernel,
             noise = noise,
             regmodel = regmodel,

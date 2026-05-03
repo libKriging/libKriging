@@ -94,9 +94,9 @@ class TestModel:
         assert params['normalize'] == True
         assert params['regmodel'] == 'linear'
         
-        # Check array shapes
+        # Check array shapes (carma returns column vectors as 2D (n,1) arrays)
         assert params['X'].shape == (n, 1)
-        assert params['y'].shape == (n,)
+        assert params['y'].shape == (n, 1)
         assert len(params['theta']) > 0
         assert len(params['beta']) > 0
     
@@ -113,7 +113,7 @@ class TestModel:
         
         # Heterogeneous noise Kriging should have 'noise' field
         assert 'noise' in params, "Heterogeneous noise model should have 'noise' field"
-        assert params['noise'].shape == (n,)
+        assert params['noise'].shape == (n, 1)
         assert params['noise_model'] == 'heterogeneous'
     
     def test_model_nugget_kriging(self):

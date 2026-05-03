@@ -556,7 +556,9 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       if (optim != "none") {
         SECTION("Estimate nugget and sigma2, fix theta, estimate beta") {
           Kriging nk("gauss", Kriging::NoiseModel::Nugget);
-          Kriging::Parameters params{.theta = theta_val, .is_theta_estim = false};
+          Kriging::Parameters params;
+          params.theta = theta_val;
+          params.is_theta_estim = false;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() > 0);
@@ -636,7 +638,8 @@ TEST_CASE("NuggetKriging all parameter combinations") {
       if (optim == "BFGS20") {
         SECTION("Multistart with theta starting points") {
           Kriging nk("gauss", Kriging::NoiseModel::Nugget);
-          Kriging::Parameters params{.theta = theta_starts};
+          Kriging::Parameters params;
+          params.theta = theta_starts;
           nk.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(nk.nugget() >= 0);
           CHECK(nk.sigma2() > 0);

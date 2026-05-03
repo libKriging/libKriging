@@ -107,8 +107,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
     // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters])
-    const auto regmodel
-        = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
+    const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
@@ -123,8 +122,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
             parameters);
   } else {
     // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters])
-    const auto regmodel
-        = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
+    const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
@@ -174,8 +172,7 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     output.set(0, result, "simulated response");
   } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
     // simulate(nsim, seed, X_n, with_nugget, will_update)
-    auto result
-        = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"));
+    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"));
     output.set(0, result, "simulated response");
   } else {
     // Heterogeneous: simulate(nsim, seed, X_n, with_noise, will_update)
@@ -294,11 +291,12 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 3}};
+                 RequiresArg::Range{2, 4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, false);
+  const bool want_hess = input.getOptional<bool>(3, "want_hess").value_or(false);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, want_hess);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
 }
@@ -354,16 +352,31 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
 
-  const char* fieldnames[] = {"kernel",          "optim",     "objective",       "noise_model",
-                               "theta",           "is_theta_estim",
-                               "sigma2",          "is_sigma2_estim",
-                               "nugget",          "is_nugget_estim",
-                               "X",               "centerX",   "scaleX",
-                               "y",               "centerY",   "scaleY",
-                               "noise",           "normalize", "regmodel",
-                               "beta",            "is_beta_estim",
-                               "F",               "T",         "M",
-                               "z"};
+  const char* fieldnames[] = {"kernel",
+                              "optim",
+                              "objective",
+                              "noise_model",
+                              "theta",
+                              "is_theta_estim",
+                              "sigma2",
+                              "is_sigma2_estim",
+                              "nugget",
+                              "is_nugget_estim",
+                              "X",
+                              "centerX",
+                              "scaleX",
+                              "y",
+                              "centerY",
+                              "scaleY",
+                              "noise",
+                              "normalize",
+                              "regmodel",
+                              "beta",
+                              "is_beta_estim",
+                              "F",
+                              "T",
+                              "M",
+                              "z"};
   mxArray* model_struct = mxCreateStructMatrix(1, 1, 25, fieldnames);
 
   // Helper lambda to create mxArray* from arma types using setter
