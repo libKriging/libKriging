@@ -1,5 +1,0 @@
---2026-03-22 15:09:30--  http://192.168.1.129/videostream.cgi?user=richet
-Connexion à 192.168.1.129:80… connecté.
-requête HTTP transmise, en attente de la réponse… 401 Unauthorized
-
-Échec d’authentification par identifiant et mot de passe.

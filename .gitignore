@@ -77,4 +77,13 @@ tests/*_test
 tests/*_example
 tests/GetVersion
 tests/KSTestValidation
-bench
+bench# Generated test/simulation CSV files at root level
+*.csv
+dump.json
+wget-log
+tocontinue.md
+sims*.csv
+X_sim*.csv
+test_data*.json
+Testing/
+venv
