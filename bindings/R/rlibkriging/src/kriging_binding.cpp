@@ -480,8 +480,11 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  if (theta.n_elem != impl_ptr->theta().n_elem)
-    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
+  arma::uword d = impl_ptr->theta().n_elem;
+  bool is_noise_model = (impl_ptr->noise_model() != Kriging::NoiseModel::None);
+  if (theta.n_elem != d && !(is_noise_model && theta.n_elem == d + 1))
+    Rcpp::stop("Length of arg data should be " + std::to_string(d)
+               + (is_noise_model ? " or " + std::to_string(d + 1) : "") + ")");
 
   std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
 

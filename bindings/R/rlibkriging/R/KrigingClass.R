@@ -840,7 +840,10 @@ logLikelihoodFun.Kriging <- function(object, theta,
                                   return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
-    if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(object$X()))
+    # Noise/nugget models have an extra parameter (sigma2 or alpha) beyond theta
+    nparams <- ncol(object$X()) +
+      if (kriging_noise_model(object) %in% c("nugget", "heterogeneous")) 1L else 0L
+    if (!is.matrix(theta)) theta <- matrix(theta, ncol = nparams)
     d <- ncol(theta)
     n <- nrow(theta)
     out <- list(logLikelihood = matrix(NA, nrow = n),
@@ -1083,7 +1086,10 @@ leaveOneOut.Kriging <- function(object, ...) {
 logMargPostFun.Kriging <- function(object, theta, return_grad = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
-    if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(object$X()))
+    # Nugget models have an extra parameter (alpha) beyond theta
+    nparams <- ncol(object$X()) +
+      if (kriging_noise_model(object) == "nugget") 1L else 0L
+    if (!is.matrix(theta)) theta <- matrix(theta, ncol = nparams)
     out <- list(logMargPost = matrix(NA, nrow = nrow(theta)),
                 logMargPostGrad = matrix(NA, nrow = nrow(theta),
                                          ncol = ncol(theta)))
