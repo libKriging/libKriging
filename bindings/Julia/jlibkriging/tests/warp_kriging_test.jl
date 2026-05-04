@@ -241,14 +241,14 @@ end
         s = jlibkriging.summary(k)
         @test isa(s, String) && length(s) > 0
 
-        th = get_theta(k)
+        th = theta(k)
         @test length(th) > 0
         @test all(th .> 0)
 
-        @test get_sigma2(k) > 0
+        @test sigma2(k) > 0
         @test kernel(k) == "matern3_2"
         @test isfinite(log_likelihood(k))
-        @test get_warping(k) == ["boxcox"]
+        @test warping(k) == ["boxcox"]
         @test is_fitted(k)
     end
 
@@ -259,7 +259,7 @@ end
         k = WarpKriging(y, X, ["affine"], "gauss"; optim="none")
 
         # Evaluate at a fixed benign theta (not the optimum) so FD is well-conditioned.
-        th = fill(0.3, length(get_theta(k)))
+        th = fill(0.3, length(theta(k)))
         ll_res = log_likelihood_fun(k, th; return_grad=true)
         @test isfinite(ll_res.ll)
         @test all(isfinite.(ll_res.grad))
@@ -305,7 +305,7 @@ end
         k2 = Base.copy(k)
         @test is_fitted(k2)
         @test kernel(k2) == kernel(k)
-        @test get_warping(k2) == get_warping(k)
+        @test warping(k2) == warping(k)
 
         result1 = predict(k, X)
         result2 = predict(k2, X)
@@ -319,10 +319,10 @@ end
         k = WarpKriging(y, X, ["kumaraswamy"], "gauss";
                         parameters=Dict("max_iter_adam" => "100"))
 
-        @test size(get_X(k)) == (8, 1)
-        @test length(get_y(k)) == 8
-        @test length(get_theta(k)) > 0
-        @test get_sigma2(k) > 0.0
+        @test size(X(k)) == (8, 1)
+        @test length(y(k)) == 8
+        @test length(theta(k)) > 0
+        @test sigma2(k) > 0.0
         @test feature_dim(k) > 0
     end
 end

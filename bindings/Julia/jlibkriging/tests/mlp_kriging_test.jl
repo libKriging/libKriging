@@ -35,9 +35,9 @@ end
 
         @test kernel(k) == "gauss"
         @test activation(k) == "selu"
-        @test get_hidden_dims(k) == [16, 8]
+        @test hidden_dims(k) == [16, 8]
         @test feature_dim(k) == 2
-        @test get_sigma2(k) > 0
+        @test sigma2(k) > 0
         @test isfinite(log_likelihood(k))
         @test is_fitted(k)
     end
@@ -136,13 +136,13 @@ end
                        activation="selu", kernel="gauss",
                        parameters=Dict("max_iter_adam" => "100"))
 
-        @test size(get_X(k)) == (8, 1)
-        @test length(get_y(k)) == 8
-        @test length(get_theta(k)) > 0
-        @test get_sigma2(k) > 0.0
+        @test size(X(k)) == (8, 1)
+        @test length(y(k)) == 8
+        @test length(theta(k)) > 0
+        @test sigma2(k) > 0.0
         @test kernel(k) == "gauss"
         @test activation(k) == "selu"
-        @test get_hidden_dims(k) == [16, 8]
+        @test hidden_dims(k) == [16, 8]
         @test feature_dim(k) == 2
         @test is_fitted(k)
     end
@@ -158,7 +158,7 @@ end
         ll = log_likelihood(k)
         @test isfinite(ll)
 
-        theta = get_theta(k)
+        theta = theta(k)
         ll_res = log_likelihood_fun(k, theta)
         @test isfinite(ll_res.ll)
         @test ll_res.grad === nothing

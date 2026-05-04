@@ -102,13 +102,13 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     @testset "Getters" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
 
-        @test size(get_X(nk)) == (n_train, 1)
-        @test length(get_y(nk)) == n_train
-        @test length(get_theta(nk)) > 0
-        @test get_sigma2(nk) > 0.0
-        @test length(get_noise(nk)) == n_train
-        @test all(get_noise(nk) .>= 0.0)
-        @test length(get_beta(nk)) > 0
+        @test size(X(nk)) == (n_train, 1)
+        @test length(y(nk)) == n_train
+        @test length(theta(nk)) > 0
+        @test sigma2(nk) > 0.0
+        @test length(noise(nk)) == n_train
+        @test all(noise(nk) .>= 0.0)
+        @test length(beta(nk)) > 0
         @test isa(get_centerY(nk), Float64)
         @test isa(get_scaleY(nk), Float64)
         @test length(get_centerX(nk)) == 1
@@ -120,13 +120,13 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test isa(is_beta_estim(nk), Bool)
         @test isa(is_theta_estim(nk), Bool)
         @test isa(is_sigma2_estim(nk), Bool)
-        @test isa(is_normalize(nk), Bool)
+        @test isa(normalize(nk), Bool)
         @test noise_model(nk) == "heterogeneous"
     end
 
     @testset "Log-likelihood" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise=noise_vec)
-        theta = get_theta(nk)
+        theta = theta(nk)
 
         ll = log_likelihood(nk)
         @test isfinite(ll)

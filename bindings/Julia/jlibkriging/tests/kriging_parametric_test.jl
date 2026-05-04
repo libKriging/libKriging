@@ -21,9 +21,9 @@ end
         k = Kriging(y, X, "matern5_2")
 
         @test kernel(k) == "matern5_2"
-        @test length(get_y(k)) == n
-        @test size(get_X(k)) == (n, d)
-        @test length(get_theta(k)) == d
+        @test length(y(k)) == n
+        @test size(X(k)) == (n, d)
+        @test length(theta(k)) == d
 
         result = predict(k, X; return_stdev=true, return_cov=true)
         @test length(result.mean) == n

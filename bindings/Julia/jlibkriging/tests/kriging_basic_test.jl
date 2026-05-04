@@ -102,11 +102,11 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     @testset "Getters" begin
         k = Kriging(y_train, X_train, "gauss")
 
-        @test get_X(k) == X_train
-        @test get_y(k) ≈ y_train
-        @test length(get_theta(k)) > 0
-        @test get_sigma2(k) > 0.0
-        @test length(get_beta(k)) > 0
+        @test X(k) == X_train
+        @test y(k) ≈ y_train
+        @test length(theta(k)) > 0
+        @test sigma2(k) > 0.0
+        @test length(beta(k)) > 0
         @test isa(get_centerY(k), Float64)
         @test isa(get_scaleY(k), Float64)
         @test length(get_centerX(k)) == 1
@@ -118,12 +118,12 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test isa(is_beta_estim(k), Bool)
         @test isa(is_theta_estim(k), Bool)
         @test isa(is_sigma2_estim(k), Bool)
-        @test isa(is_normalize(k), Bool)
+        @test isa(normalize(k), Bool)
     end
 
     @testset "Log-likelihood functions" begin
         k = Kriging(y_train, X_train, "gauss")
-        theta = get_theta(k)
+        theta = theta(k)
 
         ll = log_likelihood(k)
         @test isfinite(ll)
@@ -160,7 +160,7 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
 
     @testset "Leave-one-out vector" begin
         k = Kriging(y_train, X_train, "gauss")
-        theta = get_theta(k)
+        theta = theta(k)
         loo_vec = leave_one_out_vec(k, theta)
         @test length(loo_vec.yhat) == n_train
         @test length(loo_vec.stderr) == n_train
