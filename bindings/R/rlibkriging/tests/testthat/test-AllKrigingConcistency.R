@@ -198,10 +198,11 @@ lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
 
 
 test_that("Consistency between Noise(0)Kriging and Kriging", {
-    expect_equal(lk_nu$T(), lk_no$T())
-    expect_equal(lk_nu$M(), lk_no$M())
+    alpha_k <- lk_nu$sigma2() / (lk_nu$sigma2() + noise)
+    expect_equal(lk_nu$T(), lk_no$T() * sqrt(alpha_k))
+    expect_equal(lk_nu$M(), lk_no$M() / sqrt(alpha_k))
     expect_equal(lk_nu$beta(), lk_no$beta())
-    expect_equal(lk_nu$z(), lk_no$z())
+    expect_equal(lk_nu$z(), lk_no$z() / sqrt(alpha_k))
 })
 
 

@@ -20,7 +20,7 @@ set.seed(1234)
 X <- matrix(runif(n*d),ncol=d)
 y <- f(X)
 r = NULL
-try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
+try( r <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS", objective="LL") )
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 
@@ -35,7 +35,7 @@ rlibkriging:::linalg_set_num_nugget(0.0)
 rlibkriging:::linalg_get_num_nugget()
 
 r_nonugget = NULL
-try( r_nonugget <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
+try( r_nonugget <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS", objective="LL") )
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r_nonugget)))
 
@@ -67,7 +67,7 @@ y <- f(X)
 r = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
 rlibkriging:::linalg_check_chol_rcond(FALSE) # disable failover
-try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL") )
+try( r <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS", objective="LL") )
 rlibkriging:::linalg_check_chol_rcond(TRUE) # enable failover
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
@@ -97,7 +97,7 @@ X <- matrix(runif(n*d),ncol=d)
 y <- f(X)
 r = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
-try( r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS10","LL") )
+try( r <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS10", objective="LL") )
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r)))
 
@@ -113,7 +113,7 @@ rlibkriging:::linalg_get_num_nugget()
 
 r_nonugget = NULL
 # This will crash "chol(): decomposition failed before adding numerical nugget to R mat
-try( r_nonugget <- Kriging(y, X, "gauss","constant",FALSE,"BFGS10","LL") )
+try( r_nonugget <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS10", objective="LL") )
 
 test_that(desc="Kriging fit with num nugget is passing", expect_true(!is.null(r_nonugget)))
 

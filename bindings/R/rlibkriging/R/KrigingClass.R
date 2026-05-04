@@ -558,13 +558,30 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' lines(x, su[ , 1], col = "blue", lty=2)
 #' lines(x, su[ , 2], col = "blue", lty=2)
 #' lines(x, su[ , 3], col = "blue", lty=2)
-update_simulate.Kriging <- function(object, y_u, X_u, noise_u = NULL, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
+update_simulate.Kriging <- function(object, y_u, ...) {
+    # Support two calling conventions matching C++ overloads:
+    #   update_simulate(y_u, X_u)            - no noise (Nugget / pure Kriging)
+    #   update_simulate(y_u, noise_u, X_u)   - with noise (NoiseKriging)
+    # Named arguments also accepted: update_simulate(y_u, noise_u=..., X_u=...)
+    args <- list(...)
+    if (!is.null(args$X_u) || !is.null(args$noise_u)) {
+        X_u <- args$X_u
+        noise_u <- args$noise_u
+    } else if (length(args) >= 2) {
+        noise_u <- args[[1]]
+        X_u <- args[[2]]
+    } else if (length(args) == 1) {
+        X_u <- args[[1]]
+        noise_u <- NULL
+    } else {
+        stop("update_simulate: X_u is required")
+    }
+    extra <- args[!names(args) %in% c("X_u", "noise_u")]
+    if (length(extra) > 0) warnOnDots(extra)
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
     if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
     if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
-    ## Modify 'object' in the parent environment
     return(kriging_update_simulate(object, y_u, noise_u = noise_u, X_u))
 }
 
@@ -767,20 +784,25 @@ covMat.Kriging <- function(object, x1, x2, ...) {
 #' plot(t, ll(t), type = 'l')
 #' abline(v = k$theta(), col = "blue")
 logLikelihoodFun.Kriging <- function(object, theta,
-                                  return_grad = FALSE, bench=FALSE, ...) {
+                                  return_grad = FALSE, return_hess = FALSE, bench=FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(theta)) theta = data.matrix(theta)
     if (!is.matrix(theta)) theta <- matrix(theta, ncol = ncol(object$X()))
-    out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
-                logLikelihoodGrad = matrix(NA,nrow=nrow(theta),
-                                           ncol = ncol(theta)))
-    for (i in 1:nrow(theta)) {
+    d <- ncol(theta)
+    n <- nrow(theta)
+    out <- list(logLikelihood = matrix(NA, nrow = n),
+                logLikelihoodGrad = matrix(NA, nrow = n, ncol = d))
+    if (isTRUE(return_hess)) out$logLikelihoodHess <- array(NA, dim = c(n, d, d))
+    for (i in 1:n) {
         ll <- kriging_logLikelihoodFun(object, theta[i, ],
-                                    return_grad = isTRUE(return_grad), bench = isTRUE(bench))
+                                    return_grad = isTRUE(return_grad),
+                                    return_hess = isTRUE(return_hess),
+                                    bench = isTRUE(bench))
         out$logLikelihood[i] <- ll$logLikelihood
         if (isTRUE(return_grad)) out$logLikelihoodGrad[i, ] <- ll$logLikelihoodGrad
     }
     if (!isTRUE(return_grad)) out$logLikelihoodGrad <- NULL
+    if (!isTRUE(return_hess)) out$logLikelihoodHess <- NULL
 
     return(out)
 }

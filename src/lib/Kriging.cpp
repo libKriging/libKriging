@@ -1512,6 +1512,18 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  if (m_noise_model == NoiseModel::Nugget) {
+    const double alpha = m_alpha;
+    return update_simulate_impl(y_u,
+                                X_u,
+                                /*allow_cache=*/true,
+                                /*R_uu_factor=*/alpha,
+                                /*R_uu_diag=*/arma::vec(y_u.n_elem, arma::fill::ones),
+                                /*R_uo_factor=*/alpha,
+                                /*R_un_factor=*/alpha,
+                                /*R_un_coincident_to_one=*/false,
+                                /*Sigma_divisor=*/alpha);
+  }
   return update_simulate_impl(y_u,
                               X_u,
                               /*allow_cache=*/true,
@@ -1543,7 +1555,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
                                         /*R_un_factor=*/1.0,
                                         /*R_un_coincident_to_one=*/false,
                                         /*Sigma_divisor=*/1.0);
-  arma::mat eps(n_n, lastsim_nsim, arma::fill::none);
+  arma::mat eps(n_n, lastsim_nsim, arma::fill::zeros);
   if (m_lastsim_with_noise.n_elem == 1)
     eps = m_lastsim_with_noise.at(0) * Random::randn_mat(n_n, lastsim_nsim);
   else if (m_lastsim_with_noise.n_elem == n_n) {
