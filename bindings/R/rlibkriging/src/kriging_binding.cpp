@@ -279,9 +279,9 @@ Rcpp::List kriging_model(Rcpp::List k) {
 
   // noise model info
   auto nm = impl_ptr->noise_model();
-  std::string nm_str = nm == Kriging::NoiseModel::None          ? "none"
-                       : nm == Kriging::NoiseModel::Nugget       ? "nugget"
-                                                                  : "heterogeneous";
+  std::string nm_str = nm == Kriging::NoiseModel::None     ? "none"
+                       : nm == Kriging::NoiseModel::Nugget ? "nugget"
+                                                           : "heterogeneous";
   ret["noise_model"] = nm_str;
   if (nm == Kriging::NoiseModel::Nugget) {
     ret["nugget"] = impl_ptr->nugget();
