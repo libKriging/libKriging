@@ -505,7 +505,25 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
 simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
+    args <- list(...)
+    # Accept with_nugget as alias for with_noise (backward compat for NuggetKriging)
+    if (!is.null(args$with_nugget)) {
+        if (is.null(with_noise)) with_noise <- args$with_nugget
+        args$with_nugget <- NULL
+    }
+    is_nugget <- kriging_noise_model(object) == "nugget"
+    if (is.logical(with_noise) && !with_noise && is_nugget) {
+        # with_noise=FALSE for a nugget model: simulate without nugget noise.
+        # Pass NULL so C++ dispatches to the nugget-correct no-noise overload
+        # (which uses alpha-scaled correlations).  Passing FALSE would trigger
+        # the hetero path with noise=0 and wrong (non-alpha) correlation factors.
+        with_noise <- NULL
+    } else if (is.null(with_noise) && is_nugget) {
+        # For nugget models, default to including the nugget noise
+        # (backward compat: old simulate.NuggetKriging defaulted to with_nugget=TRUE)
+        with_noise <- TRUE
+    }
+    if (length(args) > 0) warnOnDots(args)
     ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
@@ -636,13 +654,47 @@ update_simulate.Kriging <- function(object, y_u, ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, X_u, noise_u=NULL, refit=TRUE,...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
+update.Kriging <- function(object, y_u, ...) {
+    # Support multiple calling conventions matching C++ overloads:
+    #   update(y_u, X_u)                    - no noise, refit defaults TRUE
+    #   update(y_u, X_u, refit)             - no noise, positional refit (logical)
+    #   update(y_u, noise_u, X_u)           - with noise, refit defaults TRUE
+    #   update(y_u, noise_u, X_u, refit)    - with noise, positional refit
+    # Named arguments are also accepted.
+    args <- list(...)
+    named_mask <- nzchar(names(args))
+    pos_args <- args[!named_mask]
+    named_args <- args[named_mask]
+
+    refit <- if (!is.null(named_args$refit)) named_args$refit else TRUE
+    noise_u <- named_args$noise_u
+    X_u <- named_args$X_u
+
+    if (is.null(X_u)) {
+        n_pos <- length(pos_args)
+        if (n_pos == 1) {
+            X_u <- pos_args[[1]]
+        } else if (n_pos == 2 && is.logical(pos_args[[2]])) {
+            X_u <- pos_args[[1]]
+            refit <- pos_args[[2]]
+        } else if (n_pos == 2) {
+            noise_u <- pos_args[[1]]
+            X_u <- pos_args[[2]]
+        } else if (n_pos == 3) {
+            noise_u <- pos_args[[1]]
+            X_u <- pos_args[[2]]
+            refit <- pos_args[[3]]
+        } else {
+            stop("update: X_u is required")
+        }
+    }
+    extra <- named_args[!names(named_args) %in% c("refit", "noise_u", "X_u")]
+    if (length(extra) > 0) warnOnDots(extra)
+
     if (is.data.frame(X_u)) X_u = data.matrix(X_u)
     if (!is.matrix(X_u)) X_u <- matrix(X_u, ncol = ncol(object$X()))
     if (is.data.frame(y_u)) y_u = data.matrix(y_u)
     if (!is.matrix(y_u)) y_u <- matrix(y_u, ncol = 1)
-    ## Modify 'object' in the parent environment
     kriging_update(object, y_u, X_u, noise_u = noise_u, refit)
 
     invisible(NULL)
