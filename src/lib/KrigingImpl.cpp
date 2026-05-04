@@ -564,7 +564,13 @@ void KrigingImpl::update_no_refit_impl(const arma::vec& y_u,
 
   const arma::uword n_total = m_X.n_rows + X_u.n_rows;
 
-  m_X = arma::join_cols(m_X, Xn_u);
+  // Append to m_X only when input and feature dimensions match.
+  // When a feature map changes the dimension (e.g. MLPKriging with d_out != d_in),
+  // extend_class_data() below is responsible for replacing m_X with the
+  // correctly feature-mapped version, so skip the premature join here.
+  if (m_X.n_cols == Xn_u.n_cols) {
+    m_X = arma::join_cols(m_X, Xn_u);
+  }
   m_y = arma::join_cols(m_y, yn_u);
 
   // Class-specific extension hook (Noise extends m_noise here)

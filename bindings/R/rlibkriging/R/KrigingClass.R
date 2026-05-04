@@ -662,7 +662,8 @@ update.Kriging <- function(object, y_u, ...) {
     #   update(y_u, noise_u, X_u, refit)    - with noise, positional refit
     # Named arguments are also accepted.
     args <- list(...)
-    named_mask <- nzchar(names(args))
+    arg_names <- names(args)
+    named_mask <- if (is.null(arg_names)) rep(FALSE, length(args)) else nzchar(arg_names)
     pos_args <- args[!named_mask]
     named_args <- args[named_mask]
 
