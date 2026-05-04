@@ -11,7 +11,7 @@ X <- as.matrix(runif(n))
 y = f(X)
 points(X,y)
 
-r <- Kriging(y,X,"matern3_2","constant",FALSE,"none","LL",
+r <- Kriging(y,X,"matern3_2", regmodel="constant", normalize=FALSE, optim="none", objective="LL",
                parameters=list(sigma2=0.2,theta=matrix(0.2)))
 
 x =seq(0,1,,101)
@@ -50,7 +50,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #points(X,y)
   k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
   library(rlibkriging)
-  r <- Kriging(y,X,kernel,"constant",FALSE,"none","LL",
+  r <- Kriging(y,X,kernel, regmodel="constant", normalize=FALSE, optim="none", objective="LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE))
   # m = as.list(r)
@@ -174,7 +174,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   points(X)
   k = DiceKriging::km(design=X,response=y,covtype = kernel,control = list(trace=F))
   library(rlibkriging)
-  r <- Kriging(y,X,kernel,"constant",FALSE,"none","LL",
+  r <- Kriging(y,X,kernel, regmodel="constant", normalize=FALSE, optim="none", objective="LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE))
   # m = as.list(r)
