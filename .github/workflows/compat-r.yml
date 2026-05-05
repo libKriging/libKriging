@@ -50,7 +50,28 @@ jobs:
         shell: Rscript {0}
         run: install.packages(c("testthat", "Rcpp", "DiceKriging"))
 
-      # ── Step 1: Install v0.9.3 and generate reference values ─────────────────
+      # ── Step 1: Build and install current rlibkriging ─────────────────────────
+      # (must happen first so that shared libs like liblbfgsb_cpp.dylib exist
+      #  in build/installed/lib before loading the v0.9.3 binary on macOS)
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.24.x'
+
+      - name: before_script
+        shell: bash
+        run: tools/common/before_script.sh
+
+      - name: Install R build dependencies
+        shell: bash
+        run: tools/r-linux-macos/install.sh
+
+      - name: Build current rlibkriging
+        shell: bash
+        run: tools/r-linux-macos/build.sh
+
+      # ── Step 2: Install v0.9.3 and generate reference values ─────────────────
 
       - name: Download v0.9.3 rlibkriging binary
         shell: bash
@@ -72,25 +93,6 @@ jobs:
       - name: Generate reference values from v0.9.3
         shell: bash
         run: R_LIBS="Rlibs_v093:$(Rscript -e 'cat(.libPaths()[1])')" Rscript tools/compat/generate_v093_reference.R "$REF_RDS"
-
-      # ── Step 2: Build and install current rlibkriging ─────────────────────────
-
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
-        with:
-          cmake-version: '3.24.x'
-
-      - name: before_script
-        shell: bash
-        run: tools/common/before_script.sh
-
-      - name: Install R build dependencies
-        shell: bash
-        run: tools/r-linux-macos/install.sh
-
-      - name: Build current rlibkriging
-        shell: bash
-        run: tools/r-linux-macos/build.sh
 
       # ── Step 3: Compare current vs v0.9.3 ────────────────────────────────────
 
