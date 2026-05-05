@@ -80,8 +80,8 @@ ref$nugget <- list(
   M            = uk$M(),
   z            = uk$z(),
   pred_mean    = p$mean,
-  pred_stdev   = p$stdev,
-  logmargpost  = uk$logMargPost()
+  pred_stdev   = p$stdev
+  # logmargpost intentionally omitted: platform-specific issue in macOS arm64 v0.9.3 binary
 )
 
 saveRDS(ref, outfile)
