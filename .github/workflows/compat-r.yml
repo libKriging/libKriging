@@ -48,7 +48,7 @@ jobs:
 
       - name: Install R package dependencies
         shell: Rscript {0}
-        run: install.packages(c("testthat", "DiceKriging"))
+        run: install.packages(c("testthat", "Rcpp", "DiceKriging"))
 
       # ── Step 1: Install v0.9.3 and generate reference values ─────────────────
 
@@ -67,12 +67,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p Rlibs_v093
-          Rscript -e "install.packages('/tmp/v093/${{ matrix.r093_asset }}', repos=NULL, lib='Rlibs_v093', type='binary')" \
-            || Rscript -e "install.packages('/tmp/v093/${{ matrix.r093_asset }}', repos=NULL, lib='Rlibs_v093')"
+          R CMD INSTALL --library=Rlibs_v093 /tmp/v093/${{ matrix.r093_asset }}
 
       - name: Generate reference values from v0.9.3
         shell: bash
-        run: R_LIBS=Rlibs_v093 Rscript tools/compat/generate_v093_reference.R "$REF_RDS"
+        run: R_LIBS="Rlibs_v093:$(Rscript -e 'cat(.libPaths()[1])')" Rscript tools/compat/generate_v093_reference.R "$REF_RDS"
 
       # ── Step 2: Build and install current rlibkriging ─────────────────────────
 
