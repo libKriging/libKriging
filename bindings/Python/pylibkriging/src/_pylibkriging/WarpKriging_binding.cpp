@@ -29,18 +29,18 @@ PyWarpKriging::PyWarpKriging(const py::array_t<double>& y,
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
-                             const py::dict& parameters) {
+                             const py::dict& parameters,
+                             py::object noise) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal = std::make_unique<lk::WarpKriging>(mat_y,
-                                                 mat_X,
-                                                 warping,
-                                                 kernel,
-                                                 Trend::fromString(regmodel),
-                                                 normalize,
-                                                 optim,
-                                                 objective,
-                                                 dict_to_string_map(parameters));
+  m_internal = std::make_unique<lk::WarpKriging>(warping, kernel);
+  if (!noise.is_none()) {
+    lk::WarpKriging::Parameters wparams;
+    wparams.noise = carma::arr_to_col<double>(noise.cast<py::array_t<double>>());
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+  } else {
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+  }
 }
 
 PyWarpKriging::~PyWarpKriging() {}
@@ -61,11 +61,18 @@ void PyWarpKriging::fit(const py::array_t<double>& y,
                         bool normalize,
                         const std::string& optim,
                         const std::string& objective,
-                        const py::dict& parameters) {
+                        const py::dict& parameters,
+                        py::object noise) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(
-      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+  if (!noise.is_none()) {
+    lk::WarpKriging::Parameters wparams;
+    wparams.noise = carma::arr_to_col<double>(noise.cast<py::array_t<double>>());
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+  } else {
+    m_internal->fit(
+        mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+  }
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>

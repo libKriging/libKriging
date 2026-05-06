@@ -26,7 +26,8 @@ class PyWarpKriging {
                 bool normalize,
                 const std::string& optim,
                 const std::string& objective,
-                const py::dict& parameters);
+                const py::dict& parameters,
+                py::object noise = py::none());
   ~PyWarpKriging();
   PyWarpKriging(PyWarpKriging&&) = default;
 
@@ -41,7 +42,8 @@ class PyWarpKriging {
            bool normalize,
            const std::string& optim,
            const std::string& objective,
-           const py::dict& parameters);
+           const py::dict& parameters,
+           py::object noise = py::none());
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv = false);

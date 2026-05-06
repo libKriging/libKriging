@@ -228,7 +228,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     bool,
                     const std::string&,
                     const std::string&,
-                    const py::dict&>(),
+                    const py::dict&,
+                    py::object>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("warping"),
@@ -237,7 +238,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("noise") = py::none())
       .def("copy", &PyWarpKriging::copy)
       .def("save", &PyWarpKriging::save)
       .def_static("load", &PyWarpKriging::load)
@@ -249,7 +251,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("noise") = py::none())
       .def("predict",
            &PyWarpKriging::predict,
            py::arg("X"),

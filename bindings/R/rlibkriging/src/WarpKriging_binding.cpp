@@ -24,23 +24,29 @@ SEXP warpKriging_new(const arma::vec& y,
                      bool normalize = false,
                      std::string optim = "BFGS+Adam",
                      std::string objective = "LL",
-                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                     Rcpp::Nullable<arma::vec> noise = R_NilValue) {
   // Convert R CharacterVector → std::vector<std::string>
   std::vector<std::string> warp_strs;
   for (int i = 0; i < warping.size(); ++i)
     warp_strs.push_back(Rcpp::as<std::string>(warping[i]));
 
-  // Parse optional parameters
-  std::map<std::string, std::string> params;
-  if (parameters.isNotNull()) {
-    Rcpp::List plist(parameters);
-    Rcpp::CharacterVector names = plist.names();
-    for (int i = 0; i < plist.size(); ++i)
-      params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
-  }
+  WarpKriging* model = new WarpKriging(warp_strs, kernel);
 
-  WarpKriging* model
-      = new WarpKriging(y, X, warp_strs, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
+  if (noise.isNotNull()) {
+    WarpKriging::Parameters wparams;
+    wparams.noise = Rcpp::as<arma::vec>(noise);
+    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+  } else {
+    std::map<std::string, std::string> params;
+    if (parameters.isNotNull()) {
+      Rcpp::List plist(parameters);
+      Rcpp::CharacterVector names = plist.names();
+      for (int i = 0; i < plist.size(); ++i)
+        params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
+    }
+    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
+  }
 
   return WarpKrigingPtr(model, true);
 }
@@ -57,18 +63,24 @@ void warpKriging_fit(SEXP model_ptr,
                      bool normalize = false,
                      std::string optim = "BFGS+Adam",
                      std::string objective = "LL",
-                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                     Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                     Rcpp::Nullable<arma::vec> noise = R_NilValue) {
   WarpKrigingPtr model(model_ptr);
 
-  std::map<std::string, std::string> params;
-  if (parameters.isNotNull()) {
-    Rcpp::List plist(parameters);
-    Rcpp::CharacterVector names = plist.names();
-    for (int i = 0; i < plist.size(); ++i)
-      params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
+  if (noise.isNotNull()) {
+    WarpKriging::Parameters wparams;
+    wparams.noise = Rcpp::as<arma::vec>(noise);
+    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+  } else {
+    std::map<std::string, std::string> params;
+    if (parameters.isNotNull()) {
+      Rcpp::List plist(parameters);
+      Rcpp::CharacterVector names = plist.names();
+      for (int i = 0; i < plist.size(); ++i)
+        params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
+    }
+    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
   }
-
-  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
 }
 
 // ---------------------------------------------------------------------------

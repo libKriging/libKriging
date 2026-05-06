@@ -194,7 +194,8 @@ WarpKriging <- function(y, X, warping,
                         normalize = FALSE,
                         optim = "BFGS+Adam",
                         objective = "LL",
-                        parameters = NULL) {
+                        parameters = NULL,
+                        noise = NULL) {
   y <- as.numeric(y)
   warping <- as.character(warping)
 
@@ -208,7 +209,7 @@ WarpKriging <- function(y, X, warping,
 
   ptr <- warpKriging_new(y, X, warping, kernel,
                          regmodel, normalize, optim, objective,
-                         parameters)
+                         parameters, noise)
   obj <- list(ptr = ptr)
   class(obj) <- "WarpKriging"
   return(obj)
@@ -254,13 +255,14 @@ fit.WarpKriging <- function(object, y, X,
                             normalize = FALSE,
                             optim = "BFGS+Adam",
                             objective = "LL",
-                            parameters = NULL, ...) {
+                            parameters = NULL,
+                            noise = NULL, ...) {
   warping <- warpKriging_warping(object$ptr)
   X <- .encode_X_from_warping(X, warping)
   warpKriging_fit(object$ptr,
                   as.numeric(y), X,
                   regmodel, normalize, optim, objective,
-                  parameters)
+                  parameters, noise)
   invisible(NULL)
 }
 

@@ -77,11 +77,11 @@ static mxArray* stringVecToCell(const std::vector<std::string>& vec) {
 namespace WarpKrigingBinding {
 
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  // args: y, X, warping_cell, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct]
+  // args: y, X, warping_cell, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct], [noise_vec]
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 9}};
+                 RequiresArg::Range{3, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto y_vec = input.get<arma::vec>(0, "y vector");
   auto X_mat = input.get<arma::mat>(1, "X matrix");
@@ -91,11 +91,20 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
   auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
-  std::map<std::string, std::string> params;
-  if (nrhs > 8)
-    params = structToStringMap(prhs[8]);
-  auto wk = buildObject<WarpKriging>(
-      y_vec, X_mat, warping, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
+  auto noise_opt = input.getOptional<arma::vec>(9, "noise");
+
+  auto wk = buildObject<WarpKriging>(warping, kernel);
+  auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
+  if (noise_opt.has_value()) {
+    WarpKriging::Parameters wparams;
+    wparams.noise = noise_opt.value();
+    wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+  } else {
+    std::map<std::string, std::string> params;
+    if (nrhs > 8)
+      params = structToStringMap(prhs[8]);
+    wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, params);
+  }
   output.set(0, wk, "new object reference");
 }
 
@@ -129,23 +138,36 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 8}};
+                 RequiresArg::Range{3, 9}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto regmodel = input.getOptional<std::string>(3, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
-  std::map<std::string, std::string> params;
-  if (nrhs > 7)
-    params = structToStringMap(prhs[7]);
+  auto noise_opt = input.getOptional<arma::vec>(8, "noise");
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  wk->fit(input.get<arma::vec>(1, "y vector"),
-          input.get<arma::mat>(2, "X matrix"),
-          Trend::fromString(regmodel),
-          normalize,
-          optim,
-          objective,
-          params);
+  if (noise_opt.has_value()) {
+    WarpKriging::Parameters wparams;
+    wparams.noise = noise_opt.value();
+    wk->fit(input.get<arma::vec>(1, "y vector"),
+            input.get<arma::mat>(2, "X matrix"),
+            Trend::fromString(regmodel),
+            normalize,
+            optim,
+            objective,
+            wparams);
+  } else {
+    std::map<std::string, std::string> params;
+    if (nrhs > 7)
+      params = structToStringMap(prhs[7]);
+    wk->fit(input.get<arma::vec>(1, "y vector"),
+            input.get<arma::mat>(2, "X matrix"),
+            Trend::fromString(regmodel),
+            normalize,
+            optim,
+            objective,
+            params);
+  }
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

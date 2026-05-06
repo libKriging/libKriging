@@ -603,13 +603,48 @@ function WarpKriging(y::Vector{Float64}, X::Matrix{Float64},
                      normalize::Bool=false,
                      optim::String="BFGS+Adam",
                      objective::String="LL",
-                     parameters::Union{Nothing,Dict{String,String}}=nothing)
+                     parameters::Union{Nothing,Dict{String,String}}=nothing,
+                     noise::Union{Nothing,Vector{Float64}}=nothing)
     n, d = size(X)
     @assert length(y) == n
     @assert length(warping) == d || length(warping) == 1
     ptrs = [Base.unsafe_convert(Cstring, s) for s in warping]
     n_params = parameters === nothing ? 0 : length(parameters)
-    if n_params > 0
+    if noise !== nothing
+        if n_params > 0
+            keys_arr = collect(keys(parameters))
+            vals_arr = [parameters[k] for k in keys_arr]
+            keys_c = [Base.unsafe_convert(Cstring, k) for k in keys_arr]
+            vals_c = [Base.unsafe_convert(Cstring, v) for v in vals_arr]
+            GC.@preserve warping keys_arr vals_arr begin
+                ptr = ccall(dlsym(_lk(), :lk_warp_kriging_new_fit_noise), Ptr{Nothing},
+                            (Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint, Cint,
+                             Ptr{Cstring}, Cint,
+                             Cstring, Cstring, Cint, Cstring, Cstring,
+                             Ptr{Cstring}, Ptr{Cstring}, Cint),
+                            y, n, noise, length(noise), X, n, d,
+                            ptrs, length(warping),
+                            kernel, regmodel, normalize ? 1 : 0, optim, objective,
+                            keys_c, vals_c, n_params)
+            end
+        else
+            GC.@preserve warping begin
+                ptr = ccall(dlsym(_lk(), :lk_warp_kriging_new_fit_noise), Ptr{Nothing},
+                            (Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint, Cint,
+                             Ptr{Cstring}, Cint,
+                             Cstring, Cstring, Cint, Cstring, Cstring,
+                             Ptr{Cstring}, Ptr{Cstring}, Cint),
+                            y, n, noise, length(noise), X, n, d,
+                            ptrs, length(warping),
+                            kernel, regmodel, normalize ? 1 : 0, optim, objective,
+                            C_NULL, C_NULL, 0)
+            end
+        end
+    elseif n_params > 0
         keys_arr = collect(keys(parameters))
         vals_arr = [parameters[k] for k in keys_arr]
         keys_c = [Base.unsafe_convert(Cstring, k) for k in keys_arr]
@@ -663,11 +698,40 @@ function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Float64};
               normalize::Bool=false,
               optim::String="BFGS+Adam",
               objective::String="LL",
-              parameters::Union{Nothing,Dict{String,String}}=nothing)
+              parameters::Union{Nothing,Dict{String,String}}=nothing,
+              noise::Union{Nothing,Vector{Float64}}=nothing)
     n, d = size(X)
     @assert length(y) == n
     n_params = parameters === nothing ? 0 : length(parameters)
-    if n_params > 0
+    if noise !== nothing
+        if n_params > 0
+            keys_arr = collect(keys(parameters))
+            vals_arr = [parameters[k] for k in keys_arr]
+            keys_c = [Base.unsafe_convert(Cstring, k) for k in keys_arr]
+            vals_c = [Base.unsafe_convert(Cstring, v) for v in vals_arr]
+            GC.@preserve keys_arr vals_arr begin
+                ret = ccall(dlsym(_lk(), :lk_warp_kriging_fit_noise), Cint,
+                            (Ptr{Nothing}, Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint,
+                             Ptr{Float64}, Cint, Cint,
+                             Cstring, Cint, Cstring, Cstring,
+                             Ptr{Cstring}, Ptr{Cstring}, Cint),
+                            wk.ptr, y, n, noise, length(noise), X, n, d,
+                            regmodel, normalize ? 1 : 0, optim, objective,
+                            keys_c, vals_c, n_params)
+            end
+        else
+            ret = ccall(dlsym(_lk(), :lk_warp_kriging_fit_noise), Cint,
+                        (Ptr{Nothing}, Ptr{Float64}, Cint,
+                         Ptr{Float64}, Cint,
+                         Ptr{Float64}, Cint, Cint,
+                         Cstring, Cint, Cstring, Cstring,
+                         Ptr{Cstring}, Ptr{Cstring}, Cint),
+                        wk.ptr, y, n, noise, length(noise), X, n, d,
+                        regmodel, normalize ? 1 : 0, optim, objective,
+                        C_NULL, C_NULL, 0)
+        end
+    elseif n_params > 0
         keys_arr = collect(keys(parameters))
         vals_arr = [parameters[k] for k in keys_arr]
         keys_c = [Base.unsafe_convert(Cstring, k) for k in keys_arr]

@@ -810,6 +810,61 @@ void* lk_warp_kriging_new_fit(const double* y,
   CATCH_RETURN_NULL
 }
 
+void* lk_warp_kriging_new_fit_noise(const double* y,
+                                    int n,
+                                    const double* noise,
+                                    int n_noise,
+                                    const double* X,
+                                    int nX,
+                                    int d,
+                                    const char** warping,
+                                    int n_warping,
+                                    const char* kernel,
+                                    const char* regmodel,
+                                    int normalize,
+                                    const char* optim,
+                                    const char* objective,
+                                    const char** param_keys,
+                                    const char** param_vals,
+                                    int n_params) {
+  try {
+    arma::vec y_vec(const_cast<double*>(y), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
+    auto* wk = new WarpKriging(to_string_vec(warping, n_warping), kernel);
+    WarpKriging::Parameters wparams;
+    wparams.noise = arma::vec(const_cast<double*>(noise), n_noise, false, true);
+    wk->fit(y_vec, X_mat, Trend::fromString(regmodel ? regmodel : "constant"), normalize != 0, optim, objective, wparams);
+    return wk;
+  }
+  CATCH_RETURN_NULL
+}
+
+int lk_warp_kriging_fit_noise(void* ptr,
+                               const double* y,
+                               int n,
+                               const double* noise,
+                               int n_noise,
+                               const double* X,
+                               int nX,
+                               int d,
+                               const char* regmodel,
+                               int normalize,
+                               const char* optim,
+                               const char* objective,
+                               const char** param_keys,
+                               const char** param_vals,
+                               int n_params) {
+  try {
+    arma::vec y_vec(const_cast<double*>(y), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
+    WarpKriging::Parameters wparams;
+    wparams.noise = arma::vec(const_cast<double*>(noise), n_noise, false, true);
+    static_cast<WarpKriging*>(ptr)->fit(y_vec, X_mat, Trend::fromString(regmodel ? regmodel : "constant"), normalize != 0, optim, objective, wparams);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
 void lk_warp_kriging_delete(void* ptr) {
   delete static_cast<WarpKriging*>(ptr);
 }
