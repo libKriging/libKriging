@@ -93,19 +93,21 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(9, "noise");
 
-  auto wk = buildObject<WarpKriging>(warping, kernel);
-  auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
   if (noise_opt.has_value()) {
+    auto wk = buildObject<WarpKriging>(warping, kernel);
+    auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
     WarpKriging::Parameters wparams;
     wparams.noise = noise_opt.value();
     wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams);
+    output.set(0, wk, "new object reference");
   } else {
     std::map<std::string, std::string> params;
     if (nrhs > 8)
       params = structToStringMap(prhs[8]);
-    wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, params);
+    auto wk = buildObject<WarpKriging>(
+        y_vec, X_mat, warping, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
+    output.set(0, wk, "new object reference");
   }
-  output.set(0, wk, "new object reference");
 }
 
 void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
