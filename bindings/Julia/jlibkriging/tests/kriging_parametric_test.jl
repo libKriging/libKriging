@@ -15,24 +15,24 @@ end
 @testset "Kriging Parametric" begin
     @testset "Kriging fit and predict (n=$n, d=$d)" for n in [40, 100], d in [3, 6]
         rng = MersenneTwister(123)
-        X = rand(rng, n, d)
-        y = f_parametric(X)
+        X_data = rand(rng, n, d)
+        y_data = f_parametric(X_data)
 
-        k = Kriging(y, X, "matern5_2")
+        k = Kriging(y_data, X_data, "matern5_2")
 
         @test kernel(k) == "matern5_2"
         @test length(y(k)) == n
         @test size(X(k)) == (n, d)
         @test length(theta(k)) == d
 
-        result = predict(k, X; return_stdev=true, return_cov=true)
+        result = predict(k, X_data; return_stdev=true, return_cov=true)
         @test length(result.mean) == n
         @test length(result.stdev) == n
         @test size(result.cov) == (n, n)
         @test all(isfinite.(result.mean))
 
         # Predictions at training points should be close to training values
-        @test all(abs.(result.mean .- y) .< 0.5)
+        @test all(abs.(result.mean .- y_data) .< 0.5)
     end
 
     @testset "Kriging with gauss kernel (n=$n, d=$d)" for n in [40, 100], d in [3, 6]

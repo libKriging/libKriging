@@ -123,29 +123,29 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
 
     @testset "Log-likelihood functions" begin
         k = Kriging(y_train, X_train, "gauss")
-        theta = theta(k)
+        theta_val = theta(k)
 
         ll = log_likelihood(k)
         @test isfinite(ll)
 
-        ll_res = log_likelihood_fun(k, theta)
+        ll_res = log_likelihood_fun(k, theta_val)
         @test isfinite(ll_res.ll)
         @test ll_res.grad === nothing
 
-        ll_res_grad = log_likelihood_fun(k, theta; return_grad=true)
+        ll_res_grad = log_likelihood_fun(k, theta_val; return_grad=true)
         @test isfinite(ll_res_grad.ll)
-        @test length(ll_res_grad.grad) == length(theta)
+        @test length(ll_res_grad.grad) == length(theta_val)
 
         loo_val = leave_one_out(k)
         @test isfinite(loo_val)
 
-        loo_res = leave_one_out_fun(k, theta)
+        loo_res = leave_one_out_fun(k, theta_val)
         @test isfinite(loo_res.loo)
 
         lmp = log_marg_post(k)
         @test isfinite(lmp)
 
-        lmp_res = log_marg_post_fun(k, theta)
+        lmp_res = log_marg_post_fun(k, theta_val)
         @test isfinite(lmp_res.lmp)
     end
 
@@ -160,8 +160,8 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
 
     @testset "Leave-one-out vector" begin
         k = Kriging(y_train, X_train, "gauss")
-        theta = theta(k)
-        loo_vec = leave_one_out_vec(k, theta)
+        theta_val = theta(k)
+        loo_vec = leave_one_out_vec(k, theta_val)
         @test length(loo_vec.yhat) == n_train
         @test length(loo_vec.stderr) == n_train
         @test all(isfinite.(loo_vec.yhat))

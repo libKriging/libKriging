@@ -158,14 +158,14 @@ end
         ll = log_likelihood(k)
         @test isfinite(ll)
 
-        theta = theta(k)
-        ll_res = log_likelihood_fun(k, theta)
+        theta_val = theta(k)
+        ll_res = log_likelihood_fun(k, theta_val)
         @test isfinite(ll_res.ll)
         @test ll_res.grad === nothing
 
-        ll_res_grad = log_likelihood_fun(k, theta; return_grad=true)
+        ll_res_grad = log_likelihood_fun(k, theta_val; return_grad=true)
         @test isfinite(ll_res_grad.ll)
-        @test length(ll_res_grad.grad) == length(theta)
+        @test length(ll_res_grad.grad) == length(theta_val)
     end
 
     @testset "Empty constructor then fit" begin

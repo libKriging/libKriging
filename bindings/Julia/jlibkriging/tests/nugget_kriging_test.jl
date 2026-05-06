@@ -133,18 +133,18 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
 
     @testset "Log-likelihood" begin
         nk = Kriging(y_train, X_train, "matern5_2"; noise="nugget")
-        theta = theta(nk)
+        theta_val = theta(nk)
 
         ll = log_likelihood(nk)
         @test isfinite(ll)
 
-        ll_res = log_likelihood_fun(nk, theta)
+        ll_res = log_likelihood_fun(nk, theta_val)
         @test isfinite(ll_res.ll)
         @test ll_res.grad === nothing
 
-        ll_res_grad = log_likelihood_fun(nk, theta; return_grad=true)
+        ll_res_grad = log_likelihood_fun(nk, theta_val; return_grad=true)
         @test isfinite(ll_res_grad.ll)
-        @test length(ll_res_grad.grad) == length(theta)
+        @test length(ll_res_grad.grad) == length(theta_val)
 
         lmp = log_marg_post(nk)
         @test isfinite(lmp)

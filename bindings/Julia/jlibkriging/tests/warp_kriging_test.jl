@@ -313,10 +313,10 @@ end
     end
 
     @testset "Getters" begin
-        X = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
-        y = [f_test(x) for x in X[:, 1]]
+        X_data = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
+        y_data = [f_test(x) for x in X_data[:, 1]]
 
-        k = WarpKriging(y, X, ["kumaraswamy"], "gauss";
+        k = WarpKriging(y_data, X_data, ["kumaraswamy"], "gauss";
                         parameters=Dict("max_iter_adam" => "100"))
 
         @test size(X(k)) == (8, 1)
