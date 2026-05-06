@@ -129,10 +129,10 @@ end
     end
 
     @testset "Getters" begin
-        X = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
-        y = [f_test(x) for x in X[:, 1]]
+        X_data = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
+        y_data = [f_test(x) for x in X_data[:, 1]]
 
-        k = MLPKriging(y, X, [16, 8], 2;
+        k = MLPKriging(y_data, X_data, [16, 8], 2;
                        activation="selu", kernel="gauss",
                        parameters=Dict("max_iter_adam" => "100"))
 
