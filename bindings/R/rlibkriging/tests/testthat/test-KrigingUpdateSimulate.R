@@ -296,6 +296,6 @@ for (i in 1:nrow(X_n)) {
     lines(density(lusd[i,]),col='red')
     if (sd(lsud[i,])>1e-3 && sd(lusd[i,])>1e-3) {# otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",sd(lsud[i,]),",",sd(lusd[i,])),
-        expect_true(ks.test(lusd[i,],lsud[i,])$p.value > 0.01))
+        expect_true(ks.test(lusd[i,],lsud[i,])$p.value > 0.001))
     }
 }

@@ -30,9 +30,9 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
 
             # Verify getters match
             @test kernel(k1) == kernel(k2)
-            @test get_sigma2(k1) ≈ get_sigma2(k2) atol=1e-12
-            @test get_theta(k1) ≈ get_theta(k2) atol=1e-12
-            @test get_beta(k1) ≈ get_beta(k2) atol=1e-12
+            @test sigma2(k1) ≈ sigma2(k2) atol=1e-12
+            @test theta(k1) ≈ theta(k2) atol=1e-12
+            @test beta(k1) ≈ beta(k2) atol=1e-12
         finally
             isfile(tmpfile) && rm(tmpfile)
         end
@@ -76,9 +76,9 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
             @test p1.stdev ≈ p2.stdev atol=1e-12
 
             @test kernel(nk1) == kernel(nk2)
-            @test get_sigma2(nk1) ≈ get_sigma2(nk2) atol=1e-12
-            @test get_nugget(nk1) ≈ get_nugget(nk2) atol=1e-12
-            @test get_theta(nk1) ≈ get_theta(nk2) atol=1e-12
+            @test sigma2(nk1) ≈ sigma2(nk2) atol=1e-12
+            @test nugget(nk1) ≈ nugget(nk2) atol=1e-12
+            @test theta(nk1) ≈ theta(nk2) atol=1e-12
         finally
             isfile(tmpfile) && rm(tmpfile)
         end
@@ -104,9 +104,9 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
             @test p1.stdev ≈ p2.stdev atol=1e-12
 
             @test kernel(nk1) == kernel(nk2)
-            @test get_sigma2(nk1) ≈ get_sigma2(nk2) atol=1e-12
-            @test get_theta(nk1) ≈ get_theta(nk2) atol=1e-12
-            @test get_noise(nk1) ≈ get_noise(nk2) atol=1e-12
+            @test sigma2(nk1) ≈ sigma2(nk2) atol=1e-12
+            @test theta(nk1) ≈ theta(nk2) atol=1e-12
+            @test noise(nk1) ≈ noise(nk2) atol=1e-12
         finally
             isfile(tmpfile) && rm(tmpfile)
         end

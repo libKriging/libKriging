@@ -9,3 +9,5 @@ add_mex_test(NAME LinearRegression-Simple FILENAME LinearRegression_simpletest.m
 add_mex_test(NAME LinearRegression-Complete FILENAME LinearRegression_completest.m)
 add_mex_test(NAME BindingConsistency FILENAME binding_consistency_test.m)
 add_mex_test(NAME Params-Demo FILENAME Params_demo.m)
+add_mex_test(NAME WarpKriging FILENAME WarpKriging_test.m)
+add_mex_test(NAME MLPKriging FILENAME MLPKriging_test.m)

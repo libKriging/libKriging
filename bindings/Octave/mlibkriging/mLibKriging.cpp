@@ -1,9 +1,9 @@
 #include "Kriging_binding.hpp"
 #include "LinearRegression_binding.hpp"
-#include "NoiseKriging_binding.hpp"
-#include "NuggetKriging_binding.hpp"
+#include "MLPKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
+#include "WarpKriging_binding.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
 #include "tools/MxMapper.hpp"
@@ -155,164 +155,306 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::is_sigma2_estim "_hash:
       return KrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::noise_model"_hash:
+      return KrigingBinding::noise_model(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::nugget"_hash:
+      return KrigingBinding::nugget(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_nugget_estim"_hash:
+      return KrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::noise"_hash:
+      return KrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
 
+    // NuggetKriging routes (deprecated, redirect to unified Kriging)
     case "NuggetKriging::new"_hash:
-      return NuggetKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::copy"_hash:
-      return NuggetKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::delete"_hash:
-      return NuggetKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::fit"_hash:
-      return NuggetKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::predict"_hash:
-      return NuggetKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::simulate"_hash:
-      return NuggetKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::update"_hash:
-      return NuggetKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::update_simulate"_hash:
-      return NuggetKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::summary"_hash:
-      return NuggetKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::save"_hash:
-      return NuggetKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::load"_hash:
-      return NuggetKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logLikelihoodFun"_hash:
-      return NuggetKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logMargPostFun"_hash:
-      return NuggetKrigingBinding::logMargPostFun(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logMargPostFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logLikelihood"_hash:
-      return NuggetKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::logMargPost"_hash:
-      return NuggetKrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logMargPost(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::covMat"_hash:
-      return NuggetKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::model"_hash:
-      return NuggetKrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NuggetKriging::kernel"_hash:
-      return NuggetKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::optim"_hash:
-      return NuggetKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::objective"_hash:
-      return NuggetKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::X"_hash:
-      return NuggetKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::centerX"_hash:
-      return NuggetKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::scaleX"_hash:
-      return NuggetKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::y"_hash:
-      return NuggetKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::centerY"_hash:
-      return NuggetKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::scaleY"_hash:
-      return NuggetKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::normalize"_hash:
-      return NuggetKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::regmodel"_hash:
-      return NuggetKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::F"_hash:
-      return NuggetKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::T"_hash:
-      return NuggetKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::M"_hash:
-      return NuggetKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::z"_hash:
-      return NuggetKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::beta"_hash:
-      return NuggetKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::is_beta_estim"_hash:
-      return NuggetKrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::theta"_hash:
-      return NuggetKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::is_theta_estim"_hash:
-      return NuggetKrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::sigma2"_hash:
-      return NuggetKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::is_sigma2_estim "_hash:
-      return NuggetKrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::nugget"_hash:
-      return NuggetKrigingBinding::nugget(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::nugget(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NuggetKriging::is_nugget_estim "_hash:
-      return NuggetKrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
 
+    // NoiseKriging routes (deprecated, redirect to unified Kriging)
     case "NoiseKriging::new"_hash:
-      return NoiseKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::copy"_hash:
-      return NoiseKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::delete"_hash:
-      return NoiseKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::fit"_hash:
-      return NoiseKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::predict"_hash:
-      return NoiseKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::simulate"_hash:
-      return NoiseKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::update"_hash:
-      return NoiseKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::update_simulate"_hash:
-      return NoiseKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::summary"_hash:
-      return NoiseKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::save"_hash:
-      return NoiseKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::load"_hash:
-      return NoiseKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::logLikelihoodFun"_hash:
-      return NoiseKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::logLikelihood"_hash:
-      return NoiseKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::covMat"_hash:
-      return NoiseKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::model"_hash:
-      return NoiseKrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::model(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NoiseKriging::kernel"_hash:
-      return NoiseKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::optim"_hash:
-      return NoiseKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::objective"_hash:
-      return NoiseKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::X"_hash:
-      return NoiseKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::centerX"_hash:
-      return NoiseKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::scaleX"_hash:
-      return NoiseKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::y"_hash:
-      return NoiseKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::centerY"_hash:
-      return NoiseKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::scaleY"_hash:
-      return NoiseKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::normalize"_hash:
-      return NoiseKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::noise"_hash:
-      return NoiseKrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::regmodel"_hash:
-      return NoiseKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::F"_hash:
-      return NoiseKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::T"_hash:
-      return NoiseKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::M"_hash:
-      return NoiseKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::z"_hash:
-      return NoiseKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::beta"_hash:
-      return NoiseKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::is_beta_estim"_hash:
-      return NoiseKrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_beta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::theta"_hash:
-      return NoiseKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::is_theta_estim"_hash:
-      return NoiseKrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_theta_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::sigma2"_hash:
-      return NoiseKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NoiseKriging::is_sigma2_estim"_hash:
-      return NoiseKrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+      return KrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "WarpKriging::new"_hash:
+      return WarpKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::copy"_hash:
+      return WarpKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::delete"_hash:
+      return WarpKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::fit"_hash:
+      return WarpKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::predict"_hash:
+      return WarpKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::simulate"_hash:
+      return WarpKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::update_simulate"_hash:
+      return WarpKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::update"_hash:
+      return WarpKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::summary"_hash:
+      return WarpKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::logLikelihoodFun"_hash:
+      return WarpKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::logLikelihood"_hash:
+      return WarpKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::kernel"_hash:
+      return WarpKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::X"_hash:
+      return WarpKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::y"_hash:
+      return WarpKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::centerX"_hash:
+      return WarpKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::scaleX"_hash:
+      return WarpKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::centerY"_hash:
+      return WarpKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::scaleY"_hash:
+      return WarpKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::normalize"_hash:
+      return WarpKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::regmodel"_hash:
+      return WarpKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::F"_hash:
+      return WarpKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::T"_hash:
+      return WarpKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::M"_hash:
+      return WarpKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::z"_hash:
+      return WarpKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::beta"_hash:
+      return WarpKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::theta"_hash:
+      return WarpKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::sigma2"_hash:
+      return WarpKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::is_fitted"_hash:
+      return WarpKrigingBinding::is_fitted(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::feature_dim"_hash:
+      return WarpKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::warping"_hash:
+      return WarpKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::save"_hash:
+      return WarpKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::load"_hash:
+      return WarpKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "MLPKriging::new"_hash:
+      return MLPKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::delete"_hash:
+      return MLPKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::fit"_hash:
+      return MLPKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::predict"_hash:
+      return MLPKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::simulate"_hash:
+      return MLPKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::update_simulate"_hash:
+      return MLPKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::update"_hash:
+      return MLPKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::summary"_hash:
+      return MLPKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::logLikelihoodFun"_hash:
+      return MLPKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::logLikelihood"_hash:
+      return MLPKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::kernel"_hash:
+      return MLPKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::X"_hash:
+      return MLPKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::y"_hash:
+      return MLPKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::centerX"_hash:
+      return MLPKrigingBinding::centerX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::scaleX"_hash:
+      return MLPKrigingBinding::scaleX(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::centerY"_hash:
+      return MLPKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::scaleY"_hash:
+      return MLPKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::normalize"_hash:
+      return MLPKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::regmodel"_hash:
+      return MLPKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::F"_hash:
+      return MLPKrigingBinding::F(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::T"_hash:
+      return MLPKrigingBinding::T(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::M"_hash:
+      return MLPKrigingBinding::M(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::z"_hash:
+      return MLPKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::beta"_hash:
+      return MLPKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::theta"_hash:
+      return MLPKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::sigma2"_hash:
+      return MLPKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::is_fitted"_hash:
+      return MLPKrigingBinding::is_fitted(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::feature_dim"_hash:
+      return MLPKrigingBinding::feature_dim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::hidden_dims"_hash:
+      return MLPKrigingBinding::hidden_dims(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::activation"_hash:
+      return MLPKrigingBinding::activation(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::copy"_hash:
+      return MLPKrigingBinding::copy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::save"_hash:
+      return MLPKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::load"_hash:
+      return MLPKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Optim::is_reparametrized"_hash:
       return OptimBinding::is_reparametrized(nlhs, plhs, nrhs - 1, prhs + 1);

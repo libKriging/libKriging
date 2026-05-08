@@ -12,9 +12,10 @@ add_library(Kriging
         Random.cpp include/libKriging/Random.hpp
         LinearAlgebra.cpp include/libKriging/LinearAlgebra.hpp
         Covariance.cpp include/libKriging/Covariance.hpp
+        KrigingImpl.cpp include/libKriging/KrigingImpl.hpp
         Kriging.cpp include/libKriging/Kriging.hpp
-        NuggetKriging.cpp include/libKriging/NuggetKriging.hpp
-        NoiseKriging.cpp include/libKriging/NoiseKriging.hpp
+        WarpKriging.cpp include/libKriging/WarpKriging.hpp
+        MLPKriging.cpp include/libKriging/MLPKriging.hpp
         KrigingLoader.cpp include/libKriging/KrigingLoader.hpp
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp

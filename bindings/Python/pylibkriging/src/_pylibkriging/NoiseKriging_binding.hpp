@@ -69,9 +69,9 @@ class PyNoiseKriging {
               const py::array_t<double>& X_u,
               const bool refit);
 
-  void update_simulate(const py::array_t<double>& y_u,
-                       const py::array_t<double>& noise_u,
-                       const py::array_t<double>& X_u);
+  py::array_t<double> update_simulate(const py::array_t<double>& y_u,
+                                      const py::array_t<double>& noise_u,
+                                      const py::array_t<double>& X_u);
 
   std::string summary() const;
 

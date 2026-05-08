@@ -46,6 +46,10 @@ void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void is_theta_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void is_sigma2_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void noise_model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_nugget_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void noise(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace KrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_KRIGING_BINDING_HPP

@@ -38,7 +38,7 @@ class TestCovMat:
         assert np.all(eigenvals >= -1e-10), "Covariance should be positive semi-definite"
     
     def test_covMat_all_classes(self):
-        """Test covMat for all Kriging classes"""
+        """Test covMat for all Kriging noise modes"""
         np.random.seed(456)
         n = 15
         X = np.random.uniform(size=(n, 1))
@@ -47,18 +47,18 @@ class TestCovMat:
         
         X_test = np.random.uniform(size=(5, 1))
         
-        # Test Kriging
+        # Test Kriging (no noise)
         k1 = lk.Kriging(y.reshape(-1, 1), X, "gauss")
         cov1 = k1.covMat(X_test, X_test)
         assert cov1.shape == (5, 5)
         
-        # Test NoiseKriging
-        k2 = lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
+        # Test Kriging with heterogeneous noise
+        k2 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise=noise.reshape(-1, 1))
         cov2 = k2.covMat(X_test, X_test)
         assert cov2.shape == (5, 5)
         
-        # Test NuggetKriging
-        k3 = lk.NuggetKriging(y.reshape(-1, 1), X, "gauss")
+        # Test Kriging with nugget
+        k3 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise="nugget")
         cov3 = k3.covMat(X_test, X_test)
         assert cov3.shape == (5, 5)
 
@@ -94,42 +94,44 @@ class TestModel:
         assert params['normalize'] == True
         assert params['regmodel'] == 'linear'
         
-        # Check array shapes
+        # Check array shapes (carma returns column vectors as 2D (n,1) arrays)
         assert params['X'].shape == (n, 1)
-        assert params['y'].shape == (n,)
+        assert params['y'].shape == (n, 1)
         assert len(params['theta']) > 0
         assert len(params['beta']) > 0
     
     def test_model_noise_kriging(self):
-        """Test model() for NoiseKriging includes noise field"""
+        """Test model() for Kriging with heterogeneous noise includes noise field"""
         np.random.seed(321)
         n = 12
         X = np.random.uniform(size=(n, 2))
         y = np.sin(X[:, 0]) * np.cos(X[:, 1])
         noise = 0.05 * np.ones(n)
         
-        k = lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
+        k = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise=noise.reshape(-1, 1))
         params = k.model()
         
-        # NoiseKriging should have 'noise' field
-        assert 'noise' in params, "NoiseKriging model should have 'noise' field"
-        assert params['noise'].shape == (n,)
+        # Heterogeneous noise Kriging should have 'noise' field
+        assert 'noise' in params, "Heterogeneous noise model should have 'noise' field"
+        assert params['noise'].shape == (n, 1)
+        assert params['noise_model'] == 'heterogeneous'
     
     def test_model_nugget_kriging(self):
-        """Test model() for NuggetKriging includes nugget fields"""
+        """Test model() for Kriging with nugget includes nugget fields"""
         np.random.seed(654)
         n = 15
         X = np.random.uniform(size=(n, 1))
         y = X.flatten() ** 2
         
-        k = lk.NuggetKriging(y.reshape(-1, 1), X, "matern3_2")
+        k = lk.Kriging(y.reshape(-1, 1), X, "matern3_2", noise="nugget")
         params = k.model()
         
-        # NuggetKriging should have 'nugget' and 'is_nugget_estim' fields
-        assert 'nugget' in params, "NuggetKriging model should have 'nugget' field"
-        assert 'is_nugget_estim' in params, "NuggetKriging model should have 'is_nugget_estim' field"
+        # Nugget Kriging should have 'nugget' and 'is_nugget_estim' fields
+        assert 'nugget' in params, "Nugget model should have 'nugget' field"
+        assert 'is_nugget_estim' in params, "Nugget model should have 'is_nugget_estim' field"
         assert isinstance(params['nugget'], (int, float))
         assert isinstance(params['is_nugget_estim'], bool)
+        assert params['noise_model'] == 'nugget'
 
 
 class TestOptim:
@@ -268,10 +270,10 @@ class TestOptim:
 
 
 class TestConsistency:
-    """Test consistency across different Kriging classes"""
+    """Test consistency across different Kriging noise modes"""
     
-    def test_all_classes_have_covMat(self):
-        """Ensure all Kriging classes have covMat method"""
+    def test_all_modes_have_covMat(self):
+        """Ensure all Kriging noise modes have covMat method"""
         np.random.seed(111)
         n = 10
         X = np.random.uniform(size=(n, 1))
@@ -279,14 +281,10 @@ class TestConsistency:
         noise = 0.01 * np.ones(n)
         
         k1 = lk.Kriging(y.reshape(-1, 1), X, "gauss")
-        k2 = lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
-        k3 = lk.NuggetKriging(y.reshape(-1, 1), X, "gauss")
+        k2 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise=noise.reshape(-1, 1))
+        k3 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise="nugget")
         
         X_test = np.random.uniform(size=(3, 1))
-        
-        assert hasattr(k1, 'covMat')
-        assert hasattr(k2, 'covMat')
-        assert hasattr(k3, 'covMat')
         
         # All should work
         cov1 = k1.covMat(X_test, X_test)
@@ -297,8 +295,8 @@ class TestConsistency:
         assert cov2.shape == (3, 3)
         assert cov3.shape == (3, 3)
     
-    def test_all_classes_have_model(self):
-        """Ensure all Kriging classes have model method"""
+    def test_all_modes_have_model(self):
+        """Ensure all Kriging noise modes have model method returning dicts"""
         np.random.seed(222)
         n = 10
         X = np.random.uniform(size=(n, 1))
@@ -306,12 +304,8 @@ class TestConsistency:
         noise = 0.01 * np.ones(n)
         
         k1 = lk.Kriging(y.reshape(-1, 1), X, "gauss")
-        k2 = lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
-        k3 = lk.NuggetKriging(y.reshape(-1, 1), X, "gauss")
-        
-        assert hasattr(k1, 'model')
-        assert hasattr(k2, 'model')
-        assert hasattr(k3, 'model')
+        k2 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise=noise.reshape(-1, 1))
+        k3 = lk.Kriging(y.reshape(-1, 1), X, "gauss", noise="nugget")
         
         # All should return dicts
         m1 = k1.model()
@@ -322,10 +316,29 @@ class TestConsistency:
         assert isinstance(m2, dict)
         assert isinstance(m3, dict)
         
-        # Check class-specific fields
+        # Check noise_model field
+        assert m1['noise_model'] == 'none'
+        assert m2['noise_model'] == 'heterogeneous'
+        assert m3['noise_model'] == 'nugget'
+        
+        # Check mode-specific fields
         assert 'noise' in m2
         assert 'nugget' in m3
         assert 'is_nugget_estim' in m3
+    
+    def test_deprecated_aliases_raise(self):
+        """Ensure NuggetKriging/NoiseKriging raise ImportError"""
+        np.random.seed(333)
+        n = 10
+        X = np.random.uniform(size=(n, 1))
+        y = X.flatten()
+        noise = 0.01 * np.ones(n)
+        
+        with pytest.raises(ImportError, match="NuggetKriging has been removed"):
+            lk.NuggetKriging(y.reshape(-1, 1), X, "gauss")
+        
+        with pytest.raises(ImportError, match="NoiseKriging has been removed"):
+            lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
 
 
 if __name__ == "__main__":

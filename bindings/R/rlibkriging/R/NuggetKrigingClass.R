@@ -93,22 +93,17 @@ NuggetKriging <- function(y=NULL, X=NULL, kernel=NULL,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LMP"),
                     parameters = NULL) {
-
+    .Deprecated("Kriging", msg = "NuggetKriging() is deprecated. Use Kriging(..., noise=\"nugget\") instead.")
     regmodel <- match.arg(regmodel)
     objective <- match.arg(objective)
-    if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
-    if (is.character(y) && is.null(X) && is.null(kernel)) # just first arg for kernel, without naming
-        nk <- new_NuggetKriging(kernel = y)
-    else if (is.null(y) && is.null(X) && !is.null(kernel))
-        nk <- new_NuggetKriging(kernel = kernel)
-    else
-        nk <- new_NuggetKrigingFit(y = y, X = X, kernel = kernel,
-                      regmodel = regmodel,
-                      normalize = normalize,
-                      optim = optim,
-                      objective = objective,
-                      parameters = parameters)
-    return(classNuggetKriging(nk))
+    if (is.character(optim)) optim <- optim[1]
+    Kriging(y = y, X = X, kernel = kernel,
+            noise = "nugget",
+            regmodel = regmodel,
+            normalize = normalize,
+            optim = optim,
+            objective = objective,
+            parameters = parameters)
 }
 
 

@@ -9,6 +9,8 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <cassert>
+#include <stdexcept>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -213,3 +215,17 @@ std::function<arma::vec(const arma::vec&, const arma::vec&)> Covariance::DlnCovD
     = [](const arma::vec& _dX, const arma::vec& /*_theta*/) {
         return arma::vec(_dX.n_elem);  // TBD
       };
+
+LIBKRIGING_EXPORT Covariance::CovFunctions Covariance::resolve(const std::string& covType) {
+  if (covType == "gauss")
+    return {Cov_gauss, DlnCovDtheta_gauss, DlnCovDx_gauss};
+  if (covType == "exp")
+    return {Cov_exp, DlnCovDtheta_exp, DlnCovDx_exp};
+  if (covType == "matern3_2")
+    return {Cov_matern32, DlnCovDtheta_matern32, DlnCovDx_matern32};
+  if (covType == "matern5_2")
+    return {Cov_matern52, DlnCovDtheta_matern52, DlnCovDx_matern52};
+  if (covType == "whitenoise")
+    return {Cov_whitenoise, DlnCovDtheta_whitenoise, DlnCovDx_whitenoise};
+  throw std::invalid_argument("Unsupported covariance kernel: " + covType);
+}

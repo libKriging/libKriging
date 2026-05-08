@@ -29,7 +29,7 @@ def main():
     args, unknown = argparser.parse_known_args()
     sys.argv = [sys.argv[0]] + unknown
 
-    libKriging_path = Path(__file__).absolute().parents[2]
+    libKriging_path = Path(__file__).absolute().parents[3]
     print(f"LibKriging root directory is {libKriging_path}")
     os.chdir(libKriging_path)
     with open("cmake/version.cmake", "r") as file:

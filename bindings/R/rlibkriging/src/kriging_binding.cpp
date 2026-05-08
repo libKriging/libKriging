@@ -15,8 +15,14 @@
 #include "retrofit_utils.hpp"
 
 // [[Rcpp::export]]
-Rcpp::List new_Kriging(std::string kernel) {
-  Kriging* ok = new Kriging(kernel);
+Rcpp::List new_Kriging(std::string kernel, std::string noise_model = "none") {
+  Kriging::NoiseModel nm = Kriging::NoiseModel::None;
+  if (noise_model == "nugget")
+    nm = Kriging::NoiseModel::Nugget;
+  else if (noise_model == "heterogeneous")
+    nm = Kriging::NoiseModel::Heterogeneous;
+
+  Kriging* ok = new Kriging(kernel, nm);
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
 
@@ -30,11 +36,19 @@ Rcpp::List new_Kriging(std::string kernel) {
 Rcpp::List new_KrigingFit(arma::vec y,
                           arma::mat X,
                           std::string kernel,
+                          std::string noise_model = "none",
+                          Rcpp::Nullable<Rcpp::NumericVector> noise = R_NilValue,
                           std::string regmodel = "constant",
                           bool normalize = false,
                           std::string optim = "BFGS",
                           std::string objective = "LL",
                           Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+  Kriging::NoiseModel nm = Kriging::NoiseModel::None;
+  if (noise_model == "nugget")
+    nm = Kriging::NoiseModel::Nugget;
+  else if (noise_model == "heterogeneous")
+    nm = Kriging::NoiseModel::Heterogeneous;
+
   Rcpp::List _parameters;
   if (parameters.isNotNull()) {
     Rcpp::List params(parameters);
@@ -46,8 +60,6 @@ Rcpp::List new_KrigingFit(arma::vec y,
           !(params.containsElementNamed("is_sigma2_estim") && !params["is_sigma2_estim"]) && optim != "none",
           "is_sigma2_estim");
     } else {
-      //_parameters.push_back(Rcpp::runif(1), "sigma2"); // turnaround mingw bug:
-      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(true, "has_sigma2");
       _parameters.push_back(-1, "sigma2");
       _parameters.push_back(false, "has_sigma2");
       _parameters.push_back(true, "is_sigma2_estim");
@@ -63,9 +75,6 @@ Rcpp::List new_KrigingFit(arma::vec y,
           !(params.containsElementNamed("is_theta_estim") && !params["is_theta_estim"]) && optim != "none",
           "is_theta_estim");
     } else {
-      // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
-      // https://github.com/msys2/MINGW-packages/issues/5019 _parameters.push_back(Rcpp::NumericMatrix(1, X.n_cols,
-      // r.begin()), "theta"); _parameters.push_back(true, "has_theta");
       _parameters.push_back(Rcpp::NumericVector(0), "theta");
       _parameters.push_back(false, "has_theta");
       _parameters.push_back(true, "is_theta_estim");
@@ -81,38 +90,57 @@ Rcpp::List new_KrigingFit(arma::vec y,
       _parameters.push_back(false, "has_beta");
       _parameters.push_back(true, "is_beta_estim");
     }
+    if (params.containsElementNamed("nugget")) {
+      _parameters.push_back(params["nugget"], "nugget");
+      _parameters.push_back(true, "has_nugget");
+      _parameters.push_back(
+          !(params.containsElementNamed("is_nugget_estim") && !params["is_nugget_estim"]) && optim != "none",
+          "is_nugget_estim");
+    } else {
+      _parameters.push_back(-1, "nugget");
+      _parameters.push_back(false, "has_nugget");
+      _parameters.push_back(true, "is_nugget_estim");
+    }
   } else {
-    // Rcpp::NumericVector r = Rcpp::runif(X.n_cols); // turnaround mingw bug:
-    // https://github.com/msys2/MINGW-packages/issues/5019
-    _parameters = Rcpp::List::create(  // Rcpp::Named("sigma2") = Rcpp::runif(1),
-                                       // Rcpp::Named("has_sigma2") = true,
-        Rcpp::Named("sigma2") = -1,
-        Rcpp::Named("has_sigma2") = false,
-        Rcpp::Named("is_sigma2_estim") = true,
-        // Rcpp::Named("theta") = Rcpp::NumericMatrix(1, X.n_cols, r.begin()),
-        // Rcpp::Named("has_theta") = true,
-        Rcpp::Named("theta") = Rcpp::NumericMatrix(0, 0),
-        Rcpp::Named("has_theta") = false,
-        Rcpp::Named("is_theta_estim") = true,
-        Rcpp::Named("beta") = Rcpp::NumericVector(0),
-        Rcpp::Named("has_beta") = false,
-        Rcpp::Named("is_beta_estim") = true);
+    _parameters = Rcpp::List::create(Rcpp::Named("sigma2") = -1,
+                                     Rcpp::Named("has_sigma2") = false,
+                                     Rcpp::Named("is_sigma2_estim") = true,
+                                     Rcpp::Named("theta") = Rcpp::NumericMatrix(0, 0),
+                                     Rcpp::Named("has_theta") = false,
+                                     Rcpp::Named("is_theta_estim") = true,
+                                     Rcpp::Named("beta") = Rcpp::NumericVector(0),
+                                     Rcpp::Named("has_beta") = false,
+                                     Rcpp::Named("is_beta_estim") = true,
+                                     Rcpp::Named("nugget") = -1,
+                                     Rcpp::Named("has_nugget") = false,
+                                     Rcpp::Named("is_nugget_estim") = true);
   }
 
-  Kriging* ok = new Kriging(
-      std::move(y),
-      std::move(X),
-      kernel,
-      Trend::fromString(regmodel),
-      normalize,
-      optim,
-      objective,
-      Kriging::Parameters{(_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
-                          _parameters["is_sigma2_estim"],
-                          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-                          _parameters["is_theta_estim"],
-                          (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
-                          _parameters["is_beta_estim"]});
+  Kriging::Parameters kparams{
+      (_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
+      _parameters["is_sigma2_estim"],
+      (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+      _parameters["is_theta_estim"],
+      (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
+      _parameters["is_beta_estim"],
+      (_parameters["has_nugget"]) ? make_optional0<double>(_parameters["nugget"]) : std::nullopt,
+      _parameters["is_nugget_estim"]};
+
+  Kriging* ok = new Kriging(kernel, nm);
+
+  if (nm == Kriging::NoiseModel::Heterogeneous && noise.isNotNull()) {
+    arma::vec noise_vec = Rcpp::as<arma::vec>(noise);
+    ok->fit(std::move(y),
+            std::move(noise_vec),
+            std::move(X),
+            Trend::fromString(regmodel),
+            normalize,
+            optim,
+            objective,
+            kparams);
+  } else {
+    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+  }
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
 
@@ -126,6 +154,7 @@ Rcpp::List new_KrigingFit(arma::vec y,
 void kriging_fit(Rcpp::List k,
                  arma::vec y,
                  arma::mat X,
+                 Rcpp::Nullable<Rcpp::NumericVector> noise = R_NilValue,
                  std::string regmodel = "constant",
                  bool normalize = false,
                  std::string optim = "BFGS",
@@ -197,19 +226,27 @@ void kriging_fit(Rcpp::List k,
         Rcpp::Named("is_beta_estim") = true);
   }
 
-  impl_ptr->fit(
-      std::move(y),
-      std::move(X),
-      Trend::fromString(regmodel),
-      normalize,
-      optim,
-      objective,
-      Kriging::Parameters{(_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
-                          _parameters["is_sigma2_estim"],
-                          (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
-                          _parameters["is_theta_estim"],
-                          (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
-                          _parameters["is_beta_estim"]});
+  Kriging::Parameters kparams{
+      (_parameters["has_sigma2"]) ? make_optional0<double>(_parameters["sigma2"]) : std::nullopt,
+      _parameters["is_sigma2_estim"],
+      (_parameters["has_theta"]) ? make_optional0<arma::mat>(_parameters["theta"]) : std::nullopt,
+      _parameters["is_theta_estim"],
+      (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
+      _parameters["is_beta_estim"]};
+
+  if (noise.isNotNull()) {
+    arma::vec noise_vec = Rcpp::as<arma::vec>(noise);
+    impl_ptr->fit(std::move(y),
+                  std::move(noise_vec),
+                  std::move(X),
+                  Trend::fromString(regmodel),
+                  normalize,
+                  optim,
+                  objective,
+                  kparams);
+  } else {
+    impl_ptr->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+  }
 }
 
 // [[Rcpp::export]]
@@ -239,6 +276,21 @@ Rcpp::List kriging_model(Rcpp::List k) {
   ret["kernel"] = impl_ptr->kernel();
   ret["optim"] = impl_ptr->optim();
   ret["objective"] = impl_ptr->objective();
+
+  // noise model info
+  auto nm = impl_ptr->noise_model();
+  std::string nm_str = nm == Kriging::NoiseModel::None     ? "none"
+                       : nm == Kriging::NoiseModel::Nugget ? "nugget"
+                                                           : "heterogeneous";
+  ret["noise_model"] = nm_str;
+  if (nm == Kriging::NoiseModel::Nugget) {
+    ret["nugget"] = impl_ptr->nugget();
+    ret["is_nugget_estim"] = impl_ptr->is_nugget_estim();
+  }
+  if (nm == Kriging::NoiseModel::Heterogeneous) {
+    ret["noise"] = impl_ptr->noise();
+  }
+
   ret["theta"] = impl_ptr->theta();
   ret["is_theta_estim"] = impl_ptr->is_theta_estim();
   ret["sigma2"] = impl_ptr->sigma2();
@@ -306,7 +358,12 @@ Rcpp::List kriging_predict(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool will_update = false) {
+arma::mat kriging_simulate(Rcpp::List k,
+                           int nsim,
+                           int seed,
+                           arma::mat X_n,
+                           Rcpp::Nullable<Rcpp::NumericVector> with_noise = R_NilValue,
+                           bool will_update = false) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -317,11 +374,25 @@ arma::mat kriging_simulate(Rcpp::List k, int nsim, int seed, arma::mat X_n, bool
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
+  if (with_noise.isNotNull()) {
+    Rcpp::NumericVector wn(with_noise);
+    if (wn.length() == 1 && Rcpp::as<bool>(wn)) {
+      // with_noise = TRUE means "include nugget" (nugget mode)
+      return impl_ptr->simulate(nsim, seed, X_n, true, will_update);
+    } else {
+      // with_noise is a numeric vector (heterogeneous noise)
+      arma::vec noise_vec = Rcpp::as<arma::vec>(with_noise);
+      return impl_ptr->simulate(nsim, seed, X_n, noise_vec, will_update);
+    }
+  }
   return impl_ptr->simulate(nsim, seed, X_n, will_update);
 }
 
 // [[Rcpp::export]]
-arma::mat kriging_update_simulate(Rcpp::List k, arma::vec y_u, arma::mat X_u) {
+arma::mat kriging_update_simulate(Rcpp::List k,
+                                  arma::vec y_u,
+                                  Rcpp::Nullable<Rcpp::NumericVector> noise_u = R_NilValue,
+                                  arma::mat X_u = arma::mat()) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -335,11 +406,19 @@ arma::mat kriging_update_simulate(Rcpp::List k, arma::vec y_u, arma::mat X_u) {
   if (X_u.n_rows != y_u.n_elem)
     Rcpp::stop("Length of arg data should be the same.");
 
+  if (noise_u.isNotNull()) {
+    arma::vec noise_vec = Rcpp::as<arma::vec>(noise_u);
+    return impl_ptr->update_simulate(y_u, noise_vec, X_u);
+  }
   return impl_ptr->update_simulate(y_u, X_u);
 }
 
 // [[Rcpp::export]]
-void kriging_update(Rcpp::List k, arma::vec y_u, arma::mat X_u, bool refit = true) {
+void kriging_update(Rcpp::List k,
+                    arma::vec y_u,
+                    arma::mat X_u,
+                    Rcpp::Nullable<Rcpp::NumericVector> noise_u = R_NilValue,
+                    bool refit = true) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -353,12 +432,12 @@ void kriging_update(Rcpp::List k, arma::vec y_u, arma::mat X_u, bool refit = tru
   if (X_u.n_rows != y_u.n_elem)
     Rcpp::stop("Length of arg data should be the same.");
 
-  impl_ptr->update(y_u, X_u, refit);
-
-  // Rcpp::List obj;
-  // obj.attr("object") = impl_ptr;
-  // obj.attr("class") = "Kriging";
-  // return obj;
+  if (noise_u.isNotNull()) {
+    arma::vec noise_vec = Rcpp::as<arma::vec>(noise_u);
+    impl_ptr->update(y_u, noise_vec, X_u, refit);
+  } else {
+    impl_ptr->update(y_u, X_u, refit);
+  }
 }
 
 // [[Rcpp::export]]
@@ -401,17 +480,20 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  if (theta.n_elem != impl_ptr->theta().n_elem)
-    Rcpp::stop("Length of arg data should be " + std::to_string(impl_ptr->theta().n_elem) + ")");
+  arma::uword d = impl_ptr->theta().n_elem;
+  bool is_noise_model = (impl_ptr->noise_model() != Kriging::NoiseModel::None);
+  if (theta.n_elem != d && !(is_noise_model && theta.n_elem == d + 1))
+    Rcpp::stop("Length of arg data should be " + std::to_string(d)
+               + (is_noise_model ? " or " + std::to_string(d + 1) : "") + ")");
 
-  std::tuple<double, arma::vec, arma::mat> ll = impl_ptr->logLikelihoodFun(theta, return_grad, return_hess, bench);
+  std::tuple<double, arma::vec> ll = impl_ptr->logLikelihoodFun(theta, return_grad, bench);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("logLikelihood") = std::get<0>(ll));
   if (return_grad) {
     ret.push_back(std::get<1>(ll), "logLikelihoodGrad");
   }
   if (return_hess) {
-    ret.push_back(std::get<2>(ll), "logLikelihoodHess");
+    ret.push_back(arma::mat(), "logLikelihoodHess");
   }
 
   return ret;
@@ -694,4 +776,47 @@ bool kriging_is_sigma2_estim(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->is_sigma2_estim();
+}
+
+// [[Rcpp::export]]
+std::string kriging_noise_model(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  switch (impl_ptr->noise_model()) {
+    case Kriging::NoiseModel::Nugget:
+      return "nugget";
+    case Kriging::NoiseModel::Heterogeneous:
+      return "heterogeneous";
+    default:
+      return "none";
+  }
+}
+
+// [[Rcpp::export]]
+double kriging_nugget(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->nugget();
+}
+
+// [[Rcpp::export]]
+bool kriging_is_nugget_estim(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->is_nugget_estim();
+}
+
+// [[Rcpp::export]]
+arma::vec kriging_noise(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->noise();
 }

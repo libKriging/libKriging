@@ -73,8 +73,8 @@ f_demo(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         println(s_after)
 
         # Model should now have more training points
-        @test length(get_y(k)) == n_design + 2
-        @test size(get_X(k), 1) == n_design + 2
+        @test length(y(k)) == n_design + 2
+        @test size(X(k), 1) == n_design + 2
     end
 
     # --- Phase 5: Predict again after update ---
@@ -95,17 +95,17 @@ f_demo(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
     # --- Phase 6: Full workflow with getters ---
     @testset "Model properties" begin
         @test kernel(k) == "gauss"
-        @test get_sigma2(k) > 0.0
-        @test length(get_theta(k)) == 1
-        @test length(get_beta(k)) > 0
+        @test sigma2(k) > 0.0
+        @test length(theta(k)) == 1
+        @test length(beta(k)) > 0
         @test isa(log_likelihood(k), Float64)
         @test isfinite(log_likelihood(k))
 
         println("\nFinal model properties:")
         println("  kernel: $(kernel(k))")
-        println("  sigma2: $(get_sigma2(k))")
-        println("  theta: $(get_theta(k))")
-        println("  beta: $(get_beta(k))")
+        println("  sigma2: $(sigma2(k))")
+        println("  theta: $(theta(k))")
+        println("  beta: $(beta(k))")
         println("  log_likelihood: $(log_likelihood(k))")
     end
 end

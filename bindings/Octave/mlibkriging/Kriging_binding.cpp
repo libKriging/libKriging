@@ -16,10 +16,34 @@ static Kriging::Parameters makeParameters(std::optional<Params*> dict) {
                                params.get<arma::mat>("theta"),
                                params.get<bool>("is_theta_estim").value_or(true),
                                params.get<arma::mat>("beta"),  // should be converted as arma::colvec by execution
-                               params.get<bool>("is_beta_estim").value_or(true)};
+                               params.get<bool>("is_beta_estim").value_or(true),
+                               params.get<double>("nugget"),
+                               params.get<bool>("is_nugget_estim").value_or(true)};
   } else {
     return Kriging::Parameters{};
   }
+}
+
+static Kriging::NoiseModel parseNoiseModel(const std::string& s) {
+  if (s == "none" || s.empty())
+    return Kriging::NoiseModel::None;
+  if (s == "nugget")
+    return Kriging::NoiseModel::Nugget;
+  if (s == "heterogeneous")
+    return Kriging::NoiseModel::Heterogeneous;
+  throw std::runtime_error("Unknown noise_model: '" + s + "'. Expected 'none', 'nugget', or 'heterogeneous'.");
+}
+
+static std::string noiseModelToString(Kriging::NoiseModel nm) {
+  switch (nm) {
+    case Kriging::NoiseModel::None:
+      return "none";
+    case Kriging::NoiseModel::Nugget:
+      return "nugget";
+    case Kriging::NoiseModel::Heterogeneous:
+      return "heterogeneous";
+  }
+  return "none";
 }
 
 namespace KrigingBinding {
@@ -28,21 +52,28 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 8}};
+                 RequiresArg::Range{3, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
   const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
   const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
-  auto km = buildObject<Kriging>(input.get<arma::vec>(0, "vector"),
-                                 input.get<arma::mat>(1, "matrix"),
-                                 input.get<std::string>(2, "kernel"),
-                                 regmodel,
-                                 normalize,
-                                 optim,
-                                 objective,
-                                 parameters);
+  const auto noise_model_str = input.getOptional<std::string>(8, "noise_model").value_or("none");
+  const auto noise_model = parseNoiseModel(noise_model_str);
+  const auto noise = input.getOptional<arma::vec>(9, "noise");
+
+  auto y = input.get<arma::vec>(0, "vector");
+  auto X = input.get<arma::mat>(1, "matrix");
+  auto kernel = input.get<std::string>(2, "kernel");
+
+  Kriging km_obj(kernel, noise_model);
+  if (noise_model == Kriging::NoiseModel::Heterogeneous && noise) {
+    km_obj.fit(y, noise.value(), X, regmodel, normalize, optim, objective, parameters);
+  } else {
+    km_obj.fit(y, X, regmodel, normalize, optim, objective, parameters);
+  }
+  auto km = buildObject<Kriging>(std::move(km_obj));
   output.set(0, km, "new object reference");
 }
 
@@ -71,21 +102,39 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 8}};
+                 RequiresArg::Range{3, 9}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
-  const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
-  const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
-  const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
-  const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
-  const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  km->fit(input.get<arma::vec>(1, "vector"),
-          input.get<arma::mat>(2, "matrix"),
-          regmodel,
-          normalize,
-          optim,
-          objective,
-          parameters);
+  if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
+    // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters])
+    const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
+    const auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
+    const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
+    const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
+    const auto parameters = makeParameters(input.getOptionalObject<Params>(8, "parameters"));
+    km->fit(input.get<arma::vec>(1, "vector"),
+            input.get<arma::vec>(2, "noise"),
+            input.get<arma::mat>(3, "matrix"),
+            regmodel,
+            normalize,
+            optim,
+            objective,
+            parameters);
+  } else {
+    // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters])
+    const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
+    const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
+    const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
+    const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
+    const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
+    km->fit(input.get<arma::vec>(1, "vector"),
+            input.get<arma::mat>(2, "matrix"),
+            regmodel,
+            normalize,
+            optim,
+            objective,
+            parameters);
+  }
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -111,34 +160,64 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{5}};
+                 RequiresArg::Range{5, 6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  auto result = km->simulate(input.get<int>(1, "nsim"),
-                             input.get<int>(2, "seed"),
-                             input.get<arma::mat>(3, "X_n"),
-                             input.get<bool>(4, "will_update"));
-  output.set(0, result, "simulated response");
+  const auto nsim = input.get<int>(1, "nsim");
+  const auto seed = input.get<int>(2, "seed");
+  const auto X_n = input.get<arma::mat>(3, "X_n");
+  if (km->noise_model() == Kriging::NoiseModel::None) {
+    // simulate(nsim, seed, X_n, will_update)
+    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "will_update"));
+    output.set(0, result, "simulated response");
+  } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
+    // simulate(nsim, seed, X_n, with_nugget, will_update)
+    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"));
+    output.set(0, result, "simulated response");
+  } else {
+    // Heterogeneous: simulate(nsim, seed, X_n, with_noise, will_update)
+    auto result
+        = km->simulate(nsim, seed, X_n, input.get<arma::vec>(4, "with_noise"), input.get<bool>(5, "will_update"));
+    output.set(0, result, "simulated response");
+  }
 }
 
 void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{4}};
+                 RequiresArg::Range{4, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  km->update(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"), input.get<bool>(3, "refit"));
+  if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
+    // update(ref, y_u, noise_u, X_u, refit)
+    km->update(input.get<arma::vec>(1, "y_u"),
+               input.get<arma::vec>(2, "noise_u"),
+               input.get<arma::mat>(3, "X_u"),
+               input.get<bool>(4, "refit"));
+  } else {
+    // update(ref, y_u, X_u, refit)
+    km->update(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"), input.get<bool>(3, "refit"));
+  }
 }
 
 void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{3}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+                 RequiresArg::Range{3, 4}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
+    // update_simulate(ref, y_u, noise_u, X_u)
+    auto result = km->update_simulate(
+        input.get<arma::vec>(1, "y_u"), input.get<arma::vec>(2, "noise_u"), input.get<arma::mat>(3, "X_u"));
+    output.set(0, result, "updated simulated values");
+  } else {
+    // update_simulate(ref, y_u, X_u)
+    auto result = km->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+    output.set(0, result, "updated simulated values");
+  }
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -213,14 +292,13 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
                  RequiresArg::Range{2, 4}};
-  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const bool return_grad = flag_output_compliance(input, 2, "return_grad", output, 1);
-  const bool want_hess = flag_output_compliance(input, 3, "want_hess", output, 2);
-  auto [ll, llgrad, llhess] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, want_hess, false);
+  const bool want_hess = input.getOptional<bool>(3, "want_hess").value_or(false);
+  auto [ll, llgrad] = km->logLikelihoodFun(input.get<arma::vec>(1, "theta"), return_grad, want_hess);
   output.set(0, ll, "ll");                  // FIXME better name
   output.setOptional(1, llgrad, "llgrad");  // FIXME better name
-  output.setOptional(2, llhess, "llhess");  // FIXME better name
 }
 
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -274,12 +352,32 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
 
-  const char* fieldnames[] = {"kernel", "optim",           "objective", "theta",     "is_theta_estim",
-                              "sigma2", "is_sigma2_estim", "X",         "centerX",   "scaleX",
-                              "y",      "centerY",         "scaleY",    "normalize", "regmodel",
-                              "beta",   "is_beta_estim",   "F",         "T",         "M",
+  const char* fieldnames[] = {"kernel",
+                              "optim",
+                              "objective",
+                              "noise_model",
+                              "theta",
+                              "is_theta_estim",
+                              "sigma2",
+                              "is_sigma2_estim",
+                              "nugget",
+                              "is_nugget_estim",
+                              "X",
+                              "centerX",
+                              "scaleX",
+                              "y",
+                              "centerY",
+                              "scaleY",
+                              "noise",
+                              "normalize",
+                              "regmodel",
+                              "beta",
+                              "is_beta_estim",
+                              "F",
+                              "T",
+                              "M",
                               "z"};
-  mxArray* model_struct = mxCreateStructMatrix(1, 1, 21, fieldnames);
+  mxArray* model_struct = mxCreateStructMatrix(1, 1, 25, fieldnames);
 
   // Helper lambda to create mxArray* from arma types using setter
   auto createMxArray = [](const auto& value) -> mxArray* {
@@ -291,16 +389,20 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   mxSetField(model_struct, 0, "kernel", mxCreateString(km->kernel().c_str()));
   mxSetField(model_struct, 0, "optim", mxCreateString(km->optim().c_str()));
   mxSetField(model_struct, 0, "objective", mxCreateString(km->objective().c_str()));
+  mxSetField(model_struct, 0, "noise_model", mxCreateString(noiseModelToString(km->noise_model()).c_str()));
   mxSetField(model_struct, 0, "theta", createMxArray(km->theta()));
   mxSetField(model_struct, 0, "is_theta_estim", mxCreateLogicalScalar(km->is_theta_estim()));
   mxSetField(model_struct, 0, "sigma2", mxCreateDoubleScalar(km->sigma2()));
   mxSetField(model_struct, 0, "is_sigma2_estim", mxCreateLogicalScalar(km->is_sigma2_estim()));
+  mxSetField(model_struct, 0, "nugget", mxCreateDoubleScalar(km->nugget()));
+  mxSetField(model_struct, 0, "is_nugget_estim", mxCreateLogicalScalar(km->is_nugget_estim()));
   mxSetField(model_struct, 0, "X", createMxArray(km->X()));
   mxSetField(model_struct, 0, "centerX", createMxArray(km->centerX()));
   mxSetField(model_struct, 0, "scaleX", createMxArray(km->scaleX()));
   mxSetField(model_struct, 0, "y", createMxArray(km->y()));
   mxSetField(model_struct, 0, "centerY", mxCreateDoubleScalar(km->centerY()));
   mxSetField(model_struct, 0, "scaleY", mxCreateDoubleScalar(km->scaleY()));
+  mxSetField(model_struct, 0, "noise", createMxArray(km->noise()));
   mxSetField(model_struct, 0, "normalize", mxCreateLogicalScalar(km->normalize()));
   mxSetField(model_struct, 0, "regmodel", mxCreateString(Trend::toString(km->regmodel()).c_str()));
   mxSetField(model_struct, 0, "beta", createMxArray(km->beta()));
@@ -521,6 +623,46 @@ void is_sigma2_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   output.set(0, km->is_sigma2_estim(), "is_sigma2_estim ");
+}
+
+void noise_model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, noiseModelToString(km->noise_model()), "noise_model");
+}
+
+void nugget(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->nugget(), "nugget");
+}
+
+void is_nugget_estim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->is_nugget_estim(), "is_nugget_estim");
+}
+
+void noise(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->noise(), "noise");
 }
 
 }  // namespace KrigingBinding

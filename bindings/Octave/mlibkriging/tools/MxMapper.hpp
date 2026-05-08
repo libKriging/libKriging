@@ -101,6 +101,9 @@ class MxMapper : public NonCopyable {
     m_accesses.set(I);
     // mxGetClassName(m_p[I]); // if you need more info
     mxArray* ref_array = mxGetProperty(m_p[I], 0, "ref");  // by convention how we build object
+    if (ref_array == nullptr) {
+      return std::nullopt;  // argument is not an object with a "ref" property
+    }
     ObjectCollector::ref_t ref = getObject(ref_array);
     auto ptr = ObjectCollector::getObject<T>(ref);
     if (ptr == nullptr) {

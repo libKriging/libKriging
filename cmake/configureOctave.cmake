@@ -21,11 +21,40 @@ find_program(OCTAVE_MKOCTFILE
         NAMES mkoctfile
         )
 
+# ── Flatpak detection ────────────────────────────────────────────────────
+# Flatpak-installed Octave reports /app/... paths (include dirs, library
+# dirs, compiler flags) that only exist inside the sandbox.  We detect this
+# early and compute a host-side prefix so that every /app/ path can be
+# rewritten to the real location on the host filesystem.
+set(_FLATPAK_APP_PREFIX "")
+execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p OCTLIBDIR
+        OUTPUT_VARIABLE _oct_libdir_check
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (_oct_libdir_check MATCHES "^/app/" AND NOT EXISTS "${_oct_libdir_check}")
+    execute_process(
+        COMMAND bash -c "find $ENV{HOME}/.local/share/flatpak/app/org.octave.Octave -path '*/files/lib' -type d -print -quit 2>/dev/null || true"
+        OUTPUT_VARIABLE _flatpak_lib
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (_flatpak_lib)
+        # _flatpak_lib is e.g. .../files/lib  →  prefix is .../files
+        get_filename_component(_FLATPAK_APP_PREFIX "${_flatpak_lib}" DIRECTORY)
+        message(STATUS "Flatpak Octave detected – host prefix: ${_FLATPAK_APP_PREFIX}")
+    endif()
+endif()
+
+# Helper macro: rewrite /app/... → <flatpak-prefix>/... in a variable
+macro(_flatpak_rewrite VAR)
+    if (_FLATPAK_APP_PREFIX AND ${VAR} MATCHES "/app/")
+        string(REPLACE "/app/" "${_FLATPAK_APP_PREFIX}/" ${VAR} "${${VAR}}")
+    endif()
+endmacro()
+
 # below: shell script to list all paramters of mkoctfile
 #  for i in ALL_CFLAGS ALL_CXXFLAGS ALL_FFLAGS ALL_LDFLAGS BLAS_LIBS CC CFLAGS CPICFLAG CPPFLAGS CXX CXXFLAGS CXXPICFLAG DL_LD DL_LDFLAGS F77 F77_INTEGER8_FLAG FFLAGS FPICFLAG INCFLAGS INCLUDEDIR LAPACK_LIBS LDFLAGS LD_CXX LD_STATIC_FLAG LFLAGS LIBDIR LIBOCTAVE LIBOCTINTERP OCTAVE_LINK_OPTS OCTINCLUDEDIR OCTAVE_LIBS OCTAVE_LINK_DEPS OCTLIBDIR OCT_LINK_DEPS OCT_LINK_OPTS RDYNAMIC_FLAG SPECIAL_MATH_LIB XTRA_CFLAGS XTRA_CXXFLAGS ; do echo $i=$(mkoctfile -p $i); done
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CPPFLAGS
         OUTPUT_VARIABLE OCT_CPPFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+_flatpak_rewrite(OCT_CPPFLAGS)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(OCT_CPPFLAGS "${OCT_CPPFLAGS} -DMEX_DEBUG")
 endif ()
@@ -36,6 +65,7 @@ execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p CXXPICFLAG
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p ALL_CXXFLAGS
         OUTPUT_VARIABLE OCT_CXXFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+_flatpak_rewrite(OCT_CXXFLAGS)
 if (WIN32)
 	# Provided options from mkoctfile could be better if they are split into target_include_directories and set_target_properties(... COMPILE_FLAGS ...)
 	# Work around misunderstanding of compiler with backslashs include paths
@@ -45,14 +75,16 @@ if (WIN32)
 		logFatalError("Unexpected configuration : WIN32 + ${CMAKE_CXX_COMPILER_ID}")
 	endif()
 endif()
-		
+
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p DL_LDFLAGS
         OUTPUT_VARIABLE OCT_DLLDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+_flatpak_rewrite(OCT_DLLDFLAGS)
 separate_arguments(OCT_DLLDFLAGS) # transform in list
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LDFLAGS
         OUTPUT_VARIABLE OCT_LDFLAGS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+_flatpak_rewrite(OCT_LDFLAGS)
 separate_arguments(OCT_LDFLAGS) # transform in list
 #execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p LFLAGS
 #        OUTPUT_VARIABLE OCT_LFLAGS
@@ -70,6 +102,7 @@ separate_arguments(OCT_LDFLAGS) # transform in list
 execute_process(COMMAND ${OCTAVE_MKOCTFILE} -p OCTLIBDIR
         OUTPUT_VARIABLE OCTAVE_LIBRARIES_PATHS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+_flatpak_rewrite(OCTAVE_LIBRARIES_PATHS)
 
 execute_process(COMMAND ${OCTAVE_CONFIG_EXECUTABLE} -v
         OUTPUT_VARIABLE OCTAVE_VERSION_STRING
@@ -152,12 +185,35 @@ macro(octave_add_mex)
     endif()
     #mkoctfile compile = CXX OCT_CPPFLAGS OCT_CXXPICFLAGS OCT_CXXFLAGS -I. -DMEX_DEBUG
     set_target_properties(${ARGS_NAME} PROPERTIES
-            COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}") 
+            COMPILE_FLAGS "${OCT_CPPFLAGS} ${OCT_CXXPICFLAGS} ${OCT_CXXFLAGS}")
     # https://stackoverflow.com/questions/48176641/linking-to-an-executable-under-osx-with-cmake si pb avec bundle_loader
     #mkoctfile link = CXX OCT_CXXFLAGS OCT_DLLDFLAGS OCT_LDFLAGS OCT_LFLAGS OCT_LIBS
     target_link_options(${ARGS_NAME}
             PRIVATE ${OCT_DLLDFLAGS} ${OCT_LDFLAGS}
             )
+    # Flatpak remaps host /usr/lib/... to /run/host/usr/lib/... inside the
+    # sandbox.  Add the /run/host mirror to RPATH so the mex can find system
+    # libs (libblas, liblapack, libgomp, …) when loaded by Flatpak Octave.
+    # We also resolve symlinks (e.g. /etc/alternatives) to find the real
+    # library directories, since those symlink chains are broken in Flatpak.
+    if (_FLATPAK_APP_PREFIX AND NOT APPLE)
+        # Include both the Flatpak-internal path (/app/lib/...) for liboctmex
+        # and the /run/host mirror for system libs (libblas, liblapack, …)
+        set(_flatpak_rpaths "${_oct_libdir_check};/run/host/usr/lib/x86_64-linux-gnu;/run/host/usr/lib")
+        # Resolve actual BLAS/LAPACK library paths (they may go through
+        # /etc/alternatives symlinks that are broken inside Flatpak)
+        foreach(_lib BLAS_LIBRARY LAPACK_LIBRARY)
+            if (${_lib})
+                get_filename_component(_real "${${_lib}}" REALPATH)
+                get_filename_component(_dir "${_real}" DIRECTORY)
+                list(APPEND _flatpak_rpaths "/run/host${_dir}")
+            endif()
+        endforeach()
+        list(REMOVE_DUPLICATES _flatpak_rpaths)
+        set_target_properties(${ARGS_NAME} PROPERTIES
+                BUILD_RPATH "${_flatpak_rpaths}"
+                INSTALL_RPATH "${_flatpak_rpaths}")
+    endif()
 endmacro()
 
 macro(octave_add_test)

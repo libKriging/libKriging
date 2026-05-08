@@ -586,3 +586,27 @@ LIBKRIGING_EXPORT double LinearAlgebra::trace_prod(const arma::mat& A, const arm
 
   return sum;
 }
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve_lower(const arma::mat& L, const arma::mat& B) {
+  return arma::solve(arma::trimatl(L), B);
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve_upper(const arma::mat& U, const arma::mat& B) {
+  return arma::solve(arma::trimatu(U), B);
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve_upper(const arma::mat& U, const arma::mat& B) {
+  // X*U = B → U'*X' = B' → X = solve_lower(U', B')'
+  return arma::solve(arma::trimatl(U.t()), B.t()).t();
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::inv_sympd(const arma::mat& L) {
+  return arma::solve(arma::trimatu(L.t()), arma::solve(arma::trimatl(L), arma::eye(L.n_rows, L.n_rows)));
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_upper(const arma::mat& A) {
+  return arma::chol(A);
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::qr_econ(arma::mat& Q, arma::mat& R, const arma::mat& A) {
+  arma::qr_econ(Q, R, A);
+}

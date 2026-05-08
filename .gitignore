@@ -44,6 +44,14 @@
 # macOS metadata files
 .DS_Store
 
+# Python virtual environments
+venv
+**/venv/
+.venv
+**/.venv/
+__pycache__
+**/__pycache__
+
 # build stuffs
 cmake-build*/
 build*/
@@ -73,4 +81,16 @@ tests/*_test
 tests/*_example
 tests/GetVersion
 tests/KSTestValidation
-bench
+bench# Generated test/simulation CSV files at root level
+*.csv
+dump.json
+wget-log
+tocontinue.md
+sims*.csv
+X_sim*.csv
+test_data*.json
+Testing/
+# op tests
+*-main
+# focus tmp tests like test-abc-1.R
+**/test-*-*.*

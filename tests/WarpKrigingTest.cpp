@@ -1,0 +1,1625 @@
+#define _USE_MATH_DEFINES  // required for Visual Studio
+/**
+ * @file test_WarpKriging.cpp
+ * @brief Tests for the WarpKriging class.
+ *
+ * Tests cover:
+ *  1. Individual warp functions (forward + backward)
+ *  2. Continuous-only: Kumaraswamy warping on 1D function
+ *  3. Categorical-only: embedding on a purely discrete problem
+ *  4. Mixed continuous + categorical
+ *  5. Ordinal variable
+ *  6. NeuralMono warping
+ *  7. Conditional simulations with mixed variables
+ *  8. Incremental update
+ */
+
+#include "libKriging/Kriging.hpp"
+#include "libKriging/LinearAlgebra.hpp"
+#include "libKriging/WarpKriging.hpp"
+
+#include <cassert>
+#include <cmath>
+#include <iostream>
+
+using namespace libKriging;
+
+// -- helpers ---------------------------------------------------------------
+
+static double f1d(double x) {
+  return 1.0 - 0.5 * (std::sin(12.0 * x) / (1.0 + x) + 2.0 * std::cos(7.0 * x) * std::pow(x, 5) + 0.7);
+}
+
+/// Check that the numerical and analytical gradients of a warp agree.
+static double check_warp_grad(IWarp& w, const arma::vec& x) {
+  arma::vec params = w.get_params();
+  if (params.empty())
+    return 0.0;  // no params
+
+  arma::mat Phi = w.forward(x);
+  arma::mat dL_dPhi = arma::randn(Phi.n_rows, Phi.n_cols);
+
+  arma::vec grad_analytic = w.backward(x, dL_dPhi);
+
+  // loss = sum(dL_dPhi .* Phi)  -- linear in Phi
+  auto loss_fn = [&](const arma::vec& p) -> double {
+    w.set_params(p);
+    arma::mat out = w.forward(x);
+    return arma::accu(dL_dPhi % out);
+  };
+
+  const double h = 1e-5;
+  arma::vec grad_numeric(params.n_elem);
+  for (arma::uword i = 0; i < params.n_elem; ++i) {
+    arma::vec pp = params, pm = params;
+    pp(i) += h;
+    pm(i) -= h;
+    grad_numeric(i) = (loss_fn(pp) - loss_fn(pm)) / (2.0 * h);
+  }
+  w.set_params(params);  // restore
+
+  double rel = arma::norm(grad_analytic - grad_numeric) / (arma::norm(grad_numeric) + 1e-12);
+  return rel;
+}
+
+// ==========================================================================
+//  Test 1: individual warp functions
+// ==========================================================================
+static void test_warp_functions() {
+  std::cout << "=== Test 1: individual warp functions ===" << std::endl;
+
+  arma::vec x_cont = arma::linspace(0.01, 0.99, 20);
+  arma::vec x_disc = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};
+
+  // -- Affine --
+  {
+    WarpAffine w;
+    w.set_params({2.0, -0.5});
+    arma::mat out = w.forward(x_cont);
+    assert(out.n_rows == 20 && out.n_cols == 1);
+    // w(0.5) = 2*0.5 - 0.5 = 0.5
+    double rel = check_warp_grad(w, x_cont);
+    std::cout << "  Affine grad error:      " << rel << std::endl;
+    assert(rel < 1e-6);
+  }
+
+  // -- BoxCox --
+  {
+    WarpBoxCox w;
+    w.set_params({0.5});
+    arma::mat out = w.forward(x_cont);
+    assert(out.is_finite());
+    double rel = check_warp_grad(w, x_cont);
+    std::cout << "  BoxCox grad error:      " << rel << std::endl;
+    assert(rel < 1e-4);
+  }
+
+  // -- Kumaraswamy --
+  {
+    WarpKumaraswamy w;
+    arma::mat out = w.forward(x_cont);
+    assert(out.is_finite());
+    double rel = check_warp_grad(w, x_cont);
+    std::cout << "  Kumaraswamy grad error: " << rel << std::endl;
+    assert(rel < 1e-4);
+  }
+
+  // -- NeuralMono --
+  {
+    WarpNeuralMono w(8, 42);
+    arma::mat out = w.forward(x_cont);
+    assert(out.is_finite());
+    // Check monotonicity
+    bool mono = true;
+    for (arma::uword i = 1; i < out.n_rows; ++i)
+      if (out(i, 0) < out(i - 1, 0) - 1e-10)
+        mono = false;
+    std::cout << "  NeuralMono monotone:    " << (mono ? "yes" : "NO") << std::endl;
+    double rel = check_warp_grad(w, x_cont);
+    std::cout << "  NeuralMono grad error:  " << rel << std::endl;
+    assert(rel < 1e-4);
+  }
+
+  // -- MLP (unconstrained, multi-dim output) --
+  {
+    WarpMLP w({16, 8}, 3, WarpMLP::Act::SELU, 42);
+    arma::mat out = w.forward(x_cont);
+    assert(out.n_rows == 20 && out.n_cols == 3);
+    assert(out.is_finite());
+    std::cout << "  MLP output shape:       " << out.n_rows << " x " << out.n_cols << std::endl;
+    std::cout << "  MLP n_params:           " << w.n_params() << std::endl;
+    double rel = check_warp_grad(w, x_cont);
+    std::cout << "  MLP grad error:         " << rel << std::endl;
+    assert(rel < 1e-4);
+
+    // Also test with Tanh activation
+    WarpMLP w2({8}, 2, WarpMLP::Act::Tanh, 99);
+    double rel2 = check_warp_grad(w2, x_cont);
+    std::cout << "  MLP(Tanh) grad error:   " << rel2 << std::endl;
+    assert(rel2 < 1e-4);
+  }
+
+  // -- Embedding --
+  {
+    WarpEmbedding w(3, 2, 42);
+    arma::mat out = w.forward(x_disc);
+    assert(out.n_rows == 10 && out.n_cols == 2);
+    // Same level → same embedding
+    assert(arma::approx_equal(out.row(0), out.row(3), "absdiff", 1e-12));
+    double rel = check_warp_grad(w, x_disc);
+    std::cout << "  Embedding grad error:   " << rel << std::endl;
+    assert(rel < 1e-6);
+  }
+
+  // -- Ordinal --
+  {
+    WarpOrdinal w(4, 42);
+    arma::vec x_ord = {0, 1, 2, 3, 0, 1, 2, 3};
+    arma::mat out = w.forward(x_ord);
+    assert(out.is_finite());
+    // Check ordering
+    bool ordered = true;
+    for (arma::uword l = 1; l < 4; ++l) {
+      // find first occurrence of level l and l-1
+      double z_l = 0, z_lm1 = 0;
+      for (arma::uword i = 0; i < x_ord.n_elem; ++i) {
+        if (std::round(x_ord(i)) == l)
+          z_l = out(i, 0);
+        if (std::round(x_ord(i)) == l - 1)
+          z_lm1 = out(i, 0);
+      }
+      if (z_l <= z_lm1)
+        ordered = false;
+    }
+    std::cout << "  Ordinal ordered:        " << (ordered ? "yes" : "NO") << std::endl;
+    double rel = check_warp_grad(w, x_ord);
+    std::cout << "  Ordinal grad error:     " << rel << std::endl;
+    assert(rel < 1e-5);
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 2: continuous-only with Kumaraswamy
+// ==========================================================================
+static void test_continuous_kumaraswamy() {
+  std::cout << "=== Test 2: continuous + Kumaraswamy warping ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  WarpKriging model({"kumaraswamy"}, "gauss");
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  std::cout << model.summary();
+
+  auto [mean_train, stdev_train, _cov1, _md1, _sd1] = model.predict(X_mat, true, false);
+  double max_err = arma::max(arma::abs(mean_train - y));
+  std::cout << "  Max train interp error: " << max_err << std::endl;
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
+  arma::mat xp(50, 1);
+  xp.col(0) = x_pred;
+  auto [mean, stdev, _cov2, _md2, _sd2] = model.predict(xp, true, false);
+  arma::vec ytrue(50);
+  for (arma::uword i = 0; i < 50; ++i)
+    ytrue(i) = f1d(x_pred(i));
+  double rmse = std::sqrt(arma::mean(arma::square(mean - ytrue)));
+  std::cout << "  RMSE on dense grid:     " << rmse << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 3: categorical-only
+// ==========================================================================
+static void test_categorical_only() {
+  std::cout << "=== Test 3: categorical-only (embedding) ===" << std::endl;
+
+  // 3 categories with different means
+  double mu[] = {1.0, 5.0, 3.0};
+  arma::uword n = 15;
+  arma::mat X(n, 1);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(42);
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::uword level = i % 3;
+    X(i, 0) = static_cast<double>(level);
+    y(i) = mu[level] + 0.1 * arma::randn<arma::vec>(1)(0);
+  }
+
+  WarpKriging model({"categorical(3,2)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  std::cout << model.summary();
+
+  // Predict at each category
+  arma::mat X_test(3, 1);
+  X_test(0, 0) = 0.0;
+  X_test(1, 0) = 1.0;
+  X_test(2, 0) = 2.0;
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
+
+  std::cout << "  Predictions per level:\n";
+  for (int l = 0; l < 3; ++l)
+    std::cout << "    level " << l << ": mean=" << mean(l) << ", stdev=" << stdev(l) << ", true_mu=" << mu[l]
+              << std::endl;
+
+  // Check that predictions are reasonable
+  for (int l = 0; l < 3; ++l)
+    assert(std::abs(mean(l) - mu[l]) < 2.0);
+
+  // Inspect learned embeddings
+  const auto& emb = dynamic_cast<const WarpEmbedding&>(model.warp(0));
+  std::cout << "  Learned embeddings:\n";
+  arma::vec lev = {0, 1, 2};
+  arma::mat E = emb.forward(lev);
+  for (int l = 0; l < 3; ++l)
+    std::cout << "    level " << l << ": " << E.row(l);
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 3b: categorical prediction at training points (interpolation check)
+//
+//  A well-fitted GP must interpolate its training data exactly (up to the
+//  tiny jitter nugget).  When predict() accidentally scales the cross-
+//  correlation by σ², the predicted mean at training points is
+//    F*β + σ² * r * R⁻¹(y - F*β)  instead of  F*β + r * R⁻¹(y - F*β),
+//  which only equals y when σ² == 1.
+// ==========================================================================
+static void test_categorical_predict_at_train() {
+  std::cout << "=== Test 3b: categorical predict at training points ===" << std::endl;
+
+  // 3 categories with well-separated means → σ² >> 1
+  double mu[] = {1.0, 10.0, 50.0};
+  arma::uword n = 15;
+  arma::mat X(n, 1);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(42);
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::uword level = i % 3;
+    X(i, 0) = static_cast<double>(level);
+    y(i) = mu[level] + 0.01 * arma::randn<arma::vec>(1)(0);
+  }
+
+  WarpKriging model({"categorical(3,2)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model.summary();
+
+  // Predict at training points — must recover training values
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X, true, false);
+
+  double max_mean_err = arma::max(arma::abs(mean - y));
+  double max_stdev = arma::max(stdev);
+  std::cout << "  sigma2 = " << model.sigma2() << std::endl;
+  std::cout << "  Max |pred_mean - y_train| = " << max_mean_err << std::endl;
+  std::cout << "  Max pred_stdev            = " << max_stdev << std::endl;
+
+  // With the nugget 1e-8 on diagonal, interpolation error should be tiny
+  assert(max_mean_err < 0.5 && "Prediction at training points must interpolate y");
+  assert(max_stdev < 1.0 && "Stdev at training points must be near zero");
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 3c: ordinal predict at training points (analogous to 3b)
+// ==========================================================================
+static void test_ordinal_predict_at_train() {
+  std::cout << "=== Test 3c: ordinal predict at training points ===" << std::endl;
+
+  // 4 ordinal levels with well-separated means → σ² >> 1
+  double mu[] = {2.0, 8.0, 20.0, 45.0};
+  arma::uword L = 4;
+  arma::uword n = 20;
+  arma::mat X(n, 1);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(42);
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::uword level = i % L;
+    X(i, 0) = static_cast<double>(level);
+    y(i) = mu[level] + 0.01 * arma::randn<arma::vec>(1)(0);
+  }
+
+  WarpKriging model({"ordinal(4)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model.summary();
+
+  // Predict at training points — must recover training values
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X, true, false);
+
+  double max_mean_err = arma::max(arma::abs(mean - y));
+  double max_stdev = arma::max(stdev);
+  std::cout << "  sigma2 = " << model.sigma2() << std::endl;
+  std::cout << "  Max |pred_mean - y_train| = " << max_mean_err << std::endl;
+  std::cout << "  Max pred_stdev            = " << max_stdev << std::endl;
+
+  // With the nugget 1e-8 on diagonal, interpolation error should be tiny
+  assert(max_mean_err < 0.5 && "Ordinal: prediction at training points must interpolate y");
+  assert(max_stdev < 1.0 && "Ordinal: stdev at training points must be near zero");
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 4: mixed continuous + categorical
+// ==========================================================================
+static void test_mixed() {
+  std::cout << "=== Test 4: mixed (1 continuous + 1 categorical) ===" << std::endl;
+
+  // f(x, cat) = sin(x) * offset[cat]
+  double offset[] = {1.0, 2.0, 0.5};
+  arma::uword n = 30;
+  arma::mat X(n, 2);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(99);
+
+  for (arma::uword i = 0; i < n; ++i) {
+    double xi = arma::randu<arma::vec>(1)(0);
+    arma::uword cat = i % 3;
+    X(i, 0) = xi;
+    X(i, 1) = static_cast<double>(cat);
+    y(i) = std::sin(2.0 * M_PI * xi) * offset[cat];
+  }
+
+  WarpKriging model(
+      {
+          "kumaraswamy",      // x0: continuous
+          "categorical(3,2)"  // x1: 3-level categorical
+      },
+      "matern5_2");
+
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model.summary();
+
+  // Predict on a grid per category
+  arma::vec xc = arma::linspace(0.01, 0.99, 20);
+  for (int cat = 0; cat < 3; ++cat) {
+    arma::mat X_test(20, 2);
+    X_test.col(0) = xc;
+    X_test.col(1).fill(static_cast<double>(cat));
+
+    auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
+
+    arma::vec ytrue(20);
+    for (arma::uword i = 0; i < 20; ++i)
+      ytrue(i) = std::sin(2.0 * M_PI * xc(i)) * offset[cat];
+
+    double rmse = std::sqrt(arma::mean(arma::square(mean - ytrue)));
+    std::cout << "  cat=" << cat << "  RMSE=" << rmse << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 5: ordinal variable
+// ==========================================================================
+static void test_ordinal() {
+  std::cout << "=== Test 5: ordinal variable ===" << std::endl;
+
+  // f(level) = level^2  (monotone in level)
+  arma::uword L = 5;
+  arma::uword n = 20;
+  arma::mat X(n, 1);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(7);
+
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::uword level = i % L;
+    X(i, 0) = static_cast<double>(level);
+    y(i) = static_cast<double>(level * level) + 0.1 * arma::randn<arma::vec>(1)(0);
+  }
+
+  WarpKriging model({"ordinal(5)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  std::cout << model.summary();
+
+  arma::mat X_test(L, 1);
+  for (arma::uword l = 0; l < L; ++l)
+    X_test(l, 0) = static_cast<double>(l);
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_test, true, false);
+
+  std::cout << "  Predictions:\n";
+  for (arma::uword l = 0; l < L; ++l)
+    std::cout << "    level " << l << ": pred=" << mean(l) << ", true=" << l * l << std::endl;
+
+  // Inspect learned positions
+  std::cout << "  Warp: " << model.warp(0).describe() << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 6: NeuralMono warping
+// ==========================================================================
+static void test_neural_mono() {
+  std::cout << "=== Test 6: NeuralMono warping ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 10);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  WarpKriging model({"neural_mono(8)"}, "gauss");
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  std::cout << model.summary();
+
+  auto [mean_train, stdev_train, _cov1, _md1, _sd1] = model.predict(X_mat, true, false);
+  double max_err = arma::max(arma::abs(mean_train - y));
+  std::cout << "  Max train interp error: " << max_err << std::endl;
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 7: MLP warping (unconstrained, multi-dim output)
+// ==========================================================================
+static void test_mlp_warp() {
+  std::cout << "=== Test 7: MLP warping ===" << std::endl;
+
+  // --- 7a: 1D function with MLP warp ---
+  arma::vec X_train = arma::linspace(0.01, 0.99, 10);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  WarpKriging model1d({"mlp(16:8,3,selu)"}, "gauss");
+  model1d.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model1d.summary();
+
+  auto [mean_train, stdev_train, _c1, _md1, _sd1] = model1d.predict(X_mat, true, false);
+  double max_err = arma::max(arma::abs(mean_train - y));
+  std::cout << "  [1D] Max train interp error:  " << max_err << std::endl;
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
+  arma::mat xp(50, 1);
+  xp.col(0) = x_pred;
+  auto [mean, stdev, _c2, _md2, _sd2] = model1d.predict(xp, true, false);
+  arma::vec ytrue(50);
+  for (arma::uword i = 0; i < 50; ++i)
+    ytrue(i) = f1d(x_pred(i));
+  double rmse = std::sqrt(arma::mean(arma::square(mean - ytrue)));
+  std::cout << "  [1D] RMSE on dense grid:      " << rmse << std::endl;
+
+  // --- 7b: mixed MLP + categorical ---
+  double offset[] = {1.0, 2.0, 0.5};
+  arma::uword n = 30;
+  arma::mat X_mix(n, 2);
+  arma::vec y_mix(n);
+  arma::arma_rng::set_seed(99);
+  for (arma::uword i = 0; i < n; ++i) {
+    double xi = arma::randu<arma::vec>(1)(0);
+    arma::uword cat = i % 3;
+    X_mix(i, 0) = xi;
+    X_mix(i, 1) = static_cast<double>(cat);
+    y_mix(i) = std::sin(2.0 * M_PI * xi) * offset[cat];
+  }
+
+  WarpKriging model_mix(
+      {
+          "mlp(16:8,2,tanh)",  // x0: MLP → ℝ²
+          "categorical(3,2)"   // x1: 3 cats → ℝ²
+      },
+      "matern5_2");
+
+  model_mix.fit(y_mix, X_mix, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << "  [Mixed MLP+cat] summary:\n" << model_mix.summary();
+
+  arma::vec xc = arma::linspace(0.01, 0.99, 20);
+  for (int cat = 0; cat < 3; ++cat) {
+    arma::mat X_test(20, 2);
+    X_test.col(0) = xc;
+    X_test.col(1).fill(static_cast<double>(cat));
+    auto [m, s, _cov, _md, _sd] = model_mix.predict(X_test, true, false);
+    arma::vec yt(20);
+    for (arma::uword i = 0; i < 20; ++i)
+      yt(i) = std::sin(2.0 * M_PI * xc(i)) * offset[cat];
+    double cat_rmse = std::sqrt(arma::mean(arma::square(m - yt)));
+    std::cout << "  [Mixed] cat=" << cat << "  RMSE=" << cat_rmse << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 8: simulate with mixed variables
+// ==========================================================================
+static void test_simulate_mixed() {
+  std::cout << "=== Test 8: simulate (mixed) ===" << std::endl;
+
+  double offset[] = {1.0, 3.0};
+  arma::uword n = 20;
+  arma::mat X(n, 2);
+  arma::vec y(n);
+  arma::arma_rng::set_seed(42);
+  for (arma::uword i = 0; i < n; ++i) {
+    X(i, 0) = arma::randu<arma::vec>(1)(0);
+    X(i, 1) = static_cast<double>(i % 2);
+    y(i) = std::sin(2.0 * M_PI * X(i, 0)) * offset[i % 2];
+  }
+
+  WarpKriging model({"affine", "categorical(2,2)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  arma::mat X_sim(10, 2);
+  X_sim.col(0) = arma::linspace(0.1, 0.9, 10);
+  X_sim.col(1).fill(0.0);
+
+  arma::mat sims = model.simulate(30, 123, X_sim);
+  assert(sims.n_rows == 10 && sims.n_cols == 30);
+  assert(sims.is_finite());
+
+  auto [mean, stdev, _cov, _md, _sd] = model.predict(X_sim, true, false);
+  arma::vec sim_mean = arma::mean(sims, 1);
+  double rel_diff = arma::norm(sim_mean - mean) / arma::norm(mean);
+  std::cout << "  Sim mean vs kriging mean rel diff: " << rel_diff << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 9: update
+// ==========================================================================
+static void test_update() {
+  std::cout << "=== Test 9: update ===" << std::endl;
+
+  arma::mat X0 = {{0.1, 0.0}, {0.5, 1.0}, {0.9, 0.0}};
+  arma::vec y0 = {1.0, 3.0, 0.5};
+
+  WarpKriging model({"none", "categorical(2,1)"}, "gauss");
+  model.fit(y0, X0, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
+
+  std::cout << "  n before update: " << model.y().n_elem << std::endl;
+
+  arma::mat X_new = {{0.3, 1.0}, {0.7, 0.0}};
+  arma::vec y_new = {2.0, 1.5};
+  model.update(y_new, X_new);
+
+  assert(model.y().n_elem == 5);
+  std::cout << "  n after update:  " << model.y().n_elem << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 10: WarpMLP param round-trip
+// ==========================================================================
+static void test_mlp_params_roundtrip() {
+  std::cout << "=== Test 10: WarpMLP param round-trip ===" << std::endl;
+
+  WarpMLP w({16, 8}, 3, WarpMLP::Act::SELU, 42);
+  arma::vec params = w.get_params();
+  arma::vec x = arma::linspace(0.0, 1.0, 10);
+  arma::mat out1 = w.forward(x);
+
+  // Perturb weights
+  arma::vec perturbed = params + 0.01 * arma::randn(params.n_elem);
+  w.set_params(perturbed);
+  arma::mat out2 = w.forward(x);
+  assert(arma::norm(out1 - out2, "fro") > 1e-10);  // output must differ
+
+  // Restore → must match original
+  w.set_params(params);
+  arma::mat out3 = w.forward(x);
+  assert(arma::approx_equal(out1, out3, "absdiff", 1e-12));
+
+  std::cout << "  n_params = " << w.n_params() << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 11: Branin 2D (multi-dimensional continuous with MLP warp)
+// ==========================================================================
+static void test_branin_2d_mlp() {
+  std::cout << "=== Test 11: Branin 2D with MLP warping ===" << std::endl;
+
+  auto branin = [](double x1, double x2) -> double {
+    double a = 1.0, b = 5.1 / (4.0 * M_PI * M_PI);
+    double c = 5.0 / M_PI, r = 6.0, s = 10.0, t = 1.0 / (8.0 * M_PI);
+    return a * std::pow(x2 - b * x1 * x1 + c * x1 - r, 2) + s * (1.0 - t) * std::cos(x1) + s;
+  };
+
+  arma::uword n = 25;
+  arma::arma_rng::set_seed(77);
+  arma::mat X = arma::randu<arma::mat>(n, 2);
+  arma::vec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = branin(X(i, 0) * 15.0 - 5.0, X(i, 1) * 15.0);
+
+  // Each continuous input gets its own MLP warp → ℝ²
+  WarpKriging model({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "matern5_2");
+
+  model.fit(y, X, Trend::RegressionModel::Constant, true, "Adam", "LL", {{"max_iter_adam", "300"}});
+
+  std::cout << model.summary();
+
+  // Predict on training data (interpolation check)
+  auto [mean_train, stdev_train, _c1, _md1, _sd1] = model.predict(X, true, false);
+  double max_interp = arma::max(arma::abs(mean_train - y));
+  std::cout << "  Max train interpolation error: " << max_interp << std::endl;
+  std::cout << "  Max train stdev:               " << arma::max(stdev_train) << std::endl;
+
+  // Predict on new test points
+  arma::mat X_test = arma::randu<arma::mat>(15, 2);
+  auto [mean_test, stdev_test, _c2, _md2, _sd2] = model.predict(X_test, true, false);
+  assert(mean_test.n_elem == 15);
+  assert(stdev_test.n_elem == 15);
+  assert(mean_test.is_finite());
+  assert(stdev_test.is_finite());
+
+  std::cout << "  Predicted mean range:  [" << arma::min(mean_test) << ", " << arma::max(mean_test) << "]" << std::endl;
+  std::cout << "  Predicted stdev range: [" << arma::min(stdev_test) << ", " << arma::max(stdev_test) << "]"
+            << std::endl;
+
+  // Simulate
+  arma::mat sims = model.simulate(20, 42, X_test);
+  assert(sims.n_rows == 15 && sims.n_cols == 20);
+  assert(sims.is_finite());
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 12: Comparison None (baseline) vs MLP warping
+// ==========================================================================
+static void test_none_vs_mlp() {
+  std::cout << "=== Test 12: None vs MLP comparison ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 12);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 50);
+  arma::mat xp(50, 1);
+  xp.col(0) = x_pred;
+  arma::vec ytrue(50);
+  for (arma::uword i = 0; i < 50; ++i)
+    ytrue(i) = f1d(x_pred(i));
+
+  // Model A: no warping (baseline, like standard Kriging)
+  WarpKriging model_none({"none"}, "gauss");
+  model_none.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  auto [mean_none, sd_none, _c1, _md1, _sd1] = model_none.predict(xp, true, false);
+  double rmse_none = std::sqrt(arma::mean(arma::square(mean_none - ytrue)));
+
+  // Model B: MLP warping
+  WarpKriging model_mlp({"mlp(16:8,2,selu)"}, "gauss");
+  model_mlp.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "300"}});
+  auto [mean_mlp, sd_mlp, _c2, _md2, _sd2] = model_mlp.predict(xp, true, false);
+  double rmse_mlp = std::sqrt(arma::mean(arma::square(mean_mlp - ytrue)));
+
+  // Model C: Kumaraswamy warping
+  WarpKriging model_kuma({"kumaraswamy"}, "gauss");
+  model_kuma.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+  auto [mean_kuma, sd_kuma, _c3, _md3, _sd3] = model_kuma.predict(xp, true, false);
+  double rmse_kuma = std::sqrt(arma::mean(arma::square(mean_kuma - ytrue)));
+
+  std::cout << "  RMSE None (baseline):    " << rmse_none << std::endl;
+  std::cout << "  RMSE Kumaraswamy:        " << rmse_kuma << std::endl;
+  std::cout << "  RMSE MLP:                " << rmse_mlp << std::endl;
+  std::cout << "  LL None:   " << model_none.logLikelihood() << std::endl;
+  std::cout << "  LL Kuma:   " << model_kuma.logLikelihood() << std::endl;
+  std::cout << "  LL MLP:    " << model_mlp.logLikelihood() << std::endl;
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 13: logLikelihoodFun (GP hyper-params evaluation)
+// ==========================================================================
+static void test_loglikelihood_fun() {
+  std::cout << "=== Test 13: logLikelihoodFun ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  WarpKriging model({"affine"}, "gauss");
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "none", "LL");
+
+  // Evaluate gradient at a fixed, benign theta away from any optimum so the FD
+  // check is well-conditioned (avoids truncation-noise at large-theta plateaus
+  // where a stochastic optimizer may stop).
+  arma::vec theta = {0.3};
+  auto [ll, grad, hess] = model.logLikelihoodFun(theta, true, false);
+
+  std::cout << "  LL at theta=0.3:        " << ll << std::endl;
+  std::cout << "  Gradient norm:          " << arma::norm(grad) << std::endl;
+  assert(std::isfinite(ll));
+  assert(grad.is_finite());
+
+  const double h = 1e-5;
+  arma::vec grad_num(theta.n_elem);
+  for (arma::uword k = 0; k < theta.n_elem; ++k) {
+    arma::vec tp = theta, tm = theta;
+    tp(k) += h;
+    tm(k) -= h;
+    auto [llp, _a, _b] = model.logLikelihoodFun(tp, false, false);
+    auto [llm, _c, _d] = model.logLikelihoodFun(tm, false, false);
+    grad_num(k) = (llp - llm) / (2.0 * h);
+  }
+  double rel = arma::norm(grad - grad_num) / (arma::norm(grad_num) + 1e-12);
+  std::cout << "  Gradient FD check err:  " << rel << std::endl;
+  assert(rel < 1e-4);
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 14: from_string / to_string round-trip
+// ==========================================================================
+static void test_from_string_roundtrip() {
+  std::cout << "=== Test 14: from_string / to_string round-trip ===" << std::endl;
+
+  // All canonical forms
+  std::vector<std::string> inputs = {
+      "none",
+      "affine",
+      "boxcox",
+      "kumaraswamy",
+      "neural_mono(8)",
+      "neural_mono(16)",
+      "mlp(16:8,3,selu)",
+      "mlp(32:16:8,4,tanh)",
+      "categorical(5,2)",
+      "categorical(3,1)",
+      "ordinal(4)",
+      "ordinal(7)",
+  };
+
+  for (const auto& s : inputs) {
+    WarpSpec spec = WarpSpec::from_string(s);
+    std::string back = spec.to_string();
+    std::cout << "  \"" << s << "\" -> parse -> \"" << back << "\"";
+    assert(back == s);
+    std::cout << "  OK" << std::endl;
+  }
+
+  // Default-argument forms
+  {
+    WarpSpec s1 = WarpSpec::from_string("neural_mono");
+    assert(s1.n_hidden == 8);
+    assert(s1.to_string() == "neural_mono(8)");
+    std::cout << "  \"neural_mono\" -> \"" << s1.to_string() << "\"  OK" << std::endl;
+  }
+  {
+    WarpSpec s2 = WarpSpec::from_string("mlp(16:8)");
+    assert(s2.hidden_dims.size() == 2);
+    assert(s2.d_out == 2);
+    assert(s2.activation == "selu");
+    std::cout << "  \"mlp(16:8)\" -> \"" << s2.to_string() << "\"  OK" << std::endl;
+  }
+  {
+    WarpSpec s3 = WarpSpec::from_string("categorical(5)");
+    assert(s3.n_levels == 5);
+    assert(s3.embed_dim == 2);
+    std::cout << "  \"categorical(5)\" -> \"" << s3.to_string() << "\"  OK" << std::endl;
+  }
+  // Whitespace tolerance
+  {
+    WarpSpec s4 = WarpSpec::from_string("  kumaraswamy  ");
+    assert(s4.type == WarpType::Kumaraswamy);
+    std::cout << "  \"  kumaraswamy  \" -> \"" << s4.to_string() << "\"  OK" << std::endl;
+  }
+
+  // Invalid strings
+  bool caught = false;
+  try {
+    WarpSpec::from_string("foobar");
+  } catch (...) {
+    caught = true;
+  }
+  assert(caught);
+  std::cout << "  \"foobar\" -> exception  OK" << std::endl;
+
+  caught = false;
+  try {
+    WarpSpec::from_string("categorical");
+  } catch (...) {
+    caught = true;
+  }
+  assert(caught);
+  std::cout << "  \"categorical\" (no args) -> exception  OK" << std::endl;
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 15: warping_strings() accessor
+// ==========================================================================
+static void test_warping_strings_accessor() {
+  std::cout << "=== Test 15: warping_strings() accessor ===" << std::endl;
+
+  arma::mat X(10, 3);
+  X.col(0) = arma::linspace(0.01, 0.99, 10);
+  X.col(1).fill(0.0);  // categorical levels
+  for (arma::uword i = 0; i < 10; ++i)
+    X(i, 1) = i % 3;
+  X.col(2).fill(0.0);  // ordinal levels
+  for (arma::uword i = 0; i < 10; ++i)
+    X(i, 2) = i % 4;
+
+  arma::vec y = arma::randn<arma::vec>(10);
+
+  WarpKriging model({"kumaraswamy", "categorical(3,2)", "ordinal(4)"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
+
+  auto ws = model.warping_strings();
+  assert(ws.size() == 3);
+  assert(ws[0] == "kumaraswamy");
+  assert(ws[1] == "categorical(3,2)");
+  assert(ws[2] == "ordinal(4)");
+
+  std::cout << "  warping_strings = {";
+  for (arma::uword i = 0; i < ws.size(); ++i)
+    std::cout << (i ? ", " : "") << "\"" << ws[i] << "\"";
+  std::cout << "}" << std::endl;
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  17. Predict derivative check vs finite differences — all warping types
+// ==========================================================================
+
+/// Helper: check mean and stdev derivatives of a fitted WarpKriging model
+/// against central finite differences at the given test points.
+/// Only checks dimensions listed in `check_dims` (use to skip discrete dims).
+/// Uses relative tolerance (rel_tol) with a minimum absolute floor (abs_tol)
+/// to handle both large and near-zero derivatives correctly.
+static void check_deriv_vs_fd(const WarpKriging& model,
+                              const arma::mat& X_new,
+                              const std::vector<arma::uword>& check_dims,
+                              const std::string& label,
+                              double h = 1e-6,
+                              double rel_tol = 0.1,
+                              double abs_tol = 0.05) {
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X_new, true, false, true);
+
+  const arma::uword n_n = X_new.n_rows;
+  const arma::uword d = X_new.n_cols;
+
+  assert(mean_deriv.n_rows == n_n);
+  assert(mean_deriv.n_cols == d);
+  assert(stdev_deriv.n_rows == n_n);
+  assert(stdev_deriv.n_cols == d);
+  assert(mean_deriv.is_finite());
+  assert(stdev_deriv.is_finite());
+
+  for (arma::uword i = 0; i < n_n; ++i) {
+    for (arma::uword j : check_dims) {
+      arma::mat X_plus = X_new;
+      arma::mat X_minus = X_new;
+      X_plus(i, j) += h;
+      X_minus(i, j) -= h;
+
+      auto [m_p, s_p, c_p, md_p, sd_p] = model.predict(X_plus, true, false, false);
+      auto [m_m, s_m, c_m, md_m, sd_m] = model.predict(X_minus, true, false, false);
+
+      double fd_mean = (m_p(i) - m_m(i)) / (2.0 * h);
+      double fd_stdev = (s_p(i) - s_m(i)) / (2.0 * h);
+
+      double err_mean = std::abs(mean_deriv(i, j) - fd_mean);
+      double scale_mean = std::max(std::abs(fd_mean), std::abs(mean_deriv(i, j)));
+      double tol_mean = std::max(abs_tol, rel_tol * scale_mean);
+
+      double err_stdev = std::abs(stdev_deriv(i, j) - fd_stdev);
+      double scale_stdev = std::max(std::abs(fd_stdev), std::abs(stdev_deriv(i, j)));
+      double tol_stdev = std::max(abs_tol, rel_tol * scale_stdev);
+
+      if (err_mean > tol_mean) {
+        std::cerr << "  [" << label << "] Mean deriv error at (" << i << "," << j
+                  << "): analytical=" << mean_deriv(i, j) << " fd=" << fd_mean << " err=" << err_mean
+                  << " tol=" << tol_mean << std::endl;
+        assert(false);
+      }
+      if (err_stdev > tol_stdev) {
+        std::cerr << "  [" << label << "] Stdev deriv error at (" << i << "," << j
+                  << "): analytical=" << stdev_deriv(i, j) << " fd=" << fd_stdev << " err=" << err_stdev
+                  << " tol=" << tol_stdev << std::endl;
+        assert(false);
+      }
+    }
+  }
+  std::cout << "  [" << label << "] Derivative check PASSED" << std::endl;
+}
+
+void test_predict_derivative() {
+  std::cout << "--- Test 17: Predict derivative (mean + stdev) vs finite differences ---" << std::endl;
+
+  auto f1 = [](double x) { return std::sin(6.0 * x); };
+  auto f2 = [](double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2); };
+
+  // ---- 17a: none (2D, gauss) ------------------------------------------------
+  {
+    arma::arma_rng::set_seed(123);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 2);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f2(X(i, 0), X(i, 1));
+
+    WarpKriging model({"none", "none"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 2);
+    check_deriv_vs_fd(model, X_new, {0, 1}, "none, gauss, 2D");
+  }
+
+  // ---- 17b: affine (1D, matern3_2) -----------------------------------------
+  {
+    arma::arma_rng::set_seed(42);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"affine"}, "matern3_2");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "affine, matern3_2");
+  }
+
+  // ---- 17c: boxcox (1D, gauss) ----------------------------------------------
+  {
+    arma::arma_rng::set_seed(77);
+    const arma::uword n = 15;
+    // BoxCox needs positive inputs
+    arma::mat X = 0.1 + 0.8 * arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"boxcox"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.15 + 0.7 * arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "boxcox, gauss");
+  }
+
+  // ---- 17d: kumaraswamy (1D, matern5_2) ------------------------------------
+  {
+    arma::arma_rng::set_seed(42);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"kumaraswamy"}, "matern5_2");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "kumaraswamy, matern5_2");
+  }
+
+  // ---- 17e: neural_mono (1D, gauss) ----------------------------------------
+  {
+    arma::arma_rng::set_seed(99);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    WarpKriging model({"neural_mono(8)"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 1);
+    check_deriv_vs_fd(model, X_new, {0}, "neural_mono, gauss");
+  }
+
+  // ---- 17f: mlp (2D, matern5_2) --------------------------------------------
+  {
+    arma::arma_rng::set_seed(55);
+    const arma::uword n = 20;
+    arma::mat X = arma::randu<arma::mat>(n, 2);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f2(X(i, 0), X(i, 1));
+
+    WarpKriging model({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "matern5_2");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "100"}});
+
+    arma::mat X_new = arma::randu<arma::mat>(5, 2);
+    check_deriv_vs_fd(model, X_new, {0, 1}, "mlp, matern5_2, 2D");
+  }
+
+  // ---- 17g: categorical (1D continuous + 1D categorical) --------------------
+  //  Derivative w.r.t. dim 0 (continuous) only; dim 1 is discrete.
+  {
+    arma::arma_rng::set_seed(33);
+    const arma::uword n = 20;
+    arma::mat X(n, 2);
+    X.col(0) = arma::randu<arma::vec>(n);
+    // 3 categories: 0, 1, 2
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 1) = std::floor(arma::randu() * 3.0);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(4.0 * X(i, 0)) + 0.5 * X(i, 1);
+
+    WarpKriging model({"none", "categorical(3,2)"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    // Test points: continuous in [0,1], categorical fixed at level 1
+    arma::mat X_new(5, 2);
+    X_new.col(0) = arma::randu<arma::vec>(5);
+    X_new.col(1).fill(1.0);
+    check_deriv_vs_fd(model, X_new, {0}, "categorical mixed, gauss");
+  }
+
+  // ---- 17h: ordinal (1D continuous + 1D ordinal) ----------------------------
+  {
+    arma::arma_rng::set_seed(44);
+    const arma::uword n = 20;
+    arma::mat X(n, 2);
+    X.col(0) = arma::randu<arma::vec>(n);
+    // 4 ordinal levels: 0, 1, 2, 3
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 1) = std::floor(arma::randu() * 4.0);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(4.0 * X(i, 0)) + 0.3 * X(i, 1);
+
+    WarpKriging model({"none", "ordinal(4)"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new(5, 2);
+    X_new.col(0) = arma::randu<arma::vec>(5);
+    X_new.col(1).fill(2.0);
+    check_deriv_vs_fd(model, X_new, {0}, "ordinal mixed, gauss");
+  }
+
+  // ---- 17j: mixed continuous warpings (kumaraswamy + none + affine, 3D) -----
+  {
+    arma::arma_rng::set_seed(111);
+    const arma::uword n = 20;
+    arma::mat X = arma::randu<arma::mat>(n, 3);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = std::sin(3.0 * X(i, 0)) + std::cos(4.0 * X(i, 1)) + 0.5 * X(i, 2);
+
+    WarpKriging model({"kumaraswamy", "none", "affine"}, "matern5_2");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL");
+
+    arma::mat X_new = 0.05 + 0.9 * arma::randu<arma::mat>(5, 3);
+    check_deriv_vs_fd(model, X_new, {0, 1, 2}, "kuma+none+affine, matern5_2, 3D");
+  }
+
+  // ---- 17k: none with different kernels (exp, matern3_2) --------------------
+  {
+    arma::arma_rng::set_seed(66);
+    const arma::uword n = 15;
+    arma::mat X = arma::randu<arma::mat>(n, 1);
+    arma::vec y(n);
+    for (arma::uword i = 0; i < n; ++i)
+      y(i) = f1(X(i, 0));
+
+    for (const auto& kern : {"exp", "matern3_2", "matern5_2", "gauss"}) {
+      WarpKriging model({"none"}, kern);
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+      arma::mat X_new = arma::randu<arma::mat>(5, 1);
+      check_deriv_vs_fd(model, X_new, {0}, std::string("none, ") + kern);
+    }
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// --- Test 18: Parallel multistart (BFGS3 and BFGS3+Adam) ----------------
+void test_parallel_multistart() {
+  std::cout << "--- Test 18: Parallel multistart optimization ---" << std::endl;
+
+  arma::arma_rng::set_seed(42);
+  const arma::uword n = 20;
+  arma::mat X = arma::randu<arma::mat>(n, 1);
+  arma::vec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = f1d(X(i, 0));
+
+  // Test BFGS3 (joint BFGS with 3 starts, parallel)
+  {
+    WarpKriging model({"kumaraswamy"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
+    double ll_multi = model.logLikelihood();
+    std::cout << "  BFGS3 LL: " << ll_multi << ", theta: " << model.theta().t();
+
+    // Compare with single start
+    WarpKriging model_single({"kumaraswamy"}, "gauss");
+    model_single.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS", "LL");
+    double ll_single = model_single.logLikelihood();
+    std::cout << "  BFGS  LL: " << ll_single << std::endl;
+
+    // Multistart should generally be at least as good as single start.
+    // Under sanitizer builds, optimization may converge differently,
+    // so we use a generous tolerance.
+    assert(ll_multi >= ll_single - 20.0);
+  }
+
+  // Test BFGS3+Adam (Adam+BFGS with 3 starts, parallel)
+  {
+    WarpKriging model({"kumaraswamy"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS3+Adam", "LL");
+    double ll = model.logLikelihood();
+    std::cout << "  BFGS3+Adam LL: " << ll << ", theta: " << model.theta().t();
+    assert(std::isfinite(ll));
+  }
+
+  // Test with 2D and multiple warping types
+  {
+    arma::arma_rng::set_seed(123);
+    arma::mat X2 = arma::randu<arma::mat>(25, 2);
+    arma::vec y2 = arma::sin(X2.col(0) * 4) % arma::cos(X2.col(1) * 3) + 0.05 * arma::randn(25);
+
+    WarpKriging model({"none", "affine"}, "matern5_2");
+    model.fit(y2, X2, Trend::RegressionModel::Constant, true, "BFGS3", "LL");
+    double ll = model.logLikelihood();
+    std::cout << "  2D BFGS3 LL: " << ll << std::endl;
+    assert(std::isfinite(ll));
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 19: Level names in categorical/ordinal specs
+// ==========================================================================
+static void test_level_names() {
+  std::cout << "=== Test 19: Level names (categorical/ordinal) ===" << std::endl;
+
+  // --- from_string / to_string round-trip with names ---
+  {
+    WarpSpec s = WarpSpec::from_string(R"(categorical(["red","green","blue"],2))");
+    assert(s.type == WarpType::Embedding);
+    assert(s.n_levels == 3);
+    assert(s.embed_dim == 2);
+    assert(s.level_names.size() == 3);
+    assert(s.level_names[0] == "red");
+    assert(s.level_names[1] == "green");
+    assert(s.level_names[2] == "blue");
+    std::string rt = s.to_string();
+    assert(rt == R"(categorical(["red","green","blue"],2))");
+    std::cout << "  categorical with names round-trip: \"" << rt << "\"  OK" << std::endl;
+  }
+  {
+    // Default embed_dim when omitted with names
+    WarpSpec s = WarpSpec::from_string(R"(categorical(["a","b","c","d"]))");
+    assert(s.n_levels == 4);
+    assert(s.embed_dim == 2);
+    assert(s.level_names.size() == 4);
+    std::cout << "  categorical with names (default embed_dim): \"" << s.to_string() << "\"  OK" << std::endl;
+  }
+  {
+    WarpSpec s = WarpSpec::from_string(R"(ordinal(["low","med","high"]))");
+    assert(s.type == WarpType::Ordinal);
+    assert(s.n_levels == 3);
+    assert(s.level_names.size() == 3);
+    assert(s.level_names[0] == "low");
+    assert(s.level_names[1] == "med");
+    assert(s.level_names[2] == "high");
+    std::string rt = s.to_string();
+    assert(rt == R"(ordinal(["low","med","high"]))");
+    std::cout << "  ordinal with names round-trip: \"" << rt << "\"  OK" << std::endl;
+  }
+
+  // --- Fit with named levels ---
+  {
+    arma::uword n = 30;
+    arma::vec y(n);
+    arma::mat X(n, 2);
+    for (arma::uword i = 0; i < n; ++i) {
+      X(i, 0) = i % 3;          // categorical: 0, 1, 2
+      X(i, 1) = 0.1 * (i + 1);  // continuous
+      y(i) = X(i, 0) * 2.0 + std::sin(X(i, 1)) + 0.01 * (i % 7);
+    }
+    WarpKriging model({R"(categorical(["red","green","blue"],2))", "kumaraswamy"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
+    std::string s = model.summary();
+    std::cout << s;
+    // Check summary contains level names
+    assert(s.find("0=\"red\"") != std::string::npos);
+    assert(s.find("1=\"green\"") != std::string::npos);
+    assert(s.find("2=\"blue\"") != std::string::npos);
+    std::cout << "  fit + summary with named categorical  OK" << std::endl;
+  }
+
+  // --- Validate: non-integer in categorical column should throw ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = 0.5;
+      arma::vec y = {1.0};
+      WarpKriging model({R"(categorical(["a","b"],1))"}, "gauss");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("non-integer") != std::string::npos);
+      std::cout << "  non-integer categorical throws: " << msg << "  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Validate: out-of-range level with names shows valid names ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = 5.0;
+      arma::vec y = {1.0};
+      WarpKriging model({R"(categorical(["a","b","c"],1))"}, "gauss");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("valid names") != std::string::npos);
+      assert(msg.find("\"a\"") != std::string::npos);
+      std::cout << "  out-of-range with names shows valid names  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Validate: negative value in ordinal column should throw ---
+  {
+    bool caught = false;
+    try {
+      arma::mat X(1, 1);
+      X(0, 0) = -1.0;
+      arma::vec y = {1.0};
+      WarpKriging model({"ordinal(3)"}, "gauss");
+      model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL");
+    } catch (const std::invalid_argument& e) {
+      caught = true;
+      std::string msg = e.what();
+      assert(msg.find("non-integer") != std::string::npos);
+      std::cout << "  negative ordinal throws: " << msg << "  OK" << std::endl;
+    }
+    assert(caught);
+  }
+
+  // --- Numeric-only specs still work with validation ---
+  {
+    arma::uword n = 15;
+    arma::mat X(n, 1);
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 0) = i % 3;
+    arma::vec y = arma::randn<arma::vec>(n);
+    WarpKriging model({"categorical(3,2)"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "20"}});
+    std::cout << "  numeric-only categorical still works  OK" << std::endl;
+  }
+
+  // --- Save/load preserves level names ---
+  {
+    arma::uword n = 15;
+    arma::mat X(n, 1);
+    for (arma::uword i = 0; i < n; ++i)
+      X(i, 0) = i % 3;
+    arma::vec y = arma::randn<arma::vec>(n);
+    WarpKriging model({R"(categorical(["x","y","z"],2))"}, "gauss");
+    model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "20"}});
+
+    std::string tmpfile = "wk_level_names_test.json";
+    model.save(tmpfile);
+    WarpKriging loaded = WarpKriging::load(tmpfile);
+    auto ws = loaded.warping_strings();
+    assert(ws.size() == 1);
+    assert(ws[0] == R"(categorical(["x","y","z"],2))");
+    std::cout << "  save/load preserves level names: \"" << ws[0] << "\"  OK" << std::endl;
+    std::remove(tmpfile.c_str());
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 20: WarpKriging(none) vs Kriging LL equivalence
+// ==========================================================================
+static void test_none_warp_vs_kriging_ll() {
+  std::cout << "=== Test 20: WarpKriging(none) vs Kriging LL function equivalence ===" << std::endl;
+
+  // With warping="none", WarpKriging reduces to Kriging apart from a small
+  // preemptive nugget (LinearAlgebra::num_nugget, default 1e-10) added to
+  // R's diagonal. The LL functions must therefore agree to ~num_nugget at
+  // well-conditioned θ; divergence at extreme θ (R near-singular) is
+  // expected and grows with n·num_nugget·κ(R).
+  struct TestCase {
+    std::string kernel;
+    arma::uword d;
+    Trend::RegressionModel regmodel;
+  };
+  std::vector<TestCase> cases = {
+      {"gauss", 1, Trend::RegressionModel::Constant},
+      {"gauss", 2, Trend::RegressionModel::Constant},
+      {"matern3_2", 1, Trend::RegressionModel::Constant},
+      {"matern5_2", 2, Trend::RegressionModel::Constant},
+  };
+
+  for (const auto& tc : cases) {
+    arma::arma_rng::set_seed(42);
+    arma::uword n = 10;
+    // Wide X range so nearest-neighbour distances are large enough that
+    // moderate θ keeps R well-conditioned (off-diagonals well below 1).
+    arma::mat X = 10.0 * arma::randu<arma::mat>(n, tc.d);
+    arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+
+    std::vector<std::string> warp_specs(tc.d, "none");
+
+    // Fit with BFGS just to initialise state. The LL *function* we test below
+    // recomputes everything at arbitrary θ, so the fitted optimum is irrelevant.
+    WarpKriging wk(warp_specs, tc.kernel);
+    wk.fit(y, X, tc.regmodel, false, "BFGS", "LL");
+
+    Kriging kr(tc.kernel);
+    kr.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+    // Moderate θ range where R stays well-conditioned; extreme θ (e.g.
+    // θ ≥ 2 with closely-spaced X and Gauss kernel) makes R near-singular
+    // and the num_nugget bias grows — not a useful equivalence test there.
+    std::vector<double> theta_vals = {0.1, 0.3, 0.5, 1.0};
+    std::cout << "  [" << tc.kernel << ", " << tc.d << "D]";
+
+    for (double tv : theta_vals) {
+      arma::vec th = arma::ones<arma::vec>(tc.d) * tv;
+      auto [wk_ll, wk_grad, wk_hess] = wk.logLikelihoodFun(th, true, false);
+      auto [kr_ll, kr_grad] = kr.logLikelihoodFun(th, true, false);
+
+      double ll_diff = std::abs(wk_ll - kr_ll);
+      if (ll_diff >= 1e-5) {
+        std::cerr << "\n  FAIL at theta=" << tv << ": WK_LL=" << wk_ll << " K_LL=" << kr_ll << " diff=" << ll_diff
+                  << std::endl;
+      }
+      assert(ll_diff < 1e-5);
+
+      double grad_diff = arma::norm(wk_grad - kr_grad) / (arma::norm(kr_grad) + 1e-12);
+      if (grad_diff >= 1e-5) {
+        std::cerr << "\n  FAIL grad at theta=" << tv << ": rel_diff=" << grad_diff << " WK_grad=" << wk_grad.t()
+                  << " K_grad=" << kr_grad.t() << std::endl;
+      }
+      assert(grad_diff < 1e-5);
+    }
+    std::cout << "  LL+grad match at " << theta_vals.size() << " theta points  OK" << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test 21: WarpKriging(none, noise=v) vs NoiseKriging LL function equivalence
+// ==========================================================================
+static void test_none_warp_with_noise_vs_noise_kriging_ll() {
+  std::cout << "=== Test 21: WarpKriging(none, noise) vs NoiseKriging LL equivalence ===" << std::endl;
+
+  // With warping="none" and a per-observation noise vector, WarpKriging
+  // should match NoiseKriging's likelihood FUNCTION up to the small
+  // preemptive nugget (LinearAlgebra::num_nugget, default 1e-10) on R's
+  // diagonal.  The two optimisers can land at different local optima on
+  // small data, so we don't compare the fitted LL directly; instead we:
+  //   (1) evaluate NK's LL at WK's fitted (θ, σ²) — must match WK's LL
+  //   (2) evaluate WK's LL at NK's fitted θ (WK re-MLEs σ²) — must be
+  //       ≥ NK's LL at (θ, σ²) since WK's σ² is already MLE'd given θ
+  struct TestCase {
+    std::string kernel;
+    arma::uword d;
+  };
+  std::vector<TestCase> cases = {
+      {"gauss", 1},
+      {"matern5_2", 2},
+  };
+
+  for (const auto& tc : cases) {
+    arma::arma_rng::set_seed(42);
+    arma::uword n = 12;
+    arma::mat X = 10.0 * arma::randu<arma::mat>(n, tc.d);
+    arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+    arma::vec noise = 0.05 + 0.05 * arma::randu<arma::vec>(n);
+
+    std::vector<std::string> warp_specs(tc.d, "none");
+    WarpKriging wk(warp_specs, tc.kernel);
+    WarpKriging::Parameters wk_params;
+    wk_params.noise = noise;
+    wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", wk_params);
+
+    Kriging nk(tc.kernel, Kriging::NoiseModel::Heterogeneous);
+    nk.fit(y, noise, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+
+    std::cout << "  [" << tc.kernel << ", " << tc.d << "D]";
+
+    // The two models optimise over different parameter sets (WK profiles
+    // σ² via inner 1D, NK optimises σ² jointly), so the final fits can
+    // land at different local optima on a small n=12 problem.  Instead we
+    // verify the LIKELIHOOD FUNCTION agrees: evaluate NK LL at WK's fitted
+    // (θ, σ²) and vice versa — both should match to preemptive-nugget tol.
+    arma::vec wk_th = wk.theta();
+    double wk_s2 = wk.sigma2();
+    arma::vec wk_ts = arma::vec(wk_th.n_elem + 1);
+    wk_ts.head(wk_th.n_elem) = wk_th;
+    wk_ts(wk_th.n_elem) = wk_s2;
+    auto [nk_ll_at_wk, nk_g_at_wk] = nk.logLikelihoodFun(wk_ts, false, false);
+    double wk_ll_at_wk = wk.logLikelihood();
+    double func_diff = std::abs(nk_ll_at_wk - wk_ll_at_wk);
+    if (func_diff >= 1e-5) {
+      std::cerr << "\n  FAIL LL-function mismatch @ WK params (theta=" << wk_th.t() << ", sigma2=" << wk_s2
+                << "): WK=" << wk_ll_at_wk << " NK=" << nk_ll_at_wk << " diff=" << func_diff << std::endl;
+    }
+    assert(func_diff < 1e-5);
+
+    // Also check at NK's fitted params.
+    arma::vec nk_th = nk.theta();
+    double nk_s2 = nk.sigma2();
+    arma::vec nk_ts(nk_th.n_elem + 1);
+    nk_ts.head(nk_th.n_elem) = nk_th;
+    nk_ts(nk_th.n_elem) = nk_s2;
+    auto [nk_ll_at_nk, nk_g_at_nk] = nk.logLikelihoodFun(nk_ts, false, false);
+    auto [wk_ll_at_nk, wk_g_at_nk, wk_h_at_nk] = wk.logLikelihoodFun(nk_th, false, false);
+    // Note: WK's logLikelihoodFun re-does inner Brent, so it returns the
+    // concentrated-σ² LL — which should be ≥ NK's LL at the given (θ, σ²=s2_fix).
+    // Stricter check: WK at (θ, σ²_MLE(θ)) ≥ NK at (θ, any σ²).
+    if (wk_ll_at_nk + 1e-5 < nk_ll_at_nk) {
+      std::cerr << "\n  FAIL: WK LL(θ)=" << wk_ll_at_nk << " < NK LL(θ, σ²)=" << nk_ll_at_nk << " (θ=" << nk_th.t()
+                << ", σ²=" << nk_s2 << ")" << std::endl;
+    }
+    assert(wk_ll_at_nk + 1e-5 >= nk_ll_at_nk);
+
+    std::cout << "  func_diff=" << func_diff << " @ WK params  OK" << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+// Test 22: simulate(with_noise) + update_simulate(noise_u) basic sanity
+static void test_simulate_and_update_simulate_with_noise() {
+  std::cout << "=== Test 22: simulate + update_simulate with noise ===" << std::endl;
+
+  arma::arma_rng::set_seed(7);
+  arma::uword n = 10;
+  arma::mat X = 5.0 * arma::randu<arma::mat>(n, 1);
+  arma::vec y = arma::sin(X.col(0)) + 0.1 * arma::randn<arma::vec>(n);
+  arma::vec noise = 0.05 * arma::ones<arma::vec>(n);
+
+  WarpKriging wk({"none"}, "gauss");
+  WarpKriging::Parameters wk_params;
+  wk_params.noise = noise;
+  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", wk_params);
+
+  // Simulation points.
+  arma::uword m = 6;
+  arma::mat X_n = arma::linspace<arma::vec>(0.1, 4.9, m);
+
+  // Case A: no sampling noise at X_n.
+  int nsim = 4;
+  arma::mat sim0 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{});
+  assert(sim0.n_rows == m);
+  assert(sim0.n_cols == (arma::uword)nsim);
+  assert(sim0.is_finite());
+
+  // Case B: scalar sampling std-dev at X_n, with_noise = 0.1.
+  arma::mat sim1 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{0.1});
+  assert(sim1.n_rows == m);
+  assert(sim1.is_finite());
+
+  // Case C: per-point std-dev vector.
+  arma::vec per_point_sd = 0.05 + 0.05 * arma::randu<arma::vec>(m);
+  arma::mat sim2 = wk.simulate(nsim, 1234, X_n, /*will_update=*/true, per_point_sd);
+  assert(sim2.n_rows == m);
+  assert(sim2.is_finite());
+
+  // update_simulate: assimilate 2 new points (noise_u required since model has noise).
+  arma::mat X_u(2, 1);
+  X_u(0, 0) = 2.0;
+  X_u(1, 0) = 3.5;
+  arma::vec y_u = arma::sin(X_u.col(0));
+  arma::vec noise_u = 0.05 * arma::ones<arma::vec>(2);
+
+  arma::mat usim = wk.update_simulate(y_u, X_u, noise_u);
+  assert(usim.n_rows == m);
+  assert(usim.n_cols == (arma::uword)nsim);
+  assert(usim.is_finite());
+
+  // Cache reuse determinism: use a noise-free simulate so no fresh eps draw is
+  // made inside update_simulate (lastsim_with_noise empty).  Then same-args
+  // update_simulate calls must return identical output.
+  wk.simulate(nsim, 1234, X_n, /*will_update=*/true, arma::vec{});
+  arma::mat usim_a = wk.update_simulate(y_u, X_u, noise_u);
+  arma::mat usim_b = wk.update_simulate(y_u, X_u, noise_u);
+  double reuse_diff = arma::norm(usim_a - usim_b, "fro");
+  if (reuse_diff > 1e-8) {
+    std::cerr << "\n  FAIL: update_simulate cache reuse produced different output (diff=" << reuse_diff << ")\n";
+  }
+  assert(reuse_diff < 1e-8);
+
+  // Missing noise_u when model has noise should throw.
+  bool threw_empty = false;
+  try {
+    wk.update_simulate(y_u, X_u, arma::vec{});
+  } catch (const std::runtime_error&) {
+    threw_empty = true;
+  }
+  assert(threw_empty);
+
+  // Negative noise_u should throw.
+  bool threw_neg = false;
+  try {
+    arma::vec bad(2);
+    bad(0) = 0.05;
+    bad(1) = -0.01;
+    wk.update_simulate(y_u, X_u, bad);
+  } catch (const std::runtime_error&) {
+    threw_neg = true;
+  }
+  assert(threw_neg);
+
+  // update() with refit=false must also accept noise_u when model has noise.
+  arma::uword n_before = wk.X().n_rows;
+  wk.update(y_u, X_u, /*refit=*/false, noise_u);
+  assert(wk.X().n_rows == n_before + 2);
+  assert(wk.noise().n_elem == n_before + 2);
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+int main() {
+  std::cout << "============================================\n"
+            << "  WarpKriging test suite\n"
+            << "============================================\n"
+            << std::endl;
+
+  try {
+    test_warp_functions();
+    test_continuous_kumaraswamy();
+    test_categorical_only();
+    test_categorical_predict_at_train();
+    test_mixed();
+    test_ordinal();
+    test_ordinal_predict_at_train();
+    test_neural_mono();
+    test_mlp_warp();
+    test_simulate_mixed();
+    test_update();
+    test_mlp_params_roundtrip();
+    test_branin_2d_mlp();
+    test_none_vs_mlp();
+    test_loglikelihood_fun();
+    test_from_string_roundtrip();
+    test_warping_strings_accessor();
+    test_predict_derivative();
+    test_parallel_multistart();
+    test_level_names();
+    test_none_warp_vs_kriging_ll();
+    test_none_warp_with_noise_vs_noise_kriging_ll();
+    test_simulate_and_update_simulate_with_noise();
+
+    std::cout << "============================================\n"
+              << "  ALL TESTS PASSED\n"
+              << "============================================" << std::endl;
+  } catch (const std::exception& e) {
+    std::cerr << "\n*** TEST FAILED: " << e.what() << " ***" << std::endl;
+    return 1;
+  }
+  return 0;
+}

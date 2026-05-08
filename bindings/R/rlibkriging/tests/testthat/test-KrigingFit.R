@@ -153,7 +153,7 @@ mll_fun <- function(x) -apply(x,1,
 contour(x,x,matrix(mll_fun(expand.grid(x,x)),nrow=length(x)),nlevels = 30)
 
 # use same startup point for convergence
-r <- Kriging(y, X, "gauss","constant",FALSE,"BFGS","LL",
+r <- Kriging(y, X, "gauss", regmodel="constant", normalize=FALSE, optim="BFGS", objective="LL",
              parameters=list(theta=matrix(k@parinit,ncol=2)))
 #mll2_fun <- function(x) -apply(x,1,
 #                              function(theta)

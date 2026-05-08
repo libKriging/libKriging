@@ -20,6 +20,13 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
   content = j["content"].template get<std::string>();
 
   if (content == "Kriging") {
+    if (j.contains("noise_model")) {
+      std::string nm = j["noise_model"].template get<std::string>();
+      if (nm == "Nugget")
+        return KrigingType::NuggetKriging;
+      if (nm == "Heterogeneous")
+        return KrigingType::NoiseKriging;
+    }
     return KrigingType::Kriging;
   } else if (content == "NoiseKriging") {
     return KrigingType::NoiseKriging;

@@ -8,11 +8,11 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
-#include <sstream>
-#include <vector>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Trend.hpp>
+#include <sstream>
+#include <vector>
 
 auto f = [](const arma::rowvec& row) {
   double sum = 0;
@@ -54,7 +54,7 @@ TEST_CASE("workflow") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-    return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false, false));
+    return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));
   });
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("save & reload") {
     const double theta = 0.5;
     arma::vec theta_vec(X.n_cols);
     theta_vec.fill(theta);
-    return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false, false));
+    return std::get<1>(ok_reloaded.logLikelihoodFun(theta_vec, true, false));
   });
 }
 
@@ -95,7 +95,7 @@ TEST_CASE("logLikelihoodFun benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodFun#" + std::to_string(i)) {
-      return std::get<0>(ok.logLikelihoodFun(theta_vec, false, false, false));  //
+      return std::get<0>(ok.logLikelihoodFun(theta_vec, false, false));  //
     };
   });
 }
@@ -110,7 +110,7 @@ TEST_CASE("logLikelihoodGrad benchmark", "[.benchmark]") {
     theta_vec.fill(theta);
 
     BENCHMARK("Kriging::logLikelihoodGrad#" + std::to_string(i)) {
-      return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false, false));  //
+      return std::get<1>(ok.logLikelihoodFun(theta_vec, true, false));  //
     };
   });
 }
@@ -266,82 +266,82 @@ TEST_CASE("Branin BFGS") {
   SECTION("BFGS20 vs 20×BFGS1 equivalence (given theta0)") {
     // Test that BFGS20 with a specific theta0 matrix gives the same result
     // as running 20 separate BFGS1 optimizations, one for each row of theta0
-    
+
     INFO("Testing that BFGS20 with given theta0 equals 20 separate BFGS1 runs");
-    
+
     // Create a specific theta0 matrix with 20 starting points
     arma::mat theta0(20, d);
     arma::arma_rng::set_seed(12345);  // Fixed seed for reproducibility
     for (arma::uword i = 0; i < 20; i++) {
       theta0.row(i) = arma::randu<arma::rowvec>(d) % (arma::ones<arma::rowvec>(d) * 2.0) + 0.01;
     }
-    
+
     INFO("Created theta0 matrix: " << theta0.n_rows << " x " << theta0.n_cols);
-    
+
     // Run BFGS20 with this theta0
     INFO("Running BFGS20...");
     Kriging ok_bfgs20 = Kriging("gauss");
     Kriging::Parameters params_multi{std::nullopt, false, theta0, true, std::nullopt, true};
     ok_bfgs20.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", params_multi);
-    
+
     arma::vec theta_bfgs20 = ok_bfgs20.theta();
     double sigma2_bfgs20 = ok_bfgs20.sigma2();
     double ll_bfgs20 = ok_bfgs20.logLikelihood();
-    
+
     INFO("BFGS20 final result: theta=" << theta_bfgs20.t() << ", sigma2=" << sigma2_bfgs20 << ", LL=" << ll_bfgs20);
-    
+
     // Run 20 separate BFGS1 optimizations, one for each row of theta0
     std::vector<double> ll_vec(20);
     std::vector<arma::vec> theta_vec(20);
     std::vector<double> sigma2_vec(20);
-    
+
     INFO("Running 20 separate BFGS1 optimizations...");
-    
+
     // Important: Set seed again before BFGS1 runs to match conditions
     arma::arma_rng::set_seed(12345);
-    
+
     for (arma::uword i = 0; i < 20; i++) {
       Kriging ok_bfgs1 = Kriging("gauss");
       arma::mat theta0_i = theta0.row(i);  // Extract row i as 1×d matrix
       Kriging::Parameters params_single{std::nullopt, false, theta0_i, true, std::nullopt, true};
       ok_bfgs1.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_single);
-      
+
       theta_vec[i] = ok_bfgs1.theta();
       sigma2_vec[i] = ok_bfgs1.sigma2();
       ll_vec[i] = ok_bfgs1.logLikelihood();
     }
-    
+
     INFO("Completed all 20 BFGS1 runs");
-    
+
     // Find the best result from the 20 BFGS1 runs
     auto best_iter = std::max_element(ll_vec.begin(), ll_vec.end());
     int best_idx = std::distance(ll_vec.begin(), best_iter);
     double ll_best_bfgs1 = ll_vec[best_idx];
     arma::vec theta_best_bfgs1 = theta_vec[best_idx];
     double sigma2_best_bfgs1 = sigma2_vec[best_idx];
-    
-    INFO("Best BFGS1[" << best_idx << "]: theta=" << theta_best_bfgs1.t() 
-         << ", sigma2=" << sigma2_best_bfgs1 << ", LL=" << ll_best_bfgs1);
-    
+
+    INFO("Best BFGS1[" << best_idx << "]: theta=" << theta_best_bfgs1.t() << ", sigma2=" << sigma2_best_bfgs1
+                       << ", LL=" << ll_best_bfgs1);
+
     // Compare BFGS20 result with best BFGS1 result
     // They should be very close (within numerical tolerance)
     double theta_diff = arma::norm(theta_bfgs20 - theta_best_bfgs1, 2);
     double theta_norm = arma::norm(theta_best_bfgs1, 2);
     double sigma2_diff = std::abs(sigma2_bfgs20 - sigma2_best_bfgs1);
     double ll_diff = std::abs(ll_bfgs20 - ll_best_bfgs1);
-    
+
     INFO("Differences:");
     INFO("  ||theta_BFGS20 - theta_best_BFGS1||_2 = " << theta_diff);
     INFO("  |sigma2_BFGS20 - sigma2_best_BFGS1| = " << sigma2_diff);
     INFO("  |LL_BFGS20 - LL_best_BFGS1| = " << ll_diff);
-    
+
     // Check for EXACT equivalence
     // BFGS20 and 20×BFGS1 should give identical results (same algorithm, same starting points)
     // With proper thread-local optimization and staggered startup, results should be deterministic
-    CHECK(theta_diff / theta_norm <= 1e-3);  // Theta must be exactly the same (relative)
-    CHECK(sigma2_diff / std::abs(sigma2_best_bfgs1) <= 1e-3); // Sigma2 must be exactly the same (relative)
-    CHECK(ll_diff / std::abs(ll_best_bfgs1) <= 1e-3);     // Log-likelihood must be exactly the same (relative)
-    
+    CHECK(theta_diff / theta_norm <= 1e-3);                    // Theta must be exactly the same (relative)
+    CHECK(sigma2_diff / std::abs(sigma2_best_bfgs1) <= 1e-3);  // Sigma2 must be exactly the same (relative)
+    CHECK(ll_diff / std::abs(ll_best_bfgs1) <= 1e-3);          // Log-likelihood must be exactly the same (relative)
+
     INFO("✓ BFGS20 and best of 20×BFGS1 are EXACTLY equivalent!");
   }
 }
@@ -364,13 +364,17 @@ TEST_CASE("Kriging fit with given parameters - BFGS1") {
 
   Kriging ok = Kriging("gauss");
   // Provide starting values for sigma2 and theta, optimize all
-  Kriging::Parameters parameters{sigma2_start, true, theta_start, true, std::nullopt, true};
+  Kriging::Parameters parameters;
+  parameters.sigma2 = sigma2_start;
+  parameters.theta = theta_start;
+  parameters.is_theta_estim = true;
+  ;
   ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", parameters);
 
   // Check that optimization ran (parameters should be different from starting values)
   CHECK(ok.theta().n_elem == d);
   CHECK(ok.sigma2() > 0);
-  
+
   // Verify predictions work
   arma::mat X_new(1, d);
   X_new.fill(0.5);
@@ -434,7 +438,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
 
   // Test all combinations of parameter estimation flags with different optimizers
   std::vector<std::string> optims = {"none", "BFGS", "BFGS20"};
-  
+
   for (const auto& optim : optims) {
     DYNAMIC_SECTION("Optim: " << optim) {
       // Combination 1: Estimate all parameters (not valid for "none")
@@ -452,7 +456,10 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       if (optim != "none") {
         SECTION("Fix sigma2, estimate theta and beta") {
           Kriging kr("gauss");
-          Kriging::Parameters params{sigma2_val, false, std::nullopt, true, std::nullopt, true};
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val;
+          params.is_sigma2_estim = false;
+          ;
           kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(kr.sigma2() == sigma2_val);
           CHECK(kr.theta().n_elem == d);
@@ -476,7 +483,12 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       // Combination 4: Fix both sigma2 and theta, estimate beta (only "none" truly fixes theta)
       SECTION("Fix sigma2 and theta, estimate beta") {
         Kriging kr("gauss");
-        Kriging::Parameters params{sigma2_val, false, theta_val, false, std::nullopt, true};
+        Kriging::Parameters params;
+        params.sigma2 = sigma2_val;
+        params.is_sigma2_estim = false;
+        params.theta = theta_val;
+        params.is_theta_estim = false;
+        ;
         kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
         CHECK(kr.sigma2() == sigma2_val);
         if (optim == "none") {
@@ -491,7 +503,10 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
       if (optim == "BFGS20") {
         SECTION("Multistart with theta starting points") {
           Kriging kr("gauss");
-          Kriging::Parameters params{sigma2_val, true, theta_starts, true, std::nullopt, true};
+          Kriging::Parameters params;
+          params.sigma2 = sigma2_val;
+          params.theta = theta_starts;
+          ;
           kr.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LL", params);
           CHECK(kr.sigma2() > 0);
           CHECK(kr.theta().n_elem == d);
@@ -504,7 +519,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
   Kriging kr_final("gauss");
   Kriging::Parameters params_final{std::nullopt, true, std::nullopt, true, std::nullopt, true};
   kr_final.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_final);
-  
+
   arma::mat X_new(1, d);
   X_new.fill(0.5);
   auto pred = kr_final.predict(X_new, true, false, false);
@@ -514,7 +529,7 @@ TEST_CASE("Kriging all parameter combinations", "[multistart]") {
 
 TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
   arma::arma_rng::set_seed(789);
-  
+
   SECTION("Many iterations with BFGS20") {
     const int n_iterations = 50;
     const arma::uword n = 30;
@@ -522,7 +537,7 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
     int failure_count = 0;
 
     INFO("Running " << n_iterations << " intensive iterations with BFGS20");
-    
+
     for (int iter = 0; iter < n_iterations; ++iter) {
       arma::mat X = arma::randu<arma::mat>(n, d);
       arma::colvec y = arma::sin(5.0 * X.col(0)) % arma::cos(3.0 * X.col(1));
@@ -530,46 +545,46 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
 
       Kriging ok = Kriging("gauss");
       Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-      
+
       try {
         ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
-        
+
         // Check if fit produced invalid results
         if (!std::isfinite(ok.sigma2()) || ok.sigma2() <= 0) {
           failure_count++;
           std::stringstream X_filename, y_filename;
           X_filename << "failing_kriging_X_iter" << iter << "_failure" << failure_count << ".csv";
           y_filename << "failing_kriging_y_iter" << iter << "_failure" << failure_count << ".csv";
-          
+
           X.save(X_filename.str(), arma::csv_ascii);
           y.save(y_filename.str(), arma::csv_ascii);
-          
+
           INFO("Saved failing case " << failure_count << " (iteration " << iter << "):");
           INFO("  X saved to: " << X_filename.str());
           INFO("  y saved to: " << y_filename.str());
           INFO("  sigma2 = " << ok.sigma2());
-          
+
           // Still report the failure for test tracking
           CHECK(ok.sigma2() > 0);
         } else {
           CHECK(ok.theta().n_elem == d);
           CHECK(ok.sigma2() > 0);
-          
+
           // Prediction test
           arma::mat X_new = arma::randu<arma::mat>(5, d);
           auto pred = ok.predict(X_new, true, false, false);
           CHECK(std::get<0>(pred).n_elem == 5);
         }
-        
+
         if ((iter + 1) % 10 == 0) {
-          INFO("Completed iteration " << (iter + 1) << "/" << n_iterations 
-               << " (" << failure_count << " failures so far)");
+          INFO("Completed iteration " << (iter + 1) << "/" << n_iterations << " (" << failure_count
+                                      << " failures so far)");
         }
       } catch (const std::exception& e) {
         FAIL("Exception at iteration " << (iter + 1) << ": " << e.what());
       }
     }
-    
+
     INFO("Total failures: " << failure_count << " out of " << n_iterations);
   }
 
@@ -582,15 +597,15 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
     y += 0.05 * arma::randn(n);
 
     INFO("Testing large dataset (n=" << n << ", d=" << d << ") with BFGS20");
-    
+
     Kriging ok = Kriging("gauss");
     Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-    
+
     ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
-    
+
     CHECK(ok.theta().n_elem == d);
     CHECK(ok.sigma2() > 0);
-    
+
     // Large prediction batch
     arma::mat X_new = arma::randu<arma::mat>(50, d);
     auto pred = ok.predict(X_new, true, true, true);
@@ -605,7 +620,7 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
     const arma::uword d = 2;
 
     INFO("Running " << n_rapid << " rapid sequential BFGS20 fits");
-    
+
     for (int i = 0; i < n_rapid; ++i) {
       arma::mat X = arma::randu<arma::mat>(n, d);
       arma::colvec y = arma::sin(5.0 * X.col(0) + 3.0 * X.col(1));
@@ -614,11 +629,11 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
       Kriging ok = Kriging("gauss");
       Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
       ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
-      
+
       CHECK(ok.sigma2() > 0);
       CHECK(ok.theta().n_elem == d);
     }
-    
+
     INFO("Completed all " << n_rapid << " rapid sequential fits successfully");
   }
 
@@ -630,15 +645,15 @@ TEST_CASE("Kriging intensive stress test", "[intensive][multistart]") {
     y += 0.1 * arma::randn(n);
 
     std::vector<std::string> kernels = {"gauss", "exp", "matern3_2", "matern5_2"};
-    
+
     for (const auto& kernel : kernels) {
       INFO("Testing kernel: " << kernel);
-      
+
       Kriging ok = Kriging(kernel);
       Kriging::Parameters parameters{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-      
+
       ok.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS20", "LL", parameters);
-      
+
       CHECK(ok.theta().n_elem == d);
       CHECK(ok.sigma2() > 0);
     }
