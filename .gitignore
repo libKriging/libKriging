@@ -45,8 +45,12 @@
 .DS_Store
 
 # Python virtual environments
-venv/
-.venv/
+venv
+**/venv/
+.venv
+**/.venv/
+__pycache__
+**/__pycache__
 
 # build stuffs
 cmake-build*/
@@ -86,4 +90,7 @@ sims*.csv
 X_sim*.csv
 test_data*.json
 Testing/
-venv
+# op tests
+*-main
+# focus tmp tests like test-abc-1.R
+**/test-*-*.*
