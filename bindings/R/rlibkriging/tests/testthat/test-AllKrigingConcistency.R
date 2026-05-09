@@ -24,9 +24,10 @@ lk_no <- Kriging(y = matrix(y_o, ncol = 1),
               normalize = FALSE,
               parameters = list(theta = matrix(0.1), sigma2 = sigma2))
 
-lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
+lk_nu <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "linear",
               optim = "none",
               normalize = FALSE,
@@ -64,7 +65,7 @@ ls = lk$simulate(1000, 123, X_n, will_update=FALSE)
 
 ls_no = lk_no$simulate(1000, 123, X_n, with_noise=NULL, will_update=FALSE)
 
-ls_nu = lk_nu$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=FALSE)
+ls_nu = lk_nu$simulate(1000, 123, X_n, with_noise=FALSE, will_update=FALSE)
 
 plot(f)
 points(X_o,y_o,pch=16)
@@ -187,9 +188,10 @@ lk_no <- Kriging(y = matrix(y_o, ncol = 1),
               #normalize = TRUE,
               parameters = list(theta = matrix(0.1), sigma2 = sigma2))
 
-lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
+lk_nu <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
@@ -214,7 +216,7 @@ ls_no = NULL
 ls_no = lk_no$simulate(10, 123, X_n, with_noise = 0, will_update=FALSE)
 
 ls_nu = NULL
-ls_nu = lk_nu$simulate(10, 123, X_n, with_nugget=FALSE, will_update=FALSE)
+ls_nu = lk_nu$simulate(10, 123, X_n, with_noise=FALSE, will_update=FALSE)
 
 plot(f,xlim=c(-0.1,0.1))
 points(X_o,y_o,pch=16)
@@ -264,7 +266,7 @@ ls_no = lk_no$simulate(1000, 123, X_n, will_update=TRUE)
 lus_no=NULL
 lus_no = lk_no$update_simulate(y_u, noise_u, X_u)
 
-ls_nu = lk_nu$simulate(1000, 123, X_n, with_nugget=FALSE, will_update=TRUE)
+ls_nu = lk_nu$simulate(1000, 123, X_n, with_noise=FALSE, will_update=TRUE)
 lus_nu=NULL
 lus_nu = lk_nu$update_simulate(y_u, X_u)
 

@@ -11,7 +11,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=T,optim.method='BFGS',multistart = 20)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS20")
+r <- Kriging(y, X, "gauss", noise = "nugget", optim = "BFGS20")
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-1d.Rdata")
@@ -89,7 +89,7 @@ r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=FALSE, nugget = nu,optim.method='BFGS',multistart = 20)
 #equivalent to Kriging with noise, not NuggetKriging:
 rr <- Kriging(y, X, "gauss", noise=rep(0.1,nrow(y)), optim = "BFGS20")
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS20", parameters=list(nugget=nu, is_nugget_estim=FALSE ))
+r <- Kriging(y, X, "gauss", noise = "nugget", optim = "BFGS20", parameters=list(nugget=nu, is_nugget_estim=FALSE ))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nuggetpreset-1d.Rdata")
@@ -179,7 +179,7 @@ k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F
 #rlibkriging:::optim_log(4)
 #rlibkriging:::optim_use_variogram_bounds_heuristic(T)
 #rlibkriging:::optim_set_max_iteration(100)
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS")
+r <- Kriging(y, X, "gauss", noise = "nugget", optim = "BFGS")
 #plot(Vectorize(function(a) r$logLikelihoodFun(c(r$theta(),a))$logLikelihood))
 #sectionview(function(ta)r$logLikelihoodFun(ta)$logLikelihood,center=c(r$theta(),r$sigma2()/(r$sigma2()+r$nugget())))
 l = as.list(r)
@@ -243,7 +243,7 @@ k <- tryCatch( # needed to catch warning due to %dopar% usage when using multist
     finally = {
     }
   )
-r <- NuggetKriging(y, X, "gauss", optim = "BFGS20", parameters=list(theta=parinit))
+r <- Kriging(y, X, "gauss", noise = "nugget", optim = "BFGS20", parameters=list(theta=parinit))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-multistart.Rdata")
@@ -294,7 +294,7 @@ y = f(X)
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=TRUE,optim="BFGS",multistart=20)#,parinit = c(0.5,5))
-r <- NuggetKriging(y, X, "gauss",, optim = "BFGS")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
+r <- Kriging(y, X, "gauss", noise = "nugget",, optim = "BFGS")#, parameters=list(theta=matrix(c(0.5,5),ncol=2)))
 l = as.list(r)
 
 # save(list=ls(),file="fit-nugget-2d-not01.Rdata")

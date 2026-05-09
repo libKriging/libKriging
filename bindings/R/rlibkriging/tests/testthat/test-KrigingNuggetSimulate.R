@@ -12,9 +12,10 @@ set.seed(1234)
 y_o <- f(X_o) #+ rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o)
 
-lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
+lk <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "constant",
               optim = "none",
               #normalize = TRUE,
@@ -52,7 +53,7 @@ X_n = unique(sort(c(X_o,seq(-1,2,,51))))
 ## Sigma21 <- covMat1Mat2(object@covariance, X1 = object@X, X2 = newdata, nugget.flag = FALSE)          ## size n x m
 ## Tinv.Sigma21 <- backsolve(t(object@T), Sigma21, upper.tri = FALSE)
 ## 
-## # libKriging / NuggetKriging.cpp / simulate(...,with_nugget=TRUE) :
+## # libKriging / NuggetKriging.cpp / simulate(...,with_noise=TRUE) :
 ## alpha = lk$sigma2()/(lk$sigma2()+lk$nugget())
 ## R_on = lk$covMat(object@X, newdata) / (lk$sigma2()+lk$nugget())
 ## 
@@ -82,7 +83,7 @@ X_n = unique(sort(c(X_o,seq(-1,2,,51))))
 ## })
 ## 
 ## 
-## # libKriging / NuggetKriging.cpp / simulate(...,with_nugget=FALSE) :
+## # libKriging / NuggetKriging.cpp / simulate(...,with_noise=FALSE) :
 ## R_on = lk$covMat(object@X, newdata) / (lk$sigma2()+lk$nugget())
 ## Rstar_on = backsolve(lk$T(), R_on, upper.tri = FALSE)
 ## R_nn = lk$covMat(newdata, newdata) / lk$sigma2()
@@ -98,7 +99,7 @@ lp = lk$predict(X_n) # libK predict
 lines(X_n,lp$mean,col='red')
 polygon(c(X_n,rev(X_n)),c(lp$mean+2*lp$stdev,rev(lp$mean-2*lp$stdev)),col=rgb(1,0,0,0.2),border=NA)
 
-ls = lk$simulate(1000, 123, X_n, with_nugget=TRUE) # libK simulate
+ls = lk$simulate(1000, 123, X_n, with_noise=TRUE) # libK simulate
 for (i in 1:min(100,ncol(ls))) {
     lines(X_n,ls[,i],col=rgb(1,0,0,.1),lwd=4)
 }

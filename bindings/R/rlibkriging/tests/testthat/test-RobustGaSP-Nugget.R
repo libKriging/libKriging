@@ -14,8 +14,9 @@ y = f(X)
 #points(X,y)
 k = RobustGaSP::rgasp(design=X,response=y,nugget.est = TRUE)
 library(rlibkriging)
-r <- NuggetKriging(y, X,
+r <- Kriging(y, X,
   kernel="matern5_2",
+  noise = "nugget",
   regmodel = "constant", normalize = FALSE,
   optim = "none",
   objective = "LMP", 
@@ -64,8 +65,9 @@ r = NULL
 library(RobustGaSP)
 k = rgasp(design=X,response=y, nugget.est = T)
 library(rlibkriging)
-r <- NuggetKriging(y, X,
+r <- Kriging(y, X,
   kernel="matern5_2",
+  noise = "nugget",
   regmodel = "constant", normalize = FALSE,
   optim = "none",
   objective = "LMP",

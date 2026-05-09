@@ -15,7 +15,7 @@ x=seq(0,1,,51)
 contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 
-r <- NuggetKriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2),nugget=0,sigma2=1))
+r <- Kriging(y, X,"gauss", noise = "nugget",parameters = list(theta=matrix(runif(40),ncol=2),nugget=0,sigma2=1))
 l= as.list(r)
 # ll = function(X) {
 #   logLikelihoodFun(r,X,return_grad=F)$logLikelihood
@@ -132,7 +132,7 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 #rlibkriging:::optim_log(1)
 
 set.seed(1234)
-r2 <- NuggetKriging(c(y,y2), rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2),nugget=0,sigma2=1))
+r2 <- Kriging(c(y,y2), rbind(X,X2),"gauss", noise = "nugget", parameters = list(theta=matrix(as.list(r)$theta,ncol=2),nugget=0,sigma2=1))
 ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r2,c(theta,as.list(r2)$sigma2/(as.list(r2)$sigma2+as.list(r2)$nugget)))$logLikelihood)}
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=TRUE,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red',pch=20)

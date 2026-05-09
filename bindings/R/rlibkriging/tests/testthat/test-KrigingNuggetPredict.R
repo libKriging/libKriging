@@ -19,7 +19,9 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #points(X,y)
   k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F), nugget=0.01,nugget.estim = FALSE)
   #library(rlibkriging)
-  r <- NuggetKriging(y,X,"gauss","constant",FALSE,"none","LL",
+  r <- Kriging(y, X, "gauss",
+               noise = "nugget",
+               regmodel = "constant", normalize = FALSE, optim = "none", objective = "LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE, is_theta_estim=FALSE,
                nugget=k@covariance@nugget,has_nugget=TRUE, is_nugget_estim=FALSE))
@@ -61,8 +63,8 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
 #  s_wn = matrix(NA,length(x),100)
 #  s_won = matrix(NA,length(x),ncol(s_wn))
 #  for (i in 1:ncol(s_wn)) {
-#    s_wn[,i] = simulate(r,x=x,seed=i, with_nugget=TRUE)
-#    s_won[,i] = simulate(r,x=x,seed=i, with_nugget=FALSE)
+#    s_wn[,i] = simulate(r,x=x,seed=i, with_noise=TRUE)
+#    s_won[,i] = simulate(r,x=x,seed=i, with_noise=FALSE)
 #      lines(x,s_wn[,i],col=rgb(1,0,0,0.2))
 #      lines(x,s_won[,i],col=rgb(0,0,1,0.2))
 #  }

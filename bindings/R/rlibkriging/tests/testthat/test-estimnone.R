@@ -26,9 +26,9 @@ test_that(desc="beta noestim",
           expect_equal( r_noestim$beta()[1] , 0.123 ,tol=1E-10))
 
 
-context("NuggetKriging")
+context("Kriging")
 
-rnu_noestim <- NuggetKriging(y, X, "gauss", optim="none", parameters=list(theta= matrix(0.1) ,sigma2= 0.01 ,beta= matrix(0.123), nugget= 0.0456))
+rnu_noestim <- Kriging(y, X, "gauss", noise = "nugget", optim="none", parameters=list(theta= matrix(0.1) ,sigma2= 0.01 ,beta= matrix(0.123), nugget= 0.0456))
 print(rnu_noestim)
 test_that(desc="theta noestim",
           expect_equal( rnu_noestim$theta()[1] , 0.1 ,tol=1E-10))

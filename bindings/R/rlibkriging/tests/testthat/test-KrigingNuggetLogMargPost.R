@@ -14,7 +14,7 @@ for (kernel in c("exp","matern3_2","matern5_2","gauss")) {
   points(X,y)
   
   #library(rlibkriging)
-  r <- NuggetKriging(y, X, kernel, objective="LMP", parameters=list(nugget=0,is_nugget_estim=TRUE))
+  r <- Kriging(y, X, kernel, noise = "nugget", objective="LMP", parameters=list(nugget=0,is_nugget_estim=TRUE))
   
 eps = 0.00001 # used for comparison bw computed grad and num grad
 precision = 0.01

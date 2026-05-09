@@ -62,7 +62,7 @@ for (kernel in c("matern5_2","matern3_2")) {
   }
 
   library(rlibkriging)
-  r <- NuggetKriging(y, X, kernel, objective="LMP")#, 
+  r <- Kriging(y, X, kernel, noise = "nugget", objective="LMP")#,
                      #optim="none", parameters=list(theta = matrix(1/k@beta_hat), nugget=k@nugget*k@sigma2_hat,sigma2=k@sigma2_hat))
   ## Should be equal:
   #lmp(1.0); lmp_deriv(1.0);

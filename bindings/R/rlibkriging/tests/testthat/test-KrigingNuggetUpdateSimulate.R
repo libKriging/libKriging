@@ -17,9 +17,10 @@ set.seed(1234)
 y_o <- f(X_o) #+ rnorm(n, sd = sqrt(nugget))
 points(X_o, y_o,pch=16)
 
-lk <- NuggetKriging(y = matrix(y_o, ncol = 1),
+lk <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
@@ -63,9 +64,10 @@ X_u = c(.4,.6)
 y_u = f(X_u) #+ rnorm(length(X_u), sd = sqrt(nugget))
 
 # new Kriging model from scratch
-l2 = NuggetKriging(y = matrix(c(y_o,y_u),ncol=1),
+l2 = Kriging(y = matrix(c(y_o,y_u),ncol=1),
              X = matrix(c(X_o,X_u),ncol=1),
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "linear",
               optim = "none",
               parameters = list(theta = matrix(0.1), nugget=nugget, sigma2 = 0.09))
@@ -111,7 +113,7 @@ y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(nugget))
 
 X_n = sort(c(X_u-1e-2,X_u+1e-2,X_n))
 
-ls = lk$simulate(1000, 123, X_n, with_nugget = TRUE, will_update=TRUE)
+ls = lk$simulate(1000, 123, X_n, with_noise = TRUE, will_update=TRUE)
 #y_u = rs[i_u,1] # force matching 1st sim
 lus=NULL
 lus = lk$update_simulate(y_u,  X_u)
@@ -119,7 +121,7 @@ lus = lk$update_simulate(y_u,  X_u)
 lu = copy(lk)
 lu$update(y_u, X_u, refit=TRUE) # refit=TRUE will update beta (required to match l2)
 lsu=NULL
-lsu = lu$simulate(1000, 123, X_n, with_nugget = TRUE)
+lsu = lu$simulate(1000, 123, X_n, with_noise = TRUE)
 
 plot(f)
 points(X_o,y_o,pch=16)
@@ -189,9 +191,10 @@ X_o <- matrix(runif(n*d),ncol=d) #seq(from = 0, to = 1, length.out = n)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(nugget))
 #points(X_o, y_o)
 
-lkd <- NuggetKriging(y = y_o,
+lkd <- Kriging(y = y_o,
               X = X_o,
               kernel = "gauss",
+              noise = "nugget",
               regmodel = "linear",
               optim = "none",
               #normalize = TRUE,
@@ -273,14 +276,14 @@ y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(nugget))
 
 X_n = rbind(X_u+1e-2,X_n) # add some nugget to avoid degenerate cases
 
-#lk = rlibkriging:::load.NuggetKriging("/tmp/lk.json")
-lsd = lkd$simulate(1000, 123, X_n, with_nugget=TRUE, will_update=TRUE)
+#lk = rlibkriging:::load.Kriging("/tmp/lk.json")
+lsd = lkd$simulate(1000, 123, X_n, with_noise=TRUE, will_update=TRUE)
 lusd = NULL
 lusd = lkd$update_simulate(y_u, X_u)
 
 lud = copy(lkd)
 lud$update(matrix(y_u,ncol=1), X_u, refit=TRUE) # refit=TRUE will update beta (required to match l2)
-#lu = rlibkriging:::load.NuggetKriging("/tmp/lu.json")
+#lu = rlibkriging:::load.Kriging("/tmp/lu.json")
 lsud = NULL
 lsud = lud$simulate(1000, 123, X_n)
 

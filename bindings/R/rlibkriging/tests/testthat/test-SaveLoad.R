@@ -28,7 +28,7 @@ print(k2)
 
 test_that("Save/Load NuggetKriging", expect_true( print(k) == print(k2)))
 
-nuk <- NuggetKriging(y, X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
+nuk <- Kriging(y, X,"gauss", noise = "nugget",parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nuk)
 
 unlink("nuk.json")

@@ -54,7 +54,7 @@ test_that("covMat works for all Kriging classes", {
   expect_equal(dim(cov2), c(5, 5))
   
   # Test NuggetKriging
-  k3 <- NuggetKriging(y, X, kernel = "gauss")
+  k3 <- Kriging(y, X, kernel = "gauss", noise = "nugget")
   cov3 <- covMat(k3, X_test, X_test)
   expect_equal(dim(cov3), c(5, 5))
 })
@@ -117,7 +117,7 @@ test_that("as.list for NuggetKriging includes nugget fields", {
   X <- matrix(runif(n), ncol = 1)
   y <- X[, 1]^2
   
-  k <- NuggetKriging(y, X, kernel = "matern3_2")
+  k <- Kriging(y, X, kernel = "matern3_2", noise = "nugget")
   params <- as.list(k)
   
   # NuggetKriging should have 'nugget' and 'is_nugget_estim' fields
@@ -232,7 +232,7 @@ test_that("All classes have covMat", {
   
   k1 <- Kriging(y, X, kernel = "gauss")
   k2 <- Kriging(y, X, kernel = "gauss", noise = noise)
-  k3 <- NuggetKriging(y, X, kernel = "gauss")
+  k3 <- Kriging(y, X, kernel = "gauss", noise = "nugget")
   
   X_test <- matrix(runif(3), ncol = 1)
   
@@ -255,7 +255,7 @@ test_that("All classes have as.list/model", {
   
   k1 <- Kriging(y, X, kernel = "gauss")
   k2 <- Kriging(y, X, kernel = "gauss", noise = noise)
-  k3 <- NuggetKriging(y, X, kernel = "gauss")
+  k3 <- Kriging(y, X, kernel = "gauss", noise = "nugget")
   
   # All should return lists
   m1 <- as.list(k1)

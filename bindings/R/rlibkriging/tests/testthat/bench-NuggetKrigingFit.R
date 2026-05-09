@@ -18,7 +18,9 @@ for (i in 1:N) {
                          multistart = 1,control = list(trace=T,maxit=20)) #,lower=rep(0.001,d),upper=rep(2*sqrt(d),d))
                     ))
     try(times$cpp[i] <- system.time(
-                        r <- NuggetKriging(y, X,"gauss","constant",FALSE,"BFGS","LL",
+                        r <- Kriging(y, X, "gauss",
+                            noise = "nugget",
+                            regmodel = "constant", normalize = FALSE, optim = "BFGS", objective = "LL",
                             # to let start optim at same initial point
                             parameters=list(theta=matrix(k@parinit,ncol=d)))#, nugget=0.001))
                     ))

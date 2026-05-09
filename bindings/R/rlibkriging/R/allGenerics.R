@@ -209,7 +209,7 @@ fit <- function(object, ...) {
 ##' 
 ##' @export
 save <- function(object=NULL, filename=NULL, ...) {
-    if (is.null(object) || !isTRUE(class(object) %in% c("Kriging","NuggetKriging"))) {# back to base::save
+    if (is.null(object) || !isTRUE(class(object) %in% c("Kriging"))) {# back to base::save
         # warning("Using base::save")
         if (!is.null(filename)) {
             if (!is.null(object)) {
@@ -246,8 +246,6 @@ save <- function(object=NULL, filename=NULL, ...) {
         
         if (k_class=="Kriging")
             return(save.Kriging(object, filename))
-        else if (k_class=="NuggetKriging")
-            return(save.NuggetKriging(object, filename))
         else 
             stop("Unknown Kriging class: ",k_class)
     }
@@ -321,8 +319,6 @@ load <- function(filename, ...) {
         } else {
             if (k_class=="Kriging")
                     return(load.Kriging(filename))
-            else if (k_class=="NuggetKriging")
-                return(load.NuggetKriging(filename))
             else 
                 stop("Unknown Kriging class: ",k_class)
         }
