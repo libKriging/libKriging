@@ -10,7 +10,7 @@
 #include "libKriging/libKriging_exports.h"
 
 struct KrigingLoader {
-  enum class LIBKRIGING_EXPORT KrigingType { Kriging, NoiseKriging, NuggetKriging, Unknown };
+  enum class LIBKRIGING_EXPORT KrigingType { Kriging, NoiseKriging, NuggetKriging, WarpKriging, MLPKriging, Unknown };
 
   LIBKRIGING_EXPORT static KrigingType describe(std::string filename);
 };

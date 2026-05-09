@@ -15,6 +15,7 @@
  */
 
 #include "libKriging/Kriging.hpp"
+#include "libKriging/KrigingLoader.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/WarpKriging.hpp"
 
@@ -1325,6 +1326,7 @@ static void test_level_names() {
 
     std::string tmpfile = "wk_level_names_test.json";
     model.save(tmpfile);
+    assert(KrigingLoader::describe(tmpfile) == KrigingLoader::KrigingType::WarpKriging);
     WarpKriging loaded = WarpKriging::load(tmpfile);
     auto ws = loaded.warping_strings();
     assert(ws.size() == 1);

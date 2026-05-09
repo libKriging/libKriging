@@ -4,6 +4,7 @@
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
 #include "WarpKriging_binding.hpp"
+#include "libKriging/KrigingLoader.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
 #include "tools/MxMapper.hpp"
@@ -55,6 +56,31 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
   switch (fnv_hash(command)) {
     case "help"_hash:
       return help_page();
+
+    case "class_saved"_hash: {
+      MxMapper input{"Input", nrhs - 1, const_cast<mxArray**>(prhs + 1), RequiresArg::Exactly{1}};
+      MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+      (void)output;
+      const auto filename = input.get<std::string>(0, "filename");
+      std::string klass;
+      switch (KrigingLoader::describe(filename)) {
+        case KrigingLoader::KrigingType::Kriging:
+        case KrigingLoader::KrigingType::NuggetKriging:
+        case KrigingLoader::KrigingType::NoiseKriging:
+          klass = "Kriging";
+          break;
+        case KrigingLoader::KrigingType::WarpKriging:
+          klass = "WarpKriging";
+          break;
+        case KrigingLoader::KrigingType::MLPKriging:
+          klass = "MLPKriging";
+          break;
+        case KrigingLoader::KrigingType::Unknown:
+          mexErrMsgIdAndTxt("mLibKriging:class_saved", "Unknown Kriging type in file");
+      }
+      plhs[0] = mxCreateString(klass.c_str());
+      return;
+    }
 
     case "Params::new"_hash:
       return ParamsBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

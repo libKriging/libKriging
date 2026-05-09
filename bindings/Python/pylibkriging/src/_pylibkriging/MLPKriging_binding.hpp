@@ -34,6 +34,7 @@ class PyMLPKriging {
                const std::string& objective,
                const py::dict& parameters);
   ~PyMLPKriging();
+  PyMLPKriging(PyMLPKriging&&) = default;
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,

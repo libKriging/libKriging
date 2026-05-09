@@ -5,6 +5,7 @@
 
 #include <carma>
 #include <iostream>
+#include <libKriging/KrigingLoader.hpp>
 #include <libKriging/LinearRegression.hpp>
 #include <libKriging/Optim.hpp>
 
@@ -24,6 +25,22 @@ constexpr bool strings_equal(char const* a, char const* b) {
 }
 
 namespace py = pybind11;
+
+static py::object load_any(const std::string& filename) {
+  auto ktype = KrigingLoader::describe(filename);
+  switch (ktype) {
+    case KrigingLoader::KrigingType::Kriging:
+    case KrigingLoader::KrigingType::NuggetKriging:
+    case KrigingLoader::KrigingType::NoiseKriging:
+      return py::cast(PyKriging::load(filename));
+    case KrigingLoader::KrigingType::WarpKriging:
+      return py::cast(PyWarpKriging::load(filename));
+    case KrigingLoader::KrigingType::MLPKriging:
+      return py::cast(PyMLPKriging::load(filename));
+    default:
+      throw std::runtime_error("Unknown Kriging type in file: " + filename);
+  }
+}
 
 PYBIND11_MODULE(_pylibkriging, m) {
   // to avoid mixing allocators from default libKriging and Python
@@ -63,6 +80,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
+
+  m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");
 
   // Basic tools
   py::class_<RandomGenerator>(m, "RandomGenerator")

@@ -43,6 +43,8 @@ else:  # Windows
 from _pylibkriging import *
 from _pylibkriging import __version__, __build_type__
 
+_cpp_load = load
+
 # Type alias to switch to the right binding
 Kriging = WrappedPyKriging
 MLPKriging = WrappedPyMLPKriging
@@ -203,6 +205,15 @@ def _has_string_columns(X):
                 if _col_has_nonnumeric_strings(arr[:, j]):
                     return True
     return False
+
+
+def load(filename):
+    obj = _cpp_load(filename)
+    if isinstance(obj, WrappedPyWarpKriging):
+        wrapped = WarpKriging.__new__(WarpKriging)
+        wrapped._impl = obj
+        return wrapped
+    return obj
 
 
 class WarpKriging:

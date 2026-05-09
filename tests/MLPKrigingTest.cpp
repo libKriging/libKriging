@@ -4,10 +4,12 @@
  * @brief Tests for the MLPKriging class (joint-MLP Deep Kernel Learning).
  */
 
+#include "libKriging/KrigingLoader.hpp"
 #include "libKriging/MLPKriging.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 
 using namespace libKriging;
@@ -169,6 +171,32 @@ static void test_predict_derivative() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+static void test_save_load_dispatch() {
+  std::cout << "=== Test 3: MLPKriging save/load dispatch ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  MLPKriging model({8, 4}, 2, "selu", "gauss");
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
+
+  const std::string filename = "mlp_dispatch_test.json";
+  model.save(filename);
+  assert(KrigingLoader::describe(filename) == KrigingLoader::KrigingType::MLPKriging);
+
+  MLPKriging loaded = MLPKriging::load(filename);
+  auto [mean, _stdev, _cov, _mean_deriv, _stdev_deriv] = loaded.predict(X_mat, true, false);
+  assert(mean.n_elem == X_mat.n_rows);
+  assert(mean.is_finite());
+
+  std::remove(filename.c_str());
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 // ==========================================================================
 //  main
 // ==========================================================================
@@ -176,6 +204,7 @@ int main() {
   try {
     test_mlp_kriging_basic();
     test_predict_derivative();
+    test_save_load_dispatch();
 
     std::cout << "============================================\n"
               << "  ALL MLPKriging TESTS PASSED\n"

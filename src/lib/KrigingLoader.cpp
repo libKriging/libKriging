@@ -14,8 +14,8 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
   nlohmann::json j = nlohmann::json::parse(f);
 
   uint32_t version = j["version"].template get<uint32_t>();
-  if (version != 2) {
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
+  if (version < 2 || version > 3) {
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   }
   content = j["content"].template get<std::string>();
 
@@ -32,6 +32,10 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
     return KrigingType::NoiseKriging;
   } else if (content == "NuggetKriging") {
     return KrigingType::NuggetKriging;
+  } else if (content == "WarpKriging") {
+    return KrigingType::WarpKriging;
+  } else if (content == "MLPKriging") {
+    return KrigingType::MLPKriging;
   } else {
     return KrigingType::Unknown;
   }

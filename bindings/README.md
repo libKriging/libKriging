@@ -126,9 +126,10 @@ This document lists all methods exposed by each language binding for accessing t
 
 | Function | R | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|
-| Detect saved class | `class_saved(file)` | — | — | — |
-| Load Kriging | `kriging_load(file)` / `load.Kriging(file)` | `load_kriging(file)` | `load(file)` | `load_kriging(file)` |
-| Load WarpKriging | `warpkriging_load(file)` / `load.WarpKriging(file)` | `load_warp_kriging(file)` | `load(file)` | — |
-| Load MLPKriging | `mlpkriging_load(file)` / `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `load(file)` | — |
+| Detect saved class | `class_saved(file)` → `"Kriging"`, `"WarpKriging"`, `"MLPKriging"` | — | `class_saved(file)` | — |
+| Generic load | `load(file)` | `load(file)` | `load_kriging(file)` | `load(file)` |
+| Load Kriging | `kriging_load(file)` / `load.Kriging(file)` | `load_kriging(file)` | `Kriging.load(file)` | `load_kriging(file)` |
+| Load WarpKriging | `warpkriging_load(file)` / `load.WarpKriging(file)` | `load_warp_kriging(file)` | `WarpKriging.load(file)` | `load_warp_kriging(file)` |
+| Load MLPKriging | `mlpkriging_load(file)` / `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `MLPKriging.load(file)` | `load_mlp_kriging(file)` |
 
 ---

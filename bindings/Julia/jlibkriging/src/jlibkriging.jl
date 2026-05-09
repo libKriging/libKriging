@@ -339,6 +339,24 @@ function save(k::Kriging, filename::String)
     _check_error(ret)
 end
 
+function _saved_content(filename::String)
+    m = match(r"\"content\"\s*:\s*\"([^\"]+)\"", read(filename, String))
+    return m === nothing ? "" : m.captures[1]
+end
+
+function load(filename::String)
+    content = _saved_content(filename)
+    if content == "Kriging" || content == "NoiseKriging" || content == "NuggetKriging"
+        return load_kriging(filename)
+    elseif content == "WarpKriging"
+        return load_warp_kriging(filename)
+    elseif content == "MLPKriging"
+        return load_mlp_kriging(filename)
+    else
+        error("Unknown Kriging type in file: $filename")
+    end
+end
+
 function load_kriging(filename::String)
     ptr = ccall(dlsym(_lk(), :lk_kriging_load), Ptr{Nothing}, (Cstring,), filename)
     return Kriging(_check_ptr(ptr))
@@ -1194,7 +1212,7 @@ end
 
 export LinearRegression, Kriging, NuggetKriging, NoiseKriging, WarpKriging, MLPKriging
 export fit!, predict, simulate, update!, update_simulate, save, summary
-export load_kriging, load_nugget_kriging, load_noise_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_nugget_kriging, load_noise_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat

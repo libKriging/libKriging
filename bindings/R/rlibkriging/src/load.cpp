@@ -54,6 +54,12 @@ std::string class_saved(std::string filename) {
     case KrigingLoader::KrigingType::NoiseKriging:
       return "Kriging";  // NoiseKriging merged into Kriging(noise=noise_vector)
       break;
+    case KrigingLoader::KrigingType::WarpKriging:
+      return "WarpKriging";
+      break;
+    case KrigingLoader::KrigingType::MLPKriging:
+      return "MLPKriging";
+      break;
     case KrigingLoader::KrigingType::Unknown:
       Rcpp::stop("Kriging object type unknown.");
       break;
