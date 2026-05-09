@@ -463,7 +463,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 update_simulate.Kriging <- function(object, y_u, ...) {
     # Support two calling conventions matching C++ overloads:
     #   update_simulate(y_u, X_u)            - no noise (Nugget / pure Kriging)
-    #   update_simulate(y_u, noise_u, X_u)   - with noise (NoiseKriging)
+    #   update_simulate(y_u, noise_u, X_u)   - with known observation noise
     # Named arguments also accepted: update_simulate(y_u, noise_u=..., X_u=...)
     args <- list(...)
     if (!is.null(args$X_u) || !is.null(args$noise_u)) {

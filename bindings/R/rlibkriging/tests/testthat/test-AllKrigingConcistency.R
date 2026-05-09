@@ -15,9 +15,9 @@ set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o,pch=16)
 
-lk_no <- NoiseKriging(y = matrix(y_o, ncol = 1),
-              noise = matrix(rep(noise, n), ncol = 1),
+lk_no <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
+              noise = matrix(rep(noise, n), ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
@@ -41,7 +41,7 @@ lk = Kriging(y = matrix(y_o, ncol = 1),
               normalize = FALSE,
               parameters = list(theta = matrix(0.1), sigma2 = sigma2))
 
-test_that("Consistency between Noise(0)Kriging and Kriging", {
+test_that("Consistency between Kriging(noise=0) and Kriging", {
     expect_equal(lk$T(), lk_no$T())
     expect_equal(lk$M(), lk_no$M())
     expect_equal(lk$beta(), lk_no$beta())
@@ -178,9 +178,9 @@ set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o,pch=16)
 
-lk_no <- NoiseKriging(y = matrix(y_o, ncol = 1),
-              noise = matrix(rep(noise, n), ncol = 1),
+lk_no <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
+              noise = matrix(rep(noise, n), ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
@@ -197,7 +197,7 @@ lk_nu <- NuggetKriging(y = matrix(y_o, ncol = 1),
 
 
 
-test_that("Consistency between Noise(0)Kriging and Kriging", {
+test_that("Consistency between Kriging(noise=const) and NuggetKriging", {
     alpha_k <- lk_nu$sigma2() / (lk_nu$sigma2() + noise)
     expect_equal(lk_nu$T(), lk_no$T() * sqrt(alpha_k))
     expect_equal(lk_nu$M(), lk_no$M() / sqrt(alpha_k))

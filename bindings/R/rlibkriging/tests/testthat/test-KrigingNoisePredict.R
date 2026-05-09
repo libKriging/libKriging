@@ -18,7 +18,7 @@ for (kernel in c("gauss","exp","matern3_2","matern5_2")) {
   #points(X,y)
   k = DiceKriging::km(design=X,noise.var=rep(0.1^2,nrow(X)),response=y,covtype = "gauss",control = list(trace=F), nugget.estim = F)
   library(rlibkriging)
-  r <- NoiseKriging(y,noise=rep(0.1^2,nrow(X)),X,"gauss","constant",FALSE,"none","LL",
+  r <- Kriging(y, X, "gauss", noise=rep(0.1^2,nrow(X)), regmodel="constant", normalize=FALSE, optim="none", objective="LL",
                parameters=list(sigma2=k@covariance@sd2,has_sigma2=TRUE, is_sigma2_estim=FALSE,
                theta=matrix(k@covariance@range.val),has_theta=TRUE, is_theta_estim=FALSE))
   # m = as.list(r)

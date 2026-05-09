@@ -30,7 +30,7 @@ tmax=1
   }}
   
   #library(rlibkriging)
-  r <- NoiseKriging(y,noise=rep(0.1^2,nrow(X)), X, kernel)
+  r <- Kriging(y, X, kernel, noise=rep(0.1^2,nrow(X)))
   ll_r = function(theta_sigma2) logLikelihoodFun(r,theta_sigma2)$logLikelihood
   x=seq(tmin,tmax,,51)
   contour(x,x,matrix(ll_r(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)

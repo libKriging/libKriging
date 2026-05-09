@@ -12,9 +12,9 @@ set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o)
 
-lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
-                noise = matrix(rep(noise, n), ncol = 1),
+lk <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
+              noise = matrix(rep(noise, n), ncol = 1),
               kernel = "gauss",
               regmodel = "constant",
               optim = "none",

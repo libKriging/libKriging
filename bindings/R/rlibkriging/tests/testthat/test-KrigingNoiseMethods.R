@@ -15,7 +15,7 @@ x=seq(0,1,,51)
 contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 
-r <- NoiseKriging(y, noise=rep(0.1^2,nrow(X)), X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2),sigma2=1))
+r <- Kriging(y, X, "gauss", noise=rep(0.1^2,nrow(X)), parameters = list(theta=matrix(runif(40),ncol=2),sigma2=1))
 l= as.list(r)
 #ll = function(X) {
 #  logLikelihoodFun(r,X,return_grad=F)$logLikelihood
@@ -109,7 +109,7 @@ contour(x,x,matrix(f(as.matrix(expand.grid(x,x))),nrow=length(x)),nlevels = 30)
 points(X)
 points(X2,col='red')
 
-r20 <- NoiseKriging(c(y,y2), c(y-f(X),y2-f(X2))^2,rbind(X,X2),"gauss")
+r20 <- Kriging(c(y,y2), rbind(X,X2), "gauss", noise=c(y-f(X),y2-f(X2))^2)
 ll = function(X) {
   logLikelihoodFun(r20,X,return_grad=F)$logLikelihood
 }
@@ -139,7 +139,7 @@ points(as.list(r)$theta[1],as.list(r)$theta[2],pch=20)
 #rlibkriging:::optim_log(1)
 
 set.seed(1234)
-r2 <- NoiseKriging(c(y,y2), noise=rep(0.1^2,nrow(X)+nrow(X2)),rbind(X,X2),"gauss", parameters = list(theta=matrix(as.list(r)$theta,ncol=2),sigma2=1))
+r2 <- Kriging(c(y,y2), rbind(X,X2), "gauss", noise=rep(0.1^2,nrow(X)+nrow(X2)), parameters = list(theta=matrix(as.list(r)$theta,ncol=2),sigma2=1))
 ll2 = function(Theta){apply(Theta,1,function(theta) logLikelihoodFun(r2,c(theta,as.list(r2)$sigma2))$logLikelihood)}
 contour(t,t,matrix(ll2(as.matrix(expand.grid(t,t))),nrow=length(t)),nlevels = 30,add=T,col='red')
 points(as.list(r2)$theta[1],as.list(r2)$theta[2],col='red',pch=20)

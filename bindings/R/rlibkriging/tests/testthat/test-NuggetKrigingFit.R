@@ -87,8 +87,8 @@ nu=0.1
 k = NULL
 r = NULL
 k = DiceKriging::km(design=X,response=y,covtype = "gauss",control = list(trace=F),nugget.estim=FALSE, nugget = nu,optim.method='BFGS',multistart = 20)
-#equivalent to NoiseKriging, not NuggetKriging: 
-rr <- NoiseKriging(y, rep(0.1,nrow(y)), X, "gauss", optim = "BFGS20")
+#equivalent to Kriging with noise, not NuggetKriging:
+rr <- Kriging(y, X, "gauss", noise=rep(0.1,nrow(y)), optim = "BFGS20")
 r <- NuggetKriging(y, X, "gauss", optim = "BFGS20", parameters=list(nugget=nu, is_nugget_estim=FALSE ))
 l = as.list(r)
 

@@ -48,8 +48,8 @@ test_that("covMat works for all Kriging classes", {
   cov1 <- covMat(k1, X_test, X_test)
   expect_equal(dim(cov1), c(5, 5))
   
-  # Test NoiseKriging
-  k2 <- NoiseKriging(y, noise, X, kernel = "gauss")
+  # Test Kriging with noise
+  k2 <- Kriging(y, X, kernel = "gauss", noise = noise)
   cov2 <- covMat(k2, X_test, X_test)
   expect_equal(dim(cov2), c(5, 5))
   
@@ -96,17 +96,17 @@ test_that("model/as.list basic functionality works", {
   expect_true(length(params$beta) > 0)
 })
 
-test_that("as.list for NoiseKriging includes noise field", {
+test_that("as.list for Kriging with noise includes noise field", {
   set.seed(123)
   n <- 20
   X <- matrix(runif(n * 2), ncol = 2)
   y <- sin(X[, 1] * 3) * cos(X[, 2] * 3) + 1
   noise <- rep(0.1, n)
   
-  k <- NoiseKriging(y, noise, X, kernel = "gauss")
+  k <- Kriging(y, X, kernel = "gauss", noise = noise)
   params <- as.list(k)
   
-  # NoiseKriging should have 'noise' field
+  # Kriging with noise should have 'noise' field
   expect_true('noise' %in% names(params))
   expect_equal(length(params$noise), n)
 })
@@ -231,7 +231,7 @@ test_that("All classes have covMat", {
   noise <- rep(0.01, n)
   
   k1 <- Kriging(y, X, kernel = "gauss")
-  k2 <- NoiseKriging(y, noise, X, kernel = "gauss")
+  k2 <- Kriging(y, X, kernel = "gauss", noise = noise)
   k3 <- NuggetKriging(y, X, kernel = "gauss")
   
   X_test <- matrix(runif(3), ncol = 1)
@@ -254,7 +254,7 @@ test_that("All classes have as.list/model", {
   noise <- rep(0.01, n)
   
   k1 <- Kriging(y, X, kernel = "gauss")
-  k2 <- NoiseKriging(y, noise, X, kernel = "gauss")
+  k2 <- Kriging(y, X, kernel = "gauss", noise = noise)
   k3 <- NuggetKriging(y, X, kernel = "gauss")
   
   # All should return lists

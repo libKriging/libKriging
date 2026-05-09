@@ -177,7 +177,7 @@ test_that("simulate works with mixed variables", {
                    parameters = list(max_iter_adam = "200"))
 
   X_sim <- cbind(seq(0.1, 0.9, length.out = 10), rep(0, 10))
-  sims <- simulate(k, nsim = 30, seed = 123, x = X_sim)
+  sims <- simulate.WarpKriging(k, nsim = 30, seed = 123, x = X_sim)
 
   expect_equal(nrow(sims), 10)
   expect_equal(ncol(sims), 30)
@@ -233,7 +233,7 @@ test_that("Branin 2D with MLP warping works", {
   expect_equal(length(p$mean), 15)
   expect_true(all(is.finite(p$stdev)))
 
-  sims <- simulate(k, nsim = 20, seed = 42, x = X_test)
+  sims <- simulate.WarpKriging(k, nsim = 20, seed = 42, x = X_test)
   expect_equal(dim(sims), c(15, 20))
 })
 

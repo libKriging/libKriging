@@ -15,10 +15,10 @@ set.seed(1234)
 X <- matrix(runif(n*d),ncol=d)
 y <- f(X)+rnorm(nrow(X),0,0.1)
 r = NULL
-try( r <- NoiseKriging(y, rep(0.1^2,nrow(X)), X, "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), sigma2 = 0.1, beta = matrix(0.01))) )
+try( r <- Kriging(y, X, "gauss", noise=rep(0.1^2,nrow(X)), regmodel="constant", normalize=FALSE, optim="none", objective="LL", parameters=list(theta = matrix(.5,ncol=3), sigma2 = 0.1, beta = matrix(0.01))) )
 
 no = floor(n*0.7)
-try( ro <- NoiseKriging(y[1:no], rep(0.1^2,no), X[1:no,], "gauss","constant",FALSE,"none","LL", parameters=list(theta = matrix(.5,ncol=3), sigma2 = 0.1, beta = matrix(0.01))) )
+try( ro <- Kriging(y[1:no], X[1:no,], "gauss", noise=rep(0.1^2,no), regmodel="constant", normalize=FALSE, optim="none", objective="LL", parameters=list(theta = matrix(.5,ncol=3), sigma2 = 0.1, beta = matrix(0.01))) )
 # update with new points, compute LL but no fit (since optim=none)
 ro$update(y[(no+1):n],rep(0.1^2,n-no), X[(no+1):n,], refit=TRUE)
 

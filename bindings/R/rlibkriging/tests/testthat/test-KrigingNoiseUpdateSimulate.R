@@ -17,9 +17,9 @@ set.seed(1234)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 points(X_o, y_o,pch=16)
 
-lk <- NoiseKriging(y = matrix(y_o, ncol = 1),
-              noise = matrix(rep(noise, n), ncol = 1),
+lk <- Kriging(y = matrix(y_o, ncol = 1),
               X = matrix(X_o, ncol = 1),
+              noise = matrix(rep(noise, n), ncol = 1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
@@ -65,9 +65,9 @@ y_u = f(X_u) + rnorm(length(X_u), sd = sqrt(noise))
 noise_u = rep(noise, length(X_u))
 
 # new Kriging model from scratch
-l2 = NoiseKriging(y = matrix(c(y_o,y_u),ncol=1),
-                noise = matrix(c(rep(noise,n),noise_u),ncol=1),
+l2 = Kriging(y = matrix(c(y_o,y_u),ncol=1),
              X = matrix(c(X_o,X_u),ncol=1),
+             noise = matrix(c(rep(noise,n),noise_u),ncol=1),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
@@ -196,9 +196,9 @@ X_o <- matrix(runif(n*d),ncol=d) #seq(from = 0, to = 1, length.out = n)
 y_o <- f(X_o) + rnorm(n, sd = sqrt(noise))
 #points(X_o, y_o)
 
-lkd <- NoiseKriging(y = y_o,
-              noise = rep(noise,n),
+lkd <- Kriging(y = y_o,
               X = X_o,
+              noise = rep(noise,n),
               kernel = "gauss",
               regmodel = "linear",
               optim = "none",
@@ -281,14 +281,14 @@ y_u = f(X_u) + rnorm(nrow(X_u), sd = sqrt(noise))
 
 X_n = rbind(X_u+1e-2,X_n) # add some noise to avoid degenerate cases
 
-#lk = rlibkriging:::load.NoiseKriging("/tmp/lk.json")
+#lk = rlibkriging:::load.Kriging("lk.json")
 lsd = lkd$simulate(1000, 123, X_n, will_update=TRUE)
 lusd = NULL
 lusd = lkd$update_simulate(y_u, rep(noise,length(y_u)), X_u)
 
 lud = copy(lkd)
 lud$update(matrix(y_u,ncol=1), rep(noise,length(y_u)), X_u, refit=TRUE) # refit=TRUE will update beta (required to match l2)
-#lu = rlibkriging:::load.NoiseKriging("/tmp/lu.json")
+#lu = rlibkriging:::load.Kriging("lu.json")
 lsud = NULL
 lsud = lud$simulate(1000, 123, X_n)
 

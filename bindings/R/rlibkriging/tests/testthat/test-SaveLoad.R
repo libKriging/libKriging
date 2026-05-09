@@ -39,7 +39,7 @@ print(nuk2)
 
 test_that("Save/Load NuggetKriging", expect_true( print(nuk) == print(nuk2)))
 
-nok <- NoiseKriging(y, rep(0.1^2,nrow(X)), X,"gauss",parameters = list(theta=matrix(runif(40),ncol=2)))
+nok <- Kriging(y, X, "gauss", noise=rep(0.1^2,nrow(X)), parameters = list(theta=matrix(runif(40),ncol=2)))
 print(nok)
 
 unlink("nok.json")
@@ -48,7 +48,7 @@ save(nok, filename="nok.json")
 nok2 <- load(filename="nok.json")
 print(nok2)
 
-test_that("Save/Load NoiseKriging", expect_true( print(nok) == print(nok2)))
+test_that("Save/Load Kriging with noise", expect_true( print(nok) == print(nok2)))
 
 context("Test rlibkriging::save/load versus base::save/load")
 
