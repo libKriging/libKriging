@@ -806,22 +806,39 @@ function predict(wk::WarpKriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
-function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Float64})
+function simulate(wk::WarpKriging, nsim::Int, seed::Int, X_n::Matrix{Float64}; will_update::Bool=false)
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_simulate), Cint,
-                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
-                wk.ptr, nsim, seed, X_n, m, d, sim_out)
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}),
+                wk.ptr, nsim, seed, X_n, m, d, will_update ? 1 : 0, sim_out)
     _check_error(ret)
     return sim_out
 end
 
-function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
+function update_simulate(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
+    n, d = size(X_u)
+    @assert length(y_u) == n
+    nsim_out = Ref{Cint}(0)
+    m_out = Ref{Cint}(0)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_update_simulate), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}),
+                wk.ptr, y_u, n, X_u, n, d, C_NULL, nsim_out, m_out)
+    _check_error(ret)
+    sim = Matrix{Float64}(undef, m_out[], nsim_out[])
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_update_simulate), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}),
+                wk.ptr, y_u, n, X_u, n, d, sim, nsim_out, m_out)
+    _check_error(ret)
+    return sim
+end
+
+function update!(wk::WarpKriging, y_u::Vector{Float64}, X_u::Matrix{Float64}; refit::Bool=true)
     n, d = size(X_u)
     @assert length(y_u) == n
     ret = ccall(dlsym(_lk(), :lk_warp_kriging_update), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint),
-                wk.ptr, y_u, n, X_u, n, d)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Cint),
+                wk.ptr, y_u, n, X_u, n, d, refit ? 1 : 0)
     _check_error(ret)
     return wk
 end
@@ -854,10 +871,21 @@ function log_likelihood_fun(wk::WarpKriging, theta::Vector{Float64};
 end
 
 kernel(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_kernel), Cstring, (Ptr{Nothing},), wk.ptr))
+normalize(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_normalize), Cint, (Ptr{Nothing},), wk.ptr) != 0
+regmodel(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), wk.ptr))
 is_fitted(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_is_fitted), Cint, (Ptr{Nothing},), wk.ptr) != 0
 feature_dim(wk::WarpKriging) = Int(ccall(dlsym(_lk(), :lk_warp_kriging_feature_dim), Cint, (Ptr{Nothing},), wk.ptr))
 X(wk::WarpKriging) = _get_mat(:lk_warp_kriging_get_X, wk.ptr)
+centerX(wk::WarpKriging) = _get_rowvec(:lk_warp_kriging_get_centerX, wk.ptr)
+scaleX(wk::WarpKriging) = _get_rowvec(:lk_warp_kriging_get_scaleX, wk.ptr)
 y(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_y, wk.ptr)
+centerY(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_centerY), Float64, (Ptr{Nothing},), wk.ptr)
+scaleY(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_scaleY), Float64, (Ptr{Nothing},), wk.ptr)
+F(wk::WarpKriging) = _get_mat(:lk_warp_kriging_get_F, wk.ptr)
+T(wk::WarpKriging) = _get_mat(:lk_warp_kriging_get_T, wk.ptr)
+M(wk::WarpKriging) = _get_mat(:lk_warp_kriging_get_M, wk.ptr)
+z(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_z, wk.ptr)
+beta(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_beta, wk.ptr)
 theta(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_theta, wk.ptr)
 sigma2(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_sigma2), Float64, (Ptr{Nothing},), wk.ptr)
 
@@ -1114,22 +1142,39 @@ function predict(mk::MLPKriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
-function simulate(mk::MLPKriging, nsim::Int, seed::Int, X_n::Matrix{Float64})
+function simulate(mk::MLPKriging, nsim::Int, seed::Int, X_n::Matrix{Float64}; will_update::Bool=false)
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_simulate), Cint,
-                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
-                mk.ptr, nsim, seed, X_n, m, d, sim_out)
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}),
+                mk.ptr, nsim, seed, X_n, m, d, will_update ? 1 : 0, sim_out)
     _check_error(ret)
     return sim_out
 end
 
-function update!(mk::MLPKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
+function update_simulate(mk::MLPKriging, y_u::Vector{Float64}, X_u::Matrix{Float64})
+    n, d = size(X_u)
+    @assert length(y_u) == n
+    nsim_out = Ref{Cint}(0)
+    m_out = Ref{Cint}(0)
+    ret = ccall(dlsym(_lk(), :lk_mlp_kriging_update_simulate), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}),
+                mk.ptr, y_u, n, X_u, n, d, C_NULL, nsim_out, m_out)
+    _check_error(ret)
+    sim = Matrix{Float64}(undef, m_out[], nsim_out[])
+    ret = ccall(dlsym(_lk(), :lk_mlp_kriging_update_simulate), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}),
+                mk.ptr, y_u, n, X_u, n, d, sim, nsim_out, m_out)
+    _check_error(ret)
+    return sim
+end
+
+function update!(mk::MLPKriging, y_u::Vector{Float64}, X_u::Matrix{Float64}; refit::Bool=true)
     n, d = size(X_u)
     @assert length(y_u) == n
     ret = ccall(dlsym(_lk(), :lk_mlp_kriging_update), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint),
-                mk.ptr, y_u, n, X_u, n, d)
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint, Cint),
+                mk.ptr, y_u, n, X_u, n, d, refit ? 1 : 0)
     _check_error(ret)
     return mk
 end
@@ -1163,10 +1208,21 @@ end
 
 kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel), Cstring, (Ptr{Nothing},), mk.ptr))
 activation(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_activation), Cstring, (Ptr{Nothing},), mk.ptr))
+normalize(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_normalize), Cint, (Ptr{Nothing},), mk.ptr) != 0
+regmodel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), mk.ptr))
 is_fitted(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_is_fitted), Cint, (Ptr{Nothing},), mk.ptr) != 0
 feature_dim(mk::MLPKriging) = Int(ccall(dlsym(_lk(), :lk_mlp_kriging_feature_dim), Cint, (Ptr{Nothing},), mk.ptr))
 X(mk::MLPKriging) = _get_mat(:lk_mlp_kriging_get_X, mk.ptr)
+centerX(mk::MLPKriging) = _get_rowvec(:lk_mlp_kriging_get_centerX, mk.ptr)
+scaleX(mk::MLPKriging) = _get_rowvec(:lk_mlp_kriging_get_scaleX, mk.ptr)
 y(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_y, mk.ptr)
+centerY(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_centerY), Float64, (Ptr{Nothing},), mk.ptr)
+scaleY(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_scaleY), Float64, (Ptr{Nothing},), mk.ptr)
+F(mk::MLPKriging) = _get_mat(:lk_mlp_kriging_get_F, mk.ptr)
+T(mk::MLPKriging) = _get_mat(:lk_mlp_kriging_get_T, mk.ptr)
+M(mk::MLPKriging) = _get_mat(:lk_mlp_kriging_get_M, mk.ptr)
+z(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_z, mk.ptr)
+beta(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_beta, mk.ptr)
 theta(mk::MLPKriging) = _get_vec(:lk_mlp_kriging_get_theta, mk.ptr)
 sigma2(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_sigma2), Float64, (Ptr{Nothing},), mk.ptr)
 

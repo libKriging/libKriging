@@ -940,10 +940,10 @@ int lk_warp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
+int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat);
+    auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;
@@ -956,6 +956,31 @@ int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
     static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat, refit != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_update_simulate(void* ptr,
+                                    const double* y_u,
+                                    int n,
+                                    const double* X_u,
+                                    int nX,
+                                    int d,
+                                    double* sim_out,
+                                    int* nsim_out,
+                                    int* m_out) {
+  try {
+    auto* wk = static_cast<WarpKriging*>(ptr);
+    arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
+    arma::mat sim = wk->update_simulate(y_vec, X_mat);
+    if (nsim_out)
+      *nsim_out = static_cast<int>(sim.n_cols);
+    if (m_out)
+      *m_out = static_cast<int>(sim.n_rows);
+    if (sim_out)
+      std::memcpy(sim_out, sim.memptr(), sim.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1009,6 +1034,23 @@ const char* lk_warp_kriging_kernel(void* ptr) {
   }
 }
 
+int lk_warp_kriging_get_normalize(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->normalize() ? 1 : 0;
+  } catch (...) {
+    return -1;
+  }
+}
+
+const char* lk_warp_kriging_get_regmodel(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = Trend::toString(static_cast<WarpKriging*>(ptr)->regmodel());
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
 int lk_warp_kriging_is_fitted(void* ptr) {
   try {
     return static_cast<WarpKriging*>(ptr)->is_fitted() ? 1 : 0;
@@ -1039,9 +1081,113 @@ int lk_warp_kriging_get_X(void* ptr, double* out, int* n, int* d) {
   CATCH_RETURN
 }
 
+int lk_warp_kriging_get_centerX(void* ptr, double* out, int* n) {
+  try {
+    const arma::rowvec& v = static_cast<WarpKriging*>(ptr)->centerX();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_scaleX(void* ptr, double* out, int* n) {
+  try {
+    const arma::rowvec& v = static_cast<WarpKriging*>(ptr)->scaleX();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_warp_kriging_get_y(void* ptr, double* out, int* n) {
   try {
     const arma::vec& v = static_cast<WarpKriging*>(ptr)->y();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_warp_kriging_get_centerY(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->centerY();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_warp_kriging_get_scaleY(void* ptr) {
+  try {
+    return static_cast<WarpKriging*>(ptr)->scaleY();
+  }
+  CATCH_RETURN_NAN
+}
+
+int lk_warp_kriging_get_F(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<WarpKriging*>(ptr)->F();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_T(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<WarpKriging*>(ptr)->T();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_M(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<WarpKriging*>(ptr)->M();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_z(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<WarpKriging*>(ptr)->z();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_warp_kriging_get_beta(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<WarpKriging*>(ptr)->beta();
     if (n)
       *n = static_cast<int>(v.n_elem);
     if (out)
@@ -1221,10 +1367,10 @@ int lk_mlp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out) {
+int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
-    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat);
+    auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
     if (sim_out)
       std::memcpy(sim_out, result.memptr(), result.n_elem * sizeof(double));
     return 0;
@@ -1237,6 +1383,31 @@ int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
     static_cast<MLPKriging*>(ptr)->update(y_vec, X_mat, refit != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_update_simulate(void* ptr,
+                                   const double* y_u,
+                                   int n,
+                                   const double* X_u,
+                                   int nX,
+                                   int d,
+                                   double* sim_out,
+                                   int* nsim_out,
+                                   int* m_out) {
+  try {
+    auto* mk = static_cast<MLPKriging*>(ptr);
+    arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
+    arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
+    arma::mat sim = mk->update_simulate(y_vec, X_mat);
+    if (nsim_out)
+      *nsim_out = static_cast<int>(sim.n_cols);
+    if (m_out)
+      *m_out = static_cast<int>(sim.n_rows);
+    if (sim_out)
+      std::memcpy(sim_out, sim.memptr(), sim.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -1299,6 +1470,23 @@ const char* lk_mlp_kriging_activation(void* ptr) {
   }
 }
 
+int lk_mlp_kriging_get_normalize(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->normalize() ? 1 : 0;
+  } catch (...) {
+    return -1;
+  }
+}
+
+const char* lk_mlp_kriging_get_regmodel(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = Trend::toString(static_cast<MLPKriging*>(ptr)->regmodel());
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
 int lk_mlp_kriging_is_fitted(void* ptr) {
   try {
     return static_cast<MLPKriging*>(ptr)->is_fitted() ? 1 : 0;
@@ -1329,9 +1517,113 @@ int lk_mlp_kriging_get_X(void* ptr, double* out, int* n, int* d) {
   CATCH_RETURN
 }
 
+int lk_mlp_kriging_get_centerX(void* ptr, double* out, int* n) {
+  try {
+    const arma::rowvec& v = static_cast<MLPKriging*>(ptr)->centerX();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_get_scaleX(void* ptr, double* out, int* n) {
+  try {
+    const arma::rowvec& v = static_cast<MLPKriging*>(ptr)->scaleX();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_mlp_kriging_get_y(void* ptr, double* out, int* n) {
   try {
     const arma::vec& v = static_cast<MLPKriging*>(ptr)->y();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_mlp_kriging_get_centerY(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->centerY();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_mlp_kriging_get_scaleY(void* ptr) {
+  try {
+    return static_cast<MLPKriging*>(ptr)->scaleY();
+  }
+  CATCH_RETURN_NAN
+}
+
+int lk_mlp_kriging_get_F(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<MLPKriging*>(ptr)->F();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_get_T(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<MLPKriging*>(ptr)->T();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_get_M(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<MLPKriging*>(ptr)->M();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_get_z(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<MLPKriging*>(ptr)->z();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mlp_kriging_get_beta(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<MLPKriging*>(ptr)->beta();
     if (n)
       *n = static_cast<int>(v.n_elem);
     if (out)

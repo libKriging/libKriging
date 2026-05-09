@@ -251,9 +251,18 @@ int lk_warp_kriging_predict(void* ptr,
                             double* mean_deriv_out,
                             double* stdev_deriv_out);
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
+int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
 
 int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
+int lk_warp_kriging_update_simulate(void* ptr,
+                                    const double* y_u,
+                                    int n,
+                                    const double* X_u,
+                                    int nX,
+                                    int d,
+                                    double* sim_out,
+                                    int* nsim_out,
+                                    int* m_out);
 
 const char* lk_warp_kriging_summary(void* ptr);
 double lk_warp_kriging_log_likelihood(void* ptr);
@@ -268,10 +277,21 @@ int lk_warp_kriging_log_likelihood_fun(void* ptr,
                                        double* hess_out);
 
 const char* lk_warp_kriging_kernel(void* ptr);
+int lk_warp_kriging_get_normalize(void* ptr);
+const char* lk_warp_kriging_get_regmodel(void* ptr);
 int lk_warp_kriging_is_fitted(void* ptr);
 int lk_warp_kriging_feature_dim(void* ptr);
 int lk_warp_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_warp_kriging_get_centerX(void* ptr, double* out, int* n);
+int lk_warp_kriging_get_scaleX(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_y(void* ptr, double* out, int* n);
+double lk_warp_kriging_get_centerY(void* ptr);
+double lk_warp_kriging_get_scaleY(void* ptr);
+int lk_warp_kriging_get_F(void* ptr, double* out, int* n, int* d);
+int lk_warp_kriging_get_T(void* ptr, double* out, int* n, int* d);
+int lk_warp_kriging_get_M(void* ptr, double* out, int* n, int* d);
+int lk_warp_kriging_get_z(void* ptr, double* out, int* n);
+int lk_warp_kriging_get_beta(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_warp_kriging_get_sigma2(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
@@ -329,9 +349,18 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* mean_deriv_out,
                            double* stdev_deriv_out);
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, double* sim_out);
+int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
 
 int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
+int lk_mlp_kriging_update_simulate(void* ptr,
+                                   const double* y_u,
+                                   int n,
+                                   const double* X_u,
+                                   int nX,
+                                   int d,
+                                   double* sim_out,
+                                   int* nsim_out,
+                                   int* m_out);
 
 const char* lk_mlp_kriging_summary(void* ptr);
 double lk_mlp_kriging_log_likelihood(void* ptr);
@@ -347,10 +376,21 @@ int lk_mlp_kriging_log_likelihood_fun(void* ptr,
 
 const char* lk_mlp_kriging_kernel(void* ptr);
 const char* lk_mlp_kriging_activation(void* ptr);
+int lk_mlp_kriging_get_normalize(void* ptr);
+const char* lk_mlp_kriging_get_regmodel(void* ptr);
 int lk_mlp_kriging_is_fitted(void* ptr);
 int lk_mlp_kriging_feature_dim(void* ptr);
 int lk_mlp_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_mlp_kriging_get_centerX(void* ptr, double* out, int* n);
+int lk_mlp_kriging_get_scaleX(void* ptr, double* out, int* n);
 int lk_mlp_kriging_get_y(void* ptr, double* out, int* n);
+double lk_mlp_kriging_get_centerY(void* ptr);
+double lk_mlp_kriging_get_scaleY(void* ptr);
+int lk_mlp_kriging_get_F(void* ptr, double* out, int* n, int* d);
+int lk_mlp_kriging_get_T(void* ptr, double* out, int* n, int* d);
+int lk_mlp_kriging_get_M(void* ptr, double* out, int* n, int* d);
+int lk_mlp_kriging_get_z(void* ptr, double* out, int* n);
+int lk_mlp_kriging_get_beta(void* ptr, double* out, int* n);
 int lk_mlp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_mlp_kriging_get_sigma2(void* ptr);
 int lk_mlp_kriging_get_hidden_dims(void* ptr, int* out, int* n);
