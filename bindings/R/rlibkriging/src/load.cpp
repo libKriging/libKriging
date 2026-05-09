@@ -29,28 +29,6 @@ Rcpp::List kriging_load(std::string filename) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List noisekriging_load(std::string filename) {
-  Kriging ok = Kriging::load(filename);
-
-  Rcpp::List obj;
-  Rcpp::XPtr<Kriging> impl_copy(new Kriging(ok, ExplicitCopySpecifier{}));
-  obj.attr("object") = impl_copy;
-  obj.attr("class") = "NoiseKriging";
-  return obj;
-}
-
-// [[Rcpp::export]]
-Rcpp::List nuggetkriging_load(std::string filename) {
-  Kriging ok = Kriging::load(filename);
-
-  Rcpp::List obj;
-  Rcpp::XPtr<Kriging> impl_copy(new Kriging(ok, ExplicitCopySpecifier{}));
-  obj.attr("object") = impl_copy;
-  obj.attr("class") = "NuggetKriging";
-  return obj;
-}
-
-// [[Rcpp::export]]
 SEXP warpkriging_load(std::string filename) {
   auto* wk = new libKriging::WarpKriging(libKriging::WarpKriging::load(filename));
   Rcpp::XPtr<libKriging::WarpKriging> ptr(wk);
@@ -71,10 +49,10 @@ std::string class_saved(std::string filename) {
       return "Kriging";
       break;
     case KrigingLoader::KrigingType::NuggetKriging:
-      return "NuggetKriging";
+      return "Kriging";  // NuggetKriging merged into Kriging(noise="nugget")
       break;
     case KrigingLoader::KrigingType::NoiseKriging:
-      return "NoiseKriging";
+      return "Kriging";  // NoiseKriging merged into Kriging(noise=noise_vector)
       break;
     case KrigingLoader::KrigingType::Unknown:
       Rcpp::stop("Kriging object type unknown.");
