@@ -32,9 +32,9 @@ This document lists all methods exposed by each language binding for accessing t
 | Covariance matrix | `kriging_covMat(obj,x1,x2)` | `obj$covMat(x1,x2)` | `obj.covMat(x1,x2)` | `covMat(obj,x1,x2)` | `cov_mat(obj,X1,X2)` |
 | Log-likelihood | `kriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
 | Log-likelihood function | `kriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
-| Leave-one-out | `kriging_leaveOneOut(obj)` | `obj$leaveOneOut()` | `obj.leaveOneOut()` | — | `leave_one_out(obj)` |
-| Leave-one-out function | `kriging_leaveOneOutFun(obj,theta,…)` | `obj$leaveOneOutFun(theta,…)` | `obj.leaveOneOutFun(theta,…)` | — | `leave_one_out_fun(obj,theta;…)` |
-| Leave-one-out vec | `kriging_leaveOneOutVec(obj,theta)` | `obj$leaveOneOutVec(theta)` | `obj.leaveOneOutVec(theta)` | — | `leave_one_out_vec(obj,theta)` |
+| Leave-one-out | `kriging_leaveOneOut(obj)` | `obj$leaveOneOut()` | `obj.leaveOneOut()` | `leaveOneOut(obj)` | `leave_one_out(obj)` |
+| Leave-one-out function | `kriging_leaveOneOutFun(obj,theta,…)` | `obj$leaveOneOutFun(theta,…)` | `obj.leaveOneOutFun(theta,…)` | `leaveOneOutFun(obj,theta,…)` | `leave_one_out_fun(obj,theta;…)` |
+| Leave-one-out vec | `kriging_leaveOneOutVec(obj,theta)` | `obj$leaveOneOutVec(theta)` | `obj.leaveOneOutVec(theta)` | `leaveOneOutVec(obj,theta)` | `leave_one_out_vec(obj,theta)` |
 | Log-marginal-post | `kriging_logMargPost(obj)` | `obj$logMargPost()` | `obj.logMargPost()` | `logMargPost(obj)` | `log_marg_post(obj)` |
 | Log-marginal-post function | `kriging_logMargPostFun(obj,theta,…)` | `obj$logMargPostFun(theta,…)` | `obj.logMargPostFun(theta,…)` | `logMargPostFun(obj,theta,…)` | `log_marg_post_fun(obj,theta;…)` |
 | Model info | `kriging_model(obj)` | `obj$kernel()`, `obj$theta()`, … | `obj.model()` | `model(obj)` | `kernel(obj)`, `optim(obj)`, … |
