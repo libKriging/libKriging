@@ -9,7 +9,7 @@
 classNoiseKriging <- function(nk) {
     class(nk) <- "NoiseKriging"
     # This will allow to call methods (like in Python/Matlab/Octave) using `k$m(...)` as well as R-style `m(k, ...)`.
-    for (f in c('as.km','as.list','copy','fit','save',
+    for (f in c('as.list','copy','fit','save',
     'covMat','logLikelihood','logLikelihoodFun',
     'predict','print','show','simulate','update','update_simulate')) {
         eval(parse(text=paste0(
@@ -140,119 +140,6 @@ NoiseKriging <- function(y=NULL, noise=NULL, X=NULL, kernel=NULL,
 as.list.NoiseKriging <- function(x, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     noisekriging_model(x)
-}
-
-
-#' Coerce a \code{NoiseKriging} object into the \code{"km"} class of the
-#' \pkg{DiceKriging} package.
-#'
-#' @author Yann Richet \email{yann.richet@asnr.fr}
-#'
-#' @param x An object with S3 class \code{"NoiseKriging"}.
-#' @param .call Force the \code{call} slot to be filled in the
-#'     returned \code{km} object.
-#' @param ... Not used.
-#'
-#' @return An object of having the S4 class \code{"KM"} which extends
-#'     the \code{"km"} class of the \pkg{DiceKriging} package and
-#'     contains an extra \code{NoiseKriging} slot.
-#'
-#' @importFrom methods new
-#' @importFrom stats model.matrix
-#' @export
-#' @method as.km NoiseKriging
-#' @aliases as.km,NoiseKriging,NoiseKriging-method
-#'
-#' @examples
-#'f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#'set.seed(123)
-#'X <- as.matrix(runif(10))
-#'y <- f(X) + X/10 * rnorm(nrow(X)) # add noise dep. on X
-#'## fit and print
-#'k <- NoiseKriging(y, noise=(X/10)^2, X, kernel = "matern3_2")
-#'print(k)
-#'
-#' k_km <- as.km(k)
-#' print(k_km)
-as.km.NoiseKriging <- function(x, .call = NULL, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    ## loadDiceKriging()
-    ## if (! "DiceKriging" %in% installed.packages())
-    ##     stop("DiceKriging must be installed to use its wrapper from libKriging.")
-
-    if (!requireNamespace("DiceKriging", quietly = TRUE))
-        stop("Package \"DiceKriging\" not found")
-
-    model <- new("NoiseKM")
-    model@NoiseKriging <- x
-
-    if (is.null(.call))
-        model@call <- match.call()
-    else
-        model@call <- .call
-
-    m <- noisekriging_model(x)
-    data <- data.frame(m$X)
-    model@trend.formula <- regmodel2formula(m$regmodel)
-    model@trend.coef <- as.numeric(m$beta)
-    model@X <- m$X
-    model@y <- m$y
-    model@d <- ncol(m$X)
-    model@n <- nrow(m$X)
-    model@F <- m$F
-    colnames(model@F) <- colnames(model.matrix(model@trend.formula,data))
-    model@p <- ncol(m$F)
-    model@noise.flag <- TRUE
-    model@noise.var <- as.numeric(m$noise)
-
-    model@case <- "LLconcentration_beta"
-
-    isTrend = !m$is_beta_estim
-    isCov = !m$is_theta_estim
-    isVar = !m$is_sigma2_estim
-    if (isCov) {
-        known.covparam <- "All"
-    } else {
-        known.covparam <- "None"
-    }
-    model@param.estim <- NA
-    model@method <- m$objective
-    model@optim.method <- m$optim
-
-    model@penalty <- list()
-    model@lower <- 0
-    model@upper <- Inf
-    model@control <- list()
-
-    model@gr <- FALSE
-
-    model@T <- t(m$T) * sqrt(m$sigma2)
-    model@z <- as.numeric(m$z) / sqrt(m$sigma2)
-    model@M <- m$M / sqrt(m$sigma2)
-
-    covStruct <-  new("covTensorProduct", d = model@d, name = m$kernel,
-                      sd2 = m$sigma2, var.names = names(data),
-                      nugget = 0, nugget.flag = FALSE, nugget.estim = FALSE,
-                      known.covparam = known.covparam)
-
-    if (isTrend && isCov && isVar) {
-        model@known.param <- "All"
-    } else if ((isTrend) && ((!isCov) || (!isVar))) {
-        model@known.param <- "Trend"
-    } else if ((!isTrend) && isCov && isVar) {
-        model@known.param <- "CovAndVar"
-    } else {    # In the other cases: All parameters are estimated (at this stage)
-        model@known.param <- "None"
-    }
-
-    covStruct@range.names <- "theta"
-    covStruct@paramset.n <- as.integer(1)
-    covStruct@param.n <- as.integer(model@d)
-    covStruct@range.n <- as.integer(model@d)
-    covStruct@range.val <- as.numeric(m$theta)
-    model@covariance <- covStruct
-
-    return(model)
 }
 
 

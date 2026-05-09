@@ -9,24 +9,6 @@
 ## ****************************************************************************
 
 ## *****************************************************************************
-##' Coerce an object into an object with S4 class \code{"km"} from the
-##' \pkg{DiceKriging} package.
-##'
-##' Such a coercion is typically used to compare the performance of
-##' the methods implemented in the current \pkg{rlibkriging} package to
-##' those which are available in the \pkg{DiceKriging} package.
-##'
-##' @title Coerce an Object into a \code{km} Object
-##'
-##' @param x Object to be coerced.
-##' @param ... Further arguments for methods.
-##' @return An object with S4 class \code{"km"}.
-##' 
-##' @export 
-as.km <- function(x, ...) {
-    UseMethod("as.km")
-}
-
 ## True generic
 setGeneric(name = "covMat",
                      def = function(object, ...) standardGeneric("covMat"))
