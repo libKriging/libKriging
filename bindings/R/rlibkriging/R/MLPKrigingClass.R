@@ -61,12 +61,14 @@ MLPKriging <- function(y, X, hidden_dims,
 #  S3 methods
 # -----------------------------------------------------------------------
 
+#' @method print MLPKriging
 #' @export
 print.MLPKriging <- function(x, ...) {
   cat(mlpKriging_summary(x$ptr))
   invisible(x)
 }
 
+#' @method summary MLPKriging
 #' @export
 summary.MLPKriging <- function(object, ...) {
   mlpKriging_summary(object$ptr)
@@ -113,6 +115,7 @@ fit.MLPKriging <- function(object, y, X,
 #' @param ... ignored
 #' @return list with \code{mean}, optionally \code{stdev}, \code{cov},
 #'   \code{mean_deriv}, \code{stdev_deriv}
+#' @method predict MLPKriging
 #' @export
 predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
                                return_deriv = FALSE, ...) {
@@ -126,6 +129,7 @@ predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALS
 #' @param x simulation matrix (m x d)
 #' @param ... ignored
 #' @return matrix (m x nsim)
+#' @method simulate MLPKriging
 #' @export
 simulate.MLPKriging <- function(object, nsim = 1, seed = 123, x,
                                  will_update = FALSE, ...) {
@@ -148,33 +152,39 @@ update_simulate.MLPKriging <- function(object, y_u, X_u, ...) {
 
 #' @title Update an MLPKriging model with new observations
 #' @param refit Logical. If \code{TRUE} the model is refitted (default is TRUE).
+#' @method update MLPKriging
 #' @export
 update.MLPKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
   mlpKriging_update(object$ptr, as.numeric(y_u), as.matrix(X_u), as.logical(refit))
   invisible(object)
 }
 
+#' @method logLikelihood MLPKriging
 #' @export
 logLikelihood.MLPKriging <- function(object, ...) {
   mlpKriging_logLikelihood(object$ptr)
 }
 
 #' @title Evaluate log-likelihood at given GP theta
+#' @method logLikelihoodFun MLPKriging
 #' @export
 logLikelihoodFun.MLPKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
   mlpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
 }
 
+#' @method theta MLPKriging
 #' @export
 theta.MLPKriging <- function(object, ...) {
   mlpKriging_theta(object$ptr)
 }
 
+#' @method sigma2 MLPKriging
 #' @export
 sigma2.MLPKriging <- function(object, ...) {
   mlpKriging_sigma2(object$ptr)
 }
 
+#' @method kernel MLPKriging
 #' @export
 kernel.MLPKriging <- function(object, ...) {
   mlpKriging_kernel(object$ptr)
@@ -184,6 +194,7 @@ kernel.MLPKriging <- function(object, ...) {
 #' @export
 feature_dim <- function(object, ...) UseMethod("feature_dim")
 
+#' @method feature_dim MLPKriging
 #' @export
 feature_dim.MLPKriging <- function(object, ...) {
   mlpKriging_featureDim(object$ptr)
@@ -193,6 +204,7 @@ feature_dim.MLPKriging <- function(object, ...) {
 #' @export
 hidden_dims <- function(object, ...) UseMethod("hidden_dims")
 
+#' @method hidden_dims MLPKriging
 #' @export
 hidden_dims.MLPKriging <- function(object, ...) {
   mlpKriging_hiddenDims(object$ptr)
@@ -202,11 +214,13 @@ hidden_dims.MLPKriging <- function(object, ...) {
 #' @export
 activation <- function(object, ...) UseMethod("activation")
 
+#' @method activation MLPKriging
 #' @export
 activation.MLPKriging <- function(object, ...) {
   mlpKriging_activation(object$ptr)
 }
 
+#' @method is_fitted MLPKriging
 #' @export
 is_fitted.MLPKriging <- function(object, ...) {
   mlpKriging_isFitted(object$ptr)
@@ -216,6 +230,7 @@ is_fitted.MLPKriging <- function(object, ...) {
 #' @param object MLPKriging object
 #' @param ... ignored
 #' @return matrix of training inputs
+#' @method X MLPKriging
 #' @export
 X.MLPKriging <- function(object, ...) {
   mlpKriging_X(object$ptr)
@@ -225,61 +240,73 @@ X.MLPKriging <- function(object, ...) {
 #' @param object MLPKriging object
 #' @param ... ignored
 #' @return vector of training outputs
+#' @method y MLPKriging
 #' @export
 y.MLPKriging <- function(object, ...) {
   mlpKriging_y(object$ptr)
 }
 
+#' @method centerX MLPKriging
 #' @export
 centerX.MLPKriging <- function(object, ...) {
   mlpKriging_centerX(object$ptr)
 }
 
+#' @method scaleX MLPKriging
 #' @export
 scaleX.MLPKriging <- function(object, ...) {
   mlpKriging_scaleX(object$ptr)
 }
 
+#' @method centerY MLPKriging
 #' @export
 centerY.MLPKriging <- function(object, ...) {
   mlpKriging_centerY(object$ptr)
 }
 
+#' @method scaleY MLPKriging
 #' @export
 scaleY.MLPKriging <- function(object, ...) {
   mlpKriging_scaleY(object$ptr)
 }
 
+#' @method normalize MLPKriging
 #' @export
 normalize.MLPKriging <- function(object, ...) {
   mlpKriging_normalize(object$ptr)
 }
 
+#' @method regmodel MLPKriging
 #' @export
 regmodel.MLPKriging <- function(object, ...) {
   mlpKriging_regmodel(object$ptr)
 }
 
+#' @method F_ MLPKriging
 #' @export
 F_.MLPKriging <- function(object, ...) {
   mlpKriging_F(object$ptr)
 }
 
+#' @method T_ MLPKriging
 #' @export
 T_.MLPKriging <- function(object, ...) {
   mlpKriging_T(object$ptr)
 }
 
+#' @method M MLPKriging
 #' @export
 M.MLPKriging <- function(object, ...) {
   mlpKriging_M(object$ptr)
 }
 
+#' @method z MLPKriging
 #' @export
 z.MLPKriging <- function(object, ...) {
   mlpKriging_z(object$ptr)
 }
 
+#' @method beta MLPKriging
 #' @export
 beta.MLPKriging <- function(object, ...) {
   mlpKriging_beta(object$ptr)
@@ -302,6 +329,7 @@ copy.MLPKriging <- function(object, ...) {
 #' @param object MLPKriging object
 #' @param filename path to save file
 #' @param ... ignored
+#' @method save MLPKriging
 #' @export
 save.MLPKriging <- function(object, filename, ...) {
   if (!is.character(filename))
@@ -314,6 +342,7 @@ save.MLPKriging <- function(object, filename, ...) {
 #' @param filename path to saved file
 #' @param ... ignored
 #' @return MLPKriging object
+#' @method load MLPKriging
 #' @export
 load.MLPKriging <- function(filename, ...) {
   if (!is.character(filename))

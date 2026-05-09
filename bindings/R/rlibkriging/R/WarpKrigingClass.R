@@ -219,12 +219,14 @@ WarpKriging <- function(y, X, warping,
 #  S3 methods
 # -----------------------------------------------------------------------
 
+#' @method print WarpKriging
 #' @export
 print.WarpKriging <- function(x, ...) {
   cat(warpKriging_summary(x$ptr))
   invisible(x)
 }
 
+#' @method summary WarpKriging
 #' @export
 summary.WarpKriging <- function(object, ...) {
   warpKriging_summary(object$ptr)
@@ -275,6 +277,7 @@ fit.WarpKriging <- function(object, y, X,
 #' @param ... ignored
 #' @return list with \code{mean}, optionally \code{stdev}, \code{cov},
 #'   \code{mean_deriv}, \code{stdev_deriv}
+#' @method predict WarpKriging
 #' @export
 predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
                                 return_deriv = FALSE, ...) {
@@ -290,6 +293,7 @@ predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FAL
 #' @param will_update logical; if TRUE, cache data for update_simulate
 #' @param ... ignored
 #' @return matrix (m x nsim)
+#' @method simulate WarpKriging
 #' @export
 simulate.WarpKriging <- function(object, nsim = 1, seed = 123, x,
                                  will_update = FALSE, ...) {
@@ -318,6 +322,7 @@ update_simulate.WarpKriging <- function(object, y_u, X_u, ...) {
 #' @param X_u new input matrix
 #' @param refit logical; if TRUE (default), re-optimise hyperparameters
 #' @param ... ignored
+#' @method update WarpKriging
 #' @export
 update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
   X_u <- .encode_X_from_warping(X_u, warpKriging_warping(object$ptr))
@@ -327,6 +332,7 @@ update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
 }
 
 #' @title Log-likelihood of the fitted model
+#' @method logLikelihood WarpKriging
 #' @export
 logLikelihood.WarpKriging <- function(object, ...) {
   warpKriging_logLikelihood(object$ptr)
@@ -339,6 +345,7 @@ logLikelihood.WarpKriging <- function(object, ...) {
 #' @param return_hess return hessian?
 #' @param ... ignored
 #' @return list with \code{logLikelihood} and optionally \code{gradient}, \code{hessian}
+#' @method logLikelihoodFun WarpKriging
 #' @export
 logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
   warpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
@@ -348,6 +355,7 @@ logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, ret
 theta <- function(object, ...) UseMethod("theta")
 
 #' @title Get GP range parameters
+#' @method theta WarpKriging
 #' @export
 theta.WarpKriging <- function(object, ...) {
   warpKriging_theta(object$ptr)
@@ -357,6 +365,7 @@ theta.WarpKriging <- function(object, ...) {
 sigma2 <- function(object, ...) UseMethod("sigma2")
 
 #' @title Get process variance (concentrated MLE)
+#' @method sigma2 WarpKriging
 #' @export
 sigma2.WarpKriging <- function(object, ...) {
   warpKriging_sigma2(object$ptr)
@@ -366,6 +375,7 @@ sigma2.WarpKriging <- function(object, ...) {
 kernel <- function(object, ...) UseMethod("kernel")
 
 #' @title Get kernel name
+#' @method kernel WarpKriging
 #' @export
 kernel.WarpKriging <- function(object, ...) {
   warpKriging_kernel(object$ptr)
@@ -375,12 +385,14 @@ kernel.WarpKriging <- function(object, ...) {
 #' @export
 warping <- function(object, ...) UseMethod("warping")
 
+#' @method warping WarpKriging
 #' @export
 warping.WarpKriging <- function(object, ...) {
   warpKriging_warping(object$ptr)
 }
 
 #' @title Get feature dimensionality of warped space
+#' @method feature_dim WarpKriging
 #' @export
 feature_dim.WarpKriging <- function(object, ...) {
   warpKriging_featureDim(object$ptr)
@@ -390,6 +402,7 @@ feature_dim.WarpKriging <- function(object, ...) {
 #' @export
 is_fitted <- function(object, ...) UseMethod("is_fitted")
 
+#' @method is_fitted WarpKriging
 #' @export
 is_fitted.WarpKriging <- function(object, ...) {
   warpKriging_isFitted(object$ptr)
@@ -402,6 +415,7 @@ is_fitted.WarpKriging <- function(object, ...) {
 #' @export
 X <- function(object, ...) UseMethod("X")
 
+#' @method X WarpKriging
 #' @export
 X.WarpKriging <- function(object, ...) {
   warpKriging_X(object$ptr)
@@ -414,6 +428,7 @@ X.WarpKriging <- function(object, ...) {
 #' @export
 y <- function(object, ...) UseMethod("y")
 
+#' @method y WarpKriging
 #' @export
 y.WarpKriging <- function(object, ...) {
   warpKriging_y(object$ptr)
@@ -423,6 +438,7 @@ y.WarpKriging <- function(object, ...) {
 #' @export
 centerX <- function(object, ...) UseMethod("centerX")
 
+#' @method centerX WarpKriging
 #' @export
 centerX.WarpKriging <- function(object, ...) {
   warpKriging_centerX(object$ptr)
@@ -432,6 +448,7 @@ centerX.WarpKriging <- function(object, ...) {
 #' @export
 scaleX <- function(object, ...) UseMethod("scaleX")
 
+#' @method scaleX WarpKriging
 #' @export
 scaleX.WarpKriging <- function(object, ...) {
   warpKriging_scaleX(object$ptr)
@@ -441,6 +458,7 @@ scaleX.WarpKriging <- function(object, ...) {
 #' @export
 centerY <- function(object, ...) UseMethod("centerY")
 
+#' @method centerY WarpKriging
 #' @export
 centerY.WarpKriging <- function(object, ...) {
   warpKriging_centerY(object$ptr)
@@ -450,6 +468,7 @@ centerY.WarpKriging <- function(object, ...) {
 #' @export
 scaleY <- function(object, ...) UseMethod("scaleY")
 
+#' @method scaleY WarpKriging
 #' @export
 scaleY.WarpKriging <- function(object, ...) {
   warpKriging_scaleY(object$ptr)
@@ -459,6 +478,7 @@ scaleY.WarpKriging <- function(object, ...) {
 #' @export
 normalize <- function(object, ...) UseMethod("normalize")
 
+#' @method normalize WarpKriging
 #' @export
 normalize.WarpKriging <- function(object, ...) {
   warpKriging_normalize(object$ptr)
@@ -468,6 +488,7 @@ normalize.WarpKriging <- function(object, ...) {
 #' @export
 regmodel <- function(object, ...) UseMethod("regmodel")
 
+#' @method regmodel WarpKriging
 #' @export
 regmodel.WarpKriging <- function(object, ...) {
   warpKriging_regmodel(object$ptr)
@@ -477,6 +498,7 @@ regmodel.WarpKriging <- function(object, ...) {
 #' @export
 F_ <- function(object, ...) UseMethod("F_")
 
+#' @method F_ WarpKriging
 #' @export
 F_.WarpKriging <- function(object, ...) {
   warpKriging_F(object$ptr)
@@ -486,6 +508,7 @@ F_.WarpKriging <- function(object, ...) {
 #' @export
 T_ <- function(object, ...) UseMethod("T_")
 
+#' @method T_ WarpKriging
 #' @export
 T_.WarpKriging <- function(object, ...) {
   warpKriging_T(object$ptr)
@@ -495,6 +518,7 @@ T_.WarpKriging <- function(object, ...) {
 #' @export
 M <- function(object, ...) UseMethod("M")
 
+#' @method M WarpKriging
 #' @export
 M.WarpKriging <- function(object, ...) {
   warpKriging_M(object$ptr)
@@ -504,6 +528,7 @@ M.WarpKriging <- function(object, ...) {
 #' @export
 z <- function(object, ...) UseMethod("z")
 
+#' @method z WarpKriging
 #' @export
 z.WarpKriging <- function(object, ...) {
   warpKriging_z(object$ptr)
@@ -513,6 +538,7 @@ z.WarpKriging <- function(object, ...) {
 #' @export
 beta <- function(object, ...) UseMethod("beta")
 
+#' @method beta WarpKriging
 #' @export
 beta.WarpKriging <- function(object, ...) {
   warpKriging_beta(object$ptr)
@@ -535,6 +561,7 @@ copy.WarpKriging <- function(object, ...) {
 #' @param object WarpKriging object
 #' @param filename path to save file
 #' @param ... ignored
+#' @method save WarpKriging
 #' @export
 save.WarpKriging <- function(object, filename, ...) {
   if (!is.character(filename))
@@ -547,6 +574,7 @@ save.WarpKriging <- function(object, filename, ...) {
 #' @param filename path to saved file
 #' @param ... ignored
 #' @return WarpKriging object
+#' @method load WarpKriging
 #' @export
 load.WarpKriging <- function(filename, ...) {
   if (!is.character(filename))
