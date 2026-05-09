@@ -42,8 +42,6 @@ install(TARGETS mLibKriging
 install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Kriging.m
-        ${CMAKE_CURRENT_SOURCE_DIR}/NuggetKriging.m
-        ${CMAKE_CURRENT_SOURCE_DIR}/NoiseKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/WarpKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/MLPKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Optim.m

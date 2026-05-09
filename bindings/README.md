@@ -6,12 +6,12 @@ This document lists all methods exposed by each language binding for accessing t
 
 | Class | Description | R | Python | Octave/Matlab | Julia |
 |---|---|:---:|:---:|:---:|:---:|
-| `Kriging` | Standard Kriging, supports `noise_model`: `none`, `nugget`, `heterogeneous` | ✅ | ✅ | ✅ | ✅ |
+| `Kriging` | Unified Kriging; all bindings support `noise_model`: `none`, `nugget`, `heterogeneous` | ✅ | ✅ | ✅ | ✅ |
 | `WarpKriging` | Kriging with input warping | ✅ | ✅ | ✅ | ✅ |
 | `MLPKriging` | Kriging with MLP feature mapping | ✅ | ✅ | ✅ | ✅ |
 | `LinearRegression` | Linear regression | ✅ | ✅ | ✅ | ✅ |
 
-> **Note on noise models**: `NoiseKriging` (heterogeneous noise) and `NuggetKriging` (nugget/homoscedastic noise) are deprecated in R, Python and Julia — use `Kriging` with `noise_model="heterogeneous"` or `noise_model="nugget"`. The Octave/Matlab binding still exposes them as separate classes.
+> **Note on noise models**: `NoiseKriging` (heterogeneous noise) and `NuggetKriging` (nugget/homoscedastic noise) have been removed from all bindings — use `Kriging` with `noise_model="heterogeneous"` or `noise_model="nugget"`.
 
 ---
 
@@ -132,19 +132,3 @@ This document lists all methods exposed by each language binding for accessing t
 | Load MLPKriging | `mlpkriging_load(file)` / `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `load(file)` | — |
 
 ---
-
-## Octave/Matlab — Deprecated classes (still present)
-
-The Octave/Matlab binding still provides separate `NoiseKriging` and `NuggetKriging` classes for backward compatibility. Use `Kriging` with `noise_model` instead.
-
-| Method | NoiseKriging (Octave) | NuggetKriging (Octave) |
-|---|---|---|
-| build | `NoiseKriging_binding build` | `NuggetKriging_binding build` |
-| fit / predict / simulate | ✅ | ✅ |
-| update / update_simulate | ✅ | ✅ |
-| logLikelihoodFun / logLikelihood | ✅ | ✅ |
-| logMargPostFun / logMargPost | — | ✅ |
-| covMat / model / summary | ✅ | ✅ |
-| save / load / copy | ✅ | ✅ |
-| `noise` accessor | ✅ | — |
-| `nugget` / `is_nugget_estim` | — | ✅ |

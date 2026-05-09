@@ -7,7 +7,7 @@ classdef MLPKriging < handle
     %
     %   hidden_dims is a numeric vector of hidden layer sizes, e.g. [16 8].
     %
-    %   See also WarpKriging, Kriging, NuggetKriging, NoiseKriging
+    %   See also WarpKriging, Kriging
 
     properties
         ref

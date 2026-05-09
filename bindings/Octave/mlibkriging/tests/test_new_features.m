@@ -73,13 +73,13 @@ function test_covMat_all_classes()
     cov1 = k1.covMat(X_test, X_test);
     assert(all(size(cov1) == [5, 5]));
     
-    % Test NoiseKriging
-    k2 = NoiseKriging(y, noise, X, 'gauss');
+    % Test Kriging with heterogeneous noise
+    k2 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'heterogeneous', noise);
     cov2 = k2.covMat(X_test, X_test);
     assert(all(size(cov2) == [5, 5]));
     
-    % Test NuggetKriging
-    k3 = NuggetKriging(y, X, 'gauss');
+    % Test Kriging with nugget noise model
+    k3 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'nugget');
     cov3 = k3.covMat(X_test, X_test);
     assert(all(size(cov3) == [5, 5]));
     
@@ -130,7 +130,7 @@ end
 
 
 function test_model_noise_kriging()
-    fprintf('Test: model() for NoiseKriging...');
+    fprintf('Test: model() for Kriging with heterogeneous noise...');
     
     rand('seed', 321);
     n = 12;
@@ -138,11 +138,11 @@ function test_model_noise_kriging()
     y = sin(X(:, 1)) .* cos(X(:, 2));
     noise = 0.05 * ones(n, 1);
     
-    k = NoiseKriging(y, noise, X, 'gauss');
+    k = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'heterogeneous', noise);
     params = k.model();
     
-    % NoiseKriging should have 'noise' field
-    assert(isfield(params, 'noise'), 'NoiseKriging model should have noise field');
+    % Kriging with heterogeneous noise should have 'noise' field
+    assert(isfield(params, 'noise'), 'Kriging model should have noise field');
     assert(length(params.noise) == n);
     
     fprintf(' PASSED\n');
@@ -150,20 +150,20 @@ end
 
 
 function test_model_nugget_kriging()
-    fprintf('Test: model() for NuggetKriging...');
+    fprintf('Test: model() for Kriging with nugget noise model...');
     
     rand('seed', 654);
     n = 15;
     X = rand(n, 1);
     y = X .^ 2;
     
-    k = NuggetKriging(y, X, 'matern3_2');
+    k = Kriging(y, X, 'matern3_2', 'constant', false, 'BFGS', 'LL', [], 'nugget');
     params = k.model();
     
-    % NuggetKriging should have 'nugget' and 'is_nugget_estim' fields
-    assert(isfield(params, 'nugget'), 'NuggetKriging model should have nugget field');
+    % Kriging with nugget noise model should have 'nugget' and 'is_nugget_estim' fields
+    assert(isfield(params, 'nugget'), 'Kriging model should have nugget field');
     assert(isfield(params, 'is_nugget_estim'), ...
-           'NuggetKriging model should have is_nugget_estim field');
+           'Kriging model should have is_nugget_estim field');
     assert(isnumeric(params.nugget));
     assert(islogical(params.is_nugget_estim));
     
@@ -353,8 +353,8 @@ function test_all_classes_have_covMat()
     noise = 0.01 * ones(n, 1);
     
     k1 = Kriging(y, X, 'gauss');
-    k2 = NoiseKriging(y, noise, X, 'gauss');
-    k3 = NuggetKriging(y, X, 'gauss');
+    k2 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'heterogeneous', noise);
+    k3 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'nugget');
     
     X_test = rand(3, 1);
     
@@ -381,8 +381,8 @@ function test_all_classes_have_model()
     noise = 0.01 * ones(n, 1);
     
     k1 = Kriging(y, X, 'gauss');
-    k2 = NoiseKriging(y, noise, X, 'gauss');
-    k3 = NuggetKriging(y, X, 'gauss');
+    k2 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'heterogeneous', noise);
+    k3 = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'nugget');
     
     % All should return structs
     m1 = k1.model();

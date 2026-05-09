@@ -11,7 +11,7 @@ classdef WarpKriging < handle
     %   encoded as integers 0..L-1 and the warping spec is rewritten to include
     %   level names.
     %
-    %   See also Kriging, NuggetKriging, NoiseKriging
+    %   See also Kriging
 
     properties
         ref
