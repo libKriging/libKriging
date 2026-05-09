@@ -72,6 +72,50 @@ classdef MLPKriging < handle
             [varargout{1:nargout}] = mLibKriging("MLPKriging::y", obj.ref, varargin{:});
         end
 
+        function varargout = centerX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::centerX", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::scaleX", obj.ref, varargin{:});
+        end
+
+        function varargout = centerY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::centerY", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::scaleY", obj.ref, varargin{:});
+        end
+
+        function varargout = normalize(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::normalize", obj.ref, varargin{:});
+        end
+
+        function varargout = regmodel(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::regmodel", obj.ref, varargin{:});
+        end
+
+        function varargout = F(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::F", obj.ref, varargin{:});
+        end
+
+        function varargout = T(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::T", obj.ref, varargin{:});
+        end
+
+        function varargout = M(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::M", obj.ref, varargin{:});
+        end
+
+        function varargout = z(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::z", obj.ref, varargin{:});
+        end
+
+        function varargout = beta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::beta", obj.ref, varargin{:});
+        end
+
         function varargout = theta(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("MLPKriging::theta", obj.ref, varargin{:});
         end

@@ -206,6 +206,50 @@ classdef WarpKriging < handle
             [varargout{1:nargout}] = mLibKriging("WarpKriging::y", obj.ref, varargin{:});
         end
 
+        function varargout = centerX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::centerX", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleX(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::scaleX", obj.ref, varargin{:});
+        end
+
+        function varargout = centerY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::centerY", obj.ref, varargin{:});
+        end
+
+        function varargout = scaleY(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::scaleY", obj.ref, varargin{:});
+        end
+
+        function varargout = normalize(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::normalize", obj.ref, varargin{:});
+        end
+
+        function varargout = regmodel(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::regmodel", obj.ref, varargin{:});
+        end
+
+        function varargout = F(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::F", obj.ref, varargin{:});
+        end
+
+        function varargout = T(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::T", obj.ref, varargin{:});
+        end
+
+        function varargout = M(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::M", obj.ref, varargin{:});
+        end
+
+        function varargout = z(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::z", obj.ref, varargin{:});
+        end
+
+        function varargout = beta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::beta", obj.ref, varargin{:});
+        end
+
         function varargout = theta(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::theta", obj.ref, varargin{:});
         end
