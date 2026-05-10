@@ -45,13 +45,11 @@ classKriging <- function(nk) {
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"},
-#'     \code{"Newton"} and \code{"none"}, the later simply keeping
-#'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective 
-#'     (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
-#'     \code{"Newton"} uses both the gradient and the Hessian of the
-#'     objective.
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and
+#'     \code{"none"}, the later simply keeping the values given in
+#'     \code{parameters}. The method \code{"BFGS"} uses the gradient
+#'     of the objective (note that \code{"BFGS10"} means 10
+#'     multi-start of BFGS).
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
@@ -97,7 +95,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     noise = NULL,
                     regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
-                    optim = c("BFGS", "Newton", "none"),
+                    optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL) {
 
@@ -106,7 +104,6 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
 
     # Determine noise_model from noise argument:
-    #   NULL        -> "none" (pure Kriging)
     #   "nugget"    -> "nugget" (estimated homoscedastic nugget)
     #   numeric     -> "heterogeneous" (known per-point noise variance)
     if (is.null(noise)) {
@@ -224,12 +221,10 @@ print.Kriging <- function(x, ...) {
 #'     \code{X} and the response \code{y} in normalized to take
 #'     values in the interval \eqn{[0, 1]}.
 #' @param optim Character giving the Optimization method used to fit
-#'     hyper-parameters. Possible values are: \code{"BFGS"},
-#'     \code{"Newton"} and \code{"none"}, the later simply keeping
-#'     the values given in \code{parameters}. The method
-#'     \code{"BFGS"} uses the gradient of the objective (note that \code{"BGFS10"} means 10 multi-start of BFGS). The method
-#'     \code{"Newton"} uses both the gradient and the Hessian of the
-#'     objective.
+#'     hyper-parameters. Possible values are: \code{"BFGS"} and
+#'     \code{"none"}, the later simply keeping the values given in
+#'     \code{parameters}. The method \code{"BFGS"} uses the gradient
+#'     of the objective (note that \code{"BFGS10"} means 10 multi-start of BFGS).
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
@@ -264,7 +259,7 @@ fit.Kriging <- function(object, y, X,
                     noise = NULL,
                     regmodel = c("constant", "linear", "interactive", "none"),
                     normalize = FALSE,
-                    optim = c("BFGS", "Newton", "none"),
+                    optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
