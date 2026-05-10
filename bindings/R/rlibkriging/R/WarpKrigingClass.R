@@ -5,6 +5,11 @@
 ##  Warping specs are plain strings, parsed by C++ WarpSpec::from_string.
 ## *************************************************************************
 
+## Register WarpKriging as a known S3 class to the S4 system so that
+## packages that override generics (e.g. RobustGaSP overriding simulate)
+## can still dispatch to the S3 simulate.WarpKriging method.
+setOldClass("WarpKriging")
+
 # -----------------------------------------------------------------------
 #  Warp specification helpers  (return strings)
 #

@@ -5,6 +5,11 @@
 ##  Phi : R^d -> R^{d_out}, k(x, x') = sigma^2 * k_base(Phi(x), Phi(x'); theta)
 ## *************************************************************************
 
+## Register MLPKriging as a known S3 class to the S4 system so that
+## packages that override generics (e.g. RobustGaSP overriding simulate)
+## can still dispatch to the S3 simulate.MLPKriging method.
+setOldClass("MLPKriging")
+
 #' @title Create an MLPKriging model (Deep Kernel Learning)
 #'
 #' @description Kriging with a joint multi-layer perceptron applied to all
