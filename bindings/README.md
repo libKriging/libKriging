@@ -9,7 +9,6 @@ This document lists all methods exposed by each language binding for accessing t
 | `Kriging` | Unified Kriging; all bindings support `noise_model`: `none`, `nugget`, `heterogeneous` | ✅ | ✅ | ✅ | ✅ |
 | `WarpKriging` | Kriging with input warping | ✅ | ✅ | ✅ | ✅ |
 | `MLPKriging` | Kriging with MLP feature mapping | ✅ | ✅ | ✅ | ✅ |
-| `LinearRegression` | Linear regression | ✅ | ✅ | ✅ | ✅ |
 
 > **Note on noise models**: `NoiseKriging` (heterogeneous noise) and `NuggetKriging` (nugget/homoscedastic noise) have been removed from all bindings — use `Kriging` with `noise_model="heterogeneous"` or `noise_model="nugget"`.
 
@@ -116,17 +115,6 @@ This document lists all methods exposed by each language binding for accessing t
 | `regmodel` | `mlpKriging_regmodel(obj)` | `obj$regmodel()` | `obj.regmodel()` | `regmodel(obj)` | `regmodel(obj)` |
 | `F`, `T`, `M`, `z` | `mlpKriging_F(obj)`, … | `obj$F()`, … | `obj.F()`, … | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` |
 | `beta`, `theta`, `sigma2` | `mlpKriging_beta(obj)`, … | `obj$beta()`, … | `obj.beta()`, … | `beta(obj)`, `theta(obj)`, `sigma2(obj)` | `beta(obj)`, `theta(obj)`, `sigma2(obj)` |
-
----
-
-## LinearRegression
-
-| Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
-|---|---|---|---|---|---|
-| Constructor | — | `LinearRegression()` | `LinearRegression()` | `build(y,X)` | `LinearRegression()` |
-| Fit | `linear_regression(y,X)` | — | `obj.fit(y,X)` | `fit(obj,y,X)` | `fit!(obj,y,X)` |
-| Predict | `linear_regression_predict(obj,x)` | — | `obj.predict(x)` | `predict(obj,x)` | `predict(obj,X)` |
-| Optimize | `linear_regression_optim(obj,…)` | — | — | — | — |
 
 ---
 

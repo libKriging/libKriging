@@ -35,10 +35,6 @@ import pylibkriging as lk
 importlib.reload(lk)
 ``` 
 
-```shell
-PYTHONPATH=../../../build/bindings/Python/pylibkriging python3 -i -c "exec(open('LinearRegression.py').read())"
-```
-
 Deployment / upload:
 ````
 # avec token in ~/.pypirc
