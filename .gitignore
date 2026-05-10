@@ -52,6 +52,11 @@ venv
 __pycache__
 **/__pycache__
 
+# R tests
+bindings/R/rlibkriging/tests/testthat/*.json
+bindings/R/rlibkriging/tests/testthat/*.Rdata
+bindings/R/rlibkriging/tests/testthat/*.pdf
+
 # build stuffs
 cmake-build*/
 build*/
