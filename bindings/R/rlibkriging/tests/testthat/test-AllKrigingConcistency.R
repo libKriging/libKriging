@@ -160,7 +160,7 @@ for (i in 1:length(X_n)) {
     if (sd(lus_no[i,])>1e-3 && sd(lus_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("updated,simulated sample follows simulated,updated distribution ",
     mean(lus_no[i,]),",",sd(lus_no[i,])," != ",mean(lus_nu[i,]),",",sd(lus_nu[i,])),
-        expect_true(ks.test(lus_no[i,],lus_nu[i,])$p.value > 0.01)) # just check that it is not clearly wrong
+        expect_true(suppressWarnings(ks.test(lus_no[i,],lus_nu[i,])$p.value) > 0.01)) # just check that it is not clearly wrong
 }
 
 ########################################## noise/nugget >0 ##########################################
@@ -308,5 +308,5 @@ for (i in 1:length(X_n)) {
     if (sd(lus_no[i,])>1e-3 && sd(lus_nu[i,])>1e-3) # otherwise means that density is ~ dirac, so don't test
     test_that(desc=paste0("nugget & noise updated simulate are consistent at x=",X_n[i]," ",
     mean(lus_no[i,]),",",sd(lus_no[i,])," != ",mean(lus_nu[i,]),",",sd(lus_nu[i,])),
-        expect_true(ks.test(lus_no[i,],lus_nu[i,])$p.value > 0.00001)) # just check that it is not clearly wrong
+        expect_true(suppressWarnings(ks.test(lus_no[i,],lus_nu[i,])$p.value) > 0.00001)) # just check that it is not clearly wrong
 }
