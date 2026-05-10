@@ -9,13 +9,6 @@ extern "C" {
    Use lk_get_last_error() to retrieve the error message. */
 const char* lk_get_last_error(void);
 
-/* --- LinearRegression --- */
-
-void* lk_linear_regression_new(void);
-void lk_linear_regression_delete(void* ptr);
-int lk_linear_regression_fit(void* ptr, const double* y, int n, const double* X, int nX, int d);
-int lk_linear_regression_predict(void* ptr, const double* X, int m, int d, double* mean_out, double* stdev_out);
-
 /* --- Kriging ---
    noise_model: "none" (default/NULL), "nugget", or "heterogeneous"
    noise:       per-observation noise vector (heterogeneous mode only, NULL otherwise)

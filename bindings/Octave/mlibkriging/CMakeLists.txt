@@ -25,7 +25,6 @@ add_subdirectory(tools)
 
 add_mex_function(NAME mLibKriging
         SOURCES mLibKriging.cpp
-        LinearRegression_binding.cpp LinearRegression_binding.hpp
         common_binding.cpp common_binding.hpp
         Kriging_binding.cpp Kriging_binding.hpp
         WarpKriging_binding.cpp WarpKriging_binding.hpp
@@ -40,7 +39,6 @@ install(TARGETS mLibKriging
         )
 
 install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/LinearRegression.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Kriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/WarpKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/MLPKriging.m

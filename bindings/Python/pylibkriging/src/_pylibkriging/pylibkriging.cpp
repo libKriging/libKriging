@@ -6,7 +6,6 @@
 #include <carma>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
-#include <libKriging/LinearRegression.hpp>
 #include <libKriging/Optim.hpp>
 
 // Should be included Only in Debug build
@@ -14,7 +13,6 @@
 #include "DictTest.hpp"
 
 #include "Kriging_binding.hpp"
-#include "LinearRegression_binding.hpp"
 #include "MLPKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
@@ -30,8 +28,6 @@ static py::object load_any(const std::string& filename) {
   auto ktype = KrigingLoader::describe(filename);
   switch (ktype) {
     case KrigingLoader::KrigingType::Kriging:
-    case KrigingLoader::KrigingType::NuggetKriging:
-    case KrigingLoader::KrigingType::NoiseKriging:
       return py::cast(PyKriging::load(filename));
     case KrigingLoader::KrigingType::WarpKriging:
       return py::cast(PyWarpKriging::load(filename));
@@ -87,18 +83,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
   py::class_<RandomGenerator>(m, "RandomGenerator")
       .def(py::init<unsigned int>())
       .def("uniform", &RandomGenerator::uniform);
-
-  // Custom manual wrapper (for testing)
-  py::class_<PyLinearRegression>(m, "WrappedPyLinearRegression")
-      .def(py::init<>())
-      .def("fit", &PyLinearRegression::fit)
-      .def("predict", &PyLinearRegression::predict);
-
-  // Automated wrappers
-  py::class_<LinearRegression>(m, "PyLinearRegression")
-      .def(py::init<>())
-      .def("fit", &LinearRegression::fit)
-      .def("predict", &LinearRegression::predict);
 
   py::enum_<Trend::RegressionModel>(m, "RegressionModel")
       .value("None", Trend::RegressionModel::None)

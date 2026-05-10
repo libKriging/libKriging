@@ -5,8 +5,6 @@ add_library(Kriging
         demo/DemoClass.cpp include/libKriging/demo/DemoClass.hpp
         demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
-        LinearRegression.cpp include/libKriging/LinearRegression.hpp
-        LinearRegressionOptim.cpp include/libKriging/LinearRegressionOptim.hpp
         Trend.cpp include/libKriging/Trend.hpp
         Optim.cpp include/libKriging/Optim.hpp
         Random.cpp include/libKriging/Random.hpp

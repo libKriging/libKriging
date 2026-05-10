@@ -45,11 +45,6 @@ target_link_libraries(catch2_unit_test LINK_PUBLIC Catch2)
 add_dependencies(all_test_binaries catch2_unit_test)
 catch_discover_tests(catch2_unit_test)
 
-add_executable(regression_unit_test regression_unit_test.cpp)
-target_link_libraries(regression_unit_test LINK_PUBLIC Kriging Catch2)
-add_dependencies(all_test_binaries regression_unit_test)
-catch_discover_tests(regression_unit_test)
-
 add_executable(KrigingTest KrigingTest.cpp)
 target_link_libraries(KrigingTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingTest)

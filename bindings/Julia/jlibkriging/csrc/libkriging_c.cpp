@@ -1,7 +1,6 @@
 #include "libkriging_c.h"
 
 #include <libKriging/Kriging.hpp>
-#include <libKriging/LinearRegression.hpp>
 #include <libKriging/MLPKriging.hpp>
 
 #include <libKriging/Trend.hpp>
@@ -39,46 +38,6 @@ static thread_local std::string g_last_error;
 
 const char* lk_get_last_error(void) {
   return g_last_error.c_str();
-}
-
-/* ========================================================================== */
-/*  LinearRegression                                                          */
-/* ========================================================================== */
-
-void* lk_linear_regression_new(void) {
-  try {
-    return new LinearRegression();
-  }
-  CATCH_RETURN_NULL
-}
-
-void lk_linear_regression_delete(void* ptr) {
-  delete static_cast<LinearRegression*>(ptr);
-}
-
-int lk_linear_regression_fit(void* ptr, const double* y, int n, const double* X, int nX, int d) {
-  try {
-    auto* lr = static_cast<LinearRegression*>(ptr);
-    arma::vec y_v(const_cast<double*>(y), n, false, true);
-    arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
-    lr->fit(y_v, X_m);
-    return 0;
-  }
-  CATCH_RETURN
-}
-
-int lk_linear_regression_predict(void* ptr, const double* X, int m, int d, double* mean_out, double* stdev_out) {
-  try {
-    auto* lr = static_cast<LinearRegression*>(ptr);
-    arma::mat X_m(const_cast<double*>(X), m, d, false, true);
-    auto [mean_v, stdev_v] = lr->predict(X_m);
-    if (mean_out)
-      std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
-    if (stdev_out)
-      std::memcpy(stdev_out, stdev_v.memptr(), stdev_v.n_elem * sizeof(double));
-    return 0;
-  }
-  CATCH_RETURN
 }
 
 /* ========================================================================== */

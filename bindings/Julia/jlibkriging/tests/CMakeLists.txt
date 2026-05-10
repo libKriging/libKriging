@@ -33,7 +33,6 @@ macro(add_julia_test)
 endmacro()
 
 add_julia_test(NAME loading FILENAME loading_test.jl)
-add_julia_test(NAME linear_regression FILENAME linear_regression_test.jl)
 add_julia_test(NAME kriging_basic FILENAME kriging_basic_test.jl)
 add_julia_test(NAME kriging_parametric FILENAME kriging_parametric_test.jl)
 add_julia_test(NAME nugget_kriging FILENAME nugget_kriging_test.jl)

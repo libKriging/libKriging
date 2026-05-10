@@ -1,5 +1,4 @@
 #include "Kriging_binding.hpp"
-#include "LinearRegression_binding.hpp"
 #include "MLPKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
@@ -25,10 +24,6 @@ mLibKriging help page
  y = randn (20,1);
  X = randn (20,1);
  X2 = randn (20,1);
- a=LinearRegression();
- a.fit(y,X);
- [y2,stderr] = a.predict(X2);
-
  load "y.mat"
  load "X.mat"
  */
@@ -65,8 +60,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       std::string klass;
       switch (KrigingLoader::describe(filename)) {
         case KrigingLoader::KrigingType::Kriging:
-        case KrigingLoader::KrigingType::NuggetKriging:
-        case KrigingLoader::KrigingType::NoiseKriging:
+
           klass = "Kriging";
           break;
         case KrigingLoader::KrigingType::WarpKriging:
@@ -88,15 +82,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return ParamsBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Params::display"_hash:
       return ParamsBinding::display(nlhs, plhs, nrhs - 1, prhs + 1);
-
-    case "LinearRegression::new"_hash:
-      return LinearRegressionBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "LinearRegression::delete"_hash:
-      return LinearRegressionBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "LinearRegression::fit"_hash:
-      return LinearRegressionBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "LinearRegression::predict"_hash:
-      return LinearRegressionBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "Kriging::new"_hash:
       return KrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
