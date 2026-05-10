@@ -326,20 +326,5 @@ class TestConsistency:
         assert 'nugget' in m3
         assert 'is_nugget_estim' in m3
     
-    def test_deprecated_aliases_raise(self):
-        """Ensure NuggetKriging/NoiseKriging raise ImportError"""
-        np.random.seed(333)
-        n = 10
-        X = np.random.uniform(size=(n, 1))
-        y = X.flatten()
-        noise = 0.01 * np.ones(n)
-        
-        with pytest.raises(ImportError, match="NuggetKriging has been removed"):
-            lk.NuggetKriging(y.reshape(-1, 1), X, "gauss")
-        
-        with pytest.raises(ImportError, match="NoiseKriging has been removed"):
-            lk.NoiseKriging(y.reshape(-1, 1), noise.reshape(-1, 1), X, "gauss")
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

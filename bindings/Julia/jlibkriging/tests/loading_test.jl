@@ -16,21 +16,6 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         end
     end
 
-    @testset "NuggetKriging constructor" begin
-        nk = NuggetKriging("matern3_2")
-        @test kernel(nk) == "matern3_2"
-    end
-
-    @testset "NoiseKriging constructor" begin
-        nk = NoiseKriging("matern3_2")
-        @test kernel(nk) == "matern3_2"
-    end
-
-    @testset "LinearRegression constructor" begin
-        lr = LinearRegression()
-        @test lr.ptr != C_NULL
-    end
-
     @testset "Generic load dispatch" begin
         X = reshape(collect(range(0.01, 0.99; length=8)), :, 1)
         y = [f_test(x) for x in X[:, 1]]

@@ -57,61 +57,6 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         end
     end
 
-    @testset "Save and load NuggetKriging" begin
-        X_train_nk = reshape(collect(range(0.0, 1.0; length=20)), :, 1)
-        y_train_nk = [f_test(x) for x in X_train_nk[:, 1]] .+ 0.01 .* randn(20)
-
-        nk1 = NuggetKriging(y_train_nk, X_train_nk, "matern5_2")
-        p1 = predict(nk1, X_pred)
-
-        tmpfile = tempname() * ".json"
-        try
-            save(nk1, tmpfile)
-            @test isfile(tmpfile)
-
-            nk2 = load_nugget_kriging(tmpfile)
-            p2 = predict(nk2, X_pred)
-
-            @test p1.mean ≈ p2.mean atol=1e-12
-            @test p1.stdev ≈ p2.stdev atol=1e-12
-
-            @test kernel(nk1) == kernel(nk2)
-            @test sigma2(nk1) ≈ sigma2(nk2) atol=1e-12
-            @test nugget(nk1) ≈ nugget(nk2) atol=1e-12
-            @test theta(nk1) ≈ theta(nk2) atol=1e-12
-        finally
-            isfile(tmpfile) && rm(tmpfile)
-        end
-    end
-
-    @testset "Save and load NoiseKriging" begin
-        X_train_nk = reshape(collect(range(0.0, 1.0; length=20)), :, 1)
-        noise_vec = fill(0.01^2, 20)
-        y_train_nk = [f_test(x) for x in X_train_nk[:, 1]] .+ 0.01 .* randn(20)
-
-        nk1 = NoiseKriging(y_train_nk, noise_vec, X_train_nk, "matern5_2")
-        p1 = predict(nk1, X_pred)
-
-        tmpfile = tempname() * ".json"
-        try
-            save(nk1, tmpfile)
-            @test isfile(tmpfile)
-
-            nk2 = load_noise_kriging(tmpfile)
-            p2 = predict(nk2, X_pred)
-
-            @test p1.mean ≈ p2.mean atol=1e-12
-            @test p1.stdev ≈ p2.stdev atol=1e-12
-
-            @test kernel(nk1) == kernel(nk2)
-            @test sigma2(nk1) ≈ sigma2(nk2) atol=1e-12
-            @test theta(nk1) ≈ theta(nk2) atol=1e-12
-            @test noise(nk1) ≈ noise(nk2) atol=1e-12
-        finally
-            isfile(tmpfile) && rm(tmpfile)
-        end
-    end
-
     @testset "Loaded model can be updated" begin
         k1 = Kriging(y_train, X_train, "gauss")
 

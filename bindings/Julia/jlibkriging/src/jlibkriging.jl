@@ -59,45 +59,6 @@ function _check_ptr(ptr::Ptr{Nothing})
     return ptr
 end
 
-# ─── LinearRegression ──────────────────────────────────────────────
-
-mutable struct LinearRegression
-    ptr::Ptr{Nothing}
-
-    function LinearRegression()
-        ptr = ccall(dlsym(_lk(), :lk_linear_regression_new), Ptr{Nothing}, ())
-        obj = new(_check_ptr(ptr))
-        finalizer(obj) do o
-            if o.ptr != C_NULL
-                ccall(dlsym(_lk(), :lk_linear_regression_delete), Nothing, (Ptr{Nothing},), o.ptr)
-                o.ptr = C_NULL
-            end
-        end
-        return obj
-    end
-end
-
-function fit!(lr::LinearRegression, y::Vector{Float64}, X::Matrix{Float64})
-    n, d = size(X)
-    @assert length(y) == n
-    ret = ccall(dlsym(_lk(), :lk_linear_regression_fit), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Ptr{Float64}, Cint, Cint),
-                lr.ptr, y, n, X, n, d)
-    _check_error(ret)
-    return lr
-end
-
-function predict(lr::LinearRegression, X::Matrix{Float64})
-    m, d = size(X)
-    mean_out = Vector{Float64}(undef, m)
-    stdev_out = Vector{Float64}(undef, m)
-    ret = ccall(dlsym(_lk(), :lk_linear_regression_predict), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
-                lr.ptr, X, m, d, mean_out, stdev_out)
-    _check_error(ret)
-    return (mean=mean_out, stdev=stdev_out)
-end
-
 # ─── Kriging ──────────────────────────────────────────────────────
 
 mutable struct Kriging
@@ -532,60 +493,6 @@ for (_old, _new) in [(:get_X, :X), (:get_y, :y), (:get_theta, :theta), (:get_sig
         Base.depwarn("`$($_old)` is deprecated, use `$($_new)` instead", $(_old))
         return $(_new)(k)
     end
-end
-
-# ─── NuggetKriging (deprecated — use Kriging with noise="nugget") ──
-
-"""
-    NuggetKriging(kernel::String)
-
-Deprecated: use `Kriging(kernel; noise="nugget")` instead.
-"""
-function NuggetKriging(kernel::String)
-    Base.depwarn("NuggetKriging is deprecated, use Kriging(kernel; noise=\"nugget\")", :NuggetKriging)
-    return Kriging(kernel; noise="nugget")
-end
-
-"""
-    NuggetKriging(y, X, kernel; kwargs...)
-
-Deprecated: use `Kriging(y, X, kernel; noise="nugget", kwargs...)` instead.
-"""
-function NuggetKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String; kwargs...)
-    Base.depwarn("NuggetKriging is deprecated, use Kriging(y, X, kernel; noise=\"nugget\")", :NuggetKriging)
-    return Kriging(y, X, kernel; noise="nugget", kwargs...)
-end
-
-function load_nugget_kriging(filename::String)
-    Base.depwarn("load_nugget_kriging is deprecated, use load_kriging", :load_nugget_kriging)
-    return load_kriging(filename)
-end
-
-# ─── NoiseKriging (deprecated — use Kriging with noise=vector) ────
-
-"""
-    NoiseKriging(kernel::String)
-
-Deprecated: use `Kriging(kernel; noise="heterogeneous")` instead.
-"""
-function NoiseKriging(kernel::String)
-    Base.depwarn("NoiseKriging is deprecated, use Kriging(kernel; noise=\"heterogeneous\")", :NoiseKriging)
-    return Kriging(kernel; noise="heterogeneous")
-end
-
-"""
-    NoiseKriging(y, noise, X, kernel; kwargs...)
-
-Deprecated: use `Kriging(y, X, kernel; noise=noise_vec, kwargs...)` instead.
-"""
-function NoiseKriging(y::Vector{Float64}, noise_vec::Vector{Float64}, X::Matrix{Float64}, kernel::String; kwargs...)
-    Base.depwarn("NoiseKriging is deprecated, use Kriging(y, X, kernel; noise=noise_vec)", :NoiseKriging)
-    return Kriging(y, X, kernel; noise=noise_vec, kwargs...)
-end
-
-function load_noise_kriging(filename::String)
-    Base.depwarn("load_noise_kriging is deprecated, use load_kriging", :load_noise_kriging)
-    return load_kriging(filename)
 end
 
 # ─── WarpKriging ──────────────────────────────────────────────────
@@ -1266,9 +1173,9 @@ end
 
 # ─── Exports ──────────────────────────────────────────────────────
 
-export LinearRegression, Kriging, NuggetKriging, NoiseKriging, WarpKriging, MLPKriging
+export Kriging, WarpKriging, MLPKriging
 export fit!, predict, simulate, update!, update_simulate, save, summary
-export load, load_kriging, load_nugget_kriging, load_noise_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat

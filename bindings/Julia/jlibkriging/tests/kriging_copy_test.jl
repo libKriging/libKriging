@@ -76,34 +76,4 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test p1_before.stdev == p1_after.stdev
     end
 
-    @testset "Copy of NuggetKriging" begin
-        X_train_nk = reshape(collect(range(0.0, 1.0; length=15)), :, 1)
-        y_train_nk = [f_test(x) for x in X_train_nk[:, 1]] .+ 0.01 .* randn(15)
-
-        nk1 = NuggetKriging(y_train_nk, X_train_nk, "matern5_2")
-        nk2 = copy(nk1)
-
-        @test nk1.ptr != nk2.ptr
-
-        p1 = predict(nk1, X_pred)
-        p2 = predict(nk2, X_pred)
-        @test p1.mean == p2.mean
-        @test p1.stdev == p2.stdev
-    end
-
-    @testset "Copy of NoiseKriging" begin
-        X_train_nk = reshape(collect(range(0.0, 1.0; length=15)), :, 1)
-        y_train_nk = [f_test(x) for x in X_train_nk[:, 1]] .+ 0.01 .* randn(15)
-        noise_vec = fill(0.01^2, 15)
-
-        nk1 = NoiseKriging(y_train_nk, noise_vec, X_train_nk, "matern5_2")
-        nk2 = copy(nk1)
-
-        @test nk1.ptr != nk2.ptr
-
-        p1 = predict(nk1, X_pred)
-        p2 = predict(nk2, X_pred)
-        @test p1.mean == p2.mean
-        @test p1.stdev == p2.stdev
-    end
 end
