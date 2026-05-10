@@ -209,6 +209,9 @@ warp_ordinal <- function(n_levels) {
 #' print(k)
 #'
 #' # Mixed: 1 continuous + 1 categorical (3 levels)
+#' n <- 15
+#' X_mix <- cbind(runif(n), rep(0:2, length.out = n))
+#' y_mix <- sin(2 * pi * X_mix[, 1]) * c(1, 2, 0.5)[X_mix[, 2] + 1]
 #' k2 <- WarpKriging(y_mix, X_mix,
 #'          warping = c("mlp(16:8,2,selu)", "categorical(3,2)"),
 #'          kernel = "matern5_2")
