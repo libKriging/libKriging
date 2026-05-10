@@ -11,17 +11,23 @@
 ## namespace is locked after loading and cannot be modified at that point.
 
 .register_warpkriging_simulate_s4 <- function() {
-  if (methods::isGeneric("simulate") &&
-      !methods::existsMethod("simulate", "WarpKriging")) {
-    methods::setMethod(
-      "simulate", "WarpKriging",
-      function(object, nsim = 1, seed = 123, x, will_update = FALSE, ...) {
-        rlibkriging:::simulate.WarpKriging(object,
-                             nsim = nsim, seed = seed, x = x,
-                             will_update = will_update, ...)
-      },
-      where = .GlobalEnv)
-  }
+  # isGeneric() can return TRUE for implicit generics (methods package lazy
+  # registration of S3 base functions) where setMethod() still fails.
+  # Use tryCatch so failures never propagate to .onLoad.
+  tryCatch({
+    if (methods::isGeneric("simulate") &&
+        !is.null(tryCatch(methods::getGeneric("simulate"), error = function(e) NULL)) &&
+        !methods::existsMethod("simulate", "WarpKriging")) {
+      methods::setMethod(
+        "simulate", "WarpKriging",
+        function(object, nsim = 1, seed = 123, x, will_update = FALSE, ...) {
+          rlibkriging:::simulate.WarpKriging(object,
+                               nsim = nsim, seed = seed, x = x,
+                               will_update = will_update, ...)
+        },
+        where = .GlobalEnv)
+    }
+  }, error = function(e) NULL)
 }
 
 .onLoad <- function(libname, pkgname) {
