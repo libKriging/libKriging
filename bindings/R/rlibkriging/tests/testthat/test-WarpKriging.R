@@ -54,6 +54,8 @@ test_that("Categorical embedding works", {
   for (l in 1:3)
     cat(sprintf("    level %d: pred=%.3f, true=%.1f\n",
                 l - 1, p$mean[l], mu[l]))
+  expect_true(all(is.finite(p$mean)))
+  expect_equal(length(p$mean), 3)
 })
 
 # ===========================================================================
@@ -79,6 +81,7 @@ test_that("Mixed continuous + categorical works", {
     ytrue <- sin(2 * pi * xc) * offset[cat_idx + 1]
     rmse <- sqrt(mean((p$mean - ytrue)^2))
     cat(sprintf("  cat=%d  RMSE=%.4f\n", cat_idx, rmse))
+    expect_true(is.finite(rmse))
   }
 })
 
@@ -101,6 +104,8 @@ test_that("Ordinal warping works", {
   p <- predict(k, X_test, stdev = TRUE)
   for (l in 0:(L - 1))
     cat(sprintf("    level %d: pred=%.3f, true=%d\n", l, p$mean[l + 1], l * l))
+  expect_true(all(is.finite(p$mean)))
+  expect_equal(length(p$mean), L)
 })
 
 # ===========================================================================
@@ -159,6 +164,7 @@ test_that("MLP + categorical mixed warping works", {
     ytrue <- sin(2 * pi * xc) * offset[cat_idx + 1]
     cat(sprintf("  [MLP+cat] cat=%d RMSE=%.4f\n", cat_idx,
                 sqrt(mean((p$mean - ytrue)^2))))
+    expect_true(all(is.finite(p$mean)))
   }
 })
 
@@ -258,6 +264,9 @@ test_that("Warping improves over None baseline", {
               rmse(k_none), rmse(k_kuma), rmse(k_mlp)))
   cat(sprintf("  LL None: %.4f\n  LL Kuma: %.4f\n  LL MLP:  %.4f\n",
               logLikelihood(k_none), logLikelihood(k_kuma), logLikelihood(k_mlp)))
+  expect_true(is.finite(rmse(k_none)))
+  expect_true(is.finite(rmse(k_kuma)))
+  expect_true(is.finite(rmse(k_mlp)))
 })
 
 # ===========================================================================
