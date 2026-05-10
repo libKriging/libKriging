@@ -56,9 +56,6 @@ test_that(desc="logLik is the same that DiceKriging one",
 test_that(desc="logLik Grad is the same that DiceKriging one", 
          expect_true(max(abs(gll(x)-gll_C(x))/abs(gll(x))) < precision))
 
-test_that(desc="logLik Hess is the same that DiceKriging one", 
-         skip("Hessian not yet implemented in C++"))
-
 }
          
 }

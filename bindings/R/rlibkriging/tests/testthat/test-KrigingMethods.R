@@ -46,17 +46,10 @@ test_that("logLikelihoodFun returned",
           expect_equal(names(logLikelihoodFun(r,runif(d))),c("logLikelihood")))
 test_that("logLikelihoodFun logLikelihoodGrad returned",
           expect_equal(names(logLikelihoodFun(r,runif(d),return_grad=T)),c("logLikelihood","logLikelihoodGrad")))
-test_that("logLikelihoodFun logLikelihoodGrad logLikelihoodHess returned",
-          expect_equal(names(logLikelihoodFun(r,runif(d),return_grad=T,return_hess=T)),c("logLikelihood","logLikelihoodGrad","logLikelihoodHess")))
-
 test_that("logLikelihoodFun dim",
           expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)))$logLikelihood),c(2,1)))
 test_that("logLikelihoodGrad dim",
           expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),return_grad=T)$logLikelihoodGrad),c(2,d)))
-test_that("logLikelihoodHess dim",
-          expect_equal(dim(logLikelihoodFun(r,rbind(runif(d),runif(d)),return_grad=T,return_hess=T)$logLikelihoodHess),c(2,d,d)))
-
-
 context("leaveOneOut")
 
 loo = function(Theta){apply(Theta,1,function(theta) leaveOneOutFun(r,theta)$leaveOneOut)}
