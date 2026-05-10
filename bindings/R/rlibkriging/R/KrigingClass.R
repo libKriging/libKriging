@@ -60,6 +60,9 @@ classKriging <- function(nk) {
 #'     variance and for the range parameters. If \code{theta} is a
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
+#' @param noise Either a numeric vector of per-observation noise variances,
+#'     or \code{"nugget"} to estimate a homogeneous nugget, or
+#'     \code{NULL} (default) for noise-free interpolation.
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -235,6 +238,9 @@ print.Kriging <- function(x, ...) {
 #'     variance and for the range parameters. If \code{theta} is a
 #'     matrix with more than one row, each row is used as a starting
 #'     point for optimization.
+#' @param noise Either a numeric vector of per-observation noise variances,
+#'     or \code{"nugget"} to estimate a homogeneous nugget, or
+#'     \code{NULL} (default) for noise-free interpolation.
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -349,7 +355,12 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' @param nsim Number of simulations to perform.
 #' @param seed Random seed used.
 #' @param x Points in model input space where to simulate.
-#' @param will_update Set to TRUE if wish to use update_simulate(...) later.
+#' @param with_noise Logical or numeric specification controlling whether
+#'     observation noise is included in the simulated paths. Use
+#'     \code{TRUE} to include fitted noise when available, \code{FALSE}
+#'     to exclude nugget noise, or \code{NULL} for the default behaviour.
+#' @param will_update Set to \code{TRUE} if you plan to call
+#'     \code{update_simulate()} later.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}
@@ -420,6 +431,8 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' @param object S3 Kriging object.
 #' @param y_u Numeric vector of new responses (output).
 #' @param X_u Numeric matrix of new input points.
+#' @param noise_u Optional numeric vector of observation noise variances
+#'     attached to \code{y_u}.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}
@@ -455,22 +468,21 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
 #' lines(x, su[ , 1], col = "blue", lty=2)
 #' lines(x, su[ , 2], col = "blue", lty=2)
 #' lines(x, su[ , 3], col = "blue", lty=2)
-update_simulate.Kriging <- function(object, y_u, ...) {
+update_simulate.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL) {
     # Support two calling conventions matching C++ overloads:
     #   update_simulate(y_u, X_u)            - no noise (Nugget / pure Kriging)
     #   update_simulate(y_u, noise_u, X_u)   - with known observation noise
     # Named arguments also accepted: update_simulate(y_u, noise_u=..., X_u=...)
     args <- list(...)
-    if (!is.null(args$X_u) || !is.null(args$noise_u)) {
+    if (is.null(X_u) && (!is.null(args$X_u) || !is.null(args$noise_u))) {
         X_u <- args$X_u
-        noise_u <- args$noise_u
-    } else if (length(args) >= 2) {
+        noise_u <- if (is.null(noise_u)) args$noise_u else noise_u
+    } else if (is.null(X_u) && length(args) >= 2) {
         noise_u <- args[[1]]
         X_u <- args[[2]]
-    } else if (length(args) == 1) {
+    } else if (is.null(X_u) && length(args) == 1) {
         X_u <- args[[1]]
-        noise_u <- NULL
-    } else {
+    } else if (is.null(X_u)) {
         stop("update_simulate: X_u is required")
     }
     extra <- args[!names(args) %in% c("X_u", "noise_u")]
@@ -489,7 +501,9 @@ update_simulate.Kriging <- function(object, y_u, ...) {
 #' @param object S3 Kriging object.
 #' @param y_u Numeric vector of new responses (output).
 #' @param X_u Numeric matrix of new input points.
-#' @param refit Logical. If \code{TRUE} the model is refitted (default is FALSE).
+#' @param noise_u Optional numeric vector of observation noise variances
+#'     attached to \code{y_u}.
+#' @param refit Logical. If \code{TRUE} the model is refitted (default is \code{TRUE}).
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -497,9 +511,9 @@ update_simulate.Kriging <- function(object, y_u, ...) {
 #' @section Caution: The method \emph{does not return the updated
 #'     object}, but instead changes the content of
 #'     \code{object}. This behaviour is quite unusual in R and
-#'     differs from the behaviour of the methods
-#'     \code{\link[DiceKriging]{update.km}} in \pkg{DiceKriging} and
-#'     \code{\link{update,KM-method}}.
+#'     differs from the behaviour of \code{\link[DiceKriging]{update.km}}
+#'     in \pkg{DiceKriging} and the \code{update} method for class
+#'     \code{KM}.
 #'
 #' @method update Kriging
 #' @export
@@ -533,7 +547,7 @@ update_simulate.Kriging <- function(object, y_u, ...) {
 #' lines(x, p2$mean, col = "red")
 #' polygon(c(x, rev(x)), c(p2$mean - 2 * p2$stdev, rev(p2$mean + 2 * p2$stdev)),
 #'  border = NA, col = rgb(1, 0, 0, 0.2))
-update.Kriging <- function(object, y_u, ...) {
+update.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL, refit = TRUE) {
     # Support multiple calling conventions matching C++ overloads:
     #   update(y_u, X_u)                    - no noise, refit defaults TRUE
     #   update(y_u, X_u, refit)             - no noise, positional refit (logical)
@@ -546,9 +560,9 @@ update.Kriging <- function(object, y_u, ...) {
     pos_args <- args[!named_mask]
     named_args <- args[named_mask]
 
-    refit <- if (!is.null(named_args$refit)) named_args$refit else TRUE
-    noise_u <- named_args$noise_u
-    X_u <- named_args$X_u
+    refit <- if (!is.null(named_args$refit)) named_args$refit else refit
+    noise_u <- if (is.null(noise_u)) named_args$noise_u else noise_u
+    X_u <- if (is.null(X_u)) named_args$X_u else X_u
 
     if (is.null(X_u)) {
         n_pos <- length(pos_args)

@@ -150,6 +150,8 @@ predict.MLPKriging <- function(object, x, return_stdev = TRUE, return_cov = FALS
 #' @param nsim number of simulations
 #' @param seed random seed
 #' @param x simulation matrix (m x d)
+#' @param will_update logical; if \code{TRUE} keep the internal state for a
+#'   subsequent \code{update_simulate()} call.
 #' @param ... ignored
 #' @return matrix (m x nsim)
 #' @method simulate MLPKriging
@@ -174,7 +176,11 @@ update_simulate.MLPKriging <- function(object, y_u, X_u, ...) {
 }
 
 #' @title Update an MLPKriging model with new observations
+#' @param object MLPKriging object
+#' @param y_u new observations
+#' @param X_u new input matrix
 #' @param refit Logical. If \code{TRUE} the model is refitted (default is TRUE).
+#' @param ... ignored
 #' @method update MLPKriging
 #' @export
 update.MLPKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
@@ -189,6 +195,11 @@ logLikelihood.MLPKriging <- function(object, ...) {
 }
 
 #' @title Evaluate log-likelihood at given GP theta
+#' @param object MLPKriging object
+#' @param theta range parameter vector
+#' @param return_grad return gradient?
+#' @param return_hess return hessian?
+#' @param ... ignored
 #' @method logLikelihoodFun MLPKriging
 #' @export
 logLikelihoodFun.MLPKriging <- function(object, theta, return_grad = FALSE, return_hess = FALSE, ...) {
@@ -214,9 +225,14 @@ kernel.MLPKriging <- function(object, ...) {
 }
 
 #' @title Get feature dimensionality (d_out)
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 feature_dim <- function(object, ...) UseMethod("feature_dim")
 
+#' @title Get feature dimensionality for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method feature_dim MLPKriging
 #' @export
 feature_dim.MLPKriging <- function(object, ...) {
@@ -224,9 +240,14 @@ feature_dim.MLPKriging <- function(object, ...) {
 }
 
 #' @title Get hidden layer sizes
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 hidden_dims <- function(object, ...) UseMethod("hidden_dims")
 
+#' @title Get hidden layer sizes for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method hidden_dims MLPKriging
 #' @export
 hidden_dims.MLPKriging <- function(object, ...) {
@@ -234,15 +255,23 @@ hidden_dims.MLPKriging <- function(object, ...) {
 }
 
 #' @title Get activation function name
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 activation <- function(object, ...) UseMethod("activation")
 
+#' @title Get activation function for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method activation MLPKriging
 #' @export
 activation.MLPKriging <- function(object, ...) {
   mlpKriging_activation(object$ptr)
 }
 
+#' @title Check whether an MLPKriging model is fitted
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method is_fitted MLPKriging
 #' @export
 is_fitted.MLPKriging <- function(object, ...) {
@@ -269,66 +298,99 @@ y.MLPKriging <- function(object, ...) {
   mlpKriging_y(object$ptr)
 }
 
+#' @title Get input centering vector for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method centerX MLPKriging
 #' @export
 centerX.MLPKriging <- function(object, ...) {
   mlpKriging_centerX(object$ptr)
 }
 
+#' @title Get input scaling vector for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method scaleX MLPKriging
 #' @export
 scaleX.MLPKriging <- function(object, ...) {
   mlpKriging_scaleX(object$ptr)
 }
 
+#' @title Get output centering value for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method centerY MLPKriging
 #' @export
 centerY.MLPKriging <- function(object, ...) {
   mlpKriging_centerY(object$ptr)
 }
 
+#' @title Get output scaling value for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method scaleY MLPKriging
 #' @export
 scaleY.MLPKriging <- function(object, ...) {
   mlpKriging_scaleY(object$ptr)
 }
 
+#' @title Get normalize flag for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method normalize MLPKriging
 #' @export
 normalize.MLPKriging <- function(object, ...) {
   mlpKriging_normalize(object$ptr)
 }
 
+#' @title Get regression model type for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method regmodel MLPKriging
 #' @export
 regmodel.MLPKriging <- function(object, ...) {
   mlpKriging_regmodel(object$ptr)
 }
 
+#' @title Get trend matrix F for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method F_ MLPKriging
 #' @export
 F_.MLPKriging <- function(object, ...) {
   mlpKriging_F(object$ptr)
 }
 
+#' @title Get Cholesky factor T for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method T_ MLPKriging
 #' @export
 T_.MLPKriging <- function(object, ...) {
   mlpKriging_T(object$ptr)
 }
 
+#' @title Get whitened trend matrix M for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method M MLPKriging
 #' @export
 M.MLPKriging <- function(object, ...) {
   mlpKriging_M(object$ptr)
 }
 
+#' @title Get whitened residuals z for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method z MLPKriging
 #' @export
 z.MLPKriging <- function(object, ...) {
   mlpKriging_z(object$ptr)
 }
 
+#' @title Get trend coefficients beta for an MLPKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method beta MLPKriging
 #' @export
 beta.MLPKriging <- function(object, ...) {

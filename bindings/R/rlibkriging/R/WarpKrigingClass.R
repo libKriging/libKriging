@@ -197,6 +197,9 @@ warp_ordinal <- function(n_levels) {
 #' @param parameters optional named list of tuning parameters,
 #'   e.g. \code{list(max_iter_adam = "300", adam_lr = "0.001",
 #'                   max_iter_bfgs = "50")}
+#' @param noise Either a numeric vector of per-observation noise variances,
+#'   or \code{"nugget"} to estimate a homogeneous nugget, or
+#'   \code{NULL} (default) for noise-free interpolation.
 #'
 #' @return An S3 object of class "WarpKriging".
 #'
@@ -274,6 +277,9 @@ summary.WarpKriging <- function(object, ...) {
 #' @param optim optimiser
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters
+#' @param noise Either a numeric vector of per-observation noise variances,
+#'   or \code{"nugget"} to estimate a homogeneous nugget, or
+#'   \code{NULL} (default) for noise-free interpolation.
 #' @param ... ignored
 #'
 #' @return No return value. WarpKriging object argument is modified.
@@ -360,6 +366,8 @@ update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
 }
 
 #' @title Log-likelihood of the fitted model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method logLikelihood WarpKriging
 #' @export
 logLikelihood.WarpKriging <- function(object, ...) {
@@ -379,30 +387,48 @@ logLikelihoodFun.WarpKriging <- function(object, theta, return_grad = FALSE, ret
   warpKriging_logLikelihoodFun(object$ptr, theta, return_grad, return_hess)
 }
 
+#' @title Get GP range parameters
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @return Numeric vector of range parameters.
 #' @export
 theta <- function(object, ...) UseMethod("theta")
 
 #' @title Get GP range parameters
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method theta WarpKriging
 #' @export
 theta.WarpKriging <- function(object, ...) {
   warpKriging_theta(object$ptr)
 }
 
+#' @title Get process variance
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @return Numeric process variance estimate.
 #' @export
 sigma2 <- function(object, ...) UseMethod("sigma2")
 
 #' @title Get process variance (concentrated MLE)
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method sigma2 WarpKriging
 #' @export
 sigma2.WarpKriging <- function(object, ...) {
   warpKriging_sigma2(object$ptr)
 }
 
+#' @title Get kernel name
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @return Character scalar naming the covariance kernel.
 #' @export
 kernel <- function(object, ...) UseMethod("kernel")
 
 #' @title Get kernel name
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method kernel WarpKriging
 #' @export
 kernel.WarpKriging <- function(object, ...) {
@@ -410,9 +436,14 @@ kernel.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get warping specifications as strings
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 warping <- function(object, ...) UseMethod("warping")
 
+#' @title Get warping specification for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method warping WarpKriging
 #' @export
 warping.WarpKriging <- function(object, ...) {
@@ -420,6 +451,8 @@ warping.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get feature dimensionality of warped space
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method feature_dim WarpKriging
 #' @export
 feature_dim.WarpKriging <- function(object, ...) {
@@ -427,9 +460,14 @@ feature_dim.WarpKriging <- function(object, ...) {
 }
 
 #' @title Check if the model has been fitted
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 is_fitted <- function(object, ...) UseMethod("is_fitted")
 
+#' @title Check whether a WarpKriging model is fitted
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method is_fitted WarpKriging
 #' @export
 is_fitted.WarpKriging <- function(object, ...) {
@@ -463,9 +501,14 @@ y.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get input centering vector
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 centerX <- function(object, ...) UseMethod("centerX")
 
+#' @title Get input centering vector for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method centerX WarpKriging
 #' @export
 centerX.WarpKriging <- function(object, ...) {
@@ -473,9 +516,14 @@ centerX.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get input scaling vector
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 scaleX <- function(object, ...) UseMethod("scaleX")
 
+#' @title Get input scaling vector for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method scaleX WarpKriging
 #' @export
 scaleX.WarpKriging <- function(object, ...) {
@@ -483,9 +531,14 @@ scaleX.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get output centering value
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 centerY <- function(object, ...) UseMethod("centerY")
 
+#' @title Get output centering value for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method centerY WarpKriging
 #' @export
 centerY.WarpKriging <- function(object, ...) {
@@ -493,9 +546,14 @@ centerY.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get output scaling value
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 scaleY <- function(object, ...) UseMethod("scaleY")
 
+#' @title Get output scaling value for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method scaleY WarpKriging
 #' @export
 scaleY.WarpKriging <- function(object, ...) {
@@ -503,9 +561,14 @@ scaleY.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get normalize flag
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 normalize <- function(object, ...) UseMethod("normalize")
 
+#' @title Get normalize flag for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method normalize WarpKriging
 #' @export
 normalize.WarpKriging <- function(object, ...) {
@@ -513,9 +576,14 @@ normalize.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get regression model type
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 regmodel <- function(object, ...) UseMethod("regmodel")
 
+#' @title Get regression model type for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method regmodel WarpKriging
 #' @export
 regmodel.WarpKriging <- function(object, ...) {
@@ -523,9 +591,14 @@ regmodel.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get trend matrix F
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 F_ <- function(object, ...) UseMethod("F_")
 
+#' @title Get trend matrix F for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method F_ WarpKriging
 #' @export
 F_.WarpKriging <- function(object, ...) {
@@ -533,9 +606,14 @@ F_.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get Cholesky factor T
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 T_ <- function(object, ...) UseMethod("T_")
 
+#' @title Get Cholesky factor T for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method T_ WarpKriging
 #' @export
 T_.WarpKriging <- function(object, ...) {
@@ -543,9 +621,14 @@ T_.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get whitened trend matrix M
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 M <- function(object, ...) UseMethod("M")
 
+#' @title Get whitened trend matrix M for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method M WarpKriging
 #' @export
 M.WarpKriging <- function(object, ...) {
@@ -553,9 +636,14 @@ M.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get whitened residuals z
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 z <- function(object, ...) UseMethod("z")
 
+#' @title Get whitened residuals z for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method z WarpKriging
 #' @export
 z.WarpKriging <- function(object, ...) {
@@ -563,9 +651,14 @@ z.WarpKriging <- function(object, ...) {
 }
 
 #' @title Get trend coefficients beta
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @export
 beta <- function(object, ...) UseMethod("beta")
 
+#' @title Get trend coefficients beta for a WarpKriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
 #' @method beta WarpKriging
 #' @export
 beta.WarpKriging <- function(object, ...) {
