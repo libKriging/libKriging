@@ -10,6 +10,25 @@
 ## can still dispatch to the S3 simulate.MLPKriging method.
 setOldClass("MLPKriging")
 
+#' Shortcut to provide functions to the S3 class "MLPKriging"
+#' @param obj A list with a \code{ptr} element pointing to a C++ MLPKriging object
+#' @return An object of class "MLPKriging" with methods accessible via \code{$}
+classMLPKriging <- function(obj) {
+    class(obj) <- "MLPKriging"
+    for (f in c('as.list','copy','fit','save',
+                'logLikelihood','logLikelihoodFun',
+                'predict','print','show','simulate','update','update_simulate',
+                'is_fitted')) {
+        eval(parse(text=paste0("obj$", f, " <- function(...) ", f, "(obj,...)")))
+    }
+    for (d in c('kernel','theta','sigma2','hidden_dims','activation','feature_dim',
+                'X','centerX','scaleX','y','centerY','scaleY',
+                'normalize','regmodel','F_','T_','M','z','beta')) {
+        eval(parse(text=paste0("obj$", d, " <- function() ", d, "(obj)")))
+    }
+    obj
+}
+
 #' @title Create an MLPKriging model (Deep Kernel Learning)
 #'
 #' @description Kriging with a joint multi-layer perceptron applied to all
@@ -58,8 +77,7 @@ MLPKriging <- function(y, X, hidden_dims,
                         activation, kernel, regmodel, normalize,
                         optim, objective, parameters)
   obj <- list(ptr = ptr)
-  class(obj) <- "MLPKriging"
-  return(obj)
+  return(classMLPKriging(obj))
 }
 
 # -----------------------------------------------------------------------
@@ -325,9 +343,7 @@ beta.MLPKriging <- function(object, ...) {
 #' @export
 copy.MLPKriging <- function(object, ...) {
   ptr_copy <- mlpKriging_copy(object$ptr)
-  obj <- list(ptr = ptr_copy)
-  class(obj) <- "MLPKriging"
-  obj
+  classMLPKriging(list(ptr = ptr_copy))
 }
 
 #' @title Save an MLPKriging model to file
@@ -353,7 +369,5 @@ load.MLPKriging <- function(filename, ...) {
   if (!is.character(filename))
     stop("'filename' must be a string")
   ptr <- mlpkriging_load(filename)
-  obj <- list(ptr = ptr)
-  class(obj) <- "MLPKriging"
-  obj
+  classMLPKriging(list(ptr = ptr))
 }

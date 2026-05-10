@@ -10,6 +10,27 @@
 ## can still dispatch to the S3 simulate.WarpKriging method.
 setOldClass("WarpKriging")
 
+#' Shortcut to provide functions to the S3 class "WarpKriging"
+#' @param obj A list with a \code{ptr} element pointing to a C++ WarpKriging object
+#' @return An object of class "WarpKriging" with methods accessible via \code{$}
+classWarpKriging <- function(obj) {
+    class(obj) <- "WarpKriging"
+    # Allow `k$method(...)` as well as R-style `method(k, ...)`
+    for (f in c('as.list','copy','fit','save',
+                'logLikelihood','logLikelihoodFun',
+                'predict','print','show','simulate','update','update_simulate',
+                'is_fitted')) {
+        eval(parse(text=paste0("obj$", f, " <- function(...) ", f, "(obj,...)")))
+    }
+    # Allow `k$prop()` data accessors
+    for (d in c('kernel','theta','sigma2','warping','feature_dim',
+                'X','centerX','scaleX','y','centerY','scaleY',
+                'normalize','regmodel','F_','T_','M','z','beta')) {
+        eval(parse(text=paste0("obj$", d, " <- function() ", d, "(obj)")))
+    }
+    obj
+}
+
 # -----------------------------------------------------------------------
 #  Warp specification helpers  (return strings)
 #
@@ -216,8 +237,7 @@ WarpKriging <- function(y, X, warping,
                          regmodel, normalize, optim, objective,
                          parameters, noise)
   obj <- list(ptr = ptr)
-  class(obj) <- "WarpKriging"
-  return(obj)
+  return(classWarpKriging(obj))
 }
 
 # -----------------------------------------------------------------------
@@ -557,9 +577,7 @@ beta.WarpKriging <- function(object, ...) {
 #' @export
 copy.WarpKriging <- function(object, ...) {
   ptr_copy <- warpKriging_copy(object$ptr)
-  obj <- list(ptr = ptr_copy)
-  class(obj) <- "WarpKriging"
-  obj
+  classWarpKriging(list(ptr = ptr_copy))
 }
 
 #' @title Save a WarpKriging model to file
@@ -585,7 +603,5 @@ load.WarpKriging <- function(filename, ...) {
   if (!is.character(filename))
     stop("'filename' must be a string")
   ptr <- warpkriging_load(filename)
-  obj <- list(ptr = ptr)
-  class(obj) <- "WarpKriging"
-  obj
+  classWarpKriging(list(ptr = ptr))
 }
