@@ -86,6 +86,7 @@ enum class WarpType {
   Kumaraswamy,  ///< w(x) = 1 - (1-x^a)^b   on [0,1]
   NeuralMono,   ///< small monotone neural network
   MLP,          ///< unconstrained multi-layer perceptron (multi-dim output)
+  Knots,        ///< piecewise-linear monotone (Xiong et al. 2007)
 
   // --- discrete / categorical ---
   Embedding,  ///< learned embedding vector per level
@@ -139,6 +140,10 @@ struct WarpSpec {
   /// n_levels is inferred from level_names.size().
   std::vector<std::string> level_names = {};
 
+  // Knots-specific fields (Xiong et al. 2007)
+  arma::uword n_knots = 3;                  ///< number of interior knots
+  std::vector<double> knot_positions = {};  ///< explicit knot positions in (0,1); empty → uniform
+
   // ---- String parsing / serialisation ------------------------------------
 
   /**
@@ -167,6 +172,23 @@ struct WarpSpec {
   static WarpSpec mlp(const std::vector<arma::uword>& hidden_dims,
                       arma::uword d_out = 2,
                       const std::string& activation = "selu");
+
+  /**
+   * @brief Piecewise-linear monotone warping with K interior knots.
+   *
+   * String format:  "knots"                  → 3 uniform interior knots
+   *                 "knots(K)"               → K uniform interior knots
+   *                 "knots(t1:t2:…:tK)"      → explicit knot positions in (0,1)
+   *
+   * Each interval carries one learnable log-slope parameter.  With K knots
+   * there are K+1 intervals and K+1 parameters.
+   *
+   * Reference: Xiong, Y., Chen, W., Apley, D. & Ding, X. (2007).
+   * "A non-stationary covariance-based Kriging method for metamodelling
+   * in engineering design." Int. J. Numer. Meth. Engng, 71(6), 733–756.
+   * (Also implemented in DiceKriging via the `knots` argument.)
+   */
+  static WarpSpec knots(arma::uword n_knots = 3, const std::vector<double>& knot_positions = {});
 
   /**
    * @brief Joint MLP warping: takes ALL input dimensions together.
@@ -461,6 +483,54 @@ class LIBKRIGING_EXPORT WarpOrdinal final : public IWarp {
  private:
   arma::uword m_n_levels;
   arma::vec m_raw_gaps;  ///< (L-1) unconstrained; actual gaps = exp(raw)
+};
+
+/**
+ * @brief Piecewise-linear monotone warping with K interior knots (Xiong et al. 2007).
+ *
+ * The input domain (after normalization to [0,1]) is partitioned by breakpoints
+ *   0 = t₀ < t₁ < … < t_K < t_{K+1} = 1
+ * into K+1 intervals.  Each interval carries a positive slope sₖ = exp(rₖ),
+ * where rₖ is the unconstrained learnable parameter.  The warp is:
+ *
+ *   w(x) = Σ_{j<k} sⱼ·(t_{j+1}−tⱼ)  +  sₖ·(x−tₖ),   for x ∈ [tₖ, t_{k+1})
+ *
+ * Initialization: rₖ = 0 for all k, so all slopes = 1 (identity-like).
+ *
+ * n_params() = K+1  (log-slopes).
+ *
+ * Reference:
+ *   Xiong, Y., Chen, W., Apley, D. & Ding, X. (2007).
+ *   "A non-stationary covariance-based Kriging method for metamodelling
+ *   in engineering design." Int. J. Numer. Meth. Engng, 71(6), 733–756.
+ *   (Also implemented in DiceKriging via the `knots` argument.)
+ */
+class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
+ public:
+  /**
+   * @param n_knots        number of interior knots K  (K ≥ 1)
+   * @param knot_positions optional explicit positions in (0,1); must have n_knots elements
+   *                       and be strictly increasing.  Empty → uniform spacing.
+   */
+  explicit WarpKnots(arma::uword n_knots = 3, const std::vector<double>& knot_positions = {});
+
+  arma::uword output_dim() const override { return 1; }
+  arma::uword n_params() const override { return m_K + 1; }
+  arma::vec get_params() const override;
+  void set_params(const arma::vec& p) override;
+  arma::mat forward(const arma::vec& x) const override;
+  arma::vec deriv_input(double x_val) const override;
+  arma::vec backward(const arma::vec& x, const arma::mat& dL_dPhi) const override;
+  std::string describe() const override;
+  std::unique_ptr<IWarp> clone() const override;
+
+ private:
+  arma::uword m_K;              ///< number of interior knots
+  std::vector<double> m_breaks; ///< K+2 breakpoints (including 0 and 1)
+  arma::vec m_log_slopes;       ///< K+1 unconstrained log-slopes
+
+  /// Find the interval index k such that m_breaks[k] <= x < m_breaks[k+1]
+  arma::uword find_interval(double x) const;
 };
 
 // =========================================================================

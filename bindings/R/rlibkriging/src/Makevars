@@ -32,7 +32,7 @@ EXTERNAL_LIBS=$(shell ../../tools/ExternalLibsExtractor.sh)
 CXX_STD = CXX17
 
 #PKG_CFLAGS=
-PKG_CPPFLAGS=-I"${LIBKRIGING_PATH}"/include -include "libKriging/utils/lkalloc.hpp" -DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc -DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free
+PKG_CPPFLAGS=-I"${LIBKRIGING_PATH}"/include -include "libKriging/utils/lkalloc.hpp" -DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc -DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free -DARMA_32BIT_WORD
 # https://stackoverflow.com/questions/49154506/understanding-makevars-for-linking-to-external-c-library-in-r-package
 PKG_LIBS=-L"${LIBKRIGING_PATH}"/lib -lKriging -larmadillo -llbfgsb_cpp $(EXTRA_PKG_LIBS) $(EXTERNAL_LIBS)
 MAKEFLAGS=-j$(nproc)

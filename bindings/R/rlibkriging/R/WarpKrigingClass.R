@@ -94,6 +94,43 @@ warp_ordinal <- function(n_levels) {
   paste0("ordinal(", n_levels, ")")
 }
 
+#' @title Piecewise-linear monotone warping with knots (Xiong et al. 2007)
+#'
+#' @description
+#' Implements the non-stationary input warping of Xiong, Chen, Apley & Ding (2007,
+#' \emph{Int. J. Numer. Meth. Engng}).  The domain \eqn{[0,1]} is split into
+#' \eqn{K+1} intervals by \eqn{K} interior knots, each carrying a learnable
+#' positive slope \eqn{s_k = \exp(r_k)}.  The warp is:
+#' \deqn{w(x) = \sum_{j<k} s_j (t_{j+1}-t_j) + s_k (x-t_k)}
+#' for \eqn{x \in [t_k, t_{k+1})}, giving a continuous, monotone
+#' piecewise-linear function with \eqn{K+1} free parameters.
+#'
+#' This is the same construction as the \code{knots} argument in
+#' \pkg{DiceKriging}.
+#'
+#' @param n_knots number of interior knots \eqn{K \ge 1} (default 3)
+#' @param knot_positions optional numeric vector of \eqn{K} knot positions
+#'   strictly inside \eqn{(0,1)}, in increasing order.
+#'   When \code{NULL} (default), knots are placed uniformly at
+#'   \eqn{1/(K+1), 2/(K+1), \ldots, K/(K+1)}.
+#' @return warp specification string, e.g. \code{"knots(3)"} or
+#'   \code{"knots(0.25:0.5:0.75)"}
+#' @references
+#'   Xiong, Y., Chen, W., Apley, D. & Ding, X. (2007).
+#'   A non-stationary covariance-based Kriging method for metamodelling
+#'   in engineering design.
+#'   \emph{International Journal for Numerical Methods in Engineering},
+#'   71(6), 733--756.
+#' @seealso \code{\link{WarpKriging}}
+#' @export
+warp_knots <- function(n_knots = 3, knot_positions = NULL) {
+  if (!is.null(knot_positions) && length(knot_positions) > 0) {
+    paste0("knots(", paste(knot_positions, collapse = ":"), ")")
+  } else {
+    paste0("knots(", as.integer(n_knots), ")")
+  }
+}
+
 # -----------------------------------------------------------------------
 #  String / factor column encoding helper
 # -----------------------------------------------------------------------
@@ -188,6 +225,7 @@ warp_ordinal <- function(n_levels) {
 #'   of X. Use \code{warp_*()} helpers or plain strings:
 #'   \code{"none"}, \code{"affine"}, \code{"boxcox"}, \code{"kumaraswamy"},
 #'   \code{"neural_mono(8)"}, \code{"mlp(16:8,2,selu)"},
+#'   \code{"knots(3)"}, \code{"knots(0.25:0.5:0.75)"},
 #'   \code{"categorical(5,2)"}, \code{"ordinal(4)"}.
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"

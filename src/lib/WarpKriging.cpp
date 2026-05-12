@@ -86,6 +86,14 @@ WarpSpec WarpSpec::mlp(const std::vector<arma::uword>& hdims, arma::uword dout, 
   return s;
 }
 
+WarpSpec WarpSpec::knots(arma::uword n_knots, const std::vector<double>& knot_positions) {
+  WarpSpec s;
+  s.type = WarpType::Knots;
+  s.n_knots = n_knots;
+  s.knot_positions = knot_positions;
+  return s;
+}
+
 WarpSpec WarpSpec::mlp_joint(const std::vector<arma::uword>& hdims, arma::uword dout, const std::string& act) {
   WarpSpec s;
   s.type = WarpType::MLPJoint;
@@ -289,6 +297,34 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
     return WarpSpec::mlp_joint(hdims, dout, act);
   }
 
+  // --- knots([K] | [t1:t2:...:tK]) ---
+  // "knots"           → 3 uniform interior knots
+  // "knots(K)"        → K uniform interior knots
+  // "knots(t1:t2:…)"  → explicit knot positions in (0,1) (colon-separated floats)
+  if (type_str == "knots") {
+    if (args_str.empty())
+      return WarpSpec::knots(3);
+
+    // Try to determine whether args_str is a single integer or floats
+    auto kparts = split(args_str, ':');
+    if (kparts.size() == 1) {
+      // Could be an integer K or a single float knot position
+      bool is_int = true;
+      for (char c : kparts[0]) {
+        if (!std::isdigit(c)) { is_int = false; break; }
+      }
+      if (is_int) {
+        arma::uword K = static_cast<arma::uword>(std::stoul(kparts[0]));
+        return WarpSpec::knots(K);
+      }
+    }
+    // Parse as explicit float knot positions
+    std::vector<double> positions;
+    for (const auto& part : kparts)
+      positions.push_back(std::stod(part));
+    return WarpSpec::knots(static_cast<arma::uword>(positions.size()), positions);
+  }
+
   throw std::invalid_argument("WarpSpec::from_string: unknown warp type: '" + type_str + "'");
 }
 
@@ -358,6 +394,22 @@ std::string WarpSpec::to_string() const {
       }
       s += "," + std::to_string(d_out) + "," + activation + ")";
       return s;
+    }
+    case WarpType::Knots: {
+      if (!knot_positions.empty() && knot_positions.size() == n_knots) {
+        // Emit explicit positions
+        std::string s = "knots(";
+        for (arma::uword i = 0; i < n_knots; ++i) {
+          if (i > 0)
+            s += ":";
+          std::ostringstream oss;
+          oss << std::setprecision(15) << knot_positions[i];
+          s += oss.str();
+        }
+        s += ")";
+        return s;
+      }
+      return "knots(" + std::to_string(n_knots) + ")";
     }
   }
   return "unknown";
@@ -1260,8 +1312,135 @@ std::unique_ptr<IWarp> WarpOrdinal::clone() const {
 }
 
 // *************************************************************************
-//  WarpKriging  —  implementation
+//  WarpKnots  —  piecewise-linear monotone warping (Xiong et al. 2007)
+//
+//  Breakpoints:  0 = t₀ < t₁ < … < t_K < t_{K+1} = 1
+//  Parameters:   log-slopes r₀, …, r_K  (unconstrained)
+//  Slopes:       sₖ = exp(rₖ) > 0
+//  Warp:         w(x) = Σ_{j<k} sⱼ·Δtⱼ  +  sₖ·(x − tₖ)
+//                for x ∈ [tₖ, t_{k+1})
 // *************************************************************************
+
+WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positions) : m_K(n_knots) {
+  if (n_knots < 1)
+    throw std::invalid_argument("WarpKnots: n_knots must be >= 1");
+
+  m_breaks.resize(m_K + 2);
+  m_breaks[0] = 0.0;
+  m_breaks[m_K + 1] = 1.0;
+
+  if (knot_positions.size() == m_K) {
+    for (arma::uword k = 0; k < m_K; ++k)
+      m_breaks[k + 1] = knot_positions[k];
+  } else if (knot_positions.empty()) {
+    for (arma::uword k = 0; k < m_K; ++k)
+      m_breaks[k + 1] = (k + 1.0) / (m_K + 1.0);
+  } else {
+    throw std::invalid_argument("WarpKnots: knot_positions must be empty (uniform) or have n_knots elements");
+  }
+
+  for (arma::uword k = 0; k < m_K + 1; ++k) {
+    if (m_breaks[k] >= m_breaks[k + 1])
+      throw std::invalid_argument("WarpKnots: breakpoints must be strictly increasing; "
+                                  "knot positions must lie strictly in (0,1)");
+  }
+
+  m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
+}
+
+arma::uword WarpKnots::find_interval(double x) const {
+  // Binary search for k such that m_breaks[k] <= x < m_breaks[k+1]
+  arma::uword lo = 0, hi = m_K;
+  while (lo < hi) {
+    arma::uword mid = (lo + hi + 1) / 2;
+    if (x >= m_breaks[mid])
+      lo = mid;
+    else
+      hi = mid - 1;
+  }
+  return lo;
+}
+
+arma::vec WarpKnots::get_params() const {
+  return m_log_slopes;
+}
+
+void WarpKnots::set_params(const arma::vec& p) {
+  m_log_slopes = p;
+}
+
+arma::mat WarpKnots::forward(const arma::vec& x) const {
+  arma::uword K1 = m_K + 1;
+  arma::vec slopes = arma::exp(m_log_slopes);
+
+  // Cumulative warp values at each breakpoint
+  arma::vec cum(K1 + 1, arma::fill::zeros);
+  for (arma::uword j = 0; j < K1; ++j)
+    cum(j + 1) = cum(j) + slopes(j) * (m_breaks[j + 1] - m_breaks[j]);
+
+  arma::vec out(x.n_elem);
+  for (arma::uword i = 0; i < x.n_elem; ++i) {
+    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    arma::uword k = find_interval(xi);
+    out(i) = cum(k) + slopes(k) * (xi - m_breaks[k]);
+  }
+  return arma::mat(out);
+}
+
+arma::vec WarpKnots::deriv_input(double x_val) const {
+  double xi = std::clamp(x_val, m_breaks[0], m_breaks[m_K + 1]);
+  arma::uword k = find_interval(xi);
+  return {std::exp(m_log_slopes(k))};
+}
+
+arma::vec WarpKnots::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
+  arma::uword K1 = m_K + 1;
+  arma::vec slopes = arma::exp(m_log_slopes);
+  arma::vec grad(K1, arma::fill::zeros);
+
+  for (arma::uword i = 0; i < x.n_elem; ++i) {
+    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    double g = dL_dPhi(i, 0);
+    arma::uword k = find_interval(xi);
+
+    // For fully traversed intervals j < k:
+    // d(w)/d(log_s_j) = slopes(j) * (t_{j+1} - t_j)  via chain rule through exp
+    for (arma::uword j = 0; j < k; ++j)
+      grad(j) += g * slopes(j) * (m_breaks[j + 1] - m_breaks[j]);
+
+    // For the partial interval k:
+    // d(w)/d(log_s_k) = slopes(k) * (xi - t_k)
+    grad(k) += g * slopes(k) * (xi - m_breaks[k]);
+  }
+  return grad;
+}
+
+std::string WarpKnots::describe() const {
+  std::ostringstream s;
+  s << "Knots(K=" << m_K << ", breaks=[";
+  for (arma::uword k = 0; k <= m_K + 1; ++k) {
+    if (k > 0)
+      s << ",";
+    s << std::setprecision(4) << m_breaks[k];
+  }
+  s << "], slopes=[";
+  for (arma::uword k = 0; k <= m_K; ++k) {
+    if (k > 0)
+      s << ",";
+    s << std::setprecision(4) << std::exp(m_log_slopes(k));
+  }
+  s << "])";
+  return s.str();
+}
+
+std::unique_ptr<IWarp> WarpKnots::clone() const {
+  std::vector<double> pos(m_K);
+  for (arma::uword k = 0; k < m_K; ++k)
+    pos[k] = m_breaks[k + 1];
+  auto c = std::make_unique<WarpKnots>(m_K, pos);
+  c->set_params(get_params());
+  return c;
+}
 
 // -------------------------------------------------------------------------
 WarpBaseKernel WarpKriging::parse_kernel(const std::string& name) {
@@ -1297,6 +1476,8 @@ std::unique_ptr<IWarp> WarpKriging::make_warp(const WarpSpec& spec) const {
       return std::make_unique<WarpEmbedding>(spec.n_levels, spec.embed_dim);
     case WarpType::Ordinal:
       return std::make_unique<WarpOrdinal>(spec.n_levels);
+    case WarpType::Knots:
+      return std::make_unique<WarpKnots>(spec.n_knots, spec.knot_positions);
     case WarpType::MLPJoint:
       // MLPJoint is not a per-variable IWarp — handled separately in build_warps
       throw std::invalid_argument("make_warp: MLPJoint is handled by build_warps, not make_warp");
