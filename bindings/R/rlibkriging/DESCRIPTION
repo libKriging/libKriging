@@ -1,8 +1,8 @@
 Package: rlibkriging
 Type: Package
 Title: Kriging Models using the 'libKriging' Library
-Version: 0.9-4
-Date: 2025-12-17
+Version: 1.0-0
+Date: 2026-05-12
 Authors@R: 
     c(person(given = "Yann",
              family = "Richet",
@@ -18,15 +18,18 @@ Authors@R:
              role = c("aut"),
              email = "deville.yves@alpestat.com"))
 Maintainer: Yann Richet <yann.richet@asnr.fr>
-Description: Interface to 'libKriging' 'C++' library <https://github.com/libKriging> that should
-    provide most standard Kriging / Gaussian process regression features
-    (like in 'DiceKriging', 'kergp' or 'RobustGaSP' packages).
+Description: Interface to 'libKriging' 'C++' library <https://github.com/libKriging> that 
+    provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update)
+    and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
+    'libKriging' relies on Armadillo linear algebra library (Apache 2 license) by Conrad Sanderson, 
+    and 'lbfgsb_cpp' which is a 'C++' port around by Pascal Have of 'lbfgsb' library (BSD-3 license) by 
+    Ciyou Zhu, Richard Byrd, Jorge Nocedal and Jose Luis Morales used for hyperparameters optimization.
 License: Apache License (>= 2)
 Encoding: UTF-8
 LinkingTo: Rcpp, RcppArmadillo
 Depends: R (>= 4.2)
 Imports: Rcpp (>= 0.12.11), methods
 Suggests: testthat, utils, foreach
-SystemRequirements: GNU make, cmake (>= 3.2.0), gcc, gfortran
+SystemRequirements: GNU make, cmake (>= 3.2.0), gcc
 URL: https://github.com/libKriging
 RoxygenNote: 7.3.3

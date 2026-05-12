@@ -3,6 +3,17 @@
 [![Coverage Status](https://coveralls.io/repos/github/libKriging/libKriging/badge.svg?branch=master)](https://coveralls.io/github/libKriging/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+
+'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
+It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
+
+
+'libKriging' relies on Armadillo linear algebra library (Apache 2 license) by Conrad Sanderson, and 'lbfgsb_cpp' which is a C++ port around by Pascal Have of 'lbfgsb' library (BSD-3 license) by Ciyou Zhu, Richard Byrd, Jorge Nocedal and Jose Luis Morales used for hyperparameters optimization.
+
+
+Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab and Julia. See [Installation from pre-built packages](#installation-from-pre-built-packages) for more details.
+
+
 Table of contents
 
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
