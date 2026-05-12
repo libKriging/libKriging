@@ -98,13 +98,13 @@ take too long. Run them locally by omitting the tag filter.
 |------|------|-------------|
 | `WarpKrigingTest.cpp` | — | Smoke tests (fit, predict, simulate, update) for all warp types |
 | `WarpKrigingUpdateSimulateTest.cpp` | `[update_simulate][warpkriging]` | `update_simulate` vs update-then-simulate for `none` and `affine` warpings |
-| `WarpKrigingPerWarpTest.cpp` | `[predict][simulate][derivative][fd][update][update_simulate][warpkriging]` | Per-warping 1-D correctness tests (see below) |
+| `WarpKrigingPerWarpTest.cpp` | `[predict][simulate][derivative][fd][loglik][gradient][update][update_simulate][warpkriging]` | Per-warping 1-D correctness tests (see below) |
 
 #### WarpKrigingPerWarpTest
 
 Exercises **7 warp types** (`none`, `affine`, `boxcox`, `kumaraswamy`, `knots(3)`,
 `neural_mono`, `mlp(8,1,selu)`) on a 1-D sin function with 15 equispaced training
-points. Three test cases are run for every warp type:
+points. Four test cases are run for every warp type:
 
 1. **predict vs simulate** `[predict][simulate]`  
    Fits the model and draws 2 000 conditional simulations. Checks that the empirical
@@ -122,6 +122,12 @@ points. Three test cases are run for every warp type:
    - **Path B**: `fit` → `update(y_new, X_new, refit=false)` → `simulate(same seed)`  
    A two-sample KS test is applied at each of 8 simulation points (α = 10⁻⁶).
    At most 1 marginal failure out of 8 is allowed.
+
+4. **log-likelihood gradient vs finite differences** `[loglik][gradient][fd]`  
+   Evaluates `logLikelihoodFun(theta, return_grad=true)` at the fitted theta and
+   checks every component of the analytical gradient against central finite
+   differences (h = 1 × 10⁻⁵), using a mixed tolerance of
+   `max(0.001, 0.01 × |value|)` (1 % relative).
 
 ### MLPKriging
 

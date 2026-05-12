@@ -290,3 +290,62 @@ TEST_CASE("WarpKrigingPerWarpTest - update+simulate vs update_simulate (1D)",
   INFO("warp=" << warp);
   check_update_simulate(warp);
 }
+
+// ==========================================================================
+//  Test 4: log-likelihood gradient vs finite differences
+// ==========================================================================
+
+/// After fitting, evaluate logLikelihoodFun at a perturbed theta and verify
+/// that the analytical gradient matches central finite differences for every
+/// component of log(theta).
+static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
+  auto wk = make_model(warp_spec);
+
+  // Use the fitted theta as the evaluation point (gradient is non-trivial there)
+  arma::vec theta0 = wk.theta();
+  REQUIRE(theta0.n_elem >= 1);
+  REQUIRE(theta0.is_finite());
+
+  // Compute analytical gradient
+  auto [ll0, grad, hess] = wk.logLikelihoodFun(theta0, /*return_grad=*/true, false);
+  REQUIRE(grad.n_elem == theta0.n_elem);
+  REQUIRE(grad.is_finite());
+
+  const double h = 1e-5;
+  // Mixed tolerance: max(abs_floor, rel * |value|)
+  const double abs_floor = 1e-3;
+  const double rel_tol = 0.01;  // 1 % relative
+
+  int failures = 0;
+  std::stringstream details;
+
+  for (arma::uword k = 0; k < theta0.n_elem; ++k) {
+    arma::vec tp = theta0, tm = theta0;
+    tp(k) += h;
+    tm(k) -= h;
+
+    double llp = std::get<0>(wk.logLikelihoodFun(tp, false, false));
+    double llm = std::get<0>(wk.logLikelihoodFun(tm, false, false));
+    double fd = (llp - llm) / (2.0 * h);
+
+    double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad(k))));
+    double err = std::abs(grad(k) - fd);
+
+    if (err > tol) {
+      details << "\n  theta[" << k << "]=" << theta0(k) << " analytic=" << grad(k) << " fd=" << fd
+              << " err=" << err << " tol=" << tol;
+      ++failures;
+    }
+  }
+
+  INFO("warp=" << warp_spec << " loglik_grad failures=" << failures << details.str());
+  CHECK(failures == 0);
+}
+
+TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)",
+          "[loglik][gradient][fd][warpkriging]") {
+  const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
+  const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
+  INFO("warp=" << warp);
+  check_loglik_grad_vs_fd(warp);
+}
