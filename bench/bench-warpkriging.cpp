@@ -115,6 +115,7 @@ std::vector<WarpConfig> build_configs(arma::uword d) {
   configs.push_back({"affine", repeat_warp("affine", d), "BFGS+Adam", {}, false});
   configs.push_back({"boxcox", repeat_warp("boxcox", d), "BFGS+Adam", {}, false});
   configs.push_back({"kumaraswamy", repeat_warp("kumaraswamy", d), "BFGS+Adam", {}, false});
+  configs.push_back({"knots", repeat_warp("knots(3)", d), "BFGS+Adam", {}, false});
   configs.push_back({"mlp", repeat_warp("mlp", d), "BFGS+Adam", {}, false});
   configs.push_back({"neural_mono", repeat_warp("neural_mono", d), "BFGS+Adam", {}, false});
 
