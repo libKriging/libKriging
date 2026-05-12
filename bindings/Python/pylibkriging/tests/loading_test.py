@@ -6,7 +6,7 @@ import pytest
 
 
 def test_version():
-    assert m.__version__ == '0.9.3'
+    assert m.__version__ == '1.0.0'
 
 
 def test_generic_load_dispatches_classes():
