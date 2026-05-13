@@ -39,13 +39,13 @@ jobs:
   guideline-checks:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: false # submodules not required here
           fetch-depth: 2 # git rev-parse HEAD^ will fail without this
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v3.x
+        uses: rlespinasse/github-slug-action@v4
 
       - name: before_script
         shell: bash
@@ -106,7 +106,7 @@ jobs:
             enable_octave: on
             timeout_minutes: 90
           - name: "Matlab Linux"
-            # Using matlab-actions/setup-matlab@v1, only available on Linux
+            # Using matlab-actions/setup-matlab@v2, only available on Linux
             os: ubuntu-22.04
             mode: Release
             enable_matlab: on
@@ -141,12 +141,12 @@ jobs:
             enable_julia: on
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
       - name: Setup python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -234,7 +234,7 @@ jobs:
         if: runner.os == 'Linux' # or use $RUNNER_OS
 
       - name: pre-install-matlab
-        uses: matlab-actions/setup-matlab@v1
+        uses: matlab-actions/setup-matlab@v2
         if: matrix.enable_matlab == 'on'
 
       - name: install
@@ -242,9 +242,9 @@ jobs:
         run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: lukka/get-cmake@v1
         with:
-          cmake-version: '3.24.x'
+          cmakeVersion: '~3.24.0'
 
       - name: before_script
         shell: bash

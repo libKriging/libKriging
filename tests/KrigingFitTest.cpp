@@ -56,10 +56,10 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
 
     INFO("Best grid LL: " << best_ll_grid << " at theta = " << best_theta_grid);
 
-    // BFGS optimization
+    // BFGS optimization with multiple starts for robustness across BLAS implementations (MKL vs OpenBLAS)
     Kriging kr_bfgs("gauss");
     Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", params_bfgs);
+    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LL", params_bfgs);
 
     double ll_bfgs = kr_bfgs.logLikelihood();
     arma::vec theta_bfgs = kr_bfgs.theta();
@@ -107,7 +107,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     // BFGS optimization
     Kriging kr_bfgs("gauss");
     Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO", params_bfgs);
+    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LOO", params_bfgs);
 
     Optim::set_log_level(0);
 
@@ -155,7 +155,7 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     // BFGS optimization
     Kriging kr_bfgs("gauss");
     Kriging::Parameters params_bfgs{std::nullopt, true, std::nullopt, true, std::nullopt, true};
-    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP", params_bfgs);
+    kr_bfgs.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS10", "LMP", params_bfgs);
 
     double lmp_bfgs = kr_bfgs.logMargPost();
     arma::vec theta_bfgs = kr_bfgs.theta();

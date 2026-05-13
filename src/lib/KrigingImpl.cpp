@@ -510,6 +510,15 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
     t0 = Bench::toc(nullptr, "Ecirc_uKon          ", t0);
 
     arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
+    Sigma_uKon = arma::symmatu(Sigma_uKon);
+    arma::vec Sigma_uKon_eigval;
+    arma::eig_sym(Sigma_uKon_eigval, Sigma_uKon);
+    const double Sigma_uKon_scale = std::max(1.0, arma::abs(Sigma_uKon.diag()).max());
+    const double Sigma_uKon_tol = std::sqrt(arma::datum::eps) * Sigma_uKon_scale;
+    if (Sigma_uKon_eigval.min() < Sigma_uKon_tol) {
+      Sigma_uKon.diag() += (Sigma_uKon_tol - Sigma_uKon_eigval.min());
+      Sigma_uKon = arma::symmatu(Sigma_uKon);
+    }
     t0 = Bench::toc(nullptr, "Sigma_uKon          ", t0);
 
     arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon / Sigma_divisor);

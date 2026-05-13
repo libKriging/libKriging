@@ -39,13 +39,13 @@ jobs:
   guideline-checks:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: false # submodules not required here
           fetch-depth: 2 # git rev-parse HEAD^ will fail without this
 
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v3.x
+        uses: rlespinasse/github-slug-action@v4
 
       - name: before_script
         shell: bash
@@ -58,7 +58,7 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.timeout_minutes || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +78,7 @@ jobs:
             enable_matlab: on
             enable_memcheck: on
             force_update: on
+            timeout_minutes: 120
           - name: "Address Sanitizer"
             os: ubuntu-22.04
             mode: Debug
@@ -104,7 +105,7 @@ jobs:
             sanitizer: thread
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -175,9 +176,9 @@ jobs:
         run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: lukka/get-cmake@v1
         with:
-          cmake-version: '3.24.x'
+          cmakeVersion: '~3.24.0'
 
       - name: before_script
         shell: bash
@@ -199,7 +200,7 @@ jobs:
         if: matrix.enable_coverage == 'on'
 
       - name: publish Coveralls report
-        uses: coverallsapp/github-action@master
+        uses: coverallsapp/github-action@v2
         with:
           path-to-lcov: ./build/coverage.info
           github-token: ${{ secrets.GITHUB_TOKEN }}

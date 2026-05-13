@@ -26,6 +26,8 @@ inline int get_optimal_threads(int max_default = 2) {
 #include "libKriging/Covariance.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
 
+#include <mutex>
+
 arma::solve_opts::opts LinearAlgebra::default_solve_opts = arma::solve_opts::fast + arma::solve_opts::no_approx;
 
 double LinearAlgebra::num_nugget = 1E-10;
@@ -97,7 +99,12 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
 
 double LinearAlgebra::min_rcond = 1e-18;
 
+// MKL's dgecon (called by arma::rcond) is not thread-safe when invoked from
+// multiple std::threads concurrently. Serialize all rcond calls with a mutex.
+static std::mutex s_rcond_mutex;
+
 LIBKRIGING_EXPORT double LinearAlgebra::rcond_chol(arma::mat chol) {
+  std::lock_guard<std::mutex> lock(s_rcond_mutex);
   double rcond = arma::rcond(chol);
   rcond *= rcond;
   if (warn_chol)

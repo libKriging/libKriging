@@ -55,9 +55,9 @@ jobs:
       #  in build/installed/lib before loading the v0.9.3 binary on macOS)
 
       - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: lukka/get-cmake@v1
         with:
-          cmake-version: '3.24.x'
+          cmakeVersion: '~3.24.0'
 
       - name: before_script
         shell: bash

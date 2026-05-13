@@ -20,11 +20,10 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
-#include <atomic>
+
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
-#include <mutex>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -1235,67 +1234,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         return result;
       };
 
-      // Execute optimizations (parallel if multistart > 1)
+      // Execute optimizations (sequential multistart in the calling thread)
+      // Running multistart workers in std::threads even when serialized by a mutex causes MKL to
+      // produce slightly different floating-point results compared to running on the main thread,
+      // because MKL uses different code paths for secondary vs. primary threads. This breaks the
+      // BFGS20 == best-of-20×BFGS1 invariant. Running sequentially in the calling thread ensures
+      // every start uses the same BLAS/LAPACK context as a single-start BFGS1 run.
       std::vector<OptimizationResult> results(multistart);
-      std::mutex results_mutex;  // Protect results vector writes
-
-      if (multistart == 1) {
-        results[0] = optimize_worker(0);
-      } else {
-        // Determine thread pool size
-        unsigned int n_cpu = std::thread::hardware_concurrency();
-        int pool_size = Optim::thread_pool_size;
-        if (pool_size <= 0) {
-          pool_size = std::max(1u, n_cpu);
-        }
-        pool_size = std::min(pool_size, (int)multistart);  // Don't exceed number of tasks
-
-        if (Optim::log_level > Optim::log_none) {
-          arma::cout << "Thread pool: " << pool_size << " workers (ncpu=" << n_cpu << ", multistart=" << multistart
-                     << ")" << arma::endl;
-        }
-
-        // Thread pool implementation: use semaphore-like counter
-        std::atomic<int> next_task(0);
-        std::vector<std::thread> threads;
-        threads.reserve(pool_size);
-
-        // RAII guard to ensure threads are always joined, even on exception
-        struct ThreadJoiner {
-          std::vector<std::thread>& threads_ref;
-          explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
-          ~ThreadJoiner() {
-            for (auto& t : threads_ref) {
-              if (t.joinable()) {
-                t.join();
-              }
-            }
-          }
-        };
-
-        for (int worker_id = 0; worker_id < pool_size; worker_id++) {
-          threads.emplace_back([&, worker_id]() {
-            while (true) {
-              int task_id = next_task.fetch_add(1);
-              if (task_id >= multistart)
-                break;
-
-              // Add staggered startup delay to avoid thread initialization race conditions
-              int delay_ms = task_id * Optim::thread_start_delay_ms;
-              std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-
-              // FIX: Eliminate intermediate stack allocation by writing directly to results
-              // This reduces C stack pressure for R bindings (issue with BFGS10)
-              {
-                std::lock_guard<std::mutex> lock(results_mutex);
-                results[task_id] = optimize_worker(task_id);
-              }
-            }
-          });
-        }
-
-        // Ensure threads are joined when leaving this scope
-        ThreadJoiner joiner(threads);
+      for (int task_id = 0; task_id < multistart; task_id++) {
+        results[task_id] = optimize_worker(task_id);
       }
 
       // Find best result

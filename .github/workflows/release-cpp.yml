@@ -23,7 +23,7 @@ jobs:
       draft-release: ${{ steps.expose-variable.outputs.draft-release }}
       
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: false
           fetch-depth: 0
@@ -87,7 +87,7 @@ jobs:
             os: windows-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -129,9 +129,9 @@ jobs:
         run: tools/${BUILD_NAME}/install.sh
 
       - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: lukka/get-cmake@v1
         with:
-          cmake-version: '3.24.x'
+          cmakeVersion: '~3.24.0'
 
       - name: before_script
         shell: bash
@@ -173,7 +173,7 @@ jobs:
       - build-cpp-library
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: false
 
@@ -221,7 +221,7 @@ jobs:
       - create-release-if-needed
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: false
 

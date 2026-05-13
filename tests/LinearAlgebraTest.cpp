@@ -327,39 +327,55 @@ TEST_CASE("LinearAlgebra::chol_block - concurrent access", "[LinearAlgebra][thre
 TEST_CASE("LinearAlgebra - stress test with mixed operations", "[LinearAlgebra][threading][stress]") {
   const int n_threads = 40;
   const int n_iterations = 10;
-  
+
+  // Pre-generate all random inputs before launching threads.
+  // arma::arma_rng::set_seed and arma::randn are NOT thread-safe.
+  struct ThreadInputs {
+    std::vector<arma::mat> M_list;
+    std::vector<arma::mat> B_list;
+    std::vector<arma::mat> A_list;
+  };
+  std::vector<ThreadInputs> inputs(n_threads);
+  for (int i = 0; i < n_threads; i++) {
+    inputs[i].M_list.resize(n_iterations);
+    inputs[i].B_list.resize(n_iterations);
+    inputs[i].A_list.resize(n_iterations);
+    for (int iter = 0; iter < n_iterations; iter++) {
+      int size = 20 + (i * n_iterations + iter) % 30;
+      inputs[i].M_list[iter] = make_pd_matrix(size, 1200 + i * n_iterations + iter);
+      arma::arma_rng::set_seed(1300 + i * n_iterations + iter);
+      inputs[i].B_list[iter] = arma::randn<arma::mat>(size, 5);
+      arma::arma_rng::set_seed(1400 + i * n_iterations + iter);
+      inputs[i].A_list[iter] = arma::randn<arma::mat>(size * 2, size);
+    }
+  }
+
   std::vector<std::thread> threads;
   std::vector<int> results(n_threads, 0);
-  
+
   for (int i = 0; i < n_threads; i++) {
-    threads.emplace_back([i, n_iterations, &results]() {
+    threads.emplace_back([i, n_iterations, &inputs, &results]() {
       try {
         bool all_ok = true;
         for (int iter = 0; iter < n_iterations; iter++) {
-          int size = 20 + (i * n_iterations + iter) % 30;
-          
-          // Test safe_chol_lower
-          arma::mat M = make_pd_matrix(size, 1200 + i * n_iterations + iter);
+          const arma::mat& M = inputs[i].M_list[iter];
+          const arma::mat& B = inputs[i].B_list[iter];
+          const arma::mat& A = inputs[i].A_list[iter];
+
           arma::mat L = LinearAlgebra::safe_chol_lower(M);
           arma::mat reconstructed = L * L.t();
           if (!arma::approx_equal(reconstructed, M, "absdiff", 1e-8)) {
             all_ok = false;
             break;
           }
-          
-          // Test solve
-          arma::arma_rng::set_seed(1300 + i * n_iterations + iter);
-          arma::mat B = arma::randn<arma::mat>(size, 5);
+
           arma::mat X = LinearAlgebra::solve(M, B);
           arma::mat check = M * X;
           if (!arma::approx_equal(check, B, "absdiff", 1e-8)) {
             all_ok = false;
             break;
           }
-          
-          // Test crossprod
-          arma::arma_rng::set_seed(1400 + i * n_iterations + iter);
-          arma::mat A = arma::randn<arma::mat>(size * 2, size);
+
           arma::mat cp = LinearAlgebra::crossprod(A);
           arma::mat expected_cp = A.t() * A;
           if (!arma::approx_equal(cp, expected_cp, "absdiff", 1e-10)) {
@@ -373,11 +389,11 @@ TEST_CASE("LinearAlgebra - stress test with mixed operations", "[LinearAlgebra][
       }
     });
   }
-  
+
   for (auto& t : threads) {
     t.join();
   }
-  
+
   for (int i = 0; i < n_threads; i++) {
     REQUIRE(results[i]);
   }
@@ -386,30 +402,43 @@ TEST_CASE("LinearAlgebra - stress test with mixed operations", "[LinearAlgebra][
 TEST_CASE("LinearAlgebra - rapid fire varying sizes", "[LinearAlgebra][threading][stress]") {
   const int n_threads = 50;
   std::vector<int> sizes = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
-  
+
+  // Pre-generate all random inputs before launching threads.
+  // arma::arma_rng::set_seed and arma::randn are NOT thread-safe.
+  struct ThreadInput {
+    arma::mat M;
+    arma::mat A;
+    arma::mat B;
+  };
+  std::vector<ThreadInput> inputs(n_threads);
+  for (int i = 0; i < n_threads; i++) {
+    int size = sizes[i % sizes.size()];
+    inputs[i].M = make_pd_matrix(size, 1500 + i);
+    arma::arma_rng::set_seed(1600 + i);
+    inputs[i].A = arma::randn<arma::mat>(size * 2, size);
+    inputs[i].B = arma::randn<arma::mat>(size, 3);
+  }
+
   std::vector<std::thread> threads;
   std::vector<int> results(n_threads, 0);
-  
+
   for (int i = 0; i < n_threads; i++) {
-    threads.emplace_back([i, &sizes, &results]() {
+    threads.emplace_back([i, &inputs, &results]() {
       try {
-        int size = sizes[i % sizes.size()];
-        arma::mat M = make_pd_matrix(size, 1500 + i);
+        const arma::mat& M = inputs[i].M;
+        const arma::mat& A = inputs[i].A;
+        const arma::mat& B = inputs[i].B;
+
         arma::mat L = LinearAlgebra::safe_chol_lower(M);
-        
-        arma::arma_rng::set_seed(1600 + i);
-        arma::mat A = arma::randn<arma::mat>(size * 2, size);
         arma::mat cp = LinearAlgebra::crossprod(A);
         arma::mat tcp = LinearAlgebra::tcrossprod(A.t());
-        
-        arma::mat B = arma::randn<arma::mat>(size, 3);
         arma::mat X = LinearAlgebra::solve(M, B);
-        
+
         arma::mat reconstructed = L * L.t();
         arma::mat check_solve = M * X;
         arma::mat expected_cp = A.t() * A;
         arma::mat expected_tcp = A.t() * A;
-        
+
         results[i] = arma::approx_equal(reconstructed, M, "absdiff", 1e-8) &&
                      arma::approx_equal(check_solve, B, "absdiff", 1e-8) &&
                      arma::approx_equal(cp, expected_cp, "absdiff", 1e-10) &&
@@ -419,11 +448,11 @@ TEST_CASE("LinearAlgebra - rapid fire varying sizes", "[LinearAlgebra][threading
       }
     });
   }
-  
+
   for (auto& t : threads) {
     t.join();
   }
-  
+
   for (int i = 0; i < n_threads; i++) {
     REQUIRE(results[i]);
   }
