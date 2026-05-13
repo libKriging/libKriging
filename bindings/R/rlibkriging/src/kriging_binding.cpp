@@ -391,8 +391,8 @@ arma::mat kriging_simulate(Rcpp::List k,
 // [[Rcpp::export]]
 arma::mat kriging_update_simulate(Rcpp::List k,
                                   arma::vec y_u,
-                                  Rcpp::Nullable<Rcpp::NumericVector> noise_u = R_NilValue,
-                                  arma::mat X_u = arma::mat()) {
+                                  Rcpp::Nullable<Rcpp::NumericVector> noise_u,
+                                  arma::mat X_u) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
