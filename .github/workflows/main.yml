@@ -106,10 +106,11 @@ jobs:
             enable_octave: on
             timeout_minutes: 90
           - name: "Matlab Linux"
+            # Disabled: requires MATHWORKS_API_TOKEN secret (license failure since v0.9.3)
             # Using matlab-actions/setup-matlab@v2, only available on Linux
             os: ubuntu-22.04
             mode: Release
-            enable_matlab: on
+            enable_matlab: off
           - name: "R Linux"
             os: ubuntu-22.04
             mode: Release

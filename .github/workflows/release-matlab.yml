@@ -1,10 +1,7 @@
 name: libKriging release workflow (Matlab binding)
 
 on:
-  push:
-    tags:
-       - 'v*' # release tag trigger 
-  workflow_dispatch:
+  workflow_dispatch:  # disabled: requires MATHWORKS_API_TOKEN secret
     inputs:
       release-tag:
         description: 'Release tag'

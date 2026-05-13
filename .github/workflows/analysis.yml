@@ -75,7 +75,7 @@ jobs:
             os: ubuntu-22.04
             mode: Debug
             enable_python: on
-            enable_matlab: on
+            enable_matlab: off  # disabled: requires MATHWORKS_API_TOKEN secret
             enable_memcheck: on
             force_update: on
             timeout_minutes: 120
