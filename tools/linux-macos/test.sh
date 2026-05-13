@@ -40,7 +40,12 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
 elif [[ "$ENABLE_MEMCHECK" == "on" ]]; then
     ctest -C "${MODE}" ${CTEST_FLAGS} -T memcheck
 else
-    ctest -C "${MODE}" ${CTEST_FLAGS}
+    CTEST_EXCLUDE_FLAGS=""
+    if [[ -n "${CTEST_EXCLUDE}" ]]; then
+      CTEST_EXCLUDE_FLAGS="-E ${CTEST_EXCLUDE}"
+    fi
+
+    ctest -C "${MODE}" ${CTEST_FLAGS} ${CTEST_EXCLUDE_FLAGS}
 
     # Cleanup compiled libs to check right path finding
     rm -fr src/lib
@@ -56,5 +61,5 @@ else
        ;;
     esac
 
-    ctest -C "${MODE}" ${CTEST_FLAGS}
+    ctest -C "${MODE}" ${CTEST_FLAGS} ${CTEST_EXCLUDE_FLAGS}
 fi
