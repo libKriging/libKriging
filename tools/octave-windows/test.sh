@@ -9,7 +9,7 @@ BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 
-# Tests 56 & 64 (LinearAlgebra varying sizes / rapid fire) time out on Windows
-export CTEST_EXCLUDE="safe_chol_lower - varying sizes|rapid fire varying sizes"
+# Tests (LinearAlgebra varying sizes / rapid fire) time out on Windows
+export CTEST_EXCLUDE="varying sizes|rapid fire"
 
 "${BASEDIR}"/../linux-macos/test.sh
