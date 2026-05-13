@@ -45,10 +45,10 @@ jobs:
       - name: Verify version name
         run: |
           echo "Checking release tag: ${GIT_TAG}" 
-          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9a-z]+.*$ ]]; then
             echo "Valid version name"
           else
-            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9]+.*\$"
+            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9a-z]+.*\$"
             exit 1
           fi
           
