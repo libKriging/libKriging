@@ -38,7 +38,7 @@ jobs:
             GIT_TAG=${{ github.event.release.tag_name }}
           else
             echo "Default GITHUB_REF is $GITHUB_REF" 
-            GIT_TAG=$(git describe --tags --dirty=-d)
+            GIT_TAG=${GITHUB_REF_NAME}
           fi
           echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
 
