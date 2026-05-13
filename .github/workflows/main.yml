@@ -236,7 +236,8 @@ jobs:
       - name: pre-install-matlab
         uses: matlab-actions/setup-matlab@v2
         if: matrix.enable_matlab == 'on'
-
+        with:
+          token: ${{ secrets.MATHWORKS_API_TOKEN }}
       - name: install
         shell: bash
         run: tools/${BUILD_NAME}/install.sh
