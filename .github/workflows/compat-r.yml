@@ -55,7 +55,7 @@ jobs:
       #  in build/installed/lib before loading the v0.9.3 binary on macOS)
 
       - name: Setup cmake
-        uses: lukka/get-cmake@v1
+        uses: lukka/get-cmake@v4.3.2
         with:
           cmakeVersion: '~3.24.0'
 
