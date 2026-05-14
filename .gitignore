@@ -100,3 +100,6 @@ Testing/
 *-main
 # focus tmp tests like test-abc-1.R
 **/test-*-*.*
+
+# Custom params
+AGENTS.md
