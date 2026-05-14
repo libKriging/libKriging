@@ -2186,7 +2186,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
     AdamBFGS opt(nw, dt);
     opt.max_iter_adam = wk.m_max_iter_adam;
     opt.adam_lr = wk.m_adam_lr;
-    opt.max_iter_bfgs = Optim::max_iteration;
+    opt.max_iter_bfgs = (wk.m_max_iter_bfgs > 0) ? wk.m_max_iter_bfgs : Optim::max_iteration;
     opt.bfgs_pgtol = Optim::gradient_tolerance;
     opt.bfgs_factr = Optim::objective_rel_tolerance / 1E-13;
     opt.maximize = true;

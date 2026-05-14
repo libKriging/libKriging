@@ -293,10 +293,7 @@ arma::vec warpKriging_beta(SEXP model_ptr) {
 // [[Rcpp::export]]
 SEXP warpKriging_copy(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
-  auto clone = new WarpKriging(model->warping_strings(), model->kernel());
-  if (model->is_fitted()) {
-    clone->fit(model->y(), model->X());
-  }
+  auto clone = new WarpKriging(model->clone_for_thread());
   Rcpp::XPtr<WarpKriging> clone_ptr(clone);
   return clone_ptr;
 }

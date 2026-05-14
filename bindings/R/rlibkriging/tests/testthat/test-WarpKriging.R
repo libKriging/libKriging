@@ -18,20 +18,22 @@ test_that("Kumaraswamy warping works on 1D function", {
   X <- as.matrix(seq(0.01, 0.99, length.out = 8))
   y <- f1d(X)
 
-  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
-                   parameters = list(max_iter_adam = "200"))
+  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss", optim = "BFGS")
 
   expect_s3_class(k, "WarpKriging")
   cat(summary(k))
 
-  p <- predict(k, X, stdev = TRUE)
-  expect_equal(length(p$mean), 8)
-  expect_true(all(is.finite(p$mean)))
+  # Must interpolate training data exactly (noise-free model)
+  p_train <- predict(k, X, stdev = TRUE)
+  expect_equal(length(p_train$mean), 8)
+  expect_true(all(is.finite(p_train$mean)))
+  expect_lt(max(abs(p_train$mean - y)), 1e-4)
 
   x_pred <- as.matrix(seq(0.01, 0.99, length.out = 50))
   p2 <- predict(k, x_pred, stdev = TRUE)
   rmse <- sqrt(mean((p2$mean - f1d(x_pred))^2))
   cat("  Kumaraswamy RMSE:", rmse, "\n")
+  expect_lt(rmse, 0.05)
 })
 
 # ===========================================================================

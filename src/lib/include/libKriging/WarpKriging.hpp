@@ -721,6 +721,9 @@ class WarpKriging : protected KrigingImpl {
   /** Load a new WarpKriging object from a file */
   LIBKRIGING_EXPORT static WarpKriging load(const std::string filename);
 
+  /// Deep copy — preserves all fitted parameters (theta, sigma2, beta, warp params)
+  LIBKRIGING_EXPORT WarpKriging clone_for_thread() const;
+
  private:
   // ---- data ---------------------------------------------------------------
   // m_y, m_X (Φ-space), m_dX (pairwise diffs), m_centerX/Y, m_scaleX/Y,
@@ -841,9 +844,6 @@ class WarpKriging : protected KrigingImpl {
 
   /// Joint optimisation (bi-level Adam+BFGS or joint L-BFGS-B)
   void optimise_joint(const std::string& method);
-
-  /// Deep copy for thread-parallel multistart (copies all state, deep-clones warps)
-  WarpKriging clone_for_thread() const;
 
   /// Internal: initialise from pre-parsed WarpSpecs
   void init_from_specs(const std::vector<WarpSpec>& specs, const std::string& kernel);

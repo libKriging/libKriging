@@ -1585,6 +1585,63 @@ static void test_simulate_and_update_simulate_with_noise() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+// ==========================================================================
+//  Test: clone_for_thread preserves all fitted parameters
+// ==========================================================================
+static void test_clone_preserves_parameters() {
+  std::cout << "=== Test: clone_for_thread preserves parameters ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  WarpKriging original({"kumaraswamy"}, "gauss");
+  original.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "200"}});
+
+  WarpKriging copy = original.clone_for_thread();
+
+  // theta must be identical
+  assert(arma::approx_equal(original.theta(), copy.theta(), "absdiff", 1e-12)
+         && "clone: theta mismatch");
+
+  // sigma2 must be identical
+  assert(std::abs(original.sigma2() - copy.sigma2()) < 1e-12
+         && "clone: sigma2 mismatch");
+
+  // beta must be identical
+  assert(arma::approx_equal(original.beta(), copy.beta(), "absdiff", 1e-12)
+         && "clone: beta mismatch");
+
+  // warp params must be identical — compare via logLikelihood (sensitive to warp params)
+  assert(std::abs(original.logLikelihood() - copy.logLikelihood()) < 1e-10
+         && "clone: logLikelihood mismatch (warp params differ)");
+
+  // predictions must be identical
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 20);
+  arma::mat xp(20, 1);
+  xp.col(0) = x_pred;
+  auto [mean_orig, stdev_orig, _c1, _m1, _s1] = original.predict(xp, true, false);
+  auto [mean_copy, stdev_copy, _c2, _m2, _s2] = copy.predict(xp, true, false);
+  assert(arma::approx_equal(mean_orig, mean_copy, "absdiff", 1e-10)
+         && "clone: predict mean mismatch");
+  assert(arma::approx_equal(stdev_orig, stdev_copy, "absdiff", 1e-10)
+         && "clone: predict stdev mismatch");
+
+  // modifying copy must not affect original
+  arma::vec y2(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y2(i) = f1d(X_train(i)) + 1.0;
+  copy.fit(y2, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
+  assert(!arma::approx_equal(original.theta(), copy.theta(), "absdiff", 1e-12)
+         || !arma::approx_equal(original.beta(), copy.beta(), "absdiff", 1e-12)
+         && "clone: original should be unaffected by re-fitting the copy");
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 int main() {
   std::cout << "============================================\n"
             << "  WarpKriging test suite\n"
@@ -1615,6 +1672,7 @@ int main() {
     test_none_warp_vs_kriging_ll();
     test_none_warp_with_noise_vs_noise_kriging_ll();
     test_simulate_and_update_simulate_with_noise();
+    test_clone_preserves_parameters();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

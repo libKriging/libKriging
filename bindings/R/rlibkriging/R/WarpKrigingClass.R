@@ -349,6 +349,20 @@ fit.WarpKriging <- function(object, y, X,
 #' @param ... ignored
 #' @return list with \code{mean}, optionally \code{stdev}, \code{cov},
 #'   \code{mean_deriv}, \code{stdev_deriv}
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' X <- as.matrix(seq(0.05, 0.95, length.out = 10))
+#' y <- f(X)
+#'
+#' wk <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss", optim = "BFGS")
+#' x <- as.matrix(seq(0, 1, length.out = 101))
+#' p <- wk$predict(x, return_stdev = TRUE)
+#'
+#' plot(f)
+#' points(X, y, col = "blue", pch = 16)
+#' lines(x, p$mean, col = "blue")
+#' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
+#'         border = NA, col = rgb(0, 0, 1, 0.2))
 #' @method predict WarpKriging
 #' @export
 predict.WarpKriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE,
