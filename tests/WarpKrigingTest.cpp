@@ -1604,16 +1604,13 @@ static void test_clone_preserves_parameters() {
   WarpKriging copy = original.clone_for_thread();
 
   // theta must be identical
-  assert(arma::approx_equal(original.theta(), copy.theta(), "absdiff", 1e-12)
-         && "clone: theta mismatch");
+  assert(arma::approx_equal(original.theta(), copy.theta(), "absdiff", 1e-12) && "clone: theta mismatch");
 
   // sigma2 must be identical
-  assert(std::abs(original.sigma2() - copy.sigma2()) < 1e-12
-         && "clone: sigma2 mismatch");
+  assert(std::abs(original.sigma2() - copy.sigma2()) < 1e-12 && "clone: sigma2 mismatch");
 
   // beta must be identical
-  assert(arma::approx_equal(original.beta(), copy.beta(), "absdiff", 1e-12)
-         && "clone: beta mismatch");
+  assert(arma::approx_equal(original.beta(), copy.beta(), "absdiff", 1e-12) && "clone: beta mismatch");
 
   // warp params must be identical — compare via logLikelihood (sensitive to warp params)
   assert(std::abs(original.logLikelihood() - copy.logLikelihood()) < 1e-10
@@ -1625,10 +1622,8 @@ static void test_clone_preserves_parameters() {
   xp.col(0) = x_pred;
   auto [mean_orig, stdev_orig, _c1, _m1, _s1] = original.predict(xp, true, false);
   auto [mean_copy, stdev_copy, _c2, _m2, _s2] = copy.predict(xp, true, false);
-  assert(arma::approx_equal(mean_orig, mean_copy, "absdiff", 1e-10)
-         && "clone: predict mean mismatch");
-  assert(arma::approx_equal(stdev_orig, stdev_copy, "absdiff", 1e-10)
-         && "clone: predict stdev mismatch");
+  assert(arma::approx_equal(mean_orig, mean_copy, "absdiff", 1e-10) && "clone: predict mean mismatch");
+  assert(arma::approx_equal(stdev_orig, stdev_copy, "absdiff", 1e-10) && "clone: predict stdev mismatch");
 
   // modifying copy must not affect original
   arma::vec y2(X_train.n_elem);
@@ -1637,7 +1632,7 @@ static void test_clone_preserves_parameters() {
   copy.fit(y2, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
   assert(!arma::approx_equal(original.theta(), copy.theta(), "absdiff", 1e-12)
          || !arma::approx_equal(original.beta(), copy.beta(), "absdiff", 1e-12)
-         && "clone: original should be unaffected by re-fitting the copy");
+                && "clone: original should be unaffected by re-fitting the copy");
 
   std::cout << "  PASSED\n" << std::endl;
 }

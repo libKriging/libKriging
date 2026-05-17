@@ -1,0 +1,43 @@
+# https://valgrind.org/docs/manual/manual-core.html#manual-core.suppress
+# https://valgrind.org/docs/manual/mc-manual.html#mc-manual.leaks
+# https://valgrind.org/docs/manual/mc-manual.html#mc-manual.suppfiles
+
+# Armadillo suppressions
+{
+   armadillo print #1
+   Memcheck:Value8
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+{
+   armadillo print #2
+   Memcheck:Cond
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+{
+   armadillo print #3
+   Memcheck:Param
+   write(buf)
+   ...
+   fun:_ZNK4arma4BaseIdNS_3MatIdEEE5printENSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_exception
+   fun:_dl_open
+   fun:do_dlopen
+}
+# Octave suppressions
+# Generated using (prefer Matlab which has less leaks)
+# * --gen-suppressions=all in main CMakeLists.txt to generate targets
+# * `sed -i.bak '/^[-=]\{2\}/d' MemoryChecker.x.log` (e.g. on result of dummy_succeededtest.m)
+# * `csplit MemoryChecker.x.log '/{/' '{*}'` (in build/Testing/Temporary)
+# * `md5sum xx* | sort -k 1 | uniq -w 32 | awk '{ print $2 }' | xargs cat >> .valgrind-suppressions`
