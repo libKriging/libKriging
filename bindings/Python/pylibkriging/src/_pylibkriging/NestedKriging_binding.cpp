@@ -79,7 +79,9 @@ std::tuple<py::array_t<double>, py::array_t<double>> PyNestedKriging::predict(co
                                                                               bool return_stdev) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [mean, stdev] = m_internal->predict(mat_X, return_stdev);
-  return {carma::col_to_arr(mean, true), carma::col_to_arr(stdev, true)};
+  // return flat 1-D arrays (avoids (q,1) vs (q,) numpy broadcasting pitfalls)
+  return {py::array_t<double>(static_cast<py::ssize_t>(mean.n_elem), mean.memptr()),
+          py::array_t<double>(static_cast<py::ssize_t>(stdev.n_elem), stdev.memptr())};
 }
 
 std::string PyNestedKriging::summary() const {
@@ -104,13 +106,16 @@ unsigned long PyNestedKriging::nb_groups() const {
 
 py::list PyNestedKriging::groups() const {
   py::list out;
-  for (const auto& g : m_internal->groups())
-    out.append(carma::col_to_arr(arma::conv_to<arma::vec>::from(g), true));
+  for (const auto& g : m_internal->groups()) {
+    arma::vec g_d = arma::conv_to<arma::vec>::from(g);
+    out.append(py::array_t<double>(static_cast<py::ssize_t>(g_d.n_elem), g_d.memptr()));
+  }
   return out;
 }
 
 py::array_t<double> PyNestedKriging::theta() const {
-  return carma::col_to_arr(m_internal->theta(), true);
+  const arma::vec& theta = m_internal->theta();
+  return py::array_t<double>(static_cast<py::ssize_t>(theta.n_elem), theta.memptr());
 }
 
 double PyNestedKriging::sigma2() const {
@@ -122,11 +127,13 @@ double PyNestedKriging::beta0() const {
 }
 
 py::array_t<double> PyNestedKriging::X() const {
-  return carma::mat_to_arr(m_internal->X(), true);
+  arma::mat X = m_internal->X();
+  return carma::mat_to_arr(X, true);
 }
 
 py::array_t<double> PyNestedKriging::y() const {
-  return carma::col_to_arr(m_internal->y(), true);
+  const arma::vec& y = m_internal->y();
+  return py::array_t<double>(static_cast<py::ssize_t>(y.n_elem), y.memptr());
 }
 
 void PyNestedKriging::set_predict_chunk(unsigned long chunk) {
