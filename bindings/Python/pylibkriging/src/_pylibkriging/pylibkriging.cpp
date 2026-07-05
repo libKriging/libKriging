@@ -145,6 +145,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("X", &PyNestedKriging::X)
       .def("y", &PyNestedKriging::y)
       .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
+      .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
       .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
 
   const bool default_normalize = false;

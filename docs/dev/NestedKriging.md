@@ -87,7 +87,7 @@ en théorie. Deux blocages d'implémentation actuels :
   `KrigingImpl::covMat` n'applique pas la `FeatureMap` φ et `WarpKriging`
   hérite de `KrigingImpl` en `protected`.
 
-Réalisé : WarpKriging expose désormais covMat(X1, X2) (public, applique φ) et warp_params() ; NestedKriging accepte un argument warping et utilise des sous-modèles WarpKriging avec prior commun (θ, warp) pris sur le plus grand groupe puis refit optim="none". Historique du design : exposer dans `WarpKriging` un `covMat(X1, X2)` public
+Réalisé : WarpKriging expose désormais covMat(X1, X2) (public, applique φ) et warp_params() ; NestedKriging accepte un argument warping et utilise des sous-modèles WarpKriging avec prior commun (θ, warp) estimé par un unique fit de référence sur un sous-échantillon global (taille min(n, warp_subsample), réglable via set_warp_subsample, défaut 1000), puis sous-modèles en optim="none" (fits fermés : un seul entraînement de warp au total au lieu de p). Historique du design : exposer dans `WarpKriging` un `covMat(X1, X2)` public
 appliquant φ, puis brancher `NestedKriging::corrMat` sur
 `submodel.covMat(...)/σ²` — ce qui éliminerait aussi l'hypothèse sur la
 convention `Cov(dx, θ)`.

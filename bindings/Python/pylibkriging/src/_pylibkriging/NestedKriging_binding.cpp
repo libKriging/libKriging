@@ -132,3 +132,7 @@ py::array_t<double> PyNestedKriging::y() const {
 void PyNestedKriging::set_predict_chunk(unsigned long chunk) {
   m_internal->set_predict_chunk(chunk);
 }
+
+void PyNestedKriging::set_warp_subsample(unsigned long m) {
+  m_internal->set_warp_subsample(m);
+}

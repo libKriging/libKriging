@@ -321,3 +321,34 @@ TEST_CASE("NestedKriging warped with one group reduces to full WarpKriging", "[n
   arma::mat C = nk.wsubmodel(0).covMat(Xt, Xt);
   CHECK(arma::abs(C.diag() / nk.wsubmodel(0).sigma2() - 1.0).max() < 1e-10);
 }
+
+TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[nested][warp]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(150, 2, X, y);
+  const std::vector<std::string> warping{"kumaraswamy", "kumaraswamy"};
+
+  NestedKriging nk("gauss");
+  nk.set_warp_subsample(60);  // reference fit on 60 of 150 points
+  CHECK(nk.warp_subsample() == 60);
+  nk.fit(y, X, /*nb_groups=*/3, Trend::RegressionModel::Constant, "BFGS", "LL", {}, warping);
+
+  // all submodels carry the same seeded (theta, warp) prior
+  for (arma::uword g = 0; g < nk.nb_groups(); ++g) {
+    CHECK(arma::abs(nk.wsubmodel(g).theta() - nk.theta()).max() < 1e-12);
+    CHECK(arma::abs(nk.wsubmodel(g).warp_params() - nk.wsubmodel(0).warp_params()).max() < 1e-12);
+  }
+
+  // NK interpolation is a property of the aggregation, not of the
+  // hyperparameters: it must hold even with subsampled hyperparameters
+  auto [mean, stdev] = nk.predict(X, true);
+  CHECK(arma::abs(mean - y).max() < 1e-3);
+  CHECK(stdev.max() < 1e-2);
+
+  // subsample larger than n must degrade gracefully to a full-data fit
+  NestedKriging nk_full("gauss");
+  nk_full.set_warp_subsample(100000);
+  nk_full.fit(y, X, 3, Trend::RegressionModel::Constant, "BFGS", "LL", {}, warping);
+  auto [m2, s2] = nk_full.predict(X, true);
+  CHECK(arma::abs(m2 - y).max() < 1e-3);
+}

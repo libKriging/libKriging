@@ -60,6 +60,7 @@ class PyNestedKriging {
   [[nodiscard]] py::array_t<double> y() const;
 
   void set_predict_chunk(unsigned long chunk);
+  void set_warp_subsample(unsigned long m);
 
  private:
   std::unique_ptr<NestedKriging> m_internal;

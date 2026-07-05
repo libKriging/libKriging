@@ -92,9 +92,9 @@ const libKriging::WarpKriging& NestedKriging::wsubmodel(arma::uword i) const {
 
 arma::mat NestedKriging::corrMat(const arma::mat& X1, const arma::mat& X2) const {
   if (warped()) {
-    // warped prior: k(Phi(x), Phi(x')) via the reference submodel's public
-    // covMat (all submodels share (theta, warp) after unification)
-    const libKriging::WarpKriging& ref = *m_wsubmodels[m_ref];
+    // warped prior: k(Phi(x), Phi(x')) via any submodel's public covMat
+    // (they all share (theta, warp) seeded from the reference subsample fit)
+    const libKriging::WarpKriging& ref = *m_wsubmodels[0];
     return ref.covMat(X1, X2) / ref.sigma2();
   }
   arma::mat R(X1.n_rows, X2.n_rows);
@@ -187,11 +187,34 @@ void NestedKriging::fit(const arma::vec& y,
   m_submodels.clear();
   m_wsubmodels.clear();
   if (warped()) {
+    // --- warped path: hyperparameters from ONE reference fit on a global
+    // subsample (min(n, m_warp_subsample) points), instead of one expensive
+    // warp training per group. The subsample is drawn uniformly (seeded by
+    // make_partition), so the whole pipeline stays reproducible.
+    const arma::uword n_all = m_X.n_rows;
+    const arma::uword m_sub = std::min<arma::uword>(m_warp_subsample, n_all);
+    const arma::uvec idx_sub = arma::sort(arma::randperm(n_all).head(m_sub));
+
+    libKriging::WarpKriging ref(m_warping, m_covType);
+    ref.fit(m_y(idx_sub),
+            m_X.rows(idx_sub),
+            regmodel,
+            /*normalize=*/false,
+            optim,
+            objective,
+            libKriging::WarpKriging::Parameters{});
+
+    libKriging::WarpKriging::Parameters fixed;
+    fixed.theta = ref.theta();
+    fixed.warp_params = ref.warp_params();
+
+    // submodel fits are now closed-form: optim="none" keeps the seeded
+    // (theta, warp); sigma2 and beta stay profiled per group
     m_wsubmodels.reserve(p);
     for (arma::uword g = 0; g < p; ++g) {
       const arma::uvec& idx = m_groups[g];
       auto wk = std::make_unique<libKriging::WarpKriging>(m_warping, m_covType);
-      wk->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, optim, objective, libKriging::WarpKriging::Parameters{});
+      wk->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, "none", objective, fixed);
       m_wsubmodels.push_back(std::move(wk));
     }
   } else {
@@ -220,27 +243,9 @@ void NestedKriging::unify_hyperparameters(const std::string& objective) {
   const double n = static_cast<double>(m_X.n_rows);
 
   if (warped()) {
-    // --- warped path: common (theta, warp) from the largest group -------------
-    // Warp parameters (embeddings, MLP weights, ...) live on non-convex
-    // manifolds: unlike theta they cannot be meaningfully averaged across
-    // groups, so the whole (theta, warp) pair is taken from one reference fit.
-    m_ref = 0;
-    for (arma::uword g = 1; g < p; ++g)
-      if (m_groups[g].n_elem > m_groups[m_ref].n_elem)
-        m_ref = g;
-
-    libKriging::WarpKriging::Parameters fixed;
-    fixed.theta = m_wsubmodels[m_ref]->theta();
-    fixed.warp_params = m_wsubmodels[m_ref]->warp_params();
-
-    // refit every submodel with optim="none": keeps the seeded (theta, warp)
-    // as-is; sigma2 and beta stay profiled per group given the common prior
-    for (arma::uword g = 0; g < p; ++g) {
-      const arma::uvec& idx = m_groups[g];
-      m_wsubmodels[g]->fit(m_y(idx), m_X.rows(idx), m_regmodel, false, "none", objective, fixed);
-    }
-
-    m_theta = m_wsubmodels[m_ref]->theta();
+    // --- warped path: submodels were already fitted on the common seeded
+    // prior (see fit()); only collect the weighted variance/trend statistics
+    m_theta = m_wsubmodels[0]->theta();
     m_sigma2 = 0;
     m_beta0 = 0;
     for (arma::uword g = 0; g < p; ++g) {

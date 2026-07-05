@@ -30,9 +30,11 @@
  *
  * With warping, the common prior is σ²·k(Φ(x), Φ(x′); θ): a warped kernel is
  * a valid GP prior, so both aggregation families apply unchanged. The common
- * (θ, warp) is taken from the largest group's fit — warp parameters
- * (embeddings, MLP weights) live on non-convex manifolds and cannot be
- * averaged across groups the way θ can.
+ * (θ, warp) is estimated by a single reference fit on a global subsample of
+ * size min(n, warp_subsample) — warp parameters (embeddings, MLP weights)
+ * live on non-convex manifolds and cannot be averaged across groups the way
+ * θ can, and one subsample fit is much cheaper than one warp training per
+ * group. Submodels are then fitted with optim="none" on the seeded prior.
  *
  * Complexities (n obs, p groups of size ~n/p, q prediction points):
  *   fit      : O(p (n/p)^3) likelihood evals  [vs O(n^3)]
@@ -77,8 +79,9 @@ class NestedKriging {
    * Plain path (warping empty, `Kriging` submodels): theta <- group-size
    * weighted geometric mean, sigma2 / beta0 <- weighted means.
    *
-   * Warped path (`WarpKriging` submodels): (theta, warp_params) <- from the
-   * largest group's fit; sigma2 / beta0 <- weighted means after refit
+   * Warped path (`WarpKriging` submodels): (theta, warp_params) <- from a
+   * single reference fit on a global subsample (see set_warp_subsample);
+   * sigma2 / beta0 <- weighted means over the seeded submodel fits
    * (sigma2 is profiled per group given the common correlation).
    *
    * @param warping per-dimension warp specs (see WarpKriging), empty for
@@ -117,6 +120,12 @@ class NestedKriging {
   /// peak extra memory is ~ n * chunk doubles for the whitened weights).
   LIBKRIGING_EXPORT void set_predict_chunk(arma::uword chunk) { m_chunk = chunk; }
 
+  /// Size of the global subsample used to estimate the warped-prior
+  /// hyperparameters (theta, warp). Call before fit(); the reference fit
+  /// costs O(min(n, m)^3) per likelihood evaluation.
+  LIBKRIGING_EXPORT void set_warp_subsample(arma::uword m) { m_warp_subsample = m; }
+  [[nodiscard]] arma::uword warp_subsample() const { return m_warp_subsample; }
+
   LIBKRIGING_EXPORT std::string summary() const;
 
  private:
@@ -135,7 +144,7 @@ class NestedKriging {
   std::vector<std::unique_ptr<Kriging>> m_submodels;       ///< plain path
   std::vector<std::unique_ptr<libKriging::WarpKriging>> m_wsubmodels;  ///< warped path
   std::vector<std::string> m_warping;                      ///< empty = plain
-  arma::uword m_ref = 0;  ///< reference submodel (largest group) for the common warped prior
+  arma::uword m_warp_subsample = 1000;  ///< subsample size for the warped reference fit
 
   // unified (common prior) hyperparameters
   arma::vec m_theta;
