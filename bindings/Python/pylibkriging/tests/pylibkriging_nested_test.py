@@ -70,3 +70,12 @@ def test_reproducibility(data):
     m2, s2 = nk2.predict(Xt, True)
     np.testing.assert_array_equal(m1, m2)
     np.testing.assert_array_equal(s1, s2)
+
+
+def test_warped_nested(data):
+    X, y = data
+    nk = lk.NestedKriging(y, X, "gauss", 3, warping=["kumaraswamy", "kumaraswamy"])
+    assert nk.warping() == ["kumaraswamy", "kumaraswamy"]
+    mean, stdev = nk.predict(X, True)
+    np.testing.assert_allclose(mean, y, atol=1e-3)  # NK interpolates under warping
+    assert np.all(stdev >= 0)

@@ -13,7 +13,7 @@ classNestedKriging <- function(nk) {
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
     }
-    for (d in c('kernel', 'aggregation', 'nb_groups', 'groups', 'theta', 'sigma2', 'beta0', 'X', 'y')) {
+    for (d in c('kernel', 'aggregation', 'nb_groups', 'groups', 'theta', 'sigma2', 'beta0', 'X', 'y', 'warping')) {
         eval(parse(text = paste0(
             "nk$", d, " <- function() nestedkriging_", d, "(nk)"
             )))
@@ -47,6 +47,8 @@ classNestedKriging <- function(nk) {
 #' @param objective Character: \code{"LL"}, \code{"LOO"} or \code{"LMP"}.
 #' @param parameters Initial or fixed values for the hyper-parameters
 #'     (named list with \code{"sigma2"}, \code{"theta"}, \code{"beta"}).
+#' @param warping Optional character vector of per-dimension warp specs
+#'     (see \code{WarpKriging}); submodels are then \code{WarpKriging}.
 #'
 #' @return An object with S3 class \code{"NestedKriging"}, to be used with
 #'     its \code{predict} method.
@@ -71,11 +73,12 @@ NestedKriging <- function(y = NULL,
                           regmodel = "constant",
                           optim = "BFGS",
                           objective = "LL",
-                          parameters = NULL) {
+                          parameters = NULL,
+                          warping = NULL) {
     stopifnot(!is.null(y), !is.null(X), !is.null(kernel), !is.null(nb_groups))
     nk <- new_NestedKrigingFit(y, X, kernel, nb_groups,
                                aggregation, partition, seed,
-                               regmodel, optim, objective, parameters)
+                               regmodel, optim, objective, parameters, warping)
     classNestedKriging(nk)
 }
 

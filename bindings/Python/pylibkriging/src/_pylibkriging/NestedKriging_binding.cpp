@@ -42,7 +42,8 @@ PyNestedKriging::PyNestedKriging(const py::array_t<double>& y,
                                  const std::string& regmodel,
                                  const std::string& optim,
                                  const std::string& objective,
-                                 const py::dict& dict) {
+                                 const py::dict& dict,
+                                 const std::vector<std::string>& warping) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal = std::make_unique<NestedKriging>(mat_y,
@@ -55,7 +56,8 @@ PyNestedKriging::PyNestedKriging(const py::array_t<double>& y,
                                                Trend::fromString(regmodel),
                                                optim,
                                                objective,
-                                               params_from_dict(dict));
+                                               params_from_dict(dict),
+                                               warping);
 }
 
 PyNestedKriging::~PyNestedKriging() {}
@@ -66,10 +68,11 @@ void PyNestedKriging::fit(const py::array_t<double>& y,
                           const std::string& regmodel,
                           const std::string& optim,
                           const std::string& objective,
-                          const py::dict& dict) {
+                          const py::dict& dict,
+                          const std::vector<std::string>& warping) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict));
+  m_internal->fit(mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>> PyNestedKriging::predict(const py::array_t<double>& X_n,
@@ -85,6 +88,10 @@ std::string PyNestedKriging::summary() const {
 
 std::string PyNestedKriging::kernel() const {
   return m_internal->kernel();
+}
+
+std::vector<std::string> PyNestedKriging::warping() const {
+  return m_internal->warping();
 }
 
 std::string PyNestedKriging::aggregation() const {

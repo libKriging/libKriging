@@ -57,3 +57,14 @@ f_test(x) = sin(3.0 * x[1]) + cos(5.0 * x[2]) + x[1] * x[2]
         @test_throws ErrorException NestedKriging(y, X, "gauss", 4; aggregation="NK", regmodel="linear")
     end
 end
+
+@testset "NestedKriging with warping" begin
+    import Random
+    rng = Random.MersenneTwister(123)
+    X = rand(rng, 120, 2)
+    y = [sin(3.0 * X[i, 1]) + cos(5.0 * X[i, 2]) for i in 1:120]
+    k = NestedKriging(y, X, "gauss", 3; warping=["kumaraswamy", "kumaraswamy"])
+    p = predict(k, X)
+    @test maximum(abs.(p.mean .- y)) < 1e-3  # NK interpolates under warping
+    @test all(p.stdev .>= 0)
+end

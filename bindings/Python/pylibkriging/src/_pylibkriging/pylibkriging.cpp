@@ -108,7 +108,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     const std::string&,
                     const std::string&,
                     const std::string&,
-                    const py::dict&>(),
+                    const py::dict&,
+                    const std::vector<std::string>&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -119,7 +120,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("regmodel") = default_regmodel,
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("warping") = std::vector<std::string>{})
       .def("fit",
            &PyNestedKriging::fit,
            py::arg("y"),
@@ -128,10 +130,12 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("regmodel") = default_regmodel,
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("warping") = std::vector<std::string>{})
       .def("predict", &PyNestedKriging::predict, py::arg("X"), py::arg("return_stdev") = true)
       .def("summary", &PyNestedKriging::summary)
       .def("kernel", &PyNestedKriging::kernel)
+      .def("warping", &PyNestedKriging::warping)
       .def("aggregation", &PyNestedKriging::aggregation)
       .def("nb_groups", &PyNestedKriging::nb_groups)
       .def("groups", &PyNestedKriging::groups)

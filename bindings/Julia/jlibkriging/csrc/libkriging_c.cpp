@@ -1681,6 +1681,13 @@ static Kriging::Parameters lk_nested_make_params(const double* sigma2,
   return params;
 }
 
+static std::vector<std::string> lk_nested_make_warping(const char** warping, int n_warping) {
+  std::vector<std::string> out;
+  for (int i = 0; i < n_warping; ++i)
+    out.push_back(warping[i] ? warping[i] : "none");
+  return out;
+}
+
 static NestedKriging::Partition lk_nested_parse_partition(const char* s) {
   const std::string p = s ? s : "kmeans";
   if (p == "random")
@@ -1700,6 +1707,8 @@ void* lk_nested_kriging_new_fit(const double* y,
                                 const char* aggregation,
                                 const char* partition,
                                 int seed,
+                                const char** warping,
+                                int n_warping,
                                 const char* regmodel,
                                 const char* optim,
                                 const char* objective,
@@ -1725,7 +1734,8 @@ void* lk_nested_kriging_new_fit(const double* y,
         Trend::fromString(regmodel ? regmodel : "constant"),
         optim ? optim : "BFGS",
         objective ? objective : "LL",
-        lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim));
+        lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
+        lk_nested_make_warping(warping, n_warping));
   }
   CATCH_RETURN_NULL
 }
@@ -1741,6 +1751,8 @@ int lk_nested_kriging_fit(void* ptr,
                           int nX,
                           int d,
                           int nb_groups,
+                          const char** warping,
+                          int n_warping,
                           const char* regmodel,
                           const char* optim,
                           const char* objective,
@@ -1762,7 +1774,8 @@ int lk_nested_kriging_fit(void* ptr,
            Trend::fromString(regmodel ? regmodel : "constant"),
            optim ? optim : "BFGS",
            objective ? objective : "LL",
-           lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim));
+           lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
+           lk_nested_make_warping(warping, n_warping));
     return 0;
   }
   CATCH_RETURN

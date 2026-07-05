@@ -58,3 +58,12 @@ test_that("input validation", {
   expect_error(NestedKriging(y, X, kernel = "gauss", nb_groups = 4,
                              aggregation = "NK", regmodel = "linear"))
 })
+
+test_that("warped submodels (WarpKriging) are supported", {
+  k <- NestedKriging(y, X, kernel = "gauss", nb_groups = 3,
+                     warping = c("kumaraswamy", "kumaraswamy"))
+  expect_equal(k$warping(), c("kumaraswamy", "kumaraswamy"))
+  p <- predict(k, X)
+  expect_lt(max(abs(p$mean - y)), 1e-3)  # NK interpolates under warping
+  expect_true(all(p$stdev >= 0))
+})

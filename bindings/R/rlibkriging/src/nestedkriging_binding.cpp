@@ -54,7 +54,8 @@ Rcpp::List new_NestedKrigingFit(arma::vec y,
                                 std::string regmodel = "constant",
                                 std::string optim = "BFGS",
                                 std::string objective = "LL",
-                                Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                                Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                                Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue) {
   NestedKriging* nk = new NestedKriging(y,
                                         X,
                                         kernel,
@@ -65,7 +66,10 @@ Rcpp::List new_NestedKrigingFit(arma::vec y,
                                         Trend::fromString(regmodel),
                                         optim,
                                         objective,
-                                        parameters_from_list(parameters, optim));
+                                        parameters_from_list(parameters, optim),
+                                        warping.isNotNull()
+                                            ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
+                                            : std::vector<std::string>{});
 
   Rcpp::XPtr<NestedKriging> impl_ptr(nk);
 
@@ -148,6 +152,13 @@ double nestedkriging_beta0(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<NestedKriging> impl_ptr(impl);
   return impl_ptr->beta0();
+}
+
+// [[Rcpp::export]]
+Rcpp::CharacterVector nestedkriging_warping(Rcpp::List k) {
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  return Rcpp::wrap(impl_ptr->warping());
 }
 
 // [[Rcpp::export]]

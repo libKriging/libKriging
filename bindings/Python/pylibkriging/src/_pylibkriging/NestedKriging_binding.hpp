@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <vector>
 
 namespace py = pybind11;
 
@@ -29,7 +30,8 @@ class PyNestedKriging {
                   const std::string& regmodel,
                   const std::string& optim,
                   const std::string& objective,
-                  const py::dict& dict);
+                  const py::dict& dict,
+                  const std::vector<std::string>& warping);
   ~PyNestedKriging();
 
   void fit(const py::array_t<double>& y,
@@ -38,7 +40,8 @@ class PyNestedKriging {
            const std::string& regmodel,
            const std::string& optim,
            const std::string& objective,
-           const py::dict& dict);
+           const py::dict& dict,
+           const std::vector<std::string>& warping);
 
   std::tuple<py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X_n, bool return_stdev);
 
@@ -46,6 +49,7 @@ class PyNestedKriging {
 
   // accessors
   [[nodiscard]] std::string kernel() const;
+  [[nodiscard]] std::vector<std::string> warping() const;
   [[nodiscard]] std::string aggregation() const;
   [[nodiscard]] unsigned long nb_groups() const;
   [[nodiscard]] py::list groups() const;
