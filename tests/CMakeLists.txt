@@ -350,3 +350,12 @@ target_link_libraries(KrigingWarmRestartTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingWarmRestartTest)
 add_test(NAME KrigingWarmRestartTest COMMAND KrigingWarmRestartTest)
 
+
+add_executable(NestedKrigingTest NestedKrigingTest.cpp)
+target_link_libraries(NestedKrigingTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries NestedKrigingTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(NestedKrigingTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
