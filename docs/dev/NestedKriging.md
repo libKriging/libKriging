@@ -75,7 +75,7 @@ plus rapide que le kriging plein (inaccessible de toute façon en mémoire).
   for datasets with a large number of observations*, Statistics & Computing.
 - Deisenroth & Ng (2015), *Distributed Gaussian Processes*, ICML (PoE/BCM/rBCM).
 
-## Compatibilité WarpKriging (v2)
+## Compatibilité WarpKriging (implémentée)
 
 Un noyau warpé k(φ(x), φ(x′)) reste un prior GP valide : NK et PoE s'appliquent
 en théorie. Deux blocages d'implémentation actuels :
@@ -87,7 +87,7 @@ en théorie. Deux blocages d'implémentation actuels :
   `KrigingImpl::covMat` n'applique pas la `FeatureMap` φ et `WarpKriging`
   hérite de `KrigingImpl` en `protected`.
 
-Chemin proposé : exposer dans `WarpKriging` un `covMat(X1, X2)` public
+Réalisé : WarpKriging expose désormais covMat(X1, X2) (public, applique φ) et warp_params() ; NestedKriging accepte un argument warping et utilise des sous-modèles WarpKriging avec prior commun (θ, warp) pris sur le plus grand groupe puis refit optim="none". Historique du design : exposer dans `WarpKriging` un `covMat(X1, X2)` public
 appliquant φ, puis brancher `NestedKriging::corrMat` sur
 `submodel.covMat(...)/σ²` — ce qui éliminerait aussi l'hypothèse sur la
 convention `Cov(dx, θ)`.

@@ -219,3 +219,105 @@ TEST_CASE("NestedKriging large-n smoke test", "[nested][kriging][intensive]") {
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
   CHECK(rmse < 0.1 * arma::stddev(y));
 }
+
+#include "libKriging/WarpKriging.hpp"
+
+TEST_CASE("NestedKriging supports WarpKriging submodels", "[nested][warp]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(120, 2, X, y);
+  const std::vector<std::string> warping{"kumaraswamy", "kumaraswamy"};
+
+  NestedKriging nk(y,
+                   X,
+                   "gauss",
+                   /*nb_groups=*/3,
+                   NestedKriging::Aggregation::NK,
+                   NestedKriging::Partition::KMeans,
+                   123,
+                   Trend::RegressionModel::Constant,
+                   "BFGS",
+                   "LL",
+                   {},
+                   warping);
+  CHECK(nk.warped());
+  CHECK(nk.warping() == warping);
+  CHECK_THROWS_AS(nk.submodel(0), std::runtime_error);  // warped: use wsubmodel
+
+  SECTION("all submodels share the common warped prior") {
+    for (arma::uword g = 0; g < nk.nb_groups(); ++g) {
+      CHECK(arma::abs(nk.wsubmodel(g).theta() - nk.theta()).max() < 1e-12);
+      CHECK(arma::abs(nk.wsubmodel(g).warp_params() - nk.wsubmodel(0).warp_params()).max() < 1e-12);
+    }
+  }
+
+  SECTION("NK interpolates the design points under warping") {
+    auto [mean, stdev] = nk.predict(X, true);
+    CHECK(arma::abs(mean - y).max() < 1e-3);
+    CHECK(stdev.max() < 1e-2);
+  }
+
+  SECTION("prediction is finite and accurate") {
+    arma::mat Xt;
+    arma::vec yt;
+    make_data(80, 2, Xt, yt, 456);
+    auto [mean, stdev] = nk.predict(Xt, true);
+    CHECK(mean.is_finite());
+    CHECK(stdev.is_finite());
+    CHECK(stdev.min() >= 0.0);
+    const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
+    CHECK(rmse < 0.5 * arma::stddev(y));
+  }
+
+  SECTION("PoE family also works with warped submodels") {
+    arma::mat Xt(30, 2, arma::fill::randu);
+    for (auto agg : {NestedKriging::Aggregation::gPoE, NestedKriging::Aggregation::rBCM}) {
+      NestedKriging nkp(y,
+                        X,
+                        "gauss",
+                        3,
+                        agg,
+                        NestedKriging::Partition::KMeans,
+                        123,
+                        Trend::RegressionModel::Constant,
+                        "BFGS",
+                        "LL",
+                        {},
+                        warping);
+      auto [m, s] = nkp.predict(Xt, true);
+      CHECK(m.is_finite());
+      CHECK(s.min() >= 0.0);
+    }
+  }
+}
+
+TEST_CASE("NestedKriging warped with one group reduces to full WarpKriging", "[nested][warp]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(60, 2, X, y);
+  const std::vector<std::string> warping{"kumaraswamy", "kumaraswamy"};
+
+  NestedKriging nk(y,
+                   X,
+                   "gauss",
+                   /*nb_groups=*/1,
+                   NestedKriging::Aggregation::NK,
+                   NestedKriging::Partition::KMeans,
+                   123,
+                   Trend::RegressionModel::Constant,
+                   "BFGS",
+                   "LL",
+                   {},
+                   warping);
+
+  arma::mat Xt(30, 2, arma::fill::randu);
+  auto [m_nk, s_nk] = nk.predict(Xt, true);
+  auto [m_wk, s_wk, cov, dm, ds] = nk.wsubmodel(0).predict(Xt, true, false, false);
+
+  CHECK(arma::abs(m_nk - m_wk).max() < 1e-6);
+  CHECK(arma::abs(s_nk - s_wk).max() < 1e-2);
+
+  // covMat consistency: corr(x,x) == 1 => covMat diag == sigma2
+  arma::mat C = nk.wsubmodel(0).covMat(Xt, Xt);
+  CHECK(arma::abs(C.diag() / nk.wsubmodel(0).sigma2() - 1.0).max() < 1e-10);
+}

@@ -11,12 +11,14 @@
 #include "libKriging/Covariance.hpp"
 #include "libKriging/Kriging.hpp"
 #include "libKriging/Trend.hpp"
+#include "libKriging/WarpKriging.hpp"
 #include "libKriging/libKriging_exports.h"
 
 /** Nested Kriging: divide-and-conquer Gaussian process for large n.
  *
- * (X, y) is partitioned into p groups; one `Kriging` submodel is fitted per
- * group; hyperparameters are then unified (common prior) and predictions are
+ * (X, y) is partitioned into p groups; one submodel is fitted per group
+ * (`Kriging` by default, `WarpKriging` when a warping spec is given);
+ * hyperparameters are then unified (common prior) and predictions are
  * aggregated with one of:
  *   - PoE / gPoE / BCM / rBCM : precision-weighted products of experts
  *     (cheap: only submodel means/variances are needed),
@@ -26,15 +28,21 @@
  *     a kriging predictor: it interpolates the data and provides consistent
  *     variances (unlike the PoE family).
  *
+ * With warping, the common prior is σ²·k(Φ(x), Φ(x′); θ): a warped kernel is
+ * a valid GP prior, so both aggregation families apply unchanged. The common
+ * (θ, warp) is taken from the largest group's fit — warp parameters
+ * (embeddings, MLP weights) live on non-convex manifolds and cannot be
+ * averaged across groups the way θ can.
+ *
  * Complexities (n obs, p groups of size ~n/p, q prediction points):
  *   fit      : O(p (n/p)^3) likelihood evals  [vs O(n^3)]
  *   predict  : PoE family O(q n^2/p) ; NK O(q n^2) worst case, dominated by
  *              cross-correlation blocks, parallelized over group pairs.
  *
- * v1 restrictions (documented, checked at runtime):
+ * Restrictions (documented, checked at runtime):
  *   - NK aggregation requires a Constant trend (simple-kriging theory);
  *     PoE family works with any trend.
- *   - no nugget/noise channel (Kriging::NoiseModel::None only);
+ *   - no nugget/noise channel;
  *   - `normalize` not yet supported (do it outside if needed);
  *   - save/load not yet implemented.
  */
@@ -60,20 +68,29 @@ class NestedKriging {
                                   const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                                   const std::string& optim = "BFGS",
                                   const std::string& objective = "LL",
-                                  const Kriging::Parameters& parameters = {});
+                                  const Kriging::Parameters& parameters = {},
+                                  const std::vector<std::string>& warping = {});
 
-  /** Fit p independent Kriging submodels, then unify hyperparameters:
-   * theta <- geometric mean of submodel thetas, sigma2 / beta0 <- group-size
-   * weighted means; submodels are refitted with optim="none" on those common
-   * values so that all share the same GP prior (required by every
-   * aggregation, mandatory for NK). */
+  /** Fit p independent submodels, then unify hyperparameters into a common
+   * prior and refit with optim="none".
+   *
+   * Plain path (warping empty, `Kriging` submodels): theta <- group-size
+   * weighted geometric mean, sigma2 / beta0 <- weighted means.
+   *
+   * Warped path (`WarpKriging` submodels): (theta, warp_params) <- from the
+   * largest group's fit; sigma2 / beta0 <- weighted means after refit
+   * (sigma2 is profiled per group given the common correlation).
+   *
+   * @param warping per-dimension warp specs (see WarpKriging), empty for
+   *        plain Kriging submodels. */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              arma::uword nb_groups,
                              const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Kriging::Parameters& parameters = {});
+                             const Kriging::Parameters& parameters = {},
+                             const std::vector<std::string>& warping = {});
 
   /** Aggregated prediction at X_n (q x d).
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
@@ -84,7 +101,12 @@ class NestedKriging {
   [[nodiscard]] Aggregation aggregation() const { return m_aggregation; }
   [[nodiscard]] arma::uword nb_groups() const { return m_groups.size(); }
   [[nodiscard]] const std::vector<arma::uvec>& groups() const { return m_groups; }
-  [[nodiscard]] const Kriging& submodel(arma::uword i) const { return *m_submodels.at(i); }
+  [[nodiscard]] bool warped() const { return !m_warping.empty(); }
+  [[nodiscard]] const std::vector<std::string>& warping() const { return m_warping; }
+  /// Plain-path submodel access (throws when warped)
+  [[nodiscard]] const Kriging& submodel(arma::uword i) const;
+  /// Warped-path submodel access (throws when plain)
+  [[nodiscard]] const libKriging::WarpKriging& wsubmodel(arma::uword i) const;
   [[nodiscard]] const arma::vec& theta() const { return m_theta; }
   [[nodiscard]] double sigma2() const { return m_sigma2; }
   [[nodiscard]] double beta0() const { return m_beta0; }
@@ -110,7 +132,10 @@ class NestedKriging {
   arma::vec m_y;
   Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
   std::vector<arma::uvec> m_groups;
-  std::vector<std::unique_ptr<Kriging>> m_submodels;
+  std::vector<std::unique_ptr<Kriging>> m_submodels;       ///< plain path
+  std::vector<std::unique_ptr<libKriging::WarpKriging>> m_wsubmodels;  ///< warped path
+  std::vector<std::string> m_warping;                      ///< empty = plain
+  arma::uword m_ref = 0;  ///< reference submodel (largest group) for the common warped prior
 
   // unified (common prior) hyperparameters
   arma::vec m_theta;
@@ -118,7 +143,7 @@ class NestedKriging {
   double m_beta0 = 0;
 
   // NK precomputations (per group, common prior)
-  Covariance::CovFunc m_corr;          ///< resolved correlation kernel
+  Covariance::CovFunc m_corr;          ///< resolved correlation kernel (plain path)
   std::vector<arma::mat> m_L;          ///< lower Cholesky of R_g (jittered)
   std::vector<arma::vec> m_alpha;      ///< R_g^{-1} (y_g - beta0)
   bool m_is_fitted = false;

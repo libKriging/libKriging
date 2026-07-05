@@ -61,19 +61,42 @@ NestedKriging::NestedKriging(const arma::vec& y,
                              const Trend::RegressionModel& regmodel,
                              const std::string& optim,
                              const std::string& objective,
-                             const Kriging::Parameters& parameters)
+                             const Kriging::Parameters& parameters,
+                             const std::vector<std::string>& warping)
     : NestedKriging(covType) {
   m_aggregation = aggregation;
   m_partition_method = partition;
   m_seed = seed;
-  fit(y, X, nb_groups, regmodel, optim, objective, parameters);
+  fit(y, X, nb_groups, regmodel, optim, objective, parameters, warping);
 }
 
 // =============================================================================
-// correlation helper (uses the same kernel functions as Kriging)
+// submodel accessors
+// =============================================================================
+
+const Kriging& NestedKriging::submodel(arma::uword i) const {
+  if (warped())
+    throw std::runtime_error("submodel(): model uses WarpKriging submodels, use wsubmodel()");
+  return *m_submodels.at(i);
+}
+
+const libKriging::WarpKriging& NestedKriging::wsubmodel(arma::uword i) const {
+  if (!warped())
+    throw std::runtime_error("wsubmodel(): model uses Kriging submodels, use submodel()");
+  return *m_wsubmodels.at(i);
+}
+
+// =============================================================================
+// correlation helper (common prior)
 // =============================================================================
 
 arma::mat NestedKriging::corrMat(const arma::mat& X1, const arma::mat& X2) const {
+  if (warped()) {
+    // warped prior: k(Phi(x), Phi(x')) via the reference submodel's public
+    // covMat (all submodels share (theta, warp) after unification)
+    const libKriging::WarpKriging& ref = *m_wsubmodels[m_ref];
+    return ref.covMat(X1, X2) / ref.sigma2();
+  }
   arma::mat R(X1.n_rows, X2.n_rows);
   for (arma::uword i = 0; i < X1.n_rows; ++i) {
     const arma::rowvec x1 = X1.row(i);
@@ -141,31 +164,44 @@ void NestedKriging::fit(const arma::vec& y,
                         const Trend::RegressionModel& regmodel,
                         const std::string& optim,
                         const std::string& objective,
-                        const Kriging::Parameters& parameters) {
+                        const Kriging::Parameters& parameters,
+                        const std::vector<std::string>& warping) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("y and X should have the same number of rows");
   if (nb_groups < 1 || nb_groups > X.n_rows / (X.n_cols + 2))
     throw std::invalid_argument("nb_groups should be in [1, n/(d+2)]");
   if (m_aggregation == Aggregation::NK && regmodel != Trend::RegressionModel::Constant)
-    throw std::invalid_argument("NK aggregation requires a Constant trend (v1); use PoE/gPoE/BCM/rBCM otherwise");
+    throw std::invalid_argument("NK aggregation requires a Constant trend; use PoE/gPoE/BCM/rBCM otherwise");
 
   m_X = X;
   m_y = y;
   m_regmodel = regmodel;
+  m_warping = warping;
 
   make_partition(nb_groups);
   const arma::uword p = m_groups.size();
 
-  // --- 1. independent submodel fits (theta free) ----------------------------
+  // --- 1. independent submodel fits ------------------------------------------
   // NOTE: kept sequential for now; Kriging::fit thread-safety (optimizer &
   // arma RNG state) must be audited before adding `#pragma omp parallel for`.
   m_submodels.clear();
-  m_submodels.reserve(p);
-  for (arma::uword g = 0; g < p; ++g) {
-    const arma::uvec& idx = m_groups[g];
-    auto km = std::make_unique<Kriging>(m_covType);
-    km->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, optim, objective, parameters);
-    m_submodels.push_back(std::move(km));
+  m_wsubmodels.clear();
+  if (warped()) {
+    m_wsubmodels.reserve(p);
+    for (arma::uword g = 0; g < p; ++g) {
+      const arma::uvec& idx = m_groups[g];
+      auto wk = std::make_unique<libKriging::WarpKriging>(m_warping, m_covType);
+      wk->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, optim, objective, libKriging::WarpKriging::Parameters{});
+      m_wsubmodels.push_back(std::move(wk));
+    }
+  } else {
+    m_submodels.reserve(p);
+    for (arma::uword g = 0; g < p; ++g) {
+      const arma::uvec& idx = m_groups[g];
+      auto km = std::make_unique<Kriging>(m_covType);
+      km->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, optim, objective, parameters);
+      m_submodels.push_back(std::move(km));
+    }
   }
 
   // --- 2. unify hyperparameters (common prior) ------------------------------
@@ -179,10 +215,44 @@ void NestedKriging::fit(const arma::vec& y,
 }
 
 void NestedKriging::unify_hyperparameters(const std::string& objective) {
-  const arma::uword p = m_submodels.size();
+  const arma::uword p = m_groups.size();
   const arma::uword d = m_X.n_cols;
   const double n = static_cast<double>(m_X.n_rows);
 
+  if (warped()) {
+    // --- warped path: common (theta, warp) from the largest group -------------
+    // Warp parameters (embeddings, MLP weights, ...) live on non-convex
+    // manifolds: unlike theta they cannot be meaningfully averaged across
+    // groups, so the whole (theta, warp) pair is taken from one reference fit.
+    m_ref = 0;
+    for (arma::uword g = 1; g < p; ++g)
+      if (m_groups[g].n_elem > m_groups[m_ref].n_elem)
+        m_ref = g;
+
+    libKriging::WarpKriging::Parameters fixed;
+    fixed.theta = m_wsubmodels[m_ref]->theta();
+    fixed.warp_params = m_wsubmodels[m_ref]->warp_params();
+
+    // refit every submodel with optim="none": keeps the seeded (theta, warp)
+    // as-is; sigma2 and beta stay profiled per group given the common prior
+    for (arma::uword g = 0; g < p; ++g) {
+      const arma::uvec& idx = m_groups[g];
+      m_wsubmodels[g]->fit(m_y(idx), m_X.rows(idx), m_regmodel, false, "none", objective, fixed);
+    }
+
+    m_theta = m_wsubmodels[m_ref]->theta();
+    m_sigma2 = 0;
+    m_beta0 = 0;
+    for (arma::uword g = 0; g < p; ++g) {
+      const double w = static_cast<double>(m_groups[g].n_elem) / n;
+      m_sigma2 += w * m_wsubmodels[g]->sigma2();
+      if (m_regmodel == Trend::RegressionModel::Constant)
+        m_beta0 += w * m_wsubmodels[g]->beta()(0);
+    }
+    return;
+  }
+
+  // --- plain path: weighted geometric mean of thetas --------------------------
   arma::vec log_theta(d, arma::fill::zeros);
   double sigma2 = 0;
   double beta0 = 0;
@@ -193,7 +263,7 @@ void NestedKriging::unify_hyperparameters(const std::string& objective) {
     if (m_regmodel == Trend::RegressionModel::Constant)
       beta0 += w * m_submodels[g]->beta()(0);
   }
-  m_theta = arma::exp(log_theta);  // geometric mean, weighted by group size
+  m_theta = arma::exp(log_theta);
   m_sigma2 = sigma2;
   m_beta0 = beta0;
 
@@ -244,16 +314,22 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict(const arma::mat& X_n, bo
 
 std::tuple<arma::vec, arma::vec> NestedKriging::predict_poe_family(const arma::mat& X_n, bool return_stdev) const {
   const arma::uword q = X_n.n_rows;
-  const arma::uword p = m_submodels.size();
+  const arma::uword p = m_groups.size();
   const double prior_var = m_sigma2;
   constexpr double tiny = 1e-12;
 
   arma::mat mus(q, p);
   arma::mat vars(q, p);
   for (arma::uword g = 0; g < p; ++g) {
-    auto [mu, sd, cov, dmu, dsd] = m_submodels[g]->predict(X_n, true, false, false);
-    mus.col(g) = mu;
-    vars.col(g) = arma::square(sd) + tiny;
+    if (warped()) {
+      auto [mu, sd, cov, dmu, dsd] = m_wsubmodels[g]->predict(X_n, true, false, false);
+      mus.col(g) = mu;
+      vars.col(g) = arma::square(sd) + tiny;
+    } else {
+      auto [mu, sd, cov, dmu, dsd] = m_submodels[g]->predict(X_n, true, false, false);
+      mus.col(g) = mu;
+      vars.col(g) = arma::square(sd) + tiny;
+    }
   }
 
   arma::vec mean(q);
@@ -299,6 +375,7 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_poe_family(const arma::m
  *   =>  K_M (p x p), k_M = diag(K_M)
  *   mean = beta0 + k_M' K_M^{-1} (M - beta0)
  *   var  = s2 * (1 - k_M' K_M^{-1} k_M)
+ * All correlations come from corrMat (plain or warped common prior).
  * Whitened weights per chunk: U_g = L_g \ C_g, W_g = L_g' \ U_g,
  * so k_g = colsum(U_g^2) and cross(i,j) = colsum(W_i % (R_ij W_j)). */
 std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n, bool return_stdev) const {
@@ -386,6 +463,12 @@ std::string NestedKriging::summary() const {
     oss << (g ? "," : "") << m_groups[g].n_elem;
   oss << ")\n";
   oss << "* aggregation: " << aggregationToString(m_aggregation) << "\n";
+  if (warped()) {
+    oss << "* warping:";
+    for (const auto& w : m_warping)
+      oss << " " << w;
+    oss << "\n";
+  }
   oss << "* trend (constant): " << m_beta0 << "\n";
   oss << "* variance: " << m_sigma2 << "\n";
   oss << "* covariance: " << m_covType << ", range: " << m_theta.t();
