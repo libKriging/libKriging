@@ -1,4 +1,5 @@
 #include "Kriging_binding.hpp"
+#include "NestedKriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
@@ -174,6 +175,29 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::noise"_hash:
       return KrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "NestedKriging::new"_hash:
+      return NestedKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::delete"_hash:
+      return NestedKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::fit"_hash:
+      return NestedKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::predict"_hash:
+      return NestedKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::summary"_hash:
+      return NestedKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::kernel"_hash:
+      return NestedKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::aggregation"_hash:
+      return NestedKrigingBinding::aggregation(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::nb_groups"_hash:
+      return NestedKrigingBinding::nb_groups(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::theta"_hash:
+      return NestedKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::sigma2"_hash:
+      return NestedKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::beta0"_hash:
+      return NestedKrigingBinding::beta0(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "WarpKriging::new"_hash:
       return WarpKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

@@ -27,6 +27,7 @@ add_mex_function(NAME mLibKriging
         SOURCES mLibKriging.cpp
         common_binding.cpp common_binding.hpp
         Kriging_binding.cpp Kriging_binding.hpp
+        NestedKriging_binding.cpp NestedKriging_binding.hpp
         WarpKriging_binding.cpp WarpKriging_binding.hpp
         MLPKriging_binding.cpp MLPKriging_binding.hpp
         Optim_binding.cpp Optim_binding.hpp
