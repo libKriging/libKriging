@@ -74,3 +74,20 @@ plus rapide que le kriging plein (inaccessible de toute façon en mémoire).
 - Rullière, Durrande, Bachoc, Chevalier (2018), *Nested Kriging predictions
   for datasets with a large number of observations*, Statistics & Computing.
 - Deisenroth & Ng (2015), *Distributed Gaussian Processes*, ICML (PoE/BCM/rBCM).
+
+## Compatibilité WarpKriging (v2)
+
+Un noyau warpé k(φ(x), φ(x′)) reste un prior GP valide : NK et PoE s'appliquent
+en théorie. Deux blocages d'implémentation actuels :
+
+- famille PoE : il suffit de templater `NestedKriging` sur le type de
+  sous-modèle (signatures `fit`/`predict` identiques), mais l'unification des
+  hyperparamètres doit couvrir θ, σ² **et** les paramètres de warp ;
+- NK : nécessite d'évaluer le noyau warpé entre points quelconques, or
+  `KrigingImpl::covMat` n'applique pas la `FeatureMap` φ et `WarpKriging`
+  hérite de `KrigingImpl` en `protected`.
+
+Chemin proposé : exposer dans `WarpKriging` un `covMat(X1, X2)` public
+appliquant φ, puis brancher `NestedKriging::corrMat` sur
+`submodel.covMat(...)/σ²` — ce qui éliminerait aussi l'hypothèse sur la
+convention `Cov(dx, θ)`.
