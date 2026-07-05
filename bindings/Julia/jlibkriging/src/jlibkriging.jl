@@ -1173,7 +1173,136 @@ end
 
 # ─── Exports ──────────────────────────────────────────────────────
 
-export Kriging, WarpKriging, MLPKriging
+# ─── NestedKriging ────────────────────────────────────────────────
+
+mutable struct NestedKriging
+    ptr::Ptr{Nothing}
+
+    function NestedKriging(ptr::Ptr{Nothing})
+        obj = new(ptr)
+        finalizer(obj) do o
+            if o.ptr != C_NULL
+                ccall(dlsym(_lk(), :lk_nested_kriging_delete), Nothing, (Ptr{Nothing},), o.ptr)
+                o.ptr = C_NULL
+            end
+        end
+        return obj
+    end
+end
+
+"""
+    NestedKriging(y, X, kernel, nb_groups; aggregation="NK", partition="kmeans", ...)
+
+Divide-and-conquer Kriging for large designs: the data are partitioned in
+`nb_groups` groups, one `Kriging` submodel is fitted per group (all sharing a
+common prior after hyperparameter unification), and predictions are aggregated
+with `aggregation` in `"NK"` (optimal nested-kriging aggregation, default),
+`"PoE"`, `"gPoE"`, `"BCM"` or `"rBCM"`.
+"""
+function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, nb_groups::Int;
+                       aggregation::String="NK",
+                       partition::String="kmeans",
+                       seed::Int=123,
+                       regmodel::String="constant",
+                       optim::String="BFGS",
+                       objective::String="LL",
+                       sigma2::Union{Nothing,Float64}=nothing,
+                       is_sigma2_estim::Bool=true,
+                       theta::Union{Nothing,Vector{Float64}}=nothing,
+                       is_theta_estim::Bool=true,
+                       beta::Union{Nothing,Vector{Float64}}=nothing,
+                       is_beta_estim::Bool=true)
+    n, d = size(X)
+    @assert length(y) == n
+    sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)
+    theta_ptr = theta === nothing ? C_NULL : theta
+    theta_n = theta === nothing ? 0 : length(theta)
+    beta_ptr = beta === nothing ? C_NULL : beta
+    beta_n = beta === nothing ? 0 : length(beta)
+    ptr = ccall(dlsym(_lk(), :lk_nested_kriging_new_fit), Ptr{Nothing},
+                (Ptr{Float64}, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Cstring, Cint, Cstring, Cstring, Cint,
+                 Cstring, Cstring, Cstring,
+                 Ptr{Float64}, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint, Cint),
+                y, n,
+                X, n, d,
+                kernel, nb_groups, aggregation, partition, seed,
+                regmodel, optim, objective,
+                sigma2_ptr, is_sigma2_estim ? 1 : 0,
+                theta_ptr, theta_n, is_theta_estim ? 1 : 0,
+                beta_ptr, beta_n, is_beta_estim ? 1 : 0)
+    return NestedKriging(_check_ptr(ptr))
+end
+
+function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_groups::Int;
+              regmodel::String="constant",
+              optim::String="BFGS",
+              objective::String="LL",
+              sigma2::Union{Nothing,Float64}=nothing,
+              is_sigma2_estim::Bool=true,
+              theta::Union{Nothing,Vector{Float64}}=nothing,
+              is_theta_estim::Bool=true,
+              beta::Union{Nothing,Vector{Float64}}=nothing,
+              is_beta_estim::Bool=true)
+    n, d = size(X)
+    @assert length(y) == n
+    sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)
+    theta_ptr = theta === nothing ? C_NULL : theta
+    theta_n = theta === nothing ? 0 : length(theta)
+    beta_ptr = beta === nothing ? C_NULL : beta
+    beta_n = beta === nothing ? 0 : length(beta)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_fit), Cint,
+                (Ptr{Nothing},
+                 Ptr{Float64}, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Cint, Cstring, Cstring, Cstring,
+                 Ptr{Float64}, Cint,
+                 Ptr{Float64}, Cint, Cint,
+                 Ptr{Float64}, Cint, Cint),
+                k.ptr,
+                y, n,
+                X, n, d,
+                nb_groups, regmodel, optim, objective,
+                sigma2_ptr, is_sigma2_estim ? 1 : 0,
+                theta_ptr, theta_n, is_theta_estim ? 1 : 0,
+                beta_ptr, beta_n, is_beta_estim ? 1 : 0)
+    _check_error(ret)
+    return k
+end
+
+function predict(k::NestedKriging, X_n::Matrix{Float64}; return_stdev::Bool=true)
+    m, d = size(X_n)
+    mean_out = Vector{Float64}(undef, m)
+    stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_predict), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, X_n, m, d, return_stdev ? 1 : 0,
+                mean_out, return_stdev ? stdev_out : C_NULL)
+    _check_error(ret)
+    return (mean=mean_out, stdev=return_stdev ? stdev_out : nothing)
+end
+
+function summary(k::NestedKriging)
+    s = ccall(dlsym(_lk(), :lk_nested_kriging_summary), Cstring, (Ptr{Nothing},), k.ptr)
+    s == C_NULL && _check_error(Cint(1))
+    return unsafe_string(s)
+end
+
+kernel(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_kernel), Cstring, (Ptr{Nothing},), k.ptr))
+aggregation(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_aggregation), Cstring, (Ptr{Nothing},), k.ptr))
+nb_groups(k::NestedKriging) = Int(ccall(dlsym(_lk(), :lk_nested_kriging_nb_groups), Cint, (Ptr{Nothing},), k.ptr))
+theta(k::NestedKriging) = _get_vec(:lk_nested_kriging_get_theta, k.ptr)
+sigma2(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_sigma2), Float64, (Ptr{Nothing},), k.ptr)
+beta0(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_beta0), Float64, (Ptr{Nothing},), k.ptr)
+
+Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
+
+
+export Kriging, WarpKriging, MLPKriging, NestedKriging
+export nb_groups, aggregation, beta0
 export fit!, predict, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
