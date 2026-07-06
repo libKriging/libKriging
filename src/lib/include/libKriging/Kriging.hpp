@@ -133,6 +133,15 @@ class Kriging : public KrigingImpl {
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
 
+  /** Vecchia approximated log-likelihood at given theta (objective="VLL(m)").
+   * Requires the Vecchia sets to be built, i.e. the model to have been fitted
+   * with objective="VLL" or "VLL(m)".
+   * @return (vll, gradient) ; gradient empty if return_grad=false. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodVecchiaFun(const arma::vec& theta, bool return_grad);
+
+  /// Number of Vecchia conditioning neighbors (0 = not fitted with VLL)
+  [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
+
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
    * @param return_stdev is true if return also stdev column vector
@@ -212,6 +221,21 @@ class Kriging : public KrigingImpl {
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;
+
+  // --- Vecchia approximated likelihood (objective="VLL(m)") -----------------
+  // Built once per fit (maxmin ordering + m nearest previously-ordered
+  // neighbors on normalized inputs), then reused for every VLL evaluation.
+  arma::uword m_vecchia_m = 0;                  ///< 0 = Vecchia mode off
+  arma::uvec m_vecchia_order;                   ///< maxmin ordering (row indices of m_X)
+  std::vector<arma::uvec> m_vecchia_neighbors;  ///< per ordered point, global row indices
+
+  /// Parse "VLL" (default m=30) or "VLL(m)"; throws on malformed spec.
+  static arma::uword parse_vll_m(const std::string& objective);
+  /// Build m_vecchia_order / m_vecchia_neighbors from m_X (call after fit_setup_impl).
+  void make_vecchia_sets();
+  /// Vecchia log-likelihood with profiled sigma2 and (GLS-profiled) beta;
+  /// analytic gradient in theta via the envelope theorem.
+  double _logLikelihoodVecchia(const arma::vec& _theta, arma::vec* grad_out) const;
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;
