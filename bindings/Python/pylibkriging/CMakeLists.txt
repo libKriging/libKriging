@@ -22,6 +22,7 @@ add_subdirectory(${LIBKRIGING_SOURCE_DIR}/dependencies/carma carma)
 set(pylibkriging_SRCS src/_pylibkriging/pylibkriging.cpp)
 list(APPEND pylibkriging_SRCS
         src/_pylibkriging/Kriging_binding.cpp src/_pylibkriging/Kriging_binding.hpp
+        src/_pylibkriging/NestedKriging_binding.cpp src/_pylibkriging/NestedKriging_binding.hpp
         src/_pylibkriging/WarpKriging_binding.cpp src/_pylibkriging/WarpKriging_binding.hpp
         src/_pylibkriging/MLPKriging_binding.cpp src/_pylibkriging/MLPKriging_binding.hpp
         src/_pylibkriging/RandomGenerator.cpp src/_pylibkriging/RandomGenerator.hpp

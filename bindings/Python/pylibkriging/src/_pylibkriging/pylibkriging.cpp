@@ -14,6 +14,7 @@
 
 #include "Kriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
+#include "NestedKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
 
@@ -93,6 +94,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .export_values();
 
   const std::string default_regmodel = "constant";
+
   const bool default_normalize = false;
   const std::string default_optim = "BFGS";
   const std::string default_objective = "LL";
@@ -218,6 +220,59 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("noise", &PyKriging::noise);
 
   const std::string default_warp_optim = "BFGS+Adam";
+
+  /* --- NestedKriging --- */
+  py::class_<PyNestedKriging>(m, "WrappedPyNestedKriging")
+      .def(py::init<const std::string&>(), py::arg("kernel"))
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const std::string&,
+                    unsigned long,
+                    const std::string&,
+                    const std::string&,
+                    int,
+                    const std::string&,
+                    const std::string&,
+                    const std::string&,
+                    const py::dict&,
+                    const std::vector<std::string>&>(),
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("nb_groups"),
+           py::arg("aggregation") = "NK",
+           py::arg("partition") = "kmeans",
+           py::arg("seed") = 123,
+           py::arg("regmodel") = default_regmodel,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{},
+           py::arg("warping") = std::vector<std::string>{})
+      .def("fit",
+           &PyNestedKriging::fit,
+           py::arg("y"),
+           py::arg("X"),
+           py::arg("nb_groups"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{},
+           py::arg("warping") = std::vector<std::string>{})
+      .def("predict", &PyNestedKriging::predict, py::arg("X"), py::arg("return_stdev") = true)
+      .def("summary", &PyNestedKriging::summary)
+      .def("kernel", &PyNestedKriging::kernel)
+      .def("warping", &PyNestedKriging::warping)
+      .def("aggregation", &PyNestedKriging::aggregation)
+      .def("nb_groups", &PyNestedKriging::nb_groups)
+      .def("groups", &PyNestedKriging::groups)
+      .def("theta", &PyNestedKriging::theta)
+      .def("sigma2", &PyNestedKriging::sigma2)
+      .def("beta0", &PyNestedKriging::beta0)
+      .def("X", &PyNestedKriging::X)
+      .def("y", &PyNestedKriging::y)
+      .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
+      .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
+      .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")
       .def(py::init<const std::vector<std::string>&, const std::string&>(),

@@ -391,6 +391,67 @@ int lk_mlp_kriging_get_hidden_dims(void* ptr, int* out, int* n);
 int lk_mlp_kriging_save(void* ptr, const char* filename);
 void* lk_mlp_kriging_load(const char* filename);
 
+/* ═══ NestedKriging ═══════════════════════════════════════════════ */
+
+void* lk_nested_kriging_new_fit(const double* y,
+                                int n,
+                                const double* X,
+                                int nX,
+                                int d,
+                                const char* kernel,
+                                int nb_groups,
+                                const char* aggregation,
+                                const char* partition,
+                                int seed,
+                                const char** warping,
+                                int n_warping,
+                                const char* regmodel,
+                                const char* optim,
+                                const char* objective,
+                                const double* sigma2,
+                                int is_sigma2_estim,
+                                const double* theta,
+                                int theta_n,
+                                int is_theta_estim,
+                                const double* beta,
+                                int beta_n,
+                                int is_beta_estim);
+void lk_nested_kriging_delete(void* ptr);
+int lk_nested_kriging_fit(void* ptr,
+                          const double* y,
+                          int n,
+                          const double* X,
+                          int nX,
+                          int d,
+                          int nb_groups,
+                          const char** warping,
+                          int n_warping,
+                          const char* regmodel,
+                          const char* optim,
+                          const char* objective,
+                          const double* sigma2,
+                          int is_sigma2_estim,
+                          const double* theta,
+                          int theta_n,
+                          int is_theta_estim,
+                          const double* beta,
+                          int beta_n,
+                          int is_beta_estim);
+int lk_nested_kriging_predict(void* ptr,
+                              const double* X_n,
+                              int m,
+                              int d,
+                              int return_stdev,
+                              double* mean_out,
+                              double* stdev_out);
+const char* lk_nested_kriging_summary(void* ptr);
+const char* lk_nested_kriging_kernel(void* ptr);
+const char* lk_nested_kriging_aggregation(void* ptr);
+int lk_nested_kriging_nb_groups(void* ptr);
+int lk_nested_kriging_get_theta(void* ptr, double* out, int* n);
+double lk_nested_kriging_get_sigma2(void* ptr);
+double lk_nested_kriging_get_beta0(void* ptr);
+
 #ifdef __cplusplus
 }
 #endif

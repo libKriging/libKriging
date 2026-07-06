@@ -2947,3 +2947,33 @@ WarpKriging WarpKriging::load(const std::string filename) {
 }
 
 }  // namespace libKriging
+
+// -------------------------------------------------------------------------
+//  Public warped-kernel covariance (NestedKriging support)
+// -------------------------------------------------------------------------
+
+namespace libKriging {
+
+arma::vec WarpKriging::warp_params() const {
+  return pack_warp_params();
+}
+
+arma::mat WarpKriging::covMat(const arma::mat& X1, const arma::mat& X2) const {
+  if (!m_fitted)
+    throw std::runtime_error("covMat: model not fitted");
+  if (X1.n_cols != m_X_raw.n_cols || X2.n_cols != m_X_raw.n_cols)
+    throw std::invalid_argument("covMat: X1/X2 must have the same number of columns as the design");
+  validate_discrete_columns(X1, "covMat");
+  validate_discrete_columns(X2, "covMat");
+
+  arma::mat Xn1 = X1;
+  arma::mat Xn2 = X2;
+  Xn1.each_row() -= m_centerX;
+  Xn1.each_row() /= m_scaleX;
+  Xn2.each_row() -= m_centerX;
+  Xn2.each_row() /= m_scaleX;
+
+  return m_sigma2 * build_Rcross(apply_warping(Xn1), apply_warping(Xn2));
+}
+
+}  // namespace libKriging

@@ -2,6 +2,7 @@
 
 #include <libKriging/Kriging.hpp>
 #include <libKriging/MLPKriging.hpp>
+#include <libKriging/NestedKriging.hpp>
 
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
@@ -1655,4 +1656,205 @@ void* lk_mlp_kriging_load(const char* filename) {
     return new MLPKriging(MLPKriging::load(filename));
   }
   CATCH_RETURN_NULL
+}
+
+/* ═══ NestedKriging ═══════════════════════════════════════════════ */
+
+static Kriging::Parameters lk_nested_make_params(const double* sigma2,
+                                                 int is_sigma2_estim,
+                                                 const double* theta,
+                                                 int theta_n,
+                                                 int is_theta_estim,
+                                                 const double* beta,
+                                                 int beta_n,
+                                                 int is_beta_estim) {
+  Kriging::Parameters params;
+  if (sigma2)
+    params.sigma2 = *sigma2;
+  params.is_sigma2_estim = is_sigma2_estim != 0;
+  if (theta && theta_n > 0)
+    params.theta = arma::mat(const_cast<double*>(theta), 1, theta_n, false, true);
+  params.is_theta_estim = is_theta_estim != 0;
+  if (beta && beta_n > 0)
+    params.beta = arma::colvec(const_cast<double*>(beta), beta_n, false, true);
+  params.is_beta_estim = is_beta_estim != 0;
+  return params;
+}
+
+static std::vector<std::string> lk_nested_make_warping(const char** warping, int n_warping) {
+  std::vector<std::string> out;
+  for (int i = 0; i < n_warping; ++i)
+    out.push_back(warping[i] ? warping[i] : "none");
+  return out;
+}
+
+static NestedKriging::Partition lk_nested_parse_partition(const char* s) {
+  const std::string p = s ? s : "kmeans";
+  if (p == "random")
+    return NestedKriging::Partition::Random;
+  if (p == "kmeans" || p.empty())
+    return NestedKriging::Partition::KMeans;
+  throw std::invalid_argument("Unknown partition: '" + p + "'. Expected 'kmeans' or 'random'.");
+}
+
+void* lk_nested_kriging_new_fit(const double* y,
+                                int n,
+                                const double* X,
+                                int nX,
+                                int d,
+                                const char* kernel,
+                                int nb_groups,
+                                const char* aggregation,
+                                const char* partition,
+                                int seed,
+                                const char** warping,
+                                int n_warping,
+                                const char* regmodel,
+                                const char* optim,
+                                const char* objective,
+                                const double* sigma2,
+                                int is_sigma2_estim,
+                                const double* theta,
+                                int theta_n,
+                                int is_theta_estim,
+                                const double* beta,
+                                int beta_n,
+                                int is_beta_estim) {
+  try {
+    arma::vec y_v(const_cast<double*>(y), n, false, true);
+    arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    return new NestedKriging(
+        y_v,
+        X_m,
+        kernel ? kernel : "matern3_2",
+        static_cast<arma::uword>(nb_groups),
+        NestedKriging::aggregationFromString(aggregation ? aggregation : "NK"),
+        lk_nested_parse_partition(partition),
+        seed,
+        Trend::fromString(regmodel ? regmodel : "constant"),
+        optim ? optim : "BFGS",
+        objective ? objective : "LL",
+        lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
+        lk_nested_make_warping(warping, n_warping));
+  }
+  CATCH_RETURN_NULL
+}
+
+void lk_nested_kriging_delete(void* ptr) {
+  delete static_cast<NestedKriging*>(ptr);
+}
+
+int lk_nested_kriging_fit(void* ptr,
+                          const double* y,
+                          int n,
+                          const double* X,
+                          int nX,
+                          int d,
+                          int nb_groups,
+                          const char** warping,
+                          int n_warping,
+                          const char* regmodel,
+                          const char* optim,
+                          const char* objective,
+                          const double* sigma2,
+                          int is_sigma2_estim,
+                          const double* theta,
+                          int theta_n,
+                          int is_theta_estim,
+                          const double* beta,
+                          int beta_n,
+                          int is_beta_estim) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    arma::vec y_v(const_cast<double*>(y), n, false, true);
+    arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    k->fit(y_v,
+           X_m,
+           static_cast<arma::uword>(nb_groups),
+           Trend::fromString(regmodel ? regmodel : "constant"),
+           optim ? optim : "BFGS",
+           objective ? objective : "LL",
+           lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
+           lk_nested_make_warping(warping, n_warping));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_predict(void* ptr,
+                              const double* X_n,
+                              int m,
+                              int d,
+                              int return_stdev,
+                              double* mean_out,
+                              double* stdev_out) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    auto [mean_v, stdev_v] = k->predict(X_m, return_stdev != 0);
+    if (mean_out)
+      std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
+    if (stdev_out && return_stdev)
+      std::memcpy(stdev_out, stdev_v.memptr(), stdev_v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+const char* lk_nested_kriging_summary(void* ptr) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    static thread_local std::string buf;
+    buf = k->summary();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_nested_kriging_kernel(void* ptr) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    static thread_local std::string buf;
+    buf = k->kernel();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_nested_kriging_aggregation(void* ptr) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    static thread_local std::string buf;
+    buf = NestedKriging::aggregationToString(k->aggregation());
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
+int lk_nested_kriging_nb_groups(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<NestedKriging*>(ptr)->nb_groups());
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_get_theta(void* ptr, double* out, int* n) {
+  try {
+    auto* k = static_cast<NestedKriging*>(ptr);
+    const arma::vec& v = k->theta();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_nested_kriging_get_sigma2(void* ptr) {
+  return static_cast<NestedKriging*>(ptr)->sigma2();
+}
+
+double lk_nested_kriging_get_beta0(void* ptr) {
+  return static_cast<NestedKriging*>(ptr)->beta0();
 }

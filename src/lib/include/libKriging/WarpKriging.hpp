@@ -715,6 +715,14 @@ class WarpKriging : protected KrigingImpl {
   /// Access the joint MLP warp (only valid when constructed with mlp_joint spec).
   const WarpMLPJoint* joint_warp() const { return m_joint_warp.get(); }
 
+  /// Packed warp parameters (optimiser layout, see pack_warp_params).
+  LIBKRIGING_EXPORT arma::vec warp_params() const;
+
+  /** Covariance matrix sigma2 * k(Phi(x), Phi(x')) between two sets of raw
+   * input points. Applies the same normalization and warping as predict.
+   * Mirrors KrigingImpl::covMat for the warped-kernel case. */
+  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2) const;
+
   /** Dump current WarpKriging object into a file */
   LIBKRIGING_EXPORT void save(const std::string filename) const;
 
