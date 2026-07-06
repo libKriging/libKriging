@@ -95,6 +95,10 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   const bool with_exact = (n_train <= 1000);
 
   std::vector<double> fit_times, fit_ll_times, vll_eval_times, vll_grad_times, ll_eval_times, ll_grad_times;
+  std::vector<double> predict_times, predict_vecchia_times;
+
+  const arma::uword n_pred = 100;
+  arma::mat X_pred(n_pred, d, arma::fill::randu);
 
   // fitted VLL model reused for the objective-evaluation rows
   Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
@@ -127,6 +131,18 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
       t1 = std::chrono::high_resolution_clock::now();
       vll_grad_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
+    // --- prediction: exact vs Vecchia (local, m neighbors) ---
+    {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      k_eval.predict(X_pred, true, false, false);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+
+      t0 = std::chrono::high_resolution_clock::now();
+      k_eval.predictVecchia(X_pred, true);
+      t1 = std::chrono::high_resolution_clock::now();
+      predict_vecchia_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+    }
     if (with_exact) {
       auto t0 = std::chrono::high_resolution_clock::now();
       k_eval.logLikelihoodFun(theta_eval, false, false);
@@ -144,6 +160,8 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   print_stats("fit", compute_stats(fit_times));
   if (with_exact)
     print_stats("fit_exact_ll", compute_stats(fit_ll_times));
+  print_stats("predict", compute_stats(predict_times));
+  print_stats("predict_vecchia", compute_stats(predict_vecchia_times));
   print_stats("vll_eval", compute_stats(vll_eval_times));
   print_stats("vll_grad", compute_stats(vll_grad_times));
   if (with_exact) {

@@ -157,3 +157,50 @@ TEST_CASE("VLL large-n smoke test", "[vecchia][kriging][intensive]") {
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
   CHECK(rmse < 0.05 * arma::stddev(y));
 }
+
+TEST_CASE("predictVecchia matches exact predict", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(400, X, y);
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(100, Xt, yt, 456);
+
+  auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
+  auto [m_v, s_v] = k.predictVecchia(Xt, true, 60);
+
+  INFO("max |mean diff| = " << arma::abs(m_v - m_ex).max());
+  INFO("max |stdev diff| = " << arma::abs(s_v - s_ex).max());
+  // with 60 of 400 neighbors, local kriging is near-indistinguishable from exact
+  CHECK(arma::abs(m_v - m_ex).max() < 1e-2 * arma::stddev(y));
+  CHECK(arma::abs(s_v - s_ex).max() < 2e-2 * arma::stddev(y));
+
+  // interpolation: a prediction point equal to an observation keeps it in its
+  // own neighborhood => exact interpolation
+  auto [m_at_X, s_at_X] = k.predictVecchia(X.rows(0, 49), true, 30);
+  CHECK(arma::abs(m_at_X - y.head(50)).max() < 1e-3);
+  CHECK(s_at_X.max() < 1e-2);
+}
+
+TEST_CASE("predictVecchia works after a plain LL fit and defaults m", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(200, X, y);
+
+  Kriging k(y, X, "matern5_2");  // objective="LL": no Vecchia sets
+  CHECK(k.vecchia_neighbors() == 0);
+
+  arma::mat Xt(50, 2, arma::fill::randu);
+  auto [m_v, s_v] = k.predictVecchia(Xt, true);  // m defaults to 30
+  auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
+  CHECK(arma::abs(m_v - m_ex).max() < 5e-2 * arma::stddev(y));
+  CHECK(m_v.is_finite());
+  CHECK(s_v.min() >= 0.0);
+
+  // dimension check
+  arma::mat Xbad(10, 3, arma::fill::randu);
+  CHECK_THROWS_AS(k.predictVecchia(Xbad, true), std::invalid_argument);
+}

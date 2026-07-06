@@ -142,6 +142,17 @@ class Kriging : public KrigingImpl {
   /// Number of Vecchia conditioning neighbors (0 = not fitted with VLL)
   [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
 
+  /** Vecchia (local) prediction: each point of X_n is kriged on its m nearest
+   * observations only — O(q m^3) instead of O(q n^2), embarrassingly parallel.
+   * Mean is universal-kriging-style with the committed beta; variance is the
+   * simple-kriging one (beta treated as known). Usable after any fit.
+   * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
+   *          fitted with VLL, else 30)
+   * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictVecchia(const arma::mat& X_n,
+                                                                    bool return_stdev = true,
+                                                                    arma::uword m = 0);
+
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
    * @param return_stdev is true if return also stdev column vector

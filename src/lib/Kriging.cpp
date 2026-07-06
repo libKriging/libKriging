@@ -929,6 +929,84 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun
   return {_logLikelihoodVecchia(theta, nullptr), grad};
 }
 
+/* Vecchia (local) prediction: condition each prediction point on its m
+ * nearest observations only (Katzfuss & Guinness 2021, response-only
+ * conditioning). Per point: O(m^3); no cross-covariances between prediction
+ * points (use predict() for the exact joint version). */
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const arma::mat& X_n,
+                                                                           bool return_stdev,
+                                                                           arma::uword m) {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword q = X_n.n_rows;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("X_n should have the same number of columns as X");
+  if (m == 0)
+    m = (m_vecchia_m > 0) ? m_vecchia_m : 30;
+  m = std::min<arma::uword>(m, n);
+
+  // normalize prediction inputs like predict() does
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  arma::vec mean(q);
+  arma::vec stdev(return_stdev ? q : 0);
+
+  // column-major observed inputs for cache-friendly neighbor search
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m >= 40000)
+#endif
+  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+    // m nearest observations (normalized space), partial selection
+    std::vector<std::pair<double, arma::uword>> cand(n);
+    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+    for (arma::uword j = 0; j < n; ++j) {
+      double s = 0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double dk = x_t(k) - xp[j * d + k];
+        s += dk * dk;
+      }
+      cand[j] = {s, j};
+    }
+    if (m < n)
+      std::nth_element(cand.begin(), cand.begin() + m, cand.end());
+    arma::uvec Ni(m);
+    for (arma::uword j = 0; j < m; ++j)
+      Ni(j) = cand[j].second;
+
+    // local kriging on the neighborhood
+    arma::mat RN(m, m, arma::fill::ones);
+    arma::vec r(m);
+    for (arma::uword a = 0; a < m; ++a) {
+      for (arma::uword b = a + 1; b < m; ++b) {
+        const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
+        RN(a, b) = RN(b, a) = _Cov(dx, m_theta);
+      }
+      const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
+      r(a) = _Cov(dx, m_theta);
+    }
+    RN.diag() += LinearAlgebra::num_nugget;
+    const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+    const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+
+    const arma::vec resid = m_y(Ni) - m_F.rows(Ni) * m_beta;
+    mean(t) = arma::dot(F_n.row(static_cast<arma::uword>(t)), m_beta) + arma::dot(a_vec, resid);
+    if (return_stdev)
+      stdev(t) = std::sqrt(m_sigma2 * std::max(0.0, 1.0 - arma::dot(r, a_vec)));
+  }
+
+  // de-normalize outputs
+  mean = mean * m_scaleY + m_centerY;
+  if (return_stdev)
+    stdev = stdev * m_scaleY;
+  return {mean, stdev};
+}
+
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
   if (objective == "LL") {
     if (m_noise_model == NoiseModel::Nugget) {

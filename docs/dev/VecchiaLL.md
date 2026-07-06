@@ -37,8 +37,14 @@ Gradient en θ analytique (théorème de l'enveloppe pour β̂).
 ## Limites (v1)
 
 - `NoiseModel::None` uniquement (pas de nugget/noise).
-- Le commit final reste O(n³) mémoire/temps : praticable jusqu'à n ~ 2·10⁴ ;
-  au-delà, prédiction Vecchia à implémenter (Katzfuss & Guinness 2021).
+- Le commit final reste O(n³) mémoire/temps : praticable jusqu'à n ~ 2·10⁴.
+- `predictVecchia(X_n, return_stdev, m=0)` : prédiction locale par
+  conditionnement sur les m observations les plus proches (Katzfuss &
+  Guinness 2021, response-only) — O(q·m³), parallèle, utilisable après tout
+  fit. Moyenne UK avec le β committé, variance SK (pas de covariances
+  croisées entre points de prédiction : utiliser `predict` pour le joint).
+  À n=1000, d=2 : 3,6 ms vs 33 ms pour les 100 points (BLAS de référence).
+  Étape suivante pour n ≥ 10⁵ : sauter le commit exact du fit.
 - Effet d'écran faible en grande dimension : recommandé pour d ≤ ~5
   (complémentaire de NestedKriging, robuste en dimension quelconque).
 - Ensembles Vecchia non sérialisés (reconstruits au refit).
