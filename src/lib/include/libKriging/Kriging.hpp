@@ -142,6 +142,16 @@ class Kriging : public KrigingImpl {
   /// Number of Vecchia conditioning neighbors (0 = not fitted with VLL)
   [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
 
+  /** Large-n mode: when set to false BEFORE a fit with objective="VLL(m)",
+   * the final exact O(n^3) factorization is skipped. The model then stores
+   * theta* plus VLL-profiled beta/sigma2, and `predict` transparently routes
+   * to `predictVecchia` (mean/stdev only); return_cov/return_deriv, simulate,
+   * update and save are not available on such a "light" model. */
+  LIBKRIGING_EXPORT void set_vecchia_exact_commit(bool b) { m_vecchia_exact_commit = b; }
+  [[nodiscard]] bool vecchia_exact_commit() const { return m_vecchia_exact_commit; }
+  /// True when the current fit skipped the exact factorization (light mode)
+  [[nodiscard]] bool is_vecchia_light() const { return m_vecchia_light; }
+
   /** Vecchia (local) prediction: each point of X_n is kriged on its m nearest
    * observations only — O(q m^3) instead of O(q n^2), embarrassingly parallel.
    * Mean is universal-kriging-style with the committed beta; variance is the
@@ -245,8 +255,16 @@ class Kriging : public KrigingImpl {
   /// Build m_vecchia_order / m_vecchia_neighbors from m_X (call after fit_setup_impl).
   void make_vecchia_sets();
   /// Vecchia log-likelihood with profiled sigma2 and (GLS-profiled) beta;
-  /// analytic gradient in theta via the envelope theorem.
-  double _logLikelihoodVecchia(const arma::vec& _theta, arma::vec* grad_out) const;
+  /// analytic gradient in theta via the envelope theorem. Optional out-params
+  /// expose the profiled beta/sigma2 (used by the light-mode commit).
+  double _logLikelihoodVecchia(const arma::vec& _theta,
+                               arma::vec* grad_out,
+                               arma::vec* beta_out = nullptr,
+                               double* sigma2_out = nullptr) const;
+  bool m_vecchia_exact_commit = true;  ///< false = skip the exact factorization at commit
+  bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
+  /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
+  void check_not_vecchia_light(const char* what) const;
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

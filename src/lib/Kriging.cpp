@@ -803,7 +803,10 @@ void Kriging::make_vecchia_sets() {
   }
 }
 
-double Kriging::_logLikelihoodVecchia(const arma::vec& _theta, arma::vec* grad_out) const {
+double Kriging::_logLikelihoodVecchia(const arma::vec& _theta,
+                                      arma::vec* grad_out,
+                                      arma::vec* beta_out,
+                                      double* sigma2_out) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   const arma::uword p = m_F.n_cols;
@@ -902,6 +905,10 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _theta, arma::vec* grad_o
   const arma::vec e = u - W.t() * beta;
   const double Q = arma::accu(e % e / v);
   const double sigma2 = Q / n;
+  if (beta_out != nullptr)
+    *beta_out = beta;
+  if (sigma2_out != nullptr)
+    *sigma2_out = sigma2;
   const double vll = -0.5 * n * std::log(2 * M_PI * sigma2) - 0.5 * arma::accu(arma::log(v)) - 0.5 * n;
 
   if (with_grad) {
@@ -914,6 +921,13 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _theta, arma::vec* grad_o
     }
   }
   return vll;
+}
+
+void Kriging::check_not_vecchia_light(const char* what) const {
+  if (m_vecchia_light)
+    throw std::runtime_error(std::string(what)
+                             + ": not available on a light Vecchia fit "
+                               "(refit with set_vecchia_exact_commit(true))");
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun(const arma::vec& theta,
@@ -1128,7 +1142,7 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
     if (Optim::reparametrize) {
       return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
         const arma::vec _theta = Optim::reparam_from(_gamma);
-        if (grad_out == nullptr && km_data != nullptr)
+        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
           return -this->_logLikelihood(_theta, nullptr, km_data, nullptr);
         double vll = this->_logLikelihoodVecchia(_theta, grad_out);
         if (grad_out != nullptr)
@@ -1137,7 +1151,7 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       };
     } else {
       return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
-        if (grad_out == nullptr && km_data != nullptr)
+        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
           return -this->_logLikelihood(_gamma, nullptr, km_data, nullptr);
         double vll = this->_logLikelihoodVecchia(_gamma, grad_out);
         if (grad_out != nullptr)
@@ -1176,6 +1190,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   arma::mat theta0
       = fit_setup_impl(y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta);
 
+  m_vecchia_light = false;
   if (objective.rfind("VLL", 0) == 0) {
     m_vecchia_m = parse_vll_m(objective);
     make_vecchia_sets();
@@ -1663,7 +1678,22 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       // Update member variables with best result
-      if (best_idx >= 0) {
+      if (best_idx >= 0 && m_vecchia_m > 0 && !m_vecchia_exact_commit) {
+        // light Vecchia commit: no exact factorization; theta from the
+        // optimizer, beta/sigma2 profiled by the Vecchia likelihood
+        const auto& best = results[best_idx];
+        m_theta = best.theta;
+        m_est_theta = true;
+        arma::vec beta_v;
+        double sigma2_v = -1;
+        _logLikelihoodVecchia(m_theta, nullptr, &beta_v, &sigma2_v);
+        if (m_est_beta)
+          m_beta = beta_v;
+        if (m_est_sigma2)
+          m_sigma2 = sigma2_v;
+        m_vecchia_light = true;
+        m_is_empty = true;  // no committed factorization: predict routes to predictVecchia
+      } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
         m_est_theta = true;
@@ -1749,6 +1779,16 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+  if (m_vecchia_light) {
+    // light Vecchia fit: no exact factorization available; route mean/stdev
+    // to the local Vecchia predictor
+    if (return_cov || return_deriv)
+      throw std::runtime_error(
+          "predict: return_cov/return_deriv are not available on a light Vecchia fit "
+          "(refit with set_vecchia_exact_commit(true), or use predictVecchia)");
+    auto [mean, stdev] = predictVecchia(X_n, return_stdev);
+    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+  }
   const arma::uword n_o = m_X.n_rows;
   const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
@@ -1785,6 +1825,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
+  check_not_vecchia_light("simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -1852,6 +1893,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  check_not_vecchia_light("update_simulate");
   if (m_noise_model == NoiseModel::Nugget) {
     const double alpha = m_alpha;
     return update_simulate_impl(y_u,
@@ -1911,6 +1953,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+  check_not_vecchia_light("update");
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -2164,6 +2207,7 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 }
 
 void Kriging::save(const std::string filename) const {
+  check_not_vecchia_light("save");
   nlohmann::json j;
   j["version"] = 2;
   j["content"] = "Kriging";

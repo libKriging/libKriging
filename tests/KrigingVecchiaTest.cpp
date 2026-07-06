@@ -204,3 +204,77 @@ TEST_CASE("predictVecchia works after a plain LL fit and defaults m", "[vecchia]
   arma::mat Xbad(10, 3, arma::fill::randu);
   CHECK_THROWS_AS(k.predictVecchia(Xbad, true), std::invalid_argument);
 }
+
+TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(300, X, y);
+
+  // reference: standard VLL fit (exact commit)
+  Kriging k_ref(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+
+  // light fit: same objective, no exact factorization at commit
+  Kriging k("matern5_2");
+  k.set_vecchia_exact_commit(false);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", {});
+  CHECK(k.is_vecchia_light());
+
+  // hyperparameters consistent with the exact-commit fit
+  INFO("theta light = " << k.theta().t() << " theta ref = " << k_ref.theta().t());
+  CHECK(arma::abs(arma::log(k.theta()) - arma::log(k_ref.theta())).max() < 0.5);
+  CHECK(k.sigma2() > 0);
+
+  // predict auto-routes to predictVecchia (mean/stdev only)
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(100, Xt, yt, 456);
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [m_v, s_v] = k.predictVecchia(Xt, true);
+  CHECK(arma::abs(mean - m_v).max() == 0.0);  // same code path
+  CHECK(arma::abs(stdev - s_v).max() == 0.0);
+  const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
+  INFO("rmse = " << rmse);
+  CHECK(rmse < 0.05 * arma::stddev(y));
+
+  // interpolation still holds through the routed predict
+  auto [m_at_X, s_at_X, c2, d2, e2] = k.predict(X.rows(0, 49), true, false, false);
+  CHECK(arma::abs(m_at_X - y.head(50)).max() < 1e-3);
+
+  // unsupported operations throw with a clear message
+  CHECK_THROWS_AS(k.predict(Xt, true, true, false), std::runtime_error);  // return_cov
+  CHECK_THROWS_AS(k.predict(Xt, true, false, true), std::runtime_error);  // return_deriv
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt, false), std::runtime_error);
+  arma::vec yu(5, arma::fill::randu);
+  arma::mat Xu(5, 2, arma::fill::randu);
+  CHECK_THROWS_AS(k.update(yu, Xu, true), std::runtime_error);
+  CHECK_THROWS_AS(k.save("/tmp/should_not_exist.json"), std::runtime_error);
+
+  // a subsequent standard fit clears the light state
+  k.set_vecchia_exact_commit(true);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", {});
+  CHECK(!k.is_vecchia_light());
+  CHECK_NOTHROW(k.simulate(2, 123, Xt.rows(0, 9), false));
+}
+
+TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensive]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(10000, X, y);
+
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, 2, arma::fill::value(0.3));
+
+  Kriging k("matern5_2");
+  k.set_vecchia_exact_commit(false);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", params);
+  CHECK(k.is_vecchia_light());
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(200, Xt, yt, 456);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  CHECK(mean.is_finite());
+  const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
+  INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
+  CHECK(rmse < 0.05 * arma::stddev(y));
+}

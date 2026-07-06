@@ -95,7 +95,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   const bool with_exact = (n_train <= 1000);
 
   std::vector<double> fit_times, fit_ll_times, vll_eval_times, vll_grad_times, ll_eval_times, ll_grad_times;
-  std::vector<double> predict_times, predict_vecchia_times;
+  std::vector<double> predict_times, predict_vecchia_times, fit_light_times;
 
   const arma::uword n_pred = 100;
   arma::mat X_pred(n_pred, d, arma::fill::randu);
@@ -111,6 +111,15 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
       Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+    }
+    // --- light fit: no exact factorization at commit ---
+    {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      Kriging kr("gauss");
+      kr.set_vecchia_exact_commit(false);
+      kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)", {});
+      auto t1 = std::chrono::high_resolution_clock::now();
+      fit_light_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     // --- fit with the exact LL (comparison baseline) ---
     if (with_exact) {
@@ -158,6 +167,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 
   print_header();
   print_stats("fit", compute_stats(fit_times));
+  print_stats("fit_light", compute_stats(fit_light_times));
   if (with_exact)
     print_stats("fit_exact_ll", compute_stats(fit_ll_times));
   print_stats("predict", compute_stats(predict_times));

@@ -44,7 +44,12 @@ Gradient en θ analytique (théorème de l'enveloppe pour β̂).
   fit. Moyenne UK avec le β committé, variance SK (pas de covariances
   croisées entre points de prédiction : utiliser `predict` pour le joint).
   À n=1000, d=2 : 3,6 ms vs 33 ms pour les 100 points (BLAS de référence).
-  Étape suivante pour n ≥ 10⁵ : sauter le commit exact du fit.
+- Mode "light" pour n ≥ 10⁴ : `set_vecchia_exact_commit(false)` avant le fit
+  saute la factorisation exacte finale ; θ* vient de l'optimiseur, β/σ² du
+  profil VLL, et `predict` route automatiquement vers `predictVecchia`
+  (mean/stdev). `return_cov`/`return_deriv`, `simulate`, `update` et `save`
+  lèvent une erreur claire sur un modèle light. Chaîne complète O(n·m³) :
+  n=10⁴ fitté + prédit en ~4 s (sandbox, BLAS de référence).
 - Effet d'écran faible en grande dimension : recommandé pour d ≤ ~5
   (complémentaire de NestedKriging, robuste en dimension quelconque).
 - Ensembles Vecchia non sérialisés (reconstruits au refit).
