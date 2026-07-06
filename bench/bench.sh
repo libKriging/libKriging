@@ -50,7 +50,7 @@ for arg in "$@"; do
     d=*)
       D_DIMS="${arg#*=}"
       ;;
-    kriging|nuggetkriging|noisekriging|warpkriging|mlpkriging)
+    kriging|nuggetkriging|noisekriging|warpkriging|mlpkriging|nestedkriging|vecchia)
       BENCHMARK_FILTER="$arg"
       ;;
     warping=*)
@@ -61,7 +61,7 @@ for arg in "$@"; do
       ;;
     *)
       echo "Unknown argument: $arg"
-      echo "Valid arguments: --clean, iterations=N, n=N, d=N, kriging|nuggetkriging|noisekriging|warpkriging|mlpkriging, warping=NAME, fit|predict|simulate|update|update_simulate"
+      echo "Valid arguments: --clean, iterations=N, n=N, d=N, kriging|nuggetkriging|noisekriging|warpkriging|mlpkriging|nestedkriging|vecchia, warping=NAME, fit|predict|simulate|update|update_simulate"
       exit 1
       ;;
   esac
@@ -90,6 +90,7 @@ if [ "$CLEAN_BUILD" = true ]; then
     echo "Cleaning benchmark binaries..."
     rm -f bench/bench-kriging bench/bench-nuggetkriging bench/bench-noisekriging bench/bench-linearalgebra
     rm -f bench/bench-warpkriging bench/bench-adambfgs bench/bench-mlpkriging
+    rm -f bench/bench-nestedkriging bench/bench-vecchia
     echo "Removed all benchmark binaries"
     echo ""
 fi
@@ -107,6 +108,8 @@ BENCHMARKS["nuggetkriging"]="bench/bench-nuggetkriging"
 BENCHMARKS["noisekriging"]="bench/bench-noisekriging"
 BENCHMARKS["warpkriging"]="bench/bench-warpkriging"
 BENCHMARKS["mlpkriging"]="bench/bench-mlpkriging"
+BENCHMARKS["nestedkriging"]="bench/bench-nestedkriging"
+BENCHMARKS["vecchia"]="bench/bench-vecchia"
 
 # Function to filter output by operation
 filter_operation() {

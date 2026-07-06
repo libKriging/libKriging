@@ -7,6 +7,12 @@ message(STATUS "Configuring benchmark executables")
 add_executable(bench-kriging bench-kriging.cpp)
 target_link_libraries(bench-kriging LINK_PUBLIC Kriging)
 
+add_executable(bench-nestedkriging bench-nestedkriging.cpp)
+target_link_libraries(bench-nestedkriging LINK_PUBLIC Kriging)
+
+add_executable(bench-vecchia bench-vecchia.cpp)
+target_link_libraries(bench-vecchia LINK_PUBLIC Kriging)
+
 add_executable(bench-nuggetkriging bench-nuggetkriging.cpp)
 target_link_libraries(bench-nuggetkriging LINK_PUBLIC Kriging)
 
@@ -29,12 +35,12 @@ add_executable(bench-mlpkriging bench-mlpkriging.cpp)
 target_link_libraries(bench-mlpkriging LINK_PUBLIC Kriging)
 
 # Optionally install benchmarks
-install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging
+install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia
         RUNTIME DESTINATION bin/bench)
 
 # Add custom target to build all benchmarks
 add_custom_target(all_benchmarks
-    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging
+    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia
     COMMENT "Building all benchmark executables")
 
 # Add CTest entries for benchmarks (optional - can be run manually or via CI)

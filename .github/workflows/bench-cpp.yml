@@ -81,6 +81,18 @@ jobs:
             done
           done
 
+          # Large-n benchmarks: NestedKriging (divide-and-conquer) and Vecchia
+          # (VLL objective). Their point is n beyond the exact-kriging comfort
+          # zone, so they get a dedicated size grid.
+          for n in 400 1000 2000; do
+            for d in 2 4; do
+              for bench in nestedkriging vecchia; do
+                echo "Running: n=$n d=$d benchmark=$bench iterations=$ITERATIONS"
+                bash bench/bench.sh iterations=$ITERATIONS n=$n d=$d $bench > "build/benchmark-results/${bench}_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for $bench n=$n d=$d"
+              done
+            done
+          done
+
           # WarpKriging benchmarks — each warping is treated as its own class.
           # Fewer iterations since fit is much slower (seconds vs milliseconds).
           WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
