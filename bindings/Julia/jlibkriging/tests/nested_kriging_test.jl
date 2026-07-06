@@ -19,7 +19,7 @@ f_test(x) = sin(3.0 * x[1]) + cos(5.0 * x[2]) + x[1] * x[2]
         @test nb_groups(k) == 4
         @test length(theta(k)) == d
         @test sigma2(k) > 0
-        @test occursin("groups", summary(k))
+        @test occursin("groups", jlibkriging.summary(k))
     end
 
     @testset "All aggregations predict" begin

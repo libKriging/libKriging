@@ -9,6 +9,16 @@
 #include <omp.h>
 #endif
 
+// ThreadSanitizer reports false-positive races on OpenMP stack captures when
+// libgomp is not TSan-instrumented; disable the NK pair-loop parallelism there.
+#if defined(__SANITIZE_THREAD__)
+#define LK_NESTED_NO_OMP 1
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define LK_NESTED_NO_OMP 1
+#endif
+#endif
+
 // =============================================================================
 // static helpers
 // =============================================================================
@@ -410,8 +420,9 @@ std::tuple<arma::vec, arma::vec> NestedKriging::predict_nk(const arma::mat& X_n,
     // cross-covariances between submodel predictors, parallel over pairs
     arma::cube cross(p, p, qc, arma::fill::zeros);
     const arma::sword npairs = static_cast<arma::sword>(p * (p - 1) / 2);
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+    const arma::uword pair_work = (p > 1) ? (m_X.n_rows * m_X.n_rows) / p * qc : 0;
+#pragma omp parallel for schedule(dynamic) if (npairs > 1 && pair_work >= 40000)
 #endif
     for (arma::sword k = 0; k < npairs; ++k) {
       // unrank pair index k -> (i, j), i < j
