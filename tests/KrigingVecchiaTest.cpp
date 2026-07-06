@@ -1,6 +1,7 @@
 // clang-format off
 // Must be first
 #define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_ENABLE_BENCHMARKING
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
@@ -277,4 +278,29 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
   CHECK(rmse < 0.05 * arma::stddev(y));
+}
+
+TEST_CASE("VLL benchmark", "[.benchmark]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(400, X, y);
+  const arma::vec theta{0.3, 0.3};
+
+  Kriging k_eval(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
+
+  BENCHMARK("Kriging::fit VLL(30) n=400") {
+    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
+  };
+  BENCHMARK("Kriging::fit LL n=400") {
+    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  };
+  BENCHMARK("Kriging::logLikelihoodVecchiaFun n=400") {
+    return std::get<0>(k_eval.logLikelihoodVecchiaFun(theta, false));
+  };
+  BENCHMARK("Kriging::logLikelihoodFun n=400") {
+    return std::get<0>(k_eval.logLikelihoodFun(theta, false, false));
+  };
+  BENCHMARK("Kriging::predictVecchia 100pts n=400") {
+    return k_eval.predictVecchia(arma::mat(100, 2, arma::fill::randu), true);
+  };
 }
