@@ -127,12 +127,7 @@ void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   const auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  // Re-construct since WarpKriging is not copyable (contains unique_ptr)
-  auto wk_copy = buildObject<WarpKriging>(wk->warping_strings(), wk->kernel());
-  if (wk->is_fitted()) {
-    auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk_copy);
-    wk_ptr->fit(wk->y(), wk->X());
-  }
+  auto wk_copy = buildObject<WarpKriging>(wk->clone_for_thread());
   output.set(0, wk_copy, "copied object reference");
 }
 

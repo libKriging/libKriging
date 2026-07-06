@@ -46,13 +46,7 @@ PyWarpKriging::PyWarpKriging(const py::array_t<double>& y,
 PyWarpKriging::~PyWarpKriging() {}
 
 PyWarpKriging PyWarpKriging::copy() const {
-  // WarpKriging is not copyable (contains unique_ptr members),
-  // so we re-fit from the stored data.
-  auto clone = std::make_unique<lk::WarpKriging>(m_internal->warping_strings(), m_internal->kernel());
-  if (m_internal->is_fitted()) {
-    clone->fit(m_internal->y(), m_internal->X());
-  }
-  return PyWarpKriging(std::move(clone));
+  return PyWarpKriging(std::make_unique<lk::WarpKriging>(m_internal->clone_for_thread()));
 }
 
 void PyWarpKriging::fit(const py::array_t<double>& y,
