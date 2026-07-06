@@ -83,6 +83,41 @@ openblas_set_num_threads_t get_openblas_set_num_threads() {
 #endif
 #endif
 
+// Register pthread_atfork handlers so that forked child processes (e.g. R's
+// parallel::mclapply) inherit a clean, single-threaded BLAS/OMP state instead
+// of a locked idle thread pool that causes deadlocks.
+//
+// The prepare handler runs in the parent just before fork(): it sets BLAS and
+// OMP to 1 thread so no new parallel work can start during the fork window.
+// The child handler re-asserts single-threading in case the runtime inherited
+// stale state.  The parent handler is omitted (nullptr): the next fit() call
+// will reset threads_per_worker as needed.
+#if !defined(_WIN32) && defined(_POSIX_VERSION)
+#include <pthread.h>
+namespace {
+
+void libkriging_atfork_quiesce() {
+#if !defined(__APPLE__) || !defined(__arm64__)
+  auto fn = get_openblas_set_num_threads();
+  if (fn) fn(1);
+#endif
+#ifdef _OPENMP
+  omp_set_num_threads(1);
+#endif
+}
+
+struct ForkSafeRegistrar {
+  ForkSafeRegistrar() {
+    pthread_atfork(libkriging_atfork_quiesce,  // prepare: quiesce before fork
+                   nullptr,                    // parent:  restored by next fit()
+                   libkriging_atfork_quiesce); // child:   ensure clean state
+  }
+};
+static ForkSafeRegistrar fork_safe_registrar;
+
+}  // namespace
+#endif  // !_WIN32 && _POSIX_VERSION
+
 /************************************************/
 /**      Kriging implementation        **/
 /************************************************/
@@ -885,26 +920,40 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       auto parsed_bfgs = Optim::parse_method(optim, "BFGS");
       int multistart = parsed_bfgs.second;
 
-      // Configure threads for Armadillo/BLAS to balance nested parallelism
-      // Each of the 'multistart' threads will use internal parallelism
+      // Configure threads for Armadillo/BLAS to balance nested parallelism.
+      // Each of the 'multistart' workers uses internal BLAS/OMP parallelism.
+      // A RAII guard resets to 1 thread when the scope exits — this collapses
+      // the idle thread pool so a subsequent fork() (e.g. R's mclapply) does
+      // not inherit locked mutexes and deadlock.
       unsigned int n_cpu = std::thread::hardware_concurrency();
+      struct ThreadCountGuard {
+        bool active = false;
+        ThreadCountGuard() = default;
+        void set(unsigned int n) {
+          active = true;
+#if !defined(__APPLE__) || !defined(__arm64__)
+          auto fn = get_openblas_set_num_threads();
+          if (fn) fn(static_cast<int>(n));
+#endif
+#ifdef _OPENMP
+          omp_set_num_threads(static_cast<int>(n));
+#endif
+        }
+        ~ThreadCountGuard() {
+          if (!active) return;
+#if !defined(__APPLE__) || !defined(__arm64__)
+          auto fn = get_openblas_set_num_threads();
+          if (fn) fn(1);
+#endif
+#ifdef _OPENMP
+          omp_set_num_threads(1);
+#endif
+        }
+      } thread_guard;
+
       if (n_cpu > 0 && multistart > 1) {
         unsigned int threads_per_worker = std::max(1u, n_cpu / multistart);
-
-        // Set OpenBLAS threads (if available)
-        // Note: Skip on macOS ARM64 where Accelerate framework is used
-#if !defined(__APPLE__) || !defined(__arm64__)
-        auto openblas_fn = get_openblas_set_num_threads();
-        if (openblas_fn != nullptr) {
-          openblas_fn(threads_per_worker);
-        }
-#endif
-
-// Set OpenMP threads (for Armadillo operations that use OpenMP)
-#ifdef _OPENMP
-        omp_set_num_threads(threads_per_worker);
-#endif
-
+        thread_guard.set(threads_per_worker);
         if (Optim::log_level > Optim::log_none) {
           arma::cout << "Threads per worker: " << threads_per_worker << " (total CPUs: " << n_cpu
                      << ", multistart: " << multistart << ")" << arma::endl;
