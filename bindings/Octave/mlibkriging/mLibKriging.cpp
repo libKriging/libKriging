@@ -1,6 +1,6 @@
 #include "Kriging_binding.hpp"
-#include "NestedKriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
+#include "NestedKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
 #include "WarpKriging_binding.hpp"

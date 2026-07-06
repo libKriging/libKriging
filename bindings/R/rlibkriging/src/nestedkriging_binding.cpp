@@ -22,9 +22,8 @@ static Kriging::Parameters parameters_from_list(Rcpp::Nullable<Rcpp::List> param
     }
     if (params.containsElementNamed("theta")) {
       out.theta = Rcpp::as<arma::mat>(params["theta"]);
-      out.is_theta_estim
-          = !(params.containsElementNamed("is_theta_estim") && !Rcpp::as<bool>(params["is_theta_estim"]))
-            && optim != "none";
+      out.is_theta_estim = !(params.containsElementNamed("is_theta_estim") && !Rcpp::as<bool>(params["is_theta_estim"]))
+                           && optim != "none";
     }
     if (params.containsElementNamed("beta")) {
       out.beta = Rcpp::as<arma::colvec>(params["beta"]);
@@ -56,20 +55,20 @@ Rcpp::List new_NestedKrigingFit(arma::vec y,
                                 std::string objective = "LL",
                                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
                                 Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue) {
-  NestedKriging* nk = new NestedKriging(y,
-                                        X,
-                                        kernel,
-                                        nb_groups,
-                                        NestedKriging::aggregationFromString(aggregation),
-                                        partition_from_string(partition),
-                                        seed,
-                                        Trend::fromString(regmodel),
-                                        optim,
-                                        objective,
-                                        parameters_from_list(parameters, optim),
-                                        warping.isNotNull()
-                                            ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
-                                            : std::vector<std::string>{});
+  NestedKriging* nk
+      = new NestedKriging(y,
+                          X,
+                          kernel,
+                          nb_groups,
+                          NestedKriging::aggregationFromString(aggregation),
+                          partition_from_string(partition),
+                          seed,
+                          Trend::fromString(regmodel),
+                          optim,
+                          objective,
+                          parameters_from_list(parameters, optim),
+                          warping.isNotNull() ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
+                                              : std::vector<std::string>{});
 
   Rcpp::XPtr<NestedKriging> impl_ptr(nk);
 

@@ -107,9 +107,9 @@ class NestedKriging {
   [[nodiscard]] bool warped() const { return !m_warping.empty(); }
   [[nodiscard]] const std::vector<std::string>& warping() const { return m_warping; }
   /// Plain-path submodel access (throws when warped)
-  [[nodiscard]] const Kriging& submodel(arma::uword i) const;
+  [[nodiscard]] LIBKRIGING_EXPORT const Kriging& submodel(arma::uword i) const;
   /// Warped-path submodel access (throws when plain)
-  [[nodiscard]] const libKriging::WarpKriging& wsubmodel(arma::uword i) const;
+  [[nodiscard]] LIBKRIGING_EXPORT const libKriging::WarpKriging& wsubmodel(arma::uword i) const;
   [[nodiscard]] const arma::vec& theta() const { return m_theta; }
   [[nodiscard]] double sigma2() const { return m_sigma2; }
   [[nodiscard]] double beta0() const { return m_beta0; }
@@ -141,10 +141,10 @@ class NestedKriging {
   arma::vec m_y;
   Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
   std::vector<arma::uvec> m_groups;
-  std::vector<std::unique_ptr<Kriging>> m_submodels;       ///< plain path
+  std::vector<std::unique_ptr<Kriging>> m_submodels;                   ///< plain path
   std::vector<std::unique_ptr<libKriging::WarpKriging>> m_wsubmodels;  ///< warped path
-  std::vector<std::string> m_warping;                      ///< empty = plain
-  arma::uword m_warp_subsample = 1000;  ///< subsample size for the warped reference fit
+  std::vector<std::string> m_warping;                                  ///< empty = plain
+  arma::uword m_warp_subsample = 1000;                                 ///< subsample size for the warped reference fit
 
   // unified (common prior) hyperparameters
   arma::vec m_theta;
@@ -152,9 +152,9 @@ class NestedKriging {
   double m_beta0 = 0;
 
   // NK precomputations (per group, common prior)
-  Covariance::CovFunc m_corr;          ///< resolved correlation kernel (plain path)
-  std::vector<arma::mat> m_L;          ///< lower Cholesky of R_g (jittered)
-  std::vector<arma::vec> m_alpha;      ///< R_g^{-1} (y_g - beta0)
+  Covariance::CovFunc m_corr;      ///< resolved correlation kernel (plain path)
+  std::vector<arma::mat> m_L;      ///< lower Cholesky of R_g (jittered)
+  std::vector<arma::vec> m_alpha;  ///< R_g^{-1} (y_g - beta0)
   bool m_is_fitted = false;
 
   static constexpr double jitter = 1e-10;

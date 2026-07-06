@@ -72,7 +72,8 @@ void PyNestedKriging::fit(const py::array_t<double>& y,
                           const std::vector<std::string>& warping) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
-  m_internal->fit(mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping);
+  m_internal->fit(
+      mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>> PyNestedKriging::predict(const py::array_t<double>& X_n,

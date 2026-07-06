@@ -13,8 +13,8 @@
 #include "DictTest.hpp"
 
 #include "Kriging_binding.hpp"
-#include "NestedKriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
+#include "NestedKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
 
@@ -94,8 +94,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .export_values();
 
   const std::string default_regmodel = "constant";
-
-
 
   const bool default_normalize = false;
   const std::string default_optim = "BFGS";
@@ -223,7 +221,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   const std::string default_warp_optim = "BFGS+Adam";
 
-/* --- NestedKriging --- */
+  /* --- NestedKriging --- */
   py::class_<PyNestedKriging>(m, "WrappedPyNestedKriging")
       .def(py::init<const std::string&>(), py::arg("kernel"))
       .def(py::init<const py::array_t<double>&,
@@ -275,7 +273,6 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
       .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
       .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
-
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")
       .def(py::init<const std::vector<std::string>&, const std::string&>(),
