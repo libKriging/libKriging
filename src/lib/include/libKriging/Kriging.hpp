@@ -98,7 +98,12 @@ class Kriging : public KrigingImpl {
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
-   * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+   * @param objective is 'LL' (log-likelihood, default), 'LOO' (leave-one-out),
+   *        'LMP' (log-marginal posterior), or 'VLL'/'VLL(m)' for the Vecchia
+   *        approximated log-likelihood with m conditioning neighbors (default
+   *        m=30): O(n m^3) per evaluation instead of O(n^3), recommended for
+   *        large n in low dimension (see docs/dev/VecchiaLL.md). Ignored if
+   *        optim=='none'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
@@ -132,6 +137,36 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT double logMargPost();
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
+
+  /** Vecchia approximated log-likelihood at given theta (objective="VLL(m)").
+   * Requires the Vecchia sets to be built, i.e. the model to have been fitted
+   * with objective="VLL" or "VLL(m)".
+   * @return (vll, gradient) ; gradient empty if return_grad=false. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodVecchiaFun(const arma::vec& theta, bool return_grad);
+
+  /// Number of Vecchia conditioning neighbors (0 = not fitted with VLL)
+  [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
+
+  /** Large-n mode: when set to false BEFORE a fit with objective="VLL(m)",
+   * the final exact O(n^3) factorization is skipped. The model then stores
+   * theta* plus VLL-profiled beta/sigma2, and `predict` transparently routes
+   * to `predictVecchia` (mean/stdev only); return_cov/return_deriv, simulate,
+   * update and save are not available on such a "light" model. */
+  LIBKRIGING_EXPORT void set_vecchia_exact_commit(bool b) { m_vecchia_exact_commit = b; }
+  [[nodiscard]] bool vecchia_exact_commit() const { return m_vecchia_exact_commit; }
+  /// True when the current fit skipped the exact factorization (light mode)
+  [[nodiscard]] bool is_vecchia_light() const { return m_vecchia_light; }
+
+  /** Vecchia (local) prediction: each point of X_n is kriged on its m nearest
+   * observations only — O(q m^3) instead of O(q n^2), embarrassingly parallel.
+   * Mean is universal-kriging-style with the committed beta; variance is the
+   * simple-kriging one (beta treated as known). Usable after any fit.
+   * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
+   *          fitted with VLL, else 30)
+   * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictVecchia(const arma::mat& X_n,
+                                                                    bool return_stdev = true,
+                                                                    arma::uword m = 0);
 
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
@@ -212,6 +247,29 @@ class Kriging : public KrigingImpl {
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;
+
+  // --- Vecchia approximated likelihood (objective="VLL(m)") -----------------
+  // Built once per fit (maxmin ordering + m nearest previously-ordered
+  // neighbors on normalized inputs), then reused for every VLL evaluation.
+  arma::uword m_vecchia_m = 0;                  ///< 0 = Vecchia mode off
+  arma::uvec m_vecchia_order;                   ///< maxmin ordering (row indices of m_X)
+  std::vector<arma::uvec> m_vecchia_neighbors;  ///< per ordered point, global row indices
+
+  /// Parse "VLL" (default m=30) or "VLL(m)"; throws on malformed spec.
+  static arma::uword parse_vll_m(const std::string& objective);
+  /// Build m_vecchia_order / m_vecchia_neighbors from m_X (call after fit_setup_impl).
+  void make_vecchia_sets();
+  /// Vecchia log-likelihood with profiled sigma2 and (GLS-profiled) beta;
+  /// analytic gradient in theta via the envelope theorem. Optional out-params
+  /// expose the profiled beta/sigma2 (used by the light-mode commit).
+  double _logLikelihoodVecchia(const arma::vec& _theta,
+                               arma::vec* grad_out,
+                               arma::vec* beta_out = nullptr,
+                               double* sigma2_out = nullptr) const;
+  bool m_vecchia_exact_commit = true;  ///< false = skip the exact factorization at commit
+  bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
+  /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
+  void check_not_vecchia_light(const char* what) const;
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

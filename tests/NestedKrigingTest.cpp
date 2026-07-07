@@ -357,3 +357,59 @@ TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[ne
   auto [m2, s2] = nk_full.predict(X, true);
   CHECK(arma::abs(m2 - y).max() < 1e-3);
 }
+
+TEST_CASE("NestedKriging with a VLL objective: globally unified prior", "[nested][vecchia]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(600, 2, X, y);
+
+  // the common prior comes from ONE global light Vecchia fit
+  NestedKriging nk(y,
+                   X,
+                   "matern5_2",
+                   /*nb_groups=*/3,
+                   NestedKriging::Aggregation::NK,
+                   NestedKriging::Partition::KMeans,
+                   123,
+                   Trend::RegressionModel::Constant,
+                   "BFGS",
+                   "VLL(20)");
+
+  // all submodels carry the globally estimated prior
+  for (arma::uword g = 0; g < nk.nb_groups(); ++g) {
+    CHECK(arma::abs(nk.submodel(g).theta() - nk.theta()).max() < 1e-12);
+    CHECK(std::abs(nk.submodel(g).sigma2() - nk.sigma2()) < 1e-12);
+    CHECK(std::abs(nk.submodel(g).beta()(0) - nk.beta0()) < 1e-12);
+  }
+
+  // NK aggregation still interpolates (property of the aggregation)
+  auto [mean, stdev] = nk.predict(X.rows(0, 99), true);
+  CHECK(arma::abs(mean - y.head(100)).max() < 1e-3);
+
+  // accuracy comparable to the LL-unified path
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(150, 2, Xt, yt, 456);
+  NestedKriging nk_ll(y, X, "matern5_2", 3, NestedKriging::Aggregation::NK);
+  auto [m_v, s_v] = nk.predict(Xt, true);
+  auto [m_l, s_l] = nk_ll.predict(Xt, true);
+  const double rmse_v = std::sqrt(arma::mean(arma::square(m_v - yt)));
+  const double rmse_l = std::sqrt(arma::mean(arma::square(m_l - yt)));
+  INFO("rmse VLL-unified = " << rmse_v << " vs LL-unified = " << rmse_l);
+  CHECK(rmse_v < 2.0 * rmse_l + 0.05 * arma::stddev(y));
+
+  // VLL + warping is not supported
+  CHECK_THROWS_AS(NestedKriging(y,
+                                X,
+                                "gauss",
+                                3,
+                                NestedKriging::Aggregation::NK,
+                                NestedKriging::Partition::KMeans,
+                                123,
+                                Trend::RegressionModel::Constant,
+                                "BFGS",
+                                "VLL(20)",
+                                Kriging::Parameters{},
+                                std::vector<std::string>{"kumaraswamy", "kumaraswamy"}),
+                  std::invalid_argument);
+}

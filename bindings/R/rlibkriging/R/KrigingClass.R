@@ -53,7 +53,11 @@ classKriging <- function(nk) {
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares and \code{"LMP"} for the Log-Marginal Posterior.
+#'     squares, \code{"LMP"} for the Log-Marginal Posterior, and
+#'     \code{"VLL"} or \code{"VLL(m)"} for the Vecchia approximated
+#'     log-likelihood with \code{m} conditioning neighbors (default 30):
+#'     each evaluation costs O(n m^3) instead of O(n^3), recommended for
+#'     large designs in low dimension.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the

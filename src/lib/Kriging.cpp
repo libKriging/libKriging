@@ -2,6 +2,7 @@
 // MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
 #define _USE_MATH_DEFINES // required for Visual Studio
 
+#include <algorithm>
 #include <cmath>
 // clang-format on
 
@@ -19,7 +20,6 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
-
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -701,6 +701,326 @@ static arma::vec nugget_reparam_from_deriv(const arma::vec& _theta_alpha, const 
   return D;
 }
 
+// =============================================================================
+// Vecchia approximated log-likelihood (objective="VLL(m)")
+//
+// Vecchia (1988): log p(y) = sum_i log p(y_i | y_{N(i)}) where N(i) is the set
+// of (at most) m nearest previously-ordered neighbors in a maxmin ordering.
+// Cost O(n m^3) per evaluation instead of O(n^3); valid Gaussian density
+// (sparse inverse Cholesky); exact for m = n-1. See Guinness (2018),
+// Katzfuss & Guinness (2021).
+//
+// Profiling matches the exact "LL" objective: sigma2 in closed form, beta by
+// (per-conditional) GLS. Gradient in theta is analytic; the theta-dependence
+// of beta_hat is ignored by the envelope theorem (d/dbeta = 0 at beta_hat).
+// =============================================================================
+
+arma::uword Kriging::parse_vll_m(const std::string& objective) {
+  // "VLL" -> default 30 ; "VLL(m)" -> m
+  if (objective == "VLL")
+    return 30;
+  if (objective.rfind("VLL(", 0) == 0 && objective.back() == ')') {
+    const std::string inside = objective.substr(4, objective.size() - 5);
+    try {
+      const long m = std::stol(inside);
+      if (m >= 1)
+        return static_cast<arma::uword>(m);
+    } catch (const std::exception&) {
+      // fall through to the throw below
+    }
+  }
+  throw std::invalid_argument("Invalid Vecchia objective '" + objective
+                              + "': expected \"VLL\" or \"VLL(m)\" with m >= 1 (e.g. \"VLL(30)\")");
+}
+
+void Kriging::make_vecchia_sets() {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword m = std::min<arma::uword>(m_vecchia_m, n - 1);
+
+  // column-major layout (d x n) for cache-friendly point access in the O(n^2)
+  // loops below; arma row access in tight loops allocates temporaries
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+  auto dist2 = [xp, d](arma::uword i, arma::uword j) {
+    const double* a = xp + i * d;
+    const double* b = xp + j * d;
+    double s = 0;
+    for (arma::uword k = 0; k < d; ++k) {
+      const double dk = a[k] - b[k];
+      s += dk * dk;
+    }
+    return s;
+  };
+
+  // --- greedy maxmin ordering (Guinness 2018) on normalized inputs ---------
+  // start from the point closest to the centroid, then repeatedly add the
+  // point maximizing its minimal distance to already-ordered points. O(n^2 d).
+  m_vecchia_order.set_size(n);
+  const arma::vec centroid = arma::mean(Xt, 1);
+  arma::vec mind2(n);
+  for (arma::uword i = 0; i < n; ++i) {
+    double s = 0;
+    for (arma::uword k = 0; k < d; ++k) {
+      const double dk = xp[i * d + k] - centroid(k);
+      s += dk * dk;
+    }
+    mind2(i) = s;
+  }
+  m_vecchia_order(0) = mind2.index_min();
+  for (arma::uword i = 0; i < n; ++i)
+    mind2(i) = dist2(i, m_vecchia_order(0));
+  mind2(m_vecchia_order(0)) = -arma::datum::inf;
+  for (arma::uword t = 1; t < n; ++t) {
+    const arma::uword next = mind2.index_max();
+    m_vecchia_order(t) = next;
+    double* mp = mind2.memptr();
+    for (arma::uword i = 0; i < n; ++i) {
+      if (mp[i] == -arma::datum::inf)
+        continue;
+      const double d2 = dist2(i, next);
+      if (d2 < mp[i])
+        mp[i] = d2;
+    }
+    mind2(next) = -arma::datum::inf;
+  }
+
+  // --- m nearest previously-ordered neighbors (global row indices) ---------
+  // partial selection (nth_element) instead of a full sort: O(n^2 d) total
+  m_vecchia_neighbors.assign(n, arma::uvec());
+  std::vector<std::pair<double, arma::uword>> cand;
+  for (arma::uword t = 1; t < n; ++t) {
+    const arma::uword k = std::min<arma::uword>(m, t);
+    cand.resize(t);
+    for (arma::uword j = 0; j < t; ++j)
+      cand[j] = {dist2(m_vecchia_order(t), m_vecchia_order(j)), m_vecchia_order(j)};
+    if (k < t)
+      std::nth_element(cand.begin(), cand.begin() + k, cand.end());
+    arma::uvec nb(k);
+    for (arma::uword j = 0; j < k; ++j)
+      nb(j) = cand[j].second;
+    m_vecchia_neighbors[t] = nb;
+  }
+}
+
+double Kriging::_logLikelihoodVecchia(const arma::vec& _theta,
+                                      arma::vec* grad_out,
+                                      arma::vec* beta_out,
+                                      double* sigma2_out) const {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword p = m_F.n_cols;
+  const bool with_grad = (grad_out != nullptr);
+  constexpr double v_floor = 1e-15;
+
+  arma::vec u(n);     // y_i - a' y_N  (trend-free residual numerator)
+  arma::vec v(n);     // conditional correlation variance 1 - r'a
+  arma::mat W(p, n);  // w_i = f_i - F_N' a  (per-conditional trend design)
+  arma::mat du, dv;
+  arma::cube dW;
+  if (with_grad) {
+    du.zeros(n, d);
+    dv.zeros(n, d);
+    dW.zeros(p, n, d);
+  }
+
+  for (arma::uword t = 0; t < n; ++t) {
+    const arma::uword oi = m_vecchia_order(t);
+    const arma::uvec& Ni = m_vecchia_neighbors[t];
+    const arma::uword mi = Ni.n_elem;
+    if (mi == 0) {
+      u(t) = m_y(oi);
+      v(t) = 1.0;
+      W.col(t) = m_F.row(oi).t();
+      continue;
+    }
+
+    // correlations (and their theta-derivatives) within {N(i), i}
+    arma::mat RN(mi, mi, arma::fill::ones);
+    arma::vec r(mi);
+    arma::cube dRN;
+    arma::mat dr;
+    if (with_grad) {
+      dRN.zeros(mi, mi, d);
+      dr.zeros(mi, d);
+    }
+    for (arma::uword a = 0; a < mi; ++a) {
+      for (arma::uword b = a + 1; b < mi; ++b) {
+        const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
+        const double c = _Cov(dx, _theta);
+        RN(a, b) = RN(b, a) = c;
+        if (with_grad) {
+          const arma::vec dln = _DlnCovDtheta(dx, _theta);
+          for (arma::uword k = 0; k < d; ++k)
+            dRN(a, b, k) = dRN(b, a, k) = c * dln(k);
+        }
+      }
+      const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(oi)).t();
+      const double c = _Cov(dx, _theta);
+      r(a) = c;
+      if (with_grad) {
+        const arma::vec dln = _DlnCovDtheta(dx, _theta);
+        for (arma::uword k = 0; k < d; ++k)
+          dr(a, k) = c * dln(k);
+      }
+    }
+    RN.diag() += LinearAlgebra::num_nugget;
+
+    const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+    const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+
+    v(t) = std::max(1.0 - arma::dot(r, a_vec), v_floor);
+    u(t) = m_y(oi) - arma::dot(a_vec, m_y(Ni));
+    W.col(t) = m_F.row(oi).t() - m_F.rows(Ni).t() * a_vec;
+
+    if (with_grad) {
+      const arma::mat FN_t = m_F.rows(Ni).t();  // p x mi
+      const arma::vec yN = m_y(Ni);
+      for (arma::uword k = 0; k < d; ++k) {
+        const arma::vec rhs = dr.col(k) - dRN.slice(k) * a_vec;
+        const arma::vec da = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), rhs));
+        dv(t, k) = -(arma::dot(dr.col(k), a_vec) + arma::dot(r, da));
+        du(t, k) = -arma::dot(da, yN);
+        dW.slice(k).col(t) = -FN_t * da;
+      }
+    }
+  }
+
+  // --- profiled beta (GLS over the per-conditional design) -------------------
+  arma::vec beta;
+  if (m_est_beta || m_beta.n_elem != p) {
+    arma::mat A(p, p, arma::fill::zeros);
+    arma::vec b(p, arma::fill::zeros);
+    for (arma::uword t = 0; t < n; ++t) {
+      A += W.col(t) * W.col(t).t() / v(t);
+      b += W.col(t) * u(t) / v(t);
+    }
+    A.diag() += LinearAlgebra::num_nugget;
+    beta = arma::solve(A, b, arma::solve_opts::likely_sympd);
+  } else {
+    beta = m_beta;
+  }
+
+  // --- profiled sigma2 & objective -------------------------------------------
+  const arma::vec e = u - W.t() * beta;
+  const double Q = arma::accu(e % e / v);
+  const double sigma2 = Q / n;
+  if (beta_out != nullptr)
+    *beta_out = beta;
+  if (sigma2_out != nullptr)
+    *sigma2_out = sigma2;
+  const double vll = -0.5 * n * std::log(2 * M_PI * sigma2) - 0.5 * arma::accu(arma::log(v)) - 0.5 * n;
+
+  if (with_grad) {
+    // envelope theorem: dQ/dbeta = 0 at beta_hat, so beta_hat's
+    // theta-dependence does not contribute to the gradient
+    for (arma::uword k = 0; k < d; ++k) {
+      const arma::vec de = du.col(k) - dW.slice(k).t() * beta;
+      const double dQ = arma::accu(2.0 * e % de / v - (e % e / (v % v)) % dv.col(k));
+      (*grad_out)(k) = -0.5 * n * dQ / Q - 0.5 * arma::accu(dv.col(k) / v);
+    }
+  }
+  return vll;
+}
+
+void Kriging::check_not_vecchia_light(const char* what) const {
+  if (m_vecchia_light)
+    throw std::runtime_error(std::string(what)
+                             + ": not available on a light Vecchia fit "
+                               "(refit with set_vecchia_exact_commit(true))");
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun(const arma::vec& theta,
+                                                                                 bool return_grad) {
+  if (m_vecchia_m == 0 || m_vecchia_order.n_elem != m_X.n_rows)
+    throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with objective=\"VLL(m)\"");
+  arma::vec grad;
+  if (return_grad) {
+    grad.set_size(theta.n_elem);
+    const double vll = _logLikelihoodVecchia(theta, &grad);
+    return {vll, grad};
+  }
+  return {_logLikelihoodVecchia(theta, nullptr), grad};
+}
+
+/* Vecchia (local) prediction: condition each prediction point on its m
+ * nearest observations only (Katzfuss & Guinness 2021, response-only
+ * conditioning). Per point: O(m^3); no cross-covariances between prediction
+ * points (use predict() for the exact joint version). */
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const arma::mat& X_n,
+                                                                           bool return_stdev,
+                                                                           arma::uword m) {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword q = X_n.n_rows;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("X_n should have the same number of columns as X");
+  if (m == 0)
+    m = (m_vecchia_m > 0) ? m_vecchia_m : 30;
+  m = std::min<arma::uword>(m, n);
+
+  // normalize prediction inputs like predict() does
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  arma::vec mean(q);
+  arma::vec stdev(return_stdev ? q : 0);
+
+  // column-major observed inputs for cache-friendly neighbor search
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m >= 40000)
+#endif
+  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+    // m nearest observations (normalized space), partial selection
+    std::vector<std::pair<double, arma::uword>> cand(n);
+    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+    for (arma::uword j = 0; j < n; ++j) {
+      double s = 0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double dk = x_t(k) - xp[j * d + k];
+        s += dk * dk;
+      }
+      cand[j] = {s, j};
+    }
+    if (m < n)
+      std::nth_element(cand.begin(), cand.begin() + m, cand.end());
+    arma::uvec Ni(m);
+    for (arma::uword j = 0; j < m; ++j)
+      Ni(j) = cand[j].second;
+
+    // local kriging on the neighborhood
+    arma::mat RN(m, m, arma::fill::ones);
+    arma::vec r(m);
+    for (arma::uword a = 0; a < m; ++a) {
+      for (arma::uword b = a + 1; b < m; ++b) {
+        const arma::vec dx = (m_X.row(Ni(a)) - m_X.row(Ni(b))).t();
+        RN(a, b) = RN(b, a) = _Cov(dx, m_theta);
+      }
+      const arma::vec dx = (m_X.row(Ni(a)) - x_t).t();
+      r(a) = _Cov(dx, m_theta);
+    }
+    RN.diag() += LinearAlgebra::num_nugget;
+    const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+    const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+
+    const arma::vec resid = m_y(Ni) - m_F.rows(Ni) * m_beta;
+    mean(t) = arma::dot(F_n.row(static_cast<arma::uword>(t)), m_beta) + arma::dot(a_vec, resid);
+    if (return_stdev)
+      stdev(t) = std::sqrt(m_sigma2 * std::max(0.0, 1.0 - arma::dot(r, a_vec)));
+  }
+
+  // de-normalize outputs
+  mean = mean * m_scaleY + m_centerY;
+  if (return_stdev)
+    stdev = stdev * m_scaleY;
+  return {mean, stdev};
+}
+
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
   if (objective == "LL") {
     if (m_noise_model == NoiseModel::Nugget) {
@@ -810,8 +1130,38 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
         return -lmp;
       };
     }
+  } else if (objective.rfind("VLL", 0) == 0) {
+    parse_vll_m(objective);  // validate the spec early (throws on malformed)
+    if (m_noise_model != NoiseModel::None)
+      throw std::invalid_argument("VLL objective not supported for Nugget/Heterogeneous noise modes");
+    // Protocol: during optimization the caller passes grad_out != nullptr and
+    // we evaluate the O(n m^3) Vecchia likelihood without touching km_data.
+    // The single final call (grad_out == nullptr, km_data != nullptr) performs
+    // ONE exact O(n^3) factorization at theta* so that the committed model
+    // (and thus predict/simulate/update) behaves exactly as after an "LL" fit.
+    if (Optim::reparametrize) {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
+          return -this->_logLikelihood(_theta, nullptr, km_data, nullptr);
+        double vll = this->_logLikelihoodVecchia(_theta, grad_out);
+        if (grad_out != nullptr)
+          *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
+        return -vll;
+      };
+    } else {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
+        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
+          return -this->_logLikelihood(_gamma, nullptr, km_data, nullptr);
+        double vll = this->_logLikelihoodVecchia(_gamma, grad_out);
+        if (grad_out != nullptr)
+          *grad_out = -*grad_out;
+        return -vll;
+      };
+    }
   } else
-    throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
+    throw std::invalid_argument("Unsupported fit objective: " + objective
+                                + " (supported are: LL, LOO, LMP, VLL, VLL(m))");
 }
 
 /** Fit the kriging object on (X,y):
@@ -820,7 +1170,9 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param normalize is a boolean to enforce inputs/output normalization
  * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
- * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+ * @param objective is 'LL' (default), 'LOO', 'LMP', or 'VLL'/'VLL(m)' for the
+ *        Vecchia approximated log-likelihood with m conditioning neighbors
+ *        (default m=30). Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
@@ -839,6 +1191,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
   arma::mat theta0
       = fit_setup_impl(y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta);
+
+  m_vecchia_light = false;
+  if (objective.rfind("VLL", 0) == 0) {
+    m_vecchia_m = parse_vll_m(objective);
+    make_vecchia_sets();
+  } else {
+    m_vecchia_m = 0;
+  }
+
   const double scaleY = m_scaleY;
   const arma::rowvec& scaleX = m_scaleX;
 
@@ -1319,7 +1680,22 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       // Update member variables with best result
-      if (best_idx >= 0) {
+      if (best_idx >= 0 && m_vecchia_m > 0 && !m_vecchia_exact_commit) {
+        // light Vecchia commit: no exact factorization; theta from the
+        // optimizer, beta/sigma2 profiled by the Vecchia likelihood
+        const auto& best = results[best_idx];
+        m_theta = best.theta;
+        m_est_theta = true;
+        arma::vec beta_v;
+        double sigma2_v = -1;
+        _logLikelihoodVecchia(m_theta, nullptr, &beta_v, &sigma2_v);
+        if (m_est_beta)
+          m_beta = beta_v;
+        if (m_est_sigma2)
+          m_sigma2 = sigma2_v;
+        m_vecchia_light = true;
+        m_is_empty = true;  // no committed factorization: predict routes to predictVecchia
+      } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
         m_est_theta = true;
@@ -1405,6 +1781,16 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+  if (m_vecchia_light) {
+    // light Vecchia fit: no exact factorization available; route mean/stdev
+    // to the local Vecchia predictor
+    if (return_cov || return_deriv)
+      throw std::runtime_error(
+          "predict: return_cov/return_deriv are not available on a light Vecchia fit "
+          "(refit with set_vecchia_exact_commit(true), or use predictVecchia)");
+    auto [mean, stdev] = predictVecchia(X_n, return_stdev);
+    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+  }
   const arma::uword n_o = m_X.n_rows;
   const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
@@ -1441,6 +1827,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
+  check_not_vecchia_light("simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -1508,6 +1895,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
+  check_not_vecchia_light("update_simulate");
   if (m_noise_model == NoiseModel::Nugget) {
     const double alpha = m_alpha;
     return update_simulate_impl(y_u,
@@ -1567,6 +1955,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
+  check_not_vecchia_light("update");
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -1618,6 +2007,11 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
     // Update trend matrix
     m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+    if (m_objective.rfind("VLL", 0) == 0) {
+      m_vecchia_m = parse_vll_m(m_objective);
+      make_vecchia_sets();  // m_X was just extended
+    }
 
     FitOfn fit_ofn = make_fit_objective(m_objective);
 
@@ -1694,6 +2088,11 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
                        gamma_lower.memptr(),
                        gamma_upper.memptr(),
                        bounds_type.memptr());
+
+    // VLL evaluations do not populate km during optimization; perform the
+    // single exact factorization at the optimum before committing the model.
+    if (m_objective.rfind("VLL", 0) == 0)
+      fit_ofn(gamma_tmp, nullptr, &km);
 
     // Extract theta and extra param from optimized gamma
     if (m_noise_model == NoiseModel::Nugget) {
@@ -1810,6 +2209,7 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 }
 
 void Kriging::save(const std::string filename) const {
+  check_not_vecchia_light("save");
   nlohmann::json j;
   j["version"] = 2;
   j["content"] = "Kriging";
