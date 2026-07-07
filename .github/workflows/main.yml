@@ -34,6 +34,10 @@ on:
 
 env:
   DEBUG_CI: true
+  # cmake >= 4 rejects dependencies declaring cmake_minimum_required < 3.5
+  # (the pinned pybind11 submodule does); this env is honored by cmake as the
+  # CMAKE_POLICY_VERSION_MINIMUM variable and restores the old behavior.
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
 jobs:
   guideline-checks:
@@ -246,12 +250,13 @@ jobs:
       - name: Setup cmake
         uses: lukka/get-cmake@v4.3.2
         with:
-          # >= 4.1 required: the windows-2025-vs2026 runner image only ships
-          # Visual Studio 2026, whose generator ("Visual Studio 18 2026") is
-          # unknown to cmake <= 4.0 (fallback to NMake then breaks on
-          # CMAKE_GENERATOR_PLATFORM). The whole project configures cleanly
-          # with cmake 4.x (all dependencies declare cmake_minimum >= 3.5).
-          cmakeVersion: '~4.1.0'
+          # >= 4.2 required: the windows-2025-vs2026 runner image only ships
+          # Visual Studio 2026, whose generator ("Visual Studio 18 2026") was
+          # added in cmake 4.2 (older cmake falls back to NMake and then
+          # breaks on CMAKE_GENERATOR_PLATFORM). See the global
+          # CMAKE_POLICY_VERSION_MINIMUM env for the cmake-4.x compatibility
+          # shim needed by the pybind11 submodule.
+          cmakeVersion: '~4.2.0'
 
       - name: before_script
         shell: bash
