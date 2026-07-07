@@ -1170,7 +1170,9 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param normalize is a boolean to enforce inputs/output normalization
  * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
- * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+ * @param objective is 'LL' (default), 'LOO', 'LMP', or 'VLL'/'VLL(m)' for the
+ *        Vecchia approximated log-likelihood with m conditioning neighbors
+ *        (default m=30). Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,

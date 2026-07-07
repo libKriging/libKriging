@@ -1,7 +1,9 @@
 classdef NestedKriging < handle
     % Divide-and-conquer Kriging for large designs (see libKriging NestedKriging).
     % k = NestedKriging(y, X, kernel, nb_groups, [aggregation], [partition], [seed],
-    %                   [regmodel], [optim], [objective], [parameters])
+    %                   [regmodel], [optim], [objective], [parameters], [warping_cell])
+    % aggregation: "NK" (optimal, default) | "PoE" | "gPoE" | "BCM" | "rBCM"
+    % objective  : "LL" (default) | "VLL(m)" (common prior from one global Vecchia fit)
     properties
         ref
     end

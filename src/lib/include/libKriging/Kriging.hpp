@@ -98,7 +98,12 @@ class Kriging : public KrigingImpl {
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
-   * @param objective is 'LOO' or 'LL'. Ignored if optim=='none'.
+   * @param objective is 'LL' (log-likelihood, default), 'LOO' (leave-one-out),
+   *        'LMP' (log-marginal posterior), or 'VLL'/'VLL(m)' for the Vecchia
+   *        approximated log-likelihood with m conditioning neighbors (default
+   *        m=30): O(n m^3) per evaluation instead of O(n^3), recommended for
+   *        large n in low dimension (see docs/dev/VecchiaLL.md). Ignored if
+   *        optim=='none'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,

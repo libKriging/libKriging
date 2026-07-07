@@ -82,6 +82,15 @@ function Kriging(kernel::String; noise::Union{Nothing,String}=nothing)
     return Kriging(_check_ptr(ptr))
 end
 
+"""
+    Kriging(y, X, kernel; regmodel="constant", optim="BFGS", objective="LL", ...)
+
+Fit a Kriging model. `objective` selects the fit criterion: `"LL"`
+(log-likelihood, default), `"LOO"` (leave-one-out), `"LMP"` (log-marginal
+posterior), or `"VLL"`/`"VLL(m)"` for the Vecchia approximated log-likelihood
+with `m` conditioning neighbors (default 30) — O(n m^3) per evaluation instead
+of O(n^3), recommended for large designs in low dimension.
+"""
 function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  noise::Union{Nothing,String,Float64,Vector{Float64}}=nothing,
                  regmodel::String="constant",
