@@ -246,7 +246,12 @@ jobs:
       - name: Setup cmake
         uses: lukka/get-cmake@v4.3.2
         with:
-          cmakeVersion: '~3.24.0'
+          # >= 4.1 required: the windows-2025-vs2026 runner image only ships
+          # Visual Studio 2026, whose generator ("Visual Studio 18 2026") is
+          # unknown to cmake <= 4.0 (fallback to NMake then breaks on
+          # CMAKE_GENERATOR_PLATFORM). The whole project configures cleanly
+          # with cmake 4.x (all dependencies declare cmake_minimum >= 3.5).
+          cmakeVersion: '~4.1.0'
 
       - name: before_script
         shell: bash

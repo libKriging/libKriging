@@ -22,7 +22,9 @@ if [ ! -f "$HOME/Miniconda3/condabin/conda.bat" ]; then
   "${BASEDIR}"/../windows/install_conda.bat
   popd
 fi
-$HOME/Miniconda3/Scripts/conda.exe update -y -n base -c defaults conda
+# NB: no `conda update -n base` here: updating the runner-image Miniconda in
+# place crashes (PermissionError on in-use libcrypto DLL + conda rollback bug);
+# a plain install is sufficient and is what tools/windows/install.sh does.
 $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config
 
 # https://chocolatey.org/docs/commands-install
