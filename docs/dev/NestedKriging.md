@@ -75,6 +75,17 @@ plus rapide que le kriging plein (inaccessible de toute façon en mémoire).
   for datasets with a large number of observations*, Statistics & Computing.
 - Deisenroth & Ng (2015), *Distributed Gaussian Processes*, ICML (PoE/BCM/rBCM).
 
+## Combinaison avec la vraisemblance de Vecchia (implémentée)
+
+`NestedKriging(..., objective="VLL(m)")` : le prior commun (θ, σ², β) est
+estimé par UN fit Vecchia light global (O(n·m³), information inter-groupes),
+puis chaque sous-modèle est fitté en forme fermée sur ce prior — au lieu de la
+moyenne géométrique de p estimateurs locaux. Statistiquement préférable à
+toute taille ; computationnellement avantageux quand les groupes sont gros
+(coût par-groupe en n³/p² contre n·m³ global — avec des petits groupes
+~500 points, les fits LL locaux restent compétitifs). Non supporté avec
+`warping` (v1). L'agrégation (NK/PoE/...) est inchangée.
+
 ## Compatibilité WarpKriging (implémentée)
 
 Un noyau warpé k(φ(x), φ(x′)) reste un prior GP valide : NK et PoE s'appliquent

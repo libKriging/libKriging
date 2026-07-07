@@ -182,6 +182,9 @@ void NestedKriging::fit(const arma::vec& y,
     throw std::invalid_argument("nb_groups should be in [1, n/(d+2)]");
   if (m_aggregation == Aggregation::NK && regmodel != Trend::RegressionModel::Constant)
     throw std::invalid_argument("NK aggregation requires a Constant trend; use PoE/gPoE/BCM/rBCM otherwise");
+  const bool vll_unified = objective.rfind("VLL", 0) == 0;
+  if (vll_unified && !warping.empty())
+    throw std::invalid_argument("VLL objective is not supported with warping in NestedKriging");
 
   m_X = X;
   m_y = y;
@@ -227,6 +230,35 @@ void NestedKriging::fit(const arma::vec& y,
       wk->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, "none", objective, fixed);
       m_wsubmodels.push_back(std::move(wk));
     }
+  } else if (vll_unified) {
+    // --- VLL-unified path: ONE global light Vecchia fit estimates the common
+    // prior (theta, sigma2, beta) in O(n m^3) using cross-group information,
+    // then every submodel is fitted in closed form on the seeded prior.
+    // Statistically preferable to averaging p per-group estimates, and
+    // cheaper: one optimization instead of p.
+    Kriging ref(m_covType);
+    ref.set_vecchia_exact_commit(false);  // light: no O(n^3) factorization
+    ref.fit(m_y, m_X, regmodel, /*normalize=*/false, optim, objective, parameters);
+
+    m_theta = ref.theta();
+    m_sigma2 = ref.sigma2();
+    if (m_regmodel == Trend::RegressionModel::Constant)
+      m_beta0 = ref.beta()(0);
+
+    Kriging::Parameters fixed;
+    fixed.theta = arma::mat(m_theta.t());  // 1 x d
+    fixed.is_theta_estim = false;
+    fixed.sigma2 = m_sigma2;
+    fixed.is_sigma2_estim = false;
+    fixed.beta = ref.beta();
+    fixed.is_beta_estim = false;
+    m_submodels.reserve(p);
+    for (arma::uword g = 0; g < p; ++g) {
+      const arma::uvec& idx = m_groups[g];
+      auto km = std::make_unique<Kriging>(m_covType);
+      km->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, "none", "LL", fixed);
+      m_submodels.push_back(std::move(km));
+    }
   } else {
     m_submodels.reserve(p);
     for (arma::uword g = 0; g < p; ++g) {
@@ -238,7 +270,9 @@ void NestedKriging::fit(const arma::vec& y,
   }
 
   // --- 2. unify hyperparameters (common prior) ------------------------------
-  unify_hyperparameters(objective);
+  // (already done by the global reference fit on the VLL-unified path)
+  if (!vll_unified || warped())
+    unify_hyperparameters(objective);
 
   // --- 3. NK precomputations -------------------------------------------------
   if (m_aggregation == Aggregation::NK)
