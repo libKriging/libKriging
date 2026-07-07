@@ -164,6 +164,48 @@ jobs:
             echo "" >> "$REPORT"
           done
 
+          # --- NestedKriging summary (large-n grid) ---
+          echo "### NestedKriging (NK & gPoE aggregations, groups of ~100 points)" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "| n | d | fit NK (ms) | predict NK (ms) | fit gPoE (ms) | predict gPoE (ms) |" >> "$REPORT"
+          echo "|---|---|-------------|-----------------|---------------|--------------------|" >> "$REPORT"
+          for n in 400 1000 2000; do
+            for d in 2 4; do
+              logfile="benchmark-results/nestedkriging_n${n}_d${d}.log"
+              if [ -f "$logfile" ]; then
+                fit=$(grep "^fit  " "$logfile" | awk '{print $3}' || echo "N/A")
+                pred=$(grep "^predict  " "$logfile" | awk '{print $3}' || echo "N/A")
+                fitg=$(grep "^fit_gpoe" "$logfile" | awk '{print $3}' || echo "N/A")
+                predg=$(grep "^predict_gpoe" "$logfile" | awk '{print $3}' || echo "N/A")
+                echo "| $n | $d | $fit | $pred | $fitg | $predg |" >> "$REPORT"
+              fi
+            done
+          done
+          echo "" >> "$REPORT"
+
+          # --- Vecchia summary (large-n grid; exact-LL columns are skipped
+          #     by bench-vecchia beyond n=1000, shown as empty) ---
+          echo "### Vecchia (objective=VLL(30) vs exact LL)" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "| n | d | fit VLL (ms) | fit light (ms) | fit LL (ms) | predict (ms) | predictVecchia (ms) | VLL eval (ms) | LL eval (ms) |" >> "$REPORT"
+          echo "|---|---|--------------|----------------|-------------|--------------|---------------------|---------------|--------------|" >> "$REPORT"
+          for n in 400 1000 2000; do
+            for d in 2 4; do
+              logfile="benchmark-results/vecchia_n${n}_d${d}.log"
+              if [ -f "$logfile" ]; then
+                fit=$(grep "^fit  " "$logfile" | awk '{print $3}' || echo "N/A")
+                fitl=$(grep "^fit_light" "$logfile" | awk '{print $3}' || echo "N/A")
+                fite=$(grep "^fit_exact_ll" "$logfile" | awk '{print $3}' || echo "-")
+                pred=$(grep "^predict  " "$logfile" | awk '{print $3}' || echo "N/A")
+                predv=$(grep "^predict_vecchia" "$logfile" | awk '{print $3}' || echo "N/A")
+                vlle=$(grep "^vll_eval" "$logfile" | awk '{print $3}' || echo "N/A")
+                lle=$(grep "^ll_eval" "$logfile" | awk '{print $3}' || echo "-")
+                echo "| $n | $d | $fit | $fitl | ${fite:--} | $pred | $predv | $vlle | ${lle:--} |" >> "$REPORT"
+              fi
+            done
+          done
+          echo "" >> "$REPORT"
+
           # --- WarpKriging:<warping> summaries (n x d) ---
           for warp in none affine boxcox kumaraswamy knots mlp neural_mono categorical ordinal; do
             echo "### WarpKriging:$warp" >> "$REPORT"
