@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "libKriging: a C++ library for Kriging / Gaussian process regression"
+abstract: >-
+  libKriging provides most standard Kriging / Gaussian process features (fit,
+  prediction, simulation, update) and many input warpings (boxcox, kumaraswamy,
+  knots, mlp, categorical, ordinal), with bindings for Python, R, Octave, Matlab
+  and Julia.
+type: software
+authors:
+  - given-names: Yann
+    family-names: Richet
+    email: yann.richet@asnr.fr
+    orcid: "https://orcid.org/0000-0002-5677-8458"
+  - given-names: Pascal
+    family-names: Havé
+    email: hpwxf@haveneer.com
+  - given-names: Yves
+    family-names: Deville
+    email: deville.yves@alpestat.com
+repository-code: "https://github.com/libKriging/libKriging"
+url: "https://github.com/libKriging"
+license: Apache-2.0
+version: 1.0.0
+date-released: "2026-05-13"
+keywords:
+  - kriging
+  - gaussian-process
+  - machine-learning
+  - design-of-experiments
+  - bayesian-optimization
+  - surrogate-model

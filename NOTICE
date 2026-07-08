@@ -1,0 +1,32 @@
+libKriging
+Copyright 2018-2026 The libKriging authors and contributors
+
+This product is licensed under the Apache License, Version 2.0 (see the LICENSE
+file). The primary authors are Yann Richet, Pascal Havé and Yves Deville
+(see CITATION.cff and the AUTHORS listed in the language-binding package
+metadata).
+
+This product bundles the following third-party components as git submodules
+under dependencies/. Each remains under its own license:
+
+  * Armadillo (Apache-2.0)
+    C++ linear algebra library by Conrad Sanderson et al.
+    https://gitlab.com/conradsnicta/armadillo-code
+    Vendored fork: https://github.com/libKriging/armadillo-code
+
+  * lbfgsb_cpp (BSD-3-Clause)
+    C++ port by Pascal Havé of the L-BFGS-B optimizer by Ciyou Zhu,
+    Richard Byrd, Jorge Nocedal and Jose Luis Morales.
+    https://github.com/libKriging/lbfgsb_cpp
+
+  * Catch2 (BSL-1.0) — unit-test framework (test builds only).
+    https://github.com/catchorg/Catch2
+
+  * pybind11 (BSD-3-Clause) — Python binding only.
+    https://github.com/pybind/pybind11
+
+  * carma (Apache-2.0) — Armadillo/NumPy bridge, Python binding only.
+    https://github.com/libKriging/carma (fork of https://github.com/RUrlus/carma)
+
+  * nlohmann/json (MIT) — vendored under src/lib/include/libKriging/utils/nlohmann.
+    https://github.com/nlohmann/json

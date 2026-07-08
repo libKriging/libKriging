@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 # Avoid to export package (like armadillo) into ~/.cmake
 # This behaviour is required to submit package to CRAN
