@@ -2,6 +2,8 @@
 [![Code Analysis](https://github.com/libKriging/libKriging/actions/workflows/analysis.yml/badge.svg)](https://github.com/libKriging/libKriging/actions/workflows/analysis.yml)
 [![Coverage Status](https://coveralls.io/repos/github/libKriging/libKriging/badge.svg?branch=master)](https://coveralls.io/github/libKriging/libKriging?branch=master)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![PyPI version](https://img.shields.io/pypi/v/pylibkriging.svg)](https://pypi.org/project/pylibkriging/)
+[![CRAN version](https://www.r-pkg.org/badges/version/rlibkriging)](https://cran.r-project.org/package=rlibkriging)
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
@@ -15,8 +17,19 @@ It targets to provide a fast, robust and easy to use implementation of Kriging /
 Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab and Julia. See [Installation from pre-built packages](#installation-from-pre-built-packages) for more details.
 
 
+## Features
+
+- **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), and `NestedKriging` for large designs.
+- **Covariance kernels**: `gauss`, `exp`, `matern3_2`, `matern5_2`.
+- **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the Vecchia approximated log-likelihood (`VLL(m)`).
+- **Input warpings**: boxcox, kumaraswamy, knots, mlp, categorical, ordinal.
+- **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
+- **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
+
+
 Table of contents
 
+- [Features](#features)
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging  for R](#rlibkriging--for-r)
@@ -38,6 +51,9 @@ Table of contents
     - [For Windows 64bits with Visual Studio](#for-windows-64bits-with-visual-studio)
   - [Assisted compilation and installation](#assisted-compilation-and-installation)
     - [Using `pip install` from GitHub](#using-pip-install-from-github)
+- [Documentation](#documentation)
+- [License](#license)
+- [How to cite](#how-to-cite)
 
 If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
@@ -124,7 +140,7 @@ From R:
 install.packages('rlibkriging')
 ```
 
-Or using the archive from [libKriging releases](https://github.com/libKriging/rlibKriging/releases)
+Or using the archive from [libKriging releases](https://github.com/libKriging/rlibkriging/releases)
 
 ```R
 # in R
@@ -556,3 +572,17 @@ To get a particular version (branch or tag ≥v0.4.9), you can use:
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 ```
 
+
+## Documentation
+
+* Per-language API: [bindings/README.md](bindings/README.md).
+* Developer documentation: [docs/dev](docs/dev).
+* The C++ API reference (Doxygen) can be generated locally with `cmake --build . --target doc`.
+
+## License
+
+libKriging is distributed under the [Apache License 2.0](LICENSE). See the [NOTICE](NOTICE) file for third-party attributions.
+
+## How to cite
+
+If you use libKriging in academic work, please cite it. Citation metadata is provided in [CITATION.cff](CITATION.cff) — GitHub's "Cite this repository" button generates APA/BibTeX entries from it. See [docs/dev/References.md](docs/dev/References.md) for the underlying methodological references.
