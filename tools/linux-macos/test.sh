@@ -14,6 +14,14 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
   . "${ROOT_DIR}"/venv/bin/activate
 fi
 
+# ThreadSanitizer: GCC/libgomp is not TSan-instrumented and reports false
+# races across OpenMP barriers (see .tsan-suppressions). Point TSan at the
+# project suppression file for the thread-sanitizer job only.
+if [[ "$(printf %s "${SANITIZE:-}" | tr "[:upper:]" "[:lower:]")" == "thread" ]]; then
+  export TSAN_OPTIONS="suppressions=${ROOT_DIR}/.tsan-suppressions${TSAN_OPTIONS:+ ${TSAN_OPTIONS}}"
+  echo "TSAN_OPTIONS=${TSAN_OPTIONS}"
+fi
+
 cd "${BUILD_DIR:-build}"
 
 # jemalloc is statically linked into libKriging (no need for LD_PRELOAD)
