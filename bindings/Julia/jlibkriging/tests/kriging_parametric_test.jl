@@ -80,3 +80,20 @@ end
         end
     end
 end
+
+# API consistency: `parameters` dict is an alternative to the sigma2/theta/... kwargs.
+@testset "Kriging parameters= dict" begin
+    rng = MersenneTwister(123)
+    n, d = 40, 2
+    X = rand(rng, n, d)
+    y = f_parametric(X)
+
+    k_dict = Kriging(y, X, "matern5_2"; optim="none",
+                     parameters=Dict("theta" => fill(0.3, d), "sigma2" => 1.0,
+                                     "is_theta_estim" => false, "is_sigma2_estim" => false))
+    k_kw = Kriging(y, X, "matern5_2"; optim="none",
+                   theta=fill(0.3, d), sigma2=1.0,
+                   is_theta_estim=false, is_sigma2_estim=false)
+    @test isapprox(theta(k_dict), theta(k_kw); atol=1e-8)
+    @test isapprox(sigma2(k_dict), sigma2(k_kw); atol=1e-8)
+end

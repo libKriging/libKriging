@@ -68,3 +68,15 @@ end
     @test maximum(abs.(p.mean .- y)) < 1e-3  # NK interpolates under warping
     @test all(p.stdev .>= 0)
 end
+
+@testset "NestedKriging parameters= dict" begin
+    import Random
+    rng = Random.MersenneTwister(123)
+    n, d = 100, 2
+    X = rand(rng, n, d)
+    y = [f_test(X[i, :]) for i in 1:n]
+    k = NestedKriging(y, X, "matern5_2", 4; parameters=Dict("theta" => fill(0.3, d)))
+    p = predict(k, X)
+    @test length(p.mean) == n
+    @test all(isfinite, p.mean)
+end

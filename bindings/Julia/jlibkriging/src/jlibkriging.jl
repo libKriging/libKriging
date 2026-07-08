@@ -90,6 +90,10 @@ Fit a Kriging model. `objective` selects the fit criterion: `"LL"`
 posterior), or `"VLL"`/`"VLL(m)"` for the Vecchia approximated log-likelihood
 with `m` conditioning neighbors (default 30) — O(n m^3) per evaluation instead
 of O(n^3), recommended for large designs in low dimension.
+
+Initial or fixed hyper-parameters can be passed either via the `sigma2`,
+`theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same
+keys (for API consistency with `WarpKriging`/`MLPKriging`).
 """
 function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  noise::Union{Nothing,String,Float64,Vector{Float64}}=nothing,
@@ -97,6 +101,7 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  normalize::Bool=false,
                  optim::String="BFGS",
                  objective::String="LL",
+                 parameters::Union{Nothing,AbstractDict}=nothing,
                  sigma2::Union{Nothing,Float64}=nothing,
                  is_sigma2_estim::Bool=true,
                  theta::Union{Nothing,Vector{Float64}}=nothing,
@@ -107,6 +112,20 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  is_nugget_estim::Bool=true)
     n, d = size(X)
     @assert length(y) == n
+
+    # `parameters` is an alternative to the individual sigma2/theta/beta/nugget
+    # kwargs, for API consistency with WarpKriging/MLPKriging. Keys present in
+    # the dict override the matching kwargs.
+    if parameters !== nothing
+        haskey(parameters, "sigma2")          && (sigma2          = Float64(parameters["sigma2"]))
+        haskey(parameters, "theta")           && (theta           = Vector{Float64}(parameters["theta"]))
+        haskey(parameters, "beta")            && (beta            = Vector{Float64}(parameters["beta"]))
+        haskey(parameters, "nugget")          && (nugget          = Float64(parameters["nugget"]))
+        haskey(parameters, "is_sigma2_estim") && (is_sigma2_estim = Bool(parameters["is_sigma2_estim"]))
+        haskey(parameters, "is_theta_estim")  && (is_theta_estim  = Bool(parameters["is_theta_estim"]))
+        haskey(parameters, "is_beta_estim")   && (is_beta_estim   = Bool(parameters["is_beta_estim"]))
+        haskey(parameters, "is_nugget_estim") && (is_nugget_estim = Bool(parameters["is_nugget_estim"]))
+    end
 
     # Determine noise_model string and noise vector
     if noise === nothing
@@ -1216,6 +1235,7 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        regmodel::String="constant",
                        optim::String="BFGS",
                        objective::String="LL",
+                       parameters::Union{Nothing,AbstractDict}=nothing,
                        sigma2::Union{Nothing,Float64}=nothing,
                        is_sigma2_estim::Bool=true,
                        theta::Union{Nothing,Vector{Float64}}=nothing,
@@ -1224,6 +1244,17 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        is_beta_estim::Bool=true)
     n, d = size(X)
     @assert length(y) == n
+
+    # `parameters` mirrors WarpKriging/MLPKriging for API consistency; keys
+    # present in the dict override the matching kwargs.
+    if parameters !== nothing
+        haskey(parameters, "sigma2")          && (sigma2          = Float64(parameters["sigma2"]))
+        haskey(parameters, "theta")           && (theta           = Vector{Float64}(parameters["theta"]))
+        haskey(parameters, "beta")            && (beta            = Vector{Float64}(parameters["beta"]))
+        haskey(parameters, "is_sigma2_estim") && (is_sigma2_estim = Bool(parameters["is_sigma2_estim"]))
+        haskey(parameters, "is_theta_estim")  && (is_theta_estim  = Bool(parameters["is_theta_estim"]))
+        haskey(parameters, "is_beta_estim")   && (is_beta_estim   = Bool(parameters["is_beta_estim"]))
+    end
     sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)
     theta_ptr = theta === nothing ? C_NULL : theta
     theta_n = theta === nothing ? 0 : length(theta)

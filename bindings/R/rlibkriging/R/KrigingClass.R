@@ -98,16 +98,28 @@ classKriging <- function(nk) {
 #' s <- simulate(k, nsim = 10, seed = 123, x = x)
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
+# Validate the `objective` argument. Unlike match.arg(), this accepts the
+# Vecchia approximated log-likelihood "VLL" / "VLL(m)" in addition to the
+# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia bindings,
+# which pass `objective` as a free string).
+.match_kriging_objective <- function(objective) {
+    objective <- objective[[1L]]
+    if (!grepl("^(LL|LOO|LMP|VLL(\\([0-9]+\\))?)$", objective))
+        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"VLL\" or \"VLL(m)\" (got \"",
+             objective, "\")", call. = FALSE)
+    objective
+}
+
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
-                    noise = NULL,
-                    regmodel = c("constant", "linear", "interactive", "none"),
+                    regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
-                    parameters = NULL) {
+                    parameters = NULL,
+                    noise = NULL) {
 
     regmodel <- match.arg(regmodel)
-    objective <- match.arg(objective)
+    objective <- .match_kriging_objective(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
 
     # Determine noise_model from noise argument:
@@ -266,16 +278,16 @@ print.Kriging <- function(x, ...) {
 #' fit(k,y,X)
 #' print(k)
 fit.Kriging <- function(object, y, X,
-                    noise = NULL,
-                    regmodel = c("constant", "linear", "interactive", "none"),
+                    regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
                     normalize = FALSE,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
-                    parameters = NULL, ...) {
+                    parameters = NULL,
+                    noise = NULL, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
 
     regmodel <- match.arg(regmodel)
-    objective <- match.arg(objective)
+    objective <- .match_kriging_objective(objective)
     if (is.character(optim)) optim <- optim[1] #optim <- match.arg(optim) because we can use BFGS10 for 10 (multistart) BFGS
 
     kriging_fit(object, y, X,
