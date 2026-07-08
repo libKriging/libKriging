@@ -14,6 +14,24 @@ if [[ "$ENABLE_PYTHON_BINDING" == "on" && ! -d "$VIRTUAL_ENV" ]]; then
   . "${ROOT_DIR}"/venv/bin/activate
 fi
 
+# ThreadSanitizer + GCC/libgomp: libgomp is not TSan-instrumented and keeps a
+# pool of parked worker threads across parallel regions, so TSan cannot see the
+# implicit end-of-parallel barrier and reports false races between a worker's
+# write inside an omp region (e.g. filling dX in LinearAlgebra::compute_dX) and
+# a later read on the main thread (e.g. max(abs(...)) in fit_setup_impl). These
+# are spurious (the non-TSan parallel builds pass with correct results).
+# Run this job with OMP_NUM_THREADS=1 so libgomp executes parallel regions
+# inline (no worker threads spawned) -> no OpenMP false positives, while TSan
+# still instruments the code and would report any genuine non-OpenMP race.
+# The .tsan-suppressions file is kept as a documented fallback and is loaded
+# too. Real multi-threaded OpenMP race detection would require building this
+# job with Clang + the TSan-aware OpenMP runtime (libarcher).
+if [[ "$(printf %s "${SANITIZE:-}" | tr "[:upper:]" "[:lower:]")" == "thread" ]]; then
+  export OMP_NUM_THREADS=1
+  export TSAN_OPTIONS="suppressions=${ROOT_DIR}/.tsan-suppressions${TSAN_OPTIONS:+ ${TSAN_OPTIONS}}"
+  echo "TSan job: OMP_NUM_THREADS=${OMP_NUM_THREADS}, TSAN_OPTIONS=${TSAN_OPTIONS}"
+fi
+
 cd "${BUILD_DIR:-build}"
 
 # jemalloc is statically linked into libKriging (no need for LD_PRELOAD)

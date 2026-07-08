@@ -1,0 +1,21 @@
+# ThreadSanitizer suppressions for libKriging
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+#
+# GCC's OpenMP runtime (libgomp) is NOT instrumented for ThreadSanitizer and
+# keeps a pool of worker threads parked between parallel regions. Because TSan
+# cannot observe libgomp's implicit end-of-parallel barrier, it reports false
+# data races between a parked worker's last access inside an omp region (e.g.
+# LinearAlgebra::compute_dX, reached from KrigingImpl::fit_setup_impl) and a
+# later access on the main thread once the region has joined (e.g. freeing an
+# Armadillo matrix in ~KrigingImpl at the end of a test). These are spurious:
+# the OpenMP barrier already orders the two accesses.
+#
+# `race:libgomp.so` suppresses only races whose call stack passes through
+# libgomp, i.e. exactly these OpenMP false positives. Genuine data races in
+# non-OpenMP threaded code keep being reported (verified).
+#
+# The complete fix would build the Thread Sanitizer job with Clang and the
+# TSan-aware OpenMP runtime (libarcher), which annotates OpenMP synchronization
+# so TSan understands it. This suppression is the pragmatic alternative while
+# the sanitizer CI toolchain stays on GCC/libgomp.
+race:libgomp.so
