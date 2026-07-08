@@ -14,6 +14,11 @@ past release, see the corresponding entry on the
 ## [1.1.0] - 2026-07-08
 
 ### Added
+- `NestedKriging`: divide-and-conquer Gaussian process for large designs —
+  partition of `(X, y)` into groups with one Kriging submodel each, unified
+  hyperparameters, and aggregated predictions (PoE / gPoE / BCM / rBCM and the
+  optimal nested-kriging `NK` aggregation), with Python/R/Octave/Matlab/Julia
+  bindings (#317).
 - Vecchia approximated log-likelihood objective `VLL(m)`, with local prediction
   and a factorization-free "light" mode (#318).
 
@@ -35,7 +40,7 @@ past release, see the corresponding entry on the
 
 | Version | Date | Notes |
 |:--------|:-----|:------|
-| [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
+| [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | NestedKriging for large designs; Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
 | [1.0.0](https://github.com/libKriging/libKriging/releases/tag/v1.0.0) | 2026-05-13 | First stable 1.0 release. |
 | [0.9.3](https://github.com/libKriging/libKriging/releases/tag/v0.9.3) | 2026-01-18 | |
 | [0.9.2](https://github.com/libKriging/libKriging/releases/tag/v0.9.2) | 2025-12-17 | |
