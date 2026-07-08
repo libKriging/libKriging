@@ -1,4 +1,4 @@
-This file describes good practices to follow if you want to contribue to this project.
+This file describes good practices to follow if you want to contribute to this project.
 
 * [Commit Message Format](#commit-message-format)
 * [Pull request procedure](#pull-request-procedure)
@@ -10,9 +10,9 @@ If you are not used to using GitHub, see [GitHub Flow guide](docs/GitHubFlow.md)
 
 ```
 [<type>[(<scope>)]: ]<subject>[ (#task)]
-<empty ling>
+<empty line>
 <body>
-<empty ling>
+<empty line>
 <footer>
 ```
 
@@ -82,7 +82,7 @@ feature(python): add 'custom expression' option
 
 bug fix:
 ```
-fix(R): correct memory corrumption while passing R objects
+fix(R): correct memory corruption while passing R objects
 
 Closes #28
 ```
@@ -103,9 +103,9 @@ This reverts commit 667ecc1654a317a13331b17617d973392f415f02.
 
 skip ci:
 ```
-doc: fix minor mispelling [skip ci]
+doc: fix minor misspelling [skip ci]
 
-CI build is a waste of time for a so tiny mispelling fix. 
+CI build is a waste of time for a so tiny misspelling fix. 
 ```
 
 # Pull request procedure

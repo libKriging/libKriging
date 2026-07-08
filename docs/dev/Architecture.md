@@ -1,13 +1,14 @@
-# libKriging Architecture #
+# libKriging Architecture
 
-The architecture of libKriging is built on a C++ kernel with efficient kriging algorithms
+libKriging is built on a single C++ kernel implementing the Kriging / Gaussian
+process algorithms (fit, prediction, simulation, update), plus input warpings.
 
-Around this kernel, there are multiple bindings (today, only R binding is available). 
-These bindings are a thin layer around C++ kernel which call features from C++ kernel thru a light mapping
-of the relevant objects.
+Around this kernel, thin bindings expose the library to other languages:
+**Python** (`pylibkriging`), **R** (`rlibkriging`), **Octave/Matlab**
+(`mlibkriging`) and **Julia** (`jlibkriging`). Each binding is a light mapping
+layer that forwards calls to the C++ kernel through the relevant objects; it
+performs no intensive computation. All algorithms live in the C++ kernel, so
+the numerical behaviour is identical across languages.
 
-There isn't any intensive computation in the bindings.
-
-All the algorithms are shared in C++ kernel.  
-
-![](images/layers.png)
+See [bindings/README.md](../../bindings/README.md) for the full per-language
+method reference.
