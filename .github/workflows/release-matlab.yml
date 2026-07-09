@@ -111,7 +111,7 @@ jobs:
       - name: Setup cmake
         uses: lukka/get-cmake@v4.3.2
         with:
-          cmakeVersion: '~3.24.0'
+          cmakeVersion: '~4.2.0'
 
       - name: before_script
         shell: bash
