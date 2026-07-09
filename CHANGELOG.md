@@ -29,6 +29,10 @@ past release, see the corresponding entry on the
   setup (#320).
 - Thread Sanitizer job: removed false-positive data races caused by GCC's
   uninstrumented OpenMP runtime (libgomp) (#320).
+- Constructor argument consistency across bindings: R `Kriging` now accepts
+  `objective="VLL(m)"` and the `"quadratic"` trend, with `noise` as the last
+  argument (aligned with Python/WarpKriging); Julia `Kriging`/`NestedKriging`
+  accept a `parameters` dict like the other classes (#323).
 
 ### Documentation
 - Documentation, licensing and metadata review: fixed stale dependency and
