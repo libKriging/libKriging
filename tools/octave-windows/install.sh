@@ -8,6 +8,7 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
+. "${BASEDIR}"/../common/choco.sh
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
@@ -29,13 +30,13 @@ $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge ope
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make
-choco install -y --no-progress make --version 4.3
+choco_install make --version 4.3
 
 if [[ "$ENABLE_OCTAVE_BINDING" == "on" ]]; then
   # select your version from https://community.chocolatey.org/packages/octave.portable#versionhistory
   # Don't forget to update loadenv.sh with the related path
   # Using 9.2.0 as 6.2.0 is no longer available on GNU FTP servers
-  choco install -y --no-progress octave.portable --version=9.2.0
+  choco_install octave.portable --version=9.2.0
   
   # Note: We use Octave's built-in MinGW compiler instead of installing a separate mingw package
   # This avoids conflicts between different MinGW versions

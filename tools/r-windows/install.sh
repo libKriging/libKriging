@@ -7,6 +7,7 @@ fi
 
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
+. "${BASEDIR}"/../common/choco.sh
 
 "${BASEDIR}"/../windows/install.sh
 
@@ -59,7 +60,7 @@ if [ "${GITHUB_ACTIONS:=false}" == "false" ]; then
 fi
 
 # For R packaging
-choco install -y --no-progress zip
+choco_install zip
 
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
 

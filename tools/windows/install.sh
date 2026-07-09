@@ -8,6 +8,7 @@ fi
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR" && pwd -P)
 test -f "${BASEDIR}"/loadenv.sh && . "${BASEDIR}"/loadenv.sh 
+. "${BASEDIR}"/../common/choco.sh
 
 if [[ "${ENABLE_COVERAGE}" == "on" ]]; then
     echo "Coverage not supported for Windows"
@@ -42,8 +43,8 @@ $HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge ope
 
 # https://chocolatey.org/docs/commands-install
 # required to compile fortran part
-choco install mingw
-choco install -y --no-progress make --version 4.3
+choco_install mingw
+choco_install make --version 4.3
 
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   # Check if python is available (it could be a python wrapper given by Windows)
