@@ -1,12 +1,28 @@
 import os
+import re
 
 import numpy as np
 import pylibkriging as m
 import pytest
 
 
+def _expected_version():
+    """Read the version from the single source of truth (cmake/version.cmake)
+    so this test does not need updating on every release."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    vfile = os.path.normpath(
+        os.path.join(here, "..", "..", "..", "..", "cmake", "version.cmake"))
+    with open(vfile) as f:
+        data = f.read()
+
+    def part(key):
+        return re.search(r"^set\(KRIGING_VERSION_%s (\d+)\)$" % key, data, re.M).group(1)
+
+    return "%s.%s.%s" % (part("MAJOR"), part("MINOR"), part("PATCH"))
+
+
 def test_version():
-    assert m.__version__ == '1.0.0'
+    assert m.__version__ == _expected_version()
 
 
 def test_generic_load_dispatches_classes():
