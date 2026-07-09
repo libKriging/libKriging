@@ -21,8 +21,8 @@ authors:
 repository-code: "https://github.com/libKriging/libKriging"
 url: "https://github.com/libKriging"
 license: Apache-2.0
-version: 1.0.0
-date-released: "2026-05-13"
+version: 1.1.0
+date-released: "2026-07-08"
 keywords:
   - kriging
   - gaussian-process
