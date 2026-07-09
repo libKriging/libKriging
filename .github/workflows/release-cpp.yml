@@ -13,6 +13,8 @@ on:
 
 env:
   DEBUG_CI: true
+  # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
 jobs:
   check-release-consistency:
@@ -131,7 +133,7 @@ jobs:
       - name: Setup cmake
         uses: lukka/get-cmake@v4.3.2
         with:
-          cmakeVersion: '~3.24.0'
+          cmakeVersion: '~4.2.0'
 
       - name: before_script
         shell: bash
