@@ -22,6 +22,16 @@ jobs:
           git submodule update --init --recursive
           git submodule update --recursive --remote
 
+      - name: Refresh pinned submodule SHAs (for no-git installs / CRAN tarball)
+        run: |
+          # rlibkriging records submodule SHAs in tools/gitmodules-shas for
+          # install_github / CRAN tarball installs (no .git). Keep it in sync
+          # with the just-updated gitlinks, otherwise its check-gitmodules-shas
+          # CI job fails and install_github pulls a stale libKriging.
+          if [ -x tools/update_submodule_shas.sh ]; then
+            bash tools/update_submodule_shas.sh
+          fi
+
       - name: Commit
         run: |
           git config user.email "actions@github.com"
