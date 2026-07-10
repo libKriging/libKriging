@@ -3,6 +3,18 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
+# Validate the `objective` argument. Unlike match.arg(), this accepts the
+# Vecchia approximated log-likelihood "VLL" / "VLL(m)" in addition to the
+# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia bindings,
+# which pass `objective` as a free string).
+.match_kriging_objective <- function(objective) {
+    objective <- objective[[1L]]
+    if (!grepl("^(LL|LOO|LMP|VLL(\\([0-9]+\\))?)$", objective))
+        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"VLL\" or \"VLL(m)\" (got \"",
+             objective, "\")", call. = FALSE)
+    objective
+}
+
 #' Shortcut to provide functions to the S3 class "Kriging"
 #' @param nk A pointer to a C++ object of class "Kriging"
 #' @return An object of class "Kriging" with methods to access and manipulate the data
@@ -98,18 +110,6 @@ classKriging <- function(nk) {
 #' s <- simulate(k, nsim = 10, seed = 123, x = x)
 #'
 #' matlines(x, s, col = rgb(0, 0, 1, 0.2), type = "l", lty = 1)
-# Validate the `objective` argument. Unlike match.arg(), this accepts the
-# Vecchia approximated log-likelihood "VLL" / "VLL(m)" in addition to the
-# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia bindings,
-# which pass `objective` as a free string).
-.match_kriging_objective <- function(objective) {
-    objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|VLL(\\([0-9]+\\))?)$", objective))
-        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"VLL\" or \"VLL(m)\" (got \"",
-             objective, "\")", call. = FALSE)
-    objective
-}
-
 Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
                     normalize = FALSE,
