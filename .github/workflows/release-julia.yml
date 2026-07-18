@@ -1,0 +1,191 @@
+name: libKriging release workflow (Julia binding)
+
+# Registers jlibkriging on the Julia General registry on every non-draft
+# release tag, the same way release-python.yml pushes pylibkriging to
+# PyPI. Unlike PyPI, General registration doesn't ship a compiled binary:
+# this only publishes the Julia source wrapper (see the "Known limitation"
+# note in this PR's description) -- users still need to build libKriging
+# with -DENABLE_JULIA_BINDING=ON themselves.
+#
+# One-time prerequisite (cannot be done from this workflow or from a PR):
+# a repository admin must install the "Julia Registrator" GitHub App on
+# libKriging/libKriging: https://github.com/apps/julia-registrator
+# Without it, the trigger comment posted below is a no-op.
+
+on:
+  push:
+    tags:
+       - 'v*' # release tag trigger
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Release tag'
+        required: false
+        default: ''
+
+jobs:
+  check-release-consistency:
+    name: Check Release Consistency
+    runs-on: ubuntu-22.04
+    outputs:
+      git-tag: ${{ steps.expose-variable.outputs.git-tag }}
+      draft-release: ${{ steps.expose-variable.outputs.draft-release }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check tag
+        shell: bash
+        run: |
+          set -eo pipefail
+          if [ -n "${{ github.event.inputs.release-tag }}" ]; then
+            GIT_TAG=${{ github.event.inputs.release-tag }}
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            GIT_TAG=${{ github.event.release.tag_name }}
+          else
+            echo "Default GITHUB_REF is $GITHUB_REF"
+            GIT_TAG=${GITHUB_REF_NAME}
+          fi
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Verify version name
+        run: |
+          echo "Checking release tag: ${GIT_TAG}"
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9a-z]+.*$ ]]; then
+            echo "Valid version name"
+          else
+            echo "Invalid version name: required scheme is ^v[0-9]+\.[0-9]+\.[0-9a-z]+.*\$"
+            exit 1
+          fi
+
+      - name: Verify source code consistency
+        run: |
+          CODE_VERSION=$(python3 tools/release/get_code_version.py)
+          if [[ ! "${GIT_TAG}" =~ ^v${CODE_VERSION} ]]; then
+            echo "GIT_TAG=${GIT_TAG} vs CODE_VERSION=${CODE_VERSION}"
+            echo "Non consistent code and requested tag versions"
+            exit 1
+          fi
+
+      - name: Verify jlibkriging Project.toml version matches the tag exactly
+        run: |
+          JL_VERSION=$(awk -F'"' '/^version *=/ { print $2; exit }' bindings/Julia/jlibkriging/Project.toml)
+          TAG_VERSION=${GIT_TAG#v}
+          if [ "${JL_VERSION}" != "${TAG_VERSION}" ]; then
+            echo "bindings/Julia/jlibkriging/Project.toml has version=${JL_VERSION}, but tag is ${GIT_TAG} (expects ${TAG_VERSION})."
+            echo "Bump the 'version' field in Project.toml to match before tagging -- General registration requires an exact match, unlike the C++ core's major.minor check above."
+            exit 1
+          fi
+          echo "Project.toml version ${JL_VERSION} matches tag ${GIT_TAG}"
+
+      - name: Check available version in the General registry
+        run: |
+          pip3 install --quiet tomli
+          JL_UUID=$(awk -F'"' '/^uuid *=/ { print $2; exit }' bindings/Julia/jlibkriging/Project.toml)
+          if ( python3 tools/release/check_julia_release.py "${JL_UUID}" "${GIT_TAG#v}" ); then
+            echo "Ok to trigger registration for this new version ${GIT_TAG}"
+          else
+            echo "Cannot re-trigger registration for an already-registered version ${GIT_TAG}"
+            exit 1
+          fi
+
+      - name: Define a global variables for next jobs
+        id: expose-variable
+        run: |
+          if [[ "${GIT_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DRAFT_RELEASE=false
+          else
+            DRAFT_RELEASE=true
+          fi
+          echo "git-tag=${GIT_TAG}" >> $GITHUB_OUTPUT
+          echo "draft-release=${DRAFT_RELEASE}" >> $GITHUB_OUTPUT
+
+  test-julia-binding:
+    name: Test Julia binding (${{ matrix.os }})
+    needs: check-release-consistency
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-22.04, macOS-latest, windows-latest ]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Define local variables
+        shell: bash
+        run: |
+          echo "MODE=Release" >> $GITHUB_ENV
+          echo "ENABLE_JULIA_BINDING=on" >> $GITHUB_ENV
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            echo "BUILD_NAME=linux-macos" >> $GITHUB_ENV
+          else
+            echo "BUILD_NAME=windows" >> $GITHUB_ENV
+          fi
+
+      - name: install
+        shell: bash
+        run: tools/${BUILD_NAME}/install.sh
+
+      - name: Setup cmake
+        uses: lukka/get-cmake@v4.3.2
+        with:
+          cmakeVersion: '~4.2.0'
+
+      - name: before_script
+        shell: bash
+        run: tools/common/before_script.sh
+
+      - name: build
+        shell: bash
+        run: tools/${BUILD_NAME}/build.sh
+
+      - name: test
+        shell: bash
+        run: tools/${BUILD_NAME}/test.sh
+
+  register-julia-package:
+    name: Register jlibkriging on the General registry
+    needs:
+      - check-release-consistency
+      - test-julia-binding
+    runs-on: ubuntu-22.04
+    if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check tag
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }}
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_ENV
+
+      - name: Resolve release commit sha
+        shell: bash
+        run: |
+          SHA=$(git rev-list -n 1 "${GIT_TAG}")
+          echo "RELEASE_SHA=${SHA}" >> $GITHUB_ENV
+
+      - name: Trigger Registrator via a commit comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -eo pipefail
+          # subdir= is required: jlibkriging lives inside the libKriging
+          # monorepo, not at the repository root. This only works once the
+          # Julia Registrator GitHub App is installed on this repo -- see
+          # the note at the top of this file.
+          gh api "repos/${{ github.repository }}/commits/${RELEASE_SHA}/comments" \
+            -f body="@JuliaRegistrator register subdir=bindings/Julia/jlibkriging"
