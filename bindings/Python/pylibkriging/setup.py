@@ -69,6 +69,11 @@ def main():
         data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
         python_requires='>=3.7',
         install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment
+        extras_require={
+            # pylibkriging.sklearn (KrigingRegressor) is optional: only
+            # needed if you want the scikit-learn-compatible estimator API.
+            'sklearn': ['scikit-learn>=1.0'],
+        },
         zip_safe=False,
     )
 
