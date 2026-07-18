@@ -190,6 +190,28 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y hub
 
+      - name: Extract changelog section
+        id: changelog
+        shell: bash
+        run: |
+          set -eo pipefail
+          VERSION=${GIT_TAG#v}
+          awk -v ver="$VERSION" '
+            {
+              if ($0 ~ ("^## \\[" ver "\\]")) { capture=1; next }
+              else if (capture && $0 ~ /^## /) { capture=0 }
+              if (capture) print
+            }
+          ' CHANGELOG.md \
+            | sed -e '/./,$!d' \
+            > CHANGELOG_SECTION.md || true
+
+          if [ -s CHANGELOG_SECTION.md ] && [ -n "$(tr -d '[:space:]' < CHANGELOG_SECTION.md)" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
@@ -202,12 +224,24 @@ jobs:
           else
               QUALIFIER="Release"  
           fi
-          cat <<EOF > RELEASE_NOTE.md
+
+          if [ "${{ steps.changelog.outputs.found }}" == "true" ]; then
+            {
+              echo "${QUALIFIER} ${GIT_TAG}"
+              echo ""
+              cat CHANGELOG_SECTION.md
+              echo ""
+              echo "_Full changelog: [CHANGELOG.md](https://github.com/libKriging/libKriging/blob/${GIT_TAG}/CHANGELOG.md)_"
+            } > RELEASE_NOTE.md
+          else
+            cat <<EOF > RELEASE_NOTE.md
           ${QUALIFIER} ${GIT_TAG}
 
-          This is an automated release note.
+          This is an automated release note. See CHANGELOG.md for details.
           
           EOF
+          fi
+
           if [ -z "${{ github.event.release.tag_name }}" ]; then
             if hub release show "$GIT_TAG" >/dev/null 2>&1; then
               echo "Release $GIT_TAG already exists, skipping creation"
