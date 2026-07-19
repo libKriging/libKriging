@@ -1,5 +1,13 @@
 # Agent Instructions
 
+## API usage guidance
+
+Before writing or reviewing code that fits/predicts/simulates a Kriging
+model (any of `Kriging`, `WarpKriging`, `MLPKriging`, `NestedKriging`, in
+C++ or any binding), read `skills/libkriging/SKILL.md` for guidance on
+which class and options to use, and the matching file under
+`skills/libkriging/references/` for exact call syntax in that language.
+
 ## Allowed tools
 
 The following tools are pre-approved and may be used freely without asking for user authorization:
