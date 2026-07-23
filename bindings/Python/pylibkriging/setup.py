@@ -69,6 +69,11 @@ def main():
         data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
         python_requires='>=3.7',
         install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment
+        extras_require={
+            # pylibkriging.multifidelity (AR1CoKriging) is optional: only
+            # needed for recursive AR(1)/Le Gratiet multi-fidelity co-kriging.
+            'multifidelity': ['scipy>=1.7'],
+        },
         zip_safe=False,
     )
 
