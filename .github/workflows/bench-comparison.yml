@@ -91,7 +91,7 @@ jobs:
 
   report:
     name: Aggregate report
-    needs: [bench-python, bench-r]
+    needs: [datasets, bench-python, bench-r]
     if: always() && needs.datasets.result == 'success'
     runs-on: ubuntu-22.04
     steps:
