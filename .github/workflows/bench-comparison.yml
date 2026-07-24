@@ -2,7 +2,13 @@ name: Comparison benchmark
 
 # Cross-package kriging benchmark on shared LHS designs.
 # Heavy job: manual trigger + monthly schedule, never on push/PR.
+# TEMPORARY: also run on this PR's branch so the new benchmark gets exercised
+# by CI before merge. Remove the push/pull_request triggers below once verified.
 on:
+  push:
+    branches: [feature/comparison-benchmark]
+  pull_request:
+    branches: [feature/comparison-benchmark]
   workflow_dispatch:
     inputs:
       repeats:
