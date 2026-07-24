@@ -1,0 +1,122 @@
+name: Comparison benchmark
+
+# Cross-package kriging benchmark on shared LHS designs.
+# Heavy job: manual trigger + monthly schedule, never on push/PR.
+# TEMPORARY: also run on this PR's branch so the new benchmark gets exercised
+# by CI before merge. Remove the push/pull_request triggers below once verified.
+on:
+  push:
+    branches: [feature/comparison-benchmark]
+  pull_request:
+    branches: [feature/comparison-benchmark]
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: 'Randomized design repetitions per case'
+        default: '10'
+      quick:
+        description: 'Quick mode (small subset of cases)'
+        type: boolean
+        default: false
+      budget:
+        description: 'Per-fit wall-clock budget (seconds)'
+        default: '300'
+  schedule:
+    - cron: '0 3 1 * *'  # monthly, 1st at 03:00 UTC
+
+env:
+  REPEATS: ${{ github.event.inputs.repeats || '10' }}
+  BUDGET: ${{ github.event.inputs.budget || '300' }}
+  QUICK: ${{ (github.event.inputs.quick == 'true') && '--quick' || '' }}
+
+jobs:
+  datasets:
+    name: Generate shared designs
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install "numpy<2" scipy
+      - name: Generate LHS designs
+        working-directory: bench/comparison
+        run: python make_datasets.py --repeats "$REPEATS" $QUICK
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-datasets
+          path: bench/comparison/data
+
+  bench-python:
+    name: Python packages
+    needs: datasets
+    runs-on: ubuntu-22.04
+    timeout-minutes: 720
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'  # GPy compatibility
+      - run: pip install "numpy<2" scipy pandas pylibkriging scikit-learn GPy smt openturns
+      - uses: actions/download-artifact@v4
+        with:
+          name: bench-datasets
+          path: bench/comparison/data
+      - name: Run Python benchmark
+        working-directory: bench/comparison
+        run: python run_python.py --budget "$BUDGET" --out results/python.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-python
+          path: bench/comparison/results
+
+  bench-r:
+    name: R packages
+    needs: datasets
+    runs-on: ubuntu-22.04
+    timeout-minutes: 720
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install R packages
+        run: |
+          Rscript -e 'install.packages(c("rlibkriging", "DiceKriging", "RobustGaSP"))'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bench-datasets
+          path: bench/comparison/data
+      - name: Run R benchmark
+        working-directory: bench/comparison
+        run: Rscript run_r.R data results/r.csv "$BUDGET"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-r
+          path: bench/comparison/results
+
+  report:
+    name: Aggregate report
+    needs: [datasets, bench-python, bench-r]
+    if: always() && needs.datasets.result == 'success'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install "numpy<2" pandas
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bench-results-*
+          path: bench/comparison/results
+          merge-multiple: true
+      - name: Aggregate and publish summary
+        working-directory: bench/comparison
+        run: |
+          python aggregate.py --results results --out results/summary.md
+          cat results/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-comparison-report
+          path: bench/comparison/results
