@@ -91,6 +91,26 @@ p = k.predict(x, True, False)
 
 Full demo: [tests/pylibkriging_demo.py](pylibkriging/tests/pylibkriging_demo.py)
 
+## scikit-learn compatible estimators
+
+`pylibkriging.sklearn` exposes `KrigingRegressor`, `WarpKrigingRegressor`,
+`MLPKrigingRegressor` and `NestedKrigingRegressor`, implementing the
+scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
+`clone`), so they drop into `Pipeline` and `GridSearchCV`:
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from pylibkriging.sklearn import KrigingRegressor
+
+pipe = Pipeline([
+    ("scale", StandardScaler()),
+    ("krige", KrigingRegressor(kernel="matern5_2")),
+]).fit(X_train, y_train)
+
+pred, stdev = pipe.predict(X_test, return_std=True)
+```
+
 ## CI
 
 Tested in GitHub Actions (`main.yml`):

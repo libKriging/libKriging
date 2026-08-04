@@ -11,6 +11,44 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- Python: scikit-learn compatible estimators for all four Kriging classes —
+  `KrigingRegressor`, `WarpKrigingRegressor`, `MLPKrigingRegressor`,
+  `NestedKrigingRegressor` in `pylibkriging.sklearn`, implementing the
+  scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
+  `clone`) so they drop into `Pipeline` and `GridSearchCV` (#338).
+- Cross-package comparison benchmark (`bench/comparison/`): libKriging vs.
+  scikit-learn/GPy/SMT/OpenTURNS (Python) and DiceKriging/RobustGaSP (R) on
+  shared randomized LHS designs (Branin, Hartmann-3/6, Borehole), reporting
+  fit/predict time, RMSE, Q², NLPD; runs on a manual/monthly CI workflow (#335).
+
+### Changed
+- Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
+  Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
+  submodules, since both hardcode offsets into NumPy's C-API function table
+  and predated the NumPy 2.0 ABI changes; also fixed a bug in carma's own
+  NumPy-2.0 fix where `PyArray_CopyInto`'s table offset (which differs
+  between NumPy 1.x and 2.x) was hardcoded to the NumPy-2-only value instead
+  of being picked at runtime (#339, libKriging/carma#1).
+
+### Fixed
+- R: `.match_kriging_objective`'s internal validator no longer hijacks
+  `Kriging`'s roxygen `@export` documentation (#329).
+- Python: `loading_test`'s version check no longer hardcodes the expected
+  version, reading it from `cmake/version.cmake` instead so it doesn't need
+  updating on every release (#328).
+- CI: Windows jobs retry the `choco install` step to absorb transient
+  community-feed 504s (#326); `rlibkriging`'s `tools/gitmodules-shas` is kept
+  in sync with submodule bumps, staged in the right order (#330, #331).
+
+### Documentation
+- Added a coding-agent skill covering libKriging usage patterns (#336) and a
+  "Known pitfalls" section to `AGENTS.md` (#333).
+
+### CI/Release process
+- Automated `jlibkriging` registration on Julia's General registry (#332).
+- GitHub release notes are now filled in from this changelog (#334).
+
 ## [1.1.0] - 2026-07-08
 
 ### Added

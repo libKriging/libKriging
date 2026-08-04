@@ -25,6 +25,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 - **Input warpings**: boxcox, kumaraswamy, knots, mlp, categorical, ordinal.
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
+- **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
 
 
 Table of contents
