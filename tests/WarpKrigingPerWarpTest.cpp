@@ -80,8 +80,7 @@ static WarpKriging make_model(const std::string& warp_spec, arma::uword n = 15, 
     y(i) = f1d(x(i));
 
   WarpKriging wk({warp_spec}, "matern5_2");
-  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-         {{"max_iter_adam", "200"}});
+  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   return wk;
 }
 
@@ -129,13 +128,13 @@ static void check_predict_vs_simulate(const std::string& warp_spec) {
     double stdev_err = std::abs(emp_stdev - pred_stdev(i));
 
     if (mean_err > mean_tol) {
-      details << "\n  point " << i << ": emp_mean=" << emp_mean << " pred_mean=" << pred_mean(i)
-              << " err=" << mean_err << " tol=" << mean_tol;
+      details << "\n  point " << i << ": emp_mean=" << emp_mean << " pred_mean=" << pred_mean(i) << " err=" << mean_err
+              << " tol=" << mean_tol;
       ++mean_failures;
     }
     if (stdev_err > stdev_tol) {
-      details << "\n  point " << i << ": emp_stdev=" << emp_stdev
-              << " pred_stdev=" << pred_stdev(i) << " err=" << stdev_err << " tol=" << stdev_tol;
+      details << "\n  point " << i << ": emp_stdev=" << emp_stdev << " pred_stdev=" << pred_stdev(i)
+              << " err=" << stdev_err << " tol=" << stdev_tol;
       ++stdev_failures;
     }
   }
@@ -200,13 +199,13 @@ static void check_predict_deriv_vs_fd(const std::string& warp_spec) {
     double err_stdev = std::abs(stdev_deriv(i, 0) - fd_stdev);
 
     if (err_mean > tol_mean) {
-      details << "\n  point " << i << " mean_deriv=" << mean_deriv(i, 0) << " fd=" << fd_mean
-              << " err=" << err_mean << " tol=" << tol_mean;
+      details << "\n  point " << i << " mean_deriv=" << mean_deriv(i, 0) << " fd=" << fd_mean << " err=" << err_mean
+              << " tol=" << tol_mean;
       ++mean_failures;
     }
     if (err_stdev > tol_stdev) {
-      details << "\n  point " << i << " stdev_deriv=" << stdev_deriv(i, 0) << " fd=" << fd_stdev
-              << " err=" << err_stdev << " tol=" << tol_stdev;
+      details << "\n  point " << i << " stdev_deriv=" << stdev_deriv(i, 0) << " fd=" << fd_stdev << " err=" << err_stdev
+              << " tol=" << tol_stdev;
       ++stdev_failures;
     }
   }
@@ -218,8 +217,7 @@ static void check_predict_deriv_vs_fd(const std::string& warp_spec) {
   CHECK(stdev_failures == 0);
 }
 
-TEST_CASE("WarpKrigingPerWarpTest - predict derivative vs FD (1D)",
-          "[predict][derivative][fd][warpkriging]") {
+TEST_CASE("WarpKrigingPerWarpTest - predict derivative vs FD (1D)", "[predict][derivative][fd][warpkriging]") {
   const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
   const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
   INFO("warp=" << warp);
@@ -260,15 +258,13 @@ static void check_update_simulate(const std::string& warp_spec) {
 
   // --- Method A: simulate with will_update=true, then update_simulate ---
   WarpKriging wk_a({warp_spec}, "matern5_2");
-  wk_a.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-            {{"max_iter_adam", "200"}});
+  wk_a.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   wk_a.simulate(nsim, seed, X_sim, /*will_update=*/true);
   arma::mat sims_a = wk_a.update_simulate(y_new, X_new);
 
   // --- Method B: update WITHOUT refit (same hyperparams as A), then simulate ---
   WarpKriging wk_b({warp_spec}, "matern5_2");
-  wk_b.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-            {{"max_iter_adam", "200"}});
+  wk_b.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   wk_b.update(y_new, X_new, /*refit=*/false);
   arma::mat sims_b = wk_b.simulate(nsim, seed, X_sim);
 
@@ -343,8 +339,8 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
     double err = std::abs(grad(k) - fd);
 
     if (err > tol) {
-      details << "\n  theta[" << k << "]=" << theta0(k) << " analytic=" << grad(k) << " fd=" << fd
-              << " err=" << err << " tol=" << tol;
+      details << "\n  theta[" << k << "]=" << theta0(k) << " analytic=" << grad(k) << " fd=" << fd << " err=" << err
+              << " tol=" << tol;
       ++failures;
     }
   }
@@ -353,8 +349,7 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
   CHECK(failures == 0);
 }
 
-TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)",
-          "[loglik][gradient][fd][warpkriging]") {
+TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)", "[loglik][gradient][fd][warpkriging]") {
   const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
   const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
   INFO("warp=" << warp);
@@ -419,8 +414,8 @@ static void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
     double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad_analytic(k))));
     double err = std::abs(grad_analytic(k) - fd);
     if (err > tol) {
-      details << "\n  warp_param[" << k << "]=" << wp0(k) << " analytic=" << grad_analytic(k)
-              << " fd=" << fd << " err=" << err << " tol=" << tol;
+      details << "\n  warp_param[" << k << "]=" << wp0(k) << " analytic=" << grad_analytic(k) << " fd=" << fd
+              << " err=" << err << " tol=" << tol;
       ++failures;
     }
   }
