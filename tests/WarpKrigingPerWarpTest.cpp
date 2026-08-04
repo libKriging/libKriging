@@ -4,7 +4,18 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
+// The two private-access macros below are scoped to this translation unit
+// only (undef'd immediately after the include) and are needed to reach
+// WarpKriging's private optimiser internals (pack_warp_params,
+// unpack_warp_params, refresh_cache, concentrated_ll, warp_gradient) from
+// the "warp_gradient vs FD" regression test further down. See that test
+// for why this is the only place in the test suite that validates the
+// warp-parameter gradient end-to-end.
+#define private public
+#define protected public
 #include "libKriging/WarpKriging.hpp"
+#undef private
+#undef protected
 #include "ks_test.hpp"
 #include <cmath>
 #include <sstream>
@@ -53,7 +64,7 @@ static const std::vector<std::string> WARP_SPECS = {
     "kumaraswamy",
     "knots(3)",
     "neural_mono",
-    "mlp(8,1,selu)",
+    "mlp(8,1,tanh)",
 };
 
 // ---------------------------------------------------------------------------
@@ -348,4 +359,82 @@ TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)",
   const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
   INFO("warp=" << warp);
   check_loglik_grad_vs_fd(warp);
+}
+
+// ==========================================================================
+//  Test 4: warp-parameter gradient vs finite differences
+//
+//  check_loglik_grad_vs_fd() (above) only validates dLL/d(theta) via the
+//  public logLikelihoodFun() API, which holds the warp parameters fixed.
+//  Nothing else in the test suite checks WarpKriging::warp_gradient()
+//  (dLL/d(warp params), used by the BFGS+Adam / joint-BFGS optimisers)
+//  against a finite difference of the true concentrated log-likelihood.
+//  This was the actual coverage gap that let a real bug in
+//  WarpKriging::dK_dPhi() go unnoticed for every continuous warp type
+//  (wrong sigma2 scaling, plus a sign error from misusing the
+//  non-antisymmetric LinearAlgebra::compute_dX() cache for i>j pairs --
+//  see WarpKriging.cpp dK_dPhi() history/comments for details): the
+//  analytical warp gradient used to be wrong by several orders of
+//  magnitude, which silently prevented the optimiser from ever finding a
+//  non-trivial (informative) warp.
+// ==========================================================================
+static void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
+  auto wk = make_model(warp_spec);
+
+  arma::vec base_wp = wk.pack_warp_params();
+  if (base_wp.n_elem == 0)
+    return;  // warp has no free parameters (e.g. "none")
+
+  // Evaluate away from the optimum (where the true gradient should be
+  // non-trivial) by perturbing the fitted warp params.
+  arma::arma_rng::set_seed(2024);
+  arma::vec wp0 = base_wp + 0.3 * arma::randn(base_wp.n_elem);
+  wk.unpack_warp_params(wp0);
+  wk.refresh_cache();
+
+  arma::vec grad_analytic = wk.warp_gradient();
+  REQUIRE(grad_analytic.n_elem == wp0.n_elem);
+  REQUIRE(grad_analytic.is_finite());
+
+  const double h = 1e-5;
+  const double abs_floor = 1e-2;
+  const double rel_tol = 0.02;  // 2 %
+
+  int failures = 0;
+  std::stringstream details;
+  for (arma::uword k = 0; k < wp0.n_elem; ++k) {
+    arma::vec pp = wp0, pm = wp0;
+    pp(k) += h;
+    pm(k) -= h;
+
+    wk.unpack_warp_params(pp);
+    wk.refresh_cache();
+    double llp = wk.concentrated_ll();
+
+    wk.unpack_warp_params(pm);
+    wk.refresh_cache();
+    double llm = wk.concentrated_ll();
+
+    double fd = (llp - llm) / (2.0 * h);
+    double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad_analytic(k))));
+    double err = std::abs(grad_analytic(k) - fd);
+    if (err > tol) {
+      details << "\n  warp_param[" << k << "]=" << wp0(k) << " analytic=" << grad_analytic(k)
+              << " fd=" << fd << " err=" << err << " tol=" << tol;
+      ++failures;
+    }
+  }
+  wk.unpack_warp_params(wp0);
+  wk.refresh_cache();
+
+  INFO("warp=" << warp_spec << " warp_grad failures=" << failures << details.str());
+  CHECK(failures == 0);
+}
+
+TEST_CASE("WarpKrigingPerWarpTest - warp-parameter gradient vs FD (1D)",
+          "[loglik][gradient][fd][warpkriging][warpparams]") {
+  const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
+  const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
+  INFO("warp=" << warp);
+  check_warp_param_grad_vs_fd(warp);
 }
