@@ -298,6 +298,16 @@ catch_discover_tests(TrendDerivativeTest EXTRA_ARGS ${AdditionalCatchParameters}
 unset(AdditionalCatchParameters)
 
 
+add_executable(LinearAlgebraGradTest LinearAlgebraGradTest.cpp)
+target_link_libraries(LinearAlgebraGradTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries LinearAlgebraGradTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(LinearAlgebraGradTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(GetVersion GetVersion.cpp)
 target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)
