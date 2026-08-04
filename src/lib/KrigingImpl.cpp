@@ -44,6 +44,8 @@ void KrigingImpl::make_Cov(const std::string& covType) {
   _Cov = std::move(cov.Cov);
   _DlnCovDtheta = std::move(cov.DlnCovDtheta);
   _DlnCovDx = std::move(cov.DlnCovDx);
+  _DCovDx = std::move(cov.DCovDx);
+  _D2CovDxDxp = std::move(cov.D2CovDxDxp);
 
   if (covType == "gauss")
     _Cov_pow = 2;
@@ -70,6 +72,57 @@ LIBKRIGING_EXPORT arma::mat KrigingImpl::covMat(const arma::mat& X1, const arma:
   return R;
 }
 
+void KrigingImpl::set_grad_obs(const arma::mat& dy) {
+  if (dy.is_empty()) {
+    m_dy.reset();
+    m_y_aug.reset();
+    m_F_aug.reset();
+    return;
+  }
+
+  if (!Covariance::supportsDerivativeObservations(m_covType))
+    throw std::runtime_error("Gradient observations require a mean-square differentiable kernel (gauss, matern3_2 or "
+                             "matern5_2), got: "
+                             + m_covType);
+  if (dy.n_rows != m_X.n_rows || dy.n_cols != m_X.n_cols)
+    throw std::runtime_error("Gradient observations must be a " + std::to_string(m_X.n_rows) + "x"
+                             + std::to_string(m_X.n_cols) + " matrix, got " + std::to_string(dy.n_rows) + "x"
+                             + std::to_string(dy.n_cols));
+
+  // Chain rule for the normalization Xn = (X - centerX)/scaleX, yn = (y - centerY)/scaleY:
+  //   dyn/dXn_j = (dy/dX_j) · scaleX_j / scaleY
+  m_dy = dy;
+  m_dy.each_row() %= m_scaleX;
+  m_dy /= m_scaleY;
+
+  rebuild_aug_data();
+}
+
+void KrigingImpl::rebuild_aug_data() {
+  if (!has_grad_obs()) {
+    m_y_aug.reset();
+    m_F_aug.reset();
+    return;
+  }
+
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+
+  // Augmented ordering: values first, then the d gradient components of each
+  // observation — i.e. m_dy read row by row.
+  m_y_aug.set_size(n * (1 + d));
+  m_y_aug.head(n) = m_y;
+  for (arma::uword a = 0; a < n; a++)
+    m_y_aug.subvec(n + a * d, n + a * d + d - 1) = m_dy.row(a).t();
+
+  m_F_aug = arma::join_cols(m_F, Trend::regressionModelDerivativeMatrix(m_regmodel, m_X));
+}
+
+void KrigingImpl::check_no_grad_obs(const char* method) const {
+  if (has_grad_obs())
+    throw std::runtime_error(std::string(method) + " is not supported yet on a model fit with gradient observations");
+}
+
 void KrigingImpl::populate_Model(KModel& m,
                                  const arma::vec& theta,
                                  const double alpha,
@@ -79,7 +132,20 @@ void KrigingImpl::populate_Model(KModel& m,
   auto t0 = Bench::tic();
   // Invalidate cached Linv so gradient code recomputes it for the new L
   m.Linv = arma::mat();
-  if (update_eligible) {
+  if (has_grad_obs()) {
+    // Augmented (GEK) system: the incremental Cholesky update path does not
+    // apply, the whole n(1+d) matrix is rebuilt.
+    const arma::uword n = m_X.n_rows;
+    const arma::uword N = n_aug();
+    m.R.set_size(N, N);
+    LinearAlgebra::covMat_sym_X_grad(&m.R, m_X.t(), theta, _Cov, _DCovDx, _D2CovDxDxp, alpha, arma::vec());
+    // The value block carries the class-specific diagonal (1 for plain/nugget,
+    // 1 + noise/σ² for noise); the gradient block keeps the curvature assembled
+    // above, i.e. gradient observations are treated as noise-free.
+    for (arma::uword a = 0; a < n; a++)
+      m.R.at(a, a) = diag_norm.is_empty() ? 1.0 : diag_norm[a];
+    m.L = LinearAlgebra::safe_chol_lower(m.R);
+  } else if (update_eligible) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, alpha, diag_norm, m_T, m_R);
   } else {
     m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, alpha, diag_norm);
@@ -89,9 +155,12 @@ void KrigingImpl::populate_Model(KModel& m,
   m.Rinv = LinearAlgebra::inv_sympd(m.L);
   t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
 
+  const arma::mat& F = F_used();
+  const arma::vec& y = y_used();
+
   // Direct GLS: compute whitened matrices using triangular solves
-  m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
-  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
+  m.Fstar = LinearAlgebra::solve_lower(m.L, F);
+  m.ystar = LinearAlgebra::solve_lower(m.L, y);
   t0 = Bench::toc(bench, "F* = L \\ F, y* = L \\ y", t0);
 
   // Gram matrix and its upper Cholesky
@@ -109,14 +178,14 @@ void KrigingImpl::populate_Model(KModel& m,
   t0 = Bench::toc(bench, "^b = R*^-1 R*'^-1 F*'y*", t0);
   m.betahat = betahat_gls;
 
-  arma::vec residual = m_y - m_F * betahat_gls;
+  arma::vec residual = y - F * betahat_gls;
   m.Estar = LinearAlgebra::solve_lower(m.L, residual);
   m.SSEstar = arma::dot(m.Estar, m.Estar);
   t0 = Bench::toc(bench, "z = L \\ (y - F*b), SSE = z'z", t0);
 }
 
 KrigingImpl::KModel KrigingImpl::allocate_KModel() const {
-  const arma::uword n = m_X.n_rows;
+  const arma::uword n = n_aug();
   const arma::uword p = m_F.n_cols;
 
   KModel m{};
@@ -146,6 +215,10 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
     const FeatureJacobian& jac) const {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
+  const bool grad_obs = has_grad_obs();
+  const arma::uword N_o = n_aug();  // n_o, or n_o(1+d) with gradient observations
+  if (grad_obs && phi)
+    throw std::runtime_error("predict: gradient observations are not supported with a feature map yet");
   arma::uword d = m_X.n_cols;  // kernel/feature space dim
   arma::uword d_input = jac ? X_n.n_cols : d;
   if (!phi && X_n.n_cols != d)
@@ -181,7 +254,18 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   }
 
   auto t0 = Bench::tic();
-  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
+  arma::mat R_on = arma::mat(N_o, n_n, arma::fill::none);
+  if (grad_obs) {
+    // Cross-covariance between the augmented observations and the (value-only)
+    // prediction points: [k(x_o, x_n) ; ∂k/∂x_o(x_o, x_n)].
+    LinearAlgebra::covMat_rect_X_grad(&R_on, Xn_o, Xn_n, m_theta, _Cov, _DCovDx, R_on_factor);
+    // Preserve the noiseless-at-observation semantics on the value rows only.
+    if (R_on_factor != 1.0)
+      for (arma::uword i = 0; i < n_o; i++)
+        for (arma::uword j = 0; j < n_n; j++)
+          if ((Xn_o.col(i) - Xn_n.col(j)).is_zero(arma::datum::eps))
+            R_on.at(i, j) = 1.0;
+  } else {
 #ifdef _OPENMP
   arma::uword total_work = n_o * n_n;
   if (total_work >= 40000) {
@@ -210,6 +294,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 #ifdef _OPENMP
   }
 #endif
+  }
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -245,10 +330,17 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
 
   if (return_deriv) {
     for (arma::uword i = 0; i < n_n; i++) {
-      // dR_on / dPhi_k — (n_o × d) in feature space
-      arma::mat DR_on_i = arma::mat(n_o, d, arma::fill::none);
+      // dR_on / dPhi_k — (N_o × d) in feature space
+      arma::mat DR_on_i = arma::mat(N_o, d, arma::fill::none);
       for (arma::uword j = 0; j < n_o; j++) {
         DR_on_i.row(j) = R_on.at(j, i) * trans(_DlnCovDx(Xn_n.col(i) - Xn_o.col(j), m_theta));
+      }
+      if (grad_obs) {
+        // Rows carrying ∂k/∂x_o differentiate once more w.r.t. the prediction
+        // point: ∂/∂x_n_k [∂k/∂x_o_l](x_o - x_n) = ∂²k/∂x_o_l ∂x_n_k.
+        for (arma::uword j = 0; j < n_o; j++)
+          DR_on_i.rows(n_o + j * d, n_o + j * d + d - 1)
+              = _D2CovDxDxp(Xn_o.col(j) - Xn_n.col(i), m_theta) * R_on_factor;
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
@@ -301,6 +393,7 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
                                      double Sigma_divisor,
                                      bool use_qr_for_circ,
                                      const FeatureMap& phi) {
+  check_no_grad_obs("simulate");
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   // Use m_centerX.n_elem for dimension check: works for both plain Kriging
@@ -435,6 +528,7 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
                                             bool R_un_coincident_to_one,
                                             double Sigma_divisor,
                                             const FeatureMap& phi) {
+  check_no_grad_obs("update_simulate");
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -568,6 +662,7 @@ void KrigingImpl::update_no_refit_impl(const arma::vec& y_u,
                                        const arma::mat& X_u,
                                        const std::function<void()>& extend_class_data,
                                        const std::function<KModel()>& build_model) {
+  check_no_grad_obs("update");
   // Normalize new data using existing normalization parameters
   arma::mat Xn_u = X_u;
   Xn_u.each_row() -= m_centerX;
