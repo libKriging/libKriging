@@ -154,3 +154,14 @@ arma::mat Trend::regressionModelDerivative(const Trend::RegressionModel& regmode
       throw std::runtime_error("Unreachable code");
   }
 }
+arma::mat Trend::regressionModelDerivativeMatrix(const Trend::RegressionModel& regmodel, const arma::mat& X) {
+  const arma::uword n = X.n_rows;
+  const arma::uword d = X.n_cols;
+  // Probe once to get p, so that the (n=0) and (p=0, i.e. None) cases stay well-sized.
+  const arma::uword p = Trend::regressionModelDerivative(regmodel, arma::vec(d, arma::fill::zeros)).n_cols;
+
+  arma::mat DF(n * d, p, arma::fill::zeros);
+  for (arma::uword a = 0; a < n; a++)
+    DF.rows(a * d, a * d + d - 1) = Trend::regressionModelDerivative(regmodel, X.row(a).t());
+  return DF;
+}

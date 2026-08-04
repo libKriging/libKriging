@@ -288,6 +288,16 @@ catch_discover_tests(CovarianceDerivativeTest EXTRA_ARGS ${AdditionalCatchParame
 unset(AdditionalCatchParameters)
 
 
+add_executable(TrendDerivativeTest TrendDerivativeTest.cpp)
+target_link_libraries(TrendDerivativeTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries TrendDerivativeTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(TrendDerivativeTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(GetVersion GetVersion.cpp)
 target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)
