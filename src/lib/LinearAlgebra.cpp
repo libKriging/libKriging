@@ -272,9 +272,25 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
   // t0 = Bench::toc(nullptr, "        Lou = Loo \\ Cou ",t0);
   L.submat(no, 0, n - 1, no - 1) = Lou.t();  // Luo;
   // t0 = Bench::toc(nullptr, "        <Luo",t0);
-  L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower(
-      Cuu - LinearAlgebra::crossprod(Lou));  // Luo * Luo.t() ); // Lu,u = chol( Cu,u - Lu,o Lu,o^T )
-  // t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
+  // Lu,u = chol( Cu,u - Lu,o Lu,o^T ). Forming this Schur complement
+  // explicitly can lose positive-definiteness through catastrophic
+  // cancellation when the new points are (numerically) almost perfectly
+  // predictable from the old ones -- i.e. their conditional variance
+  // given the old block is genuinely tiny -- even though the full matrix
+  // C is still safely factorizable directly (a monolithic Cholesky
+  // propagates rounding error more gracefully than this two-step
+  // block/Schur-complement computation). If the block update still fails
+  // after safe_chol_lower's own nugget-retry budget is exhausted, fall
+  // back to a full from-scratch factorization of C instead of throwing.
+  try {
+    L.submat(no, no, n - 1, n - 1) = LinearAlgebra::safe_chol_lower(Cuu - LinearAlgebra::crossprod(Lou));
+    // t0 = Bench::toc(nullptr, "        <Luu = chol( Cuu - Luo * Luo.t() )",t0);
+  } catch (const std::exception&) {
+    if (warn_chol)
+      arma::cout << "[WARNING] Cholesky block update failed (near-singular conditional block); "
+                 << "falling back to a full Cholesky factorization" << arma::endl;
+    return arma::trimatl(LinearAlgebra::safe_chol_lower(C));
+  }
 
   arma::mat lowL = arma::trimatl(L);
   // t0 = Bench::toc(nullptr, "        trimatl L",t0);

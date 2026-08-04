@@ -776,6 +776,19 @@ class WarpKriging : protected KrigingImpl {
   // MLPKriging is a thin facade that needs access to private members for save/load.
   friend class MLPKriging;
 
+  // WarpKrigingPerWarpTest's "warp-parameter gradient vs FD" regression test
+  // needs to drive the cache directly (pack/unpack_warp_params, refresh_cache,
+  // concentrated_ll, warp_gradient). A `friend` declaration is used here
+  // (rather than a `#define private public` include trick) because MSVC
+  // encodes the access specifier (public/protected/private) in a member
+  // function's decorated (mangled) name: a TU that sees these members as
+  // "public" (via the macro trick) emits calls to a different decorated
+  // name than the one actually exported by the library (compiled with the
+  // real, private, header), causing LNK2019 unresolved-external errors on
+  // Windows only (GCC/Clang on Linux/macOS do not encode access in the
+  // mangled name, so the macro trick happened to work there).
+  friend void check_warp_param_grad_vs_fd(const std::string& warp_spec);
+
   // Helpers used by save()/load() and delegated to by MLPKriging::save()/load().
   void dump_to_json(nlohmann::json& j) const;
   void load_from_json(const nlohmann::json& j);
@@ -818,13 +831,17 @@ class WarpKriging : protected KrigingImpl {
 
   /// Refresh all cached quantities (Φ, R, Cholesky, β̂, σ̂², α) from
   /// the current warp params and θ.
-  void refresh_cache();
+  /// Exported (despite being private) so that WarpKrigingPerWarpTest's
+  /// "warp-parameter gradient vs FD" regression test can drive the cache
+  /// directly -- see the `friend` declaration above and that test for
+  /// rationale.
+  LIBKRIGING_EXPORT void refresh_cache();
   /// Like refresh_cache but skips recomputing Φ (use when only θ changed).
-  void refresh_cache_theta_only();
+  LIBKRIGING_EXPORT void refresh_cache_theta_only();
   void normalise_data();
 
   /// Compute concentrated LL from current cache
-  double concentrated_ll() const;
+  LIBKRIGING_EXPORT double concentrated_ll() const;
 
   // ---- Analytical gradient ∂LL/∂θ ----------------------------------------
   /// Build matrix ∂R/∂θ_k  (n×n)  for the k-th range parameter
@@ -834,13 +851,13 @@ class WarpKriging : protected KrigingImpl {
   std::pair<double, arma::vec> concentrated_ll_and_grad_theta() const;
 
   // ---- Gradient ∂LL/∂(warp params) via backprop through kernel ------------
-  arma::mat dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) const;
-  arma::vec warp_gradient() const;
+  LIBKRIGING_EXPORT arma::mat dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dR) const;
+  LIBKRIGING_EXPORT arma::vec warp_gradient() const;
 
   // ---- Warp param packing (θ is NOT in here — optimised separately) ------
   arma::uword total_warp_params() const;
-  arma::vec pack_warp_params() const;
-  void unpack_warp_params(const arma::vec& w);
+  LIBKRIGING_EXPORT arma::vec pack_warp_params() const;
+  LIBKRIGING_EXPORT void unpack_warp_params(const arma::vec& w);
 
   // ---- Optimisation -------------------------------------------------------
   //

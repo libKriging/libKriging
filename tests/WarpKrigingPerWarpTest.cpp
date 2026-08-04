@@ -53,7 +53,7 @@ static const std::vector<std::string> WARP_SPECS = {
     "kumaraswamy",
     "knots(3)",
     "neural_mono",
-    "mlp(8,1,selu)",
+    "mlp(8,1,tanh)",
 };
 
 // ---------------------------------------------------------------------------
@@ -69,8 +69,7 @@ static WarpKriging make_model(const std::string& warp_spec, arma::uword n = 15, 
     y(i) = f1d(x(i));
 
   WarpKriging wk({warp_spec}, "matern5_2");
-  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-         {{"max_iter_adam", "200"}});
+  wk.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   return wk;
 }
 
@@ -118,13 +117,13 @@ static void check_predict_vs_simulate(const std::string& warp_spec) {
     double stdev_err = std::abs(emp_stdev - pred_stdev(i));
 
     if (mean_err > mean_tol) {
-      details << "\n  point " << i << ": emp_mean=" << emp_mean << " pred_mean=" << pred_mean(i)
-              << " err=" << mean_err << " tol=" << mean_tol;
+      details << "\n  point " << i << ": emp_mean=" << emp_mean << " pred_mean=" << pred_mean(i) << " err=" << mean_err
+              << " tol=" << mean_tol;
       ++mean_failures;
     }
     if (stdev_err > stdev_tol) {
-      details << "\n  point " << i << ": emp_stdev=" << emp_stdev
-              << " pred_stdev=" << pred_stdev(i) << " err=" << stdev_err << " tol=" << stdev_tol;
+      details << "\n  point " << i << ": emp_stdev=" << emp_stdev << " pred_stdev=" << pred_stdev(i)
+              << " err=" << stdev_err << " tol=" << stdev_tol;
       ++stdev_failures;
     }
   }
@@ -189,13 +188,13 @@ static void check_predict_deriv_vs_fd(const std::string& warp_spec) {
     double err_stdev = std::abs(stdev_deriv(i, 0) - fd_stdev);
 
     if (err_mean > tol_mean) {
-      details << "\n  point " << i << " mean_deriv=" << mean_deriv(i, 0) << " fd=" << fd_mean
-              << " err=" << err_mean << " tol=" << tol_mean;
+      details << "\n  point " << i << " mean_deriv=" << mean_deriv(i, 0) << " fd=" << fd_mean << " err=" << err_mean
+              << " tol=" << tol_mean;
       ++mean_failures;
     }
     if (err_stdev > tol_stdev) {
-      details << "\n  point " << i << " stdev_deriv=" << stdev_deriv(i, 0) << " fd=" << fd_stdev
-              << " err=" << err_stdev << " tol=" << tol_stdev;
+      details << "\n  point " << i << " stdev_deriv=" << stdev_deriv(i, 0) << " fd=" << fd_stdev << " err=" << err_stdev
+              << " tol=" << tol_stdev;
       ++stdev_failures;
     }
   }
@@ -207,8 +206,7 @@ static void check_predict_deriv_vs_fd(const std::string& warp_spec) {
   CHECK(stdev_failures == 0);
 }
 
-TEST_CASE("WarpKrigingPerWarpTest - predict derivative vs FD (1D)",
-          "[predict][derivative][fd][warpkriging]") {
+TEST_CASE("WarpKrigingPerWarpTest - predict derivative vs FD (1D)", "[predict][derivative][fd][warpkriging]") {
   const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
   const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
   INFO("warp=" << warp);
@@ -249,15 +247,13 @@ static void check_update_simulate(const std::string& warp_spec) {
 
   // --- Method A: simulate with will_update=true, then update_simulate ---
   WarpKriging wk_a({warp_spec}, "matern5_2");
-  wk_a.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-            {{"max_iter_adam", "200"}});
+  wk_a.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   wk_a.simulate(nsim, seed, X_sim, /*will_update=*/true);
   arma::mat sims_a = wk_a.update_simulate(y_new, X_new);
 
   // --- Method B: update WITHOUT refit (same hyperparams as A), then simulate ---
   WarpKriging wk_b({warp_spec}, "matern5_2");
-  wk_b.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL",
-            {{"max_iter_adam", "200"}});
+  wk_b.fit(y_old, X_old, Trend::RegressionModel::Constant, false, "BFGS+Adam", "LL", {{"max_iter_adam", "200"}});
   wk_b.update(y_new, X_new, /*refit=*/false);
   arma::mat sims_b = wk_b.simulate(nsim, seed, X_sim);
 
@@ -332,8 +328,8 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
     double err = std::abs(grad(k) - fd);
 
     if (err > tol) {
-      details << "\n  theta[" << k << "]=" << theta0(k) << " analytic=" << grad(k) << " fd=" << fd
-              << " err=" << err << " tol=" << tol;
+      details << "\n  theta[" << k << "]=" << theta0(k) << " analytic=" << grad(k) << " fd=" << fd << " err=" << err
+              << " tol=" << tol;
       ++failures;
     }
   }
@@ -342,10 +338,103 @@ static void check_loglik_grad_vs_fd(const std::string& warp_spec) {
   CHECK(failures == 0);
 }
 
-TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)",
-          "[loglik][gradient][fd][warpkriging]") {
+TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)", "[loglik][gradient][fd][warpkriging]") {
   const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
   const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
   INFO("warp=" << warp);
   check_loglik_grad_vs_fd(warp);
+}
+
+// ==========================================================================
+//  Test 4: warp-parameter gradient vs finite differences
+//
+//  check_loglik_grad_vs_fd() (above) only validates dLL/d(theta) via the
+//  public logLikelihoodFun() API, which holds the warp parameters fixed.
+//  Nothing else in the test suite checks WarpKriging::warp_gradient()
+//  (dLL/d(warp params), used by the BFGS+Adam / joint-BFGS optimisers)
+//  against a finite difference of the true concentrated log-likelihood.
+//  This was the actual coverage gap that let a real bug in
+//  WarpKriging::dK_dPhi() go unnoticed for every continuous warp type
+//  (wrong sigma2 scaling, plus a sign error from misusing the
+//  non-antisymmetric LinearAlgebra::compute_dX() cache for i>j pairs --
+//  see WarpKriging.cpp dK_dPhi() history/comments for details): the
+//  analytical warp gradient used to be wrong by several orders of
+//  magnitude, which silently prevented the optimiser from ever finding a
+//  non-trivial (informative) warp.
+// ==========================================================================
+// Declared inside namespace libKriging (rather than at file/global scope)
+// so that it matches the `friend` declaration in WarpKriging.hpp exactly:
+// an unqualified friend declaration written inside a class nested in
+// namespace libKriging is only ever found via ordinary/ADL lookup as
+// `libKriging::check_warp_param_grad_vs_fd` -- a free function with the
+// same name declared at global scope (or reached via a
+// `#define private public` include trick) is a *different* entity to the
+// compiler and, on MSVC specifically, would be compiled with a different
+// decorated (mangled) symbol name than the one the library actually
+// exports for these private members (MSVC encodes the access specifier in
+// the mangled name), causing LNK2019 unresolved-external errors on
+// Windows only (GCC/Clang do not encode access in the mangled name, which
+// is why the previous `#define private public` trick used to work on
+// Linux/macOS but silently broke Windows CI).
+namespace libKriging {
+void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
+  auto wk = make_model(warp_spec);
+
+  arma::vec base_wp = wk.pack_warp_params();
+  if (base_wp.n_elem == 0)
+    return;  // warp has no free parameters (e.g. "none")
+
+  // Evaluate away from the optimum (where the true gradient should be
+  // non-trivial) by perturbing the fitted warp params.
+  arma::arma_rng::set_seed(2024);
+  arma::vec wp0 = base_wp + 0.3 * arma::randn(base_wp.n_elem);
+  wk.unpack_warp_params(wp0);
+  wk.refresh_cache();
+
+  arma::vec grad_analytic = wk.warp_gradient();
+  REQUIRE(grad_analytic.n_elem == wp0.n_elem);
+  REQUIRE(grad_analytic.is_finite());
+
+  const double h = 1e-5;
+  const double abs_floor = 1e-2;
+  const double rel_tol = 0.02;  // 2 %
+
+  int failures = 0;
+  std::stringstream details;
+  for (arma::uword k = 0; k < wp0.n_elem; ++k) {
+    arma::vec pp = wp0, pm = wp0;
+    pp(k) += h;
+    pm(k) -= h;
+
+    wk.unpack_warp_params(pp);
+    wk.refresh_cache();
+    double llp = wk.concentrated_ll();
+
+    wk.unpack_warp_params(pm);
+    wk.refresh_cache();
+    double llm = wk.concentrated_ll();
+
+    double fd = (llp - llm) / (2.0 * h);
+    double tol = std::max(abs_floor, rel_tol * std::max(std::abs(fd), std::abs(grad_analytic(k))));
+    double err = std::abs(grad_analytic(k) - fd);
+    if (err > tol) {
+      details << "\n  warp_param[" << k << "]=" << wp0(k) << " analytic=" << grad_analytic(k) << " fd=" << fd
+              << " err=" << err << " tol=" << tol;
+      ++failures;
+    }
+  }
+  wk.unpack_warp_params(wp0);
+  wk.refresh_cache();
+
+  INFO("warp=" << warp_spec << " warp_grad failures=" << failures << details.str());
+  CHECK(failures == 0);
+}
+}  // namespace libKriging
+
+TEST_CASE("WarpKrigingPerWarpTest - warp-parameter gradient vs FD (1D)",
+          "[loglik][gradient][fd][warpkriging][warpparams]") {
+  const int idx = GENERATE_COPY(range(0, static_cast<int>(WARP_SPECS.size())));
+  const std::string& warp = WARP_SPECS[static_cast<std::size_t>(idx)];
+  INFO("warp=" << warp);
+  check_warp_param_grad_vs_fd(warp);
 }

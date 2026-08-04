@@ -18,7 +18,11 @@ test_that("Kumaraswamy warping works on 1D function", {
   X <- as.matrix(seq(0.01, 0.99, length.out = 8))
   y <- f1d(X)
 
-  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss", optim = "BFGS")
+  # Kumaraswamy's likelihood surface on this 8-point 1D design has several
+  # local optima; a single-start optimizer can get stuck far from the global
+  # optimum now that the warp-parameter gradient is correct (see
+  # WarpKriging.cpp fix), so use a multistart BFGS as in other tests.
+  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss", optim = "BFGS10")
 
   expect_s3_class(k, "WarpKriging")
   cat(summary(k))

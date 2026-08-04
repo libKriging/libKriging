@@ -1907,38 +1907,74 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
 }
 
 // -------------------------------------------------------------------------
-//  Gradient of LL w.r.t. warp params  (backprop through K = σ̂² R)
+//  Gradient of LL w.r.t. warp params  (backprop through R, θ held fixed)
+//
+//  Mirrors concentrated_ll_and_grad_theta(): dLL/dR_ij = 0.5*(alpha_i alpha_j
+//  / σ̂² - Rinv_ij) (validated by the passing θ-gradient FD test), then
+//  dR_ij/dΦ_i = R_ij * DlnCovDx(dPhi_ij, θ)  (sign: dPhi = Φ_i - Φ_j).
+//
+//  NOTE: an earlier version of this routine backpropagated through
+//  K = σ̂²·R instead of R directly, using dL_dK = 0.5*(alpha alphaᵀ - Kinv)
+//  paired with K_ij = σ̂²·R_ij. That introduced a spurious σ̂² scaling
+//  mismatch between the two terms (Kinv already carries a 1/σ̂², but the
+//  alpha·alphaᵀ term did not), which for small/large σ̂² blew up the
+//  analytical gradient by many orders of magnitude relative to a finite
+//  difference of the true log-likelihood -- verified by an end-to-end FD
+//  check (see git history / diagnostic test). Working directly in
+//  R-space (as done here) sidesteps the issue entirely.
 // -------------------------------------------------------------------------
-arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dK) const {
+arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dR) const {
   const arma::uword n = Phi.n_rows;
   const arma::uword d = Phi.n_cols;
   arma::mat dL_dPhi(n, d, arma::fill::zeros);
 
-  // K_ij = σ² · C(dPhi_ij, θ)
-  // ∂K_ij/∂Φ_i = K_ij · DlnCovDx(dPhi_ij, θ)   (sign: dPhi = Φ_i - Φ_j, so ∂dPhi/∂Φ_i = +1)
+  // R_ij = C(dPhi_ij, θ), with dPhi_ij = Φ_i - Φ_j.
+  // Φ_i affects BOTH the (i,j) and (j,i) slots of the (conceptually
+  // unconstrained) gradient matrix dL_dR: ∂R_ij/∂Φ_i = R_ij·DlnCovDx(dPhi_ij,θ)
+  // and, since DlnCovDx is odd in its argument and R_ji=R_ij,
+  // ∂R_ji/∂Φ_i = R_ji·DlnCovDx(dPhi_ji,θ)·(-1) = R_ij·DlnCovDx(dPhi_ij,θ)
+  // — i.e. the SAME quantity. As dL_dR is symmetric (dL_dR(i,j)=dL_dR(j,i)),
+  // both slots contribute equally, giving a factor of 2 (matching the
+  // `w = 2.0 * dLL_dR(i,j)` convention already used in
+  // concentrated_ll_and_grad_theta() for the analogous θ-gradient sum).
+  //
+  // NOTE: LinearAlgebra::compute_dX(X) does NOT store an antisymmetric
+  // pairwise-difference array: for a pair (p,q) with p<q it writes the same
+  // value diff = X_p - X_q at BOTH column p*n+q and column q*n+p (see its
+  // implementation) -- i.e. m_dX.col(a*n+b) always equals X_min(a,b) -
+  // X_max(a,b), regardless of whether a<b or a>b. Reusing that cache with
+  // the naive assumption dPhi_ij = m_dX.col(i*n+j) is therefore only
+  // correct when i<j; for i>j it silently returns -dPhi_ij, which (since
+  // DlnCovDx is odd) flips the sign of every term where the row index i is
+  // the larger one. That bug used to corrupt every row of dL_dPhi except
+  // row 0 (verified by an isolated finite-difference check against
+  // dK_dPhi() with cached vs recomputed differences). Recomputing the
+  // difference directly from Phi below sidesteps the cache entirely and
+  // is guaranteed to have the correct sign.
   for (arma::uword i = 0; i < n; ++i) {
     for (arma::uword j = 0; j < n; ++j) {
       if (i == j)
         continue;
-      double coeff = dL_dK(i, j);
+      double coeff = dL_dR(i, j);
       if (std::abs(coeff) < 1e-15)
         continue;
 
-      double K_ij = m_sigma2 * m_R(i, j);
-      arma::vec dlnCdx = _DlnCovDx(m_dX.col(i * n + j), m_theta);
-      // ∂K_ij/∂Φ_i_k = K_ij * dlnCdx_k
-      dL_dPhi.row(i) += coeff * K_ij * dlnCdx.t();
+      double R_ij = m_R(i, j);
+      arma::vec dPhi_ij = Phi.row(i).t() - Phi.row(j).t();
+      arma::vec dlnCdx = _DlnCovDx(dPhi_ij, m_theta);
+      // ∂R_ij/∂Φ_i_k = R_ij * dlnCdx_k (factor 2: see comment above)
+      dL_dPhi.row(i) += 2.0 * coeff * R_ij * dlnCdx.t();
     }
   }
   return dL_dPhi;
 }
 
 arma::vec WarpKriging::warp_gradient() const {
-  arma::mat Kinv = (1.0 / m_sigma2) * m_Rinv;  // Use cached
+  const arma::mat& Rinv = m_Rinv;  // Use cached
   arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
-  arma::mat dLL_dK = 0.5 * (alpha * alpha.t() - Kinv);
+  arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
-  arma::mat dLL_dPhi = dK_dPhi(m_X, dLL_dK);
+  arma::mat dLL_dPhi = dK_dPhi(m_X, dLL_dR);
 
   if (m_is_joint) {
     if (!m_joint_warp)
