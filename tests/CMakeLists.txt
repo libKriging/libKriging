@@ -278,6 +278,16 @@ catch_discover_tests(LinearAlgebraTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(CovarianceDerivativeTest CovarianceDerivativeTest.cpp)
+target_link_libraries(CovarianceDerivativeTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries CovarianceDerivativeTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(CovarianceDerivativeTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(GetVersion GetVersion.cpp)
 target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)
