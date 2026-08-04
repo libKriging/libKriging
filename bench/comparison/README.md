@@ -50,3 +50,14 @@ Packages differ in optimizer, restarts, bounds and internal rescaling; this
 compares *default MLE fits* under a common kernel/trend, not tuned setups.
 Contributions refining per-package settings are welcome — please keep any
 change symmetric across packages.
+
+pylibkriging/DiceKriging/RobustGaSP derive their correlation-length search
+range from the actual data by default. GPy, scikit-learn and OpenTURNS
+don't, so `run_python.py` derives a data-range-aware initial length-scale
+and bounds for those three (see its module docstring) — without it, they
+silently degenerate to a near-constant predictor on `borehole` (raw
+physical units spanning 5+ orders of magnitude across dimensions) and, for
+scikit-learn specifically, on the `hartmann` functions too (short
+correlation length vs. its zero-restart default). This is a fit-quality
+fix, not a change of kernel/trend/objective — it targets the same "fair
+MLE fit" this benchmark aims for, not a tuned/best-case setup.

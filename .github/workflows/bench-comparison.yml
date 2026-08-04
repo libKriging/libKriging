@@ -2,13 +2,17 @@ name: Comparison benchmark
 
 # Cross-package kriging benchmark on shared LHS designs.
 # Heavy job: manual trigger + monthly schedule, never on push/PR.
-# TEMPORARY: also run on this PR's branch so the new benchmark gets exercised
-# by CI before merge. Remove the push/pull_request triggers below once verified.
+# TEMPORARY: also run on push to this PR's branch so the scaling/restarts fix
+# to run_python.py gets exercised by CI before merge. Remove the
+# `fix/comparison-benchmark-scaling` entry below once verified.
+# (NOTE: `feature/comparison-benchmark` below is a leftover from the same
+# kind of temporary trigger added for the PR that introduced this workflow,
+# never cleaned up after merge — and its `pull_request:` counterpart never
+# actually fired, since that PR's base branch was `master`, not itself.
+# Safe to drop `feature/comparison-benchmark` here too whenever convenient.)
 on:
   push:
-    branches: [feature/comparison-benchmark]
-  pull_request:
-    branches: [feature/comparison-benchmark]
+    branches: [feature/comparison-benchmark, fix/comparison-benchmark-scaling]
   workflow_dispatch:
     inputs:
       repeats:

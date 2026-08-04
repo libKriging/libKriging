@@ -5,7 +5,22 @@ Common modelling choices (as close as each API allows):
   * Matern 5/2 anisotropic (ARD) kernel
   * constant trend / mean, estimated
   * interpolation (no nugget beyond numerical jitter)
-  * hyperparameters by maximum likelihood, package defaults for the optimizer
+  * hyperparameters by maximum likelihood
+
+pylibkriging/DiceKriging/RobustGaSP derive their correlation-length search
+range from the actual data (either internally, or because their default
+optimizer bounds are computed from the input range), so they cope with
+both normalized ([0,1]^d) and raw-physical-unit domains (e.g. `borehole`,
+whose 8 dimensions span 5+ orders of magnitude) out of the box. GPy,
+scikit-learn and OpenTURNS don't: left at their literal defaults
+(length_scale/theta0 = 1 in the *raw* input units, single-start
+optimization), they silently converge to a near-constant predictor
+whenever the data isn't already O(1)-scaled or has short correlation
+lengths relative to that. `_length_scale_init` derives a data-range-aware
+initial guess/bounds for these three so the comparison reflects each
+package's actual fitting quality rather than a scale mismatch; sklearn
+also gets a few optimizer restarts (`n_restarts_optimizer=0`, sklearn's
+own default, is a well-known trap for multimodal likelihoods).
 
 Each fit runs in a subprocess with a wall-clock budget (--budget, default
 300 s); failures and timeouts are recorded, never fatal.
@@ -23,6 +38,17 @@ import traceback
 import numpy as np
 
 JITTER = 1e-10
+N_RESTARTS = 5
+
+
+def _length_scale_init(X):
+    """Per-dimension (init, lower, upper) for an ARD length-scale, derived
+    from the actual column range so a length_scale=1 default doesn't
+    silently degenerate on non-O(1)-scaled or short-correlation-length
+    domains (see module docstring)."""
+    rng = X.max(axis=0) - X.min(axis=0)
+    rng = np.where(rng > 0, rng, 1.0)
+    return rng * 0.1, rng * 1e-4, rng * 1e2
 
 
 # ----------------------------------------------------------------- adapters
@@ -41,12 +67,13 @@ def pred_pylibkriging(m, Xt):
 def fit_sklearn(X, y):
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import ConstantKernel, Matern
+    init, lo, hi = _length_scale_init(X)
     k = ConstantKernel(1.0, (1e-5, 1e7)) * Matern(
-        length_scale=np.ones(X.shape[1]),
-        length_scale_bounds=(1e-6, 1e6), nu=2.5)
+        length_scale=init,
+        length_scale_bounds=list(zip(lo, hi)), nu=2.5)
     t0 = time.perf_counter()
     m = GaussianProcessRegressor(kernel=k, alpha=JITTER, normalize_y=True,
-                                 n_restarts_optimizer=0).fit(X, y)
+                                 n_restarts_optimizer=N_RESTARTS).fit(X, y)
     return m, time.perf_counter() - t0
 
 
@@ -57,12 +84,16 @@ def pred_sklearn(m, Xt):
 
 def fit_gpy(X, y):
     import GPy
-    k = GPy.kern.Matern52(input_dim=X.shape[1], ARD=True)
+    init, lo, hi = _length_scale_init(X)
+    k = GPy.kern.Matern52(input_dim=X.shape[1], ARD=True, lengthscale=init)
+    for i in range(X.shape[1]):
+        k.lengthscale[i:i + 1].constrain_bounded(lo[i], hi[i], warning=False)
     t0 = time.perf_counter()
     m = GPy.models.GPRegression(X, y.reshape(-1, 1), k)
     m.Gaussian_noise.variance = JITTER
     m.Gaussian_noise.variance.fix()
-    m.optimize()
+    m.optimize_restarts(num_restarts=N_RESTARTS, verbose=False,
+                         robust=True)
     return m, time.perf_counter() - t0
 
 
@@ -90,11 +121,17 @@ def pred_smt(m, Xt):
 def fit_openturns(X, y):
     import openturns as ot
     d = X.shape[1]
+    init, lo, hi = _length_scale_init(X)
     t0 = time.perf_counter()
-    cov = ot.MaternModel([1.0] * d, [1.0], 2.5)
+    cov = ot.MaternModel(list(init), [1.0], 2.5)
     basis = ot.ConstantBasisFactory(d).build()
     algo = ot.KrigingAlgorithm(ot.Sample(X), ot.Sample(y.reshape(-1, 1)),
                                cov, basis)
+    try:
+        algo.setOptimizationBounds(ot.Interval(list(lo), list(hi)))
+    except Exception:
+        pass  # OT version optimizes a different parameter count; keep the
+              # corrected initial scale, which is the dominant fix.
     algo.run()
     return algo.getResult(), time.perf_counter() - t0
 
