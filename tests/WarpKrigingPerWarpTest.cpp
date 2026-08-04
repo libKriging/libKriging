@@ -4,18 +4,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <catch2/catch.hpp>
-// The two private-access macros below are scoped to this translation unit
-// only (undef'd immediately after the include) and are needed to reach
-// WarpKriging's private optimiser internals (pack_warp_params,
-// unpack_warp_params, refresh_cache, concentrated_ll, warp_gradient) from
-// the "warp_gradient vs FD" regression test further down. See that test
-// for why this is the only place in the test suite that validates the
-// warp-parameter gradient end-to-end.
-#define private public
-#define protected public
 #include "libKriging/WarpKriging.hpp"
-#undef private
-#undef protected
 #include "ks_test.hpp"
 #include <cmath>
 #include <sstream>
@@ -373,7 +362,22 @@ TEST_CASE("WarpKrigingPerWarpTest - loglik gradient vs FD (1D)", "[loglik][gradi
 //  magnitude, which silently prevented the optimiser from ever finding a
 //  non-trivial (informative) warp.
 // ==========================================================================
-static void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
+// Declared inside namespace libKriging (rather than at file/global scope)
+// so that it matches the `friend` declaration in WarpKriging.hpp exactly:
+// an unqualified friend declaration written inside a class nested in
+// namespace libKriging is only ever found via ordinary/ADL lookup as
+// `libKriging::check_warp_param_grad_vs_fd` -- a free function with the
+// same name declared at global scope (or reached via a
+// `#define private public` include trick) is a *different* entity to the
+// compiler and, on MSVC specifically, would be compiled with a different
+// decorated (mangled) symbol name than the one the library actually
+// exports for these private members (MSVC encodes the access specifier in
+// the mangled name), causing LNK2019 unresolved-external errors on
+// Windows only (GCC/Clang do not encode access in the mangled name, which
+// is why the previous `#define private public` trick used to work on
+// Linux/macOS but silently broke Windows CI).
+namespace libKriging {
+void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
   auto wk = make_model(warp_spec);
 
   arma::vec base_wp = wk.pack_warp_params();
@@ -425,6 +429,7 @@ static void check_warp_param_grad_vs_fd(const std::string& warp_spec) {
   INFO("warp=" << warp_spec << " warp_grad failures=" << failures << details.str());
   CHECK(failures == 0);
 }
+}  // namespace libKriging
 
 TEST_CASE("WarpKrigingPerWarpTest - warp-parameter gradient vs FD (1D)",
           "[loglik][gradient][fd][warpkriging][warpparams]") {
