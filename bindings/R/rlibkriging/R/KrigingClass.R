@@ -30,7 +30,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','dy')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -79,6 +79,12 @@ classKriging <- function(nk) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
+#' @param grady Optional numeric matrix (n x d) of observed gradients:
+#'     \code{grady[a, j]} is \eqn{\partial y/\partial x_j} at \code{X[a, ]}.
+#'     When given, the model is fit on both values and gradients
+#'     (gradient-enhanced kriging); \code{NULL} (default) fits on values
+#'     only. Requires a mean-square differentiable kernel (\code{"gauss"},
+#'     \code{"matern3_2"} or \code{"matern5_2"}; \code{"exp"} is rejected).
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -116,7 +122,8 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
-                    noise = NULL) {
+                    noise = NULL,
+                    grady = NULL) {
 
     regmodel <- match.arg(regmodel)
     objective <- .match_kriging_objective(objective)
@@ -153,7 +160,8 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       normalize = normalize,
                       optim = optim,
                       objective = objective,
-                      parameters = parameters)
+                      parameters = parameters,
+                      grady = grady)
     return(classKriging(nk))
 }
 
@@ -257,6 +265,8 @@ print.Kriging <- function(x, ...) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
+#' @param grady Optional numeric matrix (n x d) of observed gradients; see
+#'     \code{\link{Kriging}}. \code{NULL} (default) fits on values only.
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -283,7 +293,8 @@ fit.Kriging <- function(object, y, X,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
-                    noise = NULL, ...) {
+                    noise = NULL,
+                    grady = NULL, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
 
     regmodel <- match.arg(regmodel)
@@ -296,7 +307,8 @@ fit.Kriging <- function(object, y, X,
                     normalize,
                     optim ,
                     objective,
-                    parameters)
+                    parameters,
+                    grady)
 
     invisible(NULL)
 }

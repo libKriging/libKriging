@@ -42,7 +42,8 @@ Rcpp::List new_KrigingFit(arma::vec y,
                           bool normalize = false,
                           std::string optim = "BFGS",
                           std::string objective = "LL",
-                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                          Rcpp::Nullable<Rcpp::NumericMatrix> grady = R_NilValue) {
   Kriging::NoiseModel nm = Kriging::NoiseModel::None;
   if (noise_model == "nugget")
     nm = Kriging::NoiseModel::Nugget;
@@ -128,6 +129,10 @@ Rcpp::List new_KrigingFit(arma::vec y,
 
   Kriging* ok = new Kriging(kernel, nm);
 
+  std::optional<arma::mat> grady_opt = std::nullopt;
+  if (grady.isNotNull())
+    grady_opt = Rcpp::as<arma::mat>(grady);
+
   if (nm == Kriging::NoiseModel::Heterogeneous && noise.isNotNull()) {
     arma::vec noise_vec = Rcpp::as<arma::vec>(noise);
     ok->fit(std::move(y),
@@ -137,9 +142,11 @@ Rcpp::List new_KrigingFit(arma::vec y,
             normalize,
             optim,
             objective,
-            kparams);
+            kparams,
+            grady_opt);
   } else {
-    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    ok->fit(
+        std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams, grady_opt);
   }
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
@@ -159,7 +166,8 @@ void kriging_fit(Rcpp::List k,
                  bool normalize = false,
                  std::string optim = "BFGS",
                  std::string objective = "LL",
-                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                 Rcpp::Nullable<Rcpp::NumericMatrix> grady = R_NilValue) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -234,6 +242,10 @@ void kriging_fit(Rcpp::List k,
       (_parameters["has_beta"]) ? make_optional0<arma::vec>(_parameters["beta"]) : std::nullopt,
       _parameters["is_beta_estim"]};
 
+  std::optional<arma::mat> grady_opt = std::nullopt;
+  if (grady.isNotNull())
+    grady_opt = Rcpp::as<arma::mat>(grady);
+
   if (noise.isNotNull()) {
     arma::vec noise_vec = Rcpp::as<arma::vec>(noise);
     impl_ptr->fit(std::move(y),
@@ -243,9 +255,17 @@ void kriging_fit(Rcpp::List k,
                   normalize,
                   optim,
                   objective,
-                  kparams);
+                  kparams,
+                  grady_opt);
   } else {
-    impl_ptr->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    impl_ptr->fit(std::move(y),
+                  std::move(X),
+                  Trend::fromString(regmodel),
+                  normalize,
+                  optim,
+                  objective,
+                  kparams,
+                  grady_opt);
   }
 }
 
@@ -776,6 +796,15 @@ bool kriging_is_sigma2_estim(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->is_sigma2_estim();
+}
+
+// [[Rcpp::export]]
+arma::mat kriging_dy(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->dy();
 }
 
 // [[Rcpp::export]]
