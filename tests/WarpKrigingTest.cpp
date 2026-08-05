@@ -1130,6 +1130,76 @@ void test_predict_derivative() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+// --- Test: gradient-enhanced fit with a frozen per-dimension warp -------
+void test_grad_obs() {
+  std::cout << "--- Test: fit accepts grady with a frozen per-dimension warp ---" << std::endl;
+
+  auto f2 = [](double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2); };
+  auto df2 = [](double x1, double x2) {
+    return arma::rowvec{3.0 * std::cos(3.0 * x1), -5.0 * std::sin(5.0 * x2)};
+  };
+
+  arma::arma_rng::set_seed(91);
+  const arma::uword n = 12;
+  arma::mat X = arma::randu<arma::mat>(n, 2);
+  arma::vec y(n);
+  arma::mat dy(n, 2);
+  for (arma::uword i = 0; i < n; ++i) {
+    y(i) = f2(X(i, 0), X(i, 1));
+    dy.row(i) = df2(X(i, 0), X(i, 1));
+  }
+
+  // First fit normally (warp + theta optimized) to reach a non-trivial,
+  // non-identity warp shape; then re-fit the SAME object with grady and
+  // optim="none" to keep that warp (and the optimized theta, passed back in
+  // explicitly) frozen, per the GEK+Warp v1 scope.
+  WarpKriging model({"kumaraswamy", "kumaraswamy"}, "gauss");
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "Adam", "LL", {{"max_iter_adam", "50"}});
+
+  WarpKriging::Parameters p;
+  p.theta = model.theta();
+  model.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", p, dy);
+  assert(!model.dy().is_empty());
+
+  // Analytical derivative vs finite differences at off-design points --
+  // exercises the Jacobian sandwich through both fit (R/F_aug) and predict
+  // (R_on/DR_on_i).
+  arma::mat X_new = arma::randu<arma::mat>(5, 2);
+  check_deriv_vs_fd(model, X_new, {0, 1}, "kumaraswamy+grady, gauss, 2D");
+
+  // Gradients are (approximately) interpolated at the training points too.
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X, false, false, true);
+  for (arma::uword i = 0; i < n; ++i) {
+    arma::rowvec g = df2(X(i, 0), X(i, 1));
+    for (arma::uword j = 0; j < 2; ++j)
+      assert(std::abs(mean_deriv(i, j) - g(j)) < 0.2);
+  }
+
+  // Rejects optim != "none" and a joint (MLP) warp.
+  {
+    WarpKriging model2({"kumaraswamy", "kumaraswamy"}, "gauss");
+    bool threw = false;
+    try {
+      model2.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, dy);
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  {
+    WarpKriging model3({"mlp(16:8,2,selu)", "mlp(16:8,2,selu)"}, "gauss");
+    bool threw = false;
+    try {
+      model3.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LL", {}, dy);
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 // --- Test 18: Parallel multistart (BFGS3 and BFGS3+Adam) ----------------
 void test_parallel_multistart() {
   std::cout << "--- Test 18: Parallel multistart optimization ---" << std::endl;
@@ -1662,6 +1732,7 @@ int main() {
     test_from_string_roundtrip();
     test_warping_strings_accessor();
     test_predict_derivative();
+    test_grad_obs();
     test_parallel_multistart();
     test_level_names();
     test_none_warp_vs_kriging_ll();

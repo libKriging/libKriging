@@ -590,15 +590,19 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X_grad(
     std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
     std::function<arma::mat(const arma::vec&, const arma::vec&)> D2CovDxDxp,
     double factor,
-    const arma::vec& diag) {
+    const arma::vec& diag,
+    const std::vector<arma::mat>& J) {
   if (!DCovDx || !D2CovDxDxp)
     throw std::invalid_argument(
         "covMat_sym_X_grad: kernel is not mean-square differentiable, gradient observations are not supported");
 
-  const arma::uword d = X.n_rows;
   const arma::uword n = X.n_cols;
+  const bool warped = !J.empty();
+  const arma::uword d = warped ? J[0].n_cols : X.n_rows;
   const arma::uword N = n * (1 + d);
 
+  if (warped && J.size() != n)
+    throw std::invalid_argument("covMat_sym_X_grad: J must have one Jacobian per point");
   if ((*R).n_rows != N || (*R).n_cols != N)
     throw std::invalid_argument("covMat_sym_X_grad: R must be n*(1+d) square");
   if (!diag.is_empty() && diag.n_elem != N)
@@ -616,22 +620,27 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X_grad(
       (*R).at(b, a) = k;
 
       // Cov(dZ(x_a)/dx_i, Z(x_b)) = dk/dx_i, and by symmetry
-      // Cov(Z(x_b), dZ(x_a)/dx_i) is the same entry mirrored.
-      const arma::vec g = DCovDx(dX, theta) * factor;
+      // Cov(Z(x_b), dZ(x_a)/dx_i) is the same entry mirrored. When warped,
+      // the feature-space gradient is sandwiched by the relevant point's
+      // Jacobian: Cov(dZ/dx_a_i, ·) uses J[a], Cov(·, dZ/dx_b_j) uses J[b].
+      const arma::vec g_phi = DCovDx(dX, theta) * factor;
+      const arma::vec g_a = warped ? arma::vec(J[a].t() * g_phi) : g_phi;
       for (arma::uword i = 0; i < d; i++) {
-        (*R).at(n + a * d + i, b) = g[i];
-        (*R).at(b, n + a * d + i) = g[i];
+        (*R).at(n + a * d + i, b) = g_a[i];
+        (*R).at(b, n + a * d + i) = g_a[i];
       }
 
       if (a != b) {
         // Cov(Z(x_a), dZ(x_b)/dx_j) = d/dx_b_j k(x_a - x_b) = -dk/dx_j.
+        const arma::vec g_b = warped ? arma::vec(J[b].t() * g_phi) : g_phi;
         for (arma::uword j = 0; j < d; j++) {
-          (*R).at(a, n + b * d + j) = -g[j];
-          (*R).at(n + b * d + j, a) = -g[j];
+          (*R).at(a, n + b * d + j) = -g_b[j];
+          (*R).at(n + b * d + j, a) = -g_b[j];
         }
       }
 
-      const arma::mat H = D2CovDxDxp(dX, theta) * factor;
+      const arma::mat H_phi = D2CovDxDxp(dX, theta) * factor;
+      const arma::mat H = warped ? arma::mat(J[a].t() * H_phi * J[b]) : H_phi;
       for (arma::uword i = 0; i < d; i++)
         for (arma::uword j = 0; j < d; j++) {
           (*R).at(n + a * d + i, n + b * d + j) = H(i, j);
@@ -651,15 +660,19 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect_X_grad(
     const arma::vec& theta,
     std::function<double(const arma::vec&, const arma::vec&)> Cov,
     std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
-    double factor) {
+    double factor,
+    const std::vector<arma::mat>& J) {
   if (!DCovDx)
     throw std::invalid_argument(
         "covMat_rect_X_grad: kernel is not mean-square differentiable, gradient observations are not supported");
 
-  const arma::uword d = X1.n_rows;
   const arma::uword n1 = X1.n_cols;
   const arma::uword n2 = X2.n_cols;
+  const bool warped = !J.empty();
+  const arma::uword d = warped ? J[0].n_cols : X1.n_rows;
 
+  if (warped && J.size() != n1)
+    throw std::invalid_argument("covMat_rect_X_grad: J must have one Jacobian per X1 point");
   if ((*R).n_rows != n1 * (1 + d) || (*R).n_cols != n2)
     throw std::invalid_argument("covMat_rect_X_grad: R must be (n1*(1+d)) x n2");
 
@@ -667,7 +680,8 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect_X_grad(
     for (arma::uword j = 0; j < n2; j++) {
       const arma::vec dX = X1.col(a) - X2.col(j);
       (*R).at(a, j) = Cov(dX, theta) * factor;
-      const arma::vec g = DCovDx(dX, theta) * factor;
+      const arma::vec g_phi = DCovDx(dX, theta) * factor;
+      const arma::vec g = warped ? arma::vec(J[a].t() * g_phi) : g_phi;
       for (arma::uword i = 0; i < d; i++)
         (*R).at(n1 + a * d + i, j) = g[i];
     }

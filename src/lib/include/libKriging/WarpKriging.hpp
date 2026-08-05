@@ -610,13 +610,21 @@ class WarpKriging : protected KrigingImpl {
                              const std::map<std::string, std::string>& parameters = {});
 
   /// Typed-parameters overload: lets callers seed θ / warp params.
+  ///
+  /// @param grady optional n*d_input matrix of observed gradients (see
+  ///        Kriging::fit); requires `optim == "none"` (both θ and the warp
+  ///        parameters must be given, not jointly re-optimized — the warp's
+  ///        analytical parameter gradient does not account for gradient
+  ///        observations yet), a non-joint (per-dimension) warp, and a
+  ///        mean-square differentiable kernel.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel,
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
-                             const Parameters& parameters);
+                             const Parameters& parameters,
+                             const std::optional<arma::mat>& grady = std::nullopt);
 
   // -----------------------------------------------------------------------
   //  Prediction
@@ -819,6 +827,11 @@ class WarpKriging : protected KrigingImpl {
 
   arma::mat build_trend_matrix(const arma::mat& X) const;
   arma::mat apply_warping(const arma::mat& X) const;
+
+  /// Jacobian dΦ/dx (d_phi × d_input, block-diagonal) of the per-dimension
+  /// analytic warp at a normalized input column. Requires !m_is_joint (the
+  /// joint MLP warp uses `WarpMLPJoint::jacobian_input` instead, see predict()).
+  arma::mat per_dim_warp_jacobian(const arma::vec& x_norm_col) const;
 
   /// Instantiate m_joint_warp for the given input dimension (no-op if already set).
   void ensure_joint_warp(arma::uword d_in);

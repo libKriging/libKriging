@@ -72,11 +72,12 @@ LIBKRIGING_EXPORT arma::mat KrigingImpl::covMat(const arma::mat& X1, const arma:
   return R;
 }
 
-void KrigingImpl::set_grad_obs(const arma::mat& dy) {
+void KrigingImpl::set_grad_obs(const arma::mat& dy, const std::vector<arma::mat>& jac) {
   if (dy.is_empty()) {
     m_dy.reset();
     m_y_aug.reset();
     m_F_aug.reset();
+    m_grad_jac.clear();
     return;
   }
 
@@ -84,16 +85,25 @@ void KrigingImpl::set_grad_obs(const arma::mat& dy) {
     throw std::runtime_error("Gradient observations require a mean-square differentiable kernel (gauss, matern3_2 or "
                              "matern5_2), got: "
                              + m_covType);
-  if (dy.n_rows != m_X.n_rows || dy.n_cols != m_X.n_cols)
+  if (!jac.empty() && jac.size() != m_X.n_rows)
+    throw std::runtime_error("Gradient observation Jacobians must have one entry per training point ("
+                             + std::to_string(m_X.n_rows) + "), got " + std::to_string(jac.size()));
+  const arma::uword d_expected = jac.empty() ? m_X.n_cols : jac[0].n_cols;
+  if (dy.n_rows != m_X.n_rows || dy.n_cols != d_expected)
     throw std::runtime_error("Gradient observations must be a " + std::to_string(m_X.n_rows) + "x"
-                             + std::to_string(m_X.n_cols) + " matrix, got " + std::to_string(dy.n_rows) + "x"
+                             + std::to_string(d_expected) + " matrix, got " + std::to_string(dy.n_rows) + "x"
                              + std::to_string(dy.n_cols));
 
-  // Chain rule for the normalization Xn = (X - centerX)/scaleX, yn = (y - centerY)/scaleY:
+  // Chain rule for the normalization Xn = (X - centerX)/scaleX, yn = (y - centerY)/scaleY.
+  // With a warped feature space (jac given), `dy` is expressed in the same
+  // input space m_scaleX/m_centerX normalize (WarpKriging keeps those sized
+  // to the input dimension, not the feature dimension), so the same
+  // elementwise chain rule applies unchanged.
   //   dyn/dXn_j = (dy/dX_j) · scaleX_j / scaleY
   m_dy = dy;
   m_dy.each_row() %= m_scaleX;
   m_dy /= m_scaleY;
+  m_grad_jac = jac;
 
   rebuild_aug_data();
 }
@@ -106,7 +116,7 @@ void KrigingImpl::rebuild_aug_data() {
   }
 
   const arma::uword n = m_X.n_rows;
-  const arma::uword d = m_X.n_cols;
+  const arma::uword d = d_grad();
 
   // Augmented ordering: values first, then the d gradient components of each
   // observation — i.e. m_dy read row by row.
@@ -115,7 +125,16 @@ void KrigingImpl::rebuild_aug_data() {
   for (arma::uword a = 0; a < n; a++)
     m_y_aug.subvec(n + a * d, n + a * d + d - 1) = m_dy.row(a).t();
 
-  m_F_aug = arma::join_cols(m_F, Trend::regressionModelDerivativeMatrix(m_regmodel, m_X));
+  arma::mat DF_phi = Trend::regressionModelDerivativeMatrix(m_regmodel, m_X);  // n*d_phi x p, phi-space
+  if (m_grad_jac.empty()) {
+    m_F_aug = arma::join_cols(m_F, DF_phi);
+  } else {
+    const arma::uword d_phi = m_X.n_cols;
+    arma::mat DF_grad(n * d, m_F.n_cols, arma::fill::none);
+    for (arma::uword a = 0; a < n; a++)
+      DF_grad.rows(a * d, a * d + d - 1) = m_grad_jac[a].t() * DF_phi.rows(a * d_phi, a * d_phi + d_phi - 1);
+    m_F_aug = arma::join_cols(m_F, DF_grad);
+  }
 }
 
 void KrigingImpl::check_no_grad_obs(const char* method) const {
@@ -138,7 +157,7 @@ void KrigingImpl::populate_Model(KModel& m,
     const arma::uword n = m_X.n_rows;
     const arma::uword N = n_aug();
     m.R.set_size(N, N);
-    LinearAlgebra::covMat_sym_X_grad(&m.R, m_X.t(), theta, _Cov, _DCovDx, _D2CovDxDxp, alpha, arma::vec());
+    LinearAlgebra::covMat_sym_X_grad(&m.R, m_X.t(), theta, _Cov, _DCovDx, _D2CovDxDxp, alpha, arma::vec(), m_grad_jac);
     // The value block carries the class-specific diagonal (1 for plain/nugget,
     // 1 + noise/σ² for noise); the gradient block keeps the curvature assembled
     // above, i.e. gradient observations are treated as noise-free.
@@ -216,10 +235,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
   const bool grad_obs = has_grad_obs();
-  const arma::uword N_o = n_aug();  // n_o, or n_o(1+d) with gradient observations
-  if (grad_obs && phi)
-    throw std::runtime_error("predict: gradient observations are not supported with a feature map yet");
+  const arma::uword N_o = n_aug();  // n_o, or n_o(1+d_grad) with gradient observations
+  if (grad_obs && phi && m_grad_jac.empty())
+    throw std::runtime_error(
+        "predict: gradient observations under a feature map require per-point Jacobians cached at fit time");
   arma::uword d = m_X.n_cols;  // kernel/feature space dim
+  const arma::uword d_grad_obs = grad_obs ? d_grad() : d;  // gradient-block dim (may differ from d under a warp)
   arma::uword d_input = jac ? X_n.n_cols : d;
   if (!phi && X_n.n_cols != d)
     throw std::runtime_error("Predict locations have wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
@@ -258,7 +279,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   if (grad_obs) {
     // Cross-covariance between the augmented observations and the (value-only)
     // prediction points: [k(x_o, x_n) ; ∂k/∂x_o(x_o, x_n)].
-    LinearAlgebra::covMat_rect_X_grad(&R_on, Xn_o, Xn_n, m_theta, _Cov, _DCovDx, R_on_factor);
+    LinearAlgebra::covMat_rect_X_grad(&R_on, Xn_o, Xn_n, m_theta, _Cov, _DCovDx, R_on_factor, m_grad_jac);
     // Preserve the noiseless-at-observation semantics on the value rows only.
     if (R_on_factor != 1.0)
       for (arma::uword i = 0; i < n_o; i++)
@@ -337,10 +358,15 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
       }
       if (grad_obs) {
         // Rows carrying ∂k/∂x_o differentiate once more w.r.t. the prediction
-        // point: ∂/∂x_n_k [∂k/∂x_o_l](x_o - x_n) = ∂²k/∂x_o_l ∂x_n_k.
-        for (arma::uword j = 0; j < n_o; j++)
-          DR_on_i.rows(n_o + j * d, n_o + j * d + d - 1)
-              = _D2CovDxDxp(Xn_o.col(j) - Xn_n.col(i), m_theta) * R_on_factor;
+        // point: ∂/∂Φ_n_k [∂k/∂x_o_l](Φ_o - Φ_n) = ∂²k/∂x_o_l ∂Φ_n_k. Under a
+        // warp, the observation side is already in d_grad_obs rows (sandwiched
+        // by that point's Jacobian); the prediction side stays in phi-space
+        // columns here and is projected by `jac` below, like the value rows.
+        for (arma::uword j = 0; j < n_o; j++) {
+          arma::mat H_phi = _D2CovDxDxp(Xn_o.col(j) - Xn_n.col(i), m_theta) * R_on_factor;
+          DR_on_i.rows(n_o + j * d_grad_obs, n_o + j * d_grad_obs + d_grad_obs - 1)
+              = m_grad_jac.empty() ? H_phi : arma::mat(m_grad_jac[j].t() * H_phi);
+        }
       }
       t0 = Bench::toc(nullptr, "DR_on_i    ", t0);
 
