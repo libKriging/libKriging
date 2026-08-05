@@ -263,6 +263,19 @@ class KrigingImpl {
   /// `m_X/m_y`, `m_dX/m_maxdX`, `m_regmodel/m_F`, sets `m_est_beta` and
   /// `m_beta` (if forced via `beta` with `is_beta_estim=false`).
   ///
+  /// `build_dX` (default true) controls whether the O(n^2) pairwise-difference
+  /// cube `m_dX` is built. Objectives that never touch `m_dX` (Vecchia in
+  /// light mode; Nystrom, which never touches it at all) should pass `false`:
+  /// `m_dX` is left empty and `m_maxdX` is instead computed directly as the
+  /// per-dimension range of X (O(n*d)) -- mathematically identical to
+  /// `max(abs(m_dX), 1)` since, for a single dimension, the maximum pairwise
+  /// absolute difference over all point pairs equals max(X) - min(X). Passing
+  /// `false` when something downstream *does* need `m_dX` (e.g. an exact
+  /// factorization, or Vecchia's variogram-slope theta-bounds heuristic) will
+  /// silently degrade that step (empty `m_dX` short-circuits gracefully
+  /// wherever it's consumed) rather than throw -- callers must not pass
+  /// `false` unless they know nothing downstream needs it.
+  ///
   /// Returns the normalized `theta0` matrix (empty if `theta` is not set).
   /// Wrappers handle class-specific extras (Noise: normalize and store
   /// `m_noise = noise / scaleY²`) and the optim==none / BFGS branches.
@@ -276,7 +289,8 @@ class KrigingImpl {
                            bool normalize,
                            bool is_beta_estim,
                            const std::optional<arma::vec>& beta,
-                           const std::optional<arma::mat>& theta);
+                           const std::optional<arma::mat>& theta,
+                           bool build_dX = true);
 
   /// Dump the inherited GP state to a JSON object using the
   /// Kriging/NuggetKriging/NoiseKriging schema. Used by `save()` in those

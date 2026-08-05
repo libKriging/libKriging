@@ -368,3 +368,13 @@ if(DEFINED ENV{GITHUB_ACTIONS})
 endif()
 catch_discover_tests(KrigingVecchiaTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
+
+
+add_executable(KrigingNystromTest KrigingNystromTest.cpp)
+target_link_libraries(KrigingNystromTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingNystromTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(KrigingNystromTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)

@@ -1021,6 +1021,333 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
   return {mean, stdev};
 }
 
+// =============================================================================
+// Nystrom approximated log-likelihood (objective="LLNys(k)")
+//
+// Global low-rank alternative to Vecchia: R ~= R_ns * R_ss^-1 * R_ns.t(),
+// where S is a set of k landmark rows of X, chosen ONCE (make_nystrom_landmarks,
+// called from fit() before optimization starts) and held FIXED across every
+// theta evaluation. This is standard (fixed-landmark) Nystrom, as opposed to
+// LinearAlgebra::nystromFactor's greedy pivoted-Cholesky landmark selection,
+// which re-picks pivots from the current covariance values and is therefore
+// only used here once, at a theta-neutral reference kernel, to seed the
+// landmark set. Re-selecting greedily at every theta (i.e. calling
+// nystromFactor directly inside this function) makes the pivot choice --
+// and hence the objective value -- discontinuous in theta: an earlier version
+// of this function did exactly that, and its finite-difference gradient was
+// inconsistent between step sizes as a direct symptom (see
+// KrigingNystromTest.cpp history / docs/dev/NystromLL.md).
+//
+// Once S is fixed, R_ss (k x k) and R_ns (n x k) are ordinary, smooth
+// functions of theta; U := R_ns * L_ss^-T (L_ss = chol(R_ss)) satisfies
+// U*U.t() = R_ns * R_ss^-1 * R_ns.t() exactly, and R^-1/log|R| go through
+// LinearAlgebra::woodbury_solve/woodbury_logdet -- the n x n matrix R is
+// never materialized. Cost O(n*k^2) per evaluation instead of O(n^3).
+//
+// Profiling matches the exact "LL" objective: sigma2 and beta in closed form
+// (same GLS formulas as _logLikelihood, just solved via Woodbury instead of a
+// dense Cholesky). Gradient in theta is analytic (envelope theorem, same
+// principle as _logLikelihoodVecchia: beta_hat/sigma2_hat's own theta-dependence
+// doesn't contribute since d(ll)/d(beta)=d(ll)/d(sigma2)=0 at their profiled
+// values) -- see the derivation inside _logLikelihoodNystrom's grad_out block.
+// An earlier version of this objective used a finite-difference gradient
+// instead (see git history / KrigingNystromTest.cpp); it worked but was more
+// sensitive to the likelihood surface's local curvature near small-theta /
+// near-singular-R regions than the analytic form is.
+// =============================================================================
+
+arma::uword Kriging::parse_nystrom_k(const std::string& objective) {
+  // "LLNys" -> default 50 ; "LLNys(k)" -> k
+  if (objective == "LLNys")
+    return 50;
+  if (objective.rfind("LLNys(", 0) == 0 && objective.back() == ')') {
+    const std::string inside = objective.substr(6, objective.size() - 7);
+    try {
+      const long k = std::stol(inside);
+      if (k >= 1)
+        return static_cast<arma::uword>(k);
+    } catch (const std::exception&) {
+      // fall through to the throw below
+    }
+  }
+  throw std::invalid_argument("Invalid Nystrom objective '" + objective
+                              + "': expected \"LLNys\" or \"LLNys(k)\" with k >= 1 (e.g. \"LLNys(50)\")");
+}
+
+void Kriging::make_nystrom_landmarks() {
+  // Reference kernel used only to RANK points by spatial coverage via
+  // nystromFactor's greedy residual criterion, never to evaluate the
+  // likelihood itself. Scaled to the data's own extent (m_maxdX, per
+  // dimension) rather than a fixed isotropic range: an unrelated scale (e.g.
+  // range=1 on normalized [0,1] data) makes the reference correlation matrix
+  // nearly rank-1 (all points look alike), so the greedy ranking picks a
+  // poorly-spread/near-redundant landmark set -- which then makes R_ss at the
+  // ACTUAL (possibly much shorter-range) theta ill-conditioned, in turn
+  // making safe_chol_lower's adaptive nugget retry trigger inconsistently
+  // across nearby theta and breaking the smoothness the fixed-landmark
+  // scheme is meant to provide.
+  const arma::vec ref_theta = m_maxdX;
+  arma::vec diag_resid_unused;
+  LinearAlgebra::nystromFactor(&diag_resid_unused,
+                               m_X,
+                               ref_theta,
+                               _Cov,
+                               /*factor=*/1.0,
+                               KrigingImpl::ones,
+                               m_nystrom_k,
+                               1e-12,
+                               &m_nystrom_landmarks);
+}
+
+double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
+                                      arma::vec* grad_out,
+                                      arma::vec* beta_out,
+                                      double* sigma2_out,
+                                      arma::mat* U_out,
+                                      arma::vec* D_out) const {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword kL = m_nystrom_landmarks.n_elem;
+  const arma::mat X_land = m_X.rows(m_nystrom_landmarks);  // k x d
+
+  arma::mat R_ss(kL, kL, arma::fill::none);
+  LinearAlgebra::covMat_sym_X(&R_ss, X_land.t(), _theta, _Cov, /*factor=*/1.0, KrigingImpl::ones);
+
+  arma::mat R_ns(n, kL, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_ns, m_X.t(), X_land.t(), _theta, _Cov, /*factor=*/1.0);
+
+  // A FIXED jitter (as opposed to safe_chol_lower's adaptive nugget-retry,
+  // which decides whether/how much to add based on a per-call rcond check)
+  // keeps this Cholesky deterministic and smooth in theta: an adaptive retry
+  // can trigger on one side of a finite-difference stencil and not the other,
+  // reintroducing the kind of discontinuity the fixed-landmark scheme is
+  // meant to eliminate.
+  R_ss.diag() += LinearAlgebra::num_nugget;
+  const arma::mat L_ss = arma::chol(R_ss, "lower");
+  const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U*U.t() = R_ns R_ss^-1 R_ns.t()
+
+  const arma::vec captured = arma::sum(arma::square(U), 1);
+  const arma::vec D = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+
+  const arma::mat RinvF = LinearAlgebra::woodbury_solve(U, D, m_F);
+  const arma::vec Rinvy = LinearAlgebra::woodbury_solve(U, D, m_y);
+
+  const arma::mat A = m_F.t() * RinvF;
+  const arma::vec b = m_F.t() * Rinvy;
+  const arma::vec beta = arma::solve(A, b, arma::solve_opts::likely_sympd);
+
+  const arma::vec e = m_y - m_F * beta;
+  const arma::vec Rinve = Rinvy - RinvF * beta;  // Rinv is linear: Rinv(y - F*beta) = Rinv*y - Rinv*F*beta
+  const double SSE = arma::dot(e, Rinve);
+  const double sigma2 = SSE / n;
+  const double logdetR = LinearAlgebra::woodbury_logdet(U, D);
+
+  if (beta_out != nullptr)
+    *beta_out = beta;
+  if (sigma2_out != nullptr)
+    *sigma2_out = sigma2;
+  if (U_out != nullptr)
+    *U_out = U;
+  if (D_out != nullptr)
+    *D_out = D;
+
+  if (grad_out != nullptr) {
+    // Analytic gradient, envelope theorem (beta_hat and sigma2_hat held fixed
+    // -- see the file-level comment above): for the standard concentrated GP
+    // log-likelihood, d(ll)/d(theta_k) = 0.5*(x' dRhat/dtheta_k x / sigma2 -
+    // trace(Rinv dRhat/dtheta_k)), x = Rinv*(y - F*beta_hat) = Rinve.
+    //
+    // Rhat_total = U*U.t() + diag(D) with D = 1 - diag(U*U.t()) (constant on
+    // the diagonal, by construction): so dRhat_total/dtheta_k equals
+    // d(U*U.t())/dtheta_k with its diagonal zeroed out. Writing U*U.t() =
+    // M*K^-1*M.t() (M=R_ns, K=R_ss, both smooth in theta since the landmark
+    // set is fixed), d(M K^-1 M.t())/dtheta_k = dM_k K^-1 M.t() + (same
+    // transposed) - M K^-1 dK_k K^-1 M.t(); both the quadratic form x'(.)x
+    // and the trace of Rinv*(.) reduce to O(n*k) / O(n*k^2) work per theta_k
+    // via the identities below (see docs/dev/NystromLL.md for the derivation).
+    const arma::uword d = _theta.n_elem;
+    grad_out->set_size(d);
+
+    const arma::vec& x = Rinve;
+
+    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);  // R_ss^-1
+    const arma::mat W = Kinv * R_ns.t();                    // k x n = R_ss^-1 * R_ns.t()
+    const arma::mat RM = LinearAlgebra::woodbury_solve(U, D, R_ns);  // n x k = Rinv * R_ns
+
+    const arma::vec Dinv = 1.0 / D;
+    const arma::mat DinvU = U.each_col() % Dinv;
+    const arma::mat Mcore = arma::eye<arma::mat>(kL, kL) + U.t() * DinvU;  // I_k + U.t() D^-1 U
+    const arma::mat McoreInv = LinearAlgebra::inv_sympd(arma::chol(Mcore, "lower"));
+    const arma::vec diagRinv = Dinv - LinearAlgebra::diagABA(DinvU, McoreInv);  // diag(Rinv)
+
+    const arma::vec Mtx = R_ns.t() * x;  // k
+    const arma::vec p = Kinv * Mtx;      // R_ss^-1 * R_ns.t() * x
+    const arma::mat RMtM = RM.t() * R_ns;  // k x k = R_ns.t() * Rinv * R_ns
+
+    for (arma::uword kk = 0; kk < d; ++kk) {
+      arma::mat dM_k(n, kL, arma::fill::none);
+      for (arma::uword i = 0; i < n; ++i)
+        for (arma::uword j = 0; j < kL; ++j) {
+          const arma::vec dx = (m_X.row(i) - X_land.row(j)).t();
+          dM_k(i, j) = R_ns(i, j) * _DlnCovDtheta(dx, _theta)(kk);
+        }
+      arma::mat dK_k(kL, kL, arma::fill::zeros);
+      for (arma::uword a = 0; a < kL; ++a)
+        for (arma::uword bb = a + 1; bb < kL; ++bb) {
+          const arma::vec dx = (X_land.row(a) - X_land.row(bb)).t();
+          const double v = R_ss(a, bb) * _DlnCovDtheta(dx, _theta)(kk);
+          dK_k(a, bb) = dK_k(bb, a) = v;
+        }
+
+      const arma::vec dMkx = dM_k.t() * x;
+      const double raw1 = 2.0 * arma::dot(dMkx, p) - arma::as_scalar(p.t() * dK_k * p);
+      const arma::vec rowdot = arma::sum(dM_k % W.t(), 1);        // n: dM_k(i,:) . w_i
+      const arma::vec quad = LinearAlgebra::diagABA(W.t(), dK_k);  // n: w_i' dK_k w_i
+      const double diagcorr1 = arma::dot(x % x, 2.0 * rowdot - quad);
+      const double term1_k = raw1 - diagcorr1;
+
+      const arma::mat RMt_dMk = RM.t() * dM_k;  // k x k
+      const double raw2 = 2.0 * arma::trace(Kinv * RMt_dMk) - arma::trace(Kinv * dK_k * Kinv * RMtM);
+      const double diagcorr2 = arma::dot(diagRinv, 2.0 * rowdot - quad);
+      const double term2_k = raw2 - diagcorr2;
+
+      (*grad_out)(kk) = 0.5 * (term1_k / sigma2 - term2_k);
+    }
+  }
+
+  return -0.5 * (n * std::log(2 * M_PI * sigma2) + logdetR + n);
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& theta,
+                                                                                  bool return_grad) {
+  if (m_nystrom_k == 0)
+    throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with objective=\"LLNys(k)\"");
+  arma::vec grad;
+  if (return_grad) {
+    grad.set_size(theta.n_elem);
+    const double ll = _logLikelihoodNystrom(theta, &grad);
+    return {ll, grad};
+  }
+  return {_logLikelihoodNystrom(theta), grad};
+}
+
+void Kriging::check_not_nystrom_light(const char* what) const {
+  if (m_nystrom_light)
+    throw std::runtime_error(std::string(what)
+                             + ": not available on a Nystrom fit "
+                               "(refit with objective=\"LL\", or use predictNystrom)");
+}
+
+/* Nystrom (global) prediction: uses the committed rank-k factors (U, D) via
+ * Woodbury instead of the exact O(n^2) triangular solve. Mean is
+ * universal-kriging-style with the committed beta; variance is the
+ * simple-kriging one (beta treated as known, like predictVecchia). */
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const arma::mat& X_n, bool return_stdev) {
+  if (m_nystrom_U.is_empty())
+    throw std::runtime_error("predictNystrom: model was not fitted with objective=\"LLNys(k)\"");
+  const arma::uword d = m_X.n_cols;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("predictNystrom: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+
+  arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  arma::mat R_on = arma::mat(m_X.n_rows, X_n.n_rows, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, 1.0);
+
+  const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
+
+  arma::vec mean = F_n * m_beta + RinvR_on.t() * (m_y - m_F * m_beta);
+  mean = mean * m_scaleY + m_centerY;
+
+  arma::vec stdev;
+  if (return_stdev) {
+    const arma::vec quad = arma::sum(R_on % RinvR_on, 0).t();  // r_j' Rinv r_j per prediction point j
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad), 0.0, arma::datum::inf));
+    stdev *= m_scaleY;
+  }
+  return {mean, stdev};
+}
+
+void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+
+  arma::mat Xn_u = X_u;
+  Xn_u.each_row() -= m_centerX;
+  Xn_u.each_row() /= m_scaleX;
+  const arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+
+  // m_nystrom_landmarks holds row-indices into m_X; appending rows here
+  // (never reordering/removing) keeps them valid without any adjustment.
+  m_X = arma::join_cols(m_X, Xn_u);
+  m_y = arma::join_cols(m_y, yn_u);
+  m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+  if (refit && m_optim != "none") {
+    // Warm restart: single BFGS from the current theta, over the SAME
+    // (fixed) landmark set -- landmarks are only re-picked by a full fit(),
+    // which is what keeps this O((n_old+n_new)*k^2) rather than paying the
+    // O(n*k) landmark-ranking pass (and losing the warm start) again.
+    const FitOfn fit_ofn = make_fit_objective(m_objective);
+    const arma::uword d = m_X.n_cols;
+
+    // theta bounds from the per-dimension range of the extended data --
+    // O(n*d), NOT Optim::theta_bounds's variogram-slope heuristic, which
+    // needs the O(n^2) dX cube this update path is built to avoid.
+    const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
+    arma::vec theta_lower = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+    arma::vec theta_upper = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+
+    arma::vec gamma_start = m_theta;
+    arma::vec gamma_lower = theta_lower;
+    arma::vec gamma_upper = theta_upper;
+    if (Optim::reparametrize) {
+      gamma_start = Optim::reparam_to(gamma_start);
+      gamma_lower = Optim::reparam_to(gamma_lower);
+      gamma_upper = Optim::reparam_to(gamma_upper);
+    }
+
+    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
+    optimizer.iprint = Optim::log_level - 2;
+    optimizer.max_iter = Optim::max_iteration;
+    optimizer.pgtol = Optim::gradient_tolerance;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+    const arma::ivec bounds_type{d, arma::fill::value(2)};
+
+    optimizer.minimize(
+        [&fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
+          return fit_ofn(vals_inp, &grad_out, nullptr);
+        },
+        gamma_start,
+        gamma_lower.memptr(),
+        gamma_upper.memptr(),
+        bounds_type.memptr());
+
+    m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_start) : gamma_start;
+    m_est_theta = true;
+  }
+
+  arma::vec beta_v;
+  double sigma2_v = -1;
+  arma::mat U_v;
+  arma::vec D_v;
+  _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
+  if (m_est_beta)
+    m_beta = beta_v;
+  if (m_est_sigma2)
+    m_sigma2 = sigma2_v;
+  m_nystrom_U = std::move(U_v);
+  m_nystrom_D = std::move(D_v);
+}
+
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
   if (objective == "LL") {
     if (m_noise_model == NoiseModel::Nugget) {
@@ -1159,9 +1486,32 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
         return -vll;
       };
     }
+  } else if (objective.rfind("LLNys", 0) == 0) {
+    parse_nystrom_k(objective);  // validate the spec early (throws on malformed)
+    if (m_noise_model != NoiseModel::None)
+      throw std::invalid_argument("LLNys objective not supported for Nugget/Heterogeneous noise modes");
+    // Unlike VLL, there is no exact-commit branch here: km_data (the dense
+    // O(n^3) KModel) is never populated for this objective, by design.
+    if (Optim::reparametrize) {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        arma::vec grad;
+        const double ll = this->_logLikelihoodNystrom(_theta, grad_out != nullptr ? &grad : nullptr);
+        if (grad_out != nullptr)
+          *grad_out = -Optim::reparam_from_deriv(_theta, grad);
+        return -ll;
+      };
+    } else {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const double ll = this->_logLikelihoodNystrom(_gamma, grad_out);
+        if (grad_out != nullptr)
+          *grad_out = -*grad_out;
+        return -ll;
+      };
+    }
   } else
     throw std::invalid_argument("Unsupported fit objective: " + objective
-                                + " (supported are: LL, LOO, LMP, VLL, VLL(m))");
+                                + " (supported are: LL, LOO, LMP, VLL, VLL(m), LLNys, LLNys(k))");
 }
 
 /** Fit the kriging object on (X,y):
@@ -1189,15 +1539,31 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_objective = objective;
   FitOfn fit_ofn = make_fit_objective(objective);
 
-  arma::mat theta0
-      = fit_setup_impl(y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta);
+  // Nystrom never touches m_dX (it works straight from m_X via
+  // covMat_sym_X/covMat_rect); a light Vecchia fit (exact_commit=false) skips
+  // the exact factorization that would otherwise need it. Both are only true
+  // when optim != "none": that path always does one exact make_Model call
+  // regardless of objective (see below), so it always needs m_dX.
+  const bool build_dX
+      = (optim == "none")
+        || !((objective.rfind("LLNys", 0) == 0) || (objective.rfind("VLL", 0) == 0 && !m_vecchia_exact_commit));
+  arma::mat theta0 = fit_setup_impl(
+      y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
 
   m_vecchia_light = false;
+  m_nystrom_light = false;
+  m_nystrom_k = 0;
+  m_nystrom_U.reset();
+  m_nystrom_D.reset();
   if (objective.rfind("VLL", 0) == 0) {
     m_vecchia_m = parse_vll_m(objective);
     make_vecchia_sets();
   } else {
     m_vecchia_m = 0;
+  }
+  if (objective.rfind("LLNys", 0) == 0) {
+    m_nystrom_k = parse_nystrom_k(objective);
+    make_nystrom_landmarks();
   }
 
   const double scaleY = m_scaleY;
@@ -1503,10 +1869,20 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           }
 
           Kriging::KModel& m = preallocated_models[start_idx];
-          if (m_noise_model != NoiseModel::None)
-            populate_Model(m, theta_start, extra0[start_idx % extra0.n_elem], nullptr);
-          else
-            populate_Model(m, theta_start, nullptr);
+          // This "warm-up" populate_Model call primes `m` before the BFGS
+          // loop; its result is unconditionally overwritten by the first
+          // fit_ofn evaluation for objectives that touch km_data (LL/LOO/LMP,
+          // and VLL at its final exact-commit call). It always builds a dense
+          // R via m_dX, so it must be skipped whenever m_dX was never built
+          // (LLNys, and a light -- exact_commit=false -- VLL fit): both
+          // ignore km_data entirely, so skipping this call changes nothing
+          // for them beyond avoiding the now-empty m_dX.
+          if (build_dX) {
+            if (m_noise_model != NoiseModel::None)
+              populate_Model(m, theta_start, extra0[start_idx % extra0.n_elem], nullptr);
+            else
+              populate_Model(m, theta_start, nullptr);
+          }
 
           lbfgsb::Optimizer optimizer{gd};
           optimizer.iprint = -1;  // Disable output in parallel mode. was Optim::log_level - 2;
@@ -1695,6 +2071,25 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_sigma2 = sigma2_v;
         m_vecchia_light = true;
         m_is_empty = true;  // no committed factorization: predict routes to predictVecchia
+      } else if (best_idx >= 0 && m_nystrom_k > 0) {
+        // Nystrom commit: never an exact factorization; theta from the
+        // optimizer, beta/sigma2/U/D profiled by the Nystrom likelihood at theta*
+        const auto& best = results[best_idx];
+        m_theta = best.theta;
+        m_est_theta = true;
+        arma::vec beta_v;
+        double sigma2_v = -1;
+        arma::mat U_v;
+        arma::vec D_v;
+        _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
+        if (m_est_beta)
+          m_beta = beta_v;
+        if (m_est_sigma2)
+          m_sigma2 = sigma2_v;
+        m_nystrom_U = U_v;
+        m_nystrom_D = D_v;
+        m_nystrom_light = true;
+        m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
@@ -1791,6 +2186,16 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
     auto [mean, stdev] = predictVecchia(X_n, return_stdev);
     return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
   }
+  if (m_nystrom_light) {
+    // Nystrom fit: no exact factorization available; route mean/stdev to the
+    // Woodbury-based Nystrom predictor
+    if (return_cov || return_deriv)
+      throw std::runtime_error(
+          "predict: return_cov/return_deriv are not available on a Nystrom fit "
+          "(refit with objective=\"LL\", or use predictNystrom)");
+    auto [mean, stdev] = predictNystrom(X_n, return_stdev);
+    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+  }
   const arma::uword n_o = m_X.n_rows;
   const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
@@ -1828,6 +2233,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const arma::mat& X_n,
                                               const bool will_update) {
   check_not_vecchia_light("simulate");
+  check_not_nystrom_light("simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -1896,6 +2302,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   check_not_vecchia_light("update_simulate");
+  check_not_nystrom_light("update_simulate");
   if (m_noise_model == NoiseModel::Nugget) {
     const double alpha = m_alpha;
     return update_simulate_impl(y_u,
@@ -1956,6 +2363,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   check_not_vecchia_light("update");
+  if (m_nystrom_light) {
+    update_nystrom(y_u, X_u, refit);
+    return;
+  }
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -2210,6 +2621,7 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 
 void Kriging::save(const std::string filename) const {
   check_not_vecchia_light("save");
+  check_not_nystrom_light("save");
   nlohmann::json j;
   j["version"] = 2;
   j["content"] = "Kriging";

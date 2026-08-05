@@ -77,12 +77,21 @@ void KrigingImpl::populate_Model(KModel& m,
                                  const bool update_eligible,
                                  std::map<std::string, double>* bench) const {
   auto t0 = Bench::tic();
+  // m_dX may have been skipped at fit time for objectives that never call
+  // populate_Model (Nystrom, light Vecchia) -- if a caller reaches here
+  // anyway (e.g. the exact logLikelihoodFun/leaveOneOutFun/logMargPostFun API
+  // called explicitly on such a model), lazily rebuild it locally: this whole
+  // call is already O(n^3), so the extra one-time O(n^2) build here doesn't
+  // change its complexity class.
+  arma::mat dX_local;
+  const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
+
   // Invalidate cached Linv so gradient code recomputes it for the new L
   m.Linv = arma::mat();
   if (update_eligible) {
-    m.L = LinearAlgebra::update_cholCov(&(m.R), m_dX, theta, _Cov, alpha, diag_norm, m_T, m_R);
+    m.L = LinearAlgebra::update_cholCov(&(m.R), dX, theta, _Cov, alpha, diag_norm, m_T, m_R);
   } else {
-    m.L = LinearAlgebra::cholCov(&(m.R), m_dX, theta, _Cov, alpha, diag_norm);
+    m.L = LinearAlgebra::cholCov(&(m.R), dX, theta, _Cov, alpha, diag_norm);
   }
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
@@ -758,7 +767,8 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
                                       bool normalize,
                                       bool is_beta_estim,
                                       const std::optional<arma::vec>& beta,
-                                      const std::optional<arma::mat>& theta) {
+                                      const std::optional<arma::mat>& theta,
+                                      bool build_dX) {
   const arma::uword d = X.n_cols;
 
   // Normalization of inputs and output
@@ -792,8 +802,16 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
   }
 
   // Distance matrix between points (transposed compared to m_X)
-  m_dX = LinearAlgebra::compute_dX(m_X);
-  m_maxdX = arma::max(arma::abs(m_dX), 1);
+  if (build_dX) {
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+  } else {
+    m_dX.reset();
+    // max(abs(m_dX), 1) column-wise reduces, per dimension, to max(X) - min(X)
+    // over all pairs (achieved at the extremes) -- same value, O(n*d) instead
+    // of the O(n^2) compute_dX + max(abs(.)) it would otherwise take.
+    m_maxdX = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
+  }
 
   // Regression matrix
   m_regmodel = regmodel;
@@ -842,9 +860,17 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
                                              arma::vec& term2_vec) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword d = theta.n_elem;
+  // m_dX may have been skipped at fit time for objectives that never reach
+  // this exact-gradient path (Nystrom, light Vecchia) -- if a caller reaches
+  // it anyway (e.g. logLikelihoodFun(..., return_grad=true) called explicitly
+  // on such a model), lazily rebuild it locally: this whole function is
+  // already O(n^2), so the extra one-time O(n^2) build here doesn't change
+  // its complexity class.
+  arma::mat dX_local;
+  const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
-      arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), theta);
+      arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
       double R_ij = R.at(i, j);
       double x_i = x.at(i);
       double x_j = x.at(j);
@@ -868,12 +894,17 @@ arma::vec KrigingImpl::compute_lmp_theta_ans(const KModel& m,
   const arma::uword d = theta.n_elem;
   arma::vec ans(d, arma::fill::none);
   arma::mat Wb_k;
+  // See compute_ll_grad_theta_vecs's comment: lazily rebuild m_dX locally if
+  // it was skipped at fit time (Nystrom/light Vecchia) but this exact
+  // (LMP-gradient) path is reached anyway.
+  arma::mat dX_local;
+  const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
   for (arma::uword k = 0; k < d; k++) {
     auto t0 = Bench::tic();
     arma::mat gradR_k(n, n, arma::fill::zeros);
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
-        arma::vec dlnCov = _DlnCovDtheta(m_dX.col(i * n + j), theta);
+        arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
         double gradR_k_ij = m.R.at(i, j) * dlnCov.at(k);
         gradR_k.at(i, j) = gradR_k_ij;
         gradR_k.at(j, i) = gradR_k_ij;

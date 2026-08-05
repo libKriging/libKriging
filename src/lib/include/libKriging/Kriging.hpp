@@ -172,6 +172,28 @@ class Kriging : public KrigingImpl {
                                                                     bool return_stdev = true,
                                                                     arma::uword m = 0);
 
+  /** Nystrom (global low-rank) approximated log-likelihood at given theta
+   * (objective="LLNys(k)"). Requires the model to have been fitted with
+   * objective="LLNys" or "LLNys(k)".
+   * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient is
+   *         currently computed by central finite differences (see
+   *         docs/dev/NystromLL.md); an analytic low-rank gradient is planned. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodNystromFun(const arma::vec& theta, bool return_grad);
+
+  /// Nystrom rank used at fit time (0 = not fitted with LLNys)
+  [[nodiscard]] arma::uword nystrom_rank() const { return m_nystrom_k; }
+  /// True when the current fit is a Nystrom (no exact O(n^3) factorization) fit
+  [[nodiscard]] bool is_nystrom_light() const { return m_nystrom_light; }
+
+  /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
+   * (U, D) from the LLNys(k) fit via the Woodbury identity instead of the
+   * exact O(n^2) triangular solve — O(n*k*q) instead of O(n^2*q) for q
+   * prediction points. Mean is universal-kriging-style with the committed
+   * beta; variance is the simple-kriging one (beta treated as known, like
+   * predictVecchia). Only usable after an "LLNys(k)" fit.
+   * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictNystrom(const arma::mat& X_n, bool return_stdev = true);
+
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
    * @param return_stdev is true if return also stdev column vector
@@ -274,6 +296,57 @@ class Kriging : public KrigingImpl {
   bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
   /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
   void check_not_vecchia_light(const char* what) const;
+
+  // --- Nystrom approximated likelihood (objective="LLNys(k)") ---------------
+  // Unlike Vecchia (which by default still performs one exact O(n^3)
+  // factorization at commit), Nystrom NEVER factorizes R exactly: the
+  // committed model only carries the rank-k factors (m_nystrom_U, m_nystrom_D)
+  // from the last likelihood evaluation at theta*, so predict/simulate/update
+  // behave like a permanent "light" fit (see m_nystrom_light below).
+  arma::uword m_nystrom_k = 0;  ///< rank k (0 = Nystrom mode off)
+  arma::mat m_nystrom_U;        ///< committed low-rank factor (n x k): R ~= U*U.t() + diag(D)
+  arma::vec m_nystrom_D;        ///< committed residual diagonal (n), jittered to stay > 0
+  /// Landmark row-indices (into m_X), chosen ONCE per fit and held fixed
+  /// across every theta evaluation during optimization. Fixing the landmark
+  /// SET (as opposed to re-selecting it greedily at each theta, which is what
+  /// a naive per-call nystromFactor would do) is what makes
+  /// _logLikelihoodNystrom smooth in theta -- required for both the
+  /// finite-difference gradient here and the analytic one planned in phase 3b.
+  /// Chosen via one nystromFactor call at a theta-neutral reference kernel
+  /// (isotropic range 1), i.e. purely for spatial coverage.
+  arma::uvec m_nystrom_landmarks;
+  /// Populate m_nystrom_landmarks from the current m_X/m_dX (call once, after
+  /// fit_setup_impl, before optimization starts).
+  void make_nystrom_landmarks();
+
+  /// Parse "LLNys" (default k=50) or "LLNys(k)"; throws on malformed spec.
+  static arma::uword parse_nystrom_k(const std::string& objective);
+  /// Nystrom log-likelihood with profiled sigma2 and (GLS-profiled) beta, via
+  /// a FIXED-landmark Nystrom factorization (R ~= R_ns * R_ss^-1 * R_ns.t(),
+  /// landmarks = m_nystrom_landmarks) and Woodbury solves/logdet (no n x n
+  /// matrix ever built). Analytic gradient in theta (envelope theorem, same
+  /// principle as _logLikelihoodVecchia) computed in O(n*k^2 + n*k*d) when
+  /// grad_out is non-null -- see the derivation in the .cpp file-level
+  /// comment above this function. Optional out-params expose the profiled
+  /// beta/sigma2/factors (used by the commit step and by tests).
+  double _logLikelihoodNystrom(const arma::vec& _theta,
+                               arma::vec* grad_out = nullptr,
+                               arma::vec* beta_out = nullptr,
+                               double* sigma2_out = nullptr,
+                               arma::mat* U_out = nullptr,
+                               arma::vec* D_out = nullptr) const;
+  bool m_nystrom_light = false;  ///< true whenever m_nystrom_k > 0 (no exact factorization ever exists)
+  /// Throw if the model is a Nystrom fit (used by simulate/update/save)
+  void check_not_nystrom_light(const char* what) const;
+  /// Nystrom-specific incremental update: extends m_X/m_y/m_F with the new
+  /// data (the FIXED landmark set is still valid -- rows were appended, never
+  /// reordered/removed), then either re-profiles beta/sigma2/U/D at the
+  /// current theta (refit=false), or first does a warm-restart single BFGS
+  /// from the current theta over the SAME landmark set (refit=true, no
+  /// re-selection) before re-profiling. Both paths stay
+  /// O((n_old+n_new)*k^2): no O(n^2) matrix or pairwise-difference cube is
+  /// built, unlike the exact/Vecchia update() paths.
+  void update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit);
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;
