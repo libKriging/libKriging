@@ -6,20 +6,26 @@
  * @brief Kriging with per-variable input warping for libKriging.
  *
  * Each input dimension can be independently warped before the GP kernel
- * is evaluated.  This supports:
+ * is evaluated.  This supports (see docs/math/Warping-*.md for the full
+ * math description, worked example and references of each):
  *
  *   Continuous variables:
  *     - None       : identity  (no warping)
- *     - Affine     : w(x) = a·x + b                     [2 params]
- *     - BoxCox     : w(x) = (x^λ − 1)/λ   (λ ≠ 0)      [1 param]
- *     - Kumaraswamy: w(x) = 1−(1−x^a)^b   on [0,1]      [2 params]
- *     - NeuralMono : small monotone network               [≥ 6 params]
+ *     - Affine     : w(x) = a·x + b                     [2 params]                (docs/math/Warping-Affine.md)
+ *     - BoxCox     : w(x) = (x^λ − 1)/λ   (λ ≠ 0)      [1 param]                 (docs/math/Warping-BoxCox.md)
+ *     - Kumaraswamy: w(x) = 1−(1−x^a)^b   on [0,1]      [2 params]                (docs/math/Warping-Kumaraswamy.md)
+ *     - NeuralMono : small monotone network               [≥ 6 params]           (docs/math/Warping-NeuralMono.md)
+ *     - Knots      : piecewise-linear monotone warp       [K+1 params]           (docs/math/Warping-Knots.md)
+ *     - MLP        : unconstrained per-variable network                          (docs/math/Warping-MLP.md)
  *
  *   Discrete / categorical variables:
- *     - Embedding  : each level l → learned e_l ∈ ℝ^q    [L·q params]
+ *     - Embedding  : each level l → learned e_l ∈ ℝ^q    [L·q params]            (docs/math/Warping-Categorical.md)
  *
  *   Ordinal variables:
- *     - Ordinal    : ordered positions z_1 < z_2 < … < z_L  [L−1 params]
+ *     - Ordinal    : ordered positions z_1 < z_2 < … < z_L  [L−1 params]         (docs/math/Warping-Ordinal.md)
+ *
+ *   Joint (all inputs at once, used by MLPKriging):
+ *     - MLPJoint   : Φ(x) = MLP(x_1, …, x_d) ∈ ℝ^{d_out}                        (docs/math/Warping-MLPJoint.md)
  *
  * The warped representation Φ(x) is the concatenation of all per-variable
  * outputs.  The GP kernel then operates in this warped space:

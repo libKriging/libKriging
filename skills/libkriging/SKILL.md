@@ -20,10 +20,12 @@ Ask, in order:
 
 1. **Is the response noise-free (deterministic simulator, e.g. a CFD/FEM
    code)?**
-   → `Kriging` (interpolates the data exactly).
+   → `Kriging` (interpolates the data exactly). See
+   [Kriging.md](../../docs/math/Kriging.md) for the model/objectives math.
 
 2. **Is the response noisy?**
-   → still `Kriging`, not a separate class:
+   → still `Kriging`, not a separate class (see
+   [Noise.md](../../docs/math/Noise.md) for the math):
    - Known per-observation noise variance → pass it as `noise` (a vector).
    - Unknown, but homogeneous noise → pass `noise="nugget"` (estimates one
      shared nugget term).
@@ -60,12 +62,9 @@ Ask, in order:
    unifies hyperparameters, then aggregates predictions. See §3 for the
    aggregation choice. Current restrictions: no nugget/noise channel,
    `normalize` unsupported, save/load not yet implemented — mention these
-   if a user's request would hit them. **`NestedKriging` is not currently
-   exposed in `pylibkriging`** (only `Kriging`/`WarpKriging`/`MLPKriging`
-   are bound) — for a partition/aggregation workflow driven from Python,
-   either call into the C++/R/Julia/Octave-MATLAB bindings (which do
-   expose it) or fall back to a manual partition + one independent
-   `Kriging` per group, documented explicitly as an approximation.
+   if a user's request would hit them. `NestedKriging` is exposed in
+   `pylibkriging` (alongside `Kriging`/`WarpKriging`/`MLPKriging`), plus
+   the other bindings (C++/R/Julia/Octave-MATLAB).
 
 Don't reach for `NestedKriging` or Vecchia by default — for the common case
 (n in the hundreds to low thousands), plain `Kriging` with default options
@@ -76,9 +75,9 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 
 | Option | Values | Guidance |
 |---|---|---|
-| `kernel` / `covType` | `"gauss"`, `"exp"`, `"matern3_2"`, `"matern5_2"` (`"whitenoise"` exists but is an internal building block, not a modelling choice) | `"matern5_2"` is the sane general-purpose default (smoother than Matérn 3/2, less rigid than Gaussian, which tends to numerical ill-conditioning). Use `"gauss"` only if the underlying function is known to be very smooth/analytic. |
+| `kernel` / `covType` | `"gauss"`, `"exp"`, `"matern3_2"`, `"matern5_2"` (`"whitenoise"` exists but is an internal building block, not a modelling choice) | `"matern5_2"` is the sane general-purpose default (smoother than Matérn 3/2, less rigid than Gaussian, which tends to numerical ill-conditioning). Use `"gauss"` only if the underlying function is known to be very smooth/analytic. See [Kernels.md](../../docs/math/Kernels.md) for formulas. |
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
-| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out), `"LMP"` (log marginal posterior), `"VLL"` / `"VLL(m)"` (Vecchia) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"VLL(m)"` only for scaling (see §1.5) — it changes the objective, not just its cost, so don't use it on small problems expecting identical results to `"LL"`. |
+| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)), `"VLL"` / `"VLL(m)"` (Vecchia) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. `"VLL(m)"` only for scaling (see §1.5) — it changes the objective, not just its cost, so don't use it on small problems expecting identical results to `"LL"`. |
 | `optim` | `"BFGS"` (default), `"BFGSk"` for k random restarts (e.g. `"BFGS10"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). For a difficult/multimodal likelihood (many inputs, clustered design), multistart (`"BFGS10"`+) is cheap insurance against a bad local optimum — recommend it over blindly trusting a single `"BFGS"` run when the user reports an unstable or suspicious fit. |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. Not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |
@@ -99,18 +98,21 @@ inconsistency.
 
 One spec string per input column, e.g. `{"kumaraswamy", "categorical(5,2)", "none"}`:
 
-| Spec | Use for | Params |
-|---|---|---|
-| `none` | leave the variable as-is | 0 |
-| `affine` | rescale/shift a continuous variable | 2 |
-| `boxcox` | stabilize variance / skew on a positive continuous variable | 1 |
-| `kumaraswamy` | flexible monotone warp of a variable already in [0,1] | 2 |
-| `neural_mono(H)` | more flexible monotone warp, H hidden units (default `H=8`) | 3H+1 |
-| `categorical(L,q)` / `categorical(["a","b",...], q)` | unordered categorical with L levels, embedded in ℝ^q | L·q |
-| `ordinal(L)` / `ordinal(["low","med","high"])` | ordered categorical | L−1 |
+| Spec | Use for | Params | Details |
+|---|---|---|---|
+| `none` | leave the variable as-is | 0 | — |
+| `affine` | rescale/shift a continuous variable | 2 | [Warping-Affine.md](../../docs/math/Warping-Affine.md) |
+| `boxcox` | stabilize variance / skew on a positive continuous variable | 1 | [Warping-BoxCox.md](../../docs/math/Warping-BoxCox.md) |
+| `kumaraswamy` | flexible monotone warp of a variable already in [0,1] | 2 | [Warping-Kumaraswamy.md](../../docs/math/Warping-Kumaraswamy.md) |
+| `neural_mono(H)` | more flexible monotone warp, H hidden units (default `H=8`) | 3H+1 | [Warping-NeuralMono.md](../../docs/math/Warping-NeuralMono.md) |
+| `knots(K)` / `knots(t1:...:tK)` | piecewise-linear warp, non-stationarity localized to specific regions (DiceKriging-style) | K+1 | [Warping-Knots.md](../../docs/math/Warping-Knots.md) |
+| `mlp(h1:h2,q,act)` | unconstrained (non-monotone), possibly multi-dim, per-variable warp | depends on layers | [Warping-MLP.md](../../docs/math/Warping-MLP.md) |
+| `categorical(L,q)` / `categorical(["a","b",...], q)` | unordered categorical with L levels, embedded in ℝ^q | L·q | [Warping-Categorical.md](../../docs/math/Warping-Categorical.md) |
+| `ordinal(L)` / `ordinal(["low","med","high"])` | ordered categorical | L−1 | [Warping-Ordinal.md](../../docs/math/Warping-Ordinal.md) |
 
 For a genuinely deep/joint transform across several continuous variables at
-once, use `MLPKriging` (`mlp(h1:h2,q,act)`-style joint map) instead of
+once, use `MLPKriging` (`mlp_joint(h1:h2,q,act)`-style joint map, see
+[Warping-MLPJoint.md](../../docs/math/Warping-MLPJoint.md)) instead of
 stacking per-variable warps. Valid `act`/`activation` values are `"selu"`
 (default), `"relu"`, `"tanh"`, `"sigmoid"`, `"elu"`. If a user reports an
 unstable or stuck fit with a single-start optimizer (`optim="BFGS"`, no

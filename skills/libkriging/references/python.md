@@ -120,14 +120,6 @@ model = lk.load("model.h5")  # auto-detects class, incl. legacy Nugget/NoiseKrig
 - `X`/`y` as Python lists instead of NumPy `float64` arrays — pybind11
   bindings expect `numpy.ndarray`.
 - `aggregation="NK"` combined with `regmodel != "constant"` on `NestedKriging`.
-- **`NestedKriging` is not yet exposed in `pylibkriging`** (only `Kriging`,
-  `WarpKriging`, `MLPKriging` are — check with
-  `[n for n in dir(pylibkriging) if not n.startswith("_")]`). If a user
-  needs partition/aggregation scaling from Python today, either drive it
-  from C++/R/Julia/Octave-MATLAB (which do expose it), or approximate it
-  manually (e.g. `sklearn.cluster.KMeans` + one independent
-  `pylibkriging.Kriging` per cluster) — document any such workaround
-  explicitly as an approximation, not as `NestedKriging` itself.
 
 ## See also
 

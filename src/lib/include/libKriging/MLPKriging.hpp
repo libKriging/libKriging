@@ -7,6 +7,8 @@
  *
  * Thin facade over WarpKriging({"mlp_joint(…)"}, kernel).
  * All GP state, optimisation, and simulation live in the WarpKriging impl.
+ * See docs/math/Warping-MLPJoint.md for the math description, worked
+ * example and references.
  */
 
 #include "libKriging/Trend.hpp"

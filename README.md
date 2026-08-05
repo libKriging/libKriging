@@ -577,6 +577,7 @@ python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 ## Documentation
 
 * Per-language API: [bindings/README.md](bindings/README.md).
+* Mathematical background (Vecchia, NestedKriging, update/simulate, each input warping): [docs/math](docs/math).
 * Developer documentation: [docs/dev](docs/dev).
 * The C++ API reference (Doxygen) can be generated locally with `cmake --build . --target doc`.
 
