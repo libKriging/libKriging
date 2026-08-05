@@ -308,6 +308,16 @@ catch_discover_tests(LinearAlgebraGradTest EXTRA_ARGS ${AdditionalCatchParameter
 unset(AdditionalCatchParameters)
 
 
+add_executable(KrigingGradTest KrigingGradTest.cpp)
+target_link_libraries(KrigingGradTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingGradTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(KrigingGradTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(GetVersion GetVersion.cpp)
 target_link_libraries(GetVersion LINK_PUBLIC Kriging)
 add_dependencies(all_test_binaries GetVersion)

@@ -152,13 +152,14 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::vec& y,
                                    bool normalize,
                                    const std::string& optim,
                                    const std::string& objective,
-                                   const Parameters& parameters) {
+                                   const Parameters& parameters,
+                                   const std::optional<arma::mat>& grady) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
 
   make_Cov(covType);
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, grady);
 }
 
 LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
@@ -215,7 +216,9 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
                                arma::vec* grad_out,
                                Kriging::KModel* model,
                                std::map<std::string, double>* bench) const {
-  arma::uword n = m_X.n_rows;
+  // With gradient observations the likelihood is that of the augmented
+  // Gaussian vector [y ; vec(dy/dx)], of dimension n(1+d).
+  arma::uword n = n_aug();
   arma::uword d = m_X.n_cols;
   const arma::vec _theta = _gamma.head(d);
 
@@ -286,6 +289,26 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
            * (n * log(2 * M_PI * sigma2_grad) + 2 * arma::sum(log(m.L.diag()))
               + as_scalar(LinearAlgebra::crossprod(m.Estar)) / sigma2_grad);
     }
+  }
+
+  if (grad_out != nullptr && has_grad_obs()) {
+    // The analytical theta-gradient below is derived from the value-only
+    // covariance (m_dX / _DlnCovDtheta) and does not carry over to the
+    // augmented system, whose blocks also involve the second derivatives of
+    // the kernel. Fall back on central finite differences: correct, and O(d)
+    // extra factorizations per evaluation.
+    const double h = 1e-6;
+    for (arma::uword k = 0; k < _gamma.n_elem; k++) {
+      const double hk = h * std::max(1.0, std::abs(_gamma.at(k)));
+      arma::vec gamma_p = _gamma;
+      arma::vec gamma_m = _gamma;
+      gamma_p.at(k) += hk;
+      gamma_m.at(k) -= hk;
+      (*grad_out).at(k)
+          = (_logLikelihood(gamma_p, nullptr, nullptr, nullptr) - _logLikelihood(gamma_m, nullptr, nullptr, nullptr))
+            / (2 * hk);
+    }
+    return ll;
   }
 
   if (grad_out != nullptr) {
@@ -1174,6 +1197,7 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
  *        Vecchia approximated log-likelihood with m conditioning neighbors
  *        (default m=30). Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
+ * @param grady optional n*d matrix of observed gradients (gradient-enhanced kriging); see header for details.
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const arma::mat& X,
@@ -1181,9 +1205,25 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     bool normalize,
                                     const std::string& optim,
                                     const std::string& objective,
-                                    const Parameters& parameters) {
+                                    const Parameters& parameters,
+                                    const std::optional<arma::mat>& grady) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
+
+  if (grady.has_value()) {
+    const arma::mat& dy = grady.value();
+    if (dy.n_rows != n || dy.n_cols != d)
+      throw std::runtime_error("fit: grady must be a " + std::to_string(n) + "x" + std::to_string(d)
+                               + " matrix, got " + std::to_string(dy.n_rows) + "x" + std::to_string(dy.n_cols));
+    if (!Covariance::supportsDerivativeObservations(m_covType))
+      throw std::runtime_error(
+          "fit: gradient observations require a mean-square differentiable kernel (gauss, matern3_2 or matern5_2), "
+          "got: "
+          + m_covType);
+    if (objective != "LL")
+      throw std::runtime_error("fit: only objective=\"LL\" is supported with gradient observations, got: "
+                               + objective);
+  }
 
   m_optim = optim;
   m_objective = objective;
@@ -1191,6 +1231,12 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
 
   arma::mat theta0
       = fit_setup_impl(y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta);
+
+  // set_grad_obs with an empty matrix (grady not given) also clears any
+  // gradients left over from a previous fit() on this object.
+  set_grad_obs(grady.has_value() ? grady.value() : arma::mat());
+  // Dimension of the vector actually conditioned on: n, or n(1+d) with gradients.
+  const arma::uword n_lik = n_aug();
 
   m_vecchia_light = false;
   if (objective.rfind("VLL", 0) == 0) {
@@ -1257,7 +1303,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     }
     if (m_noise_model == NoiseModel::Nugget) {
       if (m_est_sigma2) {
-        double total_var = m.SSEstar / n;
+        double total_var = m.SSEstar / n_lik;
         m_sigma2 = m_alpha * total_var;
         m_nugget = m_est_nugget ? (1.0 - m_alpha) * total_var : nugget_param;
       } else {
@@ -1265,7 +1311,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m_nugget = m_est_nugget ? 0.0 : nugget_param;
       }
     } else if (m_est_sigma2) {
-      m_sigma2 = m.SSEstar / n;
+      m_sigma2 = m.SSEstar / n_lik;
     } else {
       m_sigma2 = sigma2;
     }
@@ -1718,10 +1764,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           m_alpha = best.extra_param;
           if (m_est_sigma2) {
             if (m_est_nugget) {
-              double total_var = best.SSEstar / n;
+              double total_var = best.SSEstar / n_lik;
               m_sigma2 = m_alpha * total_var;
               if (m_objective.compare("LMP") == 0)
-                m_sigma2 = m_sigma2 * n / (n - m_F.n_cols - 2);
+                m_sigma2 = m_sigma2 * n_lik / (n_lik - m_F.n_cols - 2);
               m_nugget = m_sigma2 / m_alpha - m_sigma2;
             } else {
               m_sigma2 = m_nugget * m_alpha / (1.0 - m_alpha);
@@ -1737,9 +1783,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             m_sigma2 = best.extra_param;
         } else {
           if (m_est_sigma2) {
-            m_sigma2 = best.SSEstar / n;
+            m_sigma2 = best.SSEstar / n_lik;
             if (m_objective.compare("LMP") == 0)
-              m_sigma2 = best.SSEstar / (n - m_F.n_cols);
+              m_sigma2 = best.SSEstar / (n_lik - m_F.n_cols);
           }
         }
 
@@ -1763,13 +1809,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     bool normalize,
                                     const std::string& optim,
                                     const std::string& objective,
-                                    const Parameters& parameters) {
+                                    const Parameters& parameters,
+                                    const std::optional<arma::mat>& grady) {
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("fit(y, noise, X, ...) requires NoiseModel::Heterogeneous");
   if (noise.n_elem != y.n_elem)
     throw std::runtime_error("noise vector must have the same length as y");
   m_noise = noise;
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, grady);
 }
 
 /** Compute the prediction for given points X'
