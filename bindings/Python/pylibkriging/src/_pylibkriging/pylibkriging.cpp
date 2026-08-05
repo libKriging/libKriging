@@ -130,6 +130,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     const std::string&,
                     const std::string&,
                     const py::dict&,
+                    const py::object&,
                     const py::object&>(),
            py::arg("y"),
            py::arg("X"),
@@ -139,7 +140,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("grady") = py::none())
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -151,7 +153,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("grady") = py::none())
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),
@@ -214,6 +217,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("is_theta_estim", &PyKriging::is_theta_estim)
       .def("sigma2", &PyKriging::sigma2)
       .def("is_sigma2_estim", &PyKriging::is_sigma2_estim)
+      .def("dy", &PyKriging::dy)
       .def("noise_model", &PyKriging::noise_model)
       .def("nugget", &PyKriging::nugget)
       .def("is_nugget_estim", &PyKriging::is_nugget_estim)

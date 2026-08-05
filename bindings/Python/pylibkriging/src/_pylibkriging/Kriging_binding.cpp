@@ -35,6 +35,13 @@ std::string PyKriging::noise_model_to_string(Kriging::NoiseModel nm) {
   return "none";
 }
 
+// grady: None => value-only fit, array => gradient-enhanced kriging (see Kriging::fit)
+static std::optional<arma::mat> grady_from_pyobject(const py::object& grady) {
+  if (grady.is_none())
+    return std::nullopt;
+  return carma::arr_to_mat_view<double>(grady.cast<py::array_t<double>>());
+}
+
 // Parse parameters dict, including optional nugget/is_nugget_estim
 static Kriging::Parameters params_from_dict(const py::dict& dict) {
   return Kriging::Parameters{get_entry<double>(dict, "sigma2"),
@@ -62,22 +69,24 @@ PyKriging::PyKriging(const py::array_t<double>& y,
                      const std::string& optim,
                      const std::string& objective,
                      const py::dict& dict,
-                     const py::object& noise) {
+                     const py::object& noise,
+                     const py::object& grady) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   Kriging::Parameters parameters = params_from_dict(dict);
+  std::optional<arma::mat> mat_grady = grady_from_pyobject(grady);
 
   if (noise.is_none()) {
     // No noise: pure GP (NoiseModel::None)
     m_internal = std::make_unique<Kriging>(
-        mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+        mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": estimated nugget mode
     std::string noise_str = noise.cast<std::string>();
     if (noise_str != "nugget")
       throw std::invalid_argument("noise string must be 'nugget', got '" + noise_str + "'");
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Nugget);
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   } else {
     // noise is array or scalar: heterogeneous noise
     arma::colvec mat_noise;
@@ -88,7 +97,8 @@ PyKriging::PyKriging(const py::array_t<double>& y,
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Heterogeneous);
-    m_internal->fit(mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(
+        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   }
 }
 
@@ -110,16 +120,18 @@ void PyKriging::fit(const py::array_t<double>& y,
                     const std::string& optim,
                     const std::string& objective,
                     const py::dict& dict,
-                    const py::object& noise) {
+                    const py::object& noise,
+                    const py::object& grady) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   Kriging::Parameters parameters = params_from_dict(dict);
+  std::optional<arma::mat> mat_grady = grady_from_pyobject(grady);
 
   if (noise.is_none()) {
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": just fit without noise vector (Nugget mode uses the non-noise fit overload)
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   } else {
     arma::colvec mat_noise;
     if (py::isinstance<py::float_>(noise) || py::isinstance<py::int_>(noise)) {
@@ -128,7 +140,8 @@ void PyKriging::fit(const py::array_t<double>& y,
     } else {
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
-    m_internal->fit(mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(
+        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, mat_grady);
   }
 }
 
@@ -362,6 +375,10 @@ double PyKriging::sigma2() {
 
 bool PyKriging::is_sigma2_estim() {
   return m_internal->is_sigma2_estim();
+}
+
+py::array_t<double> PyKriging::dy() {
+  return carma::mat_to_arr(m_internal->dy());
 }
 
 // --- noise-related accessors ---
