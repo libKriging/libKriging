@@ -275,8 +275,12 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
         t0 = Bench::toc(nullptr, "Dysd2_n    ", t0);
       }
     }
+    // Chain rule for the normalization Xn = (X - centerX)/scaleX, yn = (y - centerY)/scaleY:
+    //   dyhat/dX_j = scaleY · dyhat_n/dXn_j / scaleX_j  (and likewise, once, for dysd2/dX_j)
     Dyhat_n *= m_scaleY;
+    Dyhat_n.each_row() /= m_scaleX;
     Dysd2_n *= var_scale * m_scaleY * m_scaleY;
+    Dysd2_n.each_row() /= m_scaleX;
   }
 
   return std::make_tuple(std::move(yhat_n),

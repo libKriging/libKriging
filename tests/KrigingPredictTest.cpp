@@ -104,3 +104,76 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences", "[predict
     }
   }
 }
+
+TEST_CASE("KrigingPredictTest - Check gradient vs finite differences with normalize=true", "[predict][kriging][normalize]") {
+  // Regression test: predict(..., return_deriv=true) with normalize=true used to
+  // return derivatives off by a factor of scaleX_j (missing chain-rule division
+  // by scaleX_j when un-normalizing dyhat/dx and dysd2/dx). Use a wide, anisotropic
+  // input range so the bug (ratio ~ scaleX_j, here very different from 1) is
+  // clearly distinguishable from a correct derivative (ratio ~ 1).
+  arma::arma_rng::set_seed(11);
+
+  const arma::uword n = 30;
+  arma::mat X = 100 * arma::randu<arma::mat>(n, 2) - 50;
+  arma::colvec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = 1000 * (0.01 * X(i, 0) * X(i, 0) - 0.02 * X(i, 1));
+
+  Kriging kr("gauss");
+  kr.fit(y, X, Trend::RegressionModel::Constant, true, "BFGS", "LL");
+
+  // Off-design points: the stdev derivative is singular (ysd2_n == 0) exactly
+  // at training points, so predict away from them.
+  arma::mat X_new = X.head_rows(3) + 1.0;
+
+  auto [mean, stdev, cov, mean_deriv, stdev_deriv] = kr.predict(X_new, true, false, true);
+
+  const double h = 1e-3;
+  const double tol = 1.0;  // absolute tolerance; the pre-fix bug is off by ~30-100x
+
+  SECTION("Mean gradient vs finite differences") {
+    for (arma::uword i = 0; i < X_new.n_rows; ++i) {
+      for (arma::uword j = 0; j < X_new.n_cols; ++j) {
+        arma::mat X_plus = X_new.row(i);
+        arma::mat X_minus = X_new.row(i);
+        X_plus(0, j) += h;
+        X_minus(0, j) -= h;
+
+        auto [mean_plus, s1, c1, d1, sd1] = kr.predict(X_plus, false, false, false);
+        auto [mean_minus, s2, c2, d2, sd2] = kr.predict(X_minus, false, false, false);
+
+        double finite_diff = (mean_plus(0) - mean_minus(0)) / (2.0 * h);
+        double analytical = mean_deriv(i, j);
+
+        INFO("Point " << i << ", dimension " << j);
+        INFO("Analytical gradient: " << analytical);
+        INFO("Finite difference: " << finite_diff);
+
+        CHECK(analytical == Approx(finite_diff).margin(tol));
+      }
+    }
+  }
+
+  SECTION("Standard deviation gradient vs finite differences") {
+    for (arma::uword i = 0; i < X_new.n_rows; ++i) {
+      for (arma::uword j = 0; j < X_new.n_cols; ++j) {
+        arma::mat X_plus = X_new.row(i);
+        arma::mat X_minus = X_new.row(i);
+        X_plus(0, j) += h;
+        X_minus(0, j) -= h;
+
+        auto [m1, stdev_plus, c1, d1, sd1] = kr.predict(X_plus, true, false, false);
+        auto [m2, stdev_minus, c2, d2, sd2] = kr.predict(X_minus, true, false, false);
+
+        double finite_diff = (stdev_plus(0) - stdev_minus(0)) / (2.0 * h);
+        double analytical = stdev_deriv(i, j);
+
+        INFO("Point " << i << ", dimension " << j);
+        INFO("Analytical stdev gradient: " << analytical);
+        INFO("Finite difference: " << finite_diff);
+
+        CHECK(analytical == Approx(finite_diff).margin(tol));
+      }
+    }
+  }
+}
