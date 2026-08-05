@@ -2,6 +2,7 @@
 #define LIBKRIGING_NESTEDKRIGING_HPP
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -71,7 +72,8 @@ class NestedKriging {
                                   const std::string& optim = "BFGS",
                                   const std::string& objective = "LL",
                                   const Kriging::Parameters& parameters = {},
-                                  const std::vector<std::string>& warping = {});
+                                  const std::vector<std::string>& warping = {},
+                                  const std::optional<arma::mat>& grady = std::nullopt);
 
   /** Fit p independent submodels, then unify hyperparameters into a common
    * prior and refit with optim="none".
@@ -90,7 +92,13 @@ class NestedKriging {
    * then every submodel is fitted in closed form on the seeded prior.
    *
    * @param warping per-dimension warp specs (see WarpKriging), empty for
-   *        plain Kriging submodels. */
+   *        plain Kriging submodels.
+   * @param grady optional n*d matrix of observed gradients (see
+   *        Kriging::fit). Routed per group to that group's submodel, and
+   *        only used in the final frozen-hyperparameters refit (the shared
+   *        theta/sigma2/beta0 are still estimated from values only) —
+   *        supported on the plain path only: requires `warping` empty and
+   *        a non-VLL `objective`. */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              arma::uword nb_groups,
@@ -98,7 +106,8 @@ class NestedKriging {
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const Kriging::Parameters& parameters = {},
-                             const std::vector<std::string>& warping = {});
+                             const std::vector<std::string>& warping = {},
+                             const std::optional<arma::mat>& grady = std::nullopt);
 
   /** Aggregated prediction at X_n (q x d).
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
@@ -167,7 +176,7 @@ class NestedKriging {
   // helpers
   [[nodiscard]] arma::mat corrMat(const arma::mat& X1, const arma::mat& X2) const;
   void make_partition(arma::uword nb_groups);
-  void unify_hyperparameters(const std::string& objective);
+  void unify_hyperparameters(const std::string& objective, const std::optional<arma::mat>& grady = std::nullopt);
   void precompute_nk();
   [[nodiscard]] std::tuple<arma::vec, arma::vec> predict_poe_family(const arma::mat& X_n, bool return_stdev) const;
   [[nodiscard]] std::tuple<arma::vec, arma::vec> predict_nk(const arma::mat& X_n, bool return_stdev) const;
