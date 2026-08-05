@@ -60,7 +60,12 @@ Ask, in order:
    unifies hyperparameters, then aggregates predictions. See §3 for the
    aggregation choice. Current restrictions: no nugget/noise channel,
    `normalize` unsupported, save/load not yet implemented — mention these
-   if a user's request would hit them.
+   if a user's request would hit them. **`NestedKriging` is not currently
+   exposed in `pylibkriging`** (only `Kriging`/`WarpKriging`/`MLPKriging`
+   are bound) — for a partition/aggregation workflow driven from Python,
+   either call into the C++/R/Julia/Octave-MATLAB bindings (which do
+   expose it) or fall back to a manual partition + one independent
+   `Kriging` per group, documented explicitly as an approximation.
 
 Don't reach for `NestedKriging` or Vecchia by default — for the common case
 (n in the hundreds to low thousands), plain `Kriging` with default options
@@ -106,7 +111,13 @@ One spec string per input column, e.g. `{"kumaraswamy", "categorical(5,2)", "non
 
 For a genuinely deep/joint transform across several continuous variables at
 once, use `MLPKriging` (`mlp(h1:h2,q,act)`-style joint map) instead of
-stacking per-variable warps.
+stacking per-variable warps. Valid `act`/`activation` values are `"selu"`
+(default), `"relu"`, `"tanh"`, `"sigmoid"`, `"elu"`. If a user reports an
+unstable or stuck fit with a single-start optimizer (`optim="BFGS"`, no
+restarts), suggest `"tanh"` over the default `"selu"`: SELU's non-smooth
+kink at `z=0` can make the likelihood surface locally jagged for a
+gradient-based optimizer — the analytic gradient is still correct, this is
+an optimization-landscape issue, not a bug.
 
 ## 5. Where to look for exact syntax
 
@@ -115,3 +126,14 @@ stacking per-variable warps.
 - `references/r.md` — rlibkriging
 - `references/julia.md` — jlibkriging
 - `references/octave-matlab.md` — mLibKriging (Octave and MATLAB share the same `.m` classes)
+
+For worked, end-to-end examples — fitting the same test function with
+libKriging and a competitor package, then mimicking one of the
+competitor's specific features (DiceKriging's `knots` warp, RobustGaSP's
+LMP objective, SMT's KPLS reduction, OpenTURNS's joint conditional
+simulation, GPy's inducing points, scikit-learn's `WhiteKernel`, GPflow's
+HMC hyperparameters, GaussianProcesses.jl's composable kernels) — see the
+notebooks under `docs/comparisons/libKriging_vs_*.ipynb`. Each ends with an
+argument-correspondence table between libKriging and the competitor's API,
+and is a good source to check exact option names against if this file and
+the reference files disagree.

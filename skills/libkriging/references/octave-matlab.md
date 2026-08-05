@@ -52,6 +52,11 @@ k = WarpKriging(y, X, {"kumaraswamy", "categorical(3,2)"}, "matern5_2");
 % k = MLPKriging(y, X, hidden_dims, d_out, activation, kernel, regmodel, normalize, ...)
 k = MLPKriging(y, X, [16, 8], 2, "selu", "gauss", "constant", true);
 ```
+Valid `activation` values: `"selu"` (default), `"relu"`, `"tanh"`,
+`"sigmoid"`, `"elu"`. Prefer `"tanh"` over `"selu"` if a single-start fit
+looks unstable — SELU's kink at `z = 0` can make the likelihood surface
+locally jagged for a gradient-based optimizer (the gradient itself is
+correct; this is an optimization-landscape issue, not a bug).
 
 ## NestedKriging
 
@@ -78,3 +83,14 @@ argument, no `normalize` support, no save/load yet on `NestedKriging`
   `simulate(...)`.
 - `NestedKriging(..., "NK", ...)` (5th positional arg) combined with a
   non-`"constant"` `regmodel` (8th positional arg).
+
+## See also
+
+No dedicated comparison notebook exists yet for Octave/MATLAB in
+`docs/comparisons/` (unlike R/Python/Julia). If one is requested, the
+strongest candidate competitors are the SUMO/ooDACE toolbox and the DACE
+toolbox (both Kriging-focused MATLAB toolboxes with a comparable
+positional-argument-style API), following the same pattern as
+`libKriging_vs_DiceKriging.ipynb`: fit the competitor, mimic it with
+libKriging, then highlight one competitor-specific feature (e.g. DACE's
+regression/correlation model grid) against a matching libKriging option.

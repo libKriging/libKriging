@@ -55,13 +55,18 @@ predict(wk, Xnew; return_stdev=true)
 
 ```julia
 mk = MLPKriging(y, X, [16, 8], 2;    # hidden_dims, d_out
-                activation="selu",
+                activation="selu",   # "selu" | "relu" | "tanh" | "sigmoid" | "elu"
                 kernel="gauss",
                 regmodel="constant",
                 normalize=false,
                 optim="BFGS+Adam",
                 objective="LL")
 ```
+Prefer `activation="tanh"` over the default `"selu"` if a single-start fit
+looks unstable: SELU has a non-smooth kink at `z=0` that can make the
+likelihood surface locally jagged for a gradient-based optimizer (the
+analytic gradient itself is correct — this is an optimization-landscape
+issue, not a bug).
 
 ## NestedKriging
 
@@ -87,3 +92,23 @@ predict(nk, Xnew; return_stdev=true)
 - Assuming `WarpKriging`/`MLPKriging` default to `optim="BFGS"` — their
   default is `"BFGS+Adam"`.
 - `aggregation="NK"` with `regmodel != "constant"` on `NestedKriging`.
+- **Name clashes with other loaded packages**: `jlibkriging` exports common
+  names (`predict`, `update`, `simulate`, ...) that many other Julia
+  packages also export (e.g. `GaussianProcesses.jl`, `StatsAPI`,
+  `StatsBase`, `ScikitLearnBase`). If more than one such package is
+  `using`'d in the same session, Julia raises an `UndefVarError`/ambiguity
+  error at the call site rather than silently picking one — qualify the
+  call explicitly (`jlibkriging.predict(k, Xnew; ...)`) whenever this can
+  happen, e.g. in any notebook that also loads a competitor GP package.
+- `jlibkriging` is **not** registered in Julia's General registry (as of
+  this writing) — it must be added via
+  `Pkg.develop(path="bindings/Julia/jlibkriging")` after building the C++
+  core (see `bindings/Julia/README.md`), not `Pkg.add("jlibkriging")`.
+
+## See also
+
+`docs/comparisons/libKriging_vs_GaussianProcessesJL.ipynb` mimics
+`GaussianProcesses.jl`'s default `GP`/`Mat52Iso` MLE fit with `Kriging`,
+then contrasts `jlibkriging`'s fixed named-kernel catalogue with
+`GaussianProcesses.jl`'s composable kernel API (`k1 + k2`, `k1 * k2`),
+including a full argument-correspondence table.
