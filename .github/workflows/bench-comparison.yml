@@ -52,26 +52,44 @@ jobs:
           path: bench/comparison/data
 
   bench-python:
-    name: Python packages
+    name: Python packages (${{ matrix.package }})
     needs: datasets
     runs-on: ubuntu-22.04
-    timeout-minutes: 720
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # One package per job so the (func x n x rep) sweep runs in parallel
+        # across packages instead of sequentially in a single 6h+ job.
+        package: [pylibkriging, sklearn, GPy, SMT, OpenTURNS]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'  # GPy compatibility
-      - run: pip install "numpy<2" scipy pandas pylibkriging scikit-learn GPy smt openturns
+      - name: Install ${{ matrix.package }}
+        run: |
+          pip install "numpy<2" scipy pandas
+          case "${{ matrix.package }}" in
+            pylibkriging) pip install pylibkriging ;;
+            sklearn)      pip install scikit-learn ;;
+            GPy)          pip install GPy ;;
+            SMT)          pip install smt ;;
+            OpenTURNS)    pip install openturns ;;
+          esac
       - uses: actions/download-artifact@v4
         with:
           name: bench-datasets
           path: bench/comparison/data
-      - name: Run Python benchmark
+      - name: Run Python benchmark (${{ matrix.package }})
         working-directory: bench/comparison
-        run: python run_python.py --budget "$BUDGET" --out results/python.csv
+        run: |
+          python run_python.py --budget "$BUDGET" \
+            --packages "${{ matrix.package }}" \
+            --out "results/python-${{ matrix.package }}.csv"
       - uses: actions/upload-artifact@v4
         with:
-          name: bench-results-python
+          name: bench-results-python-${{ matrix.package }}
           path: bench/comparison/results
 
   bench-r:
