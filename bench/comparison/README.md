@@ -2,12 +2,13 @@
 
 Benchmarks libKriging (`pylibkriging`, `rlibkriging`) against classic kriging
 packages on standard response surfaces, with **identical, randomized designs**
-shared across all packages and both languages.
+shared across all packages and languages.
 
 | | Packages |
 |---|---|
-| Python | pylibkriging, scikit-learn, GPy, SMT, OpenTURNS |
+| Python | pylibkriging, scikit-learn, GPy, GPyTorch, SMT, OpenTURNS |
 | R | rlibkriging, DiceKriging, RobustGaSP |
+| Octave | [STK](https://github.com/stk-kriging/stk) |
 
 ## Protocol
 
@@ -30,19 +31,27 @@ shared across all packages and both languages.
 
 ```sh
 cd bench/comparison
-pip install "numpy<2" scipy pandas pylibkriging scikit-learn GPy smt openturns
+pip install "numpy<2" scipy pandas pylibkriging scikit-learn GPy smt openturns torch gpytorch
 python make_datasets.py --repeats 10          # or --quick
-python run_python.py                          # results/python.csv
+python run_python.py                          # results/python.csv, all Python packages
 Rscript run_r.R data results/r.csv 300        # needs rlibkriging, DiceKriging, RobustGaSP
+octave run_stk.m /path/to/stk data results/stk.csv  # needs a local clone of stk-kriging/stk
 python aggregate.py                           # results/all.csv + summary.md
 ```
+
+`--packages` (Python) / a 4th CLI arg (R) restrict a run to a subset,
+e.g. `python run_python.py --packages GPyTorch` or
+`Rscript run_r.R data results/r.csv 300 DiceKriging`.
 
 ## CI
 
 `.github/workflows/bench-comparison.yml` — manual `workflow_dispatch`
 (inputs: `repeats`, `quick`, `budget`) plus a monthly schedule. It never runs
 on push/PR (too heavy). Python is pinned to 3.11 and `numpy<2` for GPy
-compatibility.
+compatibility. Each Python and R package, plus STK, runs in its own parallel
+job (one process per package) rather than one sequential job per language —
+the full func x n x rep sweep for a single heavy package already pushes
+against CI job timeouts, let alone all of them one after another.
 
 ## Fairness caveats
 

@@ -61,7 +61,7 @@ jobs:
       matrix:
         # One package per job so the (func x n x rep) sweep runs in parallel
         # across packages instead of sequentially in a single 6h+ job.
-        package: [pylibkriging, sklearn, GPy, SMT, OpenTURNS]
+        package: [pylibkriging, sklearn, GPy, SMT, OpenTURNS, GPyTorch]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -76,6 +76,8 @@ jobs:
             GPy)          pip install GPy ;;
             SMT)          pip install smt ;;
             OpenTURNS)    pip install openturns ;;
+            GPyTorch)     pip install torch --index-url https://download.pytorch.org/whl/cpu
+                          pip install gpytorch ;;
           esac
       - uses: actions/download-artifact@v4
         with:
@@ -93,33 +95,61 @@ jobs:
           path: bench/comparison/results
 
   bench-r:
-    name: R packages
+    name: R packages (${{ matrix.package }})
     needs: datasets
     runs-on: ubuntu-22.04
-    timeout-minutes: 720
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # One package per job, same rationale as bench-python above.
+        package: [rlibkriging, DiceKriging, RobustGaSP]
     steps:
       - uses: actions/checkout@v4
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
-      - name: Install R packages
-        run: |
-          Rscript -e 'install.packages(c("rlibkriging", "DiceKriging", "RobustGaSP"))'
+      - name: Install ${{ matrix.package }}
+        run: Rscript -e 'install.packages("${{ matrix.package }}")'
       - uses: actions/download-artifact@v4
         with:
           name: bench-datasets
           path: bench/comparison/data
-      - name: Run R benchmark
+      - name: Run R benchmark (${{ matrix.package }})
         working-directory: bench/comparison
-        run: Rscript run_r.R data results/r.csv "$BUDGET"
+        run: |
+          Rscript run_r.R data "results/r-${{ matrix.package }}.csv" "$BUDGET" "${{ matrix.package }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: bench-results-r
+          name: bench-results-r-${{ matrix.package }}
+          path: bench/comparison/results
+
+  bench-stk:
+    name: STK (Octave)
+    needs: datasets
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Octave
+        run: sudo apt-get update -qy && sudo apt-get install -qy octave
+      - name: Clone STK
+        run: git clone --depth 1 https://github.com/stk-kriging/stk.git "$RUNNER_TEMP/stk"
+      - uses: actions/download-artifact@v4
+        with:
+          name: bench-datasets
+          path: bench/comparison/data
+      - name: Run STK benchmark
+        working-directory: bench/comparison
+        run: octave --no-gui run_stk.m "$RUNNER_TEMP/stk" data results/stk.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-stk
           path: bench/comparison/results
 
   report:
     name: Aggregate report
-    needs: [datasets, bench-python, bench-r]
+    needs: [datasets, bench-python, bench-r, bench-stk]
     if: always() && needs.datasets.result == 'success'
     runs-on: ubuntu-22.04
     steps:
