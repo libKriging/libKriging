@@ -59,13 +59,19 @@ model = lk.WarpKriging(
     noise=None,   # same semantics as Kriging: None | "nugget" | variance vector
 )
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(Xnew, return_stdev=True)
+```
+One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
+columns, `WarpKriging` can auto-encode them — but being explicit about the
+`warping` spec per column is safer for review.
+
+## MLPKriging
 
 ```python
 model = lk.MLPKriging(
     y, X,
     hidden_dims=[16, 8],   # MLP layer widths
     d_out=2,               # output (feature-map) dimension fed to the GP kernel
-    activation="selu",
+    activation="selu",     # "selu" | "relu" | "tanh" | "sigmoid" | "elu" (default "selu")
     kernel="gauss",
     regmodel="constant",
     normalize=False,
@@ -74,6 +80,13 @@ model = lk.MLPKriging(
     parameters={},
 )
 ```
+Prefer `activation="tanh"` over the default `"selu"` when fitting with a
+single-start gradient-based optimizer (`optim="BFGS"`, no restarts): SELU
+has a non-smooth kink at `z=0` that can make the likelihood surface locally
+jagged and destabilize a single BFGS run (the analytic gradient is still
+correct — this is an optimization-landscape issue, not a code bug). `tanh`
+is smooth everywhere and a safer default recommendation unless the user
+specifically wants SELU's less-saturating behavior for deep/wide MLPs.
 
 ## NestedKriging
 
@@ -107,3 +120,17 @@ model = lk.load("model.h5")  # auto-detects class, incl. legacy Nugget/NoiseKrig
 - `X`/`y` as Python lists instead of NumPy `float64` arrays — pybind11
   bindings expect `numpy.ndarray`.
 - `aggregation="NK"` combined with `regmodel != "constant"` on `NestedKriging`.
+
+## See also
+
+Worked, end-to-end examples fitting the *same* Branin 2D function with
+`pylibkriging` and mimicking a specific competitor package are in
+`docs/comparisons/`:
+`libKriging_vs_SMT.ipynb` (KPLS dimension reduction),
+`libKriging_vs_OpenTURNS.ipynb` (joint conditional simulation),
+`libKriging_vs_GPy.ipynb` (sparse/inducing-point scaling),
+`libKriging_vs_sklearn.ipynb` (`WhiteKernel` noise estimation vs
+`noise="nugget"`), and `libKriging_vs_GPflow.ipynb` (HMC full-Bayesian
+hyperparameters vs `objective="LMP"`). Each notebook also ends with an
+argument-correspondence table between `pylibkriging` and the competitor's
+API.

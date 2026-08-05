@@ -18,6 +18,8 @@ class Covariance {
 
   /// Resolve kernel name to function triplet.
   /// Accepted names: "gauss", "exp", "matern3_2", "matern5_2", "whitenoise".
+  /// See docs/math/Kernels.md for the formulas, smoothness properties and
+  /// choice guidance.
   LIBKRIGING_EXPORT static CovFunctions resolve(const std::string& covType);
 
   static CovFunc Cov_gauss;

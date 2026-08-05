@@ -95,3 +95,13 @@ noise/nugget channel, no save/load yet (as of v1.1).
 - Calling `fit`/`predict` with `X` laid out as observations-in-columns
   instead of features-in-columns — libKriging matrices are `n × d`
   (row = observation), consistent across all bindings.
+
+## See also
+
+There is no C++-specific comparison notebook (comparing against another
+C++ Kriging library), but every worked example under `docs/comparisons/`
+(`libKriging_vs_DiceKriging.ipynb`, `_RobustGaSP`, `_SMT`, `_OpenTURNS`,
+`_GPy`, `_sklearn`, `_GPflow`, `_GaussianProcessesJL`) exercises this same
+core C++ API through its R/Python/Julia bindings — read them for
+end-to-end usage patterns (fit → predict → simulate → save/load) even
+when writing pure C++ code.

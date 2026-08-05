@@ -9,6 +9,7 @@ This document lists all methods exposed by each language binding for accessing t
 | `Kriging` | Unified Kriging; all bindings support `noise_model`: `none`, `nugget`, `heterogeneous` | ✅ | ✅ | ✅ | ✅ |
 | `WarpKriging` | Kriging with input warping | ✅ | ✅ | ✅ | ✅ |
 | `MLPKriging` | Kriging with MLP feature mapping | ✅ | ✅ | ✅ | ✅ |
+| `NestedKriging` | Divide-and-conquer Kriging for large designs (see [docs/math/Nested.md](../docs/math/Nested.md)) | ✅ | ✅ | ✅ | ✅ |
 
 > **Note on noise models**: `NoiseKriging` (heterogeneous noise) and `NuggetKriging` (nugget/homoscedastic noise) have been removed from all bindings — use `Kriging` with `noise_model="heterogeneous"` or `noise_model="nugget"`.
 
@@ -115,6 +116,29 @@ This document lists all methods exposed by each language binding for accessing t
 | `regmodel` | `mlpKriging_regmodel(obj)` | `obj$regmodel()` | `obj.regmodel()` | `regmodel(obj)` | `regmodel(obj)` |
 | `F`, `T`, `M`, `z` | `mlpKriging_F(obj)`, … | `obj$F()`, … | `obj.F()`, … | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` |
 | `beta`, `theta`, `sigma2` | `mlpKriging_beta(obj)`, … | `obj$beta()`, … | `obj.beta()`, … | `beta(obj)`, `theta(obj)`, `sigma2(obj)` | `beta(obj)`, `theta(obj)`, `sigma2(obj)` |
+
+---
+
+## NestedKriging
+
+| Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
+|---|---|---|---|---|---|
+| Constructor + fit | `new_NestedKrigingFit(y,X,kernel,nb_groups,…)` | — | `NestedKriging(y,X,kernel,nb_groups=…,…)` | `build(y,X,kernel,nb_groups,…)` | `NestedKriging(y,X,kernel,nb_groups;…)` |
+| Predict | `nestedkriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
+| Summary | `nestedkriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| `kernel` | `nestedkriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
+| `aggregation` | `nestedkriging_aggregation(obj)` | `obj$aggregation()` | `obj.aggregation()` | `aggregation(obj)` | `aggregation(obj)` |
+| `nb_groups` | `nestedkriging_nb_groups(obj)` | `obj$nb_groups()` | `obj.nb_groups()` | `nb_groups(obj)` | `nb_groups(obj)` |
+| `groups` | `nestedkriging_groups(obj)` | `obj$groups()` | `obj.groups()` | — | — |
+| `theta` | `nestedkriging_theta(obj)` | `obj$theta()` | `obj.theta()` | `theta(obj)` | `theta(obj)` |
+| `sigma2` | `nestedkriging_sigma2(obj)` | `obj$sigma2()` | `obj.sigma2()` | `sigma2(obj)` | `sigma2(obj)` |
+| `beta0` | `nestedkriging_beta0(obj)` | `obj$beta0()` | `obj.beta0()` | `beta0(obj)` | `beta0(obj)` |
+| `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | — | — |
+| `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | — | — |
+| `set_predict_chunk` | — | — | `obj.set_predict_chunk(chunk)` | — | — |
+| `set_warp_subsample` | — | — | `obj.set_warp_subsample(m)` | — | — |
+
+> No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` (v1.1) — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 
 ---
 

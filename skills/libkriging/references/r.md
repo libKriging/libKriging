@@ -58,7 +58,7 @@ columns, `WarpKriging` can auto-encode them — but being explicit about the
 ```r
 mk <- MLPKriging(y, X, hidden_dims = c(16, 8),
                  d_out = 2,
-                 activation = "selu",
+                 activation = "selu",   # "selu" | "relu" | "tanh" | "sigmoid" | "elu"
                  kernel = "gauss",
                  regmodel = "constant",
                  normalize = FALSE,
@@ -66,6 +66,10 @@ mk <- MLPKriging(y, X, hidden_dims = c(16, 8),
                  objective = "LL",
                  parameters = NULL)
 ```
+Prefer `activation = "tanh"` over the default `"selu"` if the user reports
+an unstable/stuck fit with a single-start optimizer: SELU's kink at `z = 0`
+can make the likelihood surface locally jagged (the gradient itself is
+still correct — this is an optimization-landscape issue, not a bug).
 
 ## NestedKriging
 
@@ -92,3 +96,30 @@ predict(nk, x = Xnew, return_stdev = TRUE)
 - `aggregation = "NK"` with `regmodel` other than `"constant"`.
 - Assuming `WarpKriging`/`MLPKriging` default to `optim = "BFGS"` like plain
   `Kriging` — their default is `"BFGS+Adam"`.
+- Forgetting `y <- as.numeric(y)` when `y` comes from a single-column
+  `data.frame`/`matrix` (e.g. from a DOE package) — the bindings expect a
+  plain numeric vector, not an `n × 1` object.
+
+## Installation
+
+`rlibkriging` is published on CRAN — `install.packages("rlibkriging")` is
+the normal path for a user who only wants to *use* the package. Building
+from this repository's sources (`tools/r-linux-macos/build.sh`) is only
+needed when developing libKriging itself or testing an unreleased fix.
+When writing an example/notebook, prefer a simple availability check
+(`requireNamespace("rlibkriging", quietly = TRUE)`, with a `warning()`
+suggesting `install.packages(...)` if missing) over embedding a
+build-from-source step — see `docs/comparisons/libKriging_vs_DiceKriging.ipynb`
+and `libKriging_vs_RobustGaSP.ipynb` for the pattern used across this
+repository's comparison notebooks.
+
+## See also
+
+`docs/comparisons/libKriging_vs_DiceKriging.ipynb` (mimicking `km()`'s
+default MLE fit, plus the `knots` non-stationary warp vs
+`WarpKriging(..., warping = "knots(K)")`) and
+`libKriging_vs_RobustGaSP.ipynb` (mimicking `rgasp()`'s default fit, plus
+`rgasp(method = "post_mode")`'s robust jointly-robust-prior estimation vs
+`Kriging(objective = "LMP")`) are complete, executable, worked examples in
+R — including an argument-correspondence table with the competitor
+package.

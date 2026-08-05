@@ -29,6 +29,9 @@ struct KrigingParameters {
 
 /** Ordinary kriging regression
  * @ingroup Regression
+ *
+ * See docs/math/Kriging.md for the model, objectives and prediction math,
+ * and docs/math/Noise.md for the nugget / heterogeneous noise models.
  */
 class Kriging : public KrigingImpl {
   Kriging() = delete;
@@ -38,7 +41,7 @@ class Kriging : public KrigingImpl {
   using Parameters = KrigingParameters;
   using KModel = KrigingImpl::KModel;
 
-  /// Which noise treatment is in use.
+  /// Which noise treatment is in use. See docs/math/Noise.md for the math.
   enum class NoiseModel {
     None,           ///< pure GP: R = corr(theta)
     Nugget,         ///< homogeneous nugget: R = alpha*corr + (1-alpha)*I
@@ -98,11 +101,12 @@ class Kriging : public KrigingImpl {
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
-   * @param objective is 'LL' (log-likelihood, default), 'LOO' (leave-one-out),
-   *        'LMP' (log-marginal posterior), or 'VLL'/'VLL(m)' for the Vecchia
+   * @param objective is 'LL' (log-likelihood, default), 'LOO' (leave-one-out;
+   *        see docs/math/LOO.md), 'LMP' (log-marginal posterior; see
+   *        docs/math/LMP.md), or 'VLL'/'VLL(m)' for the Vecchia
    *        approximated log-likelihood with m conditioning neighbors (default
    *        m=30): O(n m^3) per evaluation instead of O(n^3), recommended for
-   *        large n in low dimension (see docs/dev/VecchiaLL.md). Ignored if
+   *        large n in low dimension (see docs/math/Vecchia.md). Ignored if
    *        optim=='none'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
    */
