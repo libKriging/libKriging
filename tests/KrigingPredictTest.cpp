@@ -105,7 +105,8 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences", "[predict
   }
 }
 
-TEST_CASE("KrigingPredictTest - Check gradient vs finite differences with normalize=true", "[predict][kriging][normalize]") {
+TEST_CASE("KrigingPredictTest - Check gradient vs finite differences with normalize=true",
+          "[predict][kriging][normalize]") {
   // Regression test: predict(..., return_deriv=true) with normalize=true used to
   // return derivatives off by a factor of scaleX_j (missing chain-rule division
   // by scaleX_j when un-normalizing dyhat/dx and dysd2/dx). Use a wide, anisotropic
@@ -156,6 +157,13 @@ TEST_CASE("KrigingPredictTest - Check gradient vs finite differences with normal
 
   SECTION("Standard deviation gradient vs finite differences") {
     for (arma::uword i = 0; i < X_new.n_rows; ++i) {
+      // Skip points where the predicted stdev is (near) zero: the analytical
+      // gradient formula divides by stdev and is singular there (d/dx sqrt(v)
+      // blows up as v -> 0). Whether a given off-design point falls in this
+      // near-interpolation regime depends on the BFGS-optimized range
+      // parameter, which can differ slightly across platforms/BLAS backends.
+      if (stdev(i) < 1e-6)
+        continue;
       for (arma::uword j = 0; j < X_new.n_cols; ++j) {
         arma::mat X_plus = X_new.row(i);
         arma::mat X_minus = X_new.row(i);
