@@ -132,7 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Octave
-        run: sudo apt-get update -qy && sudo apt-get install -qy octave
+        run: sudo apt-get update -qy && sudo apt-get install -qy octave liboctave-dev
       - name: Clone STK
         run: git clone --depth 1 https://github.com/stk-kriging/stk.git "$RUNNER_TEMP/stk"
       - uses: actions/download-artifact@v4
