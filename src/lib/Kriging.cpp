@@ -1272,6 +1272,70 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
   return {mean, stdev};
 }
 
+LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const arma::mat& X_n) {
+  if (m_nystrom_U.is_empty())
+    throw std::runtime_error("simulateNystrom: model was not fitted with objective=\"LLNys(k)\"");
+  const arma::uword d = m_X.n_cols;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("simulateNystrom: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+
+  arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+  const arma::uword n_n = X_n.n_rows;
+
+  arma::mat R_on = arma::mat(m_X.n_rows, n_n, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_on, m_X.t(), Xn_n.t(), m_theta, _Cov, 1.0);
+
+  const arma::mat RinvR_on = LinearAlgebra::woodbury_solve(m_nystrom_U, m_nystrom_D, R_on);  // n_o x n_n
+
+  const arma::vec yhat_n = F_n * m_beta + RinvR_on.t() * (m_y - m_F * m_beta);
+
+  // Joint (simple-kriging, beta treated as known -- like predictNystrom)
+  // covariance among the n_n SIMULATION points: dense, but only n_n x n_n
+  // (n_n is expected to be small; it is m_X, not X_n, that can be large).
+  arma::mat R_nn = arma::mat(n_n, n_n, arma::fill::none);
+  LinearAlgebra::covMat_sym_X(&R_nn, Xn_n.t(), m_theta, _Cov, 1.0, arma::vec());
+  arma::mat Sigma_n = arma::symmatu(R_nn - R_on.t() * RinvR_on);
+
+  // Unlike a per-point marginal variance (predictNystrom's "1 - quad", simply
+  // clamped to >= 0), the JOINT covariance among several simulation points
+  // can have a genuinely (not just numerically-noise) negative eigenvalue: it
+  // mixes an EXACT R_nn with cross-terms approximated through the same
+  // rank-k landmark structure, and that mismatch does not have to be tiny for
+  // a coarse k relative to n, or at an extreme theta (e.g. one an optimizer
+  // drove very large on noise-free data -- a known, unrelated GP-MLE
+  // degeneracy, not a Nystrom artifact, but one that makes R_ss ill
+  // conditioned and hence this cross-term subtraction lose precision).
+  //
+  // safe_chol_lower's escalating (10x-per-retry) nugget, or a single uniform
+  // diagonal shift calibrated to the WORST eigenvalue (tried first here; see
+  // git history), are both the wrong tool: both inflate variance at EVERY
+  // simulation point to fix what is usually one bad eigendirection shared by
+  // only a few of them. Clip negative eigenvalues to a small floor instead
+  // (nearest-PSD-matrix projection) -- this only removes the offending
+  // eigendirection(s) and leaves well-conditioned points' variances alone.
+  arma::vec eigval;
+  arma::mat eigvec;
+  arma::eig_sym(eigval, eigvec, Sigma_n);
+  const double floor_val = std::max(LinearAlgebra::num_nugget, std::sqrt(arma::datum::eps) * eigval.max());
+  eigval = arma::clamp(eigval, floor_val, arma::datum::inf);
+  Sigma_n = arma::symmatu(eigvec * arma::diagmat(eigval) * eigvec.t());
+
+  const arma::mat L_sigma = LinearAlgebra::safe_chol_lower(Sigma_n);
+
+  arma::mat y_n = arma::mat(n_n, nsim, arma::fill::none);
+  y_n.each_col() = yhat_n;
+  Random::reset_seed(seed);
+  y_n += L_sigma * Random::randn_mat(n_n, nsim) * std::sqrt(m_sigma2);
+
+  y_n = m_centerY + m_scaleY * y_n;
+  return y_n;
+}
+
 void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
@@ -2233,7 +2297,13 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const arma::mat& X_n,
                                               const bool will_update) {
   check_not_vecchia_light("simulate");
-  check_not_nystrom_light("simulate");
+  if (m_nystrom_light) {
+    if (will_update)
+      throw std::runtime_error(
+          "simulate: will_update=true is not available on a Nystrom fit "
+          "(refit with objective=\"LL\", or call simulate(..., false))");
+    return simulateNystrom(nsim, seed, X_n);
+  }
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -2621,7 +2691,6 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 
 void Kriging::save(const std::string filename) const {
   check_not_vecchia_light("save");
-  check_not_nystrom_light("save");
   nlohmann::json j;
   j["version"] = 2;
   j["content"] = "Kriging";
@@ -2631,6 +2700,17 @@ void Kriging::save(const std::string filename) const {
     j["nugget"] = m_nugget;
     j["est_nugget"] = m_est_nugget;
     j["alpha"] = m_alpha;
+  }
+  // Nystrom fits carry no m_T/m_R/... (dump_common_to_json serializes those
+  // as empty, harmlessly): the committed low-rank factors/landmarks are the
+  // extra state that reconstructs the model, stored only when present so
+  // pre-Nystrom save files stay byte-identical.
+  j["nystrom_light"] = m_nystrom_light;
+  if (m_nystrom_light) {
+    j["nystrom_k"] = m_nystrom_k;
+    j["nystrom_landmarks"] = std::vector<arma::uword>(m_nystrom_landmarks.begin(), m_nystrom_landmarks.end());
+    j["nystrom_U"] = to_json(m_nystrom_U);
+    j["nystrom_D"] = to_json(m_nystrom_D);
   }
 
   std::ofstream f(filename);
@@ -2657,6 +2737,14 @@ Kriging Kriging::load(const std::string filename) {
     kr.m_nugget = j["nugget"].template get<double>();
     kr.m_est_nugget = j["est_nugget"].template get<bool>();
     kr.m_alpha = j["alpha"].template get<double>();
+  }
+  // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
+  if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
+    kr.m_nystrom_light = true;
+    kr.m_nystrom_k = j["nystrom_k"].template get<arma::uword>();
+    kr.m_nystrom_landmarks = arma::uvec(j["nystrom_landmarks"].template get<std::vector<arma::uword>>());
+    kr.m_nystrom_U = mat_from_json(j["nystrom_U"]);
+    kr.m_nystrom_D = colvec_from_json(j["nystrom_D"]);
   }
   return kr;
 }

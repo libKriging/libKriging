@@ -194,6 +194,16 @@ class Kriging : public KrigingImpl {
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictNystrom(const arma::mat& X_n, bool return_stdev = true);
 
+  /** Nystrom (global low-rank) simulation: draws joint sample trajectories at
+   * X_n using the committed rank-k factors (U, D) via Woodbury for the mean
+   * and the (dense, but only n_n x n_n -- X_n is expected to be small) joint
+   * predictive covariance among the SIMULATION points. Like predictNystrom,
+   * the covariance is the simple-kriging one (beta treated as known). Only
+   * usable after an "LLNys(k)" fit; does not support `will_update` (no
+   * update_simulate for Nystrom fits).
+   * @return output is n_n*nsim matrix of simulations at X_n */
+  LIBKRIGING_EXPORT arma::mat simulateNystrom(int nsim, int seed, const arma::mat& X_n);
+
   /** Compute the prediction for given points X'
    * @param X_n is m*d matrix of points where to predict output
    * @param return_stdev is true if return also stdev column vector

@@ -140,10 +140,12 @@ TEST_CASE("LLNys fit is a permanent light fit: predict routes to predictNystrom"
   CHECK_THROWS_AS(k.predict(X, true, true, false), std::runtime_error);
   CHECK_THROWS_AS(k.predict(X, true, false, true), std::runtime_error);
 
-  // simulate/save are not available either (update() IS -- see the dedicated
-  // update tests below)
-  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), false), std::runtime_error);
-  CHECK_THROWS_AS(k.save("/tmp/should_not_exist.json"), std::runtime_error);
+  // simulate() IS available (routes to simulateNystrom), but not with
+  // will_update=true (no update_simulate for Nystrom fits); update()/save()
+  // ARE available -- see the dedicated tests below
+  CHECK_NOTHROW(k.simulate(3, 123, X.rows(0, 4), false));
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), true), std::runtime_error);
+  CHECK_THROWS_AS(k.update_simulate(y.head(5), X.rows(0, 4)), std::runtime_error);
 }
 
 TEST_CASE("LLNys(k) with k close to n interpolates the training data", "[nystrom][kriging]") {
@@ -296,6 +298,83 @@ TEST_CASE("LLNys update(refit=false) rejects mismatched dimensions", "[nystrom][
   arma::vec yu_wrong_len(4, arma::fill::randu);
   arma::mat Xu(5, 2, arma::fill::randu);
   CHECK_THROWS_AS(k.update(yu_wrong_len, Xu, false), std::runtime_error);
+}
+
+TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNystrom", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(150, X, y);
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNys(30)");
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(20, Xt, yt, 456);
+
+  auto [mean, stdev] = k.predictNystrom(Xt, true);
+
+  const int nsim = 20000;
+  arma::mat sims = k.simulate(nsim, 42, Xt, false);
+  REQUIRE(sims.n_rows == 20);
+  REQUIRE(sims.n_cols == static_cast<arma::uword>(nsim));
+
+  const arma::vec sim_mean = arma::mean(sims, 1);
+  const arma::vec sim_sd = arma::stddev(sims, 0, 1);
+
+  INFO("theta=" << k.theta().t() << " sigma2=" << k.sigma2());
+  INFO("max |sim_mean - predict mean| = " << arma::abs(sim_mean - mean).max());
+  INFO("max |sim_sd - predict stdev| = " << arma::abs(sim_sd - stdev).max());
+  CHECK(arma::abs(sim_mean - mean).max() < 0.05 * arma::stddev(y));
+  // The joint (n_n x n_n) covariance behind simulateNystrom is a strictly
+  // harder numerical problem than predictNystrom's per-point marginal (see
+  // simulateNystrom's comment: it mixes an exact R_nn with cross-terms
+  // approximated through the same rank-k landmarks, and a PSD-repair -- both
+  // can lose precision, particularly when the fit's own theta lands far from
+  // the data's scale, e.g. the well-known noise-free-GP-MLE degeneracy that
+  // can drive theta toward its upper bound on deterministic data such as
+  // this test's f2d). Compare against sqrt(sigma2), the model's own natural
+  // noise scale, rather than sd(y): median for the typical case, a looser
+  // max bound to catch gross errors only.
+  const double noise_scale = std::sqrt(k.sigma2());
+  CHECK(arma::median(arma::abs(sim_sd - stdev)) < 0.05 * noise_scale);
+  CHECK(arma::abs(sim_sd - stdev).max() < 0.5 * noise_scale);
+
+  // interpolation: simulating exactly at a training point collapses to (near) zero variance
+  arma::mat sims_at_X = k.simulate(2000, 7, X.row(0), false);
+  CHECK(arma::stddev(sims_at_X.row(0).t()) < 0.05 * noise_scale);
+  CHECK(std::abs(arma::mean(sims_at_X.row(0).t()) - y(0)) < 0.05 * arma::stddev(y));
+}
+
+TEST_CASE("LLNys save/load round-trip", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(120, X, y);
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNys(25)");
+  CHECK_NOTHROW(k.save("dump_nystrom_test.json"));
+
+  Kriging k2 = Kriging::load("dump_nystrom_test.json");
+  CHECK(k2.is_nystrom_light());
+  CHECK(k2.nystrom_rank() == 25);
+  CHECK(arma::abs(k2.theta() - k.theta()).max() == 0.0);
+  CHECK(k2.sigma2() == k.sigma2());
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(60, Xt, yt, 456);
+
+  auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false);
+  auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false);
+  CHECK(arma::abs(m1 - m2).max() == 0.0);
+  CHECK(arma::abs(s1 - s2).max() == 0.0);
+
+  // the reloaded model supports the same light-fit operations
+  CHECK_NOTHROW(k2.simulate(2, 123, Xt.rows(0, 4), false));
+  arma::mat Xu;
+  arma::vec yu;
+  make_data(10, Xu, yu, 789);
+  CHECK_NOTHROW(k2.update(yu, Xu, false));
+  CHECK(k2.X().n_rows == 130);
 }
 
 TEST_CASE("LLNys large-n smoke test", "[nystrom][kriging][intensive]") {
