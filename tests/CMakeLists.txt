@@ -96,6 +96,16 @@ catch_discover_tests(KrigingPredictTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(KrigingPredictCGTest KrigingPredictCGTest.cpp)
+target_link_libraries(KrigingPredictCGTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingPredictCGTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(KrigingPredictCGTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)
+
+
 add_executable(KrigingSimulateTest KrigingSimulateTest.cpp)
 target_link_libraries(KrigingSimulateTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingSimulateTest)
