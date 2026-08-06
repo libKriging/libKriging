@@ -4,20 +4,20 @@
 // Vérifiée syntaxiquement contre les vrais en-têtes du dépôt :
 //   g++ -fsyntax-only -std=c++17 -Isrc/lib/include -Ibuild/src/lib \
 //       -Idependencies/armadillo-code/include -x c++ \
-//       wip2/draft/MultiFidelityKriging.hpp
+//       todo/draft/MarkovCoKriging.hpp
 // (nécessite un `build/` déjà configuré, pour libKriging_exports.h généré).
 //
-// Brouillon d'API pour MultiFidelityKriging, calqué sur la structure de
+// Brouillon d'API pour MarkovCoKriging, calqué sur la structure de
 // src/lib/include/libKriging/NestedKriging.hpp (classe de composition sur un
 // vecteur de sous-Kriging).
 //
 // À déplacer vers src/lib/include/libKriging/ une fois les décisions D1-D5 de
-// wip2/DESIGN.md tranchées. Les points marqués « D? » dépendent directement
+// todo/DESIGN.md tranchées. Les points marqués « D? » dépendent directement
 // d'un arbitrage encore ouvert.
 // =============================================================================
 
-#ifndef LIBKRIGING_MULTIFIDELITYKRIGING_HPP
-#define LIBKRIGING_MULTIFIDELITYKRIGING_HPP
+#ifndef LIBKRIGING_MARKOVCOKRIGING_HPP
+#define LIBKRIGING_MARKOVCOKRIGING_HPP
 
 #include <memory>
 #include <string>
@@ -31,32 +31,42 @@
 #include "libKriging/Trend.hpp"
 #include "libKriging/libKriging_exports.h"
 
-/** Multi-fidelity Kriging: recursive AR(1) co-kriging (Le Gratiet, 2013).
+/** Markov-type co-kriging: recursive proportional-covariance co-kriging
+ * (Journel 1999, MM1/MM2). Two instances share this exact class:
+ *   - AR(1) multi-fidelity (Le Gratiet, 2013): s>=2 levels ordered by cost,
+ *     nested designs D_s subset ... subset D_1;
+ *   - collocated co-kriging (Xu et al., 1992): s=2, no cost/fidelity order,
+ *     level 0 = secondary field, level 1 = primary, same nesting requirement.
  *
- * s fidelity levels, t=1 the cheapest/least accurate, t=s the reference code:
+ * s levels, t=0 the "parent" field (cheapest, or the secondary variable),
+ * t=s-1 the field of interest:
  *
- *   Z_1(x) ~ GP(f_1(x)' b_1, s_1^2 r_1(.,.;th_1))
+ *   Z_0(x) ~ GP(f_0(x)' b_0, s_0^2 r_0(.,.;th_0))
  *   Z_t(x) = rho_{t-1}(x) Z_{t-1}(x) + d_t(x),  d_t independent of Z_{t-1}
  *
- * Under NESTED designs D_s subset ... subset D_1, the joint likelihood
- * factorizes into s independent likelihoods, so the fit reduces to s ordinary
- * Kriging fits on residuals: O(sum n_t^3) instead of O((sum n_t)^3).
+ * Under NESTED designs, the joint likelihood factorizes into s independent
+ * likelihoods, so the fit reduces to s ordinary Kriging fits on residuals:
+ * O(sum n_t^3) instead of O((sum n_t)^3).
  *
- * rho is estimated as a trend coefficient by augmenting the level-t regression
- * matrix with y_{t-1}(D_t) * g(x) columns (option (a) of DESIGN.md), or by an
- * outer profiling loop (option (b)).
+ * rho is estimated by an OUTER PROFILING LOOP around unmodified Kriging fits
+ * (option (b) of DESIGN.md, locked in permanently, cf. §6 D1 / §7bis): for
+ * each candidate rho, fit an ordinary Kriging on
+ * z_t = y_t - rho(D_t) * y_{t-1}(D_t) and read its concentrated LL; rho
+ * maximizes it. No custom regression matrix, no change to KrigingImpl/Trend.
  *
  * Prediction is recursive:
  *   mu_t(x)  = rho_{t-1}(x) mu_{t-1}(x) + mu_{d_t}(x)
  *   var_t(x) = rho_{t-1}(x)^2 var_{t-1}(x) + var_{d_t}(x)
  *
  * Restrictions to enforce and document:
- *   - nested designs required (D2: strict, or opt-in approximation);
+ *   - nested designs required (D2: strict, or opt-in approximation using the
+ *     parent's predicted mean instead of its observed value);
  *   - `normalize` must be global, never per level;
- *   - level ordering: index 0 == LOWEST fidelity (classic source of mistakes);
+ *   - level ordering: index 0 == PARENT field (lowest fidelity, or the
+ *     collocated secondary variable) -- classic source of mistakes;
  *   - s >= 2.
  */
-class MultiFidelityKriging {
+class MarkovCoKriging {
  public:
   /// Form of the scaling factor rho between consecutive levels.
   enum class RhoModel {
@@ -67,9 +77,9 @@ class MultiFidelityKriging {
   LIBKRIGING_EXPORT static RhoModel rhoModelFromString(const std::string& s);
   LIBKRIGING_EXPORT static std::string rhoModelToString(RhoModel m);
 
-  MultiFidelityKriging() = delete;
+  MarkovCoKriging() = delete;
 
-  LIBKRIGING_EXPORT explicit MultiFidelityKriging(const std::string& covType);
+  LIBKRIGING_EXPORT explicit MarkovCoKriging(const std::string& covType);
 
   // ---------------------------------------------------------------------------
   // D3 (OPEN): two candidate signatures for fit. Pick ONE before writing the
@@ -170,8 +180,10 @@ class MultiFidelityKriging {
   [[nodiscard]] arma::uvec nested_indices(arma::uword t) const;
   /// rho_t evaluated at the rows of X_n (q-vector).
   [[nodiscard]] arma::vec eval_rho(arma::uword t, const arma::mat& X_n) const;
-  /// Augmented regression matrix [ diag(y_{t-1}(D_t)) G | F ] -- option (a) only.
-  [[nodiscard]] arma::mat augmented_trend_matrix(arma::uword t) const;
+  /// Outer profiling of rho_t via lbfgsb_cpp (already vendored/linked, cf.
+  /// DESIGN.md §7bis): fits a Kriging on the residual for each candidate rho
+  /// and returns the one maximizing its concentrated log-likelihood.
+  [[nodiscard]] arma::vec fit_rho(arma::uword t) const;
 };
 
-#endif  // LIBKRIGING_MULTIFIDELITYKRIGING_HPP
+#endif  // LIBKRIGING_MARKOVCOKRIGING_HPP

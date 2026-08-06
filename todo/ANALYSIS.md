@@ -113,7 +113,7 @@ dépôt : `nestedkriging_branin2d_{py,r,julia}.ipynb`).
 
 ## 6. Validation et documentation
 
-- `tests/MultiFidelityKrigingTest.cpp` + valeurs de référence dans
+- `tests/MarkovCoKrigingTest.cpp` + valeurs de référence dans
   `tests/references/`.
 - Oracle naturel : **`MuFiCokriging`**, le package R de Le Gratiet lui-même —
   cohérent avec la validation déjà faite contre DiceKriging

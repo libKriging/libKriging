@@ -48,6 +48,28 @@
 - **Branin 2-D** en versions fine / grossière : cohérent avec les notebooks
   démo existants du dépôt (`*_branin2d_*.ipynb` dans chaque binding).
 
+## Généralisation : co-krigeage collocalisé / Markov-model
+
+- **Journel, A.G. (1999).** *Markov models for cross-covariances.*
+  Mathematical Geology 31(8), 955–964.
+  → hypothèse de covariance croisée **proportionnelle** à une covariance
+  directe (Markov Model 1 : `C_12(h) = (B_12/B_11)·C_1(h)` ; Markov Model 2 :
+  symétrique en `C_2`). C'est la même hypothèse structurante que l'AR(1) de
+  Le Gratiet, mais **sans exiger d'ordre de fidélité** entre les deux
+  variables — seulement un plan `D_2 ⊆ D_1` (variable secondaire connue
+  partout où la primaire est échantillonnée).
+
+- **Xu, W., Tran, T.T., Srivastava, R.M. & Journel, A.G. (1992).**
+  *Integrating seismic data in reservoir modeling: the collocated
+  cokriging alternative.* SPE Annual Technical Conference.
+  → co-krigeage collocalisé : la secondaire n'intervient qu'au point cible
+  (dérive externe), simplification pratique de MM1/MM2.
+
+→ **Implication d'implémentation** : ces modèles se réduisent, comme
+l'AR(1), à un krigeage ordinaire sur un résidu / avec covariable — même
+patron de composition, aucune matrice de covariance jointe. Cf.
+`DESIGN.md` §1 et §2 (généralisation retenue) et `PLAN.md`.
+
 ## Extensions (hors scope v1, pour mémoire)
 
 - **Picheny & Ginsbourger** et la littérature co-EGO / enrichissement
