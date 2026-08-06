@@ -1,4 +1,4 @@
-# Vecchia approximation (`objective="VLL(m)"`)
+# Vecchia approximation (`objective="LLVecchia(m)"`)
 
 ## Idea
 
@@ -12,12 +12,12 @@ n independent O(m³) factorizations — cheap, parallelizable, and exact
 in the limit m → n−1.
 
 libKriging exposes it as an alternative fitting objective,
-`objective="VLL"` (default m = 30 neighbors) or `objective="VLL(m)"`
+`objective="LLVecchia"` (default m = 30 neighbors) or `objective="LLVecchia(m)"`
 for an explicit m, usable from any binding since `objective` is just a
 string forwarded to the C++ core.
 
 ```r
-k <- Kriging(y, X, "matern5_2", objective = "VLL(30)")   # or "VLL"
+k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")   # or "LLVecchia"
 ```
 
 ## Mathematical description
@@ -69,7 +69,7 @@ X <- matrix(runif(2 * n), ncol = 2)
 y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 
 # Exact objective would cost O(n^3) ~ 8e9 ops; Vecchia costs O(n*m^3).
-k <- Kriging(y, X, "matern5_2", objective = "VLL(30)")
+k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, stdev = TRUE)
@@ -77,7 +77,7 @@ pred <- predict(k, Xnew, stdev = TRUE)
 
 For n large enough that even the final exact commit (O(n³)) is too
 costly, `set_vecchia_exact_commit(FALSE)` before fitting skips it
-entirely: θ* comes from the optimizer, β/σ² from the VLL profile, and
+entirely: θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
 `predict` automatically routes through the local Vecchia predictor
 (mean/stdev only — `return_cov`/`return_deriv`, `simulate`, `update`
 and `save` raise a clear error on such a "light" model).

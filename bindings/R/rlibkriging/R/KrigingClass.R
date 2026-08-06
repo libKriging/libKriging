@@ -4,13 +4,15 @@
 ## ****************************************************************************
 
 # Validate the `objective` argument. Unlike match.arg(), this accepts the
-# Vecchia approximated log-likelihood "VLL" / "VLL(m)" in addition to the
-# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia bindings,
-# which pass `objective` as a free string).
+# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)" and the
+# Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
+# in addition to the classic "LL" / "LOO" / "LMP" (kept consistent with the
+# Python/Julia bindings, which pass `objective` as a free string).
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|VLL(\\([0-9]+\\))?)$", objective))
-        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"VLL\" or \"VLL(m)\" (got \"",
+    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
+        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
+             "\"LLNystrom\" or \"LLNystrom(k)\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -65,11 +67,14 @@ classKriging <- function(nk) {
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares, \code{"LMP"} for the Log-Marginal Posterior, and
-#'     \code{"VLL"} or \code{"VLL(m)"} for the Vecchia approximated
+#'     squares, \code{"LMP"} for the Log-Marginal Posterior,
+#'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
 #'     log-likelihood with \code{m} conditioning neighbors (default 30):
 #'     each evaluation costs O(n m^3) instead of O(n^3), recommended for
-#'     large designs in low dimension.
+#'     large designs in low dimension; and \code{"LLNystrom"} or
+#'     \code{"LLNystrom(k)"} for the Nystrom (global low-rank) approximated
+#'     log-likelihood with rank \code{k} (default 50): each evaluation costs
+#'     O(n k^2) instead of O(n^3), also recommended for large designs.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -247,7 +252,11 @@ print.Kriging <- function(x, ...) {
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares and \code{"LMP"} for the Log-Marginal Posterior.
+#'     squares, \code{"LMP"} for the Log-Marginal Posterior,
+#'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
+#'     log-likelihood (see \code{\link{Kriging}}), and \code{"LLNystrom"} or
+#'     \code{"LLNystrom(k)"} for the Nystrom approximated log-likelihood
+#'     (see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the

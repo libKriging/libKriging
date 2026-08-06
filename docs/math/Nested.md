@@ -78,7 +78,7 @@ them:
 
 ### Combination with the Vecchia objective
 
-`NestedKriging(..., objective="VLL(m)")` estimates the shared prior
+`NestedKriging(..., objective="LLVecchia(m)")` estimates the shared prior
 (θ, σ², β) with a single global Vecchia-light fit (O(n·m³), see
 [Vecchia.md](Vecchia.md)) instead of averaging p local MLEs — this
 uses inter-group information the purely-local estimate discards, and

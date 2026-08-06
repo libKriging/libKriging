@@ -9,9 +9,9 @@ X <- as.matrix(runif(12))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 y <- f(X)
 
-test_that("objective = 'VLL(m)' is accepted (Vecchia log-likelihood)", {
-  expect_error(Kriging(y, X, "matern5_2", objective = "VLL(3)"), NA)
-  expect_error(Kriging(y, X, "matern5_2", objective = "VLL"), NA)
+test_that("objective = 'LLVecchia(m)' is accepted (Vecchia log-likelihood)", {
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), NA)
+  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia"), NA)
 })
 
 test_that("objective still accepts LL / LOO / LMP and rejects unknown values", {

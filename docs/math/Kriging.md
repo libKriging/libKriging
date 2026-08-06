@@ -4,7 +4,7 @@
 
 `Kriging` is the core model every other class in libKriging builds on
 (`NestedKriging` fits many of them, `WarpKriging`/`MLPKriging` wrap
-them with a learned input feature map, `objective="VLL(m)"` swaps the
+them with a learned input feature map, `objective="LLVecchia(m)"` swaps the
 likelihood for a scalable approximation — see
 [Vecchia.md](Vecchia.md), [Nested.md](Nested.md),
 [Warping-Affine.md](Warping-Affine.md) *et al.*). It treats the
@@ -72,7 +72,7 @@ differences needed) via the envelope theorem for β̂.
   that discourages θ from drifting into numerically-degenerate regions
   (θ → 0 or θ → ∞) that the pure likelihood alone can favour with
   sparse data. See [LMP.md](LMP.md) for the full derivation.
-- **`"VLL"` / `"VLL(m)"`**: Vecchia approximation for large n — see
+- **`"LLVecchia"` / `"LLVecchia(m)"`**: Vecchia approximation for large n — see
   [Vecchia.md](Vecchia.md).
 
 ### Prediction

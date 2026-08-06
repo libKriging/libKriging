@@ -182,9 +182,9 @@ void NestedKriging::fit(const arma::vec& y,
     throw std::invalid_argument("nb_groups should be in [1, n/(d+2)]");
   if (m_aggregation == Aggregation::NK && regmodel != Trend::RegressionModel::Constant)
     throw std::invalid_argument("NK aggregation requires a Constant trend; use PoE/gPoE/BCM/rBCM otherwise");
-  const bool vll_unified = objective.rfind("VLL", 0) == 0;
+  const bool vll_unified = objective.rfind("LLVecchia", 0) == 0;
   if (vll_unified && !warping.empty())
-    throw std::invalid_argument("VLL objective is not supported with warping in NestedKriging");
+    throw std::invalid_argument("LLVecchia objective is not supported with warping in NestedKriging");
 
   m_X = X;
   m_y = y;
@@ -231,7 +231,7 @@ void NestedKriging::fit(const arma::vec& y,
       m_wsubmodels.push_back(std::move(wk));
     }
   } else if (vll_unified) {
-    // --- VLL-unified path: ONE global light Vecchia fit estimates the common
+    // --- LLVecchia-unified path: ONE global light Vecchia fit estimates the common
     // prior (theta, sigma2, beta) in O(n m^3) using cross-group information,
     // then every submodel is fitted in closed form on the seeded prior.
     // Statistically preferable to averaging p per-group estimates, and
@@ -270,7 +270,7 @@ void NestedKriging::fit(const arma::vec& y,
   }
 
   // --- 2. unify hyperparameters (common prior) ------------------------------
-  // (already done by the global reference fit on the VLL-unified path)
+  // (already done by the global reference fit on the LLVecchia-unified path)
   if (!vll_unified || warped())
     unify_hyperparameters(objective);
 
