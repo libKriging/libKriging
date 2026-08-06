@@ -96,7 +96,8 @@ void* lk_kriging_new_fit(const double* y,
                          int beta_n,
                          int is_beta_estim,
                          const double* nugget,
-                         int is_nugget_estim) {
+                         int is_nugget_estim,
+                         const double* grady) {
   try {
     auto nm = parse_noise_model(noise_model_str);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
@@ -115,6 +116,9 @@ void* lk_kriging_new_fit(const double* y,
     if (nugget)
       params.nugget = *nugget;
     params.is_nugget_estim = is_nugget_estim != 0;
+    std::optional<arma::mat> grady_opt;
+    if (grady)
+      grady_opt = arma::mat(const_cast<double*>(grady), nX, d, false, true);
 
     auto* kr = new Kriging(kernel ? kernel : "matern3_2", nm);
     if (nm == Kriging::NoiseModel::Heterogeneous && noise && noise_n > 0) {
@@ -126,7 +130,8 @@ void* lk_kriging_new_fit(const double* y,
               normalize != 0,
               optim ? optim : "BFGS",
               objective ? objective : "LL",
-              params);
+              params,
+              grady_opt);
     } else {
       kr->fit(y_v,
               X_m,
@@ -134,7 +139,8 @@ void* lk_kriging_new_fit(const double* y,
               normalize != 0,
               optim ? optim : "BFGS",
               objective ? objective : "LL",
-              params);
+              params,
+              grady_opt);
     }
     return kr;
   }
@@ -164,11 +170,15 @@ int lk_kriging_fit(void* ptr,
                    const char* regmodel,
                    int normalize,
                    const char* optim,
-                   const char* objective) {
+                   const char* objective,
+                   const double* grady) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    std::optional<arma::mat> grady_opt;
+    if (grady)
+      grady_opt = arma::mat(const_cast<double*>(grady), nX, d, false, true);
     if (noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(noise), noise_n, false, true);
       k->fit(y_v,
@@ -177,14 +187,18 @@ int lk_kriging_fit(void* ptr,
              Trend::fromString(regmodel ? regmodel : "constant"),
              normalize != 0,
              optim ? optim : "BFGS",
-             objective ? objective : "LL");
+             objective ? objective : "LL",
+             Kriging::Parameters{},
+             grady_opt);
     } else {
       k->fit(y_v,
              X_m,
              Trend::fromString(regmodel ? regmodel : "constant"),
              normalize != 0,
              optim ? optim : "BFGS",
-             objective ? objective : "LL");
+             objective ? objective : "LL",
+             Kriging::Parameters{},
+             grady_opt);
     }
     return 0;
   }
@@ -587,6 +601,21 @@ int lk_kriging_get_M(void* ptr, double* out, int* n, int* d) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     const arma::mat& v = k->M();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_get_dy(void* ptr, double* out, int* n, int* d) {
+  try {
+    auto* k = static_cast<Kriging*>(ptr);
+    const arma::mat& v = k->dy();
     if (n)
       *n = static_cast<int>(v.n_rows);
     if (d)

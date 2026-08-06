@@ -109,7 +109,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  beta::Union{Nothing,Vector{Float64}}=nothing,
                  is_beta_estim::Bool=true,
                  nugget::Union{Nothing,Float64}=nothing,
-                 is_nugget_estim::Bool=true)
+                 is_nugget_estim::Bool=true,
+                 grady::Union{Nothing,Matrix{Float64}}=nothing)
     n, d = size(X)
     @assert length(y) == n
 
@@ -155,10 +156,14 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
     beta_ptr = beta === nothing ? C_NULL : pointer(beta)
     beta_n = beta === nothing ? 0 : length(beta)
     nugget_ptr = nugget === nothing ? C_NULL : Ref(nugget)
+    if grady !== nothing
+        @assert size(grady) == (n, d) "grady must be n x d, matching X"
+    end
+    grady_ptr = grady === nothing ? C_NULL : pointer(grady)
 
     if noise isa Float64
-        # Keep noise_vec alive during ccall
-        GC.@preserve noise_vec begin
+        # Keep noise_vec/grady alive during ccall
+        GC.@preserve noise_vec grady begin
             ptr = ccall(dlsym(_lk(), :lk_kriging_new_fit), Ptr{Nothing},
                         (Ptr{Float64}, Cint,
                          Ptr{Float64}, Cint,
@@ -167,7 +172,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                          Ptr{Float64}, Cint,
                          Ptr{Float64}, Cint, Cint,
                          Ptr{Float64}, Cint, Cint,
-                         Ptr{Float64}, Cint),
+                         Ptr{Float64}, Cint,
+                         Ptr{Float64}),
                         y, n,
                         noise_ptr, noise_n,
                         X, n, d,
@@ -175,26 +181,31 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                         sigma2_ptr, is_sigma2_estim ? 1 : 0,
                         theta_ptr, theta_n, is_theta_estim ? 1 : 0,
                         beta_ptr, beta_n, is_beta_estim ? 1 : 0,
-                        nugget_ptr, is_nugget_estim ? 1 : 0)
+                        nugget_ptr, is_nugget_estim ? 1 : 0,
+                        grady_ptr)
         end
     else
-        ptr = ccall(dlsym(_lk(), :lk_kriging_new_fit), Ptr{Nothing},
-                    (Ptr{Float64}, Cint,
-                     Ptr{Float64}, Cint,
-                     Ptr{Float64}, Cint, Cint,
-                     Cstring, Cstring, Cstring, Cint, Cstring, Cstring,
-                     Ptr{Float64}, Cint,
-                     Ptr{Float64}, Cint, Cint,
-                     Ptr{Float64}, Cint, Cint,
-                     Ptr{Float64}, Cint),
-                    y, n,
-                    noise_ptr, noise_n,
-                    X, n, d,
-                    kernel, noise_model_str, regmodel, normalize ? 1 : 0, optim, objective,
-                    sigma2_ptr, is_sigma2_estim ? 1 : 0,
-                    theta_ptr, theta_n, is_theta_estim ? 1 : 0,
-                    beta_ptr, beta_n, is_beta_estim ? 1 : 0,
-                    nugget_ptr, is_nugget_estim ? 1 : 0)
+        GC.@preserve grady begin
+            ptr = ccall(dlsym(_lk(), :lk_kriging_new_fit), Ptr{Nothing},
+                        (Ptr{Float64}, Cint,
+                         Ptr{Float64}, Cint,
+                         Ptr{Float64}, Cint, Cint,
+                         Cstring, Cstring, Cstring, Cint, Cstring, Cstring,
+                         Ptr{Float64}, Cint,
+                         Ptr{Float64}, Cint, Cint,
+                         Ptr{Float64}, Cint, Cint,
+                         Ptr{Float64}, Cint,
+                         Ptr{Float64}),
+                        y, n,
+                        noise_ptr, noise_n,
+                        X, n, d,
+                        kernel, noise_model_str, regmodel, normalize ? 1 : 0, optim, objective,
+                        sigma2_ptr, is_sigma2_estim ? 1 : 0,
+                        theta_ptr, theta_n, is_theta_estim ? 1 : 0,
+                        beta_ptr, beta_n, is_beta_estim ? 1 : 0,
+                        nugget_ptr, is_nugget_estim ? 1 : 0,
+                        grady_ptr)
+        end
     end
     return Kriging(_check_ptr(ptr))
 end
@@ -209,19 +220,26 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               regmodel::String="constant",
               normalize::Bool=false,
               optim::String="BFGS",
-              objective::String="LL")
+              objective::String="LL",
+              grady::Union{Nothing,Matrix{Float64}}=nothing)
     n, d = size(X)
     @assert length(y) == n
+    if grady !== nothing
+        @assert size(grady) == (n, d) "grady must be n x d, matching X"
+    end
     noise_ptr = noise === nothing ? C_NULL : pointer(noise)
     noise_n = noise === nothing ? 0 : length(noise)
-    ret = ccall(dlsym(_lk(), :lk_kriging_fit), Cint,
+    grady_ptr = grady === nothing ? C_NULL : pointer(grady)
+    ret = GC.@preserve grady ccall(dlsym(_lk(), :lk_kriging_fit), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint, Cint,
-                 Cstring, Cint, Cstring, Cstring),
+                 Cstring, Cint, Cstring, Cstring,
+                 Ptr{Float64}),
                 k.ptr, y, n,
                 noise_ptr, noise_n,
-                X, n, d, regmodel, normalize ? 1 : 0, optim, objective)
+                X, n, d, regmodel, normalize ? 1 : 0, optim, objective,
+                grady_ptr)
     _check_error(ret)
     return k
 end
@@ -502,6 +520,7 @@ M(k::Kriging) = _get_mat(:lk_kriging_get_M, k.ptr)
 z(k::Kriging) = _get_vec(:lk_kriging_get_z, k.ptr)
 beta(k::Kriging) = _get_vec(:lk_kriging_get_beta, k.ptr)
 theta(k::Kriging) = _get_vec(:lk_kriging_get_theta, k.ptr)
+dy(k::Kriging) = _get_mat(:lk_kriging_get_dy, k.ptr)
 sigma2(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_get_sigma2), Float64, (Ptr{Nothing},), k.ptr)
 is_beta_estim(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_is_beta_estim), Cint, (Ptr{Nothing},), k.ptr) != 0
 is_theta_estim(k::Kriging) = ccall(dlsym(_lk(), :lk_kriging_is_theta_estim), Cint, (Ptr{Nothing},), k.ptr) != 0
@@ -1355,7 +1374,7 @@ export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
 export X, centerX, scaleX, y, centerY, scaleY
-export F, T, M, z, beta, theta, sigma2
+export F, T, M, z, beta, theta, sigma2, dy
 export is_beta_estim, is_theta_estim, is_sigma2_estim
 export nugget, is_nugget_estim, noise
 export is_fitted, feature_dim, warping
