@@ -1123,7 +1123,8 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
   // meant to eliminate.
   R_ss.diag() += LinearAlgebra::num_nugget;
   const arma::mat L_ss = arma::chol(R_ss, "lower");
-  const arma::mat U = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U*U.t() = R_ns R_ss^-1 R_ns.t()
+  const arma::mat U
+      = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));  // n x k; U*U.t() = R_ns R_ss^-1 R_ns.t()
 
   const arma::vec captured = arma::sum(arma::square(U), 1);
   const arma::vec D = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
@@ -1169,8 +1170,8 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
 
     const arma::vec& x = Rinve;
 
-    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);  // R_ss^-1
-    const arma::mat W = Kinv * R_ns.t();                    // k x n = R_ss^-1 * R_ns.t()
+    const arma::mat Kinv = LinearAlgebra::inv_sympd(L_ss);           // R_ss^-1
+    const arma::mat W = Kinv * R_ns.t();                             // k x n = R_ss^-1 * R_ns.t()
     const arma::mat RM = LinearAlgebra::woodbury_solve(U, D, R_ns);  // n x k = Rinv * R_ns
 
     const arma::vec Dinv = 1.0 / D;
@@ -1179,8 +1180,8 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
     const arma::mat McoreInv = LinearAlgebra::inv_sympd(arma::chol(Mcore, "lower"));
     const arma::vec diagRinv = Dinv - LinearAlgebra::diagABA(DinvU, McoreInv);  // diag(Rinv)
 
-    const arma::vec Mtx = R_ns.t() * x;  // k
-    const arma::vec p = Kinv * Mtx;      // R_ss^-1 * R_ns.t() * x
+    const arma::vec Mtx = R_ns.t() * x;    // k
+    const arma::vec p = Kinv * Mtx;        // R_ss^-1 * R_ns.t() * x
     const arma::mat RMtM = RM.t() * R_ns;  // k x k = R_ns.t() * Rinv * R_ns
 
     for (arma::uword kk = 0; kk < d; ++kk) {
@@ -1200,7 +1201,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
 
       const arma::vec dMkx = dM_k.t() * x;
       const double raw1 = 2.0 * arma::dot(dMkx, p) - arma::as_scalar(p.t() * dK_k * p);
-      const arma::vec rowdot = arma::sum(dM_k % W.t(), 1);        // n: dM_k(i,:) . w_i
+      const arma::vec rowdot = arma::sum(dM_k % W.t(), 1);         // n: dM_k(i,:) . w_i
       const arma::vec quad = LinearAlgebra::diagABA(W.t(), dK_k);  // n: w_i' dK_k w_i
       const double diagcorr1 = arma::dot(x % x, 2.0 * rowdot - quad);
       const double term1_k = raw1 - diagcorr1;
@@ -1218,7 +1219,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& theta,
-                                                                                  bool return_grad) {
+                                                                                 bool return_grad) {
   if (m_nystrom_k == 0)
     throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with objective=\"LLNys(k)\"");
   arma::vec grad;
@@ -1386,14 +1387,12 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
     const arma::ivec bounds_type{d, arma::fill::value(2)};
 
-    optimizer.minimize(
-        [&fit_ofn](const arma::vec& vals_inp, arma::vec& grad_out) -> double {
-          return fit_ofn(vals_inp, &grad_out, nullptr);
-        },
-        gamma_start,
-        gamma_lower.memptr(),
-        gamma_upper.memptr(),
-        bounds_type.memptr());
+    optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
+                                  arma::vec& grad_out) -> double { return fit_ofn(vals_inp, &grad_out, nullptr); },
+                       gamma_start,
+                       gamma_lower.memptr(),
+                       gamma_upper.memptr(),
+                       bounds_type.memptr());
 
     m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_start) : gamma_start;
     m_est_theta = true;

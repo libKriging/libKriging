@@ -698,7 +698,8 @@ TEST_CASE("LinearAlgebra::nystromFactor - shape and non-negative residual", "[Li
   NystromFixture fx(25);
   arma::vec diag_resid;
   arma::uvec landmarks;
-  arma::mat U = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), 8, 1e-12, &landmarks);
+  arma::mat U
+      = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), 8, 1e-12, &landmarks);
 
   REQUIRE(U.n_rows == 25);
   REQUIRE(U.n_cols == 8);

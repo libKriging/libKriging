@@ -309,16 +309,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
 // covariance values are computed on demand, row by row, straight from X. Cost
 // O(n*k) covariance evaluations and O(n*k^2) flops total for rank k, vs O(n^2)
 // to build R and O(n^3) to factorize it exactly.
-LIBKRIGING_EXPORT arma::mat LinearAlgebra::nystromFactor(
-    arma::vec* diag_resid,
-    const arma::mat& X,
-    const arma::vec& _theta,
-    std::function<double(const arma::vec&, const arma::vec&)> _Cov,
-    const double factor,
-    const arma::vec& diag,
-    arma::uword k,
-    const double tol,
-    arma::uvec* landmarks_out) {
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::nystromFactor(arma::vec* diag_resid,
+                                                         const arma::mat& X,
+                                                         const arma::vec& _theta,
+                                                         std::function<double(const arma::vec&, const arma::vec&)> _Cov,
+                                                         const double factor,
+                                                         const arma::vec& diag,
+                                                         arma::uword k,
+                                                         const double tol,
+                                                         arma::uvec* landmarks_out) {
   const arma::uword n = X.n_rows;
   k = std::min(k, n);
   const arma::vec diag0 = (diag.n_elem == 0) ? arma::vec(n, arma::fill::ones) : diag;
@@ -366,8 +365,8 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::nystromFactor(
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::woodbury_solve(const arma::mat& U, const arma::vec& D, const arma::mat& B) {
   const arma::vec Dinv = 1.0 / D;
-  const arma::mat DinvU = U.each_col() % Dinv;              // diag(Dinv) * U        (n x k)
-  const arma::mat DinvB = B.each_col() % Dinv;              // diag(Dinv) * B        (n x m)
+  const arma::mat DinvU = U.each_col() % Dinv;                             // diag(Dinv) * U        (n x k)
+  const arma::mat DinvB = B.each_col() % Dinv;                             // diag(Dinv) * B        (n x m)
   arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + U.t() * DinvU;  // I_k + U' Dinv U (k x k)
   return DinvB - DinvU * arma::solve(M, U.t() * DinvB, LinearAlgebra::default_solve_opts);
 }

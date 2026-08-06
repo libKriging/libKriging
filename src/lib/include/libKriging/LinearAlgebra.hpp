@@ -58,14 +58,14 @@ class LinearAlgebra {
   // pivot row-indices (into the n points) in selection order. `diag` follows
   // cholCov's convention: empty = ones(n), else used verbatim.
   LIBKRIGING_EXPORT static arma::mat nystromFactor(arma::vec* diag_resid,
-                                                    const arma::mat& X,
-                                                    const arma::vec& _theta,
-                                                    std::function<double(const arma::vec&, const arma::vec&)> _Cov,
-                                                    double factor,
-                                                    const arma::vec& diag,
-                                                    arma::uword k,
-                                                    double tol = 1e-12,
-                                                    arma::uvec* landmarks_out = nullptr);
+                                                   const arma::mat& X,
+                                                   const arma::vec& _theta,
+                                                   std::function<double(const arma::vec&, const arma::vec&)> _Cov,
+                                                   double factor,
+                                                   const arma::vec& diag,
+                                                   arma::uword k,
+                                                   double tol = 1e-12,
+                                                   arma::uvec* landmarks_out = nullptr);
 
   // Solve (D + U*U.t()) * X = B via the Woodbury identity, without ever
   // materializing the n x n matrix D + U*U.t(). U is n x k (as returned by
