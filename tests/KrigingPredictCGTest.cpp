@@ -43,14 +43,20 @@ static Kriging make_fixed_theta_model(const arma::vec& y,
 // -----------------------------------------------------------------------------
 
 TEST_CASE("predictCG mean/stdev match exact predict at a moderate theta", "[predictcg][kriging]") {
+  // n/n_n kept small on purpose: predictCG's return_stdev path runs one CG
+  // solve PER prediction point (O(n^2 * iters * n_n), see predictCG's own
+  // comment in Kriging.cpp), which is fine at these sizes natively but adds
+  // up to real minutes under Valgrind/TSan's 20-100x instrumentation
+  // overhead -- large enough here to previously time out the CI memcheck/tsan
+  // jobs. Kept just large enough to exercise the multi-RHS CG path.
   arma::mat X;
   arma::vec y;
-  make_data(100, X, y);
+  make_data(40, X, y);
   Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.1);
 
   arma::mat Xt;
   arma::vec yt;
-  make_data(50, Xt, yt, 456);
+  make_data(10, Xt, yt, 456);
 
   auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
   auto [m_cg, s_cg] = k.predictCG(Xt, true);
@@ -74,9 +80,11 @@ TEST_CASE("predictCG defaults to mean only (stdev empty)", "[predictcg][kriging]
 }
 
 TEST_CASE("predictCG interpolates the training data", "[predictcg][kriging]") {
+  // Small n on purpose -- see the sizing comment on the first predictCG test
+  // case above (predicts at X itself here, so n_n = n too).
   arma::mat X;
   arma::vec y;
-  make_data(80, X, y);
+  make_data(30, X, y);
   Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.1);
 
   auto [mean, stdev] = k.predictCG(X, true);
@@ -85,14 +93,16 @@ TEST_CASE("predictCG interpolates the training data", "[predictcg][kriging]") {
 }
 
 TEST_CASE("predictCG matches predict for a different kernel/trend", "[predictcg][kriging]") {
+  // Small n/n_n on purpose -- see the sizing comment on the first predictCG
+  // test case above.
   arma::mat X;
   arma::vec y;
-  make_data(120, X, y);
+  make_data(40, X, y);
   Kriging k = make_fixed_theta_model(y, X, "gauss", Trend::RegressionModel::Linear, 0.15);
 
   arma::mat Xt;
   arma::vec yt;
-  make_data(30, Xt, yt, 789);
+  make_data(10, Xt, yt, 789);
 
   auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
   auto [m_cg, s_cg] = k.predictCG(Xt, true);
@@ -119,15 +129,18 @@ TEST_CASE("predictCG rejects wrong dimension and Nugget models", "[predictcg][kr
 TEST_CASE("predictCG accuracy improves with a larger iteration budget", "[predictcg][kriging]") {
   // Sanity check that the CG loop is doing meaningful work: an artificially
   // tiny iteration budget should be measurably less accurate than the
-  // default (max_iter=0 => 2n).
+  // default (max_iter=0 => 2n). Small n/n_n on purpose -- this was the
+  // slowest case (n=150, n_n=40 originally), the one that actually timed
+  // out CI's memcheck job at 1500s under Valgrind; see the sizing comment
+  // on the first predictCG test case above.
   arma::mat X;
   arma::vec y;
-  make_data(150, X, y);
+  make_data(50, X, y);
   Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.15);
 
   arma::mat Xt;
   arma::vec yt;
-  make_data(40, Xt, yt, 456);
+  make_data(10, Xt, yt, 456);
 
   auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
   auto [m_default, s_default] = k.predictCG(Xt, true);
