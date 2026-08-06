@@ -15,7 +15,7 @@ k = Kriging(y, X, "matern5_2";
             regmodel="constant",   # "constant" | "linear" | "interactive" | "quadratic" | "none"
             normalize=false,
             optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
-            objective="LL",        # "LL" | "LOO" | "LMP" | "VLL" | "VLL(m)"
+            objective="LL",        # "LL" | "LOO" | "LMP" | "LLVecchia" | "LLVecchia(m)" | "LLNystrom" | "LLNystrom(k)"
             noise=nothing)         # nothing | "nugget" | Float64 | Vector{Float64}
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)

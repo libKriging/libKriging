@@ -48,7 +48,15 @@ auto [ll2, grad] = model.logLikelihoodFun(theta, /*return_grad=*/true, /*bench=*
 
 Vecchia approximation: same class, just change `objective`:
 ```cpp
-model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)", {});
+model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
+auto [mean, stdev] = model.predictVecchia(Xnew, /*return_stdev=*/true);
+```
+
+Nystrom approximation: same class, just change `objective`:
+```cpp
+model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)", {});
+auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);
+arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);
 ```
 
 ## WarpKriging

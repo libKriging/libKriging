@@ -15,7 +15,7 @@ k <- Kriging(y, X, kernel = "matern5_2",
              regmodel = c("constant", "linear", "interactive", "quadratic", "none"),
              normalize = FALSE,
              optim = "BFGS",              # "BFGS", "BFGS10" (10 restarts), "none"
-             objective = "LL",            # "LL" | "LOO" | "LMP" | "VLL" | "VLL(m)"
+             objective = "LL",            # "LL" | "LOO" | "LMP" | "LLVecchia" | "LLVecchia(m)" | "LLNystrom" | "LLNystrom(k)"
              parameters = NULL,
              noise = NULL)                # NULL | "nugget" | numeric vector
 
@@ -80,7 +80,7 @@ nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
                      seed = 123,
                      regmodel = "constant",
                      optim = "BFGS",
-                     objective = "LL",       # "VLL(m)" for large-n common-prior fit
+                     objective = "LL",       # "LLVecchia(m)" for large-n common-prior fit
                      parameters = NULL,
                      warping = NULL)         # non-NULL -> WarpKriging submodels
 predict(nk, x = Xnew, return_stdev = TRUE)

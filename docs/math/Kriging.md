@@ -4,9 +4,10 @@
 
 `Kriging` is the core model every other class in libKriging builds on
 (`NestedKriging` fits many of them, `WarpKriging`/`MLPKriging` wrap
-them with a learned input feature map, `objective="LLVecchia(m)"` swaps the
-likelihood for a scalable approximation — see
-[Vecchia.md](Vecchia.md), [Nested.md](Nested.md),
+them with a learned input feature map, `objective="LLVecchia(m)"` /
+`objective="LLNystrom(k)"` swap the likelihood for a scalable
+approximation — see
+[Vecchia.md](Vecchia.md), [Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
 [Warping-Affine.md](Warping-Affine.md) *et al.*). It treats the
 unknown response as a Gaussian process: a trend (regression) part
 capturing the mean behaviour, plus a zero-mean stationary GP capturing
@@ -74,6 +75,8 @@ differences needed) via the envelope theorem for β̂.
   sparse data. See [LMP.md](LMP.md) for the full derivation.
 - **`"LLVecchia"` / `"LLVecchia(m)"`**: Vecchia approximation for large n — see
   [Vecchia.md](Vecchia.md).
+- **`"LLNystrom"` / `"LLNystrom(k)"`**: Nystrom (global low-rank)
+  approximation for large n — see [Nystrom.md](Nystrom.md).
 
 ### Prediction
 

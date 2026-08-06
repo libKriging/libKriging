@@ -59,16 +59,11 @@ void print_stats(const std::string& operation, const Stats& stats) {
 }
 
 void print_header() {
-  std::cout << std::setw(25) << std::left << "Operation"
-            << " | ";
-  std::cout << std::setw(10) << std::right << "Mean (ms)"
-            << " | ";
-  std::cout << std::setw(10) << std::right << "Std (ms)"
-            << " | ";
-  std::cout << std::setw(10) << std::right << "Min (ms)"
-            << " | ";
-  std::cout << std::setw(10) << std::right << "Max (ms)"
-            << " | ";
+  std::cout << std::setw(25) << std::left << "Operation" << " | ";
+  std::cout << std::setw(10) << std::right << "Mean (ms)" << " | ";
+  std::cout << std::setw(10) << std::right << "Std (ms)" << " | ";
+  std::cout << std::setw(10) << std::right << "Min (ms)" << " | ";
+  std::cout << std::setw(10) << std::right << "Max (ms)" << " | ";
   std::cout << std::setw(10) << std::right << "Median (ms)" << std::endl;
 }
 
@@ -83,7 +78,7 @@ double test_function(const arma::rowvec& x) {
 
 void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iterations) {
   std::cout << "\n";
-  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LLVecchia(30))" << std::endl;
+  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LLNystrom(50))" << std::endl;
 
   arma::arma_rng::set_seed(123);
   arma::mat X_train(n_train, d, arma::fill::randu);
@@ -94,32 +89,23 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   // exact-LL comparison rows become prohibitive beyond a few thousand points
   const bool with_exact = (n_train <= 1000);
 
-  std::vector<double> fit_times, fit_ll_times, vll_eval_times, vll_grad_times, ll_eval_times, ll_grad_times;
-  std::vector<double> predict_times, predict_vecchia_times, fit_light_times;
+  std::vector<double> fit_times, fit_ll_times, nys_eval_times, nys_grad_times, ll_eval_times, ll_grad_times;
+  std::vector<double> predict_times, predict_nystrom_times, simulate_nystrom_times;
 
   const arma::uword n_pred = 100;
   arma::mat X_pred(n_pred, d, arma::fill::randu);
 
-  // fitted LLVecchia model reused for the objective-evaluation rows
-  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
+  // fitted LLNystrom model reused for the objective-evaluation/predict/simulate rows
+  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)");
   const arma::vec theta_eval(d, arma::fill::value(0.3));
 
   for (int iter = 0; iter < n_iterations; ++iter) {
-    // --- fit with the Vecchia objective ---
+    // --- fit with the Nystrom objective ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
+      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)");
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
-    }
-    // --- light fit: no exact factorization at commit ---
-    {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      Kriging kr("gauss");
-      kr.set_vecchia_exact_commit(false);
-      kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
-      auto t1 = std::chrono::high_resolution_clock::now();
-      fit_light_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     // --- fit with the exact LL (comparison baseline) ---
     if (with_exact) {
@@ -131,16 +117,16 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     // --- single objective evaluations at fixed theta ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k_eval.logLikelihoodVecchiaFun(theta_eval, false);
+      k_eval.logLikelihoodNystromFun(theta_eval, false);
       auto t1 = std::chrono::high_resolution_clock::now();
-      vll_eval_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      nys_eval_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 
       t0 = std::chrono::high_resolution_clock::now();
-      k_eval.logLikelihoodVecchiaFun(theta_eval, true);
+      k_eval.logLikelihoodNystromFun(theta_eval, true);
       t1 = std::chrono::high_resolution_clock::now();
-      vll_grad_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      nys_grad_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
-    // --- prediction: exact vs Vecchia (local, m neighbors) ---
+    // --- prediction: exact vs Nystrom (Woodbury, committed rank-k factors) ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
       k_eval.predict(X_pred, true, false, false);
@@ -148,9 +134,16 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
       predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 
       t0 = std::chrono::high_resolution_clock::now();
-      k_eval.predictVecchia(X_pred, true);
+      k_eval.predictNystrom(X_pred, true);
       t1 = std::chrono::high_resolution_clock::now();
-      predict_vecchia_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      predict_nystrom_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+    }
+    // --- simulation: Nystrom joint sample trajectories ---
+    {
+      auto t0 = std::chrono::high_resolution_clock::now();
+      k_eval.simulateNystrom(10, iter, X_pred);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      simulate_nystrom_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     if (with_exact) {
       auto t0 = std::chrono::high_resolution_clock::now();
@@ -167,13 +160,13 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 
   print_header();
   print_stats("fit", compute_stats(fit_times));
-  print_stats("fit_light", compute_stats(fit_light_times));
   if (with_exact)
     print_stats("fit_exact_ll", compute_stats(fit_ll_times));
   print_stats("predict", compute_stats(predict_times));
-  print_stats("predict_vecchia", compute_stats(predict_vecchia_times));
-  print_stats("vll_eval", compute_stats(vll_eval_times));
-  print_stats("vll_grad", compute_stats(vll_grad_times));
+  print_stats("predict_nystrom", compute_stats(predict_nystrom_times));
+  print_stats("simulate_nystrom", compute_stats(simulate_nystrom_times));
+  print_stats("nys_eval", compute_stats(nys_eval_times));
+  print_stats("nys_grad", compute_stats(nys_grad_times));
   if (with_exact) {
     print_stats("ll_eval", compute_stats(ll_eval_times));
     print_stats("ll_grad", compute_stats(ll_grad_times));
@@ -181,7 +174,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "Vecchia Benchmark (objective=LLVecchia(30) vs exact LL)" << std::endl;
+  std::cout << "Nystrom Benchmark (objective=LLNystrom(50) vs exact LL)" << std::endl;
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;
