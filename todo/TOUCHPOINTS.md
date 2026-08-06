@@ -59,7 +59,7 @@ sont réutilisés tels quels, sans modification.
 
 | | Fichier |
 |---|---|
-| M | `bindings/Julia/jlibkriging/csrc/libkriging_c.cpp` — **le point dur** : passer une liste de matrices via l'ABI C (tableau de `double*` + tableaux de `n_t`), ou éviter le problème via la variante `level` (cf. `DESIGN.md` D3) |
+| M | `bindings/Julia/jlibkriging/csrc/libkriging_c.cpp` — signature `(y, X, level)` tranchée (D3) : réutilise le marshalling `(Vector{Float64}, Matrix{Float64})` déjà en place, `level` est un `Vector{Int32}`/`uvec` de plus, comme `nsim`/`seed` ailleurs — **plus le point dur initialement redouté** (pas de liste de matrices à passer par l'ABI C) |
 | M | `bindings/Julia/jlibkriging/src/jlibkriging.jl` |
 | C | `bindings/Julia/jlibkriging/tests/multi_fidelity_kriging_test.jl` |
 | M | `bindings/Julia/jlibkriging/CMakeLists.txt` |
@@ -104,10 +104,10 @@ ne convertit pas.
 | Cœur C++ + tests | ~4 (`Trend`/`KrigingImpl` retirés) | 1 semaine (option (b) verrouillée, pas de bascule d'option ni de risque de régression core) |
 | Python | ~7 | 3–4 j |
 | R | ~20 (dont beaucoup de `.Rd`) | 4–5 j |
-| Julia | ~5 | 3–4 j (ABI C) |
-| Octave/MATLAB | ~6 | 3–4 j (mex) |
+| Julia | ~5 | 2 j (D3 tranchée sur `level` : plus de liste de matrices à passer par l'ABI C, marshalling mécanique) |
+| Octave/MATLAB | ~6 | 2 j (idem, mex) |
 | Documentation | ~9 | 2 j |
 
-**Le poste dominant est le marshalling multi-bindings, pas les
-mathématiques.** C'est ce qui rend la décision D3 (`DESIGN.md`) — liste de
-matrices vs. vecteur `level` — la plus rentable à trancher correctement.
+**Le poste dominant reste le marshalling multi-bindings**, mais réduit par
+le verrouillage de D3 (`DESIGN.md`) sur `(y, X, level)` — plus de nouvelle
+convention de listes de matrices à inventer 5 fois.

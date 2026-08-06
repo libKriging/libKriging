@@ -24,9 +24,12 @@ Rien n'a encore été modifié dans `src/`, `bindings/`, `tests/` ou `skills/`.
    définitivement** — zéro modification de `KrigingImpl`/`Trend`, et le
    même code couvre l'AR(1) **et** le co-krigeage collocalisé (Journel
    MM1/MM2, Xu et al. 1992). Voir `DESIGN.md` §0 et §7bis.
-2. Lire `DESIGN.md` §« Décisions ouvertes » restantes (D2 plans
-   non-emboîtés, D3 signature `fit`, D4 options par niveau, D5 nom).
-3. Puis suivre `PLAN.md` phase 0 → 5 (Phase 1 inclut désormais un oracle
+2. **D3 (signature `fit`) est tranchée : `(y, X, level)`**, `level:
+   arma::uvec` — réutilise le marshalling `(y, X)` déjà en place dans les
+   5 bindings. Voir `DESIGN.md` D3.
+3. Lire `DESIGN.md` §« Décisions ouvertes » restantes (D2 plans
+   non-emboîtés, D4 options par niveau, D5 nom).
+4. Puis suivre `PLAN.md` phase 0 → 5 (Phase 1 inclut désormais un oracle
    collocalisé en plus de `MuFiCokriging`).
 
 ## Contexte projet au moment de l'analyse

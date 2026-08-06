@@ -15,9 +15,11 @@ phase `n+1` avant de l'avoir atteint.
       ou co-krigeage complet. *(proposition : refus strict en v1 ; le mode
       approché reste gratuit à activer ensuite, cf. §7bis — il réutilise
       `predict` du niveau parent, déjà nécessaire de toute façon)*
-- [ ] **D3** : signature `fit` → `vector<vec>/vector<mat>` ou
-      `(y, X, level)`. **Décision la plus rentable** : elle conditionne le
-      coût des 5 bindings, poste dominant du projet.
+- [x] **D3** : signature `fit` → **TRANCHÉE : `(y, X, level)`** (`level:
+      arma::uvec`, index catégoriel de position dans la chaîne, pas une
+      valeur de coût continue). Réutilise le marshalling `(y, X)` déjà
+      existant dans les 5 bindings — pas de nouvelle convention à inventer.
+      Voir `DESIGN.md` D3.
 - [ ] **D4** : options par niveau (scalaire diffusé vs. vecteur).
 - [ ] **D5** : nom de la classe. *(proposition : garder `MarkovCoKriging`,
       documenter le cas `s=2` collocalisé comme usage particulier — voir
@@ -25,7 +27,7 @@ phase `n+1` avant de l'avoir atteint.
 - [ ] Scope v1 : `update` dedans ou dehors ? `save`/`load` dedans ou dehors ?
 
 **Sortie** : `DESIGN.md` §6 mis à jour, chaque décision marquée TRANCHÉE
-avec sa justification. *(D1 fait ; D2/D3/D4/D5 restent à statuer.)*
+avec sa justification. *(D1, D3 faits ; D2/D4/D5 restent à statuer.)*
 
 ---
 

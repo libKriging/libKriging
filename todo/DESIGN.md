@@ -157,17 +157,28 @@ Justification du changement de position :
 mode approché derrière une option nommée sans ambiguïté
 (`allow_non_nested=true`) documentée comme approximation.**
 
-### D3. Forme de la signature `fit`
-- `fit(std::vector<arma::vec> y, std::vector<arma::mat> X, …)` — explicite,
-  mais nouvelle convention de marshalling à inventer dans 5 bindings.
-- Alternative : `fit(arma::vec y, arma::mat X, arma::uvec level)` — un seul
-  jeu de données plus un vecteur d'index de niveau. **Aucune** nouvelle
-  convention de marshalling (tout est déjà supporté partout), au prix d'une
-  API un peu moins naturelle et d'un découpage interne.
+### D3. Forme de la signature `fit` : TRANCHÉE — variante B (`level`)
+`fit(arma::vec y, arma::mat X, arma::uvec level, …)` — un seul jeu de
+données plus un vecteur d'index de niveau (`level[i] ∈ [0, s-1]`,
+`0` = niveau parent / racine de la chaîne). **Aucune** nouvelle convention
+de marshalling : réutilise exactement le `(y, X)` déjà supporté dans les
+5 bindings, contre une nouvelle convention de listes de matrices à inventer
+partout pour la variante A — c'était le poste dominant du projet (cf.
+`TOUCHPOINTS.md` §8), donc l'argument décisif.
 
-**Proposition : sérieusement envisager la variante `level`** — elle divise
-probablement par deux le coût côté bindings, qui est le poste dominant.
-À arbitrer avec les utilisateurs cibles.
+`level` reste un `arma::uvec` (index catégoriel ordonné, pas une valeur de
+coût/fidélité continue) — cf. discussion : un type continu ne ferait que
+déplacer le problème de binning sans bénéfice, chaque niveau ayant de toute
+façon besoin de son propre sous-`Kriging` et de son propre `ρ`. L'hypothèse
+implicite `parent(t) = t-1` (chaîne linéaire, pas de topologie en arbre)
+reste posée pour v1 ; une généralisation (`arma::ivec parent` explicite)
+serait nécessaire pour des topologies non linéaires mais n'a pas d'oracle
+de référence connu (Le Gratiet et MM1/MM2 ne couvrent que la chaîne) —
+hors scope tant qu'aucune demande utilisateur ne le justifie.
+
+**Conséquence sur l'esquisse d'API** (`todo/draft/MarkovCoKriging.hpp`) :
+la variante A (`vector<vec>`/`vector<mat>`) est retirée, seule la
+signature `(y, X, level)` est conservée.
 
 ### D4. Options par niveau
 `kernel`, `regmodel`, `optim`, `objective`, `noise` : scalaire diffusé à

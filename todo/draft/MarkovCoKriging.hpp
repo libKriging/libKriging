@@ -82,32 +82,16 @@ class MarkovCoKriging {
   LIBKRIGING_EXPORT explicit MarkovCoKriging(const std::string& covType);
 
   // ---------------------------------------------------------------------------
-  // D3 (OPEN): two candidate signatures for fit. Pick ONE before writing the
-  // bindings -- this is the single most expensive decision of the project.
-  //
-  //   Variant A: list-of-levels. Natural, but a brand-new marshalling
-  //   convention must be written for all 5 bindings (painful in the Julia flat
-  //   C ABI and the Octave mex layer).
-  //
-  //   Variant B: flat data + level index vector. Reuses the existing (y, X)
-  //   marshalling everywhere, at the cost of a slightly less natural API and an
-  //   internal split. Likely halves the binding cost.
-  //
-  // Both are sketched below; delete the loser.
+  // D3 (TRANCHÉE): flat data + level index vector. Reuses the existing (y, X)
+  // marshalling everywhere -- no new convention needed in any of the 5
+  // bindings, unlike the list-of-levels alternative (discarded: it would have
+  // required inventing a new marshalling convention in all 5 bindings,
+  // painful in particular in the Julia flat C ABI and the Octave mex layer).
   // ---------------------------------------------------------------------------
 
-  /// Variant A -- y[t] is n_t, X[t] is n_t x d ; index 0 == lowest fidelity.
-  LIBKRIGING_EXPORT void fit(const std::vector<arma::vec>& y,
-                             const std::vector<arma::mat>& X,
-                             RhoModel rho_model = RhoModel::Constant,
-                             const Trend::RegressionModel& regmodel = Trend::RegressionModel::Constant,
-                             bool normalize = false,
-                             const std::string& optim = "BFGS",
-                             const std::string& objective = "LL",
-                             const std::vector<Kriging::Parameters>& parameters = {});
-
-  /// Variant B -- y is n, X is n x d, level is n with values in [0, s-1];
-  /// level 0 == lowest fidelity.
+  /// y is n, X is n x d, level is n with values in [0, s-1];
+  /// level 0 == parent field (lowest fidelity, or the collocated secondary
+  /// variable). Chain topology assumed: parent(t) = t-1.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              const arma::uvec& level,
