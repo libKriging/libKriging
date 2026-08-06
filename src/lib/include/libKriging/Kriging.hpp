@@ -241,6 +241,28 @@ class Kriging : public KrigingImpl {
                                                                                               bool return_cov,
                                                                                               bool return_deriv);
 
+  /** Predict-only alternative to `predict` for an already-fitted model,
+   * using matrix-free conjugate gradient (LinearAlgebra::conjugateGradient)
+   * instead of the stored O(n^2) Cholesky factor: needs only m_X/m_y/m_F/
+   * m_theta/m_beta/m_sigma2 (O(n) storage), at the cost of O(n^2 * iters)
+   * compute per solve instead of a single O(n^2) triangular solve. Useful
+   * when many predictions are made from a model whose dense factor either
+   * was never computed (e.g. after a light Vecchia/Nystrom fit -- though
+   * predictVecchia/predictNystrom are cheaper still there) or isn't worth
+   * keeping resident just for predict. Mean is universal-kriging-style with
+   * the committed beta; stdev requires one extra CG solve PER prediction
+   * point (O(n^2 * iters * q) total) and is disabled by default for that
+   * reason. Only available for NoiseModel::None.
+   * @param max_iter CG iteration budget per solve (0 = 2n; n is CG's exact-arithmetic
+   *        bound, but round-off on typically ill-conditioned GP covariance matrices
+   *        means more iterations keep helping in practice)
+   * @param tol relative residual tolerance (norm(A*x-b)/norm(b)) for early stopping
+   * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictCG(const arma::mat& X_n,
+                                                               bool return_stdev = false,
+                                                               arma::uword max_iter = 0,
+                                                               double tol = 1e-8) const;
+
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
