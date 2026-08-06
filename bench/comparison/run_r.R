@@ -6,12 +6,14 @@
 # interpolation (no nugget), hyperparameters by MLE (package defaults).
 # Per-fit wall-clock budget via setTimeLimit (default 300 s).
 #
-# Usage: Rscript run_r.R [data_dir] [out_csv] [budget_seconds]
+# Usage: Rscript run_r.R [data_dir] [out_csv] [budget_seconds] [packages]
+#   packages: comma-separated subset of names(fitters), default = all
 
 args <- commandArgs(trailingOnly = TRUE)
 data_dir <- ifelse(length(args) >= 1, args[1], "data")
 out_csv  <- ifelse(length(args) >= 2, args[2], "results/r.csv")
 budget   <- ifelse(length(args) >= 3, as.numeric(args[3]), 300)
+pkg_arg  <- ifelse(length(args) >= 4, args[4], NA)
 
 dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
 
@@ -44,6 +46,8 @@ fitters <- list(
     })
 )
 
+pkgs <- if (is.na(pkg_arg)) names(fitters) else strsplit(pkg_arg, ",")[[1]]
+
 metrics <- function(y, mu, sd) {
   rmse <- sqrt(mean((y - mu)^2))
   q2 <- 1 - sum((y - mu)^2) / sum((y - mean(y))^2)
@@ -66,7 +70,7 @@ for (xtr in sort(Sys.glob(file.path(data_dir, "*", "n*", "rep*", "X_train.csv"))
   d <- ncol(X)
   colnames(X) <- colnames(Xt) <- paste0("x", seq_len(d))
 
-  for (pkg in names(fitters)) {
+  for (pkg in pkgs) {
     fit_time <- pred_time <- rmse <- q2 <- nlpd <- NA
     status <- "ok"
     res <- tryCatch({
