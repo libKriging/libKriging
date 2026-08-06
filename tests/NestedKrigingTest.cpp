@@ -93,7 +93,7 @@ TEST_CASE("NestedKriging shares a common prior across submodels", "[nested][krig
   CHECK(all(all.n_elem - 1) == X.n_rows - 1);
 }
 
-TEST_CASE("NestedKriging fit routes grady per group", "[nested][kriging][grad]") {
+TEST_CASE("NestedKriging fit routes dydX per group", "[nested][kriging][grad]") {
   // f2d's analytical gradient.
   auto df2d = [](double x1, double x2) { return arma::rowvec{3.0 * std::cos(3.0 * x1) + x2, -5.0 * std::sin(5.0 * x2) + x1}; };
 
@@ -104,7 +104,7 @@ TEST_CASE("NestedKriging fit routes grady per group", "[nested][kriging][grad]")
   for (arma::uword i = 0; i < X.n_rows; ++i)
     dy.row(i) = df2d(X(i, 0), X(i, 1));
 
-  // grady only affects predictions through submodel->predict(), which the NK
+  // dydX only affects predictions through submodel->predict(), which the NK
   // aggregation path bypasses (precompute_nk/predict_nk rebuild directly from
   // values) -- so exercise a PoE-family aggregation here.
   const arma::uword nb_groups = 3;
@@ -143,7 +143,7 @@ TEST_CASE("NestedKriging fit routes grady per group", "[nested][kriging][grad]")
   double rmse_grad = std::sqrt(arma::mean(arma::square(mean_grad - y_test)));
   CHECK(rmse_grad < rmse_plain);
 
-  // Rejects VLL objective, warping, and NK aggregation combined with grady.
+  // Rejects VLL objective, warping, and NK aggregation combined with dydX.
   NestedKriging nk_bad1("gauss");
   CHECK_THROWS_AS(nk_bad1.fit(y, X, nb_groups, Trend::RegressionModel::Constant, "BFGS", "VLL", {}, {}, dy),
                   std::invalid_argument);

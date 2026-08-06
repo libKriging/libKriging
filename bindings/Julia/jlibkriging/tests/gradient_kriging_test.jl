@@ -13,10 +13,10 @@ function make_design(n::Int, seed::Int)
     return X, y, dY
 end
 
-@testset "Gradient-enhanced kriging (grady)" begin
-    @testset "grady interpolates values and gradients" begin
+@testset "Gradient-enhanced kriging (dydX)" begin
+    @testset "dydX interpolates values and gradients" begin
         X, y, dY = make_design(20, 1)
-        k = Kriging(y, X, "gauss"; grady=dY)
+        k = Kriging(y, X, "gauss"; dydX=dY)
 
         @test size(dy(k)) == (20, 2)
 
@@ -25,18 +25,18 @@ end
         @test maximum(abs.(p.mean_deriv .- dY)) < 1e-3
     end
 
-    @testset "grady=nothing is a value-only fit" begin
+    @testset "dydX=nothing is a value-only fit" begin
         X, y, _dY = make_design(20, 1)
         k = Kriging(y, X, "gauss")
         @test isempty(dy(k))
     end
 
-    @testset "grady beats a value-only fit out of sample" begin
+    @testset "dydX beats a value-only fit out of sample" begin
         X, y, dY = make_design(15, 72)
         Xt, yt, _ = make_design(200, 720)
 
         k_plain = Kriging(y, X, "gauss")
-        k_grad = Kriging(y, X, "gauss"; grady=dY)
+        k_grad = Kriging(y, X, "gauss"; dydX=dY)
 
         mean_plain = predict(k_plain, Xt; return_stdev=false).mean
         mean_grad = predict(k_grad, Xt; return_stdev=false).mean
@@ -46,22 +46,22 @@ end
         @test rmse_grad < rmse_plain
     end
 
-    @testset "fit! without grady clears previous gradient observations" begin
+    @testset "fit! without dydX clears previous gradient observations" begin
         X, y, dY = make_design(20, 1)
-        k = Kriging(y, X, "gauss"; grady=dY)
+        k = Kriging(y, X, "gauss"; dydX=dY)
         @test !isempty(dy(k))
 
         fit!(k, y, X)
         @test isempty(dy(k))
     end
 
-    @testset "grady rejects a non-differentiable kernel" begin
+    @testset "dydX rejects a non-differentiable kernel" begin
         X, y, dY = make_design(10, 1)
-        @test_throws ErrorException Kriging(y, X, "exp"; grady=dY)
+        @test_throws ErrorException Kriging(y, X, "exp"; dydX=dY)
     end
 
-    @testset "grady rejects a wrongly shaped matrix" begin
+    @testset "dydX rejects a wrongly shaped matrix" begin
         X, y, dY = make_design(10, 1)
-        @test_throws AssertionError Kriging(y, X, "gauss"; grady=dY[:, 1:1])
+        @test_throws AssertionError Kriging(y, X, "gauss"; dydX=dY[:, 1:1])
     end
 end

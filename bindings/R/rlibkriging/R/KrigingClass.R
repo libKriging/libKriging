@@ -79,8 +79,8 @@ classKriging <- function(nk) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
-#' @param grady Optional numeric matrix (n x d) of observed gradients:
-#'     \code{grady[a, j]} is \eqn{\partial y/\partial x_j} at \code{X[a, ]}.
+#' @param dydX Optional numeric matrix (n x d) of observed gradients:
+#'     \code{dydX[a, j]} is \eqn{\partial y/\partial x_j} at \code{X[a, ]}.
 #'     When given, the model is fit on both values and gradients
 #'     (gradient-enhanced kriging); \code{NULL} (default) fits on values
 #'     only. Requires a mean-square differentiable kernel (\code{"gauss"},
@@ -123,7 +123,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
                     noise = NULL,
-                    grady = NULL) {
+                    dydX = NULL) {
 
     regmodel <- match.arg(regmodel)
     objective <- .match_kriging_objective(objective)
@@ -161,7 +161,7 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       optim = optim,
                       objective = objective,
                       parameters = parameters,
-                      grady = grady)
+                      dydX = dydX)
     return(classKriging(nk))
 }
 
@@ -265,7 +265,7 @@ print.Kriging <- function(x, ...) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
-#' @param grady Optional numeric matrix (n x d) of observed gradients; see
+#' @param dydX Optional numeric matrix (n x d) of observed gradients; see
 #'     \code{\link{Kriging}}. \code{NULL} (default) fits on values only.
 #' @param ... Ignored.
 #'
@@ -294,7 +294,7 @@ fit.Kriging <- function(object, y, X,
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
                     noise = NULL,
-                    grady = NULL, ...) {
+                    dydX = NULL, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
 
     regmodel <- match.arg(regmodel)
@@ -308,7 +308,7 @@ fit.Kriging <- function(object, y, X,
                     optim ,
                     objective,
                     parameters,
-                    grady)
+                    dydX)
 
     invisible(NULL)
 }

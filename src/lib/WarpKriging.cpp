@@ -2510,7 +2510,7 @@ void WarpKriging::fit(const arma::vec& y,
                       const std::string& optim,
                       const std::string& /*objective*/,
                       const Parameters& parameters,
-                      const std::optional<arma::mat>& grady) {
+                      const std::optional<arma::mat>& dydX) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
@@ -2521,7 +2521,7 @@ void WarpKriging::fit(const arma::vec& y,
   if (!m_is_joint)
     validate_discrete_columns(X, "fit");
 
-  if (grady.has_value()) {
+  if (dydX.has_value()) {
     if (!Covariance::supportsDerivativeObservations(m_covType))
       throw std::runtime_error(
           "fit: gradient observations require a mean-square differentiable kernel (gauss, matern3_2 or matern5_2), "
@@ -2535,10 +2535,10 @@ void WarpKriging::fit(const arma::vec& y,
           "re-optimized: the warp's analytical parameter gradient does not account for gradient observations yet)");
     if (parameters.noise.has_value())
       throw std::runtime_error("fit: gradient observations are not supported yet together with per-observation noise");
-    if (grady->n_rows != X.n_rows || grady->n_cols != X.n_cols)
-      throw std::runtime_error("fit: grady must be a " + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)
-                               + " matrix, got " + std::to_string(grady->n_rows) + "x"
-                               + std::to_string(grady->n_cols));
+    if (dydX->n_rows != X.n_rows || dydX->n_cols != X.n_cols)
+      throw std::runtime_error("fit: dydX must be a " + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)
+                               + " matrix, got " + std::to_string(dydX->n_rows) + "x"
+                               + std::to_string(dydX->n_cols));
   }
 
   m_y = y;
@@ -2606,13 +2606,13 @@ void WarpKriging::fit(const arma::vec& y,
   // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
 
-  if (grady.has_value()) {
+  if (dydX.has_value()) {
     // Per-training-point Jacobian of the (frozen, per-dimension) warp,
     // evaluated at each normalized input row — see per_dim_warp_jacobian.
     std::vector<arma::mat> J(m_X_raw.n_rows);
     for (arma::uword a = 0; a < m_X_raw.n_rows; a++)
       J[a] = per_dim_warp_jacobian(m_X_raw.row(a).t());
-    set_grad_obs(*grady, J);
+    set_grad_obs(*dydX, J);
     // set_grad_obs only rebuilds m_y_aug/m_F_aug; re-run the σ̂²/Cholesky
     // refresh now that the augmented system (n_aug() rows) is in effect.
     refresh_cache_theta_only();

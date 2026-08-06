@@ -73,12 +73,12 @@ NestedKriging::NestedKriging(const arma::vec& y,
                              const std::string& objective,
                              const Kriging::Parameters& parameters,
                              const std::vector<std::string>& warping,
-                             const std::optional<arma::mat>& grady)
+                             const std::optional<arma::mat>& dydX)
     : NestedKriging(covType) {
   m_aggregation = aggregation;
   m_partition_method = partition;
   m_seed = seed;
-  fit(y, X, nb_groups, regmodel, optim, objective, parameters, warping, grady);
+  fit(y, X, nb_groups, regmodel, optim, objective, parameters, warping, dydX);
 }
 
 // =============================================================================
@@ -177,7 +177,7 @@ void NestedKriging::fit(const arma::vec& y,
                         const std::string& objective,
                         const Kriging::Parameters& parameters,
                         const std::vector<std::string>& warping,
-                        const std::optional<arma::mat>& grady) {
+                        const std::optional<arma::mat>& dydX) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("y and X should have the same number of rows");
   if (nb_groups < 1 || nb_groups > X.n_rows / (X.n_cols + 2))
@@ -187,7 +187,7 @@ void NestedKriging::fit(const arma::vec& y,
   const bool vll_unified = objective.rfind("VLL", 0) == 0;
   if (vll_unified && !warping.empty())
     throw std::invalid_argument("VLL objective is not supported with warping in NestedKriging");
-  if (grady.has_value()) {
+  if (dydX.has_value()) {
     if (!warping.empty())
       throw std::invalid_argument("fit: gradient observations are not supported yet with warping in NestedKriging");
     if (vll_unified)
@@ -196,10 +196,10 @@ void NestedKriging::fit(const arma::vec& y,
       throw std::invalid_argument(
           "fit: gradient observations are not supported yet with NK aggregation (precompute_nk/predict_nk bypass "
           "the submodels and rebuild directly from values); use PoE/gPoE/BCM/rBCM instead");
-    if (grady->n_rows != X.n_rows || grady->n_cols != X.n_cols)
-      throw std::invalid_argument("fit: grady must be a " + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)
-                                  + " matrix, got " + std::to_string(grady->n_rows) + "x"
-                                  + std::to_string(grady->n_cols));
+    if (dydX->n_rows != X.n_rows || dydX->n_cols != X.n_cols)
+      throw std::invalid_argument("fit: dydX must be a " + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)
+                                  + " matrix, got " + std::to_string(dydX->n_rows) + "x"
+                                  + std::to_string(dydX->n_cols));
   }
 
   m_X = X;
@@ -288,7 +288,7 @@ void NestedKriging::fit(const arma::vec& y,
   // --- 2. unify hyperparameters (common prior) ------------------------------
   // (already done by the global reference fit on the VLL-unified path)
   if (!vll_unified || warped())
-    unify_hyperparameters(objective, grady);
+    unify_hyperparameters(objective, dydX);
 
   // --- 3. NK precomputations -------------------------------------------------
   if (m_aggregation == Aggregation::NK)
@@ -297,7 +297,7 @@ void NestedKriging::fit(const arma::vec& y,
   m_is_fitted = true;
 }
 
-void NestedKriging::unify_hyperparameters(const std::string& objective, const std::optional<arma::mat>& grady) {
+void NestedKriging::unify_hyperparameters(const std::string& objective, const std::optional<arma::mat>& dydX) {
   const arma::uword p = m_groups.size();
   const arma::uword d = m_X.n_cols;
   const double n = static_cast<double>(m_X.n_rows);
@@ -344,10 +344,10 @@ void NestedKriging::unify_hyperparameters(const std::string& objective, const st
   }
   for (arma::uword g = 0; g < p; ++g) {
     const arma::uvec& idx = m_groups[g];
-    std::optional<arma::mat> grady_g;
-    if (grady.has_value())
-      grady_g = grady->rows(idx);
-    m_submodels[g]->fit(m_y(idx), m_X.rows(idx), m_regmodel, false, "none", objective, fixed, grady_g);
+    std::optional<arma::mat> dydX_g;
+    if (dydX.has_value())
+      dydX_g = dydX->rows(idx);
+    m_submodels[g]->fit(m_y(idx), m_X.rows(idx), m_regmodel, false, "none", objective, fixed, dydX_g);
   }
 }
 

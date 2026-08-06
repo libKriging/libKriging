@@ -88,7 +88,7 @@ class Kriging : public KrigingImpl {
                             const std::string& optim = "BFGS",
                             const std::string& objective = "LL",
                             const Parameters& parameters = {},
-                            const std::optional<arma::mat>& grady = std::nullopt);
+                            const std::optional<arma::mat>& dydX = std::nullopt);
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
@@ -110,7 +110,7 @@ class Kriging : public KrigingImpl {
    *        large n in low dimension (see docs/math/Vecchia.md). Ignored if
    *        optim=='none'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
-   * @param grady optional n*d matrix of observed gradients: grady(a,j) = ∂y/∂x_j
+   * @param dydX optional n*d matrix of observed gradients: dydX(a,j) = ∂y/∂x_j
    *        at X.row(a). When given, the GP is fit on the augmented observation
    *        vector [y ; vec(dy/dx)], of length n(1+d), which makes every
    *        linear-algebra step O(n³d³) instead of O(n³) — keep n·d moderate.
@@ -127,7 +127,7 @@ class Kriging : public KrigingImpl {
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const Parameters& parameters = {},
-                             const std::optional<arma::mat>& grady = std::nullopt);
+                             const std::optional<arma::mat>& dydX = std::nullopt);
 
   // Heterogeneous-noise variant: noise is known per-observation
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
@@ -138,7 +138,7 @@ class Kriging : public KrigingImpl {
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const Parameters& parameters = {},
-                             const std::optional<arma::mat>& grady = std::nullopt);
+                             const std::optional<arma::mat>& dydX = std::nullopt);
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
                                                                    bool return_grad,

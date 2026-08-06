@@ -23,7 +23,7 @@ class PyKriging {
   PyKriging(const std::string& kernel, const std::string& noise_model);
 
   // Full constructors with data (noise=py::none() for None/Nugget modes;
-  // grady=py::none() for a value-only fit, or an n*d array of observed
+  // dydX=py::none() for a value-only fit, or an n*d array of observed
   // gradients for gradient-enhanced kriging — see Kriging::fit)
   PyKriging(const py::array_t<double>& y,
             const py::array_t<double>& X,
@@ -34,7 +34,7 @@ class PyKriging {
             const std::string& objective,
             const py::dict& dict,
             const py::object& noise,
-            const py::object& grady);
+            const py::object& dydX);
   ~PyKriging();
 
   PyKriging(const PyKriging& other);
@@ -49,7 +49,7 @@ class PyKriging {
            const std::string& objective,
            const py::dict& dict,
            const py::object& noise,
-           const py::object& grady);
+           const py::object& dydX);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);

@@ -1,4 +1,4 @@
-"""Tests for gradient-enhanced kriging (fit(..., grady=...))."""
+"""Tests for gradient-enhanced kriging (fit(..., dydX=...))."""
 
 import numpy as np
 import pytest
@@ -22,9 +22,9 @@ def make_design(n, seed=123):
     return X, y, dy
 
 
-def test_grady_interpolates_values_and_gradients():
+def test_dydX_interpolates_values_and_gradients():
     X, y, dy = make_design(20)
-    k = lk.Kriging(y, X, "gauss", grady=dy)
+    k = lk.Kriging(y, X, "gauss", dydX=dy)
 
     assert k.dy().shape == (20, 2)
 
@@ -33,18 +33,18 @@ def test_grady_interpolates_values_and_gradients():
     assert np.abs(mean_deriv - dy).max() < 1e-3
 
 
-def test_grady_none_is_a_value_only_fit():
+def test_dydX_none_is_a_value_only_fit():
     X, y, _dy = make_design(20)
     k = lk.Kriging(y, X, "gauss")
     assert k.dy().size == 0
 
 
-def test_grady_beats_value_only_out_of_sample():
+def test_dydX_beats_value_only_out_of_sample():
     X, y, dy = make_design(15, seed=72)
     X_test, y_test, _ = make_design(200, seed=720)
 
     k_plain = lk.Kriging(y, X, "gauss")
-    k_grad = lk.Kriging(y, X, "gauss", grady=dy)
+    k_grad = lk.Kriging(y, X, "gauss", dydX=dy)
 
     mean_plain, *_ = k_plain.predict(X_test)
     mean_grad, *_ = k_grad.predict(X_test)
@@ -54,24 +54,24 @@ def test_grady_beats_value_only_out_of_sample():
     assert rmse_grad < rmse_plain
 
 
-def test_grady_via_fit_method():
+def test_dydX_via_fit_method():
     X, y, dy = make_design(20)
     k = lk.Kriging("gauss")
-    k.fit(y, X, grady=dy)
+    k.fit(y, X, dydX=dy)
     assert not k.dy().size == 0
 
-    # A later fit() without grady clears the gradient observations.
+    # A later fit() without dydX clears the gradient observations.
     k.fit(y, X)
     assert k.dy().size == 0
 
 
-def test_grady_rejects_non_differentiable_kernel():
+def test_dydX_rejects_non_differentiable_kernel():
     X, y, dy = make_design(10)
     with pytest.raises(RuntimeError):
-        lk.Kriging(y, X, "exp", grady=dy)
+        lk.Kriging(y, X, "exp", dydX=dy)
 
 
-def test_grady_rejects_wrong_shape():
+def test_dydX_rejects_wrong_shape():
     X, y, dy = make_design(10)
     with pytest.raises(RuntimeError):
-        lk.Kriging(y, X, "gauss", grady=dy[:, :1])
+        lk.Kriging(y, X, "gauss", dydX=dy[:, :1])

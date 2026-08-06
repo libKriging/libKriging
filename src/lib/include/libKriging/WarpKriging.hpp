@@ -611,7 +611,7 @@ class WarpKriging : protected KrigingImpl {
 
   /// Typed-parameters overload: lets callers seed θ / warp params.
   ///
-  /// @param grady optional n*d_input matrix of observed gradients (see
+  /// @param dydX optional n*d_input matrix of observed gradients (see
   ///        Kriging::fit); requires `optim == "none"` (both θ and the warp
   ///        parameters must be given, not jointly re-optimized — the warp's
   ///        analytical parameter gradient does not account for gradient
@@ -624,7 +624,7 @@ class WarpKriging : protected KrigingImpl {
                              const std::string& optim,
                              const std::string& objective,
                              const Parameters& parameters,
-                             const std::optional<arma::mat>& grady = std::nullopt);
+                             const std::optional<arma::mat>& dydX = std::nullopt);
 
   // -----------------------------------------------------------------------
   //  Prediction

@@ -153,13 +153,13 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::vec& y,
                                    const std::string& optim,
                                    const std::string& objective,
                                    const Parameters& parameters,
-                                   const std::optional<arma::mat>& grady) {
+                                   const std::optional<arma::mat>& dydX) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
 
   make_Cov(covType);
-  fit(y, X, regmodel, normalize, optim, objective, parameters, grady);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, dydX);
 }
 
 LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
@@ -1197,7 +1197,7 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
  *        Vecchia approximated log-likelihood with m conditioning neighbors
  *        (default m=30). Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
- * @param grady optional n*d matrix of observed gradients (gradient-enhanced kriging); see header for details.
+ * @param dydX optional n*d matrix of observed gradients (gradient-enhanced kriging); see header for details.
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const arma::mat& X,
@@ -1206,14 +1206,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const std::string& optim,
                                     const std::string& objective,
                                     const Parameters& parameters,
-                                    const std::optional<arma::mat>& grady) {
+                                    const std::optional<arma::mat>& dydX) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
-  if (grady.has_value()) {
-    const arma::mat& dy = grady.value();
+  if (dydX.has_value()) {
+    const arma::mat& dy = dydX.value();
     if (dy.n_rows != n || dy.n_cols != d)
-      throw std::runtime_error("fit: grady must be a " + std::to_string(n) + "x" + std::to_string(d)
+      throw std::runtime_error("fit: dydX must be a " + std::to_string(n) + "x" + std::to_string(d)
                                + " matrix, got " + std::to_string(dy.n_rows) + "x" + std::to_string(dy.n_cols));
     if (!Covariance::supportsDerivativeObservations(m_covType))
       throw std::runtime_error(
@@ -1232,9 +1232,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   arma::mat theta0
       = fit_setup_impl(y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta);
 
-  // set_grad_obs with an empty matrix (grady not given) also clears any
+  // set_grad_obs with an empty matrix (dydX not given) also clears any
   // gradients left over from a previous fit() on this object.
-  set_grad_obs(grady.has_value() ? grady.value() : arma::mat());
+  set_grad_obs(dydX.has_value() ? dydX.value() : arma::mat());
   // Dimension of the vector actually conditioned on: n, or n(1+d) with gradients.
   const arma::uword n_lik = n_aug();
 
@@ -1810,13 +1810,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const std::string& optim,
                                     const std::string& objective,
                                     const Parameters& parameters,
-                                    const std::optional<arma::mat>& grady) {
+                                    const std::optional<arma::mat>& dydX) {
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("fit(y, noise, X, ...) requires NoiseModel::Heterogeneous");
   if (noise.n_elem != y.n_elem)
     throw std::runtime_error("noise vector must have the same length as y");
   m_noise = noise;
-  fit(y, X, regmodel, normalize, optim, objective, parameters, grady);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, dydX);
 }
 
 /** Compute the prediction for given points X'

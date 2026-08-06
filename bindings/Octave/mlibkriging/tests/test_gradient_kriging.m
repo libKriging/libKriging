@@ -1,15 +1,15 @@
-% Test suite for gradient-enhanced kriging: Kriging(..., grady) / fit(..., grady)
+% Test suite for gradient-enhanced kriging: Kriging(..., dydX) / fit(..., dydX)
 % Run this test with: octave test_gradient_kriging.m
 
 function test_gradient_kriging()
-    fprintf('=== Testing gradient-enhanced kriging (grady) ===\n\n');
+    fprintf('=== Testing gradient-enhanced kriging (dydX) ===\n\n');
 
-    test_grady_interpolates_values_and_gradients();
-    test_grady_empty_is_value_only_fit();
-    test_grady_beats_value_only_out_of_sample();
-    test_fit_grady_clears_on_later_fit_without_grady();
-    test_grady_rejects_non_differentiable_kernel();
-    test_grady_rejects_wrong_shape();
+    test_dydX_interpolates_values_and_gradients();
+    test_dydX_empty_is_value_only_fit();
+    test_dydX_beats_value_only_out_of_sample();
+    test_fit_dydX_clears_on_later_fit_without_dydX();
+    test_dydX_rejects_non_differentiable_kernel();
+    test_dydX_rejects_wrong_shape();
 
     fprintf('\n=== All Tests Passed! ===\n');
 end
@@ -23,8 +23,8 @@ function [X, y, dy] = make_design(n, seed)
 end
 
 
-function test_grady_interpolates_values_and_gradients()
-    fprintf('Test: grady interpolates values and gradients...');
+function test_dydX_interpolates_values_and_gradients()
+    fprintf('Test: dydX interpolates values and gradients...');
 
     [X, y, dy] = make_design(20, 1);
     k = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'none', [], dy);
@@ -40,19 +40,19 @@ function test_grady_interpolates_values_and_gradients()
 end
 
 
-function test_grady_empty_is_value_only_fit()
-    fprintf('Test: grady=[] is a value-only fit...');
+function test_dydX_empty_is_value_only_fit()
+    fprintf('Test: dydX=[] is a value-only fit...');
 
     [X, y, dy] = make_design(20, 1);
     k = Kriging(y, X, 'gauss');
-    assert(isempty(k.dy()), 'dy() should be empty without grady');
+    assert(isempty(k.dy()), 'dy() should be empty without dydX');
 
     fprintf(' PASSED\n');
 end
 
 
-function test_grady_beats_value_only_out_of_sample()
-    fprintf('Test: grady beats a value-only fit out of sample...');
+function test_dydX_beats_value_only_out_of_sample()
+    fprintf('Test: dydX beats a value-only fit out of sample...');
 
     [X, y, dy] = make_design(15, 72);
     [Xt, yt, ~] = make_design(200, 720);
@@ -71,22 +71,22 @@ function test_grady_beats_value_only_out_of_sample()
 end
 
 
-function test_fit_grady_clears_on_later_fit_without_grady()
-    fprintf('Test: fit(...) without grady clears previous gradient observations...');
+function test_fit_dydX_clears_on_later_fit_without_dydX()
+    fprintf('Test: fit(...) without dydX clears previous gradient observations...');
 
     [X, y, dy] = make_design(20, 1);
     k = Kriging(y, X, 'gauss', 'constant', false, 'BFGS', 'LL', [], 'none', [], dy);
-    assert(~isempty(k.dy()), 'dy() should be non-empty after fit with grady');
+    assert(~isempty(k.dy()), 'dy() should be non-empty after fit with dydX');
 
     k.fit(y, X);
-    assert(isempty(k.dy()), 'dy() should be cleared after fit without grady');
+    assert(isempty(k.dy()), 'dy() should be cleared after fit without dydX');
 
     fprintf(' PASSED\n');
 end
 
 
-function test_grady_rejects_non_differentiable_kernel()
-    fprintf('Test: grady rejects a non-differentiable kernel...');
+function test_dydX_rejects_non_differentiable_kernel()
+    fprintf('Test: dydX rejects a non-differentiable kernel...');
 
     [X, y, dy] = make_design(10, 1);
     threw = false;
@@ -95,14 +95,14 @@ function test_grady_rejects_non_differentiable_kernel()
     catch
         threw = true;
     end
-    assert(threw, 'expected an error for grady with kernel=exp');
+    assert(threw, 'expected an error for dydX with kernel=exp');
 
     fprintf(' PASSED\n');
 end
 
 
-function test_grady_rejects_wrong_shape()
-    fprintf('Test: grady rejects a wrongly shaped matrix...');
+function test_dydX_rejects_wrong_shape()
+    fprintf('Test: dydX rejects a wrongly shaped matrix...');
 
     [X, y, dy] = make_design(10, 1);
     threw = false;
@@ -111,7 +111,7 @@ function test_grady_rejects_wrong_shape()
     catch
         threw = true;
     end
-    assert(threw, 'expected an error for a wrongly shaped grady');
+    assert(threw, 'expected an error for a wrongly shaped dydX');
 
     fprintf(' PASSED\n');
 end

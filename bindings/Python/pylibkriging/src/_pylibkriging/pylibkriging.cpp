@@ -141,7 +141,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("noise") = py::none(),
-           py::arg("grady") = py::none())
+           py::arg("dydX") = py::none())
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -154,7 +154,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
            py::arg("noise") = py::none(),
-           py::arg("grady") = py::none())
+           py::arg("dydX") = py::none())
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),

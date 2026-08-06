@@ -62,7 +62,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto noise_model_str = input.getOptional<std::string>(8, "noise_model").value_or("none");
   const auto noise_model = parseNoiseModel(noise_model_str);
   const auto noise = input.getOptional<arma::vec>(9, "noise");
-  const auto grady = input.getOptional<arma::mat>(10, "grady");
+  const auto dydX = input.getOptional<arma::mat>(10, "dydX");
 
   auto y = input.get<arma::vec>(0, "vector");
   auto X = input.get<arma::mat>(1, "matrix");
@@ -70,9 +70,9 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
 
   Kriging km_obj(kernel, noise_model);
   if (noise_model == Kriging::NoiseModel::Heterogeneous && noise) {
-    km_obj.fit(y, noise.value(), X, regmodel, normalize, optim, objective, parameters, grady);
+    km_obj.fit(y, noise.value(), X, regmodel, normalize, optim, objective, parameters, dydX);
   } else {
-    km_obj.fit(y, X, regmodel, normalize, optim, objective, parameters, grady);
+    km_obj.fit(y, X, regmodel, normalize, optim, objective, parameters, dydX);
   }
   auto km = buildObject<Kriging>(std::move(km_obj));
   output.set(0, km, "new object reference");
@@ -107,13 +107,13 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
-    // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters], [grady])
+    // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters], [dydX])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(8, "parameters"));
-    const auto grady = input.getOptional<arma::mat>(9, "grady");
+    const auto dydX = input.getOptional<arma::mat>(9, "dydX");
     km->fit(input.get<arma::vec>(1, "vector"),
             input.get<arma::vec>(2, "noise"),
             input.get<arma::mat>(3, "matrix"),
@@ -122,15 +122,15 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
             optim,
             objective,
             parameters,
-            grady);
+            dydX);
   } else {
-    // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters], [grady])
+    // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters], [dydX])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
-    const auto grady = input.getOptional<arma::mat>(8, "grady");
+    const auto dydX = input.getOptional<arma::mat>(8, "dydX");
     km->fit(input.get<arma::vec>(1, "vector"),
             input.get<arma::mat>(2, "matrix"),
             regmodel,
@@ -138,7 +138,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
             optim,
             objective,
             parameters,
-            grady);
+            dydX);
   }
 }
 

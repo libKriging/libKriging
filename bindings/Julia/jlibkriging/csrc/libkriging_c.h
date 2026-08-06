@@ -40,7 +40,7 @@ void* lk_kriging_new_fit(const double* y,
                          const double* nugget,
                          int is_nugget_estim,
                          /* observed gradients (n x d, row-major-as-nX-by-d like X; NULL for a value-only fit) */
-                         const double* grady);
+                         const double* dydX);
 void lk_kriging_delete(void* ptr);
 void* lk_kriging_copy(void* ptr);
 
@@ -57,7 +57,7 @@ int lk_kriging_fit(void* ptr,
                    const char* optim,
                    const char* objective,
                    /* observed gradients (n x d, matching X; NULL for a value-only fit) */
-                   const double* grady);
+                   const double* dydX);
 
 int lk_kriging_predict(void* ptr,
                        const double* X_n,

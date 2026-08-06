@@ -1132,7 +1132,7 @@ void test_predict_derivative() {
 
 // --- Test: gradient-enhanced fit with a frozen per-dimension warp -------
 void test_grad_obs() {
-  std::cout << "--- Test: fit accepts grady with a frozen per-dimension warp ---" << std::endl;
+  std::cout << "--- Test: fit accepts dydX with a frozen per-dimension warp ---" << std::endl;
 
   auto f2 = [](double x1, double x2) { return std::sin(3.0 * x1) + std::cos(5.0 * x2); };
   auto df2 = [](double x1, double x2) {
@@ -1150,7 +1150,7 @@ void test_grad_obs() {
   }
 
   // First fit normally (warp + theta optimized) to reach a non-trivial,
-  // non-identity warp shape; then re-fit the SAME object with grady and
+  // non-identity warp shape; then re-fit the SAME object with dydX and
   // optim="none" to keep that warp (and the optimized theta, passed back in
   // explicitly) frozen, per the GEK+Warp v1 scope.
   WarpKriging model({"kumaraswamy", "kumaraswamy"}, "gauss");
@@ -1165,7 +1165,7 @@ void test_grad_obs() {
   // exercises the Jacobian sandwich through both fit (R/F_aug) and predict
   // (R_on/DR_on_i).
   arma::mat X_new = arma::randu<arma::mat>(5, 2);
-  check_deriv_vs_fd(model, X_new, {0, 1}, "kumaraswamy+grady, gauss, 2D");
+  check_deriv_vs_fd(model, X_new, {0, 1}, "kumaraswamy+dydX, gauss, 2D");
 
   // Gradients are (approximately) interpolated at the training points too.
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(X, false, false, true);
