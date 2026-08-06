@@ -386,6 +386,70 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma:
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
 }
 
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                             const arma::mat& B,
+                                                             arma::uword max_iter,
+                                                             double tol) {
+  const arma::uword n = B.n_rows;
+  arma::mat X(n, B.n_cols, arma::fill::zeros);
+  for (arma::uword c = 0; c < B.n_cols; ++c) {
+    const arma::vec b = B.col(c);
+    const double bnorm = arma::norm(b);
+    if (bnorm == 0.0)
+      continue;  // x=0 already solves A*x=0
+
+    arma::vec x(n, arma::fill::zeros);
+    arma::vec r = b;  // b - A*x0, x0 = 0
+    arma::vec p = r;
+    double rs_old = arma::dot(r, r);
+
+    // GP covariance matrices are typically ill-conditioned (smooth kernels,
+    // many points): the recursively-updated residual (r -= alpha*Ap) drifts
+    // from the true residual under round-off well before max_iter is
+    // reached, and pushing past that point can make x measurably WORSE, not
+    // better (observed empirically: unstable growth after ~2n iterations on
+    // a matern5_2 fit). Periodically recompute the exact residual from
+    // scratch (one extra matvec every `restart_every` iterations) -- a
+    // standard CG robustness fix -- to correct that drift.
+    constexpr arma::uword restart_every = 50;
+
+    for (arma::uword it = 0; it < max_iter; ++it) {
+      const arma::vec Ap = Amul(p);
+      const double pAp = arma::dot(p, Ap);
+      if (pAp <= 0.0)
+        break;  // breakdown guard: shouldn't happen for a genuinely SPD A
+      const double alpha = rs_old / pAp;
+      x += alpha * p;
+
+      if ((it + 1) % restart_every == 0) {
+        // Full restart: the just-recomputed residual reflects the TRUE
+        // state at x, so the previous rs_old (from the drifted residual) is
+        // no longer a meaningful reference for the Fletcher-Reeves ratio --
+        // blending it into beta (as the non-restart branch does) sends the
+        // search direction off in a bad direction instead of correcting it.
+        // Reset p = r, i.e. restart CG fresh from the current x.
+        r = b - Amul(x);
+        rs_old = arma::dot(r, r);
+        if (std::sqrt(rs_old) / bnorm < tol)
+          break;
+        p = r;
+        continue;
+      }
+
+      r -= alpha * Ap;
+      const double rs_new = arma::dot(r, r);
+      if (std::sqrt(rs_new) / bnorm < tol) {
+        rs_old = rs_new;
+        break;
+      }
+      p = r + (rs_new / rs_old) * p;
+      rs_old = rs_new;
+    }
+    X.col(c) = x;
+  }
+  return X;
+}
+
 // Solve X*A=B : X = B / A
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
   // Force evaluation of ALL transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
