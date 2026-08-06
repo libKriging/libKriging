@@ -93,6 +93,69 @@ TEST_CASE("NestedKriging shares a common prior across submodels", "[nested][krig
   CHECK(all(all.n_elem - 1) == X.n_rows - 1);
 }
 
+TEST_CASE("NestedKriging fit routes dydX per group", "[nested][kriging][grad]") {
+  // f2d's analytical gradient.
+  auto df2d = [](double x1, double x2) { return arma::rowvec{3.0 * std::cos(3.0 * x1) + x2, -5.0 * std::sin(5.0 * x2) + x1}; };
+
+  arma::mat X;
+  arma::vec y;
+  make_data(60, 2, X, y, 71);
+  arma::mat dy(X.n_rows, 2);
+  for (arma::uword i = 0; i < X.n_rows; ++i)
+    dy.row(i) = df2d(X(i, 0), X(i, 1));
+
+  // dydX only affects predictions through submodel->predict(), which the NK
+  // aggregation path bypasses (precompute_nk/predict_nk rebuild directly from
+  // values) -- so exercise a PoE-family aggregation here.
+  const arma::uword nb_groups = 3;
+  NestedKriging nk_plain(y, X, "gauss", nb_groups, NestedKriging::Aggregation::PoE);
+  NestedKriging nk_grad(y,
+                        X,
+                        "gauss",
+                        nb_groups,
+                        NestedKriging::Aggregation::PoE,
+                        NestedKriging::Partition::KMeans,
+                        /*seed=*/123,
+                        Trend::RegressionModel::Constant,
+                        "BFGS",
+                        "LL",
+                        {},
+                        {},
+                        dy);
+
+  // Every submodel received exactly its group's gradient rows.
+  for (arma::uword g = 0; g < nk_grad.nb_groups(); ++g) {
+    CHECK(!nk_grad.submodel(g).dy().is_empty());
+    CHECK(nk_grad.submodel(g).dy().n_rows == nk_grad.groups()[g].n_elem);
+  }
+  for (arma::uword g = 0; g < nk_plain.nb_groups(); ++g)
+    CHECK(nk_plain.submodel(g).dy().is_empty());
+
+  // Gradient-informed submodels predict at least as well out-of-sample as
+  // value-only ones (same shared prior since it's estimated from values
+  // only either way, so this isolates the effect of the final conditioning).
+  arma::mat X_test;
+  arma::vec y_test;
+  make_data(300, 2, X_test, y_test, 720);
+  auto [mean_plain, sd_plain] = nk_plain.predict(X_test, false);
+  auto [mean_grad, sd_grad] = nk_grad.predict(X_test, false);
+  double rmse_plain = std::sqrt(arma::mean(arma::square(mean_plain - y_test)));
+  double rmse_grad = std::sqrt(arma::mean(arma::square(mean_grad - y_test)));
+  CHECK(rmse_grad < rmse_plain);
+
+  // Rejects VLL objective, warping, and NK aggregation combined with dydX.
+  NestedKriging nk_bad1("gauss");
+  CHECK_THROWS_AS(nk_bad1.fit(y, X, nb_groups, Trend::RegressionModel::Constant, "BFGS", "VLL", {}, {}, dy),
+                  std::invalid_argument);
+  NestedKriging nk_bad2("gauss");
+  CHECK_THROWS_AS(
+      nk_bad2.fit(y, X, nb_groups, Trend::RegressionModel::Constant, "BFGS", "LL", {}, {"affine", "affine"}, dy),
+      std::invalid_argument);
+  NestedKriging nk_bad3("gauss");  // default aggregation is NK
+  CHECK_THROWS_AS(nk_bad3.fit(y, X, nb_groups, Trend::RegressionModel::Constant, "BFGS", "LL", {}, {}, dy),
+                  std::invalid_argument);
+}
+
 TEST_CASE("NestedKriging is close to full Kriging on moderate n", "[nested][kriging]") {
   arma::mat X;
   arma::vec y;

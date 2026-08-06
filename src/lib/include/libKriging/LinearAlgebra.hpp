@@ -1,6 +1,8 @@
 #ifndef LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
 #define LIBKRIGING_SRC_LIB_INCLUDE_LIBKRIGING_LINEARALGEBRA_HPP
 
+#include <vector>
+
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include "libKriging/libKriging_exports.h"
@@ -92,6 +94,55 @@ class LinearAlgebra {
                                              const arma::vec& theta,
                                              std::function<double(const arma::vec&, const arma::vec&)> Cov,
                                              double factor = 1.0);
+
+  // --- Gradient-enhanced (GEK) covariance assembly ---------------------------
+  //
+  // Augmented ordering used by both builders below, for n points in dimension d:
+  //   index a            (a < n)          -> the value    Z(x_a)
+  //   index n + a*d + i  (a < n, i < d)   -> the gradient dZ(x_a)/dx_i
+  // so the augmented dimension is N = n*(1+d), matching the augmented
+  // observation vector [y ; vec(dy/dx)] and Trend::regressionModelDerivativeMatrix.
+
+  // Symmetric augmented covariance R (N x N, N = n*(1+d)) from X (d x n):
+  //   R[a, b]                    = factor * k(x_a - x_b)
+  //   R[n+a*d+i, b]              = factor * dk/dx_i     (x_a - x_b)
+  //   R[a, n+b*d+j]              = -factor * dk/dx_j    (x_a - x_b)
+  //   R[n+a*d+i, n+b*d+j]        = factor * d2k/dx_i dx'_j (x_a - x_b)
+  // `diag` (length N, or empty) overrides the diagonal after the factor is
+  // applied, allowing per-observation nugget/noise on values and gradients.
+  //
+  // `J` (optional, one d_phi x d_grad matrix per point) is the Jacobian of a
+  // feature map Φ at each of the n points, for kernels that operate in a
+  // warped feature space (X is Φ(x), d = d_phi) while gradient observations
+  // are expressed w.r.t. the original input (d_grad, possibly != d_phi).
+  // When given, every gradient block is sandwiched by the relevant point's
+  // Jacobian: g_a = J[a]' * DCovDx(dX), H_ab = J[a]' * D2CovDxDxp(dX) * J[b].
+  // Empty (default) = identity, d_grad = d_phi (no warp).
+  LIBKRIGING_EXPORT static void covMat_sym_X_grad(
+      arma::mat* R,
+      const arma::mat& X,
+      const arma::vec& theta,
+      std::function<double(const arma::vec&, const arma::vec&)> Cov,
+      std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
+      std::function<arma::mat(const arma::vec&, const arma::vec&)> D2CovDxDxp,
+      double factor = 1.0,
+      const arma::vec& diag = arma::vec(),
+      const std::vector<arma::mat>& J = {});
+
+  // Rectangular cross-covariance between augmented observations at X1 (d x n1)
+  // and plain (value-only) locations at X2 (d x n2). Result is (n1*(1+d)) x n2:
+  //   R[a, j]           = factor * k(x_a - x'_j)
+  //   R[n1+a*d+i, j]    = factor * dk/dx_i (x_a - x'_j)
+  // `J` (optional, one Jacobian per X1 point): see covMat_sym_X_grad.
+  LIBKRIGING_EXPORT static void covMat_rect_X_grad(
+      arma::mat* R,
+      const arma::mat& X1,
+      const arma::mat& X2,
+      const arma::vec& theta,
+      std::function<double(const arma::vec&, const arma::vec&)> Cov,
+      std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
+      double factor = 1.0,
+      const std::vector<arma::mat>& J = {});
 
   // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
   // Avoids explicit matrix multiplication

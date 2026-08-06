@@ -1627,6 +1627,19 @@ WarpKriging::WarpKriging(const arma::vec& y,
 // -------------------------------------------------------------------------
 //  Apply warping:  X → Φ  (per-variable concatenation)
 // -------------------------------------------------------------------------
+arma::mat WarpKriging::per_dim_warp_jacobian(const arma::vec& x_norm_col) const {
+  const arma::uword d_in = x_norm_col.n_elem;
+  arma::mat J(m_feature_dim, d_in, arma::fill::zeros);
+  arma::uword row = 0;
+  for (arma::uword k = 0; k < d_in; k++) {
+    arma::vec dw = m_warps[k]->deriv_input(x_norm_col(k));
+    arma::uword d_out_k = m_warps[k]->output_dim();
+    J.submat(row, k, row + d_out_k - 1, k) = dw;
+    row += d_out_k;
+  }
+  return J;
+}
+
 arma::mat WarpKriging::apply_warping(const arma::mat& X) const {
   if (m_is_joint) {
     if (!m_joint_warp)
@@ -1762,9 +1775,10 @@ void WarpKriging::refresh_cache_theta_only() {
   m_F = build_trend_matrix(m_X_raw);
 
   if (m_noise.is_empty()) {
-    // Closed-form concentrated σ² (unchanged no-noise path).
+    // Closed-form concentrated σ² (unchanged no-noise path). n_aug() == n
+    // unless gradient observations are present (GEK).
     WKModel m = make_Model(m_theta, 1.0);
-    m_sigma2 = std::max(m.SSEstar / n, 1e-20);
+    m_sigma2 = std::max(m.SSEstar / static_cast<double>(n_aug()), 1e-20);
     KrigingImpl::commit_model(m);
     m_logdet = 2.0 * arma::sum(arma::log(m_T.diag()));
     return;
@@ -1813,10 +1827,11 @@ void WarpKriging::refresh_cache_theta_only() {
 //      LL(θ, σ²) = -n/2 log(2π σ²) - ½ log|R̃| - ½ SSEstar / σ²
 // -------------------------------------------------------------------------
 double WarpKriging::concentrated_ll() const {
-  const double n = static_cast<double>(m_y.n_elem);
   if (m_noise.is_empty()) {
+    const double n = static_cast<double>(n_aug());
     return -0.5 * n * (1.0 + std::log(2.0 * arma::datum::pi) + std::log(m_sigma2)) - 0.5 * m_logdet;
   }
+  const double n = static_cast<double>(m_y.n_elem);
   const double SSEstar = arma::dot(m_z, m_z);
   return -0.5 * (n * std::log(2.0 * arma::datum::pi * m_sigma2) + m_logdet + SSEstar / m_sigma2);
 }
@@ -2494,7 +2509,8 @@ void WarpKriging::fit(const arma::vec& y,
                       bool normalize,
                       const std::string& optim,
                       const std::string& /*objective*/,
-                      const Parameters& parameters) {
+                      const Parameters& parameters,
+                      const std::optional<arma::mat>& dydX) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 
@@ -2504,6 +2520,26 @@ void WarpKriging::fit(const arma::vec& y,
 
   if (!m_is_joint)
     validate_discrete_columns(X, "fit");
+
+  if (dydX.has_value()) {
+    if (!Covariance::supportsDerivativeObservations(m_covType))
+      throw std::runtime_error(
+          "fit: gradient observations require a mean-square differentiable kernel (gauss, matern3_2 or matern5_2), "
+          "got: "
+          + m_covType);
+    if (m_is_joint)
+      throw std::runtime_error("fit: gradient observations are not supported yet with a joint (MLP) warp");
+    if (optim != "none")
+      throw std::runtime_error(
+          "fit: gradient observations require optim=\"none\" (theta and warp parameters must be given, not jointly "
+          "re-optimized: the warp's analytical parameter gradient does not account for gradient observations yet)");
+    if (parameters.noise.has_value())
+      throw std::runtime_error("fit: gradient observations are not supported yet together with per-observation noise");
+    if (dydX->n_rows != X.n_rows || dydX->n_cols != X.n_cols)
+      throw std::runtime_error("fit: dydX must be a " + std::to_string(X.n_rows) + "x" + std::to_string(X.n_cols)
+                               + " matrix, got " + std::to_string(dydX->n_rows) + "x"
+                               + std::to_string(dydX->n_cols));
+  }
 
   m_y = y;
   m_X_raw = X;
@@ -2569,6 +2605,19 @@ void WarpKriging::fit(const arma::vec& y,
 
   // σ̂² is concentrated — computed in refresh_cache
   refresh_cache();
+
+  if (dydX.has_value()) {
+    // Per-training-point Jacobian of the (frozen, per-dimension) warp,
+    // evaluated at each normalized input row — see per_dim_warp_jacobian.
+    std::vector<arma::mat> J(m_X_raw.n_rows);
+    for (arma::uword a = 0; a < m_X_raw.n_rows; a++)
+      J[a] = per_dim_warp_jacobian(m_X_raw.row(a).t());
+    set_grad_obs(*dydX, J);
+    // set_grad_obs only rebuilds m_y_aug/m_F_aug; re-run the σ̂²/Cholesky
+    // refresh now that the augmented system (n_aug() rows) is in effect.
+    refresh_cache_theta_only();
+  }
+
   optimise_joint(optim);
   m_optim = optim;
   m_objective = "LL";
@@ -2597,17 +2646,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
       // Analytical backpropagation through the joint MLP
       return m_joint_warp->jacobian_input(x_norm_col.t());
     }
-    // Analytical per-dimension warp derivatives (block-diagonal Jacobian)
-    const arma::uword d_in = x_norm_col.n_elem;
-    arma::mat J(m_feature_dim, d_in, arma::fill::zeros);
-    arma::uword row = 0;
-    for (arma::uword k = 0; k < d_in; k++) {
-      arma::vec dw = m_warps[k]->deriv_input(x_norm_col(k));
-      arma::uword d_out_k = m_warps[k]->output_dim();
-      J.submat(row, k, row + d_out_k - 1, k) = dw;
-      row += d_out_k;
-    }
-    return J;
+    return per_dim_warp_jacobian(x_norm_col);
   };
 
   return predict_impl(X_n,

@@ -22,7 +22,9 @@ class PyKriging {
   // Kernel + noise_model constructor (no data)
   PyKriging(const std::string& kernel, const std::string& noise_model);
 
-  // Full constructors with data (noise=py::none() for None/Nugget modes)
+  // Full constructors with data (noise=py::none() for None/Nugget modes;
+  // dydX=py::none() for a value-only fit, or an n*d array of observed
+  // gradients for gradient-enhanced kriging — see Kriging::fit)
   PyKriging(const py::array_t<double>& y,
             const py::array_t<double>& X,
             const std::string& covType,
@@ -31,7 +33,8 @@ class PyKriging {
             const std::string& optim,
             const std::string& objective,
             const py::dict& dict,
-            const py::object& noise);
+            const py::object& noise,
+            const py::object& dydX);
   ~PyKriging();
 
   PyKriging(const PyKriging& other);
@@ -45,7 +48,8 @@ class PyKriging {
            const std::string& optim,
            const std::string& objective,
            const py::dict& dict,
-           const py::object& noise);
+           const py::object& noise,
+           const py::object& dydX);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
@@ -112,6 +116,7 @@ class PyKriging {
   bool is_theta_estim();
   double sigma2();
   bool is_sigma2_estim();
+  py::array_t<double> dy();
 
   // Noise-related accessors
   std::string noise_model();

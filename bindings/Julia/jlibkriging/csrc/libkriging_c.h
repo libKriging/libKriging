@@ -38,7 +38,9 @@ void* lk_kriging_new_fit(const double* y,
                          int beta_n,
                          int is_beta_estim,
                          const double* nugget,
-                         int is_nugget_estim);
+                         int is_nugget_estim,
+                         /* observed gradients (n x d, row-major-as-nX-by-d like X; NULL for a value-only fit) */
+                         const double* dydX);
 void lk_kriging_delete(void* ptr);
 void* lk_kriging_copy(void* ptr);
 
@@ -53,7 +55,9 @@ int lk_kriging_fit(void* ptr,
                    const char* regmodel,
                    int normalize,
                    const char* optim,
-                   const char* objective);
+                   const char* objective,
+                   /* observed gradients (n x d, matching X; NULL for a value-only fit) */
+                   const double* dydX);
 
 int lk_kriging_predict(void* ptr,
                        const double* X_n,
@@ -152,6 +156,7 @@ double lk_kriging_get_scaleY(void* ptr);
 int lk_kriging_get_F(void* ptr, double* out, int* n, int* d);
 int lk_kriging_get_T(void* ptr, double* out, int* n, int* d);
 int lk_kriging_get_M(void* ptr, double* out, int* n, int* d);
+int lk_kriging_get_dy(void* ptr, double* out, int* n, int* d);
 int lk_kriging_get_z(void* ptr, double* out, int* n);
 int lk_kriging_get_beta(void* ptr, double* out, int* n);
 int lk_kriging_is_beta_estim(void* ptr);

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -44,6 +45,9 @@ class KrigingImpl {
   [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
   [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
   [[nodiscard]] const arma::vec& y() const { return m_y; };
+  /// Observed gradients (n × d) in normalized space; empty when the model was
+  /// fit on values only. See `m_dy`.
+  [[nodiscard]] const arma::mat& dy() const { return m_dy; };
   [[nodiscard]] const double& centerY() const { return m_centerY; };
   [[nodiscard]] const double& scaleY() const { return m_scaleY; };
   [[nodiscard]] const bool& normalize() const { return m_normalize; };
@@ -148,7 +152,84 @@ class KrigingImpl {
   std::function<double(const arma::vec&, const arma::vec&)> _Cov;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDtheta;
   std::function<arma::vec(const arma::vec&, const arma::vec&)> _DlnCovDx;
+  /// ∂k/∂x and ∂²k/∂x∂x'. Empty for kernels that are not mean-square
+  /// differentiable ("exp", "whitenoise"), which cannot carry gradient
+  /// observations.
+  std::function<arma::vec(const arma::vec&, const arma::vec&)> _DCovDx;
+  std::function<arma::mat(const arma::vec&, const arma::vec&)> _D2CovDxDxp;
   double _Cov_pow{};
+
+  // --- Gradient-enhanced kriging (GEK) data ----------------------------------
+  //
+  // When gradient observations are supplied, the GP is conditioned on the
+  // augmented vector [y ; vec(dy/dx)] of length N = n(1+d), with the ordering
+  // fixed by LinearAlgebra::covMat_sym_X_grad:
+  //   index a           -> value    y(x_a)
+  //   index n + a*d + i -> gradient dy/dx_i(x_a)
+  // Consequently m_R/m_T/m_Rinv become N×N, m_M is N×p and m_z is N, while
+  // m_X/m_y/m_F keep their value-only shapes.
+  //
+  // `m_dy` empty (the default) means "no gradient observations": every code
+  // path stays bit-identical to the value-only behaviour.
+
+  /// Observed gradients (n × d_grad) in normalized space:
+  /// m_dy(a,j) = (∂y/∂x_j)(x_a) · scaleX_j / scaleY. `d_grad` is the input
+  /// dimension the gradients are expressed in, which equals the kernel/feature
+  /// dimension (m_X.n_cols) unless `m_grad_jac` is set (warped feature space).
+  arma::mat m_dy;
+  /// [m_y ; vec(m_dy)] in augmented order. Empty iff `m_dy` is empty.
+  arma::vec m_y_aug;
+  /// [m_F ; Trend::regressionModelDerivativeMatrix(m_regmodel, m_X)], each
+  /// point's gradient-trend block sandwiched by `m_grad_jac[a]'` when set.
+  /// Empty iff `m_dy` is empty.
+  arma::mat m_F_aug;
+  /// Per-training-point Jacobian of the feature map Φ at that point (d_phi ×
+  /// d_grad), used only when the kernel operates in a warped feature space
+  /// that differs from the space `m_dy` is expressed in (see WarpKriging).
+  /// Empty (default) = identity, i.e. gradients are expressed directly in the
+  /// kernel's own space (Kriging / NuggetKriging / NoiseKriging).
+  std::vector<arma::mat> m_grad_jac;
+
+  [[nodiscard]] bool has_grad_obs() const { return !m_dy.is_empty(); }
+
+  /// Dimension gradient observations are expressed in: `m_dy.n_cols` when
+  /// present (may differ from the kernel/feature dimension under a warp),
+  /// the kernel dimension otherwise.
+  [[nodiscard]] arma::uword d_grad() const { return has_grad_obs() ? m_dy.n_cols : m_X.n_cols; }
+
+  /// Size of the augmented system: n(1+d_grad) with gradient observations, n without.
+  [[nodiscard]] arma::uword n_aug() const { return m_X.n_rows * (has_grad_obs() ? (1 + d_grad()) : 1); }
+
+  /// Trend / observation vector actually conditioned on: the augmented ones
+  /// when gradient observations are present, the plain ones otherwise.
+  [[nodiscard]] const arma::mat& F_used() const { return has_grad_obs() ? m_F_aug : m_F; }
+  [[nodiscard]] const arma::vec& y_used() const { return has_grad_obs() ? m_y_aug : m_y; }
+
+  /// Normalize `dy` (n × d_grad, in original units) with the current
+  /// `m_scaleX`/`m_scaleY` and store it as `m_dy`, then rebuild the augmented
+  /// data. Must be called *after* `fit_setup_impl`, which sets the scales,
+  /// `m_X` and `m_F`. An empty `dy` clears the gradient observations (and
+  /// `jac`).
+  ///
+  /// `jac` (optional, one d_phi × d_grad Jacobian per training point, in the
+  /// same order as `m_X`'s rows) declares that the kernel operates in a
+  /// warped feature space distinct from the space `dy` is expressed in; see
+  /// `m_grad_jac`. When given, `dy`'s column count is checked against
+  /// `jac[0].n_cols` (d_grad) instead of `m_X.n_cols` (d_phi).
+  ///
+  /// Throws when the kernel is not mean-square differentiable, when the
+  /// shape of `dy` doesn't match, or when `jac`'s size doesn't match `m_X`'s
+  /// row count.
+  void set_grad_obs(const arma::mat& dy, const std::vector<arma::mat>& jac = {});
+
+  /// Recompute `m_y_aug`/`m_F_aug` from `m_y`/`m_F`/`m_dy`/`m_X`. Cheap no-op
+  /// when there are no gradient observations.
+  void rebuild_aug_data();
+
+  /// Throw a uniform "not supported with gradient observations" error. Used by
+  /// the code paths that have not been generalized to the augmented system yet.
+  void check_no_grad_obs(const char* method) const;
+
 
   // Parse `covType` and populate the _Cov / _DlnCov* functors + _Cov_pow.
   void make_Cov(const std::string& covType);

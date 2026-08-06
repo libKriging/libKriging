@@ -582,6 +582,111 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   #endif
 }
 
+LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X_grad(
+    arma::mat* R,
+    const arma::mat& X,
+    const arma::vec& theta,
+    std::function<double(const arma::vec&, const arma::vec&)> Cov,
+    std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
+    std::function<arma::mat(const arma::vec&, const arma::vec&)> D2CovDxDxp,
+    double factor,
+    const arma::vec& diag,
+    const std::vector<arma::mat>& J) {
+  if (!DCovDx || !D2CovDxDxp)
+    throw std::invalid_argument(
+        "covMat_sym_X_grad: kernel is not mean-square differentiable, gradient observations are not supported");
+
+  const arma::uword n = X.n_cols;
+  const bool warped = !J.empty();
+  const arma::uword d = warped ? J[0].n_cols : X.n_rows;
+  const arma::uword N = n * (1 + d);
+
+  if (warped && J.size() != n)
+    throw std::invalid_argument("covMat_sym_X_grad: J must have one Jacobian per point");
+  if ((*R).n_rows != N || (*R).n_cols != N)
+    throw std::invalid_argument("covMat_sym_X_grad: R must be n*(1+d) square");
+  if (!diag.is_empty() && diag.n_elem != N)
+    throw std::invalid_argument("covMat_sym_X_grad: diag must have n*(1+d) entries");
+
+  // Only the lower triangle of the (a,b) point pairs is visited; the (b,a)
+  // blocks follow from Cov(-dX) = Cov(dX), DCovDx(-dX) = -DCovDx(dX) and
+  // D2CovDxDxp(-dX) = D2CovDxDxp(dX)', i.e. from the symmetry of R itself.
+  for (arma::uword a = 0; a < n; a++) {
+    for (arma::uword b = 0; b <= a; b++) {
+      const arma::vec dX = X.col(a) - X.col(b);
+
+      const double k = Cov(dX, theta) * factor;
+      (*R).at(a, b) = k;
+      (*R).at(b, a) = k;
+
+      // Cov(dZ(x_a)/dx_i, Z(x_b)) = dk/dx_i, and by symmetry
+      // Cov(Z(x_b), dZ(x_a)/dx_i) is the same entry mirrored. When warped,
+      // the feature-space gradient is sandwiched by the relevant point's
+      // Jacobian: Cov(dZ/dx_a_i, ·) uses J[a], Cov(·, dZ/dx_b_j) uses J[b].
+      const arma::vec g_phi = DCovDx(dX, theta) * factor;
+      const arma::vec g_a = warped ? arma::vec(J[a].t() * g_phi) : g_phi;
+      for (arma::uword i = 0; i < d; i++) {
+        (*R).at(n + a * d + i, b) = g_a[i];
+        (*R).at(b, n + a * d + i) = g_a[i];
+      }
+
+      if (a != b) {
+        // Cov(Z(x_a), dZ(x_b)/dx_j) = d/dx_b_j k(x_a - x_b) = -dk/dx_j.
+        const arma::vec g_b = warped ? arma::vec(J[b].t() * g_phi) : g_phi;
+        for (arma::uword j = 0; j < d; j++) {
+          (*R).at(a, n + b * d + j) = -g_b[j];
+          (*R).at(n + b * d + j, a) = -g_b[j];
+        }
+      }
+
+      const arma::mat H_phi = D2CovDxDxp(dX, theta) * factor;
+      const arma::mat H = warped ? arma::mat(J[a].t() * H_phi * J[b]) : H_phi;
+      for (arma::uword i = 0; i < d; i++)
+        for (arma::uword j = 0; j < d; j++) {
+          (*R).at(n + a * d + i, n + b * d + j) = H(i, j);
+          (*R).at(n + b * d + j, n + a * d + i) = H(i, j);
+        }
+    }
+  }
+
+  if (!diag.is_empty())
+    (*R).diag() = diag;
+}
+
+LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect_X_grad(
+    arma::mat* R,
+    const arma::mat& X1,
+    const arma::mat& X2,
+    const arma::vec& theta,
+    std::function<double(const arma::vec&, const arma::vec&)> Cov,
+    std::function<arma::vec(const arma::vec&, const arma::vec&)> DCovDx,
+    double factor,
+    const std::vector<arma::mat>& J) {
+  if (!DCovDx)
+    throw std::invalid_argument(
+        "covMat_rect_X_grad: kernel is not mean-square differentiable, gradient observations are not supported");
+
+  const arma::uword n1 = X1.n_cols;
+  const arma::uword n2 = X2.n_cols;
+  const bool warped = !J.empty();
+  const arma::uword d = warped ? J[0].n_cols : X1.n_rows;
+
+  if (warped && J.size() != n1)
+    throw std::invalid_argument("covMat_rect_X_grad: J must have one Jacobian per X1 point");
+  if ((*R).n_rows != n1 * (1 + d) || (*R).n_cols != n2)
+    throw std::invalid_argument("covMat_rect_X_grad: R must be (n1*(1+d)) x n2");
+
+  for (arma::uword a = 0; a < n1; a++)
+    for (arma::uword j = 0; j < n2; j++) {
+      const arma::vec dX = X1.col(a) - X2.col(j);
+      (*R).at(a, j) = Cov(dX, theta) * factor;
+      const arma::vec g_phi = DCovDx(dX, theta) * factor;
+      const arma::vec g = warped ? arma::vec(J[a].t() * g_phi) : g_phi;
+      for (arma::uword i = 0; i < d; i++)
+        (*R).at(n1 + a * d + i, j) = g[i];
+    }
+}
+
 // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
 // This avoids the explicit matrix multiplication A * B
 LIBKRIGING_EXPORT double LinearAlgebra::trace_prod(const arma::mat& A, const arma::mat& B) {
