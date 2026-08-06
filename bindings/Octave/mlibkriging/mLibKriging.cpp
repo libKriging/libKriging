@@ -167,6 +167,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::is_sigma2_estim "_hash:
       return KrigingBinding::is_sigma2_estim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::dy"_hash:
+      return KrigingBinding::dy(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::noise_model"_hash:
       return KrigingBinding::noise_model(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::nugget"_hash:

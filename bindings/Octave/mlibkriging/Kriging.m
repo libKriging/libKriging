@@ -171,6 +171,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::is_sigma2_estim ", obj.ref, varargin{:});
         end
 
+        function varargout = dy(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::dy", obj.ref, varargin{:});
+        end
+
         function varargout = noise_model(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::noise_model", obj.ref, varargin{:});
         end
