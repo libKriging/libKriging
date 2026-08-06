@@ -2284,6 +2284,94 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                       /*var_scale=*/sigma2);
 }
 
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma::mat& X_n,
+                                                                      bool return_stdev,
+                                                                      arma::uword max_iter,
+                                                                      double tol) const {
+  if (m_noise_model != NoiseModel::None)
+    throw std::runtime_error("predictCG: only available for NoiseModel::None");
+  if (m_X.n_rows == 0)
+    throw std::runtime_error("predictCG: model was not fitted");
+  const arma::uword d = m_X.n_cols;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("predictCG: X_n has wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
+                                + std::to_string(d));
+
+  const arma::uword n = m_X.n_rows;
+  if (max_iter == 0)
+    // n is CG's exact-arithmetic convergence bound, but GP covariance
+    // matrices are commonly ill-conditioned enough (smooth kernels, many
+    // points) that round-off keeps the true error shrinking well past that
+    // point in practice (see LinearAlgebra::conjugateGradient's periodic
+    // residual-recompute comment) -- 2n is a more realistic default budget.
+    max_iter = 2 * n;
+
+  // Matrix-free matvec R*v: R(i,j) = _Cov(X_i - X_j, theta) for i != j, 1 on
+  // the diagonal (correlation matrix, NoiseModel::None). O(n) memory (no R
+  // ever materialized), O(n^2) time per call.
+  const arma::mat Xt = m_X.t();  // d x n, contiguous columns for cache-friendly access
+  const arma::vec& theta = m_theta;
+  const auto& cov = _Cov;
+  auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
+    arma::vec out(n, arma::fill::none);
+#ifdef _OPENMP
+    if (n >= 200) {
+      int optimal_threads = get_optimal_threads(2);
+#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
+      for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
+        double acc = v(static_cast<arma::uword>(i));  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == static_cast<arma::uword>(i))
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(static_cast<arma::uword>(i)) = acc;
+      }
+    } else {
+#endif
+      for (arma::uword i = 0; i < n; ++i) {
+        double acc = v(i);  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == i)
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(i) = acc;
+      }
+#ifdef _OPENMP
+    }
+#endif
+    return out;
+  };
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+  const arma::uword n_n = X_n.n_rows;
+
+  // One CG solve, reused for every prediction point's mean.
+  const arma::vec resid = m_y - m_F * m_beta;
+  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol);
+
+  arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n.t(), m_theta, _Cov, 1.0);
+
+  arma::vec mean = F_n * m_beta + R_on.t() * w.col(0);
+  mean = mean * m_scaleY + m_centerY;
+
+  arma::vec stdev;
+  if (return_stdev) {
+    // One CG solve PER prediction point (R_on's columns don't share a
+    // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
+    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol);
+    const arma::vec quad = arma::sum(R_on % V, 0).t();
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad), 0.0, arma::datum::inf));
+    stdev *= m_scaleY;
+  }
+  return {mean, stdev};
+}
+
 /** Draw sample trajectories of kriging at given points X'
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
