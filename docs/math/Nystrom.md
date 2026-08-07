@@ -103,6 +103,11 @@ pred <- predict(k, Xnew, stdev = TRUE)
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.
 
+## See also
+
+[Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
+`NestedKriging` and `predictCG`, and how to pick between them.
+
 ## References
 
 - Williams, C. K. I., & Seeger, M. (2001). *Using the Nystrom method to
