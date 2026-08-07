@@ -59,11 +59,16 @@ void print_stats(const std::string& operation, const Stats& stats) {
 }
 
 void print_header() {
-  std::cout << std::setw(25) << std::left << "Operation" << " | ";
-  std::cout << std::setw(10) << std::right << "Mean (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Std (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Min (ms)" << " | ";
-  std::cout << std::setw(10) << std::right << "Max (ms)" << " | ";
+  std::cout << std::setw(25) << std::left << "Operation"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Mean (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Std (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Min (ms)"
+            << " | ";
+  std::cout << std::setw(10) << std::right << "Max (ms)"
+            << " | ";
   std::cout << std::setw(10) << std::right << "Median (ms)" << std::endl;
 }
 
