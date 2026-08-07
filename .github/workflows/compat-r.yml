@@ -20,6 +20,9 @@ env:
 
 jobs:
   r-compat:
+    # TEMPORARY: skip on this branch, dedicated to validating the Octave
+    # Windows CI fix in isolation. Remove this `if:` before merging.
+    if: github.ref_name != 'fix/octave-windows-omp-hang'
     name: "R Kriging vs v0.9.3 (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
