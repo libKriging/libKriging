@@ -87,9 +87,12 @@ end
 
 Fit a Kriging model. `objective` selects the fit criterion: `"LL"`
 (log-likelihood, default), `"LOO"` (leave-one-out), `"LMP"` (log-marginal
-posterior), or `"VLL"`/`"VLL(m)"` for the Vecchia approximated log-likelihood
+posterior), `"LLVecchia"`/`"LLVecchia(m)"` for the Vecchia approximated log-likelihood
 with `m` conditioning neighbors (default 30) — O(n m^3) per evaluation instead
-of O(n^3), recommended for large designs in low dimension.
+of O(n^3), recommended for large designs in low dimension — or
+`"LLNystrom"`/`"LLNystrom(k)"` for the Nystrom (global low-rank) approximated
+log-likelihood with rank `k` (default 50) — O(n k^2) per evaluation instead
+of O(n^3), also recommended for large designs.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
 `theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same

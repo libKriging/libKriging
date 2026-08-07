@@ -45,7 +45,7 @@ classNestedKriging <- function(nk) {
 #' @param optim Character, hyper-parameter optimization method of the
 #'     submodels: \code{"BFGS"} or \code{"none"}.
 #' @param objective Character: \code{"LL"} (default), \code{"LOO"},
-#'     \code{"LMP"}, or \code{"VLL(m)"} — the common prior is then estimated
+#'     \code{"LMP"}, or \code{"LLVecchia(m)"} — the common prior is then estimated
 #'     by one global Vecchia fit (O(n m^3), cross-group information).
 #' @param parameters Initial or fixed values for the hyper-parameters
 #'     (named list with \code{"sigma2"}, \code{"theta"}, \code{"beta"}).

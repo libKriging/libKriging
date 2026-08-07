@@ -230,7 +230,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
         The design is partitioned into nb_groups groups (k-means or random), one Kriging
         submodel is fitted per group on a common prior, and predictions are aggregated:
         aggregation="NK" (optimal nested-kriging aggregation, interpolating, default) or
-        "PoE"/"gPoE"/"BCM"/"rBCM". objective="VLL(m)" estimates the common prior with one
+        "PoE"/"gPoE"/"BCM"/"rBCM". objective="LLVecchia(m)" estimates the common prior with one
         global Vecchia fit; warping=[...] switches to WarpKriging submodels.
     )pbdoc")
       .def(py::init<const std::string&>(), py::arg("kernel"))

@@ -46,6 +46,38 @@ class LinearAlgebra {
 
   LIBKRIGING_EXPORT static arma::mat chol_block(const arma::mat C, const arma::mat Loo);
 
+  // Nystrom / partial-pivoted-Cholesky low-rank approximation of a covariance
+  // matrix R (n x n, built lazily from X/_theta/_Cov), never materialized in
+  // full and without ever building an O(n^2) pairwise-difference cube either
+  // (unlike cholCov's _dX): R ~= U * U.t() + diag(*diag_resid), with U
+  // (n x k_eff), k_eff <= k. X is (n x d), rows = observations (the m_X
+  // convention, not cholCov's transposed _dX layout). Greedy pivoting
+  // selects, at each step, the point with the largest residual variance
+  // (Harbrecht et al. 2012); stops early if the max residual diagonal falls
+  // below `tol` (k_eff < k). `landmarks_out`, if given, receives the selected
+  // pivot row-indices (into the n points) in selection order. `diag` follows
+  // cholCov's convention: empty = ones(n), else used verbatim.
+  LIBKRIGING_EXPORT static arma::mat nystromFactor(arma::vec* diag_resid,
+                                                   const arma::mat& X,
+                                                   const arma::vec& _theta,
+                                                   std::function<double(const arma::vec&, const arma::vec&)> _Cov,
+                                                   double factor,
+                                                   const arma::vec& diag,
+                                                   arma::uword k,
+                                                   double tol = 1e-12,
+                                                   arma::uvec* landmarks_out = nullptr);
+
+  // Solve (D + U*U.t()) * X = B via the Woodbury identity, without ever
+  // materializing the n x n matrix D + U*U.t(). U is n x k (as returned by
+  // nystromFactor), D is the strictly-positive diagonal (n). Cost O(n*k^2 + k^3)
+  // instead of O(n^3) for a dense solve. Caller must ensure D > 0 (e.g. add a
+  // jitter floor to nystromFactor's diag_resid beforehand).
+  LIBKRIGING_EXPORT static arma::mat woodbury_solve(const arma::mat& U, const arma::vec& D, const arma::mat& B);
+
+  // log|D + U*U.t()| via the matrix determinant lemma: log|D| + log|I_k + U.t() D^-1 U|.
+  // Same complexity/preconditions as woodbury_solve.
+  LIBKRIGING_EXPORT static double woodbury_logdet(const arma::mat& U, const arma::vec& D);
+
   LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
 
   LIBKRIGING_EXPORT static arma::mat rsolve(const arma::mat& A, const arma::mat& B);

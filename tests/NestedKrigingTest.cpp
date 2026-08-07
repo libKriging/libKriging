@@ -358,7 +358,7 @@ TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[ne
   CHECK(arma::abs(m2 - y).max() < 1e-3);
 }
 
-TEST_CASE("NestedKriging with a VLL objective: globally unified prior", "[nested][vecchia]") {
+TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[nested][vecchia]") {
   arma::mat X;
   arma::vec y;
   make_data(600, 2, X, y);
@@ -373,7 +373,7 @@ TEST_CASE("NestedKriging with a VLL objective: globally unified prior", "[nested
                    123,
                    Trend::RegressionModel::Constant,
                    "BFGS",
-                   "VLL(20)");
+                   "LLVecchia(20)");
 
   // all submodels carry the globally estimated prior
   for (arma::uword g = 0; g < nk.nb_groups(); ++g) {
@@ -395,10 +395,10 @@ TEST_CASE("NestedKriging with a VLL objective: globally unified prior", "[nested
   auto [m_l, s_l] = nk_ll.predict(Xt, true);
   const double rmse_v = std::sqrt(arma::mean(arma::square(m_v - yt)));
   const double rmse_l = std::sqrt(arma::mean(arma::square(m_l - yt)));
-  INFO("rmse VLL-unified = " << rmse_v << " vs LL-unified = " << rmse_l);
+  INFO("rmse LLVecchia-unified = " << rmse_v << " vs LL-unified = " << rmse_l);
   CHECK(rmse_v < 2.0 * rmse_l + 0.05 * arma::stddev(y));
 
-  // VLL + warping is not supported
+  // LLVecchia + warping is not supported
   CHECK_THROWS_AS(NestedKriging(y,
                                 X,
                                 "gauss",
@@ -408,7 +408,7 @@ TEST_CASE("NestedKriging with a VLL objective: globally unified prior", "[nested
                                 123,
                                 Trend::RegressionModel::Constant,
                                 "BFGS",
-                                "VLL(20)",
+                                "LLVecchia(20)",
                                 Kriging::Parameters{},
                                 std::vector<std::string>{"kumaraswamy", "kumaraswamy"}),
                   std::invalid_argument);

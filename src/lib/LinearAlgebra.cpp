@@ -298,6 +298,89 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::chol_block(const arma::mat C, const a
   return lowL;
 }
 
+// Greedy partial-pivoted Cholesky (Harbrecht, Peters & Schneider 2012), a.k.a.
+// the Nystrom approximation used e.g. as GPyTorch's pivoted-Cholesky
+// preconditioner. At each step, picks the point with the largest residual
+// (uncaptured) diagonal variance as the next pivot/landmark, appends a column
+// to U so that U*U.t() matches R exactly on the pivot's row/column, and
+// deflates the residual diagonal accordingly. Never touches an off-diagonal
+// entry of R that isn't on a pivot column, and never materializes an n x n
+// matrix or an O(n^2) pairwise-difference cube (unlike cholCov's _dX):
+// covariance values are computed on demand, row by row, straight from X. Cost
+// O(n*k) covariance evaluations and O(n*k^2) flops total for rank k, vs O(n^2)
+// to build R and O(n^3) to factorize it exactly.
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::nystromFactor(arma::vec* diag_resid,
+                                                         const arma::mat& X,
+                                                         const arma::vec& _theta,
+                                                         std::function<double(const arma::vec&, const arma::vec&)> _Cov,
+                                                         const double factor,
+                                                         const arma::vec& diag,
+                                                         arma::uword k,
+                                                         const double tol,
+                                                         arma::uvec* landmarks_out) {
+  const arma::uword n = X.n_rows;
+  k = std::min(k, n);
+  const arma::vec diag0 = (diag.n_elem == 0) ? arma::vec(n, arma::fill::ones) : diag;
+
+  arma::vec d = diag0;  // current residual (uncaptured) diagonal
+  arma::mat U(n, k, arma::fill::none);
+  arma::uvec landmarks(k, arma::fill::zeros);
+
+  arma::uword k_eff = 0;
+  for (arma::uword t = 0; t < k; ++t) {
+    const arma::uword piv = d.index_max();
+    const double dpiv = d(piv);
+    if (dpiv < tol)
+      break;
+    landmarks(t) = piv;
+
+    arma::vec col(n, arma::fill::none);
+    for (arma::uword i = 0; i < n; ++i)
+      col(i) = (i == piv) ? diag0(piv) : factor * _Cov(arma::trans(X.row(i) - X.row(piv)), _theta);
+
+    if (t > 0)
+      col -= U.cols(0, t - 1) * U.row(piv).cols(0, t - 1).t();
+
+    const double s = std::sqrt(std::max(dpiv, tol));
+    U.col(t) = col / s;
+
+    d -= arma::square(U.col(t));
+    d(piv) = 0.0;
+    d.transform([](double v) { return v < 0 ? 0.0 : v; });
+
+    ++k_eff;
+  }
+
+  if (k_eff < k)
+    U = (k_eff == 0) ? arma::mat(n, 0) : arma::mat(U.cols(0, k_eff - 1));
+
+  if (landmarks_out)
+    *landmarks_out = landmarks.head(k_eff);
+
+  const arma::vec captured = (k_eff == 0) ? arma::vec(n, arma::fill::zeros) : arma::sum(arma::square(U), 1);
+  *diag_resid = arma::clamp(diag0 - captured, 0.0, arma::datum::inf);
+
+  return U;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::woodbury_solve(const arma::mat& U, const arma::vec& D, const arma::mat& B) {
+  const arma::vec Dinv = 1.0 / D;
+  const arma::mat DinvU = U.each_col() % Dinv;                             // diag(Dinv) * U        (n x k)
+  const arma::mat DinvB = B.each_col() % Dinv;                             // diag(Dinv) * B        (n x m)
+  arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + U.t() * DinvU;  // I_k + U' Dinv U (k x k)
+  return DinvB - DinvU * arma::solve(M, U.t() * DinvB, LinearAlgebra::default_solve_opts);
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::woodbury_logdet(const arma::mat& U, const arma::vec& D) {
+  const arma::vec Dinv = 1.0 / D;
+  const arma::mat DinvU = U.each_col() % Dinv;
+  const arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + U.t() * DinvU;
+  double val;
+  double sign;
+  arma::log_det(val, sign, M);
+  return arma::sum(arma::log(D)) + val;
+}
+
 // Solve A*X=B : X = A \ B
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma::mat& B) {
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);

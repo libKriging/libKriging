@@ -1,16 +1,16 @@
-"""Numerical validation of the Vecchia log-likelihood (VLL) math for libKriging.
+"""Numerical validation of the Vecchia log-likelihood (LLVecchia) math for libKriging.
 
-Mirrors the planned Kriging objective="VLL(m)" implementation:
+Mirrors the planned Kriging objective="LLVecchia(m)" implementation:
   - greedy maxmin ordering,
   - m nearest previously-ordered neighbors (Euclidean),
   - per-conditional terms with profiled sigma2 and GLS-profiled constant beta,
-  - analytic gradient d(VLL)/d(theta) (envelope theorem for beta_hat).
+  - analytic gradient d(LLVecchia)/d(theta) (envelope theorem for beta_hat).
 
 Checks:
-  1. VLL(m = n-1) == exact concentrated LL      (machine precision)
+  1. LLVecchia(m = n-1) == exact concentrated LL      (machine precision)
   2. analytic gradient == finite differences    (all m)
-  3. VLL(m) -> LL monotonically-ish as m grows  (screening effect)
-  4. theta_hat from VLL(m=20) close to exact MLE on a Matern 5/2 field
+  3. LLVecchia(m) -> LL monotonically-ish as m grows  (screening effect)
+  4. theta_hat from LLVecchia(m=20) close to exact MLE on a Matern 5/2 field
   5. maxmin ordering beats natural ordering at equal m
 """
 import numpy as np
@@ -91,13 +91,13 @@ def neighbor_sets(X_ord, m):
 
 # ── Vecchia LL + analytic gradient ───────────────────────────────────────────
 def vll(X_ord, y_ord, theta, N, return_grad=False):
-    """VLL with profiled sigma2 and GLS-profiled constant beta.
+    """LLVecchia with profiled sigma2 and GLS-profiled constant beta.
 
     Per conditional i (Ni = neighbors): a = R_N^{-1} r,
       v_i = 1 - r'a,  u_i = y_i - a'y_N,  w_i = 1 - a'1
       e_i(beta) = u_i - beta*w_i
     GLS:  beta = sum(w u / v) / sum(w^2 / v) ;  sigma2 = sum(e^2/v)/n
-    VLL = -n/2 log(2 pi sigma2) - 1/2 sum log v - n/2
+    LLVecchia = -n/2 log(2 pi sigma2) - 1/2 sum log v - n/2
     Gradient by envelope theorem (d/dbeta = 0 at beta_hat)."""
     n, d = X_ord.shape
     u = np.empty(n)
@@ -163,7 +163,7 @@ theta0 = np.array([0.2, 0.2])
 ll_ex, b_ex, s2_ex = exact_ll(X, y, theta0)
 N_full = neighbor_sets(X_ord, n - 1)
 ll_v, b_v, s2_v = vll(X_ord, y_ord, theta0, N_full)
-print(f"[1] m=n-1 : VLL={ll_v:.6f} vs LL={ll_ex:.6f}  |dLL|={abs(ll_v-ll_ex):.2e}"
+print(f"[1] m=n-1 : LLVecchia={ll_v:.6f} vs LL={ll_ex:.6f}  |dLL|={abs(ll_v-ll_ex):.2e}"
       f"  |dbeta|={abs(b_v-b_ex):.2e}  |dsigma2|={abs(s2_v-s2_ex):.2e}")
 assert abs(ll_v - ll_ex) < 1e-4 and abs(b_v - b_ex) < 1e-7  # residual = jitter placement
 
@@ -181,17 +181,17 @@ for m in [5, 20, 50]:
     print(f"[2] m={m:3d} : grad={np.round(g,4)} vs FD={np.round(fd,4)}  rel err={err:.2e}")
     assert err < 1e-5
 
-# ── [3] convergence VLL(m) -> LL ─────────────────────────────────────────────
+# ── [3] convergence LLVecchia(m) -> LL ─────────────────────────────────────────────
 print("[3] convergence (theta0):")
 prev_gap = np.inf
 for m in [5, 10, 20, 40, 80]:
     N = neighbor_sets(X_ord, m)
     ll_m, _, _ = vll(X_ord, y_ord, theta0, N)
     gap = abs(ll_m - ll_ex)
-    print(f"     m={m:3d} : VLL={ll_m:10.4f}  |VLL-LL|={gap:.4f}")
+    print(f"     m={m:3d} : LLVecchia={ll_m:10.4f}  |LLVecchia-LL|={gap:.4f}")
 prev = None
 
-# ── [4] theta_hat from VLL(m=20) vs exact MLE ────────────────────────────────
+# ── [4] theta_hat from LLVecchia(m=20) vs exact MLE ────────────────────────────────
 from scipy.optimize import minimize
 N20 = neighbor_sets(X_ord, 20)
 
@@ -203,7 +203,7 @@ def negll(lt):
 r_v = minimize(negvll, np.log(theta0), method="Nelder-Mead", options={"xatol": 1e-4})
 r_e = minimize(negll, np.log(theta0), method="Nelder-Mead", options={"xatol": 1e-4})
 th_v, th_e = np.exp(r_v.x), np.exp(r_e.x)
-print(f"[4] theta_hat VLL(20)={np.round(th_v,4)} vs exact={np.round(th_e,4)} (true={theta_true})")
+print(f"[4] theta_hat LLVecchia(20)={np.round(th_v,4)} vs exact={np.round(th_e,4)} (true={theta_true})")
 assert np.abs(np.log(th_v) - np.log(th_e)).max() < 0.15  # within ~15% on log scale
 
 # ── [5] maxmin vs natural ordering at m=10 ───────────────────────────────────
@@ -212,7 +212,7 @@ ll_maxmin = vll(X_ord, y_ord, theta0, N10)[0]
 X_nat, y_nat = X, y  # natural (random) order
 N10n = neighbor_sets(X_nat, 10)
 ll_nat = vll(X_nat, y_nat, theta0, N10n)[0]
-print(f"[5] ordering m=10 : maxmin |VLL-LL|={abs(ll_maxmin-ll_ex):.4f}"
-      f"  vs natural |VLL-LL|={abs(ll_nat-ll_ex):.4f}")
+print(f"[5] ordering m=10 : maxmin |LLVecchia-LL|={abs(ll_maxmin-ll_ex):.4f}"
+      f"  vs natural |LLVecchia-LL|={abs(ll_nat-ll_ex):.4f}")
 
-print("\nAll VLL math checks passed.")
+print("\nAll LLVecchia math checks passed.")

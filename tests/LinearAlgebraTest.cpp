@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "libKriging/Covariance.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 
 #define CATCH_CONFIG_MAIN
@@ -656,7 +657,164 @@ TEST_CASE("LinearAlgebra::safe_chol_lower - asymmetric numerical errors", "[Line
   
   // Should still work
   arma::mat L = LinearAlgebra::safe_chol_lower(M);
-  
+
   REQUIRE(L.n_rows == 8);
   REQUIRE(L.n_cols == 8);
+}
+
+// -----------------------------------------------------------------------------
+// LinearAlgebra::nystromFactor
+// -----------------------------------------------------------------------------
+
+namespace {
+// Builds R (n x n) and a matern5_2 covariance functor for a random 2D design,
+// reused across the nystromFactor tests below. nystromFactor itself only ever
+// sees X (n x d, rows = observations) -- no O(n^2) pairwise-difference cube is
+// built anywhere in this fixture or in nystromFactor; R is built here only as
+// an independent oracle to check the approximation against.
+struct NystromFixture {
+  arma::mat X;
+  arma::vec theta{0.3, 0.3};
+  Covariance::CovFunctions cov = Covariance::resolve("matern5_2");
+  arma::mat R;
+
+  explicit NystromFixture(arma::uword n, unsigned seed = 42) {
+    arma::arma_rng::set_seed(seed);
+    X = arma::mat(n, 2, arma::fill::randu);
+    arma::mat dX = LinearAlgebra::compute_dX(X);
+    R = arma::mat(n, n, arma::fill::none);
+    LinearAlgebra::covMat_sym_dX(&R, dX, theta, cov.Cov, 1.0, arma::vec());
+  }
+
+  arma::mat reconstruct(const arma::mat& U, const arma::vec& diag_resid) const {
+    arma::mat Rhat = U * U.t();
+    Rhat.diag() += diag_resid;
+    return Rhat;
+  }
+};
+}  // namespace
+
+TEST_CASE("LinearAlgebra::nystromFactor - shape and non-negative residual", "[LinearAlgebra][nystrom]") {
+  NystromFixture fx(25);
+  arma::vec diag_resid;
+  arma::uvec landmarks;
+  arma::mat U
+      = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), 8, 1e-12, &landmarks);
+
+  REQUIRE(U.n_rows == 25);
+  REQUIRE(U.n_cols == 8);
+  REQUIRE(diag_resid.n_elem == 25);
+  REQUIRE(diag_resid.min() >= 0.0);
+  REQUIRE(landmarks.n_elem == 8);
+  // pivots are distinct row indices into X
+  arma::uvec unique_landmarks = arma::unique(landmarks);
+  REQUIRE(unique_landmarks.n_elem == 8);
+}
+
+TEST_CASE("LinearAlgebra::nystromFactor - reconstruction error decreases with k", "[LinearAlgebra][nystrom]") {
+  NystromFixture fx(30);
+
+  double prev_err = arma::datum::inf;
+  for (arma::uword k : {2u, 5u, 10u, 20u}) {
+    arma::vec diag_resid;
+    arma::mat U = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), k);
+    arma::mat Rhat = fx.reconstruct(U, diag_resid);
+    double err = arma::norm(Rhat - fx.R, "fro");
+    INFO("k=" << k << " frobenius err=" << err << " (prev=" << prev_err << ")");
+    CHECK(err <= prev_err + 1e-8);
+    prev_err = err;
+  }
+}
+
+TEST_CASE("LinearAlgebra::nystromFactor - exact reconstruction at full rank", "[LinearAlgebra][nystrom]") {
+  const arma::uword n = 20;
+  NystromFixture fx(n);
+
+  arma::vec diag_resid;
+  arma::mat U = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), n);
+  arma::mat Rhat = fx.reconstruct(U, diag_resid);
+
+  REQUIRE(arma::approx_equal(Rhat, fx.R, "absdiff", 1e-8));
+  REQUIRE(diag_resid.max() < 1e-8);  // full rank captures the whole diagonal
+}
+
+TEST_CASE("LinearAlgebra::nystromFactor - k clamped to n when k > n", "[LinearAlgebra][nystrom]") {
+  const arma::uword n = 10;
+  NystromFixture fx(n);
+
+  arma::vec diag_resid;
+  arma::mat U = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), 1000);
+  REQUIRE(U.n_cols <= n);
+}
+
+// -----------------------------------------------------------------------------
+// LinearAlgebra::woodbury_solve / woodbury_logdet
+// -----------------------------------------------------------------------------
+
+TEST_CASE("LinearAlgebra::woodbury_solve matches dense solve on D + U*U.t()", "[LinearAlgebra][nystrom][woodbury]") {
+  const arma::uword n = 40;
+  const arma::uword k = 6;
+  arma::arma_rng::set_seed(11);
+  arma::mat U = arma::randn<arma::mat>(n, k);
+  arma::vec D = arma::randu<arma::vec>(n) + 0.5;  // strictly positive
+  arma::mat R = U * U.t();
+  R.diag() += D;
+
+  arma::mat B = arma::randn<arma::mat>(n, 3);
+
+  arma::mat X_dense = arma::solve(R, B);
+  arma::mat X_wood = LinearAlgebra::woodbury_solve(U, D, B);
+
+  REQUIRE(arma::approx_equal(X_wood, X_dense, "reldiff", 1e-8));
+  // sanity: also check the linear system is actually satisfied
+  REQUIRE(arma::approx_equal(R * X_wood, B, "absdiff", 1e-6));
+}
+
+TEST_CASE("LinearAlgebra::woodbury_logdet matches dense log_det on D + U*U.t()", "[LinearAlgebra][nystrom][woodbury]") {
+  const arma::uword n = 35;
+  const arma::uword k = 5;
+  arma::arma_rng::set_seed(22);
+  arma::mat U = arma::randn<arma::mat>(n, k);
+  arma::vec D = arma::randu<arma::vec>(n) + 0.5;
+  arma::mat R = U * U.t();
+  R.diag() += D;
+
+  double val_dense, sign_dense;
+  arma::log_det(val_dense, sign_dense, R);
+  REQUIRE(sign_dense > 0);
+
+  double val_wood = LinearAlgebra::woodbury_logdet(U, D);
+
+  INFO("dense=" << val_dense << " woodbury=" << val_wood);
+  REQUIRE(std::abs(val_wood - val_dense) < 1e-6 * std::max(1.0, std::abs(val_dense)));
+}
+
+TEST_CASE("LinearAlgebra::woodbury_solve/logdet compose end-to-end with nystromFactor",
+          "[LinearAlgebra][nystrom][woodbury]") {
+  // Full pipeline: build R via a real covariance kernel, get a Nystrom
+  // low-rank + diagonal approximation, add a jitter floor to the residual
+  // diagonal (as a real caller must, since diag_resid can hit exactly 0 at
+  // captured pivots), then check Woodbury solve/logdet against the DENSE
+  // solve/logdet of the *reconstructed* approximate matrix Rhat = U*U.t() +
+  // diag(D) -- not the original R (Woodbury is exact for Rhat by construction,
+  // it does not by itself bound the Nystrom approximation error).
+  const arma::uword n = 30;
+  NystromFixture fx(n);
+
+  arma::vec diag_resid;
+  arma::mat U = LinearAlgebra::nystromFactor(&diag_resid, fx.X, fx.theta, fx.cov.Cov, 1.0, arma::vec(), 12);
+  arma::vec D = diag_resid + 1e-8;  // jitter floor so D > 0 strictly
+
+  arma::mat Rhat = U * U.t();
+  Rhat.diag() += D;
+
+  arma::mat B = arma::randn<arma::mat>(n, 2);
+  arma::mat X_dense = arma::solve(Rhat, B);
+  arma::mat X_wood = LinearAlgebra::woodbury_solve(U, D, B);
+  REQUIRE(arma::approx_equal(X_wood, X_dense, "reldiff", 1e-6));
+
+  double val_dense, sign_dense;
+  arma::log_det(val_dense, sign_dense, Rhat);
+  double val_wood = LinearAlgebra::woodbury_logdet(U, D);
+  REQUIRE(std::abs(val_wood - val_dense) < 1e-6 * std::max(1.0, std::abs(val_dense)));
 }

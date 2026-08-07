@@ -114,8 +114,10 @@ class KrigingRegressor(_BaseKrigingEstimator):
         k random restarts (e.g. ``"BFGS10"``), or ``"none"`` to keep
         `parameters` fixed rather than estimate them.
     objective : str, default="LL"
-        Fit objective: ``"LL"``, ``"LOO"``, ``"LMP"``, ``"VLL"``, or
-        ``"VLL(m)"`` (Vecchia approximation, for large ``n``).
+        Fit objective: ``"LL"``, ``"LOO"``, ``"LMP"``, ``"LLVecchia"``/
+        ``"LLVecchia(m)"`` (Vecchia approximation, for large ``n``), or
+        ``"LLNystrom"``/``"LLNystrom(k)"`` (Nystrom low-rank approximation,
+        also for large ``n``).
     noise : None, "nugget", float, or array-like of shape (n_samples,), default=None
         ``None`` for noise-free (exact interpolation), ``"nugget"`` for
         an estimated homogeneous nugget, or a per-observation variance

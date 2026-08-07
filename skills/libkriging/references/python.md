@@ -17,7 +17,7 @@ model = lk.Kriging(
     regmodel="constant",       # "none" | "constant" | "linear" | "interactive" | "quadratic"
     normalize=False,
     optim="BFGS",              # "BFGS", "BFGS10" (10 restarts), "none"
-    objective="LL",            # "LL" | "LOO" | "LMP" | "VLL" | "VLL(m)"
+    objective="LL",            # "LL" | "LOO" | "LMP" | "LLVecchia" | "LLVecchia(m)" | "LLNystrom" | "LLNystrom(k)"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector
 )
@@ -98,7 +98,7 @@ model = lk.NestedKriging(
     seed=123,
     regmodel="constant",
     optim="BFGS",
-    objective="LL",         # "VLL(m)" to fit the common prior via one global Vecchia fit
+    objective="LL",         # "LLVecchia(m)" to fit the common prior via one global Vecchia fit
     parameters={},
     warping=[],             # non-empty -> submodels are WarpKriging instead of Kriging
 )

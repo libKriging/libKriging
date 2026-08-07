@@ -84,7 +84,7 @@ class NestedKriging {
    * sigma2 / beta0 <- weighted means over the seeded submodel fits
    * (sigma2 is profiled per group given the common correlation).
    *
-   * VLL-unified path (objective="VLL(m)", plain submodels only): the common
+   * LLVecchia-unified path (objective="LLVecchia(m)", plain submodels only): the common
    * prior (theta, sigma2, beta) is estimated by ONE global light Vecchia fit
    * in O(n m^3) — cross-group information, one optimization instead of p —
    * then every submodel is fitted in closed form on the seeded prior.

@@ -22,50 +22,50 @@ static void make_data(arma::uword n, arma::mat& X, arma::vec& y, unsigned seed =
 
 // -----------------------------------------------------------------------------
 
-TEST_CASE("VLL objective spec parsing and validation", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia objective spec parsing and validation", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(60, X, y);
 
   // valid specs fit fine
-  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL"));
-  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(10)"));
+  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia"));
+  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)"));
 
   // malformed specs throw
-  for (const std::string bad : {"VLL()", "VLL(x)", "VLL(0)", "VLL(-3)", "VLL(10"}) {
+  for (const std::string bad : {"LLVecchia()", "LLVecchia(x)", "LLVecchia(0)", "LLVecchia(-3)", "LLVecchia(10"}) {
     CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", bad),
                     std::invalid_argument);
   }
 
-  // VLL is not available with a nugget/noise channel
+  // LLVecchia is not available with a nugget/noise channel
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
-  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(10)", {}),
+  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)", {}),
                   std::invalid_argument);
 }
 
-TEST_CASE("VLL(n-1) matches the exact concentrated log-likelihood", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia(n-1) matches the exact concentrated log-likelihood", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(60, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(59)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(59)");
 
   // compare at moderate theta values: at the *fitted* theta of such a smooth
   // function, R is near-singular and jitter placement dominates both sides
   for (const arma::vec theta : {arma::vec{0.2, 0.2}, arma::vec{0.4, 0.3}}) {
     auto [vll, gv] = k.logLikelihoodVecchiaFun(theta, false);
     auto [ll, gl] = k.logLikelihoodFun(theta, false, false);
-    INFO("theta=" << theta.t() << ": VLL(n-1) = " << vll << " vs exact LL = " << ll);
+    INFO("theta=" << theta.t() << ": LLVecchia(n-1) = " << vll << " vs exact LL = " << ll);
     CHECK(std::abs(vll - ll) < 1e-3 * std::abs(ll) + 1e-3);
   }
 }
 
-TEST_CASE("VLL analytic gradient matches finite differences", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia analytic gradient matches finite differences", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(100, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(15)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)");
 
   const double h = 1e-6;
   for (const arma::vec theta : {arma::vec{0.2, 0.3}, arma::vec{0.5, 0.15}}) {
@@ -83,12 +83,12 @@ TEST_CASE("VLL analytic gradient matches finite differences", "[vecchia][kriging
   }
 }
 
-TEST_CASE("VLL fit commits an exact model: predict interpolates", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia fit commits an exact model: predict interpolates", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(150, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)");
 
   // the final commit performs one exact factorization at theta*, so the
   // fitted model must interpolate exactly like an "LL"-fitted Kriging
@@ -97,7 +97,7 @@ TEST_CASE("VLL fit commits an exact model: predict interpolates", "[vecchia][kri
   CHECK(stdev.max() < 1e-2);
 }
 
-TEST_CASE("VLL(20) estimation is consistent with the exact MLE", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia(20) estimation is consistent with the exact MLE", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(300, X, y);
@@ -107,25 +107,25 @@ TEST_CASE("VLL(20) estimation is consistent with the exact MLE", "[vecchia][krig
   make_data(150, Xt, yt, 456);
 
   Kriging k_ll(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL");
-  Kriging k_v(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+  Kriging k_v(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)");
   CHECK(k_v.vecchia_neighbors() == 20);
 
   auto [m_ll, s1, c1, d1, e1] = k_ll.predict(Xt, false, false, false);
   auto [m_v, s2, c2, d2, e2] = k_v.predict(Xt, false, false, false);
   const double rmse_ll = std::sqrt(arma::mean(arma::square(m_ll - yt)));
   const double rmse_v = std::sqrt(arma::mean(arma::square(m_v - yt)));
-  INFO("theta LL = " << k_ll.theta().t() << " theta VLL = " << k_v.theta().t());
-  INFO("rmse LL = " << rmse_ll << " rmse VLL = " << rmse_v);
+  INFO("theta LL = " << k_ll.theta().t() << " theta LLVecchia = " << k_v.theta().t());
+  INFO("rmse LL = " << rmse_ll << " rmse LLVecchia = " << rmse_v);
   // predictive accuracy should be comparable (both use exact predict at their theta*)
   CHECK(rmse_v < 2.0 * rmse_ll + 0.05 * arma::stddev(y));
 }
 
-TEST_CASE("VLL model supports update with refit", "[vecchia][kriging]") {
+TEST_CASE("LLVecchia model supports update with refit", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(80, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(10)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(10)");
 
   arma::mat Xu;
   arma::vec yu;
@@ -137,17 +137,17 @@ TEST_CASE("VLL model supports update with refit", "[vecchia][kriging]") {
   CHECK(arma::abs(mean - k.y()).max() < 1e-3);  // still interpolates after refit
 }
 
-TEST_CASE("VLL large-n smoke test", "[vecchia][kriging][intensive]") {
+TEST_CASE("LLVecchia large-n smoke test", "[vecchia][kriging][intensive]") {
   arma::mat X;
   arma::vec y;
   make_data(2000, X, y);
 
   // starting theta to keep optimizer iterations low; wall time is dominated by
-  // the single exact O(n^3) factorization at commit (VLL evals are ~50ms here)
+  // the single exact O(n^3) factorization at commit (LLVecchia evals are ~50ms here)
   Kriging::Parameters params;
   params.theta = arma::mat(1, 2, arma::fill::value(0.3));
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", params);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)", params);
 
   arma::mat Xt;
   arma::vec yt;
@@ -164,7 +164,7 @@ TEST_CASE("predictVecchia matches exact predict", "[vecchia][kriging]") {
   arma::vec y;
   make_data(400, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)");
 
   arma::mat Xt;
   arma::vec yt;
@@ -211,13 +211,13 @@ TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]
   arma::vec y;
   make_data(300, X, y);
 
-  // reference: standard VLL fit (exact commit)
-  Kriging k_ref(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)");
+  // reference: standard LLVecchia fit (exact commit)
+  Kriging k_ref(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)");
 
   // light fit: same objective, no exact factorization at commit
   Kriging k("matern5_2");
   k.set_vecchia_exact_commit(false);
-  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", {});
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)", {});
   CHECK(k.is_vecchia_light());
 
   // hyperparameters consistent with the exact-commit fit
@@ -252,7 +252,7 @@ TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]
 
   // a subsequent standard fit clears the light state
   k.set_vecchia_exact_commit(true);
-  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", {});
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)", {});
   CHECK(!k.is_vecchia_light());
   CHECK_NOTHROW(k.simulate(2, 123, Xt.rows(0, 9), false));
 }
@@ -267,7 +267,7 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
 
   Kriging k("matern5_2");
   k.set_vecchia_exact_commit(false);
-  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "VLL(20)", params);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)", params);
   CHECK(k.is_vecchia_light());
 
   arma::mat Xt;
@@ -280,16 +280,16 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
   CHECK(rmse < 0.05 * arma::stddev(y));
 }
 
-TEST_CASE("VLL benchmark", "[.benchmark]") {
+TEST_CASE("LLVecchia benchmark", "[.benchmark]") {
   arma::mat X;
   arma::vec y;
   make_data(400, X, y);
   const arma::vec theta{0.3, 0.3};
 
-  Kriging k_eval(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
+  Kriging k_eval(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
 
-  BENCHMARK("Kriging::fit VLL(30) n=400") {
-    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "VLL(30)");
+  BENCHMARK("Kriging::fit LLVecchia(30) n=400") {
+    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
   };
   BENCHMARK("Kriging::fit LL n=400") {
     return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL");
