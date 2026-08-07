@@ -122,6 +122,11 @@ same n (which would not fit in memory anyway).
   `set_warp_subsample`), then submodels are fit closed-form
   (`optim="none"`) — one warp training total instead of p.
 
+## See also
+
+[Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
+`LLNystrom` and `predictCG`, and how to pick between them.
+
 ## References
 
 - Rullière, D., Durrande, N., Bachoc, F., & Chevalier, C. (2018).

@@ -49,7 +49,9 @@ Ask, in order:
    it's cheaper to fit and easier to interpret.
 
 5. **Is `n` (number of observations) too large for an O(n³) fit — say,
-   more than a few thousand points?**
+   more than a few thousand points?** (See
+   [Scalability.md](../../docs/math/Scalability.md) for the full method
+   inventory and combinability notes.)
    → Keep `Kriging`/`WarpKriging` but switch the fit objective to one of
    the two scalable approximations (both O(n·k³)/O(n·k²) instead of O(n³),
    both give an alternative *objective*, not just a cheaper way to
@@ -68,7 +70,7 @@ Ask, in order:
    These change the *fit* objective. If instead the fit itself is fine
    (`objective="LL"`/`"LOO"`/`"LMP"`, ordinary O(n³) cost is acceptable
    once) but keeping an O(n²) dense factor resident just for `predict`
-   isn't — or it was never computed at all — C++'s `predictCG` solves
+   isn't — or it was never computed at all — `predictCG` solves
    each prediction with matrix-free conjugate gradient instead, at the
    cost of O(n²·iters) per solve; see
    [PredictCG.md](../../docs/math/PredictCG.md). Narrower than the above
