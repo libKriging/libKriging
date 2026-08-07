@@ -94,6 +94,19 @@ jobs:
             done
           done
 
+          # predictCG: a moderate-n grid, distinct from the large-n one above.
+          # predictCG is O(n^2) per matvec with no reduced-cost approximation
+          # (unlike Vecchia/Nystrom), so it doesn't scale to the same n as
+          # those; the point here is characterizing its cost relative to the
+          # exact predictor at sizes where a resident dense factor may or may
+          # not be worth keeping, not pushing n as far as possible.
+          for n in 100 200 400; do
+            for d in 2 4; do
+              echo "Running: n=$n d=$d benchmark=predictcg iterations=$ITERATIONS"
+              bash bench/bench.sh iterations=$ITERATIONS n=$n d=$d predictcg > "build/benchmark-results/predictcg_n${n}_d${d}.log" 2>&1 || echo "Warning: benchmark failed for predictcg n=$n d=$d"
+            done
+          done
+
           # WarpKriging benchmarks — each warping is treated as its own class.
           # Fewer iterations since fit is much slower (seconds vs milliseconds).
           WARP_ITERATIONS=$(( ITERATIONS < 2 ? ITERATIONS : 2 ))
@@ -225,6 +238,25 @@ jobs:
                 nyse=$(grep "^nys_eval" "$logfile" | awk '{print $3}' || echo "N/A")
                 lle=$(grep "^ll_eval" "$logfile" | awk '{print $3}' || echo "-")
                 echo "| $n | $d | $fit | ${fite:--} | $pred | $predn | $simn | $nyse | ${lle:--} |" >> "$REPORT"
+              fi
+            done
+          done
+          echo "" >> "$REPORT"
+
+          # --- predictCG summary (moderate-n grid; see the run-benchmarks
+          #     step comment on why this doesn't share the large-n grid) ---
+          echo "### predictCG (matrix-free CG predict vs exact predict)" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "| n | d | predict (ms) | predictCG mean (ms) | predictCG stdev, q=10 (ms) |" >> "$REPORT"
+          echo "|---|---|--------------|----------------------|------------------------------|" >> "$REPORT"
+          for n in 100 200 400; do
+            for d in 2 4; do
+              logfile="benchmark-results/predictcg_n${n}_d${d}.log"
+              if [ -f "$logfile" ]; then
+                pred=$(grep "^predict  " "$logfile" | awk '{print $3}' || echo "N/A")
+                predcgm=$(grep "^predictCG_mean" "$logfile" | awk '{print $3}' || echo "N/A")
+                predcgs=$(grep "^predictCG_stdev" "$logfile" | awk '{print $3}' || echo "N/A")
+                echo "| $n | $d | $pred | $predcgm | $predcgs |" >> "$REPORT"
               fi
             done
           done
