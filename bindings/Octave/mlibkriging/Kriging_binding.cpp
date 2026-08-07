@@ -175,6 +175,24 @@ void subsetOfData(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, idx1, "subset row-indices");
 }
 
+void predictCG(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Range{2, 5}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
+  const int max_iter = input.getOptional<int>(3, "max_iter").value_or(0);
+  const double tol = input.getOptional<double>(4, "tol").value_or(1e-8);
+  if (max_iter < 0)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "max_iter must be >= 0 (0 means the default, 2n)");
+  auto [mean_v, stdev_v]
+      = km->predictCG(input.get<arma::mat>(1, "matrix"), return_stdev, static_cast<arma::uword>(max_iter), tol);
+  output.set(0, mean_v, "predicted response");
+  output.setOptional(1, stdev_v, "stdev vector");
+}
+
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

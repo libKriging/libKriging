@@ -23,6 +23,10 @@ p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
 s <- simulate(k, nsim = 10, seed = 123, x = Xnew)
 update(k, y_u, X_u, refit = TRUE)
 
+# Matrix-free CG prediction (predict-only, any exact "LL"/"LOO"/"LMP" fit):
+p_cg <- predictCG(k, x = Xnew, return_stdev = TRUE)  # return_stdev default FALSE
+# max_iter = 0L (default) means 2n; see docs/math/PredictCG.md
+
 logLikelihood(k)
 leaveOneOut(k)
 logMargPost(k)

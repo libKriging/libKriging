@@ -31,6 +31,17 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::predict", obj.ref, varargin{:});
         end
 
+        % Predict-only, matrix-free conjugate-gradient alternative to
+        % predict(): solves each prediction with CG instead of using a
+        % stored dense factor. Args: (X_n, return_stdev=false, max_iter=0,
+        % tol=1e-8). return_stdev=true runs one extra CG solve PER
+        % prediction point, so it defaults to false. Only available for
+        % models fitted without a nugget/noise channel. See
+        % docs/math/PredictCG.md.
+        function varargout = predictCG(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::predictCG", obj.ref, varargin{:});
+        end
+
         function varargout = simulate(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::simulate", obj.ref, varargin{:});
         end

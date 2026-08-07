@@ -96,6 +96,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::subsetOfData"_hash:
       return KrigingBinding::subsetOfData(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::predictCG"_hash:
+      return KrigingBinding::predictCG(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::simulate"_hash:
       return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::update"_hash:

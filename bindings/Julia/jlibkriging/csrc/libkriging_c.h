@@ -76,6 +76,20 @@ int lk_kriging_predict(void* ptr,
    0-based row-indices into X. */
 int lk_kriging_subsetOfData(const double* X_n, int m, int d, int n_max, const char* method, int seed, int* idx_out);
 
+/* Predict-only, matrix-free conjugate-gradient alternative to
+   lk_kriging_predict: solves each prediction with CG instead of using a
+   stored dense factor. max_iter=0 means the default (2n). See
+   docs/math/PredictCG.md. */
+int lk_kriging_predictCG(void* ptr,
+                         const double* X_n,
+                         int m,
+                         int d,
+                         int return_stdev,
+                         int max_iter,
+                         double tol,
+                         double* mean_out,
+                         double* stdev_out);
+
 int lk_kriging_simulate(void* ptr,
                         int nsim,
                         int seed,
