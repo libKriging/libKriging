@@ -180,6 +180,18 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
+      .def("predictCG",
+           &PyKriging::predictCG,
+           py::arg("X"),
+           py::arg("return_stdev") = false,
+           py::arg("max_iter") = 0,
+           py::arg("tol") = 1e-8,
+           R"pbdoc(Predict-only, matrix-free conjugate-gradient alternative to
+predict(): solves each prediction with CG instead of using a stored dense
+factor. return_stdev=True runs one extra CG solve PER prediction point
+(much more expensive than the mean-only path), so it defaults to False.
+Only available for models fitted without a nugget/noise channel
+(NoiseModel.none). See docs/math/PredictCG.md.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
            py::arg("nsim") = 1,

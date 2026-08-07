@@ -259,6 +259,37 @@ function predict(k::Kriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
+"""
+    predictCG(k::Kriging, X_n; return_stdev=false, max_iter=0, tol=1e-8)
+
+Predict-only, matrix-free conjugate-gradient alternative to `predict`:
+solves each prediction with CG instead of using a stored dense factor.
+`return_stdev=true` runs one extra CG solve PER prediction point (much
+more expensive than the mean-only path), so it defaults to `false`.
+`max_iter=0` means the default (`2n`). Only available for models fitted
+without a nugget/noise channel. See `docs/math/PredictCG.md`.
+"""
+function predictCG(k::Kriging, X_n::Matrix{Float64};
+                   return_stdev::Bool=false,
+                   max_iter::Int=0,
+                   tol::Float64=1e-8)
+    max_iter >= 0 || throw(ArgumentError("predictCG: max_iter must be >= 0 (0 means the default, 2n)"))
+    m, d = size(X_n)
+    mean_out = Vector{Float64}(undef, m)
+    stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
+
+    ret = ccall(dlsym(_lk(), :lk_kriging_predictCG), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Cint, Cint, Cdouble,
+                 Ptr{Float64}, Ptr{Float64}),
+                k.ptr, X_n, m, d,
+                return_stdev ? 1 : 0, max_iter, tol,
+                mean_out,
+                return_stdev ? stdev_out : C_NULL)
+    _check_error(ret)
+    return (mean=mean_out, stdev=return_stdev ? stdev_out : nothing)
+end
+
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Bool=true,
                   with_noise::Union{Nothing,Vector{Float64}}=nothing,
@@ -1351,7 +1382,7 @@ Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export nb_groups, aggregation, beta0
-export fit!, predict, simulate, update!, update_simulate, save, summary
+export fit!, predict, predictCG, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post

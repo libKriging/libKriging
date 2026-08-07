@@ -72,7 +72,7 @@ Ask, in order:
    each prediction with matrix-free conjugate gradient instead, at the
    cost of O(n²·iters) per solve; see
    [PredictCG.md](../../docs/math/PredictCG.md). Narrower than the above
-   (predict-only, doesn't touch fit time, C++ only as of this writing).
+   (predict-only, doesn't touch fit time).
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too
    slow, and the design can be partitioned / prediction can be
