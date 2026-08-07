@@ -122,6 +122,11 @@ rank-$k$ convergence/accuracy/timing plots and references.
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`
 and `NestedKriging`, and how to pick between them.
 
+## See also
+
+[Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
+`NestedKriging` and `predictCG`, and how to pick between them.
+
 ## References
 
 - Williams, C. K. I., & Seeger, M. (2001). *Using the Nystrom method to

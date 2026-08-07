@@ -86,6 +86,11 @@ auto [mean3, stdev3] = model.predictCG(Xnew, true, /*max_iter=*/500, /*tol=*/1e-
 - No preconditioning (e.g. pivoted-Cholesky, as GPyTorch uses for its own
   CG-based inference) -- iteration count scales with R's conditioning as-is.
 
+## See also
+
+[Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
+`LLNystrom` and `NestedKriging`, and how to pick between them.
+
 ## References
 
 - Hestenes, M. R., & Stiefel, E. (1952). *Methods of conjugate gradients

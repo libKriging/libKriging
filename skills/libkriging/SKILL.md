@@ -70,7 +70,7 @@ Ask, in order:
    These change the *fit* objective. If instead the fit itself is fine
    (`objective="LL"`/`"LOO"`/`"LMP"`, ordinary O(n³) cost is acceptable
    once) but keeping an O(n²) dense factor resident just for `predict`
-   isn't — or it was never computed at all — C++'s `predictCG` solves
+   isn't — or it was never computed at all — `predictCG` solves
    each prediction with matrix-free conjugate gradient instead, at the
    cost of O(n²·iters) per solve; see
    [PredictCG.md](../../docs/math/PredictCG.md). Narrower than the above
