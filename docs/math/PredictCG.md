@@ -79,8 +79,6 @@ auto [mean3, stdev3] = model.predictCG(Xnew, true, /*max_iter=*/500, /*tol=*/1e-
 
 ## Current limitations (v1)
 
-- C++ only -- not yet exposed in the Python/R/Julia/Octave-MATLAB
-  bindings.
 - `NoiseModel::None` only (no nugget/noise channel).
 - `return_stdev=true`'s O(n²·iters·q) cost makes it a poor fit for large
   q; prefer the exact `predict` (if a factor is already resident) or

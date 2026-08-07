@@ -1,0 +1,67 @@
+import numpy as np
+import pylibkriging as lk
+import pytest
+
+
+def f2d(x1, x2):
+    return np.sin(3 * x1) + np.cos(5 * x2) + x1 * x2
+
+
+def make_data(n, seed=123):
+    rng = np.random.default_rng(seed)
+    X = rng.uniform(size=(n, 2))
+    y = f2d(X[:, 0], X[:, 1])
+    return X, y
+
+
+def make_fixed_theta_model(y, X, theta_val=0.3):
+    # Fixed, moderate theta (optim="none"): on this noise-free deterministic
+    # test function, a free BFGS fit is known to drift theta toward a
+    # near-singular correlation matrix (unrelated to predictCG itself --
+    # see docs/math/PredictCG.md), which would make predict/predictCG's
+    # agreement noisy rather than a clean correctness signal.
+    parameters = {"theta": np.full((1, X.shape[1]), theta_val), "sigma2": 1.0}
+    return lk.Kriging(y, X, "matern5_2", regmodel="constant", optim="none",
+                      objective="LL", parameters=parameters)
+
+
+def test_predictcg_mean_stdev_match_exact_predict_at_a_moderate_theta():
+    X, y = make_data(60)
+    k = make_fixed_theta_model(y, X)
+    Xt, _ = make_data(20, seed=456)
+
+    m_ex, s_ex, _, _, _ = k.predict(Xt, True, False, False)
+    m_cg, s_cg = k.predictCG(Xt, True)
+
+    sdy = np.std(y)
+    assert np.max(np.abs(m_ex - m_cg)) < 0.05 * sdy
+    assert np.max(np.abs(s_ex - s_cg)) < 0.05 * sdy
+
+
+def test_predictcg_defaults_to_mean_only():
+    X, y = make_data(40)
+    k = make_fixed_theta_model(y, X)
+    Xt, _ = make_data(5, seed=789)
+
+    mean, stdev = k.predictCG(Xt)
+    assert len(mean) == 5
+    assert len(stdev) == 0
+
+
+def test_predictcg_interpolates_the_training_data():
+    X, y = make_data(30)
+    k = make_fixed_theta_model(y, X)
+
+    mean, stdev = k.predictCG(X, True)
+    sdy = np.std(y)
+    assert np.max(np.abs(mean.flatten() - y)) < 0.05 * sdy
+    assert np.max(stdev) < 0.05 * sdy
+
+
+def test_predictcg_rejects_a_negative_max_iter():
+    X, y = make_data(20)
+    k = make_fixed_theta_model(y, X)
+    Xt, _ = make_data(5, seed=789)
+
+    with pytest.raises(Exception):
+        k.predictCG(Xt, False, -1)

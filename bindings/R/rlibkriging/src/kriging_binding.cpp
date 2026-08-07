@@ -366,6 +366,34 @@ arma::uvec kriging_subsetOfData(arma::mat X, int n_max, std::string method = "km
 }
 
 // [[Rcpp::export]]
+Rcpp::List kriging_predictCG(Rcpp::List k,
+                             arma::mat X_n,
+                             bool return_stdev = false,
+                             int max_iter = 0,
+                             double tol = 1e-8) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  if (max_iter < 0)
+    Rcpp::stop("max_iter must be >= 0 (0 means the default, 2n)");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  int d = impl_ptr->X().n_cols;
+  if (d != X_n.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  auto [mean, stdev] = impl_ptr->predictCG(X_n, return_stdev, static_cast<arma::uword>(max_iter), tol);
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = mean);
+  if (return_stdev) {
+    ret.push_back(stdev, "stdev");
+  }
+
+  return ret;
+}
+
+// [[Rcpp::export]]
 arma::mat kriging_simulate(Rcpp::List k,
                            int nsim,
                            int seed,

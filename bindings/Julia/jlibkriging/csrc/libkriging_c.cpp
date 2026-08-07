@@ -240,6 +240,30 @@ int lk_kriging_subsetOfData(const double* X_n, int m, int d, int n_max, const ch
   CATCH_RETURN
 }
 
+int lk_kriging_predictCG(void* ptr,
+                         const double* X_n,
+                         int m,
+                         int d,
+                         int return_stdev,
+                         int max_iter,
+                         double tol,
+                         double* mean_out,
+                         double* stdev_out) {
+  try {
+    if (max_iter < 0)
+      throw std::invalid_argument("lk_kriging_predictCG: max_iter must be >= 0 (0 means the default, 2n)");
+    auto* k = static_cast<Kriging*>(ptr);
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    auto [mean_v, stdev_v] = k->predictCG(X_m, return_stdev != 0, static_cast<arma::uword>(max_iter), tol);
+    if (mean_out)
+      std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
+    if (stdev_out && return_stdev)
+      std::memcpy(stdev_out, stdev_v.memptr(), stdev_v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_simulate(void* ptr,
                         int nsim,
                         int seed,

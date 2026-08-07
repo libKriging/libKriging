@@ -192,6 +192,18 @@ returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
 for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
 LLVecchia/LLNystrom (which still use every point), this
 discards n - n_max points outright.)pbdoc")
+      .def("predictCG",
+           &PyKriging::predictCG,
+           py::arg("X"),
+           py::arg("return_stdev") = false,
+           py::arg("max_iter") = 0,
+           py::arg("tol") = 1e-8,
+           R"pbdoc(Predict-only, matrix-free conjugate-gradient alternative to
+predict(): solves each prediction with CG instead of using a stored dense
+factor. return_stdev=True runs one extra CG solve PER prediction point
+(much more expensive than the mean-only path), so it defaults to False.
+Only available for models fitted without a nugget/noise channel
+(NoiseModel.none). See docs/math/PredictCG.md.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
            py::arg("nsim") = 1,
