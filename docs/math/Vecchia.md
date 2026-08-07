@@ -95,8 +95,8 @@ and `save` raise a clear error on such a "light" model).
 [llvecchia_vs_cholesky.ipynb](llvecchia_vs_cholesky.ipynb) for a worked,
 executed notebook: the math above illustrated on a running example, with
 convergence/accuracy/timing plots and references.
-[Scalability.md](Scalability.md) for how this compares to `LLNystrom`
-and `NestedKriging`, and how to pick between them.
+[Scalability.md](Scalability.md) for how this compares to `LLNystrom`,
+`NestedKriging` and `predictCG`, and how to pick between them.
 
 ## References
 

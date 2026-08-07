@@ -17,11 +17,12 @@ method has its own page with the full derivation.
 | `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
+| `predictCG` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictCG.md](PredictCG.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
 
-All of these (Vecchia, Nystrom, NestedKriging, subsetOfData) are usable
-independently and, where noted below, combinable — none of them require
-opting out of the others.
+All of these (Vecchia, Nystrom, NestedKriging, subsetOfData, predictCG)
+are usable independently and, where noted below, combinable — none of
+them require opting out of the others.
 
 ## Which one, when
 
@@ -50,7 +51,16 @@ opting out of the others.
      discarding `n - n_max` observations outright rather than using all
      of them more cheaply the way every other method here does.
 
-2. **Regardless of which of the above you use**: OpenMP parallelizes
+2. **Is the fit fine (ordinary `"LL"`/`"LOO"`/`"LMP"`, one-time O(n³) is
+   acceptable) but you don't want an O(n²) dense factor resident just
+   for `predict` — or it was never computed at all?**
+   → `predictCG`. Doesn't change the objective or its accuracy at all;
+   just solves each prediction with matrix-free conjugate gradient
+   instead of reusing a stored factor. `return_stdev=true` is
+   opt-in-expensive (one CG solve *per prediction point*) — cheap only
+   for the mean, or for a handful of stdev queries.
+
+3. **Regardless of which of the above you use**: OpenMP parallelizes
    independent work (multi-start `optim`, multi-trajectory `simulate`,
    multi-point `predict`) transparently when built with it — no API
    change, always worth having on for large designs.
@@ -75,6 +85,17 @@ target* it converges to as group size grows.
 - **Vecchia/Nystrom + `NoiseModel`**: neither supports a nugget/noise
   channel yet (`NoiseModel::None` only) — see each method's own
   "Current limitations" section.
+- **`predictCG` after a light Vecchia fit**: a light Vecchia fit
+  (`set_vecchia_exact_commit(false)`) never has a resident dense
+  factor, so `predict` on it always routes to the *local* Vecchia
+  predictor. `predictCG` is a legitimate alternative there too — same
+  fitted θ/β, but a *global* (not m-neighbor-local) prediction, at
+  O(n²·iters) instead of Vecchia's O(n³) exact-commit cost. Neither
+  path is automatic; call the one you want explicitly.
+- **`predictCG` after a Nystrom fit**: works (predictCG only needs
+  m_X/m_y/m_F/θ/β, which a Nystrom fit still populates in full), but is
+  usually pointless — `predictNystrom` reuses the fit's own committed
+  low-rank factors and is cheaper than a fresh CG solve over the full n.
 
 ## Not implemented (deferred)
 
@@ -94,4 +115,5 @@ for a direct comparison against a library that does implement these
 
 See each method's own page ([Vecchia.md](Vecchia.md),
 [Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
-[SubsetOfData.md](SubsetOfData.md)) for its specific references.
+[SubsetOfData.md](SubsetOfData.md), [PredictCG.md](PredictCG.md)) for its
+specific references.
