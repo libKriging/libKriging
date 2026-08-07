@@ -24,7 +24,7 @@ jobs:
   benchmark-cpp:
     # TEMPORARY: skip on this branch, dedicated to validating the Octave
     # Windows CI fix in isolation. Remove this `if:` before merging.
-    if: github.ref_name != 'fix/octave-windows-omp-hang'
+    if: (github.head_ref || github.ref_name) != 'fix/octave-windows-omp-hang'
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
