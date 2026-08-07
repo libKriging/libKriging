@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, predictCG, or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -66,6 +66,15 @@ Ask, in order:
      landmarks): a global low-rank approximation, dimension-robust in the
      same way `NestedKriging`'s `NK` aggregation is, but a single model
      rather than a partition. See [Nystrom.md](../../docs/math/Nystrom.md).
+
+   These change the *fit* objective. If instead the fit itself is fine
+   (`objective="LL"`/`"LOO"`/`"LMP"`, ordinary O(n³) cost is acceptable
+   once) but keeping an O(n²) dense factor resident just for `predict`
+   isn't — or it was never computed at all — C++'s `predictCG` solves
+   each prediction with matrix-free conjugate gradient instead, at the
+   cost of O(n²·iters) per solve; see
+   [PredictCG.md](../../docs/math/PredictCG.md). Narrower than the above
+   (predict-only, doesn't touch fit time, C++ only as of this writing).
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too
    slow, and the design can be partitioned / prediction can be
