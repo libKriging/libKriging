@@ -58,7 +58,7 @@ leaveOneOutFun <- function(object, ...) {
 ##' at a different value of the parameters.
 ##'
 ##' @title Leave-One-Out vector
-##' 
+##'
 ##' @param object An object representing a fitted model.
 ##' @param ... Further arguments of function (eg. range).
 ##'
@@ -66,6 +66,23 @@ leaveOneOutFun <- function(object, ...) {
 ##' @export
 leaveOneOutVec <- function(object, ...) {
     UseMethod("leaveOneOutVec")
+}
+
+## *****************************************************************************
+##' Predict-only, matrix-free conjugate-gradient alternative to
+##' \code{predict}: solves each prediction with CG instead of using a
+##' stored dense factor. See \code{docs/math/PredictCG.md}.
+##'
+##' @title Matrix-free conjugate-gradient prediction
+##'
+##' @param object An object representing a fitted model.
+##' @param ... Further arguments of function (eg. points, return_stdev).
+##'
+##' @return A list containing the element \code{mean} and, if
+##'     \code{return_stdev=TRUE}, \code{stdev}.
+##' @export
+predictCG <- function(object, ...) {
+    UseMethod("predictCG")
 }
 
 ## *****************************************************************************

@@ -157,6 +157,19 @@ py::array_t<int> PyKriging::subsetOfData(const py::array_t<double>& X, int n_max
   return carma::col_to_arr(idx_i, true);
 }
 
+// --- predictCG ---
+
+std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::predictCG(const py::array_t<double>& X_n,
+                                                                          bool return_stdev,
+                                                                          int max_iter,
+                                                                          double tol) {
+  if (max_iter < 0)
+    throw std::invalid_argument("predictCG: max_iter must be >= 0 (0 means the default, 2n)");
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+  auto [mean, stdev] = m_internal->predictCG(mat_X, return_stdev, static_cast<arma::uword>(max_iter), tol);
+  return std::make_tuple(carma::col_to_arr(mean, true), carma::col_to_arr(stdev, true));
+}
+
 // --- simulate ---
 
 py::array_t<double> PyKriging::simulate(const int nsim,
