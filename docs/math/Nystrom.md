@@ -102,6 +102,17 @@ pred <- predict(k, Xnew, stdev = TRUE)
 - Landmarks are not serialized (rebuilt on refit).
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.
+- **Free MLE fits (`optim="BFGS"` with no starting `theta`) can drift
+  toward a large-θ degenerate optimum on smooth/near-deterministic test
+  functions**, giving a poor predictor despite a high objective value.
+  This is not specific to `LLNystrom`: it is the standard GP-MLE
+  degeneracy that affects the exact `"LL"` objective just as much on
+  such data (verified directly — both the exact and `LLNystrom`
+  concentrated log-likelihoods increase together with θ once σ² is
+  correctly profiled at each θ, rather than held fixed). The practical
+  mitigation is the same one used throughout this codebase's own test
+  suites: seed or fix `theta` at a domain-informed value rather than
+  trusting a single free `optim="BFGS"` run on deterministic data.
 
 ## See also
 
