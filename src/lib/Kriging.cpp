@@ -99,7 +99,8 @@ namespace {
 void libkriging_atfork_quiesce() {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
-  if (fn) fn(1);
+  if (fn)
+    fn(1);
 #endif
 #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -108,9 +109,9 @@ void libkriging_atfork_quiesce() {
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,  // prepare: quiesce before fork
-                   nullptr,                    // parent:  restored by next fit()
-                   libkriging_atfork_quiesce); // child:   ensure clean state
+    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
+                   nullptr,                     // parent:  restored by next fit()
+                   libkriging_atfork_quiesce);  // child:   ensure clean state
   }
 };
 static ForkSafeRegistrar fork_safe_registrar;
@@ -1454,6 +1455,187 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
   m_nystrom_D = std::move(D_v);
 }
 
+// =============================================================================
+// Iterative (matrix-free CG + stochastic log-det) approximated log-likelihood
+// (objective="LLIterative(m)")
+//
+// Unlike LLVecchia/LLNystrom (which each replace R by a cheaper structured
+// approximation -- local conditioning / global low rank), this keeps R
+// itself EXACT: every term except log|R| is a CG-converged matrix-free
+// solve, mathematically the same quantity a dense Cholesky factorization
+// would give (up to CG's own convergence tolerance), just computed via
+// O(n^2) matvecs instead of an O(n^3) factorization. Only the log-
+// determinant -- the one term CG cannot produce directly -- is replaced by
+// a Stochastic Lanczos Quadrature (SLQ) estimate
+// (LinearAlgebra::stochasticLogDet), and correspondingly the gradient's
+// trace(Rinv * dR/dtheta_k) term is a Hutchinson estimate sharing the SAME
+// probe vectors as the log-det (both are computed from the same
+// LinearAlgebra::conjugateGradient(Rmul, probes, ...) batch solve). This is
+// the same overall strategy as GPyTorch's BBMM/Lanczos-based inference.
+//
+// Probes are drawn ONCE per fit (make_iterative_probes, fixed seed) and
+// held fixed across every theta evaluation during optimization, for the
+// same smoothness reason LLNystrom's landmarks are fixed: re-drawing fresh
+// probes at every evaluation would make the objective (and its gradient)
+// noisy/non-smooth between BFGS iterations.
+// =============================================================================
+
+arma::uword Kriging::parse_iterative_m(const std::string& objective) {
+  // "LLIterative" -> default 30 ; "LLIterative(m)" -> m
+  if (objective == "LLIterative")
+    return 30;
+  if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
+    const std::string inside = objective.substr(12, objective.size() - 13);
+    try {
+      const long m = std::stol(inside);
+      if (m >= 1)
+        return static_cast<arma::uword>(m);
+    } catch (const std::exception&) {
+      // fall through to the throw below
+    }
+  }
+  throw std::invalid_argument("Invalid Iterative objective '" + objective
+                              + "': expected \"LLIterative\" or \"LLIterative(m)\" with m >= 1 (e.g. "
+                                "\"LLIterative(30)\")");
+}
+
+void Kriging::make_iterative_probes() {
+  const arma::uword n = m_X.n_rows;
+  m_iterative_probes = LinearAlgebra::rademacherProbes(n, m_iterative_nprobe, /*seed=*/20260808u);
+}
+
+double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
+                                        arma::vec* grad_out,
+                                        arma::vec* beta_out,
+                                        double* sigma2_out) const {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword nprobe = m_iterative_nprobe;
+  const arma::uword max_iter = (m_iterative_cg_max_iter == 0) ? 2 * n : m_iterative_cg_max_iter;
+
+  const arma::mat Xt = m_X.t();  // d x n, cache-friendly columns
+  const arma::vec& theta = _theta;
+  const auto& cov = _Cov;
+  auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
+    arma::vec out(n, arma::fill::none);
+#ifdef _OPENMP
+    if (n >= 200) {
+      int optimal_threads = get_optimal_threads(2);
+#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
+      for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
+        double acc = v(static_cast<arma::uword>(i));  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == static_cast<arma::uword>(i))
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(static_cast<arma::uword>(i)) = acc;
+      }
+    } else {
+#endif
+      for (arma::uword i = 0; i < n; ++i) {
+        double acc = v(i);  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == i)
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(i) = acc;
+      }
+#ifdef _OPENMP
+    }
+#endif
+    return out;
+  };
+
+  // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
+  // columns): p+1 right-hand sides sharing the same matvec, each an
+  // independent Krylov solve (no block-CG subspace sharing, but far cheaper
+  // than p+1 separate O(n^3) factorizations either way).
+  arma::mat FY = arma::join_rows(m_F, m_y);
+  const arma::mat RinvFY = LinearAlgebra::conjugateGradient(Rmul, FY, max_iter, m_iterative_cg_tol);
+  const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
+  const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
+
+  const arma::mat A = m_F.t() * RinvF;
+  const arma::vec b = m_F.t() * Rinvy;
+  const arma::vec beta = arma::solve(A, b, arma::solve_opts::likely_sympd);
+
+  const arma::vec e = m_y - m_F * beta;
+  const arma::vec x = Rinvy - RinvF * beta;  // Rinv is linear: Rinv(y - F*beta) = Rinv*y - Rinv*F*beta
+  const double SSE = arma::dot(e, x);
+  const double sigma2 = SSE / n;
+
+  const double logdetR
+      = LinearAlgebra::stochasticLogDet(Rmul, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
+
+  if (beta_out != nullptr)
+    *beta_out = beta;
+  if (sigma2_out != nullptr)
+    *sigma2_out = sigma2;
+
+  if (grad_out != nullptr) {
+    // Envelope theorem (beta_hat/sigma2_hat's own theta-dependence doesn't
+    // contribute at their profiled values -- same principle as
+    // _logLikelihoodVecchia/_logLikelihoodNystrom):
+    //   d(ll)/d(theta_k) = 0.5*(x' dR/dtheta_k x / sigma2 - trace(Rinv dR/dtheta_k))
+    // trace(Rinv dR/dtheta_k) is a Hutchinson estimate sharing the SAME
+    // probes as the log-determinant: w_p = Rinv*z_p (one batched CG call
+    // for all probes at once), then trace_k ~= mean_p( w_p . (dR/dtheta_k * z_p) ).
+    const arma::uword d = _theta.n_elem;
+    grad_out->set_size(d);
+
+    const arma::mat W = LinearAlgebra::conjugateGradient(Rmul, m_iterative_probes, max_iter, m_iterative_cg_tol);
+
+    for (arma::uword kk = 0; kk < d; ++kk) {
+      auto dRmul_k = [this, &Xt, &theta, &cov, n, kk](const arma::vec& v) -> arma::vec {
+        arma::vec out(n, arma::fill::zeros);
+        for (arma::uword i = 0; i < n; ++i) {
+          double acc = 0.0;  // diagonal of dR/dtheta_k is 0 (diag(R) = 1 is theta-independent)
+          for (arma::uword j = 0; j < n; ++j) {
+            if (j == i)
+              continue;
+            const arma::vec dx = Xt.col(i) - Xt.col(j);
+            acc += cov(dx, theta) * _DlnCovDtheta(dx, theta)(kk) * v(j);
+          }
+          out(i) = acc;
+        }
+        return out;
+      };
+
+      const double term1 = arma::dot(x, dRmul_k(x));
+
+      double trace_k = 0.0;
+      for (arma::uword p = 0; p < nprobe; ++p)
+        trace_k += arma::dot(W.col(p), dRmul_k(m_iterative_probes.col(p)));
+      trace_k /= static_cast<double>(nprobe);
+
+      (*grad_out)(kk) = 0.5 * (term1 / sigma2 - trace_k);
+    }
+  }
+
+  return -0.5 * (n * std::log(2 * M_PI * sigma2) + logdetR + n);
+}
+
+LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodIterativeFun(const arma::vec& theta,
+                                                                                   bool return_grad) {
+  if (m_iterative_nprobe == 0)
+    throw std::runtime_error("logLikelihoodIterativeFun: model was not fitted with objective=\"LLIterative(m)\"");
+  arma::vec grad;
+  if (return_grad) {
+    grad.set_size(theta.n_elem);
+    const double ll = _logLikelihoodIterative(theta, &grad);
+    return {ll, grad};
+  }
+  return {_logLikelihoodIterative(theta), grad};
+}
+
+void Kriging::check_not_iterative_light(const char* what) const {
+  if (m_iterative_light)
+    throw std::runtime_error(std::string(what)
+                             + ": not available on an Iterative fit "
+                               "(refit with objective=\"LL\", or use predictCG)");
+}
+
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
   if (objective == "LL") {
     if (m_noise_model == NoiseModel::Nugget) {
@@ -1615,9 +1797,34 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
         return -ll;
       };
     }
+  } else if (objective.rfind("LLIterative", 0) == 0) {
+    parse_iterative_m(objective);  // validate the spec early (throws on malformed)
+    if (m_noise_model != NoiseModel::None)
+      throw std::invalid_argument("LLIterative objective not supported for Nugget/Heterogeneous noise modes");
+    // Like LLNystrom, there is no exact-commit branch here: km_data (the dense
+    // O(n^3) KModel) is never populated for this objective, by design.
+    if (Optim::reparametrize) {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const arma::vec _theta = Optim::reparam_from(_gamma);
+        arma::vec grad;
+        const double ll = this->_logLikelihoodIterative(_theta, grad_out != nullptr ? &grad : nullptr);
+        if (grad_out != nullptr)
+          *grad_out = -Optim::reparam_from_deriv(_theta, grad);
+        return -ll;
+      };
+    } else {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const double ll = this->_logLikelihoodIterative(_gamma, grad_out);
+        if (grad_out != nullptr)
+          *grad_out = -*grad_out;
+        return -ll;
+      };
+    }
   } else
-    throw std::invalid_argument("Unsupported fit objective: " + objective
-                                + " (supported are: LL, LOO, LMP, LLVecchia, LLVecchia(m), LLNystrom, LLNystrom(k))");
+    throw std::invalid_argument(
+        "Unsupported fit objective: " + objective
+        + " (supported are: LL, LOO, LMP, LLVecchia, LLVecchia(m), LLNystrom, LLNystrom(k), LLIterative, "
+          "LLIterative(m))");
 }
 
 /** Fit the kriging object on (X,y):
@@ -1645,13 +1852,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_objective = objective;
   FitOfn fit_ofn = make_fit_objective(objective);
 
-  // Nystrom never touches m_dX (it works straight from m_X via
-  // covMat_sym_X/covMat_rect); a light Vecchia fit (exact_commit=false) skips
-  // the exact factorization that would otherwise need it. Both are only true
-  // when optim != "none": that path always does one exact make_Model call
-  // regardless of objective (see below), so it always needs m_dX.
+  // Nystrom/Iterative never touch m_dX (they work straight from m_X via
+  // covMat_sym_X/covMat_rect or a matrix-free matvec); a light Vecchia fit
+  // (exact_commit=false) skips the exact factorization that would otherwise
+  // need it. All are only true when optim != "none": that path always does
+  // one exact make_Model call regardless of objective (see below), so it
+  // always needs m_dX.
   const bool build_dX = (optim == "none")
-                        || !((objective.rfind("LLNystrom", 0) == 0)
+                        || !((objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLIterative", 0) == 0)
                              || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit));
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
@@ -1661,6 +1869,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_nystrom_k = 0;
   m_nystrom_U.reset();
   m_nystrom_D.reset();
+  m_iterative_light = false;
+  m_iterative_nprobe = 0;
+  m_iterative_probes.reset();
   if (objective.rfind("LLVecchia", 0) == 0) {
     m_vecchia_m = parse_vll_m(objective);
     make_vecchia_sets();
@@ -1670,6 +1881,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   if (objective.rfind("LLNystrom", 0) == 0) {
     m_nystrom_k = parse_nystrom_k(objective);
     make_nystrom_landmarks();
+  }
+  if (objective.rfind("LLIterative", 0) == 0) {
+    m_iterative_nprobe = parse_iterative_m(objective);
+    make_iterative_probes();
   }
 
   const double scaleY = m_scaleY;
@@ -1818,17 +2033,20 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           active = true;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(static_cast<int>(n));
+          if (fn)
+            fn(static_cast<int>(n));
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(static_cast<int>(n));
 #endif
         }
         ~ThreadCountGuard() {
-          if (!active) return;
+          if (!active)
+            return;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(1);
+          if (fn)
+            fn(1);
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(1);
@@ -2277,6 +2495,21 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m_nystrom_D = D_v;
         m_nystrom_light = true;
         m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
+      } else if (best_idx >= 0 && m_iterative_nprobe > 0) {
+        // Iterative commit: never an exact factorization; theta from the
+        // optimizer, beta/sigma2 profiled by the Iterative likelihood at theta*
+        const auto& best = results[best_idx];
+        m_theta = best.theta;
+        m_est_theta = true;
+        arma::vec beta_v;
+        double sigma2_v = -1;
+        _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+        if (m_est_beta)
+          m_beta = beta_v;
+        if (m_est_sigma2)
+          m_sigma2 = sigma2_v;
+        m_iterative_light = true;
+        m_is_empty = true;  // no committed factorization: predict routes to predictCG
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
@@ -2381,6 +2614,16 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
           "predict: return_cov/return_deriv are not available on a Nystrom fit "
           "(refit with objective=\"LL\", or use predictNystrom)");
     auto [mean, stdev] = predictNystrom(X_n, return_stdev);
+    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+  }
+  if (m_iterative_light) {
+    // Iterative fit: no exact factorization available; route mean/stdev to
+    // the matrix-free CG predictor
+    if (return_cov || return_deriv)
+      throw std::runtime_error(
+          "predict: return_cov/return_deriv are not available on an Iterative fit "
+          "(refit with objective=\"LL\", or use predictCG)");
+    auto [mean, stdev] = predictCG(X_n, return_stdev);
     return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
   }
   const arma::uword n_o = m_X.n_rows;
@@ -2529,6 +2772,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const arma::mat& X_n,
                                               const bool will_update) {
   check_not_vecchia_light("simulate");
+  check_not_iterative_light("simulate");
   if (m_nystrom_light) {
     if (will_update)
       throw std::runtime_error(
@@ -2605,6 +2849,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
 LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u, const arma::mat& X_u) {
   check_not_vecchia_light("update_simulate");
   check_not_nystrom_light("update_simulate");
+  check_not_iterative_light("update_simulate");
   if (m_noise_model == NoiseModel::Nugget) {
     const double alpha = m_alpha;
     return update_simulate_impl(y_u,
@@ -2665,6 +2910,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   check_not_vecchia_light("update");
+  check_not_iterative_light("update");
   if (m_nystrom_light) {
     update_nystrom(y_u, X_u, refit);
     return;
@@ -2923,6 +3169,7 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 
 void Kriging::save(const std::string filename) const {
   check_not_vecchia_light("save");
+  check_not_iterative_light("save");
   nlohmann::json j;
   j["version"] = 2;
   j["content"] = "Kriging";
