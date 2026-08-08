@@ -257,11 +257,21 @@ class Kriging : public KrigingImpl {
    *        bound, but round-off on typically ill-conditioned GP covariance matrices
    *        means more iterations keep helping in practice)
    * @param tol relative residual tolerance (norm(A*x-b)/norm(b)) for early stopping
+   * @param use_nystrom_precond build a rank-`precond_rank` Nystrom factor of R
+   *        at the model's own (already-fitted) theta and use it as a CG
+   *        preconditioner (LinearAlgebra::woodbury_solve as Pinv) -- same
+   *        idea as GPyTorch's pivoted-Cholesky preconditioner: fewer CG
+   *        iterations to reach `tol` on the typically ill-conditioned R,
+   *        at a one-time O(n*k^2) setup cost. Off by default (matches prior
+   *        behavior exactly).
+   * @param precond_rank rank of that Nystrom preconditioner, if enabled.
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictCG(const arma::mat& X_n,
                                                                bool return_stdev = false,
                                                                arma::uword max_iter = 0,
-                                                               double tol = 1e-8) const;
+                                                               double tol = 1e-8,
+                                                               bool use_nystrom_precond = false,
+                                                               arma::uword precond_rank = 50) const;
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output
