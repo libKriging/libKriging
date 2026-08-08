@@ -210,6 +210,25 @@ class Kriging : public KrigingImpl {
   /// True when the current fit is a Nystrom (no exact O(n^3) factorization) fit
   [[nodiscard]] bool is_nystrom_light() const { return m_nystrom_light; }
 
+  /** Matrix-free (CG + stochastic log-det) approximated log-likelihood at
+   * given theta (objective="LLIterative(m)"). Requires the model to have
+   * been fitted with objective="LLIterative" or "LLIterative(m)". Unlike
+   * LLVecchia/LLNystrom (whose approximation changes the covariance model
+   * itself), this stays close to the EXACT objective -- only its log|R|
+   * term is a stochastic (SLQ) estimate, everything else is a CG-converged
+   * exact solve -- see docs/math/Iterative.md.
+   * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient
+   *         via the envelope theorem + a Hutchinson trace estimator sharing
+   *         the same probes as the log-determinant term -- see the
+   *         derivation inside _logLikelihoodIterative's grad_out block in
+   *         Kriging.cpp. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodIterativeFun(const arma::vec& theta, bool return_grad);
+
+  /// Number of Hutchinson/SLQ probes used at fit time (0 = not fitted with LLIterative)
+  [[nodiscard]] arma::uword iterative_nprobe() const { return m_iterative_nprobe; }
+  /// True when the current fit is an Iterative (no exact O(n^3) factorization) fit
+  [[nodiscard]] bool is_iterative_light() const { return m_iterative_light; }
+
   /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
    * (U, D) from the LLNystrom(k) fit via the Woodbury identity instead of the
    * exact O(n^2) triangular solve — O(n*k*q) instead of O(n^2*q) for q
@@ -414,6 +433,48 @@ class Kriging : public KrigingImpl {
   /// O((n_old+n_new)*k^2): no O(n^2) matrix or pairwise-difference cube is
   /// built, unlike the exact/Vecchia update() paths.
   void update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+
+  // --- Iterative (matrix-free CG + stochastic log-det) approximated
+  // likelihood (objective="LLIterative(m)") ----------------------------------
+  // Unlike Vecchia/Nystrom (whose approximation replaces R by a cheaper
+  // structured model -- local conditioning / low rank), this keeps R
+  // itself exact: R^-1*y, R^-1*F and the SSE/beta/sigma2 GLS terms are all
+  // ordinary matrix-free CG solves (LinearAlgebra::conjugateGradient) that
+  // converge to the SAME answer the exact factorization would give, just
+  // without ever materializing R. Only log|R| -- the one term CG cannot
+  // give directly -- is replaced by a stochastic (SLQ) estimate
+  // (LinearAlgebra::stochasticLogDet), using the SAME Rademacher probes for
+  // the Hutchinson trace term in the gradient. This is the same overall
+  // strategy as GPyTorch's BBMM (see docs/math/Iterative.md).
+  arma::uword m_iterative_nprobe = 0;  ///< number of Hutchinson/SLQ probe vectors (0 = mode off)
+  /// n x nprobe Rademacher probes, drawn ONCE per fit (fixed seed) and held
+  /// fixed across every theta evaluation during optimization -- same
+  /// smoothness rationale as Nystrom's fixed landmarks: re-drawing fresh
+  /// probes at every evaluation would make the objective noisy/non-smooth
+  /// between BFGS iterations.
+  arma::mat m_iterative_probes;
+  arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictCG)
+  double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
+  arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
+
+  /// Parse "LLIterative" (default m=30) or "LLIterative(m)"; throws on malformed spec.
+  static arma::uword parse_iterative_m(const std::string& objective);
+  /// Draw m_iterative_probes from m_X's row count (call once, after
+  /// fit_setup_impl, before optimization starts).
+  void make_iterative_probes();
+  /// Iterative log-likelihood with profiled sigma2 and (GLS-profiled) beta,
+  /// via matrix-free CG solves and an SLQ log-determinant. Analytic gradient
+  /// in theta (envelope theorem, same principle as
+  /// _logLikelihoodVecchia/_logLikelihoodNystrom) computed via a shared-probe
+  /// Hutchinson trace estimator when grad_out is non-null. Optional
+  /// out-params expose the profiled beta/sigma2 (used by the commit step).
+  double _logLikelihoodIterative(const arma::vec& _theta,
+                                 arma::vec* grad_out = nullptr,
+                                 arma::vec* beta_out = nullptr,
+                                 double* sigma2_out = nullptr) const;
+  bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
+  /// Throw if the model is an Iterative fit (used by simulate/update/save)
+  void check_not_iterative_light(const char* what) const;
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;
