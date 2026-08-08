@@ -140,10 +140,19 @@ class LinearAlgebra {
   // Trades O(n^2) storage for O(n^2 * iters) compute per column, vs a single
   // O(n^2) dense triangular solve from a precomputed Cholesky factor -- only
   // worthwhile when that factor either doesn't exist or isn't kept in memory.
+  // Optional `Pinv` applies an approximate inverse of a preconditioner M
+  // (M^-1 * v) to accelerate convergence on ill-conditioned A -- e.g.
+  // LinearAlgebra::woodbury_solve bound to a Nystrom factor of A itself.
+  // Left empty (default), this reduces to plain CG. Standard
+  // preconditioned-CG recurrence (z = Pinv(r) replaces r in the
+  // Fletcher-Reeves ratio and search direction); the same periodic
+  // exact-residual restart as plain CG applies here too.
   LIBKRIGING_EXPORT static arma::mat conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
                                                        const arma::mat& B,
                                                        arma::uword max_iter,
-                                                       double tol = 1e-8);
+                                                       double tol = 1e-8,
+                                                       const std::function<arma::vec(const arma::vec&)>& Pinv
+                                                       = std::function<arma::vec(const arma::vec&)>());
 
   LIBKRIGING_EXPORT static arma::mat solve_lower(const arma::mat& L, const arma::mat& B);
   LIBKRIGING_EXPORT static arma::mat solve_upper(const arma::mat& U, const arma::mat& B);
