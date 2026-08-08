@@ -152,6 +152,59 @@ TEST_CASE("predictCG accuracy improves with a larger iteration budget", "[predic
   CHECK(err_default < err_tiny);
 }
 
+TEST_CASE("predictCG with Nystrom preconditioning matches exact predict", "[predictcg][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(40, X, y);
+  Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.1);
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(10, Xt, yt, 456);
+
+  auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
+  auto [m_cg, s_cg] = k.predictCG(Xt,
+                                  true,
+                                  /*max_iter=*/0,
+                                  /*tol=*/1e-8,
+                                  /*use_nystrom_precond=*/true,
+                                  /*precond_rank=*/20);
+
+  INFO("max |mean diff| = " << arma::abs(m_cg - m_ex).max());
+  INFO("max |stdev diff| = " << arma::abs(s_cg - s_ex).max());
+  CHECK(arma::abs(m_cg - m_ex).max() < 0.05 * arma::stddev(y));
+  CHECK(arma::abs(s_cg - s_ex).max() < 0.05 * arma::stddev(y));
+}
+
+TEST_CASE("predictCG Nystrom preconditioning converges faster on a tight iteration budget", "[predictcg][kriging]") {
+  // A larger theta makes R more strongly correlated/ill-conditioned (see the
+  // sizing rationale in make_fixed_theta_model's comment) -- exactly the
+  // regime a preconditioner should help with. Compare plain vs
+  // Nystrom-preconditioned CG at the SAME, deliberately tight iteration
+  // budget (tol set unreachably small so both runs use the full budget,
+  // isolating the effect of the preconditioner from early stopping).
+  arma::mat X;
+  arma::vec y;
+  make_data(60, X, y);
+  Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.5);
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(10, Xt, yt, 456);
+
+  auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
+
+  const arma::uword tight_budget = 6;
+  auto [m_plain, s_plain] = k.predictCG(Xt, false, tight_budget, 1e-12);
+  auto [m_pc, s_pc] = k.predictCG(Xt, false, tight_budget, 1e-12, /*use_nystrom_precond=*/true, /*precond_rank=*/30);
+
+  const double err_plain = arma::abs(m_plain - m_ex).max();
+  const double err_pc = arma::abs(m_pc - m_ex).max();
+  INFO("err plain CG (budget=" << tight_budget << ") = " << err_plain
+                               << ", err Nystrom-preconditioned CG = " << err_pc);
+  CHECK(err_pc < err_plain);
+}
+
 TEST_CASE("predictCG benchmark", "[.benchmark]") {
   arma::mat X;
   arma::vec y;
