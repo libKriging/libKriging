@@ -454,6 +454,79 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function
   return X;
 }
 
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rademacherProbes(arma::uword n, arma::uword nprobe, unsigned seed) {
+  arma::arma_rng::set_seed(static_cast<arma::arma_rng::seed_type>(seed));
+  arma::mat probes(n, nprobe, arma::fill::none);
+  probes.randu();  // in [0,1)
+  probes.transform([](double v) { return v < 0.5 ? -1.0 : 1.0; });
+  return probes;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                          arma::uword n,
+                                                          arma::uword nprobe,
+                                                          arma::uword lanczos_steps,
+                                                          const arma::mat& probes) {
+  lanczos_steps = std::min(lanczos_steps, n);
+  double total = 0.0;
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    const double znorm = arma::norm(probes.col(p));
+    if (znorm == 0.0)
+      continue;
+
+    // m-step Lanczos tridiagonalization of A, starting from probes.col(p)/znorm,
+    // with full reorthogonalization (lanczos_steps stays modest relative to
+    // n, so the extra O(m^2*n) cost is cheap next to the O(m*n^2) matvecs).
+    arma::mat V(n, lanczos_steps, arma::fill::none);
+    arma::vec alpha(lanczos_steps, arma::fill::zeros);
+    arma::vec beta(lanczos_steps, arma::fill::zeros);  // beta(j) links v_{j+1} and v_j, beta(0) unused
+
+    V.col(0) = probes.col(p) / znorm;
+    arma::vec v_prev(n, arma::fill::zeros);
+    double beta_prev = 0.0;
+    arma::uword m_eff = lanczos_steps;
+    for (arma::uword j = 0; j < lanczos_steps; ++j) {
+      arma::vec w = Amul(V.col(j)) - beta_prev * v_prev;
+      alpha(j) = arma::dot(w, V.col(j));
+      w -= alpha(j) * V.col(j);
+      // full reorthogonalization against all previous Lanczos vectors
+      for (arma::uword i = 0; i <= j; ++i)
+        w -= arma::dot(w, V.col(i)) * V.col(i);
+      const double bj = arma::norm(w);
+      if (j + 1 == lanczos_steps)
+        break;
+      if (bj < 1e-12) {
+        m_eff = j + 1;  // invariant subspace found: A*V(:,0:j) stays within span(V(:,0:j))
+        break;
+      }
+      beta(j) = bj;
+      V.col(j + 1) = w / bj;
+      v_prev = V.col(j);
+      beta_prev = bj;
+    }
+
+    arma::mat T(m_eff, m_eff, arma::fill::zeros);
+    for (arma::uword j = 0; j < m_eff; ++j)
+      T(j, j) = alpha(j);
+    for (arma::uword j = 0; j + 1 < m_eff; ++j) {
+      T(j, j + 1) = beta(j);
+      T(j + 1, j) = beta(j);
+    }
+
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, T);
+
+    double quad = 0.0;
+    for (arma::uword j = 0; j < m_eff; ++j) {
+      const double lambda = std::max(eigval(j), LinearAlgebra::num_nugget);
+      quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
+    }
+    total += quad;  // the leading znorm^2 == n for exact Rademacher entries is folded into the (n/nprobe) below
+  }
+  return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
 // Solve X*A=B : X = B / A
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
   // Force evaluation of ALL transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
