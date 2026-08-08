@@ -48,6 +48,30 @@ class Kriging : public KrigingImpl {
     Heterogeneous,  ///< known per-obs noise: R = corr + diag(noise/sigma2)
   };
 
+  /** Subset-of-data pre-fit reduction: picks `n_max` representative rows out
+   * of X (by index), meant to be applied BEFORE constructing/fitting a
+   * Kriging model on the reduced (X.rows(idx), y(idx)) -- a pure
+   * pre-processing layer, no change to the fit engine itself. This is the
+   * cheapest of libKriging's large-n options (a single k-means pass, then
+   * an ordinary O(n_max^3) exact fit) at the cost of discarding
+   * n - n_max points outright, unlike Vecchia/Nystrom/NestedKriging which
+   * all still use every point.
+   * @param X n x d design.
+   * @param n_max target subset size; if n_max >= X.n_rows, returns all
+   *        indices (no-op).
+   * @param method "kmeans" (default): n_max k-means centroids on X, each
+   *        replaced by its nearest actual (not synthetic) data point, so
+   *        the subset always consists of real observations; falls back to
+   *        "random" if k-means degenerates (e.g. n_max close to n_rows
+   *        producing near-empty clusters). "random": uniform subsample
+   *        without replacement.
+   * @param seed RNG seed (k-means initialization and/or random fallback).
+   * @return sorted row-indices into X (and the matching y) to keep. */
+  LIBKRIGING_EXPORT static arma::uvec subsetOfData(const arma::mat& X,
+                                                   arma::uword n_max,
+                                                   const std::string& method = "kmeans",
+                                                   int seed = 123);
+
   // populate_Model with member-state extra_param (alpha or sigma2)
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;

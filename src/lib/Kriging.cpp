@@ -118,6 +118,49 @@ static ForkSafeRegistrar fork_safe_registrar;
 }  // namespace
 #endif  // !_WIN32 && _POSIX_VERSION
 
+// =============================================================================
+// Subset-of-data pre-fit reduction (see Kriging.hpp for the full doc) -- a
+// pure pre-processing layer ahead of an ordinary fit, no interaction with
+// the rest of the class (static, no member access).
+// =============================================================================
+
+LIBKRIGING_EXPORT arma::uvec Kriging::subsetOfData(const arma::mat& X,
+                                                   arma::uword n_max,
+                                                   const std::string& method,
+                                                   int seed) {
+  const arma::uword n = X.n_rows;
+  if (n_max >= n)
+    return arma::regspace<arma::uvec>(0, n - 1);
+  if (n_max == 0)
+    return arma::uvec();
+
+  arma::arma_rng::set_seed(static_cast<arma::arma_rng::seed_type>(seed));
+
+  if (method == "kmeans") {
+    arma::mat centroids;
+    // arma::kmeans expects d x n data (rows = dimensions, cols = observations).
+    const bool kmeans_ok = arma::kmeans(centroids, X.t(), n_max, arma::random_subset, 10, false);
+    if (kmeans_ok) {
+      arma::uvec idx(n_max, arma::fill::none);
+      std::vector<bool> taken(n, false);
+      for (arma::uword c = 0; c < n_max; ++c) {
+        arma::vec dist2(n, arma::fill::none);
+        for (arma::uword i = 0; i < n; ++i)
+          dist2(i) = taken[i] ? arma::datum::inf : arma::accu(arma::square(X.row(i).t() - centroids.col(c)));
+        const arma::uword nearest = dist2.index_min();
+        idx(c) = nearest;
+        taken[nearest] = true;
+      }
+      return arma::sort(idx);
+    }
+    // else fall through to the random method below
+  } else if (method != "random") {
+    throw std::invalid_argument("subsetOfData: unknown method '" + method + "' (expected \"kmeans\" or \"random\")");
+  }
+
+  return arma::sort(arma::uvec(arma::randperm(n, n_max)));
+}
+
 /************************************************/
 /**      Kriging implementation        **/
 /************************************************/
