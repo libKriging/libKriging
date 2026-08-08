@@ -2411,7 +2411,9 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma::mat& X_n,
                                                                       bool return_stdev,
                                                                       arma::uword max_iter,
-                                                                      double tol) const {
+                                                                      double tol,
+                                                                      bool use_nystrom_precond,
+                                                                      arma::uword precond_rank) const {
   if (m_noise_model != NoiseModel::None)
     throw std::runtime_error("predictCG: only available for NoiseModel::None");
   if (m_X.n_rows == 0)
@@ -2468,6 +2470,25 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma
     return out;
   };
 
+  // Optional Nystrom preconditioner: a rank-precond_rank factor of R at the
+  // model's own (fixed, already-fitted) theta -- unlike the LLNystrom
+  // objective's landmarks, no cross-theta smoothness constraint applies
+  // here, so this can legitimately be built exactly at the theta being used
+  // for prediction rather than at a generic reference. Pinv is left empty
+  // (== plain CG) when disabled, matching the prior behavior exactly.
+  arma::mat U_pc;
+  arma::vec D_pc;
+  std::function<arma::vec(const arma::vec&)> Pinv;
+  if (use_nystrom_precond) {
+    arma::vec diag_resid;
+    U_pc = LinearAlgebra::nystromFactor(
+        &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, KrigingImpl::ones, std::min(precond_rank, n), 1e-12);
+    D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
+    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
+      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
+    };
+  }
+
   arma::mat Xn_n = X_n;
   Xn_n.each_row() -= m_centerX;
   Xn_n.each_row() /= m_scaleX;
@@ -2476,7 +2497,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma
 
   // One CG solve, reused for every prediction point's mean.
   const arma::vec resid = m_y - m_F * m_beta;
-  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol);
+  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol, Pinv);
 
   arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
   LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n.t(), m_theta, _Cov, 1.0);
@@ -2488,7 +2509,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma
   if (return_stdev) {
     // One CG solve PER prediction point (R_on's columns don't share a
     // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
-    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol);
+    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol, Pinv);
     const arma::vec quad = arma::sum(R_on % V, 0).t();
     stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad), 0.0, arma::datum::inf));
     stdev *= m_scaleY;
