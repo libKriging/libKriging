@@ -48,6 +48,30 @@ class Kriging : public KrigingImpl {
     Heterogeneous,  ///< known per-obs noise: R = corr + diag(noise/sigma2)
   };
 
+  /** Subset-of-data pre-fit reduction: picks `n_max` representative rows out
+   * of X (by index), meant to be applied BEFORE constructing/fitting a
+   * Kriging model on the reduced (X.rows(idx), y(idx)) -- a pure
+   * pre-processing layer, no change to the fit engine itself. This is the
+   * cheapest of libKriging's large-n options (a single k-means pass, then
+   * an ordinary O(n_max^3) exact fit) at the cost of discarding
+   * n - n_max points outright, unlike Vecchia/Nystrom/NestedKriging which
+   * all still use every point.
+   * @param X n x d design.
+   * @param n_max target subset size; if n_max >= X.n_rows, returns all
+   *        indices (no-op).
+   * @param method "kmeans" (default): n_max k-means centroids on X, each
+   *        replaced by its nearest actual (not synthetic) data point, so
+   *        the subset always consists of real observations; falls back to
+   *        "random" if k-means degenerates (e.g. n_max close to n_rows
+   *        producing near-empty clusters). "random": uniform subsample
+   *        without replacement.
+   * @param seed RNG seed (k-means initialization and/or random fallback).
+   * @return sorted row-indices into X (and the matching y) to keep. */
+  LIBKRIGING_EXPORT static arma::uvec subsetOfData(const arma::mat& X,
+                                                   arma::uword n_max,
+                                                   const std::string& method = "kmeans",
+                                                   int seed = 123);
+
   // populate_Model with member-state extra_param (alpha or sigma2)
   Kriging::KModel make_Model(const arma::vec& theta, std::map<std::string, double>* bench) const;
   void populate_Model(Kriging::KModel& m, const arma::vec& theta, std::map<std::string, double>* bench) const;
@@ -186,6 +210,25 @@ class Kriging : public KrigingImpl {
   /// True when the current fit is a Nystrom (no exact O(n^3) factorization) fit
   [[nodiscard]] bool is_nystrom_light() const { return m_nystrom_light; }
 
+  /** Matrix-free (CG + stochastic log-det) approximated log-likelihood at
+   * given theta (objective="LLIterative(m)"). Requires the model to have
+   * been fitted with objective="LLIterative" or "LLIterative(m)". Unlike
+   * LLVecchia/LLNystrom (whose approximation changes the covariance model
+   * itself), this stays close to the EXACT objective -- only its log|R|
+   * term is a stochastic (SLQ) estimate, everything else is a CG-converged
+   * exact solve -- see docs/math/Iterative.md.
+   * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient
+   *         via the envelope theorem + a Hutchinson trace estimator sharing
+   *         the same probes as the log-determinant term -- see the
+   *         derivation inside _logLikelihoodIterative's grad_out block in
+   *         Kriging.cpp. */
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodIterativeFun(const arma::vec& theta, bool return_grad);
+
+  /// Number of Hutchinson/SLQ probes used at fit time (0 = not fitted with LLIterative)
+  [[nodiscard]] arma::uword iterative_nprobe() const { return m_iterative_nprobe; }
+  /// True when the current fit is an Iterative (no exact O(n^3) factorization) fit
+  [[nodiscard]] bool is_iterative_light() const { return m_iterative_light; }
+
   /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
    * (U, D) from the LLNystrom(k) fit via the Woodbury identity instead of the
    * exact O(n^2) triangular solve — O(n*k*q) instead of O(n^2*q) for q
@@ -216,6 +259,38 @@ class Kriging : public KrigingImpl {
                                                                                               bool return_stdev,
                                                                                               bool return_cov,
                                                                                               bool return_deriv);
+
+  /** Predict-only alternative to `predict` for an already-fitted model,
+   * using matrix-free conjugate gradient (LinearAlgebra::conjugateGradient)
+   * instead of the stored O(n^2) Cholesky factor: needs only m_X/m_y/m_F/
+   * m_theta/m_beta/m_sigma2 (O(n) storage), at the cost of O(n^2 * iters)
+   * compute per solve instead of a single O(n^2) triangular solve. Useful
+   * when many predictions are made from a model whose dense factor either
+   * was never computed (e.g. after a light Vecchia/Nystrom fit -- though
+   * predictVecchia/predictNystrom are cheaper still there) or isn't worth
+   * keeping resident just for predict. Mean is universal-kriging-style with
+   * the committed beta; stdev requires one extra CG solve PER prediction
+   * point (O(n^2 * iters * q) total) and is disabled by default for that
+   * reason. Only available for NoiseModel::None.
+   * @param max_iter CG iteration budget per solve (0 = 2n; n is CG's exact-arithmetic
+   *        bound, but round-off on typically ill-conditioned GP covariance matrices
+   *        means more iterations keep helping in practice)
+   * @param tol relative residual tolerance (norm(A*x-b)/norm(b)) for early stopping
+   * @param use_nystrom_precond build a rank-`precond_rank` Nystrom factor of R
+   *        at the model's own (already-fitted) theta and use it as a CG
+   *        preconditioner (LinearAlgebra::woodbury_solve as Pinv) -- same
+   *        idea as GPyTorch's pivoted-Cholesky preconditioner: fewer CG
+   *        iterations to reach `tol` on the typically ill-conditioned R,
+   *        at a one-time O(n*k^2) setup cost. Off by default (matches prior
+   *        behavior exactly).
+   * @param precond_rank rank of that Nystrom preconditioner, if enabled.
+   * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictCG(const arma::mat& X_n,
+                                                               bool return_stdev = false,
+                                                               arma::uword max_iter = 0,
+                                                               double tol = 1e-8,
+                                                               bool use_nystrom_precond = false,
+                                                               arma::uword precond_rank = 50) const;
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output
@@ -358,6 +433,48 @@ class Kriging : public KrigingImpl {
   /// O((n_old+n_new)*k^2): no O(n^2) matrix or pairwise-difference cube is
   /// built, unlike the exact/Vecchia update() paths.
   void update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+
+  // --- Iterative (matrix-free CG + stochastic log-det) approximated
+  // likelihood (objective="LLIterative(m)") ----------------------------------
+  // Unlike Vecchia/Nystrom (whose approximation replaces R by a cheaper
+  // structured model -- local conditioning / low rank), this keeps R
+  // itself exact: R^-1*y, R^-1*F and the SSE/beta/sigma2 GLS terms are all
+  // ordinary matrix-free CG solves (LinearAlgebra::conjugateGradient) that
+  // converge to the SAME answer the exact factorization would give, just
+  // without ever materializing R. Only log|R| -- the one term CG cannot
+  // give directly -- is replaced by a stochastic (SLQ) estimate
+  // (LinearAlgebra::stochasticLogDet), using the SAME Rademacher probes for
+  // the Hutchinson trace term in the gradient. This is the same overall
+  // strategy as GPyTorch's BBMM (see docs/math/Iterative.md).
+  arma::uword m_iterative_nprobe = 0;  ///< number of Hutchinson/SLQ probe vectors (0 = mode off)
+  /// n x nprobe Rademacher probes, drawn ONCE per fit (fixed seed) and held
+  /// fixed across every theta evaluation during optimization -- same
+  /// smoothness rationale as Nystrom's fixed landmarks: re-drawing fresh
+  /// probes at every evaluation would make the objective noisy/non-smooth
+  /// between BFGS iterations.
+  arma::mat m_iterative_probes;
+  arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictCG)
+  double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
+  arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
+
+  /// Parse "LLIterative" (default m=30) or "LLIterative(m)"; throws on malformed spec.
+  static arma::uword parse_iterative_m(const std::string& objective);
+  /// Draw m_iterative_probes from m_X's row count (call once, after
+  /// fit_setup_impl, before optimization starts).
+  void make_iterative_probes();
+  /// Iterative log-likelihood with profiled sigma2 and (GLS-profiled) beta,
+  /// via matrix-free CG solves and an SLQ log-determinant. Analytic gradient
+  /// in theta (envelope theorem, same principle as
+  /// _logLikelihoodVecchia/_logLikelihoodNystrom) computed via a shared-probe
+  /// Hutchinson trace estimator when grad_out is non-null. Optional
+  /// out-params expose the profiled beta/sigma2 (used by the commit step).
+  double _logLikelihoodIterative(const arma::vec& _theta,
+                                 arma::vec* grad_out = nullptr,
+                                 arma::vec* beta_out = nullptr,
+                                 double* sigma2_out = nullptr) const;
+  bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
+  /// Throw if the model is an Iterative fit (used by simulate/update/save)
+  void check_not_iterative_light(const char* what) const;
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

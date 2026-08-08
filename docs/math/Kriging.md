@@ -6,7 +6,8 @@
 (`NestedKriging` fits many of them, `WarpKriging`/`MLPKriging` wrap
 them with a learned input feature map, `objective="LLVecchia(m)"` /
 `objective="LLNystrom(k)"` swap the likelihood for a scalable
-approximation — see
+approximation — see [Scalability.md](Scalability.md) for the full
+inventory of large-n methods and how to pick one, or individually:
 [Vecchia.md](Vecchia.md), [Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
 [Warping-Affine.md](Warping-Affine.md) *et al.*). It treats the
 unknown response as a Gaussian process: a trend (regression) part
@@ -87,7 +88,10 @@ the same trend uncertainty term as the concentrated likelihood. See
 [Update.md](Update.md) for the exact formulas shared
 by `predict`, `simulate`, `update` and `update_simulate`, all
 implemented via the same cached Cholesky/QR factorization rather than
-independent from-scratch computations.
+independent from-scratch computations. `predictCG` is a predict-only,
+matrix-free alternative (conjugate gradient instead of the stored
+factor) for models where that factor isn't resident — see
+[PredictCG.md](PredictCG.md).
 
 ## Simple example
 

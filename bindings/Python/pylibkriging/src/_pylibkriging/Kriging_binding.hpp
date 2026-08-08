@@ -50,6 +50,11 @@ class PyKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
+  std::tuple<py::array_t<double>, py::array_t<double>> predictCG(const py::array_t<double>& X_n,
+                                                                 bool return_stdev,
+                                                                 int max_iter,
+                                                                 double tol);
+
   // with_noise: None => plain, True => with nugget, array => heterogeneous noise
   py::array_t<double> simulate(const int nsim,
                                const int seed,

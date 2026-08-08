@@ -9,6 +9,7 @@ void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void predictCG(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

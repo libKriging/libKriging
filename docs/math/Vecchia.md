@@ -90,6 +90,11 @@ and `save` raise a clear error on such a "light" model).
   beyond that.
 - Vecchia neighbor sets are not serialized (rebuilt on refit).
 
+## See also
+
+[Scalability.md](Scalability.md) for how this compares to `LLNystrom`,
+`NestedKriging` and `predictCG`, and how to pick between them.
+
 ## References
 
 - Vecchia, A. V. (1988). *Estimation and model identification for

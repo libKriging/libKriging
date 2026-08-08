@@ -386,6 +386,147 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma:
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
 }
 
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                             const arma::mat& B,
+                                                             arma::uword max_iter,
+                                                             double tol,
+                                                             const std::function<arma::vec(const arma::vec&)>& Pinv) {
+  const bool preconditioned = static_cast<bool>(Pinv);
+  const arma::uword n = B.n_rows;
+  arma::mat X(n, B.n_cols, arma::fill::zeros);
+  for (arma::uword c = 0; c < B.n_cols; ++c) {
+    const arma::vec b = B.col(c);
+    const double bnorm = arma::norm(b);
+    if (bnorm == 0.0)
+      continue;  // x=0 already solves A*x=0
+
+    arma::vec x(n, arma::fill::zeros);
+    arma::vec r = b;  // b - A*x0, x0 = 0
+    arma::vec z = preconditioned ? Pinv(r) : r;
+    arma::vec p = z;
+    double rz_old = arma::dot(r, z);
+
+    // GP covariance matrices are typically ill-conditioned (smooth kernels,
+    // many points): the recursively-updated residual (r -= alpha*Ap) drifts
+    // from the true residual under round-off well before max_iter is
+    // reached, and pushing past that point can make x measurably WORSE, not
+    // better (observed empirically: unstable growth after ~2n iterations on
+    // a matern5_2 fit). Periodically recompute the exact residual from
+    // scratch (one extra matvec every `restart_every` iterations) -- a
+    // standard CG robustness fix -- to correct that drift.
+    constexpr arma::uword restart_every = 50;
+
+    for (arma::uword it = 0; it < max_iter; ++it) {
+      const arma::vec Ap = Amul(p);
+      const double pAp = arma::dot(p, Ap);
+      if (pAp <= 0.0)
+        break;  // breakdown guard: shouldn't happen for a genuinely SPD A
+      const double alpha = rz_old / pAp;
+      x += alpha * p;
+
+      if ((it + 1) % restart_every == 0) {
+        // Full restart: the just-recomputed residual reflects the TRUE
+        // state at x, so the previous rz_old (from the drifted residual) is
+        // no longer a meaningful reference for the Fletcher-Reeves ratio --
+        // blending it into beta (as the non-restart branch does) sends the
+        // search direction off in a bad direction instead of correcting it.
+        // Reset p = z, i.e. restart CG fresh from the current x.
+        r = b - Amul(x);
+        if (arma::norm(r) / bnorm < tol)
+          break;
+        z = preconditioned ? Pinv(r) : r;
+        rz_old = arma::dot(r, z);
+        p = z;
+        continue;
+      }
+
+      r -= alpha * Ap;
+      const double rnorm = arma::norm(r);
+      if (rnorm / bnorm < tol)
+        break;
+      z = preconditioned ? Pinv(r) : r;
+      const double rz_new = arma::dot(r, z);
+      p = z + (rz_new / rz_old) * p;
+      rz_old = rz_new;
+    }
+    X.col(c) = x;
+  }
+  return X;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rademacherProbes(arma::uword n, arma::uword nprobe, unsigned seed) {
+  arma::arma_rng::set_seed(static_cast<arma::arma_rng::seed_type>(seed));
+  arma::mat probes(n, nprobe, arma::fill::none);
+  probes.randu();  // in [0,1)
+  probes.transform([](double v) { return v < 0.5 ? -1.0 : 1.0; });
+  return probes;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                          arma::uword n,
+                                                          arma::uword nprobe,
+                                                          arma::uword lanczos_steps,
+                                                          const arma::mat& probes) {
+  lanczos_steps = std::min(lanczos_steps, n);
+  double total = 0.0;
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    const double znorm = arma::norm(probes.col(p));
+    if (znorm == 0.0)
+      continue;
+
+    // m-step Lanczos tridiagonalization of A, starting from probes.col(p)/znorm,
+    // with full reorthogonalization (lanczos_steps stays modest relative to
+    // n, so the extra O(m^2*n) cost is cheap next to the O(m*n^2) matvecs).
+    arma::mat V(n, lanczos_steps, arma::fill::none);
+    arma::vec alpha(lanczos_steps, arma::fill::zeros);
+    arma::vec beta(lanczos_steps, arma::fill::zeros);  // beta(j) links v_{j+1} and v_j, beta(0) unused
+
+    V.col(0) = probes.col(p) / znorm;
+    arma::vec v_prev(n, arma::fill::zeros);
+    double beta_prev = 0.0;
+    arma::uword m_eff = lanczos_steps;
+    for (arma::uword j = 0; j < lanczos_steps; ++j) {
+      arma::vec w = Amul(V.col(j)) - beta_prev * v_prev;
+      alpha(j) = arma::dot(w, V.col(j));
+      w -= alpha(j) * V.col(j);
+      // full reorthogonalization against all previous Lanczos vectors
+      for (arma::uword i = 0; i <= j; ++i)
+        w -= arma::dot(w, V.col(i)) * V.col(i);
+      const double bj = arma::norm(w);
+      if (j + 1 == lanczos_steps)
+        break;
+      if (bj < 1e-12) {
+        m_eff = j + 1;  // invariant subspace found: A*V(:,0:j) stays within span(V(:,0:j))
+        break;
+      }
+      beta(j) = bj;
+      V.col(j + 1) = w / bj;
+      v_prev = V.col(j);
+      beta_prev = bj;
+    }
+
+    arma::mat T(m_eff, m_eff, arma::fill::zeros);
+    for (arma::uword j = 0; j < m_eff; ++j)
+      T(j, j) = alpha(j);
+    for (arma::uword j = 0; j + 1 < m_eff; ++j) {
+      T(j, j + 1) = beta(j);
+      T(j + 1, j) = beta(j);
+    }
+
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, T);
+
+    double quad = 0.0;
+    for (arma::uword j = 0; j < m_eff; ++j) {
+      const double lambda = std::max(eigval(j), LinearAlgebra::num_nugget);
+      quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
+    }
+    total += quad;  // the leading znorm^2 == n for exact Rademacher entries is folded into the (n/nprobe) below
+  }
+  return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
 // Solve X*A=B : X = B / A
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::rsolve(const arma::mat& A, const arma::mat& B) {
   // Force evaluation of ALL transposes to avoid LAPACK dimension mismatch (MKL ERROR Parameter 7)
