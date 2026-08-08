@@ -154,6 +154,35 @@ class LinearAlgebra {
                                                        const std::function<arma::vec(const arma::vec&)>& Pinv
                                                        = std::function<arma::vec(const arma::vec&)>());
 
+  // Stochastic Lanczos Quadrature (SLQ) estimate of log|A| for an SPD matrix
+  // A of size n, given only as a matrix-vector product `Amul` -- A itself is
+  // never materialized (Ubaru, Chen & Saad 2017). For `nprobe` independent
+  // Rademacher probe vectors z_i (entries +-1, so z_i.t()*z_i = n exactly),
+  // an `lanczos_steps`-step Lanczos tridiagonalization of A starting from
+  // z_i (full reorthogonalization against all prior Lanczos vectors, since
+  // `lanczos_steps` is meant to stay modest relative to n) gives a small
+  // tridiagonal T_i whose eigendecomposition V*diag(lambda)*V.t() yields
+  // z_i.t()*log(A)*z_i ~= n * sum_j V(0,j)^2 * log(lambda_j); averaging
+  // over probes and using trace(log(A)) = log|A| gives the estimate. Cost
+  // O(nprobe * lanczos_steps * n^2) (matvec-dominated) instead of O(n^3)
+  // for an exact Cholesky-based log-determinant -- the same idea GPyTorch's
+  // BBMM uses for its own log-determinant term. `seed` makes repeated calls
+  // with the same probes reproducible (needed for a smooth objective across
+  // nearby theta evaluations during optimization).
+  LIBKRIGING_EXPORT static double stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                    arma::uword n,
+                                                    arma::uword nprobe,
+                                                    arma::uword lanczos_steps,
+                                                    const arma::mat& probes);
+
+  // Generates `nprobe` Rademacher (+-1 entries) probe vectors of length n,
+  // as columns of an n x nprobe matrix -- meant to be generated ONCE (fixed
+  // seed) and reused across every theta evaluation of an iterative
+  // objective, exactly like LLNystrom's fixed landmarks: re-drawing fresh
+  // probes at every evaluation would make the objective noisy/non-smooth
+  // between optimizer iterations.
+  LIBKRIGING_EXPORT static arma::mat rademacherProbes(arma::uword n, arma::uword nprobe, unsigned seed);
+
   LIBKRIGING_EXPORT static arma::mat solve_lower(const arma::mat& L, const arma::mat& B);
   LIBKRIGING_EXPORT static arma::mat solve_upper(const arma::mat& U, const arma::mat& B);
   LIBKRIGING_EXPORT static arma::mat rsolve_upper(const arma::mat& U, const arma::mat& B);
