@@ -34,10 +34,15 @@ classdef Kriging < handle
         % Predict-only, matrix-free conjugate-gradient alternative to
         % predict(): solves each prediction with CG instead of using a
         % stored dense factor. Args: (X_n, return_stdev=false, max_iter=0,
-        % tol=1e-8). return_stdev=true runs one extra CG solve PER
-        % prediction point, so it defaults to false. Only available for
-        % models fitted without a nugget/noise channel. See
-        % docs/math/PredictCG.md.
+        % tol=1e-8, use_nystrom_precond=false, precond_rank=50).
+        % return_stdev=true runs one extra CG solve PER prediction point,
+        % so it defaults to false. use_nystrom_precond=true builds a
+        % rank-precond_rank Nystrom factor of R at the model's own
+        % (already-fitted) theta and uses it as a CG preconditioner (fewer
+        % CG iterations to reach tol, at a one-time setup cost); off by
+        % default. Only available for models fitted without a
+        % nugget/noise channel. See docs/math/PredictCG.md and
+        % docs/math/Nystrom.md.
         function varargout = predictCG(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::predictCG", obj.ref, varargin{:});
         end
@@ -112,6 +117,14 @@ classdef Kriging < handle
 
         function varargout = nystrom_rank(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::nystrom_rank", obj.ref, varargin{:});
+        end
+
+        function varargout = iterative_nprobe(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::iterative_nprobe", obj.ref, varargin{:});
+        end
+
+        function varargout = is_iterative_light(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::is_iterative_light", obj.ref, varargin{:});
         end
 
         function varargout = X(obj, varargin)

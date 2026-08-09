@@ -137,6 +137,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::nystrom_rank"_hash:
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::iterative_nprobe"_hash:
+      return KrigingBinding::iterative_nprobe(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_iterative_light"_hash:
+      return KrigingBinding::is_iterative_light(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::X"_hash:
       return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::centerX"_hash:

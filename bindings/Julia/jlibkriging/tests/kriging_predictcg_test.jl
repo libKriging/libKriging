@@ -63,4 +63,50 @@ make_fixed_theta_model(y, X; theta_val::Float64=0.3) =
 
         @test_throws ArgumentError predictCG(k, Xt; max_iter=-1)
     end
+
+    @testset "Nystrom-preconditioned CG matches exact predict" begin
+        X, y = make_data(60)
+        k = make_fixed_theta_model(y, X)
+        Xt = rand(20, 2)
+
+        p_exact = predict(k, Xt; return_stdev=true)
+        p_pc = predictCG(k, Xt; return_stdev=true, use_nystrom_precond=true, precond_rank=20)
+
+        sdy = std(y)
+        @test maximum(abs.(p_exact.mean .- p_pc.mean)) < 0.05 * sdy
+        @test maximum(abs.(p_exact.stdev .- p_pc.stdev)) < 0.05 * sdy
+    end
+
+    @testset "rejects a negative precond_rank" begin
+        X, y = make_data(20)
+        k = make_fixed_theta_model(y, X)
+        Xt = rand(5, 2)
+
+        @test_throws ArgumentError predictCG(k, Xt; use_nystrom_precond=true, precond_rank=-1)
+    end
+end
+
+@testset "Kriging subsetOfData" begin
+    @testset "returns n_max sorted 0-based indices" begin
+        X, _ = make_data(200)
+
+        idx = subsetOfData(X, 20)
+        @test length(idx) == 20
+        @test issorted(idx)
+        @test minimum(idx) >= 0
+        @test maximum(idx) < size(X, 1)
+    end
+
+    @testset "is a no-op when n_max covers all rows" begin
+        X, _ = make_data(15)
+
+        idx = subsetOfData(X, 15)
+        @test idx == collect(0:14)
+    end
+
+    @testset "rejects a non-positive n_max" begin
+        X, _ = make_data(10)
+
+        @test_throws ArgumentError subsetOfData(X, 0)
+    end
 end
