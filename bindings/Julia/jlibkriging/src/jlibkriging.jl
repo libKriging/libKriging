@@ -260,6 +260,46 @@ function predict(k::Kriging, X_n::Matrix{Float64};
 end
 
 """
+    predictCG(k::Kriging, X_n; return_stdev=false, max_iter=0, tol=1e-8,
+              use_nystrom_precond=false, precond_rank=50)
+
+Predict-only, matrix-free conjugate-gradient alternative to `predict`:
+solves each prediction with CG instead of using a stored dense factor.
+`return_stdev=true` runs one extra CG solve PER prediction point (much
+more expensive than the mean-only path), so it defaults to `false`.
+`max_iter=0` means the default (`2n`). `use_nystrom_precond=true` builds a
+rank-`precond_rank` Nystrom factor of R at the model's own (already-fitted)
+theta and uses it as a CG preconditioner (fewer CG iterations to reach
+`tol` on the typically ill-conditioned R, at a one-time setup cost); off by
+default. Only available for models fitted without a nugget/noise channel.
+See `docs/math/PredictCG.md` and `docs/math/Nystrom.md`.
+"""
+function predictCG(k::Kriging, X_n::Matrix{Float64};
+                   return_stdev::Bool=false,
+                   max_iter::Int=0,
+                   tol::Float64=1e-8,
+                   use_nystrom_precond::Bool=false,
+                   precond_rank::Int=50)
+    max_iter >= 0 || throw(ArgumentError("predictCG: max_iter must be >= 0 (0 means the default, 2n)"))
+    precond_rank >= 0 || throw(ArgumentError("predictCG: precond_rank must be >= 0"))
+    m, d = size(X_n)
+    mean_out = Vector{Float64}(undef, m)
+    stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
+
+    ret = ccall(dlsym(_lk(), :lk_kriging_predictCG), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
+                 Cint, Cint, Cdouble, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}),
+                k.ptr, X_n, m, d,
+                return_stdev ? 1 : 0, max_iter, tol,
+                use_nystrom_precond ? 1 : 0, precond_rank,
+                mean_out,
+                return_stdev ? stdev_out : C_NULL)
+    _check_error(ret)
+    return (mean=mean_out, stdev=return_stdev ? stdev_out : nothing)
+end
+
+"""
     subsetOfData(X::Matrix{Float64}, n_max::Int; method="kmeans", seed=123)
 
 Subset-of-data pre-fit reduction: select `n_max` rows of `X` (k-means
@@ -267,7 +307,7 @@ centroids snapped to the nearest real point, or a uniform random
 subsample), returned as 0-based row-indices into `X` (`Vector{Int}`).
 Meant as a cheap pre-fit reduction for large designs: fit on
 `X[idx.+1, :], y[idx.+1]` instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+LLVecchia/LLNystrom/LLIterative (which still use every point), this
 discards `n - n_max` points outright. If `n_max >= size(X, 1)`, returns all
 indices (no-op).
 """
@@ -283,37 +323,6 @@ function subsetOfData(X::Matrix{Float64}, n_max::Int; method::String="kmeans", s
         error("libKriging error: $msg")
     end
     return Int.(idx_out[1:ret])
-end
-
-"""
-    predictCG(k::Kriging, X_n; return_stdev=false, max_iter=0, tol=1e-8)
-
-Predict-only, matrix-free conjugate-gradient alternative to `predict`:
-solves each prediction with CG instead of using a stored dense factor.
-`return_stdev=true` runs one extra CG solve PER prediction point (much
-more expensive than the mean-only path), so it defaults to `false`.
-`max_iter=0` means the default (`2n`). Only available for models fitted
-without a nugget/noise channel. See `docs/math/PredictCG.md`.
-"""
-function predictCG(k::Kriging, X_n::Matrix{Float64};
-                   return_stdev::Bool=false,
-                   max_iter::Int=0,
-                   tol::Float64=1e-8)
-    max_iter >= 0 || throw(ArgumentError("predictCG: max_iter must be >= 0 (0 means the default, 2n)"))
-    m, d = size(X_n)
-    mean_out = Vector{Float64}(undef, m)
-    stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
-
-    ret = ccall(dlsym(_lk(), :lk_kriging_predictCG), Cint,
-                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
-                 Cint, Cint, Cdouble,
-                 Ptr{Float64}, Ptr{Float64}),
-                k.ptr, X_n, m, d,
-                return_stdev ? 1 : 0, max_iter, tol,
-                mean_out,
-                return_stdev ? stdev_out : C_NULL)
-    _check_error(ret)
-    return (mean=mean_out, stdev=return_stdev ? stdev_out : nothing)
 end
 
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
@@ -513,6 +522,14 @@ end
 
 function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
+end
+
+function iterative_nprobe(k::Kriging)
+    return Int(ccall(dlsym(_lk(), :lk_kriging_iterative_nprobe), Cint, (Ptr{Nothing},), k.ptr))
+end
+
+function is_iterative_light(k::Kriging)
+    return ccall(dlsym(_lk(), :lk_kriging_is_iterative_light), Cint, (Ptr{Nothing},), k.ptr) != 0
 end
 
 function normalize(k::Kriging)
@@ -1466,7 +1483,7 @@ export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
-export nystrom_rank
+export nystrom_rank, iterative_nprobe, is_iterative_light
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim
