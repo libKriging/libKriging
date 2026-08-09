@@ -48,10 +48,17 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   // no-grad evaluation happen, no CG-heavy optimization)
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative"));
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8)"));
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5)"));  // opt-in Nystrom CG precond
 
   // malformed specs throw
-  for (const std::string bad :
-       {"LLIterative()", "LLIterative(x)", "LLIterative(0)", "LLIterative(-3)", "LLIterative(10"}) {
+  for (const std::string bad : {"LLIterative()",
+                                "LLIterative(x)",
+                                "LLIterative(0)",
+                                "LLIterative(-3)",
+                                "LLIterative(10",
+                                "LLIterative(8,0)",
+                                "LLIterative(8,-2)",
+                                "LLIterative(8,x)"}) {
     CHECK_THROWS_AS(make_fixed_theta_iterative(y, X, bad), std::invalid_argument);
   }
 
@@ -133,6 +140,32 @@ TEST_CASE("LLIterative analytic gradient approximately matches finite difference
     CHECK(grad(kk) * fd > 0.0);  // same sign
     CHECK(std::abs(grad(kk) - fd) < 0.5 * (std::abs(grad(kk)) + std::abs(fd)) + 3.0);
   }
+}
+
+TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unpreconditioned objective/gradient",
+          "[iterative][kriging]") {
+  // The preconditioner only changes HOW FAST CG's Krylov iteration converges
+  // to R^-1*[F|y|probes], not what it converges TO: both runs use the same
+  // default max_iter=2n budget and tol=1e-8, comfortably enough for exact
+  // (unpreconditioned) CG to fully converge on this size of problem, so the
+  // preconditioned and unpreconditioned objective/gradient should agree
+  // tightly -- unlike the SLQ/Hutchinson-vs-exact-LL comparisons elsewhere
+  // in this file, which only agree in an order-of-magnitude sense.
+  arma::mat X;
+  arma::vec y;
+  make_data(35, X, y);
+
+  Kriging k_plain = make_fixed_theta_iterative(y, X, "LLIterative(30)");
+  Kriging k_pc = make_fixed_theta_iterative(y, X, "LLIterative(30,15)");
+
+  const arma::vec theta{0.35, 0.3};
+  auto [ll_plain, grad_plain] = k_plain.logLikelihoodIterativeFun(theta, true);
+  auto [ll_pc, grad_pc] = k_pc.logLikelihoodIterativeFun(theta, true);
+
+  INFO("ll_plain=" << ll_plain << " ll_pc=" << ll_pc << " grad_plain=" << grad_plain.t()
+                   << " grad_pc=" << grad_pc.t());
+  CHECK(std::abs(ll_plain - ll_pc) < 1e-4 * std::abs(ll_plain) + 1e-6);
+  CHECK(arma::abs(grad_plain - grad_pc).max() < 0.02 * arma::abs(grad_plain).max() + 0.05);
 }
 
 // The "light fit" flag (and everything gated behind it: predictCG routing,

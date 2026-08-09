@@ -1480,28 +1480,63 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 // noisy/non-smooth between BFGS iterations.
 // =============================================================================
 
-arma::uword Kriging::parse_iterative_m(const std::string& objective) {
-  // "LLIterative" -> default 30 ; "LLIterative(m)" -> m
+arma::uword Kriging::parse_iterative_m(const std::string& objective, arma::uword* precond_rank_out) {
+  // "LLIterative" -> default 30, no precond ; "LLIterative(m)" -> m, no
+  // precond ; "LLIterative(m,precond_rank)" -> m and an opt-in Nystrom CG
+  // preconditioner of the given rank.
+  if (precond_rank_out != nullptr)
+    *precond_rank_out = 0;
   if (objective == "LLIterative")
     return 30;
   if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
     const std::string inside = objective.substr(12, objective.size() - 13);
+    const std::size_t comma = inside.find(',');
     try {
-      const long m = std::stol(inside);
-      if (m >= 1)
+      const std::string m_str = (comma == std::string::npos) ? inside : inside.substr(0, comma);
+      const long m = std::stol(m_str);
+      if (m < 1)
+        throw std::invalid_argument("m must be >= 1");
+      if (comma == std::string::npos)
         return static_cast<arma::uword>(m);
+      const long precond_rank = std::stol(inside.substr(comma + 1));
+      if (precond_rank < 1)
+        throw std::invalid_argument("precond_rank must be >= 1");
+      if (precond_rank_out != nullptr)
+        *precond_rank_out = static_cast<arma::uword>(precond_rank);
+      return static_cast<arma::uword>(m);
     } catch (const std::exception&) {
       // fall through to the throw below
     }
   }
-  throw std::invalid_argument("Invalid Iterative objective '" + objective
-                              + "': expected \"LLIterative\" or \"LLIterative(m)\" with m >= 1 (e.g. "
-                                "\"LLIterative(30)\")");
+  throw std::invalid_argument(
+      "Invalid Iterative objective '" + objective
+      + "': expected \"LLIterative\", \"LLIterative(m)\" or \"LLIterative(m,precond_rank)\" with m >= 1 "
+        "and precond_rank >= 1 (e.g. \"LLIterative(30)\" or \"LLIterative(30,50)\")");
 }
 
 void Kriging::make_iterative_probes() {
   const arma::uword n = m_X.n_rows;
   m_iterative_probes = LinearAlgebra::rademacherProbes(n, m_iterative_nprobe, /*seed=*/20260808u);
+}
+
+void Kriging::make_iterative_precond_landmarks() {
+  // Same reference-kernel greedy selection as make_nystrom_landmarks, and
+  // for the same reason: a landmark SET fixed across every theta evaluation
+  // keeps the CG-preconditioned objective/gradient smooth in theta, whereas
+  // re-selecting pivots from the current (evaluation-specific) covariance
+  // would make the preconditioner -- and therefore the CG-converged
+  // objective itself -- discontinuous between BFGS iterations.
+  const arma::vec ref_theta = m_maxdX;
+  arma::vec diag_resid_unused;
+  LinearAlgebra::nystromFactor(&diag_resid_unused,
+                               m_X,
+                               ref_theta,
+                               _Cov,
+                               /*factor=*/1.0,
+                               KrigingImpl::ones,
+                               std::min(m_iterative_precond_rank, m_X.n_rows),
+                               1e-12,
+                               &m_iterative_precond_landmarks);
 }
 
 double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
@@ -1547,12 +1582,35 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     return out;
   };
 
+  // Opt-in Nystrom preconditioner (objective="LLIterative(m,precond_rank)"),
+  // same principle as predictCG's: rebuilt at the CURRENT theta on every
+  // call (unlike predictCG, which only ever precondition-solves at one
+  // fixed, already-fitted m_theta) but over the FIXED landmark set chosen
+  // once in make_iterative_precond_landmarks -- keeping the preconditioner,
+  // and hence the CG-converged objective/gradient, smooth in theta.
+  arma::mat U_pc;
+  arma::vec D_pc;
+  std::function<arma::vec(const arma::vec&)> Pinv;
+  if (m_iterative_precond_rank > 0) {
+    const arma::mat X_land = m_X.rows(m_iterative_precond_landmarks);
+    arma::mat R_ss(m_iterative_precond_landmarks.n_elem, m_iterative_precond_landmarks.n_elem, arma::fill::none);
+    LinearAlgebra::covMat_sym_X(&R_ss, X_land.t(), theta, cov, /*factor=*/1.0, KrigingImpl::ones);
+    arma::mat R_ns(n, m_iterative_precond_landmarks.n_elem, arma::fill::none);
+    LinearAlgebra::covMat_rect(&R_ns, Xt, X_land.t(), theta, cov, /*factor=*/1.0);
+    R_ss.diag() += LinearAlgebra::num_nugget;
+    const arma::mat L_ss = arma::chol(R_ss, "lower");
+    U_pc = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
+    const arma::vec captured = arma::sum(arma::square(U_pc), 1);
+    D_pc = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec { return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0); };
+  }
+
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
   // columns): p+1 right-hand sides sharing the same matvec, each an
   // independent Krylov solve (no block-CG subspace sharing, but far cheaper
   // than p+1 separate O(n^3) factorizations either way).
   arma::mat FY = arma::join_rows(m_F, m_y);
-  const arma::mat RinvFY = LinearAlgebra::conjugateGradient(Rmul, FY, max_iter, m_iterative_cg_tol);
+  const arma::mat RinvFY = LinearAlgebra::conjugateGradient(Rmul, FY, max_iter, m_iterative_cg_tol, Pinv);
   const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
   const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
 
@@ -1584,7 +1642,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     const arma::uword d = _theta.n_elem;
     grad_out->set_size(d);
 
-    const arma::mat W = LinearAlgebra::conjugateGradient(Rmul, m_iterative_probes, max_iter, m_iterative_cg_tol);
+    const arma::mat W = LinearAlgebra::conjugateGradient(Rmul, m_iterative_probes, max_iter, m_iterative_cg_tol, Pinv);
 
     for (arma::uword kk = 0; kk < d; ++kk) {
       auto dRmul_k = [this, &Xt, &theta, &cov, n, kk](const arma::vec& v) -> arma::vec {
@@ -1872,6 +1930,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_iterative_light = false;
   m_iterative_nprobe = 0;
   m_iterative_probes.reset();
+  m_iterative_precond_rank = 0;
+  m_iterative_precond_landmarks.reset();
   if (objective.rfind("LLVecchia", 0) == 0) {
     m_vecchia_m = parse_vll_m(objective);
     make_vecchia_sets();
@@ -1883,8 +1943,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     make_nystrom_landmarks();
   }
   if (objective.rfind("LLIterative", 0) == 0) {
-    m_iterative_nprobe = parse_iterative_m(objective);
+    m_iterative_nprobe = parse_iterative_m(objective, &m_iterative_precond_rank);
     make_iterative_probes();
+    if (m_iterative_precond_rank > 0)
+      make_iterative_precond_landmarks();
   }
 
   const double scaleY = m_scaleY;
