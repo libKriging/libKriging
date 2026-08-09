@@ -70,8 +70,12 @@ int lk_kriging_predict(void* ptr,
 
 /* Predict-only, matrix-free conjugate-gradient alternative to
    lk_kriging_predict: solves each prediction with CG instead of using a
-   stored dense factor. max_iter=0 means the default (2n). See
-   docs/math/PredictCG.md. */
+   stored dense factor. max_iter=0 means the default (2n).
+   use_nystrom_precond!=0 builds a rank-precond_rank Nystrom factor of R at
+   the model's own (already-fitted) theta and uses it as a CG
+   preconditioner (fewer CG iterations to reach tol, at a one-time setup
+   cost); off by default. See docs/math/PredictCG.md and
+   docs/math/Nystrom.md. */
 int lk_kriging_predictCG(void* ptr,
                          const double* X_n,
                          int m,
@@ -79,8 +83,24 @@ int lk_kriging_predictCG(void* ptr,
                          int return_stdev,
                          int max_iter,
                          double tol,
+                         int use_nystrom_precond,
+                         int precond_rank,
                          double* mean_out,
                          double* stdev_out);
+
+/* Subset-of-data pre-fit reduction: select n_max rows of X (k-means
+   centroids snapped to the nearest real point, or a uniform random
+   subsample). idx_out must have room for min(n_max, m) ints; returns the
+   actual number of indices written (== n_max unless n_max >= m, in which
+   case it's a no-op returning all m indices), or -1 on error. Indices are
+   0-based row-indices into X. */
+int lk_kriging_subsetOfData(const double* X_n,
+                            int m,
+                            int d,
+                            int n_max,
+                            const char* method,
+                            int seed,
+                            int* idx_out);
 
 int lk_kriging_simulate(void* ptr,
                         int nsim,
@@ -155,6 +175,9 @@ int lk_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double
 const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
+int lk_kriging_nystrom_rank(void* ptr);
+int lk_kriging_iterative_nprobe(void* ptr);
+int lk_kriging_is_iterative_light(void* ptr);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);

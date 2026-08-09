@@ -230,19 +230,48 @@ int lk_kriging_predictCG(void* ptr,
                          int return_stdev,
                          int max_iter,
                          double tol,
+                         int use_nystrom_precond,
+                         int precond_rank,
                          double* mean_out,
                          double* stdev_out) {
   try {
     if (max_iter < 0)
       throw std::invalid_argument("lk_kriging_predictCG: max_iter must be >= 0 (0 means the default, 2n)");
+    if (precond_rank < 0)
+      throw std::invalid_argument("lk_kriging_predictCG: precond_rank must be >= 0");
     auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
-    auto [mean_v, stdev_v] = k->predictCG(X_m, return_stdev != 0, static_cast<arma::uword>(max_iter), tol);
+    auto [mean_v, stdev_v] = k->predictCG(X_m,
+                                          return_stdev != 0,
+                                          static_cast<arma::uword>(max_iter),
+                                          tol,
+                                          use_nystrom_precond != 0,
+                                          static_cast<arma::uword>(precond_rank));
     if (mean_out)
       std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
     if (stdev_out && return_stdev)
       std::memcpy(stdev_out, stdev_v.memptr(), stdev_v.n_elem * sizeof(double));
     return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_subsetOfData(const double* X_n,
+                            int m,
+                            int d,
+                            int n_max,
+                            const char* method,
+                            int seed,
+                            int* idx_out) {
+  try {
+    if (n_max <= 0)
+      throw std::invalid_argument("lk_kriging_subsetOfData: n_max must be >= 1");
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    arma::uvec idx = Kriging::subsetOfData(X_m, static_cast<arma::uword>(n_max), method ? method : "kmeans", seed);
+    if (idx_out)
+      for (arma::uword i = 0; i < idx.n_elem; ++i)
+        idx_out[i] = static_cast<int>(idx(i));  // 0-based C++ row-indices
+    return static_cast<int>(idx.n_elem);
   }
   CATCH_RETURN
 }
@@ -488,6 +517,27 @@ const char* lk_kriging_objective(void* ptr) {
     return static_cast<Kriging*>(ptr)->objective().c_str();
   }
   CATCH_RETURN_NULL
+}
+
+int lk_kriging_nystrom_rank(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->nystrom_rank());
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_iterative_nprobe(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->iterative_nprobe());
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_is_iterative_light(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->is_iterative_light() ? 1 : 0;
+  }
+  CATCH_RETURN
 }
 
 int lk_kriging_is_normalize(void* ptr) {
