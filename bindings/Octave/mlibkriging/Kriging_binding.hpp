@@ -31,6 +31,8 @@ void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void iterative_nprobe(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void is_iterative_light(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void centerX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

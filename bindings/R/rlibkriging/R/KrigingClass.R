@@ -4,15 +4,20 @@
 ## ****************************************************************************
 
 # Validate the `objective` argument. Unlike match.arg(), this accepts the
-# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)" and the
+# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)", the
 # Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
-# in addition to the classic "LL" / "LOO" / "LMP" (kept consistent with the
-# Python/Julia bindings, which pass `objective` as a free string).
+# and the matrix-free CG/SLQ approximated log-likelihood "LLIterative" /
+# "LLIterative(m)" / "LLIterative(m,precond_rank)" (the last form opts into a
+# Nystrom-preconditioned CG for the fit's own solves), in addition to the
+# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia
+# bindings, which pass `objective` as a free string).
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
+    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?|LLIterative(\\([0-9]+(,[0-9]+)?\\))?)$",
+               objective))
         stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
-             "\"LLNystrom\" or \"LLNystrom(k)\" (got \"",
+             "\"LLNystrom\", \"LLNystrom(k)\", \"LLIterative\", \"LLIterative(m)\" or ",
+             "\"LLIterative(m,precond_rank)\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -32,7 +37,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','iterative_nprobe','is_iterative_light')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -368,12 +373,64 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 }
 
 
+#' Predict-only, matrix-free conjugate-gradient alternative to
+#' \code{predict} for a \code{Kriging} object.
+#'
+#' Solves each prediction with conjugate gradient instead of using a
+#' stored dense factor: O(n) memory instead of O(n^2), at the cost of
+#' O(n^2 * iters) compute per solve. Useful when a model's dense factor
+#' either was never computed or isn't worth keeping resident just for
+#' prediction. \code{return_stdev = TRUE} runs one extra CG solve PER
+#' prediction point, so it defaults to \code{FALSE}. Only available for
+#' models fitted without a nugget/noise channel. See
+#' \code{docs/math/PredictCG.md} for the full derivation.
+#'
+#' @author Yann Richet \email{yann.richet@asnr.fr}
+#'
+#' @param object S3 Kriging object.
+#' @param x Input points where the prediction must be computed.
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
+#'     is returned (one extra CG solve per prediction point).
+#' @param max_iter CG iteration budget per solve (\code{0} = default, \code{2n}).
+#' @param tol Relative residual tolerance for early stopping.
+#' @param use_nystrom_precond \code{Logical}. If \code{TRUE}, build a rank-\code{precond_rank}
+#'     Nystrom factor of R at the model's own (already-fitted) theta and use it
+#'     as a CG preconditioner: fewer CG iterations to reach \code{tol} on the
+#'     typically ill-conditioned R, at a one-time setup cost. Off by default.
+#' @param precond_rank Rank of that Nystrom preconditioner, if enabled.
+#' @param ... Ignored.
+#'
+#' @return A list containing the element \code{mean} and, if
+#'     \code{return_stdev=TRUE}, \code{stdev}.
+#'
+#' @method predictCG Kriging
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, "matern3_2")
+#'
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p <- predictCG(k, x)
+predictCG.Kriging <- function(object, x, return_stdev = FALSE, max_iter = 0L, tol = 1e-8,
+                              use_nystrom_precond = FALSE, precond_rank = 50L, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (is.data.frame(x)) x = data.matrix(x)
+    if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
+    return(kriging_predictCG(object, x, return_stdev, as.integer(max_iter), tol,
+                             use_nystrom_precond, as.integer(precond_rank)))
+}
+
 #' Subset-of-data pre-fit reduction.
 #'
 #' Selects a subset of \code{n_max} rows from a design \code{X}, meant to be
 #' used as a cheap pre-fit reduction for large designs: fit on
 #' \code{X[idx, ]}/\code{y[idx]} instead of the full data. Unlike
-#' Vecchia/Nystrom (which still use every point), this discards
+#' Vecchia/Nystrom/Iterative (which still use every point), this discards
 #' \code{n - n_max} points outright, in exchange for an ordinary exact fit
 #' on the reduced design.
 #'
@@ -402,51 +459,6 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
     if (is.data.frame(X)) X = data.matrix(X)
     if (!is.matrix(X)) X = matrix(X, ncol = 1)
     return(kriging_subsetOfData(X, as.integer(n_max), method, as.integer(seed)))
-}
-
-#' Predict-only, matrix-free conjugate-gradient alternative to
-#' \code{predict} for a \code{Kriging} object.
-#'
-#' Solves each prediction with conjugate gradient instead of using a
-#' stored dense factor: O(n) memory instead of O(n^2), at the cost of
-#' O(n^2 * iters) compute per solve. Useful when a model's dense factor
-#' either was never computed or isn't worth keeping resident just for
-#' prediction. \code{return_stdev = TRUE} runs one extra CG solve PER
-#' prediction point, so it defaults to \code{FALSE}. Only available for
-#' models fitted without a nugget/noise channel. See
-#' \code{docs/math/PredictCG.md} for the full derivation.
-#'
-#' @author Yann Richet \email{yann.richet@asnr.fr}
-#'
-#' @param object S3 Kriging object.
-#' @param x Input points where the prediction must be computed.
-#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
-#'     is returned (one extra CG solve per prediction point).
-#' @param max_iter CG iteration budget per solve (\code{0} = default, \code{2n}).
-#' @param tol Relative residual tolerance for early stopping.
-#' @param ... Ignored.
-#'
-#' @return A list containing the element \code{mean} and, if
-#'     \code{return_stdev=TRUE}, \code{stdev}.
-#'
-#' @method predictCG Kriging
-#' @export
-#'
-#' @examples
-#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-#' set.seed(123)
-#' X <- as.matrix(runif(10))
-#' y <- f(X)
-#'
-#' k <- Kriging(y, X, "matern3_2")
-#'
-#' x <- seq(from = 0, to = 1, length.out = 101)
-#' p <- predictCG(k, x)
-predictCG.Kriging <- function(object, x, return_stdev = FALSE, max_iter = 0L, tol = 1e-8, ...) {
-    if (length(L <- list(...)) > 0) warnOnDots(L)
-    if (is.data.frame(x)) x = data.matrix(x)
-    if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
-    return(kriging_predictCG(object, x, return_stdev, as.integer(max_iter), tol))
 }
 
 

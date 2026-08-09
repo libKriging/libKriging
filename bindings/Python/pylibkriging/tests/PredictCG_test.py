@@ -65,3 +65,45 @@ def test_predictcg_rejects_a_negative_max_iter():
 
     with pytest.raises(Exception):
         k.predictCG(Xt, False, -1)
+
+
+def test_predictcg_nystrom_precond_matches_exact_predict():
+    X, y = make_data(60)
+    k = make_fixed_theta_model(y, X)
+    Xt, _ = make_data(20, seed=456)
+
+    m_ex, s_ex, _, _, _ = k.predict(Xt, True, False, False)
+    m_pc, s_pc = k.predictCG(Xt, True, 0, 1e-8, True, 20)
+
+    sdy = np.std(y)
+    assert np.max(np.abs(m_ex - m_pc)) < 0.05 * sdy
+    assert np.max(np.abs(s_ex - s_pc)) < 0.05 * sdy
+
+
+def test_predictcg_rejects_a_negative_precond_rank():
+    X, y = make_data(20)
+    k = make_fixed_theta_model(y, X)
+    Xt, _ = make_data(5, seed=789)
+
+    with pytest.raises(Exception):
+        k.predictCG(Xt, False, 0, 1e-8, True, -1)
+
+
+def test_subset_of_data_returns_n_max_sorted_0based_indices():
+    X, _ = make_data(200)
+
+    idx = lk.Kriging.subsetOfData(X, 20)
+    idx = np.asarray(idx).flatten()
+
+    assert len(idx) == 20
+    assert np.array_equal(idx, np.sort(idx))
+    assert idx.min() >= 0
+    assert idx.max() < X.shape[0]
+
+
+def test_subset_of_data_is_a_noop_when_n_max_covers_all_rows():
+    X, _ = make_data(15)
+
+    idx = np.asarray(lk.Kriging.subsetOfData(X, 15)).flatten()
+
+    assert np.array_equal(idx, np.arange(15))
