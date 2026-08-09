@@ -457,11 +457,27 @@ class Kriging : public KrigingImpl {
   double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
   arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
 
-  /// Parse "LLIterative" (default m=30) or "LLIterative(m)"; throws on malformed spec.
-  static arma::uword parse_iterative_m(const std::string& objective);
+  arma::uword m_iterative_precond_rank = 0;  ///< Nystrom preconditioner rank (0 = no preconditioning)
+  /// Landmark row-indices (into m_X) for the CG preconditioner, chosen ONCE
+  /// per fit (same fixed-landmark rationale as m_nystrom_landmarks: re-
+  /// selecting greedily at each theta would make the preconditioner --
+  /// and hence the CG-converged objective/gradient -- non-smooth in theta).
+  /// The preconditioner itself (R_ss/R_ns -> Woodbury Pinv) is still
+  /// rebuilt from these fixed landmarks at the CURRENT theta on every call,
+  /// unlike m_nystrom_U/D which are only committed once at theta*.
+  arma::uvec m_iterative_precond_landmarks;
+
+  /// Parse "LLIterative" (default m=30), "LLIterative(m)" or
+  /// "LLIterative(m,precond_rank)"; throws on malformed spec. precond_rank
+  /// defaults to 0 (preconditioning off) when omitted.
+  static arma::uword parse_iterative_m(const std::string& objective, arma::uword* precond_rank_out = nullptr);
   /// Draw m_iterative_probes from m_X's row count (call once, after
   /// fit_setup_impl, before optimization starts).
   void make_iterative_probes();
+  /// Populate m_iterative_precond_landmarks from the current m_X (call once,
+  /// after fit_setup_impl, before optimization starts), same greedy
+  /// reference-kernel selection as make_nystrom_landmarks.
+  void make_iterative_precond_landmarks();
   /// Iterative log-likelihood with profiled sigma2 and (GLS-profiled) beta,
   /// via matrix-free CG solves and an SLQ log-determinant. Analytic gradient
   /// in theta (envelope theorem, same principle as
