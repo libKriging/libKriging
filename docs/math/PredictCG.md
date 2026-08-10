@@ -56,6 +56,20 @@ auto [mean, stdev] = model.predictCG(Xnew, true);  // matrix-free predict
 - **Tolerance**: `tol` (default `1e-8`) is a relative-residual early-stop
   criterion (`‖Ax - b‖ / ‖b‖ < tol`), checked at every iteration and at
   each restart.
+- **Preconditioning (opt-in)**: `use_nystrom_precond=true` builds a
+  rank-`precond_rank` Nystrom factor of R (`LinearAlgebra::nystromFactor`,
+  same machinery as [`LLNystrom`](Nystrom.md)) at the model's own
+  already-fitted θ*, and uses `LinearAlgebra::woodbury_solve` bound to
+  that factor as the CG preconditioner (`Pinv`) — same idea as
+  GPyTorch's pivoted-Cholesky preconditioner: fewer CG iterations needed
+  to reach `tol` on the typically ill-conditioned R, at a one-time
+  O(n·precond_rank²) setup cost. Off by default (`precond_rank=50` when
+  enabled). Since predictCG is only ever called at one fixed θ*, the
+  factor is built once per `predictCG` call and doesn't need the
+  fixed-landmark-set machinery `LLNystrom`/`LLIterative` use to stay
+  smooth across varying θ. Measured ~38x accuracy improvement at a fixed
+  tight iteration budget on an ill-conditioned fit — see
+  `KrigingPredictCGTest.cpp`.
 - **Scope**: `NoiseModel::None` only (no nugget/noise channel); throws if
   the model wasn't fitted, or on `X_n` dimension mismatch.
 
@@ -75,6 +89,11 @@ auto [mean2, stdev] = model.predictCG(Xnew, /*return_stdev=*/true);
 
 // Explicit iteration budget / tolerance (defaults: max_iter=2n, tol=1e-8).
 auto [mean3, stdev3] = model.predictCG(Xnew, true, /*max_iter=*/500, /*tol=*/1e-6);
+
+// Nystrom-preconditioned CG (opt-in): fewer iterations to reach `tol` on
+// an ill-conditioned R, at a one-time O(n*precond_rank^2) setup cost.
+auto [mean4, stdev4] = model.predictCG(Xnew, true, /*max_iter=*/50, /*tol=*/1e-6,
+                                       /*use_nystrom_precond=*/true, /*precond_rank=*/50);
 ```
 
 ## Current limitations (v1)
@@ -83,13 +102,17 @@ auto [mean3, stdev3] = model.predictCG(Xnew, true, /*max_iter=*/500, /*tol=*/1e-
 - `return_stdev=true`'s O(n²·iters·q) cost makes it a poor fit for large
   q; prefer the exact `predict` (if a factor is already resident) or
   batch/limit q when only `predictCG` is available.
-- No preconditioning (e.g. pivoted-Cholesky, as GPyTorch uses for its own
-  CG-based inference) -- iteration count scales with R's conditioning as-is.
+- Preconditioning is opt-in and per-call: `use_nystrom_precond` isn't
+  inherited from an `LLIterative(m,precond_rank)` fit's own
+  preconditioner (see [Iterative.md](Iterative.md)) — the two are
+  independent and each must be enabled explicitly where used.
 
 ## See also
 
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
 `LLNystrom` and `NestedKriging`, and how to pick between them.
+[Iterative.md](Iterative.md) reuses this same Nystrom-preconditioned-CG
+idea for the fit's own CG solves, not just prediction.
 
 ## References
 
