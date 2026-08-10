@@ -93,11 +93,20 @@ Where this sits relative to the other scaling methods:
   optimizer convergence.
 - **`optim="none"` never sets the light-fit flag**: exactly like
   `LLNystrom`/`LLVecchia`, `m_iterative_light` (and everything gated
-  behind it — `predict` routing, blocked `simulate`/`update`/`save`)
+  behind it — `predict` routing, blocked `simulate`/`update_simulate`/`save`)
   is only set on the actual multistart-BFGS commit path. A fixed-theta
   `optim="none"` fit always does the plain exact O(n³) factorization
   regardless of objective — existing, consistent behavior across
   Nystrom/Vecchia/Iterative.
+- **Incremental `update`**: `update_iterative` mirrors `update_nystrom`'s
+  strategy — extend `m_X`/`m_y`/`m_F` with the new rows (the fixed
+  `precond_rank`-landmark set, if enabled, stays valid since rows are only
+  ever appended), redraw `m_iterative_probes` at the new n (they're sized
+  per-point, unlike the landmarks, so can't just be left as-is), then either
+  re-profile β/σ² at the current θ (`refit=false`) or first do a
+  warm-restart single BFGS from the current θ over the same (fixed) probes
+  and landmarks (`refit=true`) before re-profiling. No O(n³)/O(n²) matrix is
+  ever built by this path.
 
 ## Usage
 
@@ -125,9 +134,12 @@ pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictCG (light fit)
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - Permanent light fit like `LLNystrom`/`LLVecchia`: `predict()` routes to
-  `predictCG`; `simulate`/`update`/`update_simulate`/`save` are
-  intentionally **blocked** for this first pass (narrower scope than
-  `LLNystrom` — no dedicated `update_iterative` incremental path yet).
+  `predictCG`. `update()` has its own incremental path (`update_iterative`,
+  see above); `simulate`/`update_simulate`/`save` are still intentionally
+  **blocked** — simulating from a matrix-free model would need a genuine
+  stochastic sampling technique (e.g. Lanczos-based sampling) rather than
+  the explicit covariance square root the exact/Nystrom `simulate` paths
+  use, and isn't implemented yet.
 - No preconditioning inside `predictCG` is inherited automatically from
   an `LLIterative(m,precond_rank)` fit — `predictCG`'s own
   `use_nystrom_precond`/`precond_rank` arguments are independent and
