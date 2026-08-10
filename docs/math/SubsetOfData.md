@@ -5,7 +5,7 @@
 The cheapest of libKriging's large-n options: pick `n_max` rows out of a
 design `X` with `n > n_max`, and fit an ordinary exact Kriging model
 (O(n_max³)) on that subset — at the cost of discarding `n - n_max` points
-outright. Unlike `LLVecchia`/`LLNystrom`/`NestedKriging`
+outright. Unlike `LLVecchia`/`LLNystrom`/`LLIterative`/`NestedKriging`
 (which all still use every point, in a cheaper structured or partitioned
 way), `subsetOfData` doesn't change the objective or the model at all; it
 changes what data the model ever sees.
@@ -79,7 +79,8 @@ pred <- predict(k, Xnew, stdev = TRUE)
 worked, executed notebook: coverage (fill-distance) vs. naive random
 subsampling, and accuracy/cost vs. `n_max`, with references.
 [Scalability.md](Scalability.md) for how this compares to
-`LLVecchia`/`LLNystrom`/`NestedKriging`, and how to pick between them.
+`LLVecchia`/`LLNystrom`/`LLIterative`/`NestedKriging`, and how to pick
+between them.
 
 ## References
 

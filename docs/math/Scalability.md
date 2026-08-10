@@ -15,14 +15,15 @@ method has its own page with the full derivation.
 |---|---|---|---|---|---|
 | `LLVecchia(m)` | fit objective | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
 | `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
+| `LLIterative(m[,r])` | fit objective | O(n²·iters) per CG solve, m+1 solves/eval | *nothing* structural — R stays exact; only `log\|R\|` is a stochastic (SLQ) estimate | none (doesn't touch the covariance structure) | [Iterative.md](Iterative.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
-| `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | `predictCG` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictCG.md](PredictCG.md) |
+| `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
 
-All of these (Vecchia, Nystrom, NestedKriging, subsetOfData, predictCG)
-are usable independently and, where noted below, combinable — none of
-them require opting out of the others.
+All of these (Vecchia, Nystrom, Iterative, NestedKriging, predictCG,
+subsetOfData) are usable independently and, where noted below,
+combinable — none of them require opting out of the others.
 
 ## Which one, when
 
@@ -43,6 +44,16 @@ them require opting out of the others.
      submodels per group, aggregates predictions (`NK` by default —
      converges to the exact/PoE-family predictor as group size grows;
      see [Nested.md](Nested.md) §3 for the aggregation choice).
+   - **You want to keep R itself exact — no structural approximation
+     at all, not even locally/low-rank — and only accept a stochastic
+     estimate of the one term CG can't give directly (`log|R|`)**
+     → `objective="LLIterative(m)"`. Every other term (β, σ², the
+     gradient's quadratic form) is exact up to CG's tolerance; costs
+     O(n²) per matvec like the exact objective's O(n³) factorization
+     would eventually need, but never materializes R and never
+     factorizes it. Optionally add a Nystrom-preconditioned CG
+     (`"LLIterative(m,precond_rank)"`) to cut the iteration count on
+     ill-conditioned fits.
    - **Willing to lose information rather than approximate it**:
      `subsetOfData(X, n_max)` picks `n_max` representative rows
      (k-means, snapped to real points) and hands them to an ordinary
@@ -58,7 +69,9 @@ them require opting out of the others.
    just solves each prediction with matrix-free conjugate gradient
    instead of reusing a stored factor. `return_stdev=true` is
    opt-in-expensive (one CG solve *per prediction point*) — cheap only
-   for the mean, or for a handful of stdev queries.
+   for the mean, or for a handful of stdev queries. On an
+   ill-conditioned fit, `use_nystrom_precond=true` cuts the iteration
+   count needed to reach a given tolerance (see [PredictCG.md](PredictCG.md)).
 
 3. **Regardless of which of the above you use**: OpenMP parallelizes
    independent work (multi-start `optim`, multi-trajectory `simulate`,
@@ -77,14 +90,6 @@ target* it converges to as group size grows.
   (`objective="LLVecchia(m)"`) instead of a full O(n³) reference fit —
   see [Nested.md](Nested.md)'s "Common prior" section. `LLNystrom` is
   **not** currently wired into `NestedKriging`'s common-prior path.
-- **`subsetOfData` before any of the above**: since it's a plain
-  pre-fit row selection, not a fit objective, it composes with every
-  other method here — reduce `(X, y)` first, then fit with
-  `LLVecchia`/`LLNystrom`/`NestedKriging`/exact `"LL"` on the reduced
-  design if it's still large enough to warrant one of them.
-- **Vecchia/Nystrom + `NoiseModel`**: neither supports a nugget/noise
-  channel yet (`NoiseModel::None` only) — see each method's own
-  "Current limitations" section.
 - **`predictCG` after a light Vecchia fit**: a light Vecchia fit
   (`set_vecchia_exact_commit(false)`) never has a resident dense
   factor, so `predict` on it always routes to the *local* Vecchia
@@ -96,6 +101,20 @@ target* it converges to as group size grows.
   m_X/m_y/m_F/θ/β, which a Nystrom fit still populates in full), but is
   usually pointless — `predictNystrom` reuses the fit's own committed
   low-rank factors and is cheaper than a fresh CG solve over the full n.
+- **`LLIterative` fits are also permanent light fits**: like Nystrom and
+  a light-mode Vecchia, an `LLIterative` fit's `predict()` always routes
+  to `predictCG` — see [Iterative.md](Iterative.md).
+  `predictCG`'s own `use_nystrom_precond` is independent of whether the
+  fit itself used `LLIterative(m,precond_rank)`'s preconditioner; each
+  must be enabled explicitly where it's used.
+- **`subsetOfData` before any of the above**: since it's a plain
+  pre-fit row selection, not a fit objective, it composes with every
+  other method here — reduce `(X, y)` first, then fit with
+  `LLVecchia`/`LLNystrom`/`LLIterative`/`NestedKriging`/exact `"LL"` on
+  the reduced design if it's still large enough to warrant one of them.
+- **Vecchia/Nystrom/Iterative + `NoiseModel`**: none of the three
+  support a nugget/noise channel yet (`NoiseModel::None` only) — see
+  each method's own "Current limitations" section.
 
 ## Not implemented (deferred)
 
@@ -114,6 +133,6 @@ for a direct comparison against a library that does implement these
 ## References
 
 See each method's own page ([Vecchia.md](Vecchia.md),
-[Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
-[SubsetOfData.md](SubsetOfData.md), [PredictCG.md](PredictCG.md)) for its
-specific references.
+[Nystrom.md](Nystrom.md), [Iterative.md](Iterative.md),
+[Nested.md](Nested.md), [PredictCG.md](PredictCG.md),
+[SubsetOfData.md](SubsetOfData.md)) for its specific references.
