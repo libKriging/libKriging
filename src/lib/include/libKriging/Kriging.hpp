@@ -489,8 +489,17 @@ class Kriging : public KrigingImpl {
                                  arma::vec* beta_out = nullptr,
                                  double* sigma2_out = nullptr) const;
   bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
-  /// Throw if the model is an Iterative fit (used by simulate/update/save)
+  /// Throw if the model is an Iterative fit (used by simulate/update_simulate/save;
+  /// update() has its own update_iterative() incremental path instead)
   void check_not_iterative_light(const char* what) const;
+  /// Iterative-specific incremental update: extends m_X/m_y/m_F with the new
+  /// data (the FIXED probes are redrawn at the new n; the FIXED precond
+  /// landmark set, if any, stays valid since rows are only ever appended),
+  /// then either re-profiles beta/sigma2 at the current theta (refit=false),
+  /// or first does a warm-restart single BFGS from the current theta
+  /// (refit=true, same fixed probes/landmarks) before re-profiling. Mirrors
+  /// update_nystrom's O((n_old+n_new)*...) incremental strategy.
+  void update_iterative(const arma::vec& y_u, const arma::mat& X_u, bool refit);
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

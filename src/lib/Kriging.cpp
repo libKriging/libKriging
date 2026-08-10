@@ -1687,6 +1687,85 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodIterativeF
   return {_logLikelihoodIterative(theta), grad};
 }
 
+void Kriging::update_iterative(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+
+  arma::mat Xn_u = X_u;
+  Xn_u.each_row() -= m_centerX;
+  Xn_u.each_row() /= m_scaleX;
+  const arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+
+  // m_iterative_precond_landmarks (when precond is enabled) holds row-indices
+  // into m_X; appending rows here (never reordering/removing) keeps them
+  // valid without any adjustment -- same trick as m_nystrom_landmarks.
+  m_X = arma::join_cols(m_X, Xn_u);
+  m_y = arma::join_cols(m_y, yn_u);
+  m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+
+  // Probes are one Rademacher vector PER DATA POINT (n x nprobe), so unlike
+  // the landmarks they can't just be left as-is -- redraw at the new n. Same
+  // fixed-seed call as a fresh fit, so this update is itself deterministic;
+  // it just means probes differ from what a fit on the combined data from
+  // scratch would have drawn (same acceptable smoothness trade-off already
+  // made for a fresh fit's own probes).
+  make_iterative_probes();
+
+  if (refit && m_optim != "none") {
+    // Warm restart: single BFGS from the current theta, over the SAME
+    // (fixed) precond landmark set -- landmarks are only re-picked by a full
+    // fit(), which is what keeps this from paying the O(n*precond_rank)
+    // landmark-ranking pass (and losing the warm start) again.
+    const FitOfn fit_ofn = make_fit_objective(m_objective);
+    const arma::uword d = m_X.n_cols;
+
+    // theta bounds from the per-dimension range of the extended data --
+    // O(n*d), NOT Optim::theta_bounds's variogram-slope heuristic, which
+    // needs the O(n^2) dX cube this update path is built to avoid.
+    const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
+    arma::vec theta_lower = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+    arma::vec theta_upper = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+
+    arma::vec gamma_start = m_theta;
+    arma::vec gamma_lower = theta_lower;
+    arma::vec gamma_upper = theta_upper;
+    if (Optim::reparametrize) {
+      gamma_start = Optim::reparam_to(gamma_start);
+      gamma_lower = Optim::reparam_to(gamma_lower);
+      gamma_upper = Optim::reparam_to(gamma_upper);
+    }
+
+    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
+    optimizer.iprint = Optim::log_level - 2;
+    optimizer.max_iter = Optim::max_iteration;
+    optimizer.pgtol = Optim::gradient_tolerance;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+    const arma::ivec bounds_type{d, arma::fill::value(2)};
+
+    optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
+                                  arma::vec& grad_out) -> double { return fit_ofn(vals_inp, &grad_out, nullptr); },
+                       gamma_start,
+                       gamma_lower.memptr(),
+                       gamma_upper.memptr(),
+                       bounds_type.memptr());
+
+    m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_start) : gamma_start;
+    m_est_theta = true;
+  }
+
+  arma::vec beta_v;
+  double sigma2_v = -1;
+  _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+  if (m_est_beta)
+    m_beta = beta_v;
+  if (m_est_sigma2)
+    m_sigma2 = sigma2_v;
+}
+
 void Kriging::check_not_iterative_light(const char* what) const {
   if (m_iterative_light)
     throw std::runtime_error(std::string(what)
@@ -2972,9 +3051,12 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
   check_not_vecchia_light("update");
-  check_not_iterative_light("update");
   if (m_nystrom_light) {
     update_nystrom(y_u, X_u, refit);
+    return;
+  }
+  if (m_iterative_light) {
+    update_iterative(y_u, X_u, refit);
     return;
   }
   if (y_u.n_elem != X_u.n_rows)

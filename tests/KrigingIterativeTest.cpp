@@ -198,7 +198,7 @@ TEST_CASE("LLIterative fit is a permanent light fit: predict routes to predictCG
   CHECK_THROWS_AS(k.predict(Xt, true, false, true), std::runtime_error);  // return_deriv
 }
 
-TEST_CASE("LLIterative fit blocks simulate/update/update_simulate/save", "[iterative][kriging]") {
+TEST_CASE("LLIterative fit blocks simulate/update_simulate/save", "[iterative][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(15, X, y);
@@ -207,9 +207,69 @@ TEST_CASE("LLIterative fit blocks simulate/update/update_simulate/save", "[itera
   REQUIRE(k.is_iterative_light());
 
   CHECK_THROWS_AS(k.simulate(5, 123, X), std::runtime_error);
-  CHECK_THROWS_AS(k.update(y.head(2), X.head_rows(2), true), std::runtime_error);
   CHECK_THROWS_AS(k.update_simulate(y.head(2), X.head_rows(2)), std::runtime_error);
   CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
+}
+
+// update() has its own incremental path (update_iterative): unlike
+// simulate/update_simulate/save, it does NOT require ever materializing an
+// n x n matrix -- it just extends m_X/m_y/m_F, redraws the (n-sized) probes,
+// and re-profiles beta/sigma2 (optionally after a warm-restart single BFGS)
+// via the same matrix-free CG machinery as the original fit. Mirrors
+// update_nystrom's test pattern in KrigingNystromTest.cpp.
+TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterative][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(20, X, y);
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLIterative(8)");
+  REQUIRE(k.is_iterative_light());
+  const arma::uword n0 = k.X().n_rows;
+
+  arma::mat Xu;
+  arma::vec yu;
+  make_data(5, Xu, yu, 789);
+
+  SECTION("refit=false: re-profiles beta/sigma2 at the current theta") {
+    const arma::vec theta_before = k.theta();
+    k.update(yu, Xu, false);
+
+    CHECK(k.is_iterative_light());
+    CHECK(k.X().n_rows == n0 + 5);
+    CHECK(k.y().n_elem == n0 + 5);
+    CHECK(arma::approx_equal(k.theta(), theta_before, "absdiff", 1e-12));  // theta untouched
+
+    // predictCG should still give finite, sane predictions after the update.
+    arma::mat Xt;
+    arma::vec yt;
+    make_data(6, Xt, yt, 321);
+    auto [m_pred, s_pred] = k.predictCG(Xt, true);
+    CHECK(m_pred.n_elem == 6);
+    CHECK(m_pred.is_finite());
+    CHECK(s_pred.is_finite());
+  }
+
+  SECTION("refit=true: warm-restarts theta from its current value") {
+    k.update(yu, Xu, true);
+
+    CHECK(k.is_iterative_light());
+    CHECK(k.X().n_rows == n0 + 5);
+
+    arma::mat Xt;
+    arma::vec yt;
+    make_data(6, Xt, yt, 321);
+    auto [m_pred, s_pred] = k.predictCG(Xt, true);
+    CHECK(m_pred.n_elem == 6);
+    CHECK(m_pred.is_finite());
+    CHECK(s_pred.is_finite());
+  }
+
+  SECTION("still blocks simulate/update_simulate/save after update()") {
+    k.update(yu, Xu, false);
+    CHECK_THROWS_AS(k.simulate(5, 123, k.X()), std::runtime_error);
+    CHECK_THROWS_AS(k.update_simulate(yu, Xu), std::runtime_error);
+    CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
+  }
 }
 
 TEST_CASE("LLIterative(m) at a fixed theta: predictCG is broadly consistent with the exact MLE",
