@@ -180,8 +180,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
-      .def("predictCG",
-           &PyKriging::predictCG,
+      .def("predictIterative",
+           &PyKriging::predictIterative,
            py::arg("X"),
            py::arg("return_stdev") = false,
            py::arg("max_iter") = 0,
@@ -196,7 +196,7 @@ use_nystrom_precond=True builds a rank-precond_rank Nystrom factor of R at
 the model's own (already-fitted) theta and uses it as a CG preconditioner
 (fewer CG iterations to reach tol on the typically ill-conditioned R, at a
 one-time setup cost); off by default. Only available for models fitted
-without a nugget/noise channel (NoiseModel.none). See docs/math/PredictCG.md
+without a nugget/noise channel (NoiseModel.none). See docs/math/PredictIterative.md
 and docs/math/Nystrom.md.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
