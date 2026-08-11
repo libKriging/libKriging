@@ -1583,8 +1583,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   };
 
   // Opt-in Nystrom preconditioner (objective="LLIterative(m,precond_rank)"),
-  // same principle as predictCG's: rebuilt at the CURRENT theta on every
-  // call (unlike predictCG, which only ever precondition-solves at one
+  // same principle as predictIterative's: rebuilt at the CURRENT theta on every
+  // call (unlike predictIterative, which only ever precondition-solves at one
   // fixed, already-fitted m_theta) but over the FIXED landmark set chosen
   // once in make_iterative_precond_landmarks -- keeping the preconditioner,
   // and hence the CG-converged objective/gradient, smooth in theta.
@@ -1602,7 +1602,9 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     U_pc = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
     const arma::vec captured = arma::sum(arma::square(U_pc), 1);
     D_pc = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
-    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec { return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0); };
+    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
+      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
+    };
   }
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
@@ -1687,7 +1689,7 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodIterativeF
   return {_logLikelihoodIterative(theta), grad};
 }
 
-void Kriging::update_iterative(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
+void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
   if (y_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
                              + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
@@ -1770,7 +1772,7 @@ void Kriging::check_not_iterative_light(const char* what) const {
   if (m_iterative_light)
     throw std::runtime_error(std::string(what)
                              + ": not available on an Iterative fit "
-                               "(refit with objective=\"LL\", or use predictCG)");
+                               "(refit with objective=\"LL\", or use predictIterative)");
 }
 
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
@@ -2650,7 +2652,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         if (m_est_sigma2)
           m_sigma2 = sigma2_v;
         m_iterative_light = true;
-        m_is_empty = true;  // no committed factorization: predict routes to predictCG
+        m_is_empty = true;  // no committed factorization: predict routes to predictIterative
       } else if (best_idx >= 0) {
         const auto& best = results[best_idx];
         m_theta = best.theta;  // copy
@@ -2763,8 +2765,8 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
     if (return_cov || return_deriv)
       throw std::runtime_error(
           "predict: return_cov/return_deriv are not available on an Iterative fit "
-          "(refit with objective=\"LL\", or use predictCG)");
-    auto [mean, stdev] = predictCG(X_n, return_stdev);
+          "(refit with objective=\"LL\", or use predictIterative)");
+    auto [mean, stdev] = predictIterative(X_n, return_stdev);
     return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
   }
   const arma::uword n_o = m_X.n_rows;
@@ -2792,131 +2794,17 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                       /*var_scale=*/sigma2);
 }
 
-LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma::mat& X_n,
-                                                                      bool return_stdev,
-                                                                      arma::uword max_iter,
-                                                                      double tol,
-                                                                      bool use_nystrom_precond,
-                                                                      arma::uword precond_rank) const {
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictIterative(const arma::mat& X_n,
+                                                                             bool return_stdev,
+                                                                             arma::uword max_iter,
+                                                                             double tol,
+                                                                             bool use_nystrom_precond,
+                                                                             arma::uword precond_rank) const {
   if (m_noise_model != NoiseModel::None)
-    throw std::runtime_error("predictCG: only available for NoiseModel::None");
+    throw std::runtime_error("predictIterative: only available for NoiseModel::None");
   if (m_X.n_rows == 0)
-    throw std::runtime_error("predictCG: model was not fitted");
-  const arma::uword d = m_X.n_cols;
-  if (X_n.n_cols != d)
-    throw std::invalid_argument("predictCG: X_n has wrong dimension: " + std::to_string(X_n.n_cols) + " instead of "
-                                + std::to_string(d));
-
-  const arma::uword n = m_X.n_rows;
-  if (max_iter == 0)
-    // n is CG's exact-arithmetic convergence bound, but GP covariance
-    // matrices are commonly ill-conditioned enough (smooth kernels, many
-    // points) that round-off keeps the true error shrinking well past that
-    // point in practice (see LinearAlgebra::conjugateGradient's periodic
-    // residual-recompute comment) -- 2n is a more realistic default budget.
-    max_iter = 2 * n;
-
-  // Matrix-free matvec R*v: R(i,j) = _Cov(X_i - X_j, theta) for i != j, 1 on
-  // the diagonal (correlation matrix, NoiseModel::None). O(n) memory (no R
-  // ever materialized), O(n^2) time per call.
-  const arma::mat Xt = m_X.t();  // d x n, contiguous columns for cache-friendly access
-  const arma::vec& theta = m_theta;
-  const auto& cov = _Cov;
-  auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
-    arma::vec out(n, arma::fill::none);
-#ifdef _OPENMP
-    if (n >= 200) {
-      int optimal_threads = get_optimal_threads(2);
-#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
-      for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
-        double acc = v(static_cast<arma::uword>(i));  // diag = 1
-        for (arma::uword j = 0; j < n; ++j) {
-          if (j == static_cast<arma::uword>(i))
-            continue;
-          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
-        }
-        out(static_cast<arma::uword>(i)) = acc;
-      }
-    } else {
-#endif
-      for (arma::uword i = 0; i < n; ++i) {
-        double acc = v(i);  // diag = 1
-        for (arma::uword j = 0; j < n; ++j) {
-          if (j == i)
-            continue;
-          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
-        }
-        out(i) = acc;
-      }
-#ifdef _OPENMP
-    }
-#endif
-    return out;
-  };
-
-  // Optional Nystrom preconditioner: a rank-precond_rank factor of R at the
-  // model's own (fixed, already-fitted) theta -- unlike the LLNystrom
-  // objective's landmarks, no cross-theta smoothness constraint applies
-  // here, so this can legitimately be built exactly at the theta being used
-  // for prediction rather than at a generic reference. Pinv is left empty
-  // (== plain CG) when disabled, matching the prior behavior exactly.
-  arma::mat U_pc;
-  arma::vec D_pc;
-  std::function<arma::vec(const arma::vec&)> Pinv;
-  if (use_nystrom_precond) {
-    arma::vec diag_resid;
-    U_pc = LinearAlgebra::nystromFactor(
-        &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, KrigingImpl::ones, std::min(precond_rank, n), 1e-12);
-    D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
-    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
-      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
-    };
-  }
-
-  arma::mat Xn_n = X_n;
-  Xn_n.each_row() -= m_centerX;
-  Xn_n.each_row() /= m_scaleX;
-  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
-  const arma::uword n_n = X_n.n_rows;
-
-  // One CG solve, reused for every prediction point's mean.
-  const arma::vec resid = m_y - m_F * m_beta;
-  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol, Pinv);
-
-  arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
-  LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n.t(), m_theta, _Cov, 1.0);
-
-  arma::vec mean = F_n * m_beta + R_on.t() * w.col(0);
-  mean = mean * m_scaleY + m_centerY;
-
-  arma::vec stdev;
-  if (return_stdev) {
-    // One CG solve PER prediction point (R_on's columns don't share a
-    // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
-    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol, Pinv);
-    const arma::vec quad = arma::sum(R_on % V, 0).t();
-
-    arma::vec gls_correction(n_n, arma::fill::zeros);
-    if (m_F.n_cols > 0) {
-      // GLS correction for the trend coefficients' own estimation
-      // uncertainty -- same u^T(F^T R^-1 F)^-1 u term predict()'s Cholesky
-      // path computes via m_circ/Ecirc_n (see KrigingImpl::predict_impl),
-      // here via one extra shared CG solve (R^-1 F, m_F.n_cols right-hand
-      // sides) plus O(n_n * p^2) small dense linear algebra (p = m_F.n_cols).
-      // Without it, stdev reduces to the simple-kriging formula (correct
-      // only when the trend is known rather than estimated, i.e. regmodel
-      // == "none") and understates the prediction uncertainty otherwise.
-      const arma::mat W_F = LinearAlgebra::conjugateGradient(Rmul, m_F, max_iter, tol, Pinv);
-      const arma::mat FtRinvF = m_F.t() * W_F;
-      const arma::mat E = F_n - R_on.t() * W_F;
-      const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
-      gls_correction = arma::sum(E.t() % correction_rhs, 0).t();
-    }
-
-    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad + gls_correction), 0.0, arma::datum::inf));
-    stdev *= m_scaleY;
-  }
-  return {mean, stdev};
+    throw std::runtime_error("predictIterative: model was not fitted");
+  return predictIterative_impl(X_n, return_stdev, max_iter, tol, use_nystrom_precond, precond_rank);
 }
 
 /** Draw sample trajectories of kriging at given points X'
@@ -3074,7 +2962,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     return;
   }
   if (m_iterative_light) {
-    update_iterative(y_u, X_u, refit);
+    updateIterative(y_u, X_u, refit);
     return;
   }
   if (y_u.n_elem != X_u.n_rows)

@@ -83,7 +83,7 @@ double test_function(const arma::rowvec& x) {
 
 void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iterations) {
   std::cout << "\n";
-  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (predictCG)" << std::endl;
+  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (predictIterative)" << std::endl;
 
   arma::arma_rng::set_seed(123);
   arma::mat X_train(n_train, d, arma::fill::randu);
@@ -91,10 +91,10 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   for (arma::uword i = 0; i < n_train; ++i)
     y_train(i) = test_function(X_train.row(i));
 
-  std::vector<double> predict_times, predictcg_mean_times, predictcg_stdev_times;
+  std::vector<double> predict_times, prediterative_mean_times, prediterative_stdev_times;
 
   // Small prediction batch for the return_stdev=true row: it runs one CG
-  // solve PER point (O(n^2 * iters * q), see PredictCG.md), so a handful
+  // solve PER point (O(n^2 * iters * q), see PredictIterative.md), so a handful
   // of points is enough to characterize its cost without the run blowing
   // up at larger n -- unlike the mean-only row, which shares a single CG
   // solve across all prediction points.
@@ -114,26 +114,26 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     }
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k.predictCG(X_pred);
+      k.predictIterative(X_pred);
       auto t1 = std::chrono::high_resolution_clock::now();
-      predictcg_mean_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      prediterative_mean_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k.predictCG(X_pred_stdev, true);
+      k.predictIterative(X_pred_stdev, true);
       auto t1 = std::chrono::high_resolution_clock::now();
-      predictcg_stdev_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      prediterative_stdev_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
   }
 
   print_header();
   print_stats("predict", compute_stats(predict_times));
-  print_stats("predictCG_mean", compute_stats(predictcg_mean_times));
-  print_stats("predictCG_stdev(q=10)", compute_stats(predictcg_stdev_times));
+  print_stats("predictIterative_mean", compute_stats(prediterative_mean_times));
+  print_stats("predictIterative_stdev(q=10)", compute_stats(prediterative_stdev_times));
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "predictCG Benchmark (matrix-free CG predict vs exact predict)" << std::endl;
+  std::cout << "predictIterative Benchmark (matrix-free CG predict vs exact predict)" << std::endl;
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;

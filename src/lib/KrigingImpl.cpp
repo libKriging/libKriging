@@ -299,6 +299,140 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
                          std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d_input, arma::fill::ones))));
 }
 
+std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::mat& X_n,
+                                                                    bool return_stdev,
+                                                                    arma::uword max_iter,
+                                                                    double tol,
+                                                                    bool use_nystrom_precond,
+                                                                    arma::uword precond_rank,
+                                                                    const FeatureMap& phi) const {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  if (!phi && X_n.n_cols != d)
+    throw std::invalid_argument("predictIterative: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+
+  if (max_iter == 0)
+    // n is CG's exact-arithmetic convergence bound, but GP covariance
+    // matrices are commonly ill-conditioned enough (smooth kernels, many
+    // points) that round-off keeps the true error shrinking well past that
+    // point in practice (see LinearAlgebra::conjugateGradient's periodic
+    // residual-recompute comment) -- 2n is a more realistic default budget.
+    max_iter = 2 * n;
+
+  // Matrix-free matvec R*v: R(i,j) = _Cov(X_i - X_j, theta) for i != j, 1 on
+  // the diagonal (correlation matrix, no noise channel). O(n) memory (no R
+  // ever materialized), O(n^2) time per call. m_X is already in feature
+  // space when phi is set (same convention as predict_impl), so this needs
+  // no phi of its own.
+  const arma::mat Xt = m_X.t();  // d x n, contiguous columns for cache-friendly access
+  const arma::vec& theta = m_theta;
+  const auto& cov = _Cov;
+  auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
+    arma::vec out(n, arma::fill::none);
+#ifdef _OPENMP
+    if (n >= 200) {
+      int optimal_threads = get_optimal_threads(2);
+#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
+      for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
+        double acc = v(static_cast<arma::uword>(i));  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == static_cast<arma::uword>(i))
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(static_cast<arma::uword>(i)) = acc;
+      }
+    } else {
+#endif
+      for (arma::uword i = 0; i < n; ++i) {
+        double acc = v(i);  // diag = 1
+        for (arma::uword j = 0; j < n; ++j) {
+          if (j == i)
+            continue;
+          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+        }
+        out(i) = acc;
+      }
+#ifdef _OPENMP
+    }
+#endif
+    return out;
+  };
+
+  // Optional Nystrom preconditioner: a rank-precond_rank factor of R at the
+  // model's own (fixed, already-fitted) theta -- unlike the LLNystrom
+  // objective's landmarks, no cross-theta smoothness constraint applies
+  // here, so this can legitimately be built exactly at the theta being used
+  // for prediction rather than at a generic reference. Pinv is left empty
+  // (== plain CG) when disabled, matching the prior behavior exactly.
+  arma::mat U_pc;
+  arma::vec D_pc;
+  std::function<arma::vec(const arma::vec&)> Pinv;
+  if (use_nystrom_precond) {
+    arma::vec diag_resid;
+    U_pc = LinearAlgebra::nystromFactor(
+        &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, ones, std::min(precond_rank, n), 1e-12);
+    D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
+    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
+      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
+    };
+  }
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  arma::mat F_n;
+  if (phi) {
+    arma::mat Xn_n_feat = phi(Xn_n);  // n_n × d
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n_feat);
+    Xn_n = trans(Xn_n_feat);  // d × n_n (phi-space from here on)
+  } else {
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+    Xn_n = trans(Xn_n);  // d × n_n
+  }
+  const arma::uword n_n = X_n.n_rows;
+
+  // One CG solve, reused for every prediction point's mean.
+  const arma::vec resid = m_y - m_F * m_beta;
+  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol, Pinv);
+
+  arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n, m_theta, _Cov, 1.0);
+
+  arma::vec mean = F_n * m_beta + R_on.t() * w.col(0);
+  mean = mean * m_scaleY + m_centerY;
+
+  arma::vec stdev;
+  if (return_stdev) {
+    // One CG solve PER prediction point (R_on's columns don't share a
+    // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
+    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol, Pinv);
+    const arma::vec quad = arma::sum(R_on % V, 0).t();
+
+    arma::vec gls_correction(n_n, arma::fill::zeros);
+    if (m_F.n_cols > 0) {
+      // GLS correction for the trend coefficients' own estimation
+      // uncertainty -- same u^T(F^T R^-1 F)^-1 u term predict_impl computes
+      // via m_circ/Ecirc_n, here via one extra shared CG solve (R^-1 F,
+      // m_F.n_cols right-hand sides) plus O(n_n * p^2) small dense linear
+      // algebra (p = m_F.n_cols). Without it, stdev reduces to the
+      // simple-kriging formula (correct only when the trend is known
+      // rather than estimated, i.e. regmodel == "none") and understates
+      // the prediction uncertainty otherwise.
+      const arma::mat W_F = LinearAlgebra::conjugateGradient(Rmul, m_F, max_iter, tol, Pinv);
+      const arma::mat FtRinvF = m_F.t() * W_F;
+      const arma::mat E = F_n - R_on.t() * W_F;
+      const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
+      gls_correction = arma::sum(E.t() % correction_rhs, 0).t();
+    }
+
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad + gls_correction), 0.0, arma::datum::inf));
+    stdev *= m_scaleY;
+  }
+  return {mean, stdev};
+}
+
 arma::mat KrigingImpl::simulate_impl(int nsim,
                                      int seed,
                                      const arma::mat& X_n,

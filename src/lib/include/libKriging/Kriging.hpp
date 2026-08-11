@@ -285,12 +285,12 @@ class Kriging : public KrigingImpl {
    *        behavior exactly).
    * @param precond_rank rank of that Nystrom preconditioner, if enabled.
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
-  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictCG(const arma::mat& X_n,
-                                                               bool return_stdev = false,
-                                                               arma::uword max_iter = 0,
-                                                               double tol = 1e-8,
-                                                               bool use_nystrom_precond = false,
-                                                               arma::uword precond_rank = 50) const;
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictIterative(const arma::mat& X_n,
+                                                                      bool return_stdev = false,
+                                                                      arma::uword max_iter = 0,
+                                                                      double tol = 1e-8,
+                                                                      bool use_nystrom_precond = false,
+                                                                      arma::uword precond_rank = 50) const;
 
   /** Draw observed trajectories of kriging at given points X_n
    * @param X_n is m*d matrix of points where to simulate output
@@ -453,7 +453,7 @@ class Kriging : public KrigingImpl {
   /// probes at every evaluation would make the objective noisy/non-smooth
   /// between BFGS iterations.
   arma::mat m_iterative_probes;
-  arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictCG)
+  arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictIterative)
   double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
   arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
 
@@ -490,7 +490,7 @@ class Kriging : public KrigingImpl {
                                  double* sigma2_out = nullptr) const;
   bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
   /// Throw if the model is an Iterative fit (used by simulate/update_simulate/save;
-  /// update() has its own update_iterative() incremental path instead)
+  /// update() has its own updateIterative() incremental path instead)
   void check_not_iterative_light(const char* what) const;
   /// Iterative-specific incremental update: extends m_X/m_y/m_F with the new
   /// data (the FIXED probes are redrawn at the new n; the FIXED precond
@@ -499,7 +499,7 @@ class Kriging : public KrigingImpl {
   /// or first does a warm-restart single BFGS from the current theta
   /// (refit=true, same fixed probes/landmarks) before re-profiling. Mirrors
   /// update_nystrom's O((n_old+n_new)*...) incremental strategy.
-  void update_iterative(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+  void updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool refit);
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

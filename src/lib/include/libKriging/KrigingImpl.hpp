@@ -206,6 +206,26 @@ class KrigingImpl {
                                                                                  const FeatureMap& phi = {},
                                                                                  const FeatureJacobian& jac = {}) const;
 
+  /// Unified matrix-free conjugate-gradient predict, shared by any variant
+  /// with no per-point noise channel (plain correlation matrix, diag=1) --
+  /// callers are responsible for checking that precondition (nugget/noise
+  /// classes don't call this). Same mean/stdev formulas as `predict_impl`
+  /// (universal-kriging mean, GLS-corrected variance), just solved via
+  /// `LinearAlgebra::conjugateGradient` instead of the stored Cholesky
+  /// factor: needs only m_X/m_y/m_F/m_theta/m_beta/m_sigma2 (O(n) storage),
+  /// at the cost of O(n^2 * iters) compute per solve instead of a single
+  /// O(n^2) triangular solve. See `Kriging::predictIterative` for the parameter
+  /// docs (max_iter/tol/use_nystrom_precond/precond_rank); `phi` is the same
+  /// optional feature map as `predict_impl` (pass {} for identity -- m_X
+  /// must already store Φ(X_normalized) when phi is set).
+  std::tuple<arma::vec, arma::vec> predictIterative_impl(const arma::mat& X_n,
+                                                         bool return_stdev,
+                                                         arma::uword max_iter,
+                                                         double tol,
+                                                         bool use_nystrom_precond,
+                                                         arma::uword precond_rank,
+                                                         const FeatureMap& phi = {}) const;
+
   /// Unified simulate scaffolding shared by the three variants.  Builds R_nn,
   /// R_on, draws y_n ~ N(yhat_n, σ² · Sigma/Sigma_divisor), and (when
   /// `will_update`) stores the common `lastsim_*` members needed by

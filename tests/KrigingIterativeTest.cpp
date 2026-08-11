@@ -162,13 +162,12 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
   auto [ll_plain, grad_plain] = k_plain.logLikelihoodIterativeFun(theta, true);
   auto [ll_pc, grad_pc] = k_pc.logLikelihoodIterativeFun(theta, true);
 
-  INFO("ll_plain=" << ll_plain << " ll_pc=" << ll_pc << " grad_plain=" << grad_plain.t()
-                   << " grad_pc=" << grad_pc.t());
+  INFO("ll_plain=" << ll_plain << " ll_pc=" << ll_pc << " grad_plain=" << grad_plain.t() << " grad_pc=" << grad_pc.t());
   CHECK(std::abs(ll_plain - ll_pc) < 1e-4 * std::abs(ll_plain) + 1e-6);
   CHECK(arma::abs(grad_plain - grad_pc).max() < 0.02 * arma::abs(grad_plain).max() + 0.05);
 }
 
-// The "light fit" flag (and everything gated behind it: predictCG routing,
+// The "light fit" flag (and everything gated behind it: predictIterative routing,
 // blocking simulate/update/save) is only set on the actual multistart-BFGS
 // commit path -- exactly like m_nystrom_light/m_vecchia_light. optim="none"
 // bypasses that path entirely and does a plain exact factorization (mirrors
@@ -176,7 +175,7 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
 // fit. n and nprobe are kept deliberately tiny (each gradient evaluation
 // does a CG solve over `nprobe` right-hand sides, and BFGS calls it many
 // times) to keep runtime bounded.
-TEST_CASE("LLIterative fit is a permanent light fit: predict routes to predictCG", "[iterative][kriging]") {
+TEST_CASE("LLIterative fit is a permanent light fit: predict routes to predictIterative", "[iterative][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(15, X, y);
@@ -190,7 +189,7 @@ TEST_CASE("LLIterative fit is a permanent light fit: predict routes to predictCG
   make_data(8, Xt, yt, 456);
 
   auto [m_pred, s_pred, cov, dm, ds] = k.predict(Xt, true, false, false);
-  auto [m_cg, s_cg] = k.predictCG(Xt, true);
+  auto [m_cg, s_cg] = k.predictIterative(Xt, true);
   CHECK(arma::approx_equal(m_pred, m_cg, "absdiff", 1e-8));
   CHECK(arma::approx_equal(s_pred, s_cg, "absdiff", 1e-8));
 
@@ -211,7 +210,7 @@ TEST_CASE("LLIterative fit blocks simulate/update_simulate/save", "[iterative][k
   CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
 }
 
-// update() has its own incremental path (update_iterative): unlike
+// update() has its own incremental path (updateIterative): unlike
 // simulate/update_simulate/save, it does NOT require ever materializing an
 // n x n matrix -- it just extends m_X/m_y/m_F, redraws the (n-sized) probes,
 // and re-profiles beta/sigma2 (optionally after a warm-restart single BFGS)
@@ -239,11 +238,11 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
     CHECK(k.y().n_elem == n0 + 5);
     CHECK(arma::approx_equal(k.theta(), theta_before, "absdiff", 1e-12));  // theta untouched
 
-    // predictCG should still give finite, sane predictions after the update.
+    // predictIterative should still give finite, sane predictions after the update.
     arma::mat Xt;
     arma::vec yt;
     make_data(6, Xt, yt, 321);
-    auto [m_pred, s_pred] = k.predictCG(Xt, true);
+    auto [m_pred, s_pred] = k.predictIterative(Xt, true);
     CHECK(m_pred.n_elem == 6);
     CHECK(m_pred.is_finite());
     CHECK(s_pred.is_finite());
@@ -258,7 +257,7 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
     arma::mat Xt;
     arma::vec yt;
     make_data(6, Xt, yt, 321);
-    auto [m_pred, s_pred] = k.predictCG(Xt, true);
+    auto [m_pred, s_pred] = k.predictIterative(Xt, true);
     CHECK(m_pred.n_elem == 6);
     CHECK(m_pred.is_finite());
     CHECK(s_pred.is_finite());
@@ -272,12 +271,12 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
   }
 }
 
-TEST_CASE("LLIterative(m) at a fixed theta: predictCG is broadly consistent with the exact MLE",
+TEST_CASE("LLIterative(m) at a fixed theta: predictIterative is broadly consistent with the exact MLE",
           "[iterative][kriging]") {
   // Fixed theta (optim="none" doesn't set the light flag, so call
-  // predictCG directly to force the CG-based prediction path regardless):
-  // isolates the CG-based beta/sigma2 estimation + predictCG's own accuracy
-  // (already covered in isolation by KrigingPredictCGTest) from Optim.cpp's
+  // predictIterative directly to force the CG-based prediction path regardless):
+  // isolates the CG-based beta/sigma2 estimation + predictIterative's own accuracy
+  // (already covered in isolation by KrigingPredictIterativeTest) from Optim.cpp's
   // free-fit convergence behaviour, which on this deterministic test
   // function is prone to the well-documented GP-MLE degeneracy (see
   // docs/math/Nystrom.md's limitations section).
@@ -294,14 +293,14 @@ TEST_CASE("LLIterative(m) at a fixed theta: predictCG is broadly consistent with
   arma::vec yt;
   make_data(20, Xt, yt, 789);
 
-  auto [m_it, s_it] = k.predictCG(Xt, true);
+  auto [m_it, s_it] = k.predictIterative(Xt, true);
   auto [m_ex, s_ex, c2, d3, d4] = k_exact.predict(Xt, true, false, false);
 
   INFO("max |mean diff| = " << arma::abs(m_it - m_ex).max());
   INFO("max |stdev diff| = " << arma::abs(s_it - s_ex).max());
-  // An LLIterative fit's predict() always routes through predictCG (see
+  // An LLIterative fit's predict() always routes through predictIterative (see
   // Iterative.md), so its stdev (including the GLS-correction term) needs
-  // the same verification as predictCG's own tests.
+  // the same verification as predictIterative's own tests.
   CHECK(arma::abs(m_it - m_ex).max() < 0.02 * arma::stddev(y));
   CHECK(arma::abs(s_it - s_ex).max() < 0.02 * arma::stddev(y));
 }
