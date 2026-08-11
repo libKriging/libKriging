@@ -96,13 +96,13 @@ catch_discover_tests(KrigingPredictTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
-add_executable(KrigingPredictCGTest KrigingPredictCGTest.cpp)
-target_link_libraries(KrigingPredictCGTest LINK_PUBLIC Kriging Catch2)
-add_dependencies(all_test_binaries KrigingPredictCGTest)
+add_executable(KrigingPredictIterativeTest KrigingPredictIterativeTest.cpp)
+target_link_libraries(KrigingPredictIterativeTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingPredictIterativeTest)
 if(DEFINED ENV{GITHUB_ACTIONS})
     set(AdditionalCatchParameters "~[intensive]")
 endif()
-catch_discover_tests(KrigingPredictCGTest EXTRA_ARGS ${AdditionalCatchParameters})
+catch_discover_tests(KrigingPredictIterativeTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
