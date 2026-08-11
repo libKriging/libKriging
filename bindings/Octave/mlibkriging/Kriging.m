@@ -41,10 +41,10 @@ classdef Kriging < handle
         % (already-fitted) theta and uses it as a CG preconditioner (fewer
         % CG iterations to reach tol, at a one-time setup cost); off by
         % default. Only available for models fitted without a
-        % nugget/noise channel. See docs/math/PredictCG.md and
+        % nugget/noise channel. See docs/math/PredictIterative.md and
         % docs/math/Nystrom.md.
-        function varargout = predictCG(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::predictCG", obj.ref, varargin{:});
+        function varargout = predictIterative(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::predictIterative", obj.ref, varargin{:});
         end
 
         function varargout = simulate(obj, varargin)
