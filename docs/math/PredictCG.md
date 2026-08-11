@@ -39,7 +39,13 @@ auto [mean, stdev] = model.predictCG(Xnew, true);  // matrix-free predict
   model without a resident factor, but scales worse than the exact
   predictor's O(n²) *total* cost (not per point) as q grows -- see
   [PredictCGTest.cpp](../../tests/KrigingPredictCGTest.cpp) and
-  `bench/bench-predictcg.cpp` for the concrete crossover.
+  `bench/bench-predictcg.cpp` for the concrete crossover. Whenever the fit
+  has an estimated trend (any `regmodel != "none"`, including the default
+  `"constant"`), the variance also needs the GLS correction term
+  `u.t() * (F.t() R⁻¹ F)⁻¹ * u` (`u = F_n - R_on.t() * R⁻¹F`) that accounts
+  for β's own estimation uncertainty -- same term the exact predictor
+  computes via its Cholesky factor, here from one additional CG solve of
+  `R⁻¹F` (shared across all prediction points, same as the mean's solve).
 - **Iteration budget**: `max_iter=0` defaults to `2n`. CG's classical
   exact-arithmetic bound is n iterations, but GP covariance matrices are
   commonly ill-conditioned enough (smooth kernels, clustered designs)
