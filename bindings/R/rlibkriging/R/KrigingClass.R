@@ -31,7 +31,7 @@ classKriging <- function(nk) {
     for (f in c('as.list','copy','fit','save',
     'covMat','leaveOneOut','leaveOneOutFun','leaveOneOutVec',
     'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','predictCG','print','show','simulate','update', 'update_simulate')) {
+    'predict','predictIterative','print','show','simulate','update', 'update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -383,7 +383,7 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' prediction. \code{return_stdev = TRUE} runs one extra CG solve PER
 #' prediction point, so it defaults to \code{FALSE}. Only available for
 #' models fitted without a nugget/noise channel. See
-#' \code{docs/math/PredictCG.md} for the full derivation.
+#' \code{docs/math/PredictIterative.md} for the full derivation.
 #'
 #' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
@@ -403,7 +403,7 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' @return A list containing the element \code{mean} and, if
 #'     \code{return_stdev=TRUE}, \code{stdev}.
 #'
-#' @method predictCG Kriging
+#' @method predictIterative Kriging
 #' @export
 #'
 #' @examples
@@ -415,13 +415,13 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 #' k <- Kriging(y, X, "matern3_2")
 #'
 #' x <- seq(from = 0, to = 1, length.out = 101)
-#' p <- predictCG(k, x)
-predictCG.Kriging <- function(object, x, return_stdev = FALSE, max_iter = 0L, tol = 1e-8,
+#' p <- predictIterative(k, x)
+predictIterative.Kriging <- function(object, x, return_stdev = FALSE, max_iter = 0L, tol = 1e-8,
                               use_nystrom_precond = FALSE, precond_rank = 50L, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
-    return(kriging_predictCG(object, x, return_stdev, as.integer(max_iter), tol,
+    return(kriging_predictIterative(object, x, return_stdev, as.integer(max_iter), tol,
                              use_nystrom_precond, as.integer(precond_rank)))
 }
 
