@@ -74,9 +74,9 @@ int lk_kriging_predict(void* ptr,
    use_nystrom_precond!=0 builds a rank-precond_rank Nystrom factor of R at
    the model's own (already-fitted) theta and uses it as a CG
    preconditioner (fewer CG iterations to reach tol, at a one-time setup
-   cost); off by default. See docs/math/PredictCG.md and
+   cost); off by default. See docs/math/PredictIterative.md and
    docs/math/Nystrom.md. */
-int lk_kriging_predictCG(void* ptr,
+int lk_kriging_predictIterative(void* ptr,
                          const double* X_n,
                          int m,
                          int d,

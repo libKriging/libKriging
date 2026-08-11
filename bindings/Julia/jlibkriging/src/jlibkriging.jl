@@ -260,7 +260,7 @@ function predict(k::Kriging, X_n::Matrix{Float64};
 end
 
 """
-    predictCG(k::Kriging, X_n; return_stdev=false, max_iter=0, tol=1e-8,
+    predictIterative(k::Kriging, X_n; return_stdev=false, max_iter=0, tol=1e-8,
               use_nystrom_precond=false, precond_rank=50)
 
 Predict-only, matrix-free conjugate-gradient alternative to `predict`:
@@ -272,21 +272,21 @@ rank-`precond_rank` Nystrom factor of R at the model's own (already-fitted)
 theta and uses it as a CG preconditioner (fewer CG iterations to reach
 `tol` on the typically ill-conditioned R, at a one-time setup cost); off by
 default. Only available for models fitted without a nugget/noise channel.
-See `docs/math/PredictCG.md` and `docs/math/Nystrom.md`.
+See `docs/math/PredictIterative.md` and `docs/math/Nystrom.md`.
 """
-function predictCG(k::Kriging, X_n::Matrix{Float64};
+function predictIterative(k::Kriging, X_n::Matrix{Float64};
                    return_stdev::Bool=false,
                    max_iter::Int=0,
                    tol::Float64=1e-8,
                    use_nystrom_precond::Bool=false,
                    precond_rank::Int=50)
-    max_iter >= 0 || throw(ArgumentError("predictCG: max_iter must be >= 0 (0 means the default, 2n)"))
-    precond_rank >= 0 || throw(ArgumentError("predictCG: precond_rank must be >= 0"))
+    max_iter >= 0 || throw(ArgumentError("predictIterative: max_iter must be >= 0 (0 means the default, 2n)"))
+    precond_rank >= 0 || throw(ArgumentError("predictIterative: precond_rank must be >= 0"))
     m, d = size(X_n)
     mean_out = Vector{Float64}(undef, m)
     stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
 
-    ret = ccall(dlsym(_lk(), :lk_kriging_predictCG), Cint,
+    ret = ccall(dlsym(_lk(), :lk_kriging_predictIterative), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
                  Cint, Cint, Cdouble, Cint, Cint,
                  Ptr{Float64}, Ptr{Float64}),
@@ -1477,7 +1477,7 @@ Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export nb_groups, aggregation, beta0
-export fit!, predict, predictCG, subsetOfData, simulate, update!, update_simulate, save, summary
+export fit!, predict, predictIterative, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post

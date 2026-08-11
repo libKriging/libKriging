@@ -34,7 +34,7 @@ endmacro()
 
 add_julia_test(NAME loading FILENAME loading_test.jl)
 add_julia_test(NAME kriging_basic FILENAME kriging_basic_test.jl)
-add_julia_test(NAME kriging_predictcg FILENAME kriging_predictcg_test.jl)
+add_julia_test(NAME kriging_prediterative FILENAME kriging_prediterative_test.jl)
 add_julia_test(NAME kriging_parametric FILENAME kriging_parametric_test.jl)
 add_julia_test(NAME nugget_kriging FILENAME nugget_kriging_test.jl)
 add_julia_test(NAME noise_kriging FILENAME noise_kriging_test.jl)
