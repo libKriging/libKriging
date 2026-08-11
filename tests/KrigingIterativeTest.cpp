@@ -298,5 +298,10 @@ TEST_CASE("LLIterative(m) at a fixed theta: predictCG is broadly consistent with
   auto [m_ex, s_ex, c2, d3, d4] = k_exact.predict(Xt, true, false, false);
 
   INFO("max |mean diff| = " << arma::abs(m_it - m_ex).max());
-  CHECK(arma::abs(m_it - m_ex).max() < 0.1 * arma::stddev(y));
+  INFO("max |stdev diff| = " << arma::abs(s_it - s_ex).max());
+  // An LLIterative fit's predict() always routes through predictCG (see
+  // Iterative.md), so its stdev (including the GLS-correction term) needs
+  // the same verification as predictCG's own tests.
+  CHECK(arma::abs(m_it - m_ex).max() < 0.02 * arma::stddev(y));
+  CHECK(arma::abs(s_it - s_ex).max() < 0.02 * arma::stddev(y));
 }
