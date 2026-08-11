@@ -156,7 +156,7 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.setOptional(4, stderr_deriv_m, "predicted stdev deriv matrix");
 }
 
-void predictCG(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+void predictIterative(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
@@ -172,7 +172,7 @@ void predictCG(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     throw MxException(LOCATION(), "mLibKriging:badArgument", "max_iter must be >= 0 (0 means the default, 2n)");
   if (precond_rank < 0)
     throw MxException(LOCATION(), "mLibKriging:badArgument", "precond_rank must be >= 0");
-  auto [mean_v, stdev_v] = km->predictCG(input.get<arma::mat>(1, "matrix"),
+  auto [mean_v, stdev_v] = km->predictIterative(input.get<arma::mat>(1, "matrix"),
                                          return_stdev,
                                          static_cast<arma::uword>(max_iter),
                                          tol,
