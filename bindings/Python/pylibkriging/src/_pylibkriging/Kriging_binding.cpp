@@ -146,20 +146,20 @@ PyKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool retur
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
-// --- predictCG ---
+// --- predictIterative ---
 
-std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::predictCG(const py::array_t<double>& X_n,
+std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::predictIterative(const py::array_t<double>& X_n,
                                                                           bool return_stdev,
                                                                           int max_iter,
                                                                           double tol,
                                                                           bool use_nystrom_precond,
                                                                           int precond_rank) {
   if (max_iter < 0)
-    throw std::invalid_argument("predictCG: max_iter must be >= 0 (0 means the default, 2n)");
+    throw std::invalid_argument("predictIterative: max_iter must be >= 0 (0 means the default, 2n)");
   if (precond_rank < 0)
-    throw std::invalid_argument("predictCG: precond_rank must be >= 0");
+    throw std::invalid_argument("predictIterative: precond_rank must be >= 0");
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
-  auto [mean, stdev] = m_internal->predictCG(mat_X,
+  auto [mean, stdev] = m_internal->predictIterative(mat_X,
                                              return_stdev,
                                              static_cast<arma::uword>(max_iter),
                                              tol,

@@ -50,7 +50,7 @@ class PyKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
-  std::tuple<py::array_t<double>, py::array_t<double>> predictCG(const py::array_t<double>& X_n,
+  std::tuple<py::array_t<double>, py::array_t<double>> predictIterative(const py::array_t<double>& X_n,
                                                                  bool return_stdev,
                                                                  int max_iter,
                                                                  double tol,
