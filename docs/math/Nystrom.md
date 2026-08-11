@@ -120,7 +120,7 @@ pred <- predict(k, Xnew, stdev = TRUE)
 executed notebook: the math above illustrated on a running example, with
 rank-$k$ convergence/accuracy/timing plots and references.
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
-`NestedKriging` and `predictCG`, and how to pick between them.
+`NestedKriging` and `predictIterative`, and how to pick between them.
 
 ## References
 

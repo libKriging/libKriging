@@ -125,7 +125,7 @@ same n (which would not fit in memory anyway).
 ## See also
 
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
-`LLNystrom` and `predictCG`, and how to pick between them.
+`LLNystrom` and `predictIterative`, and how to pick between them.
 
 ## References
 

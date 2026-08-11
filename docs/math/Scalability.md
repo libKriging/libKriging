@@ -17,11 +17,11 @@ method has its own page with the full derivation.
 | `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
 | `LLIterative(m[,r])` | fit objective | O(n²·iters) per CG solve, m+1 solves/eval | *nothing* structural — R stays exact; only `log\|R\|` is a stochastic (SLQ) estimate | none (doesn't touch the covariance structure) | [Iterative.md](Iterative.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
-| `predictCG` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictCG.md](PredictCG.md) |
+| `predictIterative` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictIterative.md](PredictIterative.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
 
-All of these (Vecchia, Nystrom, Iterative, NestedKriging, predictCG,
+All of these (Vecchia, Nystrom, Iterative, NestedKriging, predictIterative,
 subsetOfData) are usable independently and, where noted below,
 combinable — none of them require opting out of the others.
 
@@ -65,13 +65,13 @@ combinable — none of them require opting out of the others.
 2. **Is the fit fine (ordinary `"LL"`/`"LOO"`/`"LMP"`, one-time O(n³) is
    acceptable) but you don't want an O(n²) dense factor resident just
    for `predict` — or it was never computed at all?**
-   → `predictCG`. Doesn't change the objective or its accuracy at all;
+   → `predictIterative`. Doesn't change the objective or its accuracy at all;
    just solves each prediction with matrix-free conjugate gradient
    instead of reusing a stored factor. `return_stdev=true` is
    opt-in-expensive (one CG solve *per prediction point*) — cheap only
    for the mean, or for a handful of stdev queries. On an
    ill-conditioned fit, `use_nystrom_precond=true` cuts the iteration
-   count needed to reach a given tolerance (see [PredictCG.md](PredictCG.md)).
+   count needed to reach a given tolerance (see [PredictIterative.md](PredictIterative.md)).
 
 3. **Regardless of which of the above you use**: OpenMP parallelizes
    independent work (multi-start `optim`, multi-trajectory `simulate`,
@@ -90,21 +90,21 @@ target* it converges to as group size grows.
   (`objective="LLVecchia(m)"`) instead of a full O(n³) reference fit —
   see [Nested.md](Nested.md)'s "Common prior" section. `LLNystrom` is
   **not** currently wired into `NestedKriging`'s common-prior path.
-- **`predictCG` after a light Vecchia fit**: a light Vecchia fit
+- **`predictIterative` after a light Vecchia fit**: a light Vecchia fit
   (`set_vecchia_exact_commit(false)`) never has a resident dense
   factor, so `predict` on it always routes to the *local* Vecchia
-  predictor. `predictCG` is a legitimate alternative there too — same
+  predictor. `predictIterative` is a legitimate alternative there too — same
   fitted θ/β, but a *global* (not m-neighbor-local) prediction, at
   O(n²·iters) instead of Vecchia's O(n³) exact-commit cost. Neither
   path is automatic; call the one you want explicitly.
-- **`predictCG` after a Nystrom fit**: works (predictCG only needs
+- **`predictIterative` after a Nystrom fit**: works (predictIterative only needs
   m_X/m_y/m_F/θ/β, which a Nystrom fit still populates in full), but is
   usually pointless — `predictNystrom` reuses the fit's own committed
   low-rank factors and is cheaper than a fresh CG solve over the full n.
 - **`LLIterative` fits are also permanent light fits**: like Nystrom and
   a light-mode Vecchia, an `LLIterative` fit's `predict()` always routes
-  to `predictCG` — see [Iterative.md](Iterative.md).
-  `predictCG`'s own `use_nystrom_precond` is independent of whether the
+  to `predictIterative` — see [Iterative.md](Iterative.md).
+  `predictIterative`'s own `use_nystrom_precond` is independent of whether the
   fit itself used `LLIterative(m,precond_rank)`'s preconditioner; each
   must be enabled explicitly where it's used.
 - **`subsetOfData` before any of the above**: since it's a plain
@@ -134,5 +134,5 @@ for a direct comparison against a library that does implement these
 
 See each method's own page ([Vecchia.md](Vecchia.md),
 [Nystrom.md](Nystrom.md), [Iterative.md](Iterative.md),
-[Nested.md](Nested.md), [PredictCG.md](PredictCG.md),
+[Nested.md](Nested.md), [PredictIterative.md](PredictIterative.md),
 [SubsetOfData.md](SubsetOfData.md)) for its specific references.

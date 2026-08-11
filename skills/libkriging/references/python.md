@@ -31,9 +31,9 @@ sims = model.simulate(nsim=10, seed=123, X=Xnew)
 model.update(y_u, X_u, refit=True)
 
 # Matrix-free CG prediction (predict-only, any exact "LL"/"LOO"/"LMP" fit):
-mean, stdev = model.predictCG(Xnew)                      # mean only, cheap
-mean, stdev = model.predictCG(Xnew, return_stdev=True)    # + 1 CG solve per point
-# max_iter=0 (default) means 2n; see docs/math/PredictCG.md
+mean, stdev = model.predictIterative(Xnew)                      # mean only, cheap
+mean, stdev = model.predictIterative(Xnew, return_stdev=True)    # + 1 CG solve per point
+# max_iter=0 (default) means 2n; see docs/math/PredictIterative.md
 
 model.logLikelihood()
 model.leaveOneOut()
