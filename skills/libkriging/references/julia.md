@@ -25,8 +25,8 @@ s = simulate(k, 10, 123, Xnew; will_update=false)   # (k, nsim, seed, X)
 update!(k, y_u, X_u; refit=true)
 
 # Matrix-free CG prediction (predict-only, any exact "LL"/"LOO"/"LMP" fit):
-p_cg = predictCG(k, Xnew; return_stdev=true)  # return_stdev default false
-# max_iter=0 (default) means 2n; see docs/math/PredictCG.md
+p_cg = predictIterative(k, Xnew; return_stdev=true)  # return_stdev default false
+# max_iter=0 (default) means 2n; see docs/math/PredictIterative.md
 
 log_likelihood(k)
 leave_one_out(k)

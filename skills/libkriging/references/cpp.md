@@ -61,10 +61,10 @@ arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);
 
 Matrix-free CG prediction (predict-only, any exact `"LL"`/`"LOO"`/`"LMP"`
 fit -- doesn't change how the model is fitted, only how `predict` computes
-its answer): see [PredictCG.md](../../docs/math/PredictCG.md).
+its answer): see [PredictIterative.md](../../docs/math/PredictIterative.md).
 ```cpp
-auto [mean, stdev_empty] = model.predictCG(Xnew);                 // mean only, cheap
-auto [mean2, stdev] = model.predictCG(Xnew, /*return_stdev=*/true); // + 1 CG solve per point
+auto [mean, stdev_empty] = model.predictIterative(Xnew);                 // mean only, cheap
+auto [mean2, stdev] = model.predictIterative(Xnew, /*return_stdev=*/true); // + 1 CG solve per point
 ```
 
 ## WarpKriging

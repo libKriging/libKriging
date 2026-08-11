@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, predictCG, or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, predictIterative, or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -70,10 +70,10 @@ Ask, in order:
    These change the *fit* objective. If instead the fit itself is fine
    (`objective="LL"`/`"LOO"`/`"LMP"`, ordinary O(n³) cost is acceptable
    once) but keeping an O(n²) dense factor resident just for `predict`
-   isn't — or it was never computed at all — `predictCG` solves
+   isn't — or it was never computed at all — `predictIterative` solves
    each prediction with matrix-free conjugate gradient instead, at the
    cost of O(n²·iters) per solve; see
-   [PredictCG.md](../../docs/math/PredictCG.md). Narrower than the above
+   [PredictIterative.md](../../docs/math/PredictIterative.md). Narrower than the above
    (predict-only, doesn't touch fit time).
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too

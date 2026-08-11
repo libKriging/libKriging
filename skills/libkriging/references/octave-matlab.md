@@ -24,10 +24,10 @@ s = k.simulate(int32(10), int32(123), Xnew, false);
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
 
 % Matrix-free CG prediction (predict-only, any exact "LL"/"LOO"/"LMP" fit):
-[p_mean, p_stdev] = k.predictCG(Xnew, true);
+[p_mean, p_stdev] = k.predictIterative(Xnew, true);
 %                               (X, return_stdev, max_iter, tol)
 %                               return_stdev default false, max_iter=0 means 2n
-%                               -- see docs/math/PredictCG.md
+%                               -- see docs/math/PredictIterative.md
 
 k.logLikelihood();
 k.leaveOneOut();

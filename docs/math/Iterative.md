@@ -31,7 +31,7 @@ Where this sits relative to the other scaling methods:
   still O(n²) per CG iteration though (R is exact, not structured), so
   it doesn't reduce the matvec cost the way Vecchia/Nystrom do — its
   payoff is avoiding the O(n³) dense factorization and O(n²) memory,
-  same rationale as [`predictCG`](PredictCG.md) but applied to *fit*
+  same rationale as [`predictIterative`](PredictIterative.md) but applied to *fit*
   rather than just predict.
 
 ## Mathematical description
@@ -70,12 +70,12 @@ Where this sits relative to the other scaling methods:
   optimizer iterations.
 - **Optional CG preconditioner**: `objective="LLIterative(m,precond_rank)"`
   opts into the same Nystrom/Woodbury preconditioner as
-  [`predictCG`](PredictCG.md#preconditioning): a rank-`precond_rank`
+  [`predictIterative`](PredictIterative.md#preconditioning): a rank-`precond_rank`
   Nystrom factor built from a FIXED landmark set (chosen once, same
   greedy pivoted-Cholesky selection as `LLNystrom`'s landmarks, at a
   θ-neutral reference kernel) is passed as `Pinv` to both CG calls,
   fewer Krylov iterations needed to reach `tol` on the typically
-  ill-conditioned R. Unlike `predictCG` (which only ever
+  ill-conditioned R. Unlike `predictIterative` (which only ever
   preconditions-solves at one fixed, already-fitted θ*), the
   preconditioner here is **rebuilt from the fixed landmarks at the
   current θ on every objective/gradient evaluation** — the landmark
@@ -98,7 +98,7 @@ Where this sits relative to the other scaling methods:
   `optim="none"` fit always does the plain exact O(n³) factorization
   regardless of objective — existing, consistent behavior across
   Nystrom/Vecchia/Iterative.
-- **Incremental `update`**: `update_iterative` mirrors `update_nystrom`'s
+- **Incremental `update`**: `updateIterative` mirrors `update_nystrom`'s
   strategy — extend `m_X`/`m_y`/`m_F` with the new rows (the fixed
   `precond_rank`-landmark set, if enabled, stays valid since rows are only
   ever appended), redraw `m_iterative_probes` at the new n (they're sized
@@ -127,23 +127,23 @@ k <- Kriging(y, X, "matern5_2", objective = "LLIterative(30)")
 k2 <- Kriging(y, X, "matern5_2", objective = "LLIterative(30,50)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictCG (light fit)
+pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictIterative (light fit)
 ```
 
 ## Current limitations (v1)
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - Permanent light fit like `LLNystrom`/`LLVecchia`: `predict()` routes to
-  `predictCG`. `update()` has its own incremental path (`update_iterative`,
+  `predictIterative`. `update()` has its own incremental path (`updateIterative`,
   see above); `simulate`/`update_simulate`/`save` are still intentionally
   **blocked** — simulating from a matrix-free model would need a genuine
   stochastic sampling technique (e.g. Lanczos-based sampling) rather than
   the explicit covariance square root the exact/Nystrom `simulate` paths
   use, and isn't implemented yet.
-- No preconditioning inside `predictCG` is inherited automatically from
-  an `LLIterative(m,precond_rank)` fit — `predictCG`'s own
+- No preconditioning inside `predictIterative` is inherited automatically from
+  an `LLIterative(m,precond_rank)` fit — `predictIterative`'s own
   `use_nystrom_precond`/`precond_rank` arguments are independent and
-  must be passed explicitly at call time (see [PredictCG.md](PredictCG.md)).
+  must be passed explicitly at call time (see [PredictIterative.md](PredictIterative.md)).
 - The SLQ log-determinant and the Hutchinson gradient trace term are
   independent estimators (see above) — don't expect the analytic
   gradient to match a finite-difference of the objective as tightly as
@@ -152,8 +152,8 @@ pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictCG (light fit)
 ## See also
 
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
-`LLNystrom` and `predictCG`, and how to pick between them.
-[PredictCG.md](PredictCG.md) for the Nystrom-preconditioned CG idea this
+`LLNystrom` and `predictIterative`, and how to pick between them.
+[PredictIterative.md](PredictIterative.md) for the Nystrom-preconditioned CG idea this
 reuses, and [Nystrom.md](Nystrom.md) for the fixed-landmark rationale
 both this and the preconditioner share.
 
