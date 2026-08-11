@@ -358,7 +358,7 @@ Rcpp::List kriging_predict(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
-Rcpp::List kriging_predictCG(Rcpp::List k,
+Rcpp::List kriging_predictIterative(Rcpp::List k,
                              arma::mat X_n,
                              bool return_stdev = false,
                              int max_iter = 0,
@@ -379,7 +379,7 @@ Rcpp::List kriging_predictCG(Rcpp::List k,
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
-  auto [mean, stdev] = impl_ptr->predictCG(X_n,
+  auto [mean, stdev] = impl_ptr->predictIterative(X_n,
                                            return_stdev,
                                            static_cast<arma::uword>(max_iter),
                                            tol,
