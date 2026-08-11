@@ -63,8 +63,11 @@ TEST_CASE("predictCG mean/stdev match exact predict at a moderate theta", "[pred
 
   INFO("max |mean diff| = " << arma::abs(m_cg - m_ex).max());
   INFO("max |stdev diff| = " << arma::abs(s_cg - s_ex).max());
-  CHECK(arma::abs(m_cg - m_ex).max() < 0.05 * arma::stddev(y));
-  CHECK(arma::abs(s_cg - s_ex).max() < 0.05 * arma::stddev(y));
+  // predictCG solves the same exact system as predict() (same
+  // objective/theta), via CG instead of a stored Cholesky factor -- at this
+  // well-conditioned theta, default settings converge to ~1e-9.
+  CHECK(arma::abs(m_cg - m_ex).max() < 1e-5 * arma::stddev(y));
+  CHECK(arma::abs(s_cg - s_ex).max() < 1e-5 * arma::stddev(y));
 }
 
 TEST_CASE("predictCG defaults to mean only (stdev empty)", "[predictcg][kriging]") {
@@ -105,10 +108,18 @@ TEST_CASE("predictCG matches predict for a different kernel/trend", "[predictcg]
   make_data(10, Xt, yt, 789);
 
   auto [m_ex, s_ex, c, dm, ds] = k.predict(Xt, true, false, false);
-  auto [m_cg, s_cg] = k.predictCG(Xt, true);
+  // gauss kernel + linear trend at theta=0.15 is more ill-conditioned than
+  // the matern5_2/constant case above; give CG a generous budget (still
+  // <1s at n=40) so it actually converges before checking the mean/stdev
+  // formulas match across kernels/trends -- the default budget's own
+  // accuracy is covered separately by "predictCG accuracy improves with a
+  // larger iteration budget" below.
+  auto [m_cg, s_cg] = k.predictCG(Xt, true, /*max_iter=*/5000, /*tol=*/1e-12);
 
-  CHECK(arma::abs(m_cg - m_ex).max() < 0.05 * arma::stddev(y));
-  CHECK(arma::abs(s_cg - s_ex).max() < 0.05 * arma::stddev(y));
+  INFO("max |mean diff| = " << arma::abs(m_cg - m_ex).max());
+  INFO("max |stdev diff| = " << arma::abs(s_cg - s_ex).max());
+  CHECK(arma::abs(m_cg - m_ex).max() < 1e-5 * arma::stddev(y));
+  CHECK(arma::abs(s_cg - s_ex).max() < 1e-5 * arma::stddev(y));
 }
 
 TEST_CASE("predictCG rejects wrong dimension and Nugget models", "[predictcg][kriging]") {
@@ -150,6 +161,12 @@ TEST_CASE("predictCG accuracy improves with a larger iteration budget", "[predic
   const double err_tiny = arma::abs(m_tiny - m_ex).max();
   INFO("err with default budget (2n) = " << err_default << ", err with max_iter=2 = " << err_tiny);
   CHECK(err_default < err_tiny);
+
+  // Same sanity check for stdev, including its own GLS-correction solve.
+  const double err_default_s = arma::abs(s_default - s_ex).max();
+  const double err_tiny_s = arma::abs(s_tiny - s_ex).max();
+  INFO("stdev err with default budget (2n) = " << err_default_s << ", err with max_iter=2 = " << err_tiny_s);
+  CHECK(err_default_s < err_tiny_s);
 }
 
 TEST_CASE("predictCG with Nystrom preconditioning matches exact predict", "[predictcg][kriging]") {
@@ -172,8 +189,10 @@ TEST_CASE("predictCG with Nystrom preconditioning matches exact predict", "[pred
 
   INFO("max |mean diff| = " << arma::abs(m_cg - m_ex).max());
   INFO("max |stdev diff| = " << arma::abs(s_cg - s_ex).max());
-  CHECK(arma::abs(m_cg - m_ex).max() < 0.05 * arma::stddev(y));
-  CHECK(arma::abs(s_cg - s_ex).max() < 0.05 * arma::stddev(y));
+  // Nystrom-preconditioned CG converges to the same exact result as plain
+  // CG, just faster -- ~1e-9 here at default tol=1e-8.
+  CHECK(arma::abs(m_cg - m_ex).max() < 1e-5 * arma::stddev(y));
+  CHECK(arma::abs(s_cg - s_ex).max() < 1e-5 * arma::stddev(y));
 }
 
 TEST_CASE("predictCG Nystrom preconditioning converges faster on a tight iteration budget", "[predictcg][kriging]") {

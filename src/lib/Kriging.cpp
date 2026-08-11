@@ -2895,7 +2895,25 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictCG(const arma
     // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
     const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol, Pinv);
     const arma::vec quad = arma::sum(R_on % V, 0).t();
-    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad), 0.0, arma::datum::inf));
+
+    arma::vec gls_correction(n_n, arma::fill::zeros);
+    if (m_F.n_cols > 0) {
+      // GLS correction for the trend coefficients' own estimation
+      // uncertainty -- same u^T(F^T R^-1 F)^-1 u term predict()'s Cholesky
+      // path computes via m_circ/Ecirc_n (see KrigingImpl::predict_impl),
+      // here via one extra shared CG solve (R^-1 F, m_F.n_cols right-hand
+      // sides) plus O(n_n * p^2) small dense linear algebra (p = m_F.n_cols).
+      // Without it, stdev reduces to the simple-kriging formula (correct
+      // only when the trend is known rather than estimated, i.e. regmodel
+      // == "none") and understates the prediction uncertainty otherwise.
+      const arma::mat W_F = LinearAlgebra::conjugateGradient(Rmul, m_F, max_iter, tol, Pinv);
+      const arma::mat FtRinvF = m_F.t() * W_F;
+      const arma::mat E = F_n - R_on.t() * W_F;
+      const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
+      gls_correction = arma::sum(E.t() % correction_rhs, 0).t();
+    }
+
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad + gls_correction), 0.0, arma::datum::inf));
     stdev *= m_scaleY;
   }
   return {mean, stdev};
