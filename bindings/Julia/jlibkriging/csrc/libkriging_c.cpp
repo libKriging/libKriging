@@ -226,7 +226,7 @@ int lk_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_kriging_predictCG(void* ptr,
+int lk_kriging_predictIterative(void* ptr,
                          const double* X_n,
                          int m,
                          int d,
@@ -239,12 +239,12 @@ int lk_kriging_predictCG(void* ptr,
                          double* stdev_out) {
   try {
     if (max_iter < 0)
-      throw std::invalid_argument("lk_kriging_predictCG: max_iter must be >= 0 (0 means the default, 2n)");
+      throw std::invalid_argument("lk_kriging_predictIterative: max_iter must be >= 0 (0 means the default, 2n)");
     if (precond_rank < 0)
-      throw std::invalid_argument("lk_kriging_predictCG: precond_rank must be >= 0");
+      throw std::invalid_argument("lk_kriging_predictIterative: precond_rank must be >= 0");
     auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
-    auto [mean_v, stdev_v] = k->predictCG(X_m,
+    auto [mean_v, stdev_v] = k->predictIterative(X_m,
                                           return_stdev != 0,
                                           static_cast<arma::uword>(max_iter),
                                           tol,
