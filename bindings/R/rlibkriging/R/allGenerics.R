@@ -71,7 +71,7 @@ leaveOneOutVec <- function(object, ...) {
 ## *****************************************************************************
 ##' Predict-only, matrix-free conjugate-gradient alternative to
 ##' \code{predict}: solves each prediction with CG instead of using a
-##' stored dense factor. See \code{docs/math/PredictCG.md}.
+##' stored dense factor. See \code{docs/math/PredictIterative.md}.
 ##'
 ##' @title Matrix-free conjugate-gradient prediction
 ##'
@@ -81,8 +81,8 @@ leaveOneOutVec <- function(object, ...) {
 ##' @return A list containing the element \code{mean} and, if
 ##'     \code{return_stdev=TRUE}, \code{stdev}.
 ##' @export
-predictCG <- function(object, ...) {
-    UseMethod("predictCG")
+predictIterative <- function(object, ...) {
+    UseMethod("predictIterative")
 }
 
 ## *****************************************************************************
