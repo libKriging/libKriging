@@ -1,6 +1,21 @@
+import sys
+import faulthandler
+
 import numpy as np
 import pylibkriging as lk
 import pytest
+
+# TEMP DEBUG (issue #351): dump every thread's Python-level stack after 60s
+# without needing a hang to finish first -- ctest's --timeout kills the
+# process at 120s (see tools/windows/test.sh), so this should fire well
+# before that and land in the captured stdout. Revert before merge.
+faulthandler.enable()
+faulthandler.dump_traceback_later(60, exit=False)
+
+
+def _breadcrumb(msg):
+    print(f"[DEBUG-351] {msg}", flush=True)
+    sys.stdout.flush()
 
 
 def f2d(x1, x2):
@@ -21,21 +36,32 @@ def make_fixed_theta_model(y, X, theta_val=0.3):
     # see docs/math/PredictIterative.md), which would make predict/predictIterative's
     # agreement noisy rather than a clean correctness signal.
     parameters = {"theta": np.full((1, X.shape[1]), theta_val), "sigma2": 1.0}
-    return lk.Kriging(y, X, "matern5_2", regmodel="constant", optim="none",
-                      objective="LL", parameters=parameters)
+    _breadcrumb("make_fixed_theta_model: before lk.Kriging(...) constructor")
+    k = lk.Kriging(y, X, "matern5_2", regmodel="constant", optim="none",
+                  objective="LL", parameters=parameters)
+    _breadcrumb("make_fixed_theta_model: after lk.Kriging(...) constructor")
+    return k
 
 
 def test_prediterative_mean_stdev_match_exact_predict_at_a_moderate_theta():
+    _breadcrumb("test start")
     X, y = make_data(60)
+    _breadcrumb("make_data(60) done")
     k = make_fixed_theta_model(y, X)
+    _breadcrumb("make_fixed_theta_model done")
     Xt, _ = make_data(20, seed=456)
+    _breadcrumb("make_data(20) done")
 
+    _breadcrumb("before k.predict(...)")
     m_ex, s_ex, _, _, _ = k.predict(Xt, True, False, False)
+    _breadcrumb("after k.predict(...), before k.predictIterative(...)")
     m_cg, s_cg = k.predictIterative(Xt, True)
+    _breadcrumb("after k.predictIterative(...)")
 
     sdy = np.std(y)
     assert np.max(np.abs(m_ex - m_cg)) < 0.05 * sdy
     assert np.max(np.abs(s_ex - s_cg)) < 0.05 * sdy
+    _breadcrumb("test end")
 
 
 def test_prediterative_defaults_to_mean_only():

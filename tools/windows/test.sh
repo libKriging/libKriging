@@ -12,6 +12,12 @@ else
   CTEST_FLAGS=--output-on-failure
 fi
 
+# TEMP DEBUG (issue #351): cut the per-test timeout way down from ctest's
+# 1500s default so the Windows Python Debug hang fails fast (with whatever
+# stdout was captured before the kill) instead of eating the full 1h job
+# timeout. Restore before merge.
+CTEST_FLAGS="${CTEST_FLAGS} --timeout 120"
+
 MODE=${MODE:-Debug}
 
 if [[ "$ENABLE_COVERAGE" == "on" ]]; then
