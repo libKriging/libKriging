@@ -463,10 +463,10 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::rademacherProbes(arma::uword n, arma:
 }
 
 LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
-                                                          arma::uword n,
-                                                          arma::uword nprobe,
-                                                          arma::uword lanczos_steps,
-                                                          const arma::mat& probes) {
+                                                         arma::uword n,
+                                                         arma::uword nprobe,
+                                                         arma::uword lanczos_steps,
+                                                         const arma::mat& probes) {
   lanczos_steps = std::min(lanczos_steps, n);
   double total = 0.0;
   for (arma::uword p = 0; p < nprobe; ++p) {

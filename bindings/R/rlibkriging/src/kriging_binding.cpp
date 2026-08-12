@@ -359,12 +359,12 @@ Rcpp::List kriging_predict(Rcpp::List k,
 
 // [[Rcpp::export]]
 Rcpp::List kriging_predictIterative(Rcpp::List k,
-                             arma::mat X_n,
-                             bool return_stdev = false,
-                             int max_iter = 0,
-                             double tol = 1e-8,
-                             bool use_nystrom_precond = false,
-                             int precond_rank = 50) {
+                                    arma::mat X_n,
+                                    bool return_stdev = false,
+                                    int max_iter = 0,
+                                    double tol = 1e-8,
+                                    bool use_nystrom_precond = false,
+                                    int precond_rank = 50) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   if (max_iter < 0)
@@ -380,11 +380,11 @@ Rcpp::List kriging_predictIterative(Rcpp::List k,
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
   auto [mean, stdev] = impl_ptr->predictIterative(X_n,
-                                           return_stdev,
-                                           static_cast<arma::uword>(max_iter),
-                                           tol,
-                                           use_nystrom_precond,
-                                           static_cast<arma::uword>(precond_rank));
+                                                  return_stdev,
+                                                  static_cast<arma::uword>(max_iter),
+                                                  tol,
+                                                  use_nystrom_precond,
+                                                  static_cast<arma::uword>(precond_rank));
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = mean);
   if (return_stdev) {
