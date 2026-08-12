@@ -77,16 +77,16 @@ int lk_kriging_predict(void* ptr,
    cost); off by default. See docs/math/PredictIterative.md and
    docs/math/Nystrom.md. */
 int lk_kriging_predictIterative(void* ptr,
-                         const double* X_n,
-                         int m,
-                         int d,
-                         int return_stdev,
-                         int max_iter,
-                         double tol,
-                         int use_nystrom_precond,
-                         int precond_rank,
-                         double* mean_out,
-                         double* stdev_out);
+                                const double* X_n,
+                                int m,
+                                int d,
+                                int return_stdev,
+                                int max_iter,
+                                double tol,
+                                int use_nystrom_precond,
+                                int precond_rank,
+                                double* mean_out,
+                                double* stdev_out);
 
 /* Subset-of-data pre-fit reduction: select n_max rows of X (k-means
    centroids snapped to the nearest real point, or a uniform random
@@ -94,13 +94,7 @@ int lk_kriging_predictIterative(void* ptr,
    actual number of indices written (== n_max unless n_max >= m, in which
    case it's a no-op returning all m indices), or -1 on error. Indices are
    0-based row-indices into X. */
-int lk_kriging_subsetOfData(const double* X_n,
-                            int m,
-                            int d,
-                            int n_max,
-                            const char* method,
-                            int seed,
-                            int* idx_out);
+int lk_kriging_subsetOfData(const double* X_n, int m, int d, int n_max, const char* method, int seed, int* idx_out);
 
 int lk_kriging_simulate(void* ptr,
                         int nsim,

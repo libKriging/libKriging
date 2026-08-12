@@ -170,10 +170,10 @@ class LinearAlgebra {
   // with the same probes reproducible (needed for a smooth objective across
   // nearby theta evaluations during optimization).
   LIBKRIGING_EXPORT static double stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
-                                                    arma::uword n,
-                                                    arma::uword nprobe,
-                                                    arma::uword lanczos_steps,
-                                                    const arma::mat& probes);
+                                                   arma::uword n,
+                                                   arma::uword nprobe,
+                                                   arma::uword lanczos_steps,
+                                                   const arma::mat& probes);
 
   // Generates `nprobe` Rademacher (+-1 entries) probe vectors of length n,
   // as columns of an n x nprobe matrix -- meant to be generated ONCE (fixed

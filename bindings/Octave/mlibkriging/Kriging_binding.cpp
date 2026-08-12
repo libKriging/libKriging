@@ -173,11 +173,11 @@ void predictIterative(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) 
   if (precond_rank < 0)
     throw MxException(LOCATION(), "mLibKriging:badArgument", "precond_rank must be >= 0");
   auto [mean_v, stdev_v] = km->predictIterative(input.get<arma::mat>(1, "matrix"),
-                                         return_stdev,
-                                         static_cast<arma::uword>(max_iter),
-                                         tol,
-                                         use_nystrom_precond,
-                                         static_cast<arma::uword>(precond_rank));
+                                                return_stdev,
+                                                static_cast<arma::uword>(max_iter),
+                                                tol,
+                                                use_nystrom_precond,
+                                                static_cast<arma::uword>(precond_rank));
   output.set(0, mean_v, "predicted response");
   output.setOptional(1, stdev_v, "stdev vector");
 }
@@ -193,7 +193,8 @@ void subsetOfData(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto seed = input.getOptional<int>(3, "seed").value_or(123);
   if (n_max <= 0)
     throw MxException(LOCATION(), "mLibKriging:badArgument", "n_max must be >= 1");
-  arma::uvec idx = Kriging::subsetOfData(input.get<arma::mat>(0, "matrix"), static_cast<arma::uword>(n_max), method, seed);
+  arma::uvec idx
+      = Kriging::subsetOfData(input.get<arma::mat>(0, "matrix"), static_cast<arma::uword>(n_max), method, seed);
   // 0-based C++ row-indices -> 1-based Octave indices; returned as a double
   // column vector (no arma::uvec setter is registered for MxMapper output).
   arma::vec idx1 = arma::conv_to<arma::vec>::from(idx) + 1.0;
