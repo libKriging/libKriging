@@ -217,9 +217,16 @@ TEST_CASE("LLIterative fit blocks simulate/update_simulate/save", "[iterative][k
 // via the same matrix-free CG machinery as the original fit. Mirrors
 // update_nystrom's test pattern in KrigingNystromTest.cpp.
 TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterative][kriging]") {
+  // Small n on purpose -- this is the one test in this file that exercises a
+  // real free BFGS fit (every other LLIterative test uses optim="none" and a
+  // fixed theta specifically to avoid this cost, see the file-level comment
+  // above make_fixed_theta_iterative). Catch2 SECTIONs re-run the shared
+  // TEST_CASE body from scratch for each leaf section, so this free-BFGS
+  // constructor call runs 3x; at n0=20 that measured ~19s natively, comfortably
+  // past ctest's 1500s timeout under Valgrind's ~50-100x memcheck overhead.
   arma::mat X;
   arma::vec y;
-  make_data(20, X, y);
+  make_data(10, X, y);
 
   Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLIterative(8)");
   REQUIRE(k.is_iterative_light());
@@ -227,15 +234,15 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
 
   arma::mat Xu;
   arma::vec yu;
-  make_data(5, Xu, yu, 789);
+  make_data(3, Xu, yu, 789);
 
   SECTION("refit=false: re-profiles beta/sigma2 at the current theta") {
     const arma::vec theta_before = k.theta();
     k.update(yu, Xu, false);
 
     CHECK(k.is_iterative_light());
-    CHECK(k.X().n_rows == n0 + 5);
-    CHECK(k.y().n_elem == n0 + 5);
+    CHECK(k.X().n_rows == n0 + 3);
+    CHECK(k.y().n_elem == n0 + 3);
     CHECK(arma::approx_equal(k.theta(), theta_before, "absdiff", 1e-12));  // theta untouched
 
     // predictIterative should still give finite, sane predictions after the update.
@@ -252,7 +259,7 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
     k.update(yu, Xu, true);
 
     CHECK(k.is_iterative_light());
-    CHECK(k.X().n_rows == n0 + 5);
+    CHECK(k.X().n_rows == n0 + 3);
 
     arma::mat Xt;
     arma::vec yt;
