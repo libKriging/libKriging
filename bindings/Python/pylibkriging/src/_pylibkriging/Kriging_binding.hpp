@@ -51,18 +51,15 @@ class PyKriging {
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
   std::tuple<py::array_t<double>, py::array_t<double>> predictIterative(const py::array_t<double>& X_n,
-                                                                 bool return_stdev,
-                                                                 int max_iter,
-                                                                 double tol,
-                                                                 bool use_nystrom_precond,
-                                                                 int precond_rank);
+                                                                        bool return_stdev,
+                                                                        int max_iter,
+                                                                        double tol,
+                                                                        bool use_nystrom_precond,
+                                                                        int precond_rank);
 
   // Subset-of-data pre-fit reduction: k-means (or random) subset of n_max
   // rows of X, returned as 0-based row-indices to keep.
-  static py::array_t<int> subsetOfData(const py::array_t<double>& X,
-                                       int n_max,
-                                       const std::string& method,
-                                       int seed);
+  static py::array_t<int> subsetOfData(const py::array_t<double>& X, int n_max, const std::string& method, int seed);
 
   // with_noise: None => plain, True => with nugget, array => heterogeneous noise
   py::array_t<double> simulate(const int nsim,
