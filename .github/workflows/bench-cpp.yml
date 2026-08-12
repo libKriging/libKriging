@@ -21,7 +21,10 @@ env:
   DEBUG_CI: false
 
 jobs:
+  # TEMP DEBUG (issue #351): skipped on this branch to focus CI capacity on
+  # the Windows Python Debug hang. Restore before merge.
   benchmark-cpp:
+    if: github.ref != 'refs/heads/feature/cg-predict'
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
