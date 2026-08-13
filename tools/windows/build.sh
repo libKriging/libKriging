@@ -53,6 +53,28 @@ if [[ "$BUILD_TEST" == "true" ]]; then
       CTEST_FLAGS=--output-on-failure
     fi
 
+    # TEMP DEBUG (issue #351): fix attempt, based on the identical symptom
+    # already diagnosed and fixed for Octave Windows (see
+    # tools/octave-windows/test.sh / commit b6cbf97a) -- MinGW/Windows
+    # libgomp thread-pool churn when OpenMP parallel regions
+    # (LinearAlgebra.cpp) are entered repeatedly inside an optimization loop,
+    # causing a >1000x slowdown on Windows specifically vs Linux/macOS for
+    # otherwise-identical work. That fix scoped OMP_NUM_THREADS=1 to the
+    # Octave Windows job; trying the same here for Python Windows, since the
+    # observed pattern (fine on Linux/macOS, fine as a compiled C++ .exe,
+    # hangs specifically for Python tests that fit/optimize repeatedly) matches.
+    if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
+      export OMP_NUM_THREADS=1
+      echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn, see issue #351)"
+    fi
+
+    # TEMP DEBUG (issue #351): also cap the per-test timeout so that if the
+    # OMP_NUM_THREADS fix above does NOT fully resolve the hang, ctest moves
+    # on and we still get the full picture (which tests, if any, still hang)
+    # in one CI run instead of eating the whole job budget on the first one.
+    # Restore both of the above before merge.
+    CTEST_FLAGS="${CTEST_FLAGS} --timeout 180"
+
     # Test on fresh build lib (before installation)
     ctest -C "${MODE}" ${CTEST_FLAGS}
 

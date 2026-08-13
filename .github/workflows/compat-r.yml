@@ -19,7 +19,10 @@ env:
   REF_RDS: /tmp/rlibkriging_v093_ref.rds
 
 jobs:
+  # TEMP DEBUG (issue #351): skipped on this branch to focus CI capacity on
+  # the Windows Python Debug hang. Restore before merge.
   r-compat:
+    if: github.head_ref != 'debug/windows-python-hang' && github.ref != 'refs/heads/debug/windows-python-hang'
     name: "R Kriging vs v0.9.3 (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
