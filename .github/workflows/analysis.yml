@@ -36,10 +36,7 @@ env:
   DEBUG_CI: true
 
 jobs:
-  # TEMP DEBUG (issue #351): whole workflow skipped on this branch to focus
-  # CI capacity on the Windows Python Debug hang. Restore before merge.
   guideline-checks:
-    if: github.head_ref != 'feature/cg-predict' && github.ref != 'refs/heads/feature/cg-predict'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +56,6 @@ jobs:
         run: tools/checks/test.sh
 
   build:
-    if: github.head_ref != 'feature/cg-predict' && github.ref != 'refs/heads/feature/cg-predict'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.timeout_minutes || 30 }}

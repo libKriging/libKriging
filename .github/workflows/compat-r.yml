@@ -19,10 +19,7 @@ env:
   REF_RDS: /tmp/rlibkriging_v093_ref.rds
 
 jobs:
-  # TEMP DEBUG (issue #351): skipped on this branch to focus CI capacity on
-  # the Windows Python Debug hang. Restore before merge.
   r-compat:
-    if: github.head_ref != 'feature/cg-predict' && github.ref != 'refs/heads/feature/cg-predict'
     name: "R Kriging vs v0.9.3 (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
