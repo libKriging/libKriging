@@ -1648,6 +1648,35 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     } else
       m_est_sigma2 = true;
 
+    if (m_nystrom_k > 0) {
+      // LLNystrom objective with optim="none": commit a genuine Nystrom-light
+      // fit at the given (fixed) theta -- beta/sigma2/U/D via the same
+      // Woodbury likelihood the free-optimization path uses (mirrors
+      // update_nystrom's refit=false path) -- instead of silently falling
+      // through to an exact dense fit below, which would ignore the
+      // requested approximate objective entirely and leave m_nystrom_light
+      // false (so predictNystrom would then throw "model was not fitted
+      // with objective=\"LLNystrom(k)\""). This is what makes a fully
+      // deterministic (no BFGS, no platform-dependent convergence) Nystrom
+      // fit possible -- see docs/math/Nystrom.md and issue #351's follow-up.
+      arma::vec beta_v;
+      double sigma2_v = -1;
+      arma::mat U_v;
+      arma::vec D_v;
+      _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
+      if (m_est_beta)
+        m_beta = beta_v;
+      if (m_est_sigma2)
+        m_sigma2 = sigma2_v;
+      else
+        m_sigma2 = sigma2;
+      m_nystrom_U = std::move(U_v);
+      m_nystrom_D = std::move(D_v);
+      m_nystrom_light = true;
+      m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
+      return;
+    }
+
     double extra_param;         // alpha for Nugget, sigma2 for Heterogeneous, unused for None
     double nugget_param = 0.0;  // only used for Nugget mode
     if (m_noise_model == NoiseModel::Nugget) {
@@ -1756,10 +1785,39 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
+      // Nystrom warm start: with no given theta, every multistart worker
+      // otherwise begins from a fully random point in theta_bounds, so how
+      // well/consistently BFGS converges depends on luck and platform RNG.
+      // The landmarks were already chosen (make_nystrom_landmarks, greedy
+      // pivoted-Cholesky) as a representative subsample of the correlation
+      // structure, so a cheap EXACT LL fit restricted to just those k points
+      // -- O(k^3), negligible next to the O(n*k^2) Nystrom cost -- tends to
+      // land close to the full-data optimum. Seed one multistart worker with
+      // it; keep the rest random so a single unlucky/degenerate landmark
+      // subsample can't strand every worker in the same bad basin.
+      arma::mat theta0_seed;
+      if (m_nystrom_k > 0 && !parameters.theta.has_value()) {
+        try {
+          Kriging land_fit(m_y.elem(m_nystrom_landmarks),
+                           m_X.rows(m_nystrom_landmarks),
+                           m_covType,
+                           m_regmodel,
+                           /*normalize=*/false,
+                           "BFGS",
+                           "LL");
+          theta0_seed = land_fit.theta().t();  // 1 x d, already in m_X's (normalized) scale
+        } catch (const std::exception&) {
+          // degenerate landmark subsample (e.g. too few distinct points): fall back to plain random multistart
+        }
+      }
+
       if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
         multistart = std::max(multistart, (int)theta0.n_rows);
         theta0 = arma::join_cols(theta0, theta0_rand);  // append random starting points to given ones
         theta0.resize(multistart, theta0.n_cols);       // keep only multistart first rows
+      } else if (!theta0_seed.is_empty()) {
+        theta0 = arma::join_cols(theta0_seed, theta0_rand);  // landmark-fit theta first, then random
+        theta0.resize(multistart, theta0.n_cols);
       } else {
         theta0 = theta0_rand;
       }
