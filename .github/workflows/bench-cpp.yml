@@ -21,10 +21,7 @@ env:
   DEBUG_CI: false
 
 jobs:
-  # TEMP DEBUG (issue #351): skipped on this branch to focus CI capacity on
-  # the Windows Python Debug hang. Restore before merge.
   benchmark-cpp:
-    if: github.head_ref != 'debug/windows-python-hang' && github.ref != 'refs/heads/debug/windows-python-hang'
     runs-on: ubuntu-latest
     timeout-minutes: 180
 

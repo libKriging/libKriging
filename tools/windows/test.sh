@@ -19,14 +19,12 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     exit 1
 fi
 
-# TEMP DEBUG (issue #351): same fix attempt as build.sh's embedded ctest
-# call -- see the comment there for the Octave Windows precedent. Restore
-# both this and the --timeout below before merge.
+# Same fix as build.sh's embedded ctest call -- see the comment there for
+# the Octave Windows precedent (commit b6cbf97a) this mirrors.
 if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
   export OMP_NUM_THREADS=1
-  echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn, see issue #351)"
+  echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn)"
 fi
-CTEST_FLAGS="${CTEST_FLAGS} --timeout 180"
 
 cd ${BUILD_DIR:-build}
 
