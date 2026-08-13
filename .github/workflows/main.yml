@@ -40,10 +40,7 @@ env:
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
 
 jobs:
-  # TEMP DEBUG (issue #351): skipped while the matrix below is trimmed to just
-  # the Windows Python Debug hang investigation. Restore before merge.
   guideline-checks:
-    if: false
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -69,22 +66,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # TEMP DEBUG (issue #351): every other matrix entry commented out
-          # below to focus CI capacity on the Windows Python Debug hang.
-          # Restore the full matrix before merge.
-          # - name: "Linux Debug"
-          #   os: ubuntu-22.04
-          #   mode: Debug
-          #   enable_python: on
-          # - name: "Linux Debug without OpenMP"
-          #   os: ubuntu-22.04
-          #   mode: Debug
-          #   enable_python: on
-          #   disable_openmp: on
-          # - name: "macOS Debug"
-          #   os: macOS-latest
-          #   mode: Debug
-          #   enable_python: on
+          - name: "Linux Debug"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: on
+          - name: "Linux Debug without OpenMP"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: on
+            disable_openmp: on
+          - name: "macOS Debug"
+            os: macOS-latest
+            mode: Debug
+            enable_python: on
           - name: "Python (3.7) Windows Debug"
             os: windows-latest
             mode: Debug
@@ -95,61 +89,61 @@ jobs:
             mode: Debug
             enable_python: on
             python-version: 3.9
-          # - name: "Octave Linux"
-          #   os: ubuntu-22.04 # required to ease the support of octave ≥ 6
-          #   mode: Release
-          #   enable_python: off
-          #   enable_octave: on
-          #   force_update: on
-          # - name: "Octave macOS"
-          #   os: macOS-latest
-          #   mode: Release
-          #   enable_python: off
-          #   enable_octave: on
-          # - name: "Octave Windows"
-          #   os: windows-latest
-          #   mode: Release
-          #   # using python and octave in windows leads to the following error:
-          #   # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-          #   #   491 | # define snprintf _snprintf
-          #   enable_python: off
-          #   enable_octave: on
-          #   timeout_minutes: 90
-          # - name: "Matlab Linux"
-          #   # Disabled: requires MATHWORKS_API_TOKEN secret (license failure since v0.9.3)
-          #   # Using matlab-actions/setup-matlab@v2, only available on Linux
-          #   os: ubuntu-22.04
-          #   mode: Release
-          #   enable_matlab: off
-          # - name: "R Linux"
-          #   os: ubuntu-22.04
-          #   mode: Release
-          #   enable_R: on
-          # - name: "R Linux without OpenMP"
-          #   os: ubuntu-22.04
-          #   mode: Release
-          #   enable_R: on
-          #   disable_openmp: on
-          # - name: "R macOS"
-          #   os: macOS-latest
-          #   mode: Release
-          #   enable_R: on
-          # - name: "R Windows"
-          #   os: windows-latest
-          #   mode: Release
-          #   enable_R: on
-          # - name: "Julia Linux"
-          #   os: ubuntu-22.04
-          #   mode: Release
-          #   enable_julia: on
-          # - name: "Julia macOS"
-          #   os: macOS-latest
-          #   mode: Release
-          #   enable_julia: on
-          # - name: "Julia Windows"
-          #   os: windows-latest
-          #   mode: Release
-          #   enable_julia: on
+          - name: "Octave Linux"
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
+            mode: Release
+            enable_python: off
+            enable_octave: on
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-latest
+            mode: Release
+            enable_python: off
+            enable_octave: on
+          - name: "Octave Windows"
+            os: windows-latest
+            mode: Release
+            # using python and octave in windows leads to the following error:
+            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+            #   491 | # define snprintf _snprintf
+            enable_python: off
+            enable_octave: on
+            timeout_minutes: 90
+          - name: "Matlab Linux"
+            # Disabled: requires MATHWORKS_API_TOKEN secret (license failure since v0.9.3)
+            # Using matlab-actions/setup-matlab@v2, only available on Linux
+            os: ubuntu-22.04
+            mode: Release
+            enable_matlab: off
+          - name: "R Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+          - name: "R Linux without OpenMP"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+            disable_openmp: on
+          - name: "R macOS"
+            os: macOS-latest
+            mode: Release
+            enable_R: on
+          - name: "R Windows"
+            os: windows-latest
+            mode: Release
+            enable_R: on
+          - name: "Julia Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_julia: on
+          - name: "Julia macOS"
+            os: macOS-latest
+            mode: Release
+            enable_julia: on
+          - name: "Julia Windows"
+            os: windows-latest
+            mode: Release
+            enable_julia: on
 
     steps:
       - uses: actions/checkout@v4
