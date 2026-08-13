@@ -36,7 +36,11 @@ env:
   DEBUG_CI: true
 
 jobs:
+  # TEMP DEBUG (issue #354): whole workflow skipped on this branch to focus
+  # CI capacity on the WrappedPyKrigingParametricTest Windows hang. Restore
+  # before merge.
   guideline-checks:
+    if: github.head_ref != 'debug/wrapped-py-parametric-hang' && github.ref != 'refs/heads/debug/wrapped-py-parametric-hang'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +60,7 @@ jobs:
         run: tools/checks/test.sh
 
   build:
+    if: github.head_ref != 'debug/wrapped-py-parametric-hang' && github.ref != 'refs/heads/debug/wrapped-py-parametric-hang'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.timeout_minutes || 30 }}

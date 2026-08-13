@@ -66,8 +66,11 @@ if [[ "$BUILD_TEST" == "true" ]]; then
       echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn)"
     fi
 
-    # Test on fresh build lib (before installation)
-    ctest -C "${MODE}" ${CTEST_FLAGS}
+    # TEMP DEBUG (issue #354): bisecting the WrappedPyKrigingParametricTest
+    # Windows hang -- restrict to just that test and cut the timeout from
+    # 1500s to 120s so a hang fails fast instead of eating the whole job
+    # budget. Restore before merge.
+    ctest -C "${MODE}" ${CTEST_FLAGS} --timeout 120 -R WrappedPyKrigingParametricTest
 
     cmake --build . --target install --config "${MODE}"
 else

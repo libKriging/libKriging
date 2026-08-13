@@ -21,7 +21,9 @@ env:
   DEBUG_CI: false
 
 jobs:
+  # TEMP DEBUG (issue #354): skipped on this branch. Restore before merge.
   benchmark-cpp:
+    if: github.head_ref != 'debug/wrapped-py-parametric-hang' && github.ref != 'refs/heads/debug/wrapped-py-parametric-hang'
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
