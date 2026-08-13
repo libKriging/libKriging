@@ -1648,6 +1648,35 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     } else
       m_est_sigma2 = true;
 
+    if (m_nystrom_k > 0) {
+      // LLNystrom objective with optim="none": commit a genuine Nystrom-light
+      // fit at the given (fixed) theta -- beta/sigma2/U/D via the same
+      // Woodbury likelihood the free-optimization path uses (mirrors
+      // update_nystrom's refit=false path) -- instead of silently falling
+      // through to an exact dense fit below, which would ignore the
+      // requested approximate objective entirely and leave m_nystrom_light
+      // false (so predictNystrom would then throw "model was not fitted
+      // with objective=\"LLNystrom(k)\""). This is what makes a fully
+      // deterministic (no BFGS, no platform-dependent convergence) Nystrom
+      // fit possible -- see docs/math/Nystrom.md and issue #351's follow-up.
+      arma::vec beta_v;
+      double sigma2_v = -1;
+      arma::mat U_v;
+      arma::vec D_v;
+      _logLikelihoodNystrom(m_theta, nullptr, &beta_v, &sigma2_v, &U_v, &D_v);
+      if (m_est_beta)
+        m_beta = beta_v;
+      if (m_est_sigma2)
+        m_sigma2 = sigma2_v;
+      else
+        m_sigma2 = sigma2;
+      m_nystrom_U = std::move(U_v);
+      m_nystrom_D = std::move(D_v);
+      m_nystrom_light = true;
+      m_is_empty = true;  // no committed factorization: predict routes to predictNystrom
+      return;
+    }
+
     double extra_param;         // alpha for Nugget, sigma2 for Heterogeneous, unused for None
     double nugget_param = 0.0;  // only used for Nugget mode
     if (m_noise_model == NoiseModel::Nugget) {

@@ -188,15 +188,22 @@ TEST_CASE("predictNystrom matches exact predict after an LLNystrom fit close to 
   arma::vec y;
   make_data(200, X, y);
 
-  // fit exactly (theta*), then compare predictNystrom (rank close to n, so
-  // near-exact) against the exact predict at the SAME theta/beta/sigma2 by
-  // constructing a plain "LL" model with optim=none pinned to k's theta.
-  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(190)");
-
+  // Fixed, moderate theta for BOTH models (optim="none"): this test's point
+  // is checking predictNystrom (rank close to n, so near-exact) against
+  // exact predict at a SHARED theta/beta/sigma2 -- it isn't about where a
+  // free BFGS fit happens to converge. A free fit here previously let theta
+  // (and hence the Nystrom approximation's own error, which is
+  // theta-dependent) drift with platform/compiler-specific BFGS convergence
+  // differences, observed anywhere from 0.012 to 0.155 for the median-stdev-
+  // diff assertion below against the same seed -- not a stable comparison.
+  // Fixing theta removes that confound; this test is about the low-rank
+  // approximation's accuracy at a known theta, not about free-fit
+  // reproducibility (LLNystrom's own MLE consistency has its own test,
+  // "LLNystrom(k) estimation is consistent with the exact MLE").
   Kriging::Parameters params;
-  params.theta = arma::mat(1, 2, arma::fill::none);
-  params.theta.value().row(0) = k_n.theta().t();
+  params.theta = arma::mat(1, 2, arma::fill::value(0.3));
   params.is_theta_estim = false;
+  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LLNystrom(190)", params);
   Kriging k_exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
 
   arma::mat Xt;
@@ -208,18 +215,19 @@ TEST_CASE("predictNystrom matches exact predict after an LLNystrom fit close to 
 
   INFO("max |mean diff| = " << arma::abs(m_n - m_ex).max());
   INFO("max |stdev diff| = " << arma::abs(s_n - s_ex).max());
-  CHECK(arma::abs(m_n - m_ex).max() < 5e-2 * arma::stddev(y));
+  CHECK(arma::abs(m_n - m_ex).max() < 1e-2 * arma::stddev(y));
   // stdev is a much more sensitive quantity than the mean here: it is a
   // (clamped) sqrt of a small residual variance, so even a good low-rank
   // approximation (k=190 of n=200) can show a larger absolute gap on a few
   // points where the true variance is already tiny -- use the median rather
   // than the max to check the approximation is good typically, and a looser
-  // max bound to catch gross errors only. The median bound needs real margin:
-  // it's sensitive to small platform/compiler floating-point differences in
-  // where BFGS converges (observed 0.012 locally on Release, but 0.063 on
-  // Linux CI Debug builds and 0.066 on Windows -- all against the same seed).
-  CHECK(arma::median(arma::abs(s_n - s_ex)) < 0.15 * arma::stddev(y));
-  CHECK(arma::abs(s_n - s_ex).max() < 0.5 * arma::stddev(y));
+  // max bound to catch gross errors only. Both theta and the comparison
+  // point are now fully fixed (no BFGS involved on either side), so the
+  // remaining margin is just for ordinary cross-platform BLAS/compiler
+  // rounding, not free-fit convergence variance -- measured median ~7e-4,
+  // max ~3e-3 locally.
+  CHECK(arma::median(arma::abs(s_n - s_ex)) < 1e-2 * arma::stddev(y));
+  CHECK(arma::abs(s_n - s_ex).max() < 5e-2 * arma::stddev(y));
 
   // interpolation: predicting at training points recovers y almost exactly
   auto [m_at_X, s_at_X] = k_n.predictNystrom(X.rows(0, 49), true);
