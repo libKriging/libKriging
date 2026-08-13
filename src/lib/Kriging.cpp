@@ -1785,10 +1785,39 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       // theta0 = arma::abs(0.5 + Random::randn_mat(multistart, d) / 6.0)
       //          % arma::repmat(max(m_X, 0) - min(m_X, 0), multistart, 1);
 
+      // Nystrom warm start: with no given theta, every multistart worker
+      // otherwise begins from a fully random point in theta_bounds, so how
+      // well/consistently BFGS converges depends on luck and platform RNG.
+      // The landmarks were already chosen (make_nystrom_landmarks, greedy
+      // pivoted-Cholesky) as a representative subsample of the correlation
+      // structure, so a cheap EXACT LL fit restricted to just those k points
+      // -- O(k^3), negligible next to the O(n*k^2) Nystrom cost -- tends to
+      // land close to the full-data optimum. Seed one multistart worker with
+      // it; keep the rest random so a single unlucky/degenerate landmark
+      // subsample can't strand every worker in the same bad basin.
+      arma::mat theta0_seed;
+      if (m_nystrom_k > 0 && !parameters.theta.has_value()) {
+        try {
+          Kriging land_fit(m_y.elem(m_nystrom_landmarks),
+                           m_X.rows(m_nystrom_landmarks),
+                           m_covType,
+                           m_regmodel,
+                           /*normalize=*/false,
+                           "BFGS",
+                           "LL");
+          theta0_seed = land_fit.theta().t();  // 1 x d, already in m_X's (normalized) scale
+        } catch (const std::exception&) {
+          // degenerate landmark subsample (e.g. too few distinct points): fall back to plain random multistart
+        }
+      }
+
       if (parameters.theta.has_value()) {  // just use given theta(s) as starting values for multi-bfgs
         multistart = std::max(multistart, (int)theta0.n_rows);
         theta0 = arma::join_cols(theta0, theta0_rand);  // append random starting points to given ones
         theta0.resize(multistart, theta0.n_cols);       // keep only multistart first rows
+      } else if (!theta0_seed.is_empty()) {
+        theta0 = arma::join_cols(theta0_seed, theta0_rand);  // landmark-fit theta first, then random
+        theta0.resize(multistart, theta0.n_cols);
       } else {
         theta0 = theta0_rand;
       }
