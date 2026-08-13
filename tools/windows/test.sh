@@ -19,6 +19,13 @@ if [[ "$ENABLE_COVERAGE" == "on" ]]; then
     exit 1
 fi
 
+# Same fix as build.sh's embedded ctest call -- see the comment there for
+# the Octave Windows precedent (commit b6cbf97a) this mirrors.
+if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
+  export OMP_NUM_THREADS=1
+  echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn)"
+fi
+
 cd ${BUILD_DIR:-build}
 
 # Cleanup compiled libs to check right path finding
