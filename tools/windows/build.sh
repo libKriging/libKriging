@@ -62,8 +62,8 @@ if [[ "$BUILD_TEST" == "true" ]]; then
     # Forcing single-threaded OpenMP avoids that churn here too. Verified
     # across Python 3.7/3.9/3.10/3.11/3.12 (see issue #351).
     if [[ "$ENABLE_PYTHON_BINDING" == "on" ]]; then
-      export OMP_NUM_THREADS=1
-      echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn)"
+      export OMP_NUM_THREADS=${DEBUG_354_OMP_NUM_THREADS:-1}
+      echo "OMP_NUM_THREADS=${OMP_NUM_THREADS} (Windows Python job: avoid libgomp thread-pool churn) [DEBUG #354 override]"
     fi
 
     # TEMP DEBUG (issue #354): bisecting the WrappedPyKrigingParametricTest
