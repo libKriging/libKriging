@@ -38,11 +38,11 @@ env:
   # (the pinned pybind11 submodule does); this env is honored by cmake as the
   # CMAKE_POLICY_VERSION_MINIMUM variable and restores the old behavior.
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
-  # TEMP DEBUG (issue #354): override tools/windows/build.sh's OMP_NUM_THREADS
-  # to see whether the WrappedPyKrigingParametricTest hang at 51f9e4a0 is the
-  # same libgomp-churn class as #351 (thread-count-sensitive) or something
-  # else entirely (hangs regardless of thread count). Restore before merge.
-  DEBUG_354_OMP_NUM_THREADS: "2"
+  # TEMP DEBUG (issue #354): OMP_NUM_THREADS=1 vs 2 hung identically at
+  # 51f9e4a0, ruling out thread-count-sensitive libgomp churn (the #351
+  # class). Now testing with OpenMP compiled out entirely. Restore before
+  # merge.
+  DEBUG_354_DISABLE_OPENMP: "1"
 
 jobs:
   # TEMP DEBUG (issue #354): skipped while the matrix below is trimmed to just

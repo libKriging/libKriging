@@ -30,6 +30,13 @@ STATIC_LIB=on
 MAKE_SHARED_LIBS=off
 EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DSTATIC_LIB=${STATIC_LIB}"
 
+# TEMP DEBUG (issue #354): force find_package(OpenMP) to fail, so the build
+# has no -fopenmp/libgomp anywhere, to test whether OpenMP is involved in the
+# WrappedPyKrigingParametricTest Windows hang at all. Restore before merge.
+if [[ "${DEBUG_354_DISABLE_OPENMP:-}" == "1" ]]; then
+  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON"
+fi
+
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}
 cmake \
