@@ -18,6 +18,28 @@
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
 
+// Windows Debug builds link the debug CRT (ucrtbased.dll), whose default
+// error-reporting mode pops a blocking modal MessageBox on heap-corruption
+// detection (see issue #354). In headless CI that dialog can never be
+// dismissed, turning a real bug into a silent multi-hour timeout instead of
+// a fast, diagnosable failure. Redirect CRT reports to stderr so any such
+// issue fails loudly and immediately instead of hanging.
+#if defined(_MSC_VER) && defined(_DEBUG)
+#include <crtdbg.h>
+namespace {
+struct Debug354ReportModeInit {
+  Debug354ReportModeInit() {
+    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+  }
+} debug354_report_mode_init;
+}  // namespace
+#endif
+
 // To compare string at compile time (before latest C++)
 constexpr bool strings_equal(char const* a, char const* b) {
   return *a == *b && (*a == '\0' || strings_equal(a + 1, b + 1));
