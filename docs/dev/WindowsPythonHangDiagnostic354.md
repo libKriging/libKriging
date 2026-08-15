@@ -1,16 +1,93 @@
 # Issue #354 — `WrappedPyKrigingParametricTest` "hang" on Windows Python Debug
 
-**Status: unresolved.** This document records a deep, evidence-backed diagnostic
-session (2026-08-14) conducted from inside an actual Windows VM (dockur/windows,
-`Z:\` = this repo shared from the host). Its purpose is to give the next person
-(future session or upstream report) a precise starting point instead of
-"it hangs."
+**Status: ROOT CAUSE FOUND AND FIXED (2026-08-15).** This document records a
+deep, evidence-backed diagnostic session (2026-08-14/15) conducted from
+inside an actual Windows VM (dockur/windows, `Z:\` = this repo shared from
+the host). It ends with a confirmed, verified fix — see "Root cause and fix"
+below. The rest of the document is kept as-is: the full elimination trail
+(nine hypotheses tested and ruled out with hard evidence) is genuinely
+useful context for the fix itself and for anyone facing a similar
+Windows-only heap-corruption symptom in the future.
 
 - Issue: https://github.com/libKriging/libKriging/issues/354
 - Throwaway bisection branch/PR (do not merge): `debug/wrapped-py-parametric-hang`,
   https://github.com/libKriging/libKriging/pull/355
 - Main PR blocked by this: `feature/cg-predict`,
   https://github.com/libKriging/libKriging/pull/347
+
+## Root cause and fix
+
+**Root cause**: Armadillo's memory allocator (`_aligned_malloc`/
+`_aligned_free`, MSVC's default) was never actually wired to use `lkalloc`
+(libKriging's allocator indirection layer), despite the Python binding
+explicitly calling `lkalloc::set_allocation_functions(cnalloc::npy_malloc,
+cnalloc::npy_free)` at module init (`pylibkriging.cpp`, with the comment
+*"to avoid mixing allocators from default libKriging and Python"*) — the
+compile-time defines that would make Armadillo actually route through
+`lkalloc::malloc`/`lkalloc::free` (`ARMA_ALIEN_MEM_ALLOC_FUNCTION`/
+`ARMA_ALIEN_MEM_FREE_FUNCTION`) were commented out in the top-level
+`CMakeLists.txt`, making that call a complete no-op. Git archaeology found
+why: commit `03c51a9f` ("try fix ABI issue", 2025-11-15) disabled them with
+the justification *"Custom allocators cause ABI mismatch with external code
+(R, Python, standalone tests)"*, referencing a `SOLUTION_1_PROPER_KMODEL_INIT.md`
+that was never actually committed to git (confirmed via `git log --all
+--diff-filter=A` — it isn't a deleted file, it was never tracked). Per the
+author (2026-08-15), that "ABI mismatch" diagnosis — and a related jemalloc
+detour from the same period — was itself a misdiagnosis.
+
+Left disabled, this meant Armadillo's own internal workspace allocations
+(e.g. the `work`/`iwork` arrays passed to LAPACK's `trcon` inside
+`arma::auxlib::rcond_trimat`, precisely localized earlier in this
+investigation) always went through plain `_aligned_malloc`/`_aligned_free`
+— consistently so within Armadillo itself, but apparently interacting badly
+with the surrounding heap state established by the real `libKriging`
+pipeline's own allocation history when hosted inside `python.exe` (matching
+every negative result in the elimination trail below: never reproduced
+standalone, never reproduced in a minimal `.pyd`, only ever in the real
+pipeline).
+
+**Fix**: re-enable the three defines in `CMakeLists.txt` (right after
+`add_definitions(/DARMA_32BIT_WORD)`):
+
+```cmake
+add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
+add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
+add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
+```
+
+This makes the Python binding's existing (previously-inert)
+`set_allocation_functions` call actually take effect, so Armadillo's memory
+in the Python binding is managed by the same allocator as NumPy
+(`cnalloc::npy_malloc`/`npy_free`) instead of a second, independent
+`_aligned_malloc` allocator running alongside it in the same process.
+
+**Why this is safe for every other binding** (Octave, MATLAB, the core C++
+library and its own tests, none of which call `set_allocation_functions`):
+checked `src/lib/lkalloc.cpp` — when no custom allocator has been set
+(`custom_malloc == nullptr`, the default), `lkalloc::malloc`/`free` fall
+back to *exactly* `_aligned_malloc`/`_aligned_free` on MSVC. Zero behavior
+change for every binding except Python; one extra function-pointer
+indirection, negligible overhead.
+
+**Verification**:
+- The originally-hanging `WrappedPyKrigingParametricTest` file: all 8 tests
+  pass in ~0.7s (was: infinite hang).
+- Full Python test suite (`bindings/Python/pylibkriging/tests/`): **136
+  passed, 10 skipped, 0 failed**, 14–22s.
+- Same full suite re-run under Application Verifier's **full Page Heap**
+  (the strictest corruption detector used throughout this investigation,
+  catching even single-byte overruns) — still clean, no access violation.
+  This rules out "the fix just hides the corruption behind a less strict
+  allocator" — Page Heap would have caught a real out-of-bounds write
+  regardless of which allocator produced it.
+- C++ core test suite (`catch2_unit_test`): passes unchanged (17
+  assertions, 2 test cases — confirms the core library still builds/links/
+  runs correctly with the allocator wiring active).
+
+**Files changed**: `CMakeLists.txt` only (the three `add_definitions`
+lines). No source code changes were needed — the fix is activating
+infrastructure (`lkalloc`, `set_allocation_functions`) that already existed
+in the codebase but was silently disconnected.
 
 ## Prior related Windows CI issues (history)
 
@@ -22,18 +99,25 @@ Context for anyone tempted to reach for the same fix again — these are
 | Octave Windows (pre-existing) | Hang/timeout on a NestedKriging test | OpenMP "libgomp thread-pool churn" under MinGW/Windows | Force `OMP_NUM_THREADS=1` in `tools/octave-windows/test.sh` (`fc9e12e9`, `b6cbf97a`) | ✅ Resolved, on `master` |
 | #351 — Python Windows 3.7/3.9 on `master` | Jobs blocked ~1h (timeout) on several unrelated Python test files | Same OpenMP thread-pool churn mechanism, hit during BFGS's repeated parallel regions | Force `OMP_NUM_THREADS=1` in `tools/windows/build.sh`/`test.sh`, PR #352 (merged). Verified across Python 3.7/3.9/3.10/3.11/3.12 on a throwaway branch (`debug/windows-python-hang`) — 3.10+ were never added to the permanent CI matrix, only used for that one-off verification | ✅ Resolved, PR #352 merged |
 | Nystrom flaky on Octave Windows | `CHECK(...)` assertion sometimes failed (`predictNystrom matches exact predict...`), numeric gap over tolerance | Not OpenMP/hang related — BFGS-converged theta varied slightly by platform/compiler, widening the measured gap past the test's tolerance | Fixed both sides' theta (`optim="none"`) for a deterministic comparison, plus a library-side fix so `optim="none"` + `LLNystrom(k)` actually honors the requested objective instead of silently doing an exact fit. PR #353 (merged) | ✅ Resolved, PR #353 merged |
-| **#354 (this doc)** — PR #347, `WrappedPyKrigingParametricTest` | Windows Python Debug jobs still hang, on a *different* test than #351, introduced by a pybind11-registration-only commit | Not OpenMP (ruled out identically to #351's mechanized checks) — see below | — | ❌ Unresolved |
+| **#354 (this doc)** — PR #347, `WrappedPyKrigingParametricTest` | Windows Python Debug jobs hang, on a *different* test than #351, introduced by a pybind11-registration-only commit | Real heap corruption in Armadillo's LAPACK workspace allocations, exposed because a pre-existing allocator-consistency mechanism (`lkalloc`) was disconnected — see "Root cause and fix" above | Re-enable `ARMA_ALIEN_MEM_ALLOC_FUNCTION`/`_FREE_FUNCTION` in `CMakeLists.txt` | ✅ Resolved |
 
 ## TL;DR
 
-This is **not a deadlock or a real hang**. It is the MSVC **Debug CRT**
-(`ucrtbased.dll`) detecting genuine **heap corruption** and popping a blocking
-`MessageBoxW` dialog that nobody can click in CI — so the process sits forever,
-looking exactly like a timeout. The corruption is real (confirmed via a hard
-access violation under Application Verifier's page heap), is **not**
-BLAS/LAPACK-backend-specific, is **not** dependent on the specific matrix
-values involved, and is **not** caused by the `X`/`y` NumPy→Armadillo view
-conversion. Its true origin is still unlocated.
+This was **not a deadlock or a real hang**. It was the MSVC **Debug CRT**
+(`ucrtbased.dll`) detecting genuine **heap corruption** and popping a
+blocking `MessageBoxW` dialog that nobody can click in CI — so the process
+sat forever, looking exactly like a timeout. The corruption was real
+(confirmed via a hard access violation under Application Verifier's page
+heap), was **not** BLAS/LAPACK-backend-specific, **not** dependent on the
+specific matrix values involved, and **not** caused by the `X`/`y`
+NumPy→Armadillo view conversion — see "Hypotheses tested and ruled out"
+below for the full elimination trail (nine hypotheses, each disproven with
+direct evidence). **Root cause found and fixed**: see "Root cause and fix"
+above — a pre-existing allocator-consistency mechanism (`lkalloc`, wiring
+Armadillo's memory to the same allocator NumPy uses) was silently
+disconnected by a commented-out CMake define, itself the result of an
+earlier misdiagnosis. Re-enabling it fixes the corruption with no source
+changes and no effect on any other language binding.
 
 ## Symptom
 
@@ -233,6 +317,131 @@ Proven by code inspection alone (no runtime instrumentation needed): this
 path is compiled but **never executed** for this call signature. **Ruled
 out.**
 
+### 8. Debug/Release CRT mismatch between `python.exe` and `_pylibkriging.pyd`
+
+A very well-reasoned hypothesis, worth recording in detail because it fit
+every piece of prior evidence: the official python.org installer's
+`python.exe` links the **Release** CRT (`api-ms-win-crt-*.dll` forwarders →
+`ucrtbase.dll`), while our Debug build's `_pylibkriging.pyd` links the
+**Debug** CRT (`ucrtbased.dll`, `MSVCP140D.dll`, `VCRUNTIME140D.dll`,
+`VCRUNTIME140_1D.dll`, `VCOMP140D.DLL`) — confirmed directly via
+`dumpbin /dependents` on both binaries. Mixing debug and release CRT
+instances in the same process is an explicitly unsupported, documented
+Microsoft pitfall, and it's consistent with the bug being Windows-only,
+requiring `python.exe` hosting, backend-independent, and deterministic.
+
+**Tested directly**: rebuilt with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
+(`/MD`, Release CRT) to match `python.exe`. First attempt had no effect —
+`CMAKE_MSVC_RUNTIME_LIBRARY` only takes effect under CMake policy `CMP0091`
+= `NEW`, and both the top-level project (`cmake_minimum_required(VERSION
+3.13)`) and pybind11's own CMakeLists (`VERSION 3.5`) default that policy to
+`OLD`, silently ignoring the setting. Forcing it via
+`-DCMAKE_POLICY_DEFAULT_CMP0091=NEW` fixed the linkage — `dumpbin` then
+confirmed `_pylibkriging.pyd` linking the same Release CRT DLLs as
+`python.exe`, with `armadillo.lib`/`Kriging.lib`/`lbfgsb_cpp.lib` all
+rebuilt consistently (verified via matching timestamps) before testing.
+
+**Result: the crash still happens**, with the exact same Python-level
+traceback (`test.py:18`, `WrappedPyKriging(y, X, "gauss")`) — but now
+reported as `Windows fatal exception: code 0xc0000374`
+(`STATUS_HEAP_CORRUPTION`, the Windows heap manager's own built-in
+corruption fast-fail, since `ucrtbased.dll`'s extra guard-byte bookkeeping
+is no longer in the picture at all). **Ruled out**: this is not a
+Debug/Release CRT mismatch. The corruption is more fundamental than a CRT
+instance mismatch — it reproduces even when every module in the process
+(`python.exe` and the entire `.pyd` + its static dependencies) agrees on a
+single, consistent Release CRT.
+
+Side note for anyone reproducing this specific test: use
+`-DCMAKE_POLICY_DEFAULT_CMP0091=NEW` if you need
+`CMAKE_MSVC_RUNTIME_LIBRARY` to actually take effect in this project — it's
+silently a no-op without it, which cost real time to notice.
+
+### 9. NumPy 2.0's C-API changes
+
+Also a strong candidate worth real scrutiny: `requirements.txt` only pins
+`numpy>=1.18` (no upper bound), so the environment installs NumPy 2.0.2 —
+and NumPy 2.0 is a well-known source of silent C-extension breakage, since
+it reorganized parts of its C API. `carma` (the NumPy↔Armadillo bridge) is
+*exactly* the kind of code this can break: `carma_bits/numpyapi.h` resolves
+NumPy C functions by **hardcoded integer index** into the raw `_ARRAY_API`
+capsule table, bypassing NumPy's own header-generated accessor macros. The
+code already contains proof this is a real risk in this exact codebase — it
+version-branches `PyArray_CopyInto`'s index at runtime (82 for NumPy 1.x, 50
+for 2.x) because NumPy 2.0 actually moved it. The other six hardcoded
+indices (`PyArray_Free=165`, `PyArray_Size=59`, `PyArray_NewCopy=85`,
+`PyArray_NewLikeArray=277`, `PyArray_NewFromDescr=94`, `PyDataMem_NEW=288`,
+`PyDataMem_FREE=289`) have no such version check. Separately, `cnumpy.h`'s
+`steal_memory<T>()` does direct `PyArrayObject_fields*` struct-field access —
+exactly the pattern NumPy 2.0's own docs warn will break.
+
+**Checked both mechanisms**:
+- Compared all 7 hardcoded indices against the actual installed NumPy 2.0.2
+  header (`numpy/_core/include/numpy/__multiarray_api.h`) — every single one
+  matches exactly. Not stale for this NumPy version.
+- `steal_memory<T>()` only compiles in under `CARMA_SOFT_STEAL`/
+  `CARMA_HARD_STEAL`, and neither is defined in this build (confirmed via
+  the generated `carma_bits/config.h`, both `#undef`). Dead code here — not
+  the cause.
+
+**Tested empirically anyway**, since code inspection can't rule out every
+possible NumPy-2-related mechanism: downgraded to `numpy==1.26.4` and
+rebuilt `_pylibkriging.pyd` from scratch against it (both build-time headers
+and runtime consistently NumPy 1.x, avoiding a new version-mismatch
+confound). **Result: identical corruption**, same
+`Damage before 0x... which was allocated by aligned routine` message, same
+crash site (`test.py:18`). **Ruled out**: this is not NumPy-2-specific. The
+NumPy version was restored to 2.0.2 afterward to match `requirements.txt`.
+
+## Precise localization: it's inside `arma::rcond()` itself, nothing earlier
+
+Added `_CrtCheckMemory()` checkpoints (each validates the *entire* debug
+heap and prints OK/DAMAGED to stderr, safe to call repeatedly since the
+fail-fast report-mode redirect below is in place) at six points along the
+call chain: (A) right after carma's `X`/`y` conversion in
+`PyKriging::PyKriging`, (B) `Kriging::Kriging` constructor entry,
+(C) `Kriging::fit` entry before BFGS setup, (D) `KrigingImpl::populate_Model`
+entry, (E) `cholCov` entry, (F) right before the `rcond_chol(L)` call in
+`safe_chol_lower_retry` (after `arma::chol()` has already succeeded).
+
+**Result: A through F all report `heap OK`.** The `Damage before...` message
+appears immediately after checkpoint F fires, on the very first
+`rcond_chol` call. `safe_chol_lower_retry`'s nugget-retry path then recurses
+(F fires again, still `heap OK`), and the *second* `rcond_chol` call
+corrupts again — this time fatally.
+
+This conclusively rules out everything between the carma conversion and a
+successful `arma::chol()` as the corruption's origin. **The corruption is
+introduced strictly inside `arma::rcond(chol)` — i.e. inside
+`op_rcond::apply` → `rcond_trimat` → `lapack::trcon` and its immediate
+workspace cleanup** — exactly the call originally identified via
+`py-spy`/`cdb` at the very start of this investigation. The bisection
+didn't find an earlier culprit; it confirmed there isn't one.
+
+## Hosting inside `python.exe` alone is not sufficient either
+
+Built a minimal pybind11 module (`debug354_repro.pyd`, same `/MDd` Debug
+CRT, same `armadillo.lib`/`openblas.dll` as the real build) whose only job
+is to load the exact crashing 40×40 Cholesky factor from CSV and call
+`arma::rcond()` on it 50 times — no NumPy array marshaling, no
+`Kriging`/`Trend`/`Covariance` object construction, no BFGS/`lbfgsb_cpp`
+setup, none of the rest of the real pipeline's allocations. Ran it from
+`python.exe` via `import debug354_repro; debug354_repro.run()`.
+
+**Result: zero corruption, 50/50 clean runs, identical rcond value every
+time.** This refutes "hosted in `python.exe`" as a sufficient condition on
+its own — combined with hypothesis #5 (same matrix, same CRT, but as a
+standalone `.exe`, also clean), that's **three** environments where the
+exact same `arma::rcond()` call on the exact same matrix with the exact
+same CRT/libraries never corrupts: a standalone `.exe`, and a minimal
+`.pyd` loaded into `python.exe`. Only the *real* `libKriging` pipeline
+triggers it — which is exactly what led to re-examining the allocator
+wiring (`lkalloc`) that turned out to be the actual answer: two
+independent allocators (NumPy's and Armadillo's own `_aligned_malloc`)
+coexisting in the same process, with a pre-existing mechanism to unify
+them silently disconnected. See "Root cause and fix" at the top of this
+document.
+
 ## Mitigation applied: fail fast instead of hanging
 
 The corruption itself is still unfixed, but the *symptom* CI actually suffers
@@ -276,41 +485,21 @@ for PR #347, zero risk, loses coverage); dropping Debug CRT (`/MD` instead of
 silent again, at the cost of losing the debug heap's ability to catch other
 future corruption bugs on Windows — not recommended as a long-term fix).
 
-## What remains unknown
+## How the elimination trail led to the fix
 
-The corruption is real, deterministic (first `rcond_chol` call, every time),
-Windows+Debug-CRT-only, and requires being hosted inside `python.exe` — but
-its actual origin is still unlocated. Since it isn't the `X`/`y` view
-conversion or the dict-parameter path, the remaining candidates are:
-
-- Something inside `Kriging::fit`/`Kriging::Kriging`'s own internal setup
-  before `populate_Model` is reached (e.g. normalization of `X`/`y`, initial
-  theta/covariance-matrix construction) — not yet instrumented.
-- A more general interaction between CPython/NumPy's own heap activity and
-  the Debug CRT's aligned allocator (e.g. heap layout/fragmentation specific
-  to being loaded as a `.pyd` inside `python.exe`, vs a standalone `.exe`) —
-  this would explain why hosting context matters even with the exact same
-  data and code.
-
-### Suggested next steps
-
-1. **Bisect further back with `_CrtCheckMemory()`.** Add checkpoints (each
-   prints a label to stderr, then calls `_CrtCheckMemory()`, which itself
-   validates the *entire* debug heap and will pop the same kind of report if
-   anything is already damaged) at: entry to `PyKriging::PyKriging` right
-   after the carma conversions; entry to `Kriging::Kriging`/`Kriging::fit`;
-   entry to `populate_Model`; entry to `cholCov`; right before
-   `rcond_chol`. The first checkpoint that reports damage brackets the real
-   corruption site much tighter than "somewhere before the first
-   `rcond_chol` call".
-2. **Test the DLL-hosting-context theory directly.** Compile the same minimal
-   repro (see below) as a `.pyd` and call it from Python instead of a
-   standalone `.exe`, to isolate whether being loaded into `python.exe`
-   matters independent of any real Kriging code running at all.
-3. Once the real corruption site is found, check whether it's a genuine
-   out-of-bounds write in libKriging's own code, or another
-   allocator/ownership mismatch at a different pybind11/carma boundary than
-   the ones already ruled out.
+By this point the trail had reached: the corruption was real, deterministic
+(first `rcond_chol` call, every time), Windows-only, required being hosted
+inside `python.exe`, and was **not** specific to the Debug CRT (hypothesis
+#8) or to NumPy 2 (hypothesis #9) — and the two sections above had just
+shown it wasn't anything in `Kriging`'s own call chain either, and wasn't
+simply "hosted in `python.exe`" as a standalone condition. The leading
+candidate — "a general interaction between CPython/NumPy's own heap
+activity and Armadillo's aligned allocator" — turned out to be exactly
+right, just missing the specific mechanism: **two independent allocators
+(NumPy's and Armadillo's own `_aligned_malloc`) running in the same
+process, where a pre-existing mechanism to unify them (`lkalloc`) existed
+in the codebase but was disconnected.** See "Root cause and fix" at the top
+of this document.
 
 ## Reproducing locally
 
@@ -471,13 +660,19 @@ reverted after use in this session.
 
 ## Cleanup notes for this VM
 
-- Application Verifier's Page Heap for `python.exe` may still be **enabled**
-  system-wide from this session — check with
-  `appverif -query Heaps -for python.exe` and disable with
-  `appverif -disable Heaps -for python.exe` if you don't need it anymore.
+- **The fix itself (`CMakeLists.txt`, the three `add_definitions` lines) is
+  a real source change, not a scratch artifact — it needs to be committed
+  and go through a PR against `master` (this session did not commit or push
+  anything, per standing instructions for this investigation).** It's
+  currently sitting as an uncommitted working-tree change in this checkout.
+- Application Verifier's Page Heap for `python.exe` was left **disabled**
+  at the end of this session — double check with
+  `appverif -query Heaps -for python.exe` if picking this back up later.
 - Scratch artifacts from this session (safe to delete): `Z:\tmp_repro\`
-  (standalone repro `.cpp`/`.exe` files and `chol_dump_*.csv`),
-  `Z:\build_win_debug_netlib\`, and the `netlib_test` conda env
+  (standalone repro `.cpp`/`.exe`/`.pyd` files and `chol_dump_*.csv`),
+  `Z:\build_win_debug_netlib\`, `Z:\build_win_crt_test\` (the
+  Release-CRT test build for hypothesis #8), and the `netlib_test` conda env
   (`conda env remove -n netlib_test`).
-- `Z:\build_win_debug\` is the main Debug build produced during this session
-  and can be reused for further work.
+- `Z:\build_win_debug\` is the main Debug build produced during this
+  session, already rebuilt with the fix active and passing the full test
+  suite — reusable as-is for further work.

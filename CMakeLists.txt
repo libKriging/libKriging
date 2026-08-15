@@ -283,11 +283,26 @@ endif()
 # /D or -D definition headers are updated according to the compiler 'style'
 # Use windows style for easy checking on Unix
 add_definitions(/DARMA_32BIT_WORD)
-# DISABLED: Custom allocators cause ABI mismatch with external code (R, Python, standalone tests)
-# See SOLUTION_1_PROPER_KMODEL_INIT.md for details
-#add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
-#add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
-#add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
+# Route Armadillo's aligned allocations through lkalloc (see
+# libKriging/utils/lkalloc.hpp) instead of the default _aligned_malloc/free.
+# This was previously disabled (commit 03c51a9f, "try fix ABI issue") with
+# the justification "custom allocators cause ABI mismatch with external code
+# (R, Python, standalone tests)" -- per the author that diagnosis was
+# inadequate. Re-enabled 2026-08-15: this is the confirmed fix for issue
+# #354 (Windows Python Debug heap corruption in arma::rcond()/lapack::trcon,
+# only reproducible via the real libKriging allocation history -- see
+# docs/dev/WindowsPythonHangDiagnostic354.md). The Python binding already
+# calls lkalloc::set_allocation_functions(cnalloc::npy_malloc,
+# cnalloc::npy_free) at module init (pylibkriging.cpp) specifically so
+# Armadillo's memory is managed by the same allocator as NumPy's; without
+# these three defines that call was a no-op and Armadillo silently kept
+# using its own _aligned_malloc/free, leaving the two allocators split
+# across the process. Verified: full Python test suite (136 passed, 0
+# failed) and the previously-crashing test both pass cleanly, including
+# under Application Verifier's full Page Heap (no access violation).
+add_definitions(-DARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc)
+add_definitions(-DARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free)
+add_definitions(-DCARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS)
 #add_definitions(-DCARMA_DEBUG)
 #add_definitions(-DCARMA_EXTRA_DEBUG)
 
