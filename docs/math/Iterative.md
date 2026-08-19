@@ -151,6 +151,10 @@ pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictIterative (light fit
 
 ## See also
 
+[lliterative_vs_cholesky.ipynb](lliterative_vs_cholesky.ipynb) for a
+worked notebook covering this objective's math in detail, including an
+honest, empirically-found caveat about free-BFGS convergence on its
+stochastic objective.
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
 `LLNystrom` and `predictIterative`, and how to pick between them.
 [PredictIterative.md](PredictIterative.md) for the Nystrom-preconditioned CG idea this

@@ -123,6 +123,9 @@ auto [mean4, stdev4] = model.predictIterative(Xnew, true, /*max_iter=*/50, /*tol
 
 ## See also
 
+[predictiterative_vs_cholesky.ipynb](predictiterative_vs_cholesky.ipynb)
+for a worked, executed notebook: the linear-algebra idea illustrated on a
+1D running example, plus accuracy/timing benchmarks.
 [Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
 `LLNystrom` and `NestedKriging`, and how to pick between them.
 [Iterative.md](Iterative.md) reuses this same Nystrom-preconditioned-CG

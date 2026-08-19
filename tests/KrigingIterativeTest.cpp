@@ -168,13 +168,15 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
 }
 
 // The "light fit" flag (and everything gated behind it: predictIterative routing,
-// blocking simulate/update/save) is only set on the actual multistart-BFGS
-// commit path -- exactly like m_nystrom_light/m_vecchia_light. optim="none"
-// bypasses that path entirely and does a plain exact factorization (mirrors
-// existing LLNystrom/LLVecchia behaviour), so these tests need a real BFGS
-// fit. n and nprobe are kept deliberately tiny (each gradient evaluation
-// does a CG solve over `nprobe` right-hand sides, and BFGS calls it many
-// times) to keep runtime bounded.
+// blocking simulate/update/save) is set on BOTH the multistart-BFGS commit
+// path and the optim="none" fixed-theta commit path -- exactly like
+// m_nystrom_light (LLIterative has no exact-commit toggle, unlike
+// m_vecchia_light, so it is unconditional either way; see
+// "LLIterative honors optim=none/BFGS identically" below for the dedicated
+// cross-optim regression test). This test specifically exercises the real
+// BFGS path. n and nprobe are kept deliberately tiny (each gradient
+// evaluation does a CG solve over `nprobe` right-hand sides, and BFGS calls
+// it many times) to keep runtime bounded.
 TEST_CASE("LLIterative fit is a permanent light fit: predict routes to predictIterative", "[iterative][kriging]") {
   arma::mat X;
   arma::vec y;
@@ -280,13 +282,14 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
 
 TEST_CASE("LLIterative(m) at a fixed theta: predictIterative is broadly consistent with the exact MLE",
           "[iterative][kriging]") {
-  // Fixed theta (optim="none" doesn't set the light flag, so call
-  // predictIterative directly to force the CG-based prediction path regardless):
-  // isolates the CG-based beta/sigma2 estimation + predictIterative's own accuracy
-  // (already covered in isolation by KrigingPredictIterativeTest) from Optim.cpp's
-  // free-fit convergence behaviour, which on this deterministic test
-  // function is prone to the well-documented GP-MLE degeneracy (see
-  // docs/math/Nystrom.md's limitations section).
+  // Fixed theta, optim="none" (which now also sets the light flag -- see the
+  // cross-optim regression test below -- so k.predict() would work here too;
+  // predictIterative is called directly anyway to isolate the CG-based
+  // beta/sigma2 estimation + predictIterative's own accuracy, already covered
+  // in isolation by KrigingPredictIterativeTest, from Optim.cpp's free-fit
+  // convergence behaviour, which on this deterministic test function is
+  // prone to the well-documented GP-MLE degeneracy (see docs/math/Nystrom.md's
+  // limitations section).
   // grad_out is null on this path (theta fixed => no optimizer gradient
   // calls), so this stays cheap even at n=80.
   arma::mat X;
@@ -310,4 +313,41 @@ TEST_CASE("LLIterative(m) at a fixed theta: predictIterative is broadly consiste
   // the same verification as predictIterative's own tests.
   CHECK(arma::abs(m_it - m_ex).max() < 0.02 * arma::stddev(y));
   CHECK(arma::abs(s_it - s_ex).max() < 0.02 * arma::stddev(y));
+}
+
+// Regression test for a real bug: optim="none" used to silently fall through
+// to a plain exact factorization for LLIterative, ignoring the objective
+// requested at construction (fixed alongside the identical LLVecchia bug --
+// see "LLVecchia honors optim=none identically to LLNystrom/LLIterative" in
+// KrigingVecchiaTest.cpp). The contract under test: whatever objective is
+// given at fit time is what predict()/etc actually use afterwards, for EVERY
+// supported value of optim, not just the free-fit "BFGS" path exercised by
+// the "permanent light fit" test above.
+TEST_CASE("LLIterative honors optim=none identically to optim=BFGS", "[iterative][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(15, X, y);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(8, Xt, yt, 456);
+
+  const std::string optim = GENERATE(as<std::string>{}, "none", "BFGS(1)");
+  CAPTURE(optim);
+
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
+  params.is_theta_estim = (optim != "none");  // optim="none" requires a fixed theta
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LLIterative(6)", params);
+  CHECK(k.is_iterative_light());
+
+  auto [m_pred, s_pred, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [m_cg, s_cg] = k.predictIterative(Xt, true);
+  CHECK(arma::approx_equal(m_pred, m_cg, "absdiff", 1e-8));
+  CHECK(arma::approx_equal(s_pred, s_cg, "absdiff", 1e-8));
+
+  // simulate/update_simulate/save stay blocked regardless of how the light
+  // fit was reached.
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), false), std::runtime_error);
+  CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
 }
