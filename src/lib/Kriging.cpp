@@ -2101,6 +2101,26 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       return;
     }
 
+    if (m_iterative_nprobe > 0) {
+      // LLIterative objective with optim="none": commit a genuine
+      // Iterative-light fit at the given (fixed) theta -- same rationale as
+      // the LLNystrom branch above. Unlike LLVecchia, LLIterative has no
+      // exact-commit toggle: it is always a light (matrix-free) fit, so this
+      // branch applies unconditionally whenever the objective is LLIterative.
+      arma::vec beta_v;
+      double sigma2_v = -1;
+      _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+      if (m_est_beta)
+        m_beta = beta_v;
+      if (m_est_sigma2)
+        m_sigma2 = sigma2_v;
+      else
+        m_sigma2 = sigma2;
+      m_iterative_light = true;
+      m_is_empty = true;  // no committed factorization: predict routes to predictIterative
+      return;
+    }
+
     double extra_param;         // alpha for Nugget, sigma2 for Heterogeneous, unused for None
     double nugget_param = 0.0;  // only used for Nugget mode
     if (m_noise_model == NoiseModel::Nugget) {
@@ -2490,8 +2510,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
             double sol_to_ub = arma::min(arma::abs(theta_part - theta_upper));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
-            // Check abnormal termination or convergence at bounds to decide on restart
-            if ((retry < Optim::max_restart)
+            // Check abnormal termination or convergence at bounds to decide on restart.
+            // This heuristic assumes a deterministic, smooth objective: "converged in
+            // <=2 iterations" or "no improvement over the previous attempt" are treated
+            // as suspicious signals worth retrying from a contracted start. LLIterative's
+            // objective is intrinsically stochastic (SLQ log-det / Hutchinson gradient
+            // estimates on fixed probes) -- the exact same signals routinely happen there
+            // just from estimator noise, triggering restart after restart (each paying
+            // the full CG/SLQ cost again) instead of ever finishing. Skip restarting for
+            // it entirely; a single BFGS attempt is what LLIterative gets.
+            const bool skip_restart_noisy_objective = m_objective.rfind("LLIterative", 0) == 0;
+            if (!skip_restart_noisy_objective && (retry < Optim::max_restart)
                 && ((opt_result.task.rfind("ABNORMAL_TERMINATION_IN_LNSRCH", 0) == 0)  // Check for abnormal termination
                     || (opt_result.num_iters <= 2)          // Start point is strangely quite optimal...
                     || (sol_to_lb < arma::datum::eps)       // Stuck at lower bound
