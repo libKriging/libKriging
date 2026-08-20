@@ -1584,14 +1584,32 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // oversubscription without depending on the OpenMP runtime's default
     // (implementation-defined) nested-parallel-region behavior.
     if (n >= 32 && !omp_in_parallel()) {
-      const int optimal_threads = get_optimal_threads(2);
+      // Capped higher than the historical default of 2: this only fires
+      // when NOT already inside conjugateGradient's column-parallel region
+      // (single-column solves, e.g. the 2-column F,y solve) -- profiling at
+      // n=400 found it otherwise leaving most of a 20-core machine idle
+      // while doing real, substantial per-row work (each row now does
+      // roughly n/2 pairs after the symmetric-matvec change).
+      const int optimal_threads = get_optimal_threads(8);
       std::vector<arma::vec> thread_out(static_cast<std::size_t>(optimal_threads), arma::vec(n, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
       {
         double* local = thread_out[static_cast<std::size_t>(omp_get_thread_num())].memptr();
         arma::vec dx(dimX, arma::fill::none);
         double* dx_mem = dx.memptr();
-#pragma omp for schedule(dynamic, 4)
+        // static,1 (round-robin over i) rather than dynamic: this loop's
+        // workload is triangular (row i does n-1-i pairs), so round-robin
+        // still balances reasonably well, but -- unlike dynamic -- always
+        // assigns the SAME i's to the SAME thread regardless of runtime
+        // timing. Dynamic scheduling here made the exact floating-point
+        // rounding of each matvec (and hence of CG's accumulated result)
+        // depend on non-deterministic thread-scheduling order: harmless in
+        // principle (both orderings are valid roundings of the same sum),
+        // but it intermittently pushed the "Nystrom-preconditioned CG
+        // matches the unpreconditioned objective/gradient" test's tolerance
+        // over the edge on some runs and not others -- a real, if subtle,
+        // reproducibility regression, not just test flakiness to ignore.
+#pragma omp for schedule(static, 1)
         for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
           const arma::uword ii = static_cast<arma::uword>(i);
           for (arma::uword j = ii + 1; j < n; ++j) {
