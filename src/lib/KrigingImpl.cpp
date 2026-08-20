@@ -331,7 +331,13 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
     arma::vec out(n, arma::fill::none);
 #ifdef _OPENMP
-    if (n >= 200) {
+    // Skip the inner parallel region when already running inside one (e.g.
+    // LinearAlgebra::conjugateGradient parallelizing across the columns of
+    // R_on -- one per prediction point -- each calling this Rmul many
+    // times): avoids nested-parallelism oversubscription without depending
+    // on the OpenMP runtime's default (implementation-defined) nested-
+    // parallel-region behavior.
+    if (n >= 200 && !omp_in_parallel()) {
       int optimal_threads = get_optimal_threads(2);
 #pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
       for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {

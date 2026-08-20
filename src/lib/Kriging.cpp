@@ -1553,47 +1553,70 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const auto& cov = _Cov;
   // Rmul is called O(CG iterations x CG solves) times per objective/gradient
   // evaluation -- often several thousand times, each recomputing every R_ij
-  // from scratch (matrix-free: R is never cached). The per-pair cost matters
-  // a lot here, so avoid reallocating the small (d,) delta vector cov()
-  // expects on every single (i,j) pair: allocate ONE reusable buffer per
-  // outer i (n allocations instead of n^2) and fill it by index instead of
-  // going through Xt.col(i) - Xt.col(j) (an armadillo subview subtraction,
-  // which allocates its own temporary every time). Lowered the OpenMP
-  // threshold from n>=200: at small-to-medium n, thousands of repeated Rmul
-  // calls each doing real (if now cheaper) O(n) work per row still benefit
-  // from parallelizing across rows.
-  auto Rmul = [&Xt, &theta, &cov, n, dimX](const arma::vec& v) -> arma::vec {
-    arma::vec out(n, arma::fill::none);
+  // from scratch (matrix-free BY DESIGN: R is never cached as an n x n array,
+  // not even transiently during one evaluation -- see the LLIterative memory
+  // measurement in docs/math/lliterative_vs_cholesky.ipynb, which this would
+  // invalidate). Two things ARE free to exploit without giving that up:
+  //   1. R is symmetric (R_ij = R_ji): looping over unordered pairs i<j and
+  //      writing BOTH out(i) and out(j) from one cov() call halves the number
+  //      of (expensive, transcendental-function-heavy) covariance evaluations
+  //      per matvec, vs. the previous i,j-independent double loop that
+  //      evaluated every pair twice.
+  //   2. The (d,)-sized delta vector cov() expects doesn't need reallocating
+  //      per pair -- one reusable buffer per row (serial) / per thread
+  //      (parallel) suffices, and going through raw memptr() indexing avoids
+  //      armadillo subview overhead entirely (Xt.col(i) - Xt.col(j) both
+  //      allocates a temporary AND goes through subview machinery).
+  // Accumulating into out(j) from whichever i<j is currently being processed
+  // is a genuine write-write hazard under parallelization (unlike writing
+  // into a dense n x n matrix's distinct (i,j)/(j,i) cells, e.g. in
+  // LinearAlgebra::covMat_sym_X): different threads working on different i
+  // can target the SAME j concurrently. Give each thread its own O(n)
+  // (not O(n^2)) accumulator and sum them once at the end instead.
+  const double* Xt_mem = Xt.memptr();
+  auto Rmul = [Xt_mem, &theta, &cov, n, dimX](const arma::vec& v) -> arma::vec {
+    arma::vec out(v);  // diag = 1 (out(i) = v(i) before adding off-diagonal terms)
+    const double* v_mem = v.memptr();
 #ifdef _OPENMP
-    if (n >= 32) {
-      int optimal_threads = get_optimal_threads(2);
-#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 32)
-      for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
-        const arma::uword ii = static_cast<arma::uword>(i);
-        double acc = v(ii);  // diag = 1
+    // Skip the inner parallel region when already running inside one (e.g.
+    // LinearAlgebra::conjugateGradient parallelizing across probe columns,
+    // each column calling this Rmul many times): avoids nested-parallelism
+    // oversubscription without depending on the OpenMP runtime's default
+    // (implementation-defined) nested-parallel-region behavior.
+    if (n >= 32 && !omp_in_parallel()) {
+      const int optimal_threads = get_optimal_threads(2);
+      std::vector<arma::vec> thread_out(static_cast<std::size_t>(optimal_threads), arma::vec(n, arma::fill::zeros));
+#pragma omp parallel num_threads(optimal_threads)
+      {
+        double* local = thread_out[static_cast<std::size_t>(omp_get_thread_num())].memptr();
         arma::vec dx(dimX, arma::fill::none);
-        for (arma::uword j = 0; j < n; ++j) {
-          if (j == ii)
-            continue;
-          for (arma::uword k = 0; k < dimX; ++k)
-            dx[k] = Xt(k, ii) - Xt(k, j);
-          acc += cov(dx, theta) * v(j);
+        double* dx_mem = dx.memptr();
+#pragma omp for schedule(dynamic, 4)
+        for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
+          const arma::uword ii = static_cast<arma::uword>(i);
+          for (arma::uword j = ii + 1; j < n; ++j) {
+            for (arma::uword k = 0; k < dimX; ++k)
+              dx_mem[k] = Xt_mem[k + ii * dimX] - Xt_mem[k + j * dimX];
+            const double c = cov(dx, theta);
+            local[ii] += c * v_mem[j];
+            local[j] += c * v_mem[ii];
+          }
         }
-        out(ii) = acc;
       }
+      for (const auto& lo : thread_out)
+        out += lo;
     } else {
 #endif
+      arma::vec dx(dimX, arma::fill::none);
+      double* dx_mem = dx.memptr();
       for (arma::uword i = 0; i < n; ++i) {
-        double acc = v(i);  // diag = 1
-        arma::vec dx(dimX, arma::fill::none);
-        for (arma::uword j = 0; j < n; ++j) {
-          if (j == i)
-            continue;
+        for (arma::uword j = i + 1; j < n; ++j) {
           for (arma::uword k = 0; k < dimX; ++k)
-            dx[k] = Xt(k, i) - Xt(k, j);
-          acc += cov(dx, theta) * v(j);
+            dx_mem[k] = Xt_mem[k + i * dimX] - Xt_mem[k + j * dimX];
+          const double c = cov(dx, theta);
+          out(i) += c * v_mem[j];
+          out(j) += c * v_mem[i];
         }
-        out(i) = acc;
       }
 #ifdef _OPENMP
     }

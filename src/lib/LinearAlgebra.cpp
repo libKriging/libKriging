@@ -394,11 +394,14 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function
   const bool preconditioned = static_cast<bool>(Pinv);
   const arma::uword n = B.n_rows;
   arma::mat X(n, B.n_cols, arma::fill::zeros);
-  for (arma::uword c = 0; c < B.n_cols; ++c) {
+
+  // One column's CG solve, factored out so it can be driven from either the
+  // parallel-across-columns loop below or a plain serial loop.
+  auto solve_one_column = [&](arma::uword c) {
     const arma::vec b = B.col(c);
     const double bnorm = arma::norm(b);
     if (bnorm == 0.0)
-      continue;  // x=0 already solves A*x=0
+      return;  // x=0 already solves A*x=0
 
     arma::vec x(n, arma::fill::zeros);
     arma::vec r = b;  // b - A*x0, x0 = 0
@@ -450,7 +453,38 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function
       rz_old = rz_new;
     }
     X.col(c) = x;
+  };
+
+  // Each column of B is an independent linear solve against the SAME A
+  // (accessed only via Amul/Pinv, never mutated) -- for B.n_cols large
+  // enough (e.g. LLIterative's nprobe right-hand sides, previously solved
+  // one at a time here), that's an embarrassingly parallel loop across
+  // columns, distinct from and complementary to whatever row-level
+  // parallelism Amul/Pinv may already do internally for a SINGLE matvec
+  // (e.g. Kriging::_logLikelihoodIterative's Rmul). Those guard their own
+  // internal `#pragma omp parallel for` with `!omp_in_parallel()` so they
+  // fall back to serial when already invoked from here, avoiding nested
+  // oversubscription instead of relying on the OpenMP runtime's (not
+  // universally the same) default nested-parallelism behavior.
+#ifdef _OPENMP
+  if (B.n_cols >= 4) {
+    // Unlike row-level parallelism within a single matvec (capped low,
+    // get_optimal_threads(2), to stay conservative when many matvecs each
+    // pay thread-launch overhead), one thread per column here does real,
+    // substantial, independent work (an entire CG solve, not a single
+    // reduction step) -- undersubscribing this is pure waste. Cap at
+    // B.n_cols (no point starting more threads than there are columns).
+    const int optimal_threads = get_optimal_threads(static_cast<int>(B.n_cols));
+#pragma omp parallel for schedule(dynamic, 1) num_threads(optimal_threads) if (B.n_cols >= 4)
+    for (arma::sword sc = 0; sc < static_cast<arma::sword>(B.n_cols); ++sc)
+      solve_one_column(static_cast<arma::uword>(sc));
+  } else {
+#endif
+    for (arma::uword c = 0; c < B.n_cols; ++c)
+      solve_one_column(c);
+#ifdef _OPENMP
   }
+#endif
   return X;
 }
 
