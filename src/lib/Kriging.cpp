@@ -1548,31 +1548,50 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const arma::uword max_iter = (m_iterative_cg_max_iter == 0) ? 2 * n : m_iterative_cg_max_iter;
 
   const arma::mat Xt = m_X.t();  // d x n, cache-friendly columns
+  const arma::uword dimX = Xt.n_rows;
   const arma::vec& theta = _theta;
   const auto& cov = _Cov;
-  auto Rmul = [&Xt, &theta, &cov, n](const arma::vec& v) -> arma::vec {
+  // Rmul is called O(CG iterations x CG solves) times per objective/gradient
+  // evaluation -- often several thousand times, each recomputing every R_ij
+  // from scratch (matrix-free: R is never cached). The per-pair cost matters
+  // a lot here, so avoid reallocating the small (d,) delta vector cov()
+  // expects on every single (i,j) pair: allocate ONE reusable buffer per
+  // outer i (n allocations instead of n^2) and fill it by index instead of
+  // going through Xt.col(i) - Xt.col(j) (an armadillo subview subtraction,
+  // which allocates its own temporary every time). Lowered the OpenMP
+  // threshold from n>=200: at small-to-medium n, thousands of repeated Rmul
+  // calls each doing real (if now cheaper) O(n) work per row still benefit
+  // from parallelizing across rows.
+  auto Rmul = [&Xt, &theta, &cov, n, dimX](const arma::vec& v) -> arma::vec {
     arma::vec out(n, arma::fill::none);
 #ifdef _OPENMP
-    if (n >= 200) {
+    if (n >= 32) {
       int optimal_threads = get_optimal_threads(2);
-#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 200)
+#pragma omp parallel for schedule(static) num_threads(optimal_threads) if (n >= 32)
       for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
-        double acc = v(static_cast<arma::uword>(i));  // diag = 1
+        const arma::uword ii = static_cast<arma::uword>(i);
+        double acc = v(ii);  // diag = 1
+        arma::vec dx(dimX, arma::fill::none);
         for (arma::uword j = 0; j < n; ++j) {
-          if (j == static_cast<arma::uword>(i))
+          if (j == ii)
             continue;
-          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+          for (arma::uword k = 0; k < dimX; ++k)
+            dx[k] = Xt(k, ii) - Xt(k, j);
+          acc += cov(dx, theta) * v(j);
         }
-        out(static_cast<arma::uword>(i)) = acc;
+        out(ii) = acc;
       }
     } else {
 #endif
       for (arma::uword i = 0; i < n; ++i) {
         double acc = v(i);  // diag = 1
+        arma::vec dx(dimX, arma::fill::none);
         for (arma::uword j = 0; j < n; ++j) {
           if (j == i)
             continue;
-          acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
+          for (arma::uword k = 0; k < dimX; ++k)
+            dx[k] = Xt(k, i) - Xt(k, j);
+          acc += cov(dx, theta) * v(j);
         }
         out(i) = acc;
       }
@@ -1647,14 +1666,16 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     const arma::mat W = LinearAlgebra::conjugateGradient(Rmul, m_iterative_probes, max_iter, m_iterative_cg_tol, Pinv);
 
     for (arma::uword kk = 0; kk < d; ++kk) {
-      auto dRmul_k = [this, &Xt, &theta, &cov, n, kk](const arma::vec& v) -> arma::vec {
+      auto dRmul_k = [this, &Xt, &theta, &cov, n, dimX, kk](const arma::vec& v) -> arma::vec {
         arma::vec out(n, arma::fill::zeros);
+        arma::vec dx(dimX, arma::fill::none);
         for (arma::uword i = 0; i < n; ++i) {
           double acc = 0.0;  // diagonal of dR/dtheta_k is 0 (diag(R) = 1 is theta-independent)
           for (arma::uword j = 0; j < n; ++j) {
             if (j == i)
               continue;
-            const arma::vec dx = Xt.col(i) - Xt.col(j);
+            for (arma::uword k = 0; k < dimX; ++k)
+              dx[k] = Xt(k, i) - Xt(k, j);
             acc += cov(dx, theta) * _DlnCovDtheta(dx, theta)(kk) * v(j);
           }
           out(i) = acc;
