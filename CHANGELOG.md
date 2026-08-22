@@ -21,6 +21,14 @@ past release, see the corresponding entry on the
   scikit-learn/GPy/SMT/OpenTURNS (Python) and DiceKriging/RobustGaSP (R) on
   shared randomized LHS designs (Branin, Hartmann-3/6, Borehole), reporting
   fit/predict time, RMSE, Q², NLPD; runs on a manual/monthly CI workflow (#335).
+- `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting for
+  large designs. Available in the core C++ API and all four bindings
+  (Python/R/Julia/Octave-MATLAB); see `docs/math/SubsetOfData.md` and
+  `Scalability.md` (#358).
+- `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
+  bindings (Python already had it); worked notebooks
+  `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
+  comparing `LLNystrom`/`LLVecchia` against exact Cholesky (#358).
 
 ### Changed
 - Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
@@ -32,6 +40,11 @@ past release, see the corresponding entry on the
   of being picked at runtime (#339, libKriging/carma#1).
 
 ### Fixed
+- `optim="none"` silently fell through to a plain exact factorization for
+  a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
+  requested `LLVecchia(m)` objective entirely instead of committing a
+  genuine light fit at the given theta (the same class of bug already
+  fixed for `LLNystrom` in #353) (#358).
 - R: `.match_kriging_objective`'s internal validator no longer hijacks
   `Kriging`'s roxygen `@export` documentation (#329).
 - Python: `loading_test`'s version check no longer hardcodes the expected

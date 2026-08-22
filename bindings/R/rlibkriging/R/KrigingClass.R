@@ -32,7 +32,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -365,6 +365,43 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
     return(kriging_predict(object, x, return_stdev, return_cov, return_deriv))
+}
+
+
+#' Subset-of-data pre-fit reduction.
+#'
+#' Selects a subset of \code{n_max} rows from a design \code{X}, meant to be
+#' used as a cheap pre-fit reduction for large designs: fit on
+#' \code{X[idx, ]}/\code{y[idx]} instead of the full data. Unlike
+#' Vecchia/Nystrom (which still use every point), this discards
+#' \code{n - n_max} points outright, in exchange for an ordinary exact fit
+#' on the reduced design.
+#'
+#' @param X n x d design matrix.
+#' @param n_max Target subset size; if \code{n_max >= nrow(X)}, returns all
+#'     indices (no-op).
+#' @param method \code{"kmeans"} (default): \code{n_max} k-means centroids on
+#'     \code{X}, each replaced by its nearest actual data point, so the
+#'     subset always consists of real observations; falls back to
+#'     \code{"random"} if k-means degenerates. \code{"random"}: uniform
+#'     subsample without replacement.
+#' @param seed RNG seed (k-means initialization and/or random fallback).
+#'
+#' @return Sorted 1-based row-indices into \code{X} (and the matching
+#'     \code{y}) to keep.
+#'
+#' @author Yann Richet \email{yann.richet@asnr.fr}
+#'
+#' @export
+#'
+#' @examples
+#' X <- matrix(runif(200), ncol = 2)
+#' idx <- subsetOfData(X, 20)
+#' Xr <- X[idx, ]
+subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
+    if (is.data.frame(X)) X = data.matrix(X)
+    if (!is.matrix(X)) X = matrix(X, ncol = 1)
+    return(kriging_subsetOfData(X, as.integer(n_max), method, as.integer(seed)))
 }
 
 

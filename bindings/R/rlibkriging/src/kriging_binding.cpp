@@ -358,6 +358,14 @@ Rcpp::List kriging_predict(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
+arma::uvec kriging_subsetOfData(arma::mat X, int n_max, std::string method = "kmeans", int seed = 123) {
+  if (n_max <= 0)
+    Rcpp::stop("n_max must be >= 1");
+  arma::uvec idx = Kriging::subsetOfData(X, static_cast<arma::uword>(n_max), method, seed);
+  return idx + 1;  // 0-based C++ row-indices -> 1-based R indices
+}
+
+// [[Rcpp::export]]
 arma::mat kriging_simulate(Rcpp::List k,
                            int nsim,
                            int seed,
@@ -614,6 +622,15 @@ std::string kriging_objective(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return impl_ptr->objective();
+}
+
+// [[Rcpp::export]]
+int kriging_nystrom_rank(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return static_cast<int>(impl_ptr->nystrom_rank());
 }
 
 // [[Rcpp::export]]

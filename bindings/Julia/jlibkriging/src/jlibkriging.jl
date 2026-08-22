@@ -259,6 +259,32 @@ function predict(k::Kriging, X_n::Matrix{Float64};
             stdev_deriv=return_deriv ? stdev_deriv_out : nothing)
 end
 
+"""
+    subsetOfData(X::Matrix{Float64}, n_max::Int; method="kmeans", seed=123)
+
+Subset-of-data pre-fit reduction: select `n_max` rows of `X` (k-means
+centroids snapped to the nearest real point, or a uniform random
+subsample), returned as 0-based row-indices into `X` (`Vector{Int}`).
+Meant as a cheap pre-fit reduction for large designs: fit on
+`X[idx.+1, :], y[idx.+1]` instead of the full data. Unlike
+LLVecchia/LLNystrom (which still use every point), this
+discards `n - n_max` points outright. If `n_max >= size(X, 1)`, returns all
+indices (no-op).
+"""
+function subsetOfData(X::Matrix{Float64}, n_max::Int; method::String="kmeans", seed::Int=123)
+    n_max >= 1 || throw(ArgumentError("subsetOfData: n_max must be >= 1"))
+    m, d = size(X)
+    idx_out = Vector{Cint}(undef, min(n_max, m))
+    ret = ccall(dlsym(_lk(), :lk_kriging_subsetOfData), Cint,
+                (Ptr{Float64}, Cint, Cint, Cint, Cstring, Cint, Ptr{Cint}),
+                X, m, d, n_max, method, seed, idx_out)
+    if ret < 0
+        msg = unsafe_string(ccall(dlsym(_lk(), :lk_get_last_error), Cstring, ()))
+        error("libKriging error: $msg")
+    end
+    return Int.(idx_out[1:ret])
+end
+
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Bool=true,
                   with_noise::Union{Nothing,Vector{Float64}}=nothing,
@@ -452,6 +478,10 @@ end
 
 function objective(k::Kriging)
     return unsafe_string(ccall(dlsym(_lk(), :lk_kriging_objective), Cstring, (Ptr{Nothing},), k.ptr))
+end
+
+function nystrom_rank(k::Kriging)
+    return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
 end
 
 function normalize(k::Kriging)
@@ -1351,12 +1381,13 @@ Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export nb_groups, aggregation, beta0
-export fit!, predict, simulate, update!, update_simulate, save, summary
+export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
+export nystrom_rank
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2
 export is_beta_estim, is_theta_estim, is_sigma2_estim

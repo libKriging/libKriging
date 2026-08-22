@@ -223,6 +223,20 @@ int lk_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
+int lk_kriging_subsetOfData(const double* X_n, int m, int d, int n_max, const char* method, int seed, int* idx_out) {
+  try {
+    if (n_max <= 0)
+      throw std::invalid_argument("lk_kriging_subsetOfData: n_max must be >= 1");
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    arma::uvec idx = Kriging::subsetOfData(X_m, static_cast<arma::uword>(n_max), method ? method : "kmeans", seed);
+    if (idx_out)
+      for (arma::uword i = 0; i < idx.n_elem; ++i)
+        idx_out[i] = static_cast<int>(idx(i));  // 0-based C++ row-indices
+    return static_cast<int>(idx.n_elem);
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_simulate(void* ptr,
                         int nsim,
                         int seed,
@@ -464,6 +478,13 @@ const char* lk_kriging_objective(void* ptr) {
     return static_cast<Kriging*>(ptr)->objective().c_str();
   }
   CATCH_RETURN_NULL
+}
+
+int lk_kriging_nystrom_rank(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->nystrom_rank());
+  }
+  CATCH_RETURN
 }
 
 int lk_kriging_is_normalize(void* ptr) {

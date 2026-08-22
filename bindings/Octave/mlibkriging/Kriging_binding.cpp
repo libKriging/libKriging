@@ -156,6 +156,25 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.setOptional(4, stderr_deriv_m, "predicted stdev deriv matrix");
 }
 
+void subsetOfData(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Range{2, 4}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto n_max = input.get<int>(1, "n_max");
+  const auto method = input.getOptional<std::string>(2, "method").value_or("kmeans");
+  const auto seed = input.getOptional<int>(3, "seed").value_or(123);
+  if (n_max <= 0)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "n_max must be >= 1");
+  arma::uvec idx
+      = Kriging::subsetOfData(input.get<arma::mat>(0, "matrix"), static_cast<arma::uword>(n_max), method, seed);
+  // 0-based C++ row-indices -> 1-based Octave indices; returned as a double
+  // column vector (no arma::uvec setter is registered for MxMapper output).
+  arma::vec idx1 = arma::conv_to<arma::vec>::from(idx) + 1.0;
+  output.set(0, idx1, "subset row-indices");
+}
+
 void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
@@ -443,6 +462,16 @@ void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   output.set(0, km->objective(), "objective");
+}
+
+void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, static_cast<int>(km->nystrom_rank()), "nystrom_rank");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

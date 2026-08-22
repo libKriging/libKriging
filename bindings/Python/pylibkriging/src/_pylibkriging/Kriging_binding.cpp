@@ -146,6 +146,17 @@ PyKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool retur
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
+// --- subsetOfData ---
+
+py::array_t<int> PyKriging::subsetOfData(const py::array_t<double>& X, int n_max, const std::string& method, int seed) {
+  if (n_max <= 0)
+    throw std::invalid_argument("subsetOfData: n_max must be >= 1");
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X);
+  arma::uvec idx = Kriging::subsetOfData(mat_X, static_cast<arma::uword>(n_max), method, seed);
+  arma::Col<int> idx_i = arma::conv_to<arma::Col<int>>::from(idx);  // 0-based, matches Python indexing
+  return carma::col_to_arr(idx_i, true);
+}
+
 // --- simulate ---
 
 py::array_t<double> PyKriging::simulate(const int nsim,
@@ -290,6 +301,10 @@ std::string PyKriging::optim() {
 
 std::string PyKriging::objective() {
   return m_internal->objective();
+}
+
+int PyKriging::nystrom_rank() {
+  return static_cast<int>(m_internal->nystrom_rank());
 }
 
 py::array_t<double> PyKriging::X() {

@@ -99,6 +99,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::objective", obj.ref, varargin{:});
         end
 
+        function varargout = nystrom_rank(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::nystrom_rank", obj.ref, varargin{:});
+        end
+
         function varargout = X(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::X", obj.ref, varargin{:});
         end
@@ -193,6 +197,14 @@ classdef Kriging < handle
         function obj = load(varargin)
             obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
             obj.ref = mLibKriging("Kriging::load", varargin{:});
+        end
+
+        % Subset-of-data pre-fit reduction: select n_max rows of X
+        % (k-means centroids snapped to the nearest real point, or a
+        % uniform random subsample), returned as sorted 1-based
+        % row-indices into X. Args: (X, n_max, method="kmeans", seed=123).
+        function varargout = subsetOfData(varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::subsetOfData", varargin{:});
         end
     end
 end
