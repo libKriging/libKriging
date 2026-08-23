@@ -663,8 +663,28 @@ include(CTest)
 add_subdirectory(tests)
 add_subdirectory(bench)
 
+# PROCESSOR_COUNT was previously used below without ever being set, silently
+# expanding to nothing and letting `ctest -j` fall back to CTest's own
+# "use every detected core" default -- full, unconstrained parallelism with no
+# --output-on-failure, unlike every other ctest invocation in this project
+# (tools/*/test.sh run ctest serially). On shared/resource-constrained CI
+# runners this oversubscribes (each test binary may itself spawn OpenMP
+# threads) and made tolerance/timing-sensitive tests (BFGS-within-budget,
+# gradient-vs-finite-differences, concurrent-access stress tests) intermittently
+# fail under contention -- reproduced identically across unrelated branches and
+# unrelated content changes. Detect a real core count (falling back to 1 if
+# detection fails) and cap it modestly.
+include(ProcessorCount)
+ProcessorCount(PROCESSOR_COUNT)
+if (PROCESSOR_COUNT EQUAL 0)
+    set(PROCESSOR_COUNT 1)
+endif ()
+if (PROCESSOR_COUNT GREATER 4)
+    set(PROCESSOR_COUNT 4)
+endif ()
+
 add_custom_target(run_unit_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT}
+        COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT} --output-on-failure
         COMMENT "Executing unit tests."
         DEPENDS all_test_binaries
         )
@@ -697,7 +717,7 @@ if (ENABLE_COVERAGE)
             # This way the percentage of total lines covered will always be correct, even when not all source code files were loaded during the test(s)
             COMMAND ${LCOV} --base-directory ${LIBKRIGING_SOURCE_DIR} --directory ${LIBKRIGING_BINARY_DIR} --capture --initial --output-file coverage_base.info
             # Run tests
-            COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT}
+            COMMAND ${CMAKE_CTEST_COMMAND} -j ${PROCESSOR_COUNT} --output-on-failure
             # Collect data from executions
             COMMAND ${LCOV} --base-directory ${LIBKRIGING_SOURCE_DIR} --directory ${LIBKRIGING_BINARY_DIR} --capture --output-file coverage_ctest.info
             # Combine base and ctest results
