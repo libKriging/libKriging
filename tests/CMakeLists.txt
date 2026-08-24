@@ -378,3 +378,13 @@ if(DEFINED ENV{GITHUB_ACTIONS})
 endif()
 catch_discover_tests(KrigingNystromTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
+
+
+add_executable(KrigingSubsetOfDataTest KrigingSubsetOfDataTest.cpp)
+target_link_libraries(KrigingSubsetOfDataTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingSubsetOfDataTest)
+if(DEFINED ENV{GITHUB_ACTIONS})
+    set(AdditionalCatchParameters "~[intensive]")
+endif()
+catch_discover_tests(KrigingSubsetOfDataTest EXTRA_ARGS ${AdditionalCatchParameters})
+unset(AdditionalCatchParameters)

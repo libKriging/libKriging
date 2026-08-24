@@ -280,6 +280,53 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
   CHECK(rmse < 0.05 * arma::stddev(y));
 }
 
+// Regression test for a real bug: optim="none" used to silently fall through
+// to a plain exact factorization for LLVecchia's light mode
+// (set_vecchia_exact_commit(false)), ignoring the requested objective. The
+// contract under test: whatever objective is given at fit time is what
+// predict()/etc actually use afterwards, for EVERY supported value of optim.
+TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(60, X, y);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(20, Xt, yt, 456);
+
+  const std::string optim = GENERATE(as<std::string>{}, "none", "BFGS(1)");
+  CAPTURE(optim);
+
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
+  params.is_theta_estim = (optim != "none");  // optim="none" requires a fixed theta
+
+  SECTION("set_vecchia_exact_commit(false): stays a light (non-factorized) fit") {
+    Kriging k("matern5_2");
+    k.set_vecchia_exact_commit(false);
+    k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LLVecchia(20)", params);
+    CHECK(k.is_vecchia_light());
+
+    auto [m_pred, s_pred, cov, dm, ds] = k.predict(Xt, true, false, false);
+    auto [m_v, s_v] = k.predictVecchia(Xt, true);
+    CHECK(arma::abs(m_pred - m_v).max() == 0.0);
+    CHECK(arma::abs(s_pred - s_v).max() == 0.0);
+    CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), false), std::runtime_error);
+    CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
+  }
+
+  SECTION("default set_vecchia_exact_commit(true): stays an exact (fully-factorized) fit") {
+    // The default is documented (docs/math/Vecchia.md) to commit an exact
+    // factorization at the fitted/given theta -- that must hold regardless of
+    // optim too, i.e. optim="none" must not accidentally *also* switch this
+    // default case into a light fit.
+    Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LLVecchia(20)", params);
+    CHECK_FALSE(k.is_vecchia_light());
+
+    auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
+    CHECK(arma::abs(mean - y).max() < 1e-3);  // exact commit interpolates
+  }
+}
+
 TEST_CASE("LLVecchia benchmark", "[.benchmark]") {
   arma::mat X;
   arma::vec y;

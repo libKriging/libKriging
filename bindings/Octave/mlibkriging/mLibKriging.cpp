@@ -94,6 +94,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::predict"_hash:
       return KrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::subsetOfData"_hash:
+      return KrigingBinding::subsetOfData(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::simulate"_hash:
       return KrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::update"_hash:
@@ -131,6 +133,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::objective"_hash:
       return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::nystrom_rank"_hash:
+      return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::X"_hash:
       return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::centerX"_hash:

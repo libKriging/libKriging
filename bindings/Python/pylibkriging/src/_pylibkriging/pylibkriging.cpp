@@ -180,6 +180,18 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
+      .def_static("subsetOfData",
+                  &PyKriging::subsetOfData,
+                  py::arg("X"),
+                  py::arg("n_max"),
+                  py::arg("method") = "kmeans",
+                  py::arg("seed") = 123,
+                  R"pbdoc(Subset-of-data pre-fit reduction: select n_max rows of X (k-means
+centroids snapped to the nearest real point, or a uniform random subsample),
+returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
+for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
+LLVecchia/LLNystrom (which still use every point), this
+discards n - n_max points outright.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
            py::arg("nsim") = 1,
@@ -218,6 +230,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
       .def("kernel", &PyKriging::kernel)
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
+      .def("nystrom_rank", &PyKriging::nystrom_rank)
       .def("X", &PyKriging::X)
       .def("centerX", &PyKriging::centerX)
       .def("scaleX", &PyKriging::scaleX)

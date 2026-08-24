@@ -68,6 +68,14 @@ int lk_kriging_predict(void* ptr,
                        double* mean_deriv_out,
                        double* stdev_deriv_out);
 
+/* Subset-of-data pre-fit reduction: select n_max rows of X (k-means
+   centroids snapped to the nearest real point, or a uniform random
+   subsample). idx_out must have room for min(n_max, m) ints; returns the
+   actual number of indices written (== n_max unless n_max >= m, in which
+   case it's a no-op returning all m indices), or -1 on error. Indices are
+   0-based row-indices into X. */
+int lk_kriging_subsetOfData(const double* X_n, int m, int d, int n_max, const char* method, int seed, int* idx_out);
+
 int lk_kriging_simulate(void* ptr,
                         int nsim,
                         int seed,
@@ -141,6 +149,7 @@ int lk_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double
 const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
+int lk_kriging_nystrom_rank(void* ptr);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);

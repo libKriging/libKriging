@@ -413,6 +413,40 @@ TEST_CASE("LLNystrom large-n smoke test", "[nystrom][kriging][intensive]") {
   CHECK(rmse < 0.3 * arma::stddev(y));
 }
 
+// Same general contract as the sibling regression test in
+// KrigingVecchiaTest.cpp: whatever objective is
+// given at fit time is what predict()/etc actually use afterwards, for EVERY
+// supported value of optim, not just the free-fit "BFGS" path exercised by
+// the "permanent light fit" test above. LLNystrom already honored this
+// correctly (it was the reference implementation the other was fixed to
+// match); this test just makes that guarantee explicit and pins it down.
+TEST_CASE("LLNystrom honors optim=none identically to optim=BFGS", "[nystrom][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(150, X, y);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(40, Xt, yt, 456);
+
+  const std::string optim = GENERATE(as<std::string>{}, "none", "BFGS(1)");
+  CAPTURE(optim);
+
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
+  params.is_theta_estim = (optim != "none");  // optim="none" requires a fixed theta
+
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LLNystrom(30)", params);
+  CHECK(k.is_nystrom_light());
+  CHECK(k.nystrom_rank() == 30);
+
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [m_nys, s_nys] = k.predictNystrom(Xt, true);
+  CHECK(arma::abs(mean - m_nys).max() == 0.0);
+  CHECK(arma::abs(stdev - s_nys).max() == 0.0);
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), true), std::runtime_error);
+  CHECK_THROWS_AS(k.update_simulate(y.head(3), X.rows(0, 2)), std::runtime_error);
+}
+
 TEST_CASE("LLNystrom benchmark", "[.benchmark]") {
   arma::mat X;
   arma::vec y;
