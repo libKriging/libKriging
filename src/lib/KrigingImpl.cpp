@@ -16,6 +16,7 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
+#include <memory>
 #include <tuple>
 #include <utility>
 
@@ -372,17 +373,20 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // here, so this can legitimately be built exactly at the theta being used
   // for prediction rather than at a generic reference. Pinv is left empty
   // (== plain CG) when disabled, matching the prior behavior exactly.
-  arma::mat U_pc;
-  arma::vec D_pc;
+  std::unique_ptr<LinearAlgebra::WoodburyFactorization> woodbury_pc;
   std::function<arma::vec(const arma::vec&)> Pinv;
   if (use_nystrom_precond) {
     arma::vec diag_resid;
-    U_pc = LinearAlgebra::nystromFactor(
+    arma::mat U_pc = LinearAlgebra::nystromFactor(
         &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, ones, std::min(precond_rank, n), 1e-12);
-    D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
-    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
-      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
-    };
+    arma::vec D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
+    // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
+    // for every CG iteration's Pinv(v) call (O(n*k + k^2) each) -- calling
+    // LinearAlgebra::woodbury_solve fresh per apply would redo that
+    // factorization every iteration, making the "cheap" preconditioner
+    // apply as expensive as the O(n^2) matvec it's meant to help avoid.
+    woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
+    Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
   }
 
   arma::mat Xn_n = X_n;

@@ -24,6 +24,7 @@
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
+#include <memory>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -1648,8 +1649,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // fixed, already-fitted m_theta) but over the FIXED landmark set chosen
   // once in make_iterative_precond_landmarks -- keeping the preconditioner,
   // and hence the CG-converged objective/gradient, smooth in theta.
-  arma::mat U_pc;
-  arma::vec D_pc;
+  std::unique_ptr<LinearAlgebra::WoodburyFactorization> woodbury_pc;
   std::function<arma::vec(const arma::vec&)> Pinv;
   if (m_iterative_precond_rank > 0) {
     const arma::mat X_land = m_X.rows(m_iterative_precond_landmarks);
@@ -1659,12 +1659,16 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     LinearAlgebra::covMat_rect(&R_ns, Xt, X_land.t(), theta, cov, /*factor=*/1.0);
     R_ss.diag() += LinearAlgebra::num_nugget;
     const arma::mat L_ss = arma::chol(R_ss, "lower");
-    U_pc = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
+    const arma::mat U_pc = arma::trans(LinearAlgebra::solve_lower(L_ss, R_ns.t()));
     const arma::vec captured = arma::sum(arma::square(U_pc), 1);
-    D_pc = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
-    Pinv = [&U_pc, &D_pc](const arma::vec& v) -> arma::vec {
-      return LinearAlgebra::woodbury_solve(U_pc, D_pc, v).col(0);
-    };
+    const arma::vec D_pc = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
+    // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
+    // for every CG iteration's Pinv(v) call (O(n*k + k^2) each) -- calling
+    // LinearAlgebra::woodbury_solve fresh per apply would redo that
+    // factorization every iteration, making the "cheap" preconditioner
+    // apply as expensive as the O(n^2) matvec it's meant to help avoid.
+    woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
+    Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
   }
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few

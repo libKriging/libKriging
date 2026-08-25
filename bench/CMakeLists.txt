@@ -40,6 +40,9 @@ target_link_libraries(bench-warpkriging LINK_PUBLIC Kriging)
 add_executable(bench-mlpkriging bench-mlpkriging.cpp)
 target_link_libraries(bench-mlpkriging LINK_PUBLIC Kriging)
 
+add_executable(debug-woodbury debug-woodbury.cpp)
+target_link_libraries(debug-woodbury LINK_PUBLIC Kriging)
+
 # Optionally install benchmarks
 install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-predictiterative
         RUNTIME DESTINATION bin/bench)
