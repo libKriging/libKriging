@@ -1,13 +1,13 @@
+#include <iostream>
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/utils/lk_armadillo.hpp"
-#include <iostream>
 
 int main() {
   arma::arma_rng::set_seed(1);
   int n = 50, k = 5, m = 3;
   arma::mat U(n, k, arma::fill::randn);
   arma::vec D(n, arma::fill::randu);
-  D += 0.5; // keep positive, away from 0
+  D += 0.5;  // keep positive, away from 0
   arma::mat B(n, m, arma::fill::randn);
 
   arma::mat ref = LinearAlgebra::woodbury_solve(U, D, B);

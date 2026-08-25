@@ -10,8 +10,10 @@ namespace {
 
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
 
-__device__ __forceinline__ double lk_cov_pair(CovKind kind, const double* __restrict__ Xi,
-                                              const double* __restrict__ Xj, const double* __restrict__ theta,
+__device__ __forceinline__ double lk_cov_pair(CovKind kind,
+                                              const double* __restrict__ Xi,
+                                              const double* __restrict__ Xj,
+                                              const double* __restrict__ theta,
                                               int dimX) {
   double c, sum = 0.0, sum_sq = 0.0;
   switch (kind) {
@@ -63,9 +65,14 @@ __device__ __forceinline__ double lk_cov_pair(CovKind kind, const double* __rest
 // history of this file / bench/bench-iterative-cuda.cpp's n-sweep): at
 // small n, grid.y>1 keeps far more SMs busy than grid=(ceil(n/128),1) ever
 // could on its own.
-__global__ void rmul_batched_kernel(const double* __restrict__ Xt, int n, int dimX,
-                                    const double* __restrict__ theta, CovKind kind, const double* __restrict__ P,
-                                    int ncols, double* __restrict__ Ap) {
+__global__ void rmul_batched_kernel(const double* __restrict__ Xt,
+                                    int n,
+                                    int dimX,
+                                    const double* __restrict__ theta,
+                                    CovKind kind,
+                                    const double* __restrict__ P,
+                                    int ncols,
+                                    double* __restrict__ Ap) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n || c >= ncols)
@@ -110,9 +117,14 @@ __global__ void rmul_batched_kernel(const double* __restrict__ Xt, int n, int di
 // afterward (sum_partials_kernel) keeps the summation order deterministic
 // regardless of thread scheduling, at the cost of one extra kernel pass
 // and O(n*ncols*j_blocks) scratch memory.
-__global__ void rmul_batched_tiled_kernel(const double* __restrict__ Xt, int n, int dimX,
-                                          const double* __restrict__ theta, CovKind kind,
-                                          const double* __restrict__ P, int ncols, double* __restrict__ d_partial,
+__global__ void rmul_batched_tiled_kernel(const double* __restrict__ Xt,
+                                          int n,
+                                          int dimX,
+                                          const double* __restrict__ theta,
+                                          CovKind kind,
+                                          const double* __restrict__ P,
+                                          int ncols,
+                                          double* __restrict__ d_partial,
                                           int j_tile) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
@@ -139,7 +151,10 @@ __global__ void rmul_batched_tiled_kernel(const double* __restrict__ Xt, int n, 
 // threads happen to finish rmul_batched_tiled_kernel in), so the result is
 // reproducible across repeated calls with identical inputs -- see the
 // determinism note on rmul_batched_tiled_kernel above.
-__global__ void sum_partials_kernel(const double* __restrict__ d_partial, int n, int ncols, int j_blocks,
+__global__ void sum_partials_kernel(const double* __restrict__ d_partial,
+                                    int n,
+                                    int ncols,
+                                    int j_blocks,
                                     double* __restrict__ Ap) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
@@ -154,7 +169,9 @@ __global__ void sum_partials_kernel(const double* __restrict__ d_partial, int n,
 // One block per column: a standard shared-memory tree reduction of
 // sum_i A[i,c]*B[i,c], with each thread first striding over n/blockDim.x
 // elements before the intra-block reduction.
-__global__ void batched_dot_kernel(const double* __restrict__ A, const double* __restrict__ B, int n,
+__global__ void batched_dot_kernel(const double* __restrict__ A,
+                                   const double* __restrict__ B,
+                                   int n,
                                    double* __restrict__ out) {
   extern __shared__ double sdata[];
   const int c = blockIdx.x;
@@ -177,8 +194,10 @@ __global__ void batched_dot_kernel(const double* __restrict__ A, const double* _
 }
 
 // Y[:,c] += alpha[c] * X[:,c], one thread per (i, c).
-__global__ void batched_axpy_kernel(const double* __restrict__ alpha, const double* __restrict__ X,
-                                    double* __restrict__ Y, int n) {
+__global__ void batched_axpy_kernel(const double* __restrict__ alpha,
+                                    const double* __restrict__ X,
+                                    double* __restrict__ Y,
+                                    int n) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n)
@@ -189,8 +208,10 @@ __global__ void batched_axpy_kernel(const double* __restrict__ alpha, const doub
 
 // P[:,c] = R[:,c] + beta[c] * P[:,c], one thread per (i, c) -- fused
 // scal+axpy for CG's search-direction update (avoids a second pass over P).
-__global__ void batched_update_p_kernel(const double* __restrict__ R, const double* __restrict__ beta,
-                                        double* __restrict__ P, int n) {
+__global__ void batched_update_p_kernel(const double* __restrict__ R,
+                                        const double* __restrict__ beta,
+                                        double* __restrict__ P,
+                                        int n) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n)
@@ -263,8 +284,15 @@ extern "C" int lk_cuda_rmul_batched_scratch_elems(int n, int ncols) {
 // d_scratch must be non-null and sized (in doubles) at least
 // lk_cuda_rmul_batched_scratch_elems(n, ncols) whenever that is > 0;
 // ignored (may be null) otherwise.
-extern "C" void lk_cuda_rmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                            const double* d_P, int ncols, double* d_Ap, double* d_scratch) {
+extern "C" void lk_cuda_rmul_batched_launch(const double* d_Xt,
+                                            int n,
+                                            int dimX,
+                                            const double* d_theta,
+                                            int covKind,
+                                            const double* d_P,
+                                            int ncols,
+                                            double* d_Ap,
+                                            double* d_scratch) {
   const dim3 block(128, 1, 1);
   const int row_blocks = (n + static_cast<int>(block.x) - 1) / static_cast<int>(block.x);
   const int j_blocks = chooseJBlocks(n, row_blocks, ncols);
@@ -277,8 +305,8 @@ extern "C" void lk_cuda_rmul_batched_launch(const double* d_Xt, int n, int dimX,
 
   const int j_tile = (n + j_blocks - 1) / j_blocks;
   const dim3 tiled_grid(row_blocks, static_cast<unsigned int>(ncols), static_cast<unsigned int>(j_blocks));
-  rmul_batched_tiled_kernel<<<tiled_grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_P, ncols,
-                                                   d_scratch, j_tile);
+  rmul_batched_tiled_kernel<<<tiled_grid, block>>>(
+      d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_P, ncols, d_scratch, j_tile);
 
   const dim3 reduce_grid(row_blocks, static_cast<unsigned int>(ncols), 1);
   sum_partials_kernel<<<reduce_grid, block>>>(d_scratch, n, ncols, j_blocks, d_Ap);
@@ -289,14 +317,16 @@ extern "C" void lk_cuda_batched_dot_launch(const double* d_A, const double* d_B,
   batched_dot_kernel<<<ncols, block, block * sizeof(double)>>>(d_A, d_B, n, d_out);
 }
 
-extern "C" void lk_cuda_batched_axpy_launch(const double* d_alpha, const double* d_X, double* d_Y, int n,
-                                            int ncols) {
+extern "C" void lk_cuda_batched_axpy_launch(const double* d_alpha, const double* d_X, double* d_Y, int n, int ncols) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   batched_axpy_kernel<<<grid, block>>>(d_alpha, d_X, d_Y, n);
 }
 
-extern "C" void lk_cuda_batched_update_p_launch(const double* d_R, const double* d_beta, double* d_P, int n,
+extern "C" void lk_cuda_batched_update_p_launch(const double* d_R,
+                                                const double* d_beta,
+                                                double* d_P,
+                                                int n,
                                                 int ncols) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);

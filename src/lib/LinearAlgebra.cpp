@@ -378,7 +378,7 @@ LIBKRIGING_EXPORT LinearAlgebra::WoodburyFactorization::WoodburyFactorization(co
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::solve(const arma::mat& B) const {
-  const arma::mat DinvB = B.each_col() % m_Dinv;                     // diag(Dinv) * B        (n x m)
+  const arma::mat DinvB = B.each_col() % m_Dinv;  // diag(Dinv) * B        (n x m)
   const arma::mat y = LinearAlgebra::solve_lower(m_M_chol_lower, m_Ut * DinvB);
   const arma::mat z = LinearAlgebra::solve_upper(m_M_chol_lower.t(), y);
   return DinvB - m_DinvU * z;
