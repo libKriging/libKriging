@@ -1733,33 +1733,87 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 
     const arma::mat W = cgSolve(m_iterative_probes);
 
-    for (arma::uword kk = 0; kk < d; ++kk) {
-      auto dRmul_k = [this, &Xt, &theta, &cov, n, dimX, kk](const arma::vec& v) -> arma::vec {
-        arma::vec out(n, arma::fill::zeros);
-        arma::vec dx(dimX, arma::fill::none);
-        for (arma::uword i = 0; i < n; ++i) {
-          double acc = 0.0;  // diagonal of dR/dtheta_k is 0 (diag(R) = 1 is theta-independent)
-          for (arma::uword j = 0; j < n; ++j) {
-            if (j == i)
-              continue;
-            for (arma::uword k = 0; k < dimX; ++k)
-              dx[k] = Xt(k, i) - Xt(k, j);
-            acc += cov(dx, theta) * _DlnCovDtheta(dx, theta)(kk) * v(j);
+    // dR/dtheta_k * v for ALL d dimensions at once, in one O(n^2/2) pass
+    // over unordered pairs (i,j) instead of one O(n^2) pass PER dimension
+    // (the previous per-kk dRmul_k closure, called from a `for kk` loop
+    // wrapping this whole block). Two things were being wasted there:
+    //   1. _DlnCovDtheta(dx,theta) returns the FULL d-length gradient of
+    //      log-covariance in one call, but the old code called it once per
+    //      (i,j) pair PER kk and threw away d-1 of its d components each
+    //      time -- d-1 wasted calls (each allocating its own arma::vec)
+    //      out of every d.
+    //   2. Unlike Rmul (see its comment above), the old loop visited every
+    //      (i,j) pair in both directions instead of exploiting dR/dtheta_k's
+    //      symmetry (it's built from cov()/DlnCovDtheta(), both even
+    //      functions of dx, same reasoning as Rmul's own symmetry).
+    // Combined, this cuts total cov()/DlnCovDtheta() evaluations by a
+    // factor of ~2*d (mirrors Rmul's parallel/symmetric/raw-memptr pattern,
+    // including the schedule(static,1) determinism fix and the
+    // !omp_in_parallel() nested-parallelism guard -- see Rmul's comment for
+    // why both matter).
+    auto dRmul_all = [Xt_mem, &theta, &cov, this, n, dimX, d](const arma::vec& v) -> arma::mat {
+      arma::mat out(n, d, arma::fill::zeros);
+      const double* v_mem = v.memptr();
+#ifdef _OPENMP
+      if (n >= 32 && !omp_in_parallel()) {
+        const int optimal_threads = get_optimal_threads(8);
+        std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
+                                          arma::mat(n, d, arma::fill::zeros));
+#pragma omp parallel num_threads(optimal_threads)
+        {
+          arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
+          arma::vec dx(dimX, arma::fill::none);
+          double* dx_mem = dx.memptr();
+#pragma omp for schedule(static, 1)
+          for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
+            const arma::uword ii = static_cast<arma::uword>(i);
+            for (arma::uword j = ii + 1; j < n; ++j) {
+              for (arma::uword k = 0; k < dimX; ++k)
+                dx_mem[k] = Xt_mem[k + ii * dimX] - Xt_mem[k + j * dimX];
+              const double c = cov(dx, theta);
+              const arma::vec dlncov = _DlnCovDtheta(dx, theta);  // all d components, ONE call
+              for (arma::uword kk = 0; kk < d; ++kk) {
+                const double cd = c * dlncov(kk);
+                local(ii, kk) += cd * v_mem[j];
+                local(j, kk) += cd * v_mem[ii];
+              }
+            }
           }
-          out(i) = acc;
         }
-        return out;
-      };
+        for (const auto& lo : thread_out)
+          out += lo;
+      } else {
+#endif
+        arma::vec dx(dimX, arma::fill::none);
+        double* dx_mem = dx.memptr();
+        for (arma::uword i = 0; i < n; ++i) {
+          for (arma::uword j = i + 1; j < n; ++j) {
+            for (arma::uword k = 0; k < dimX; ++k)
+              dx_mem[k] = Xt_mem[k + i * dimX] - Xt_mem[k + j * dimX];
+            const double c = cov(dx, theta);
+            const arma::vec dlncov = _DlnCovDtheta(dx, theta);
+            for (arma::uword kk = 0; kk < d; ++kk) {
+              const double cd = c * dlncov(kk);
+              out(i, kk) += cd * v_mem[j];
+              out(j, kk) += cd * v_mem[i];
+            }
+          }
+        }
+#ifdef _OPENMP
+      }
+#endif
+      return out;
+    };
 
-      const double term1 = arma::dot(x, dRmul_k(x));
+    const arma::rowvec term1 = x.t() * dRmul_all(x);  // 1 x d, all dimensions at once
 
-      double trace_k = 0.0;
-      for (arma::uword p = 0; p < nprobe; ++p)
-        trace_k += arma::dot(W.col(p), dRmul_k(m_iterative_probes.col(p)));
-      trace_k /= static_cast<double>(nprobe);
+    arma::rowvec trace(d, arma::fill::zeros);
+    for (arma::uword p = 0; p < nprobe; ++p)
+      trace += W.col(p).t() * dRmul_all(m_iterative_probes.col(p));
+    trace /= static_cast<double>(nprobe);
 
-      (*grad_out)(kk) = 0.5 * (term1 / sigma2 - trace_k);
-    }
+    for (arma::uword kk = 0; kk < d; ++kk)
+      (*grad_out)(kk) = 0.5 * (term1(kk) / sigma2 - trace(kk));
   }
 
   return -0.5 * (n * std::log(2 * M_PI * sigma2) + logdetR + n);
