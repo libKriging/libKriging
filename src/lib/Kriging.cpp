@@ -21,6 +21,8 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
+#include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
@@ -1671,12 +1673,25 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
   }
 
+  // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON, a
+  // CUDA device is available at runtime, no Nystrom preconditioner is in
+  // play (the GPU path doesn't implement one yet), and the kernel has a
+  // device-side implementation (see CudaLinearAlgebraKernel.cu). Falls back
+  // to the CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
+  auto cgSolve = [&](const arma::mat& B) -> arma::mat {
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+    if (!Pinv && LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+      return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
+#endif
+    return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
+  };
+
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
   // columns): p+1 right-hand sides sharing the same matvec, each an
   // independent Krylov solve (no block-CG subspace sharing, but far cheaper
   // than p+1 separate O(n^3) factorizations either way).
   arma::mat FY = arma::join_rows(m_F, m_y);
-  const arma::mat RinvFY = LinearAlgebra::conjugateGradient(Rmul, FY, max_iter, m_iterative_cg_tol, Pinv);
+  const arma::mat RinvFY = cgSolve(FY);
   const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
   const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
 
@@ -1708,7 +1723,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     const arma::uword d = _theta.n_elem;
     grad_out->set_size(d);
 
-    const arma::mat W = LinearAlgebra::conjugateGradient(Rmul, m_iterative_probes, max_iter, m_iterative_cg_tol, Pinv);
+    const arma::mat W = cgSolve(m_iterative_probes);
 
     for (arma::uword kk = 0; kk < d; ++kk) {
       auto dRmul_k = [this, &Xt, &theta, &cov, n, dimX, kk](const arma::vec& v) -> arma::vec {

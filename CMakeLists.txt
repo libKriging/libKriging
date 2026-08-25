@@ -103,6 +103,11 @@ option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
+# Explicit opt-in only -- never auto-detected, even if a CUDA toolkit is
+# present on the machine. Requires a working CUDA toolkit (no longer needs
+# cuBLAS -- see src/lib/cuda/CudaLinearAlgebraKernel.cu). See
+# docs/math/Iterative.md.
+option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative (requires CUDA toolkit)" OFF)
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 

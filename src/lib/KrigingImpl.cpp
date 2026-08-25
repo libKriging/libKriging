@@ -16,6 +16,8 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
+#include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+
 #include <memory>
 #include <tuple>
 #include <utility>
@@ -389,6 +391,19 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
     Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
   }
 
+  // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON, a
+  // CUDA device is available at runtime, no Nystrom preconditioner is in
+  // play (the GPU path doesn't implement one yet), and the kernel has a
+  // device-side implementation (see CudaLinearAlgebraKernel.cu). Falls back
+  // to the CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
+  auto cgSolve = [&](const arma::mat& B) -> arma::mat {
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+    if (!Pinv && LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+      return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol);
+#endif
+    return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, tol, Pinv);
+  };
+
   arma::mat Xn_n = X_n;
   Xn_n.each_row() -= m_centerX;
   Xn_n.each_row() /= m_scaleX;
@@ -405,7 +420,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
 
   // One CG solve, reused for every prediction point's mean.
   const arma::vec resid = m_y - m_F * m_beta;
-  const arma::mat w = LinearAlgebra::conjugateGradient(Rmul, resid, max_iter, tol, Pinv);
+  const arma::mat w = cgSolve(resid);
 
   arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
   LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n, m_theta, _Cov, 1.0);
@@ -417,7 +432,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   if (return_stdev) {
     // One CG solve PER prediction point (R_on's columns don't share a
     // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in.
-    const arma::mat V = LinearAlgebra::conjugateGradient(Rmul, R_on, max_iter, tol, Pinv);
+    const arma::mat V = cgSolve(R_on);
     const arma::vec quad = arma::sum(R_on % V, 0).t();
 
     arma::vec gls_correction(n_n, arma::fill::zeros);
@@ -430,7 +445,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
       // simple-kriging formula (correct only when the trend is known
       // rather than estimated, i.e. regmodel == "none") and understates
       // the prediction uncertainty otherwise.
-      const arma::mat W_F = LinearAlgebra::conjugateGradient(Rmul, m_F, max_iter, tol, Pinv);
+      const arma::mat W_F = cgSolve(m_F);
       const arma::mat FtRinvF = m_F.t() * W_F;
       const arma::mat E = F_n - R_on.t() * W_F;
       const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
