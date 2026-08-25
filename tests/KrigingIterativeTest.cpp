@@ -7,6 +7,32 @@
 #include "libKriging/Kriging.hpp"
 // clang-format on
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// Cross-platform environment variable functions (mirrors the same helper in
+// NuggetKrigingTest.cpp/NoiseKrigingTest.cpp).
+#ifdef _WIN32
+#include <cstdlib>
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  if (!overwrite && std::getenv(name) != nullptr) {
+    return 0;
+  }
+  return _putenv_s(name, value);
+}
+inline int unsetenv_portable(const char* name) {
+  return _putenv_s(name, "");
+}
+#else
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  return setenv(name, value, overwrite);
+}
+inline int unsetenv_portable(const char* name) {
+  return unsetenv(name);
+}
+#endif
+
 static double f2d(double x1, double x2) {
   return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2;
 }
@@ -151,6 +177,28 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
   // preconditioned and unpreconditioned objective/gradient should agree
   // tightly -- unlike the SLQ/Hutchinson-vs-exact-LL comparisons elsewhere
   // in this file, which only agree in an order-of-magnitude sense.
+  //
+  // Force single-threaded execution for this comparison specifically: both
+  // Rmul's row-parallel matvec (Kriging.cpp) and conjugateGradient's
+  // column-parallel per-probe solve (LinearAlgebra.cpp) are internally
+  // multi-threaded, and although each is individually deterministic for a
+  // FIXED thread count, that count itself varies across machines/CI
+  // runners -- producing a rounding-order difference tight enough to
+  // occasionally cross this test's tolerance (observed failing on CI, never
+  // locally, with two separate runs landing on two slightly different
+  // near-miss values). Setting both env vars AND calling
+  // omp_set_num_threads(1) directly, since libgomp/MSVC OpenMP read
+  // OMP_NUM_THREADS once at first use and don't hot-reload later setenv
+  // calls -- the explicit API call is what actually guarantees it here.
+  const char* old_openblas = std::getenv("OPENBLAS_NUM_THREADS");
+  const char* old_omp = std::getenv("OMP_NUM_THREADS");
+  setenv_portable("OPENBLAS_NUM_THREADS", "1", 1);
+  setenv_portable("OMP_NUM_THREADS", "1", 1);
+#ifdef _OPENMP
+  const int old_omp_max_threads = omp_get_max_threads();
+  omp_set_num_threads(1);
+#endif
+
   arma::mat X;
   arma::vec y;
   make_data(35, X, y);
@@ -161,6 +209,20 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
   const arma::vec theta{0.35, 0.3};
   auto [ll_plain, grad_plain] = k_plain.logLikelihoodIterativeFun(theta, true);
   auto [ll_pc, grad_pc] = k_pc.logLikelihoodIterativeFun(theta, true);
+
+#ifdef _OPENMP
+  omp_set_num_threads(old_omp_max_threads);
+#endif
+  if (old_omp) {
+    setenv_portable("OMP_NUM_THREADS", old_omp, 1);
+  } else {
+    unsetenv_portable("OMP_NUM_THREADS");
+  }
+  if (old_openblas) {
+    setenv_portable("OPENBLAS_NUM_THREADS", old_openblas, 1);
+  } else {
+    unsetenv_portable("OPENBLAS_NUM_THREADS");
+  }
 
   INFO("ll_plain=" << ll_plain << " ll_pc=" << ll_pc << " grad_plain=" << grad_plain.t() << " grad_pc=" << grad_pc.t());
   CHECK(std::abs(ll_plain - ll_pc) < 1e-4 * std::abs(ll_plain) + 1e-6);
