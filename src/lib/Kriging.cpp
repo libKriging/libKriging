@@ -22,6 +22,7 @@
 #include "libKriging/utils/utils.hpp"
 
 #include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+#include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -1673,15 +1674,22 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
   }
 
-  // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON, a
-  // CUDA device is available at runtime, no Nystrom preconditioner is in
-  // play (the GPU path doesn't implement one yet), and the kernel has a
-  // device-side implementation (see CudaLinearAlgebraKernel.cu). Falls back
-  // to the CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
+  // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON or
+  // -DENABLE_HIP_ITERATIVE=ON, a device is available at runtime, no Nystrom
+  // preconditioner is in play (neither GPU path implements it yet), and the
+  // kernel has a device-side implementation (see CudaLinearAlgebraKernel.cu
+  // / HipLinearAlgebraKernel.hip.cpp). CUDA is tried first when both are
+  // compiled in (won't happen in practice -- a machine has one vendor's GPU
+  // or the other -- but there's no reason to forbid it). Falls back to the
+  // CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
   auto cgSolve = [&](const arma::mat& B) -> arma::mat {
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
     if (!Pinv && LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
       return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
+#endif
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+    if (!Pinv && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+      return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
 #endif
     return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
   };

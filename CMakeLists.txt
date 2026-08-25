@@ -108,6 +108,13 @@ option(LBFGSB_SHOW_BUILD OFF)
 # cuBLAS -- see src/lib/cuda/CudaLinearAlgebraKernel.cu). See
 # docs/math/Iterative.md.
 option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative (requires CUDA toolkit)" OFF)
+# Same feature, AMD/ROCm backend. Explicit opt-in only, never auto-detected.
+# UNVERIFIED: written as a mechanical port of the CUDA backend with no
+# ROCm toolchain or AMD GPU available to build/run it against -- see
+# src/lib/hip/HipLinearAlgebra.hpp for the full caveat. Requires CMake
+# >= 3.21 (native HIP language support) and a ROCm install providing
+# CMAKE_PREFIX_PATH/hip-config.cmake.
+option(ENABLE_HIP_ITERATIVE "Enable HIP/ROCm-accelerated matvec/CG for LLIterative and predictIterative (requires ROCm; UNVERIFIED, see src/lib/hip/HipLinearAlgebra.hpp)" OFF)
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 
