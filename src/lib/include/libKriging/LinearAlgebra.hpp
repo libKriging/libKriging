@@ -78,6 +78,32 @@ class LinearAlgebra {
   // Same complexity/preconditions as woodbury_solve.
   LIBKRIGING_EXPORT static double woodbury_logdet(const arma::mat& U, const arma::vec& D);
 
+  // One-time O(n*k^2 + k^3) factorization of D + U*U.t() (Woodbury), reused
+  // afterward for many O(n*k + k^2) solves via solve(). Exists specifically
+  // for the CG-preconditioner use case (Kriging::_logLikelihoodIterative,
+  // KrigingImpl::predictIterative_impl): those call the preconditioner's
+  // apply once PER CG ITERATION, so building a fresh woodbury_solve() call
+  // each time -- which redoes the full O(n*k^2+k^3) factorization on every
+  // single apply -- makes each "cheap" preconditioner application cost as
+  // much as (or more than) the O(n^2) matvec it's meant to make cheaper to
+  // skip, silently erasing any iteration-count benefit from preconditioning
+  // (found by profiling: a 79s unpreconditioned predictIterative solve
+  // became 137s "preconditioned" at n=500, k=50, despite genuinely
+  // converging in fewer iterations -- see git history). Build ONE of these
+  // per CG solve (not per iteration) and call solve() from the Pinv
+  // closure instead.
+  class WoodburyFactorization {
+   public:
+    LIBKRIGING_EXPORT WoodburyFactorization(const arma::mat& U, const arma::vec& D);
+    LIBKRIGING_EXPORT arma::mat solve(const arma::mat& B) const;
+
+   private:
+    arma::vec m_Dinv;
+    arma::mat m_Ut;    // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
+    arma::mat m_DinvU;
+    arma::mat m_M_chol_lower;
+  };
+
   LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
 
   LIBKRIGING_EXPORT static arma::mat rsolve(const arma::mat& A, const arma::mat& B);
