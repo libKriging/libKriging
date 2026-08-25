@@ -41,8 +41,15 @@ int lk_hip_rmul_batched_scratch_elems(int n, int ncols);
 // null otherwise). All pointers are device pointers. Launches
 // asynchronously; the caller is responsible for checking
 // hipGetLastError()/hipDeviceSynchronize() afterward.
-void lk_hip_rmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                const double* d_P, int ncols, double* d_Ap, double* d_scratch);
+void lk_hip_rmul_batched_launch(const double* d_Xt,
+                                int n,
+                                int dimX,
+                                const double* d_theta,
+                                int covKind,
+                                const double* d_P,
+                                int ncols,
+                                double* d_Ap,
+                                double* d_scratch);
 
 // out[c] = sum_i A[i,c]*B[i,c] for every column c (A, B are n x ncols,
 // column-major); pass the same pointer for A and B to get a per-column

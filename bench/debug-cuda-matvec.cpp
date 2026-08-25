@@ -32,7 +32,8 @@ int main() {
     for (int i = 0; i < n; ++i) {
       double acc = P(i, c);
       for (int j = 0; j < n; ++j) {
-        if (j == i) continue;
+        if (j == i)
+          continue;
         acc += cov(Xt.col(i) - Xt.col(j), theta) * P(j, c);
       }
       Ap_cpu(i, c) = acc;
@@ -72,8 +73,8 @@ int main() {
   check(cudaGetLastError(), "launch2");
   check(cudaDeviceSynchronize(), "sync2");
   check(cudaMemcpy(Ap_gpu2.memptr(), d_Ap, sizeof(double) * n * ncols, cudaMemcpyDeviceToHost), "cpy back2");
-  std::cout << "determinism: max abs diff between two identical-input calls = "
-            << arma::abs(Ap_gpu - Ap_gpu2).max() << std::endl;
+  std::cout << "determinism: max abs diff between two identical-input calls = " << arma::abs(Ap_gpu - Ap_gpu2).max()
+            << std::endl;
 
   // Now the full CG solve (repeated matvecs), same P used as the RHS B.
   auto Rmul = [&](const arma::vec& v) -> arma::vec {
@@ -81,7 +82,8 @@ int main() {
     for (int i = 0; i < n; ++i) {
       double acc = v(i);
       for (int j = 0; j < n; ++j) {
-        if (j == i) continue;
+        if (j == i)
+          continue;
         acc += cov(Xt.col(i) - Xt.col(j), theta) * v(j);
       }
       out(i) = acc;

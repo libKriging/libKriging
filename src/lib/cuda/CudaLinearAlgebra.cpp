@@ -23,15 +23,15 @@
 
 namespace {
 
-#define LK_CUDA_CHECK(expr)                                                            \
-  do {                                                                                 \
-    cudaError_t lk_cuda_status__ = (expr);                                              \
-    if (lk_cuda_status__ != cudaSuccess) {                                              \
-      std::ostringstream lk_cuda_oss__;                                                \
-      lk_cuda_oss__ << "CUDA error at " << __FILE__ << ":" << __LINE__ << ": "          \
-                    << cudaGetErrorString(lk_cuda_status__);                            \
-      throw std::runtime_error(lk_cuda_oss__.str());                                   \
-    }                                                                                  \
+#define LK_CUDA_CHECK(expr)                                                    \
+  do {                                                                         \
+    cudaError_t lk_cuda_status__ = (expr);                                     \
+    if (lk_cuda_status__ != cudaSuccess) {                                     \
+      std::ostringstream lk_cuda_oss__;                                        \
+      lk_cuda_oss__ << "CUDA error at " << __FILE__ << ":" << __LINE__ << ": " \
+                    << cudaGetErrorString(lk_cuda_status__);                   \
+      throw std::runtime_error(lk_cuda_oss__.str());                           \
+    }                                                                          \
   } while (0)
 
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
@@ -114,8 +114,12 @@ bool supports(const std::string& covType) {
 // by however many iterations the slowest column still needs) for keeping
 // everything in one batched launch per step -- the right trade given
 // launch/sync overhead, not FLOPs, was the measured bottleneck.
-arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const std::string& covType,
-                            const arma::mat& B, arma::uword max_iter, double tol) {
+arma::mat conjugateGradient(const arma::mat& Xt,
+                            const arma::vec& theta,
+                            const std::string& covType,
+                            const arma::mat& B,
+                            arma::uword max_iter,
+                            double tol) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: unsupported covType '" + covType + "'");
@@ -129,8 +133,8 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
   double *d_Xt, *d_theta;
   LK_CUDA_CHECK(cudaMalloc(&d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
   LK_CUDA_CHECK(cudaMalloc(&d_theta, sizeof(double) * dimX));
-  LK_CUDA_CHECK(cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX,
-                          cudaMemcpyHostToDevice));
+  LK_CUDA_CHECK(
+      cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
   LK_CUDA_CHECK(cudaMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
 
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
@@ -165,7 +169,7 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
   for (arma::uword c = 0; c < B.n_cols; ++c)
     bnorm[c] = arma::norm(B.col(c));
   for (int c = 0; c < ncols; ++c) {
-    active[c] = bnorm[c] != 0.0;  // x=0 already solves A*x=0 for a zero column
+    active[c] = bnorm[c] != 0.0;      // x=0 already solves A*x=0 for a zero column
     rz_old[c] = bnorm[c] * bnorm[c];  // r=b initially, so r.r = |b|^2
   }
 
@@ -197,7 +201,14 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
       // scratch for every still-active column, same rationale as
       // LinearAlgebra::conjugateGradient's restart_every (corrects
       // round-off drift in the recursively updated residual).
-      lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_x, ncols, d_Ap,
+      lk_cuda_rmul_batched_launch(d_Xt,
+                                  n,
+                                  dimX,
+                                  d_theta,
+                                  static_cast<int>(kind),
+                                  d_x,
+                                  ncols,
+                                  d_Ap,
                                   d_rmul_scratch);  // Ap = A*x
       LK_CUDA_CHECK(cudaGetLastError());
       LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b

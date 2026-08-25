@@ -29,15 +29,14 @@
 
 namespace {
 
-#define LK_HIP_CHECK(expr)                                                           \
-  do {                                                                               \
-    hipError_t lk_hip_status__ = (expr);                                              \
-    if (lk_hip_status__ != hipSuccess) {                                              \
-      std::ostringstream lk_hip_oss__;                                               \
-      lk_hip_oss__ << "HIP error at " << __FILE__ << ":" << __LINE__ << ": "         \
-                   << hipGetErrorString(lk_hip_status__);                            \
-      throw std::runtime_error(lk_hip_oss__.str());                                  \
-    }                                                                                \
+#define LK_HIP_CHECK(expr)                                                                                          \
+  do {                                                                                                              \
+    hipError_t lk_hip_status__ = (expr);                                                                            \
+    if (lk_hip_status__ != hipSuccess) {                                                                            \
+      std::ostringstream lk_hip_oss__;                                                                              \
+      lk_hip_oss__ << "HIP error at " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(lk_hip_status__); \
+      throw std::runtime_error(lk_hip_oss__.str());                                                                 \
+    }                                                                                                               \
   } while (0)
 
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
@@ -101,8 +100,12 @@ bool supports(const std::string& covType) {
   return covKindFromString(covType, &kind);
 }
 
-arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const std::string& covType,
-                            const arma::mat& B, arma::uword max_iter, double tol) {
+arma::mat conjugateGradient(const arma::mat& Xt,
+                            const arma::vec& theta,
+                            const std::string& covType,
+                            const arma::mat& B,
+                            arma::uword max_iter,
+                            double tol) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraHip::conjugateGradient: unsupported covType '" + covType + "'");
@@ -116,8 +119,8 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
   double *d_Xt, *d_theta;
   LK_HIP_CHECK(hipMalloc(&d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
   LK_HIP_CHECK(hipMalloc(&d_theta, sizeof(double) * dimX));
-  LK_HIP_CHECK(hipMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX,
-                        hipMemcpyHostToDevice));
+  LK_HIP_CHECK(
+      hipMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, hipMemcpyHostToDevice));
   LK_HIP_CHECK(hipMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, hipMemcpyHostToDevice));
 
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
@@ -152,7 +155,7 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
   for (arma::uword c = 0; c < B.n_cols; ++c)
     bnorm[c] = arma::norm(B.col(c));
   for (int c = 0; c < ncols; ++c) {
-    active[c] = bnorm[c] != 0.0;  // x=0 already solves A*x=0 for a zero column
+    active[c] = bnorm[c] != 0.0;      // x=0 already solves A*x=0 for a zero column
     rz_old[c] = bnorm[c] * bnorm[c];  // r=b initially, so r.r = |b|^2
   }
 
@@ -184,7 +187,14 @@ arma::mat conjugateGradient(const arma::mat& Xt, const arma::vec& theta, const s
       // scratch for every still-active column, same rationale as
       // LinearAlgebra::conjugateGradient's restart_every (corrects
       // round-off drift in the recursively updated residual).
-      lk_hip_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_x, ncols, d_Ap,
+      lk_hip_rmul_batched_launch(d_Xt,
+                                 n,
+                                 dimX,
+                                 d_theta,
+                                 static_cast<int>(kind),
+                                 d_x,
+                                 ncols,
+                                 d_Ap,
                                  d_rmul_scratch);  // Ap = A*x
       LK_HIP_CHECK(hipGetLastError());
       LK_HIP_CHECK(hipMemcpy(d_r, d_b, mat_bytes, hipMemcpyDeviceToDevice));  // r = b

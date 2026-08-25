@@ -99,7 +99,7 @@ class LinearAlgebra {
 
    private:
     arma::vec m_Dinv;
-    arma::mat m_Ut;    // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
+    arma::mat m_Ut;  // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
     arma::mat m_DinvU;
     arma::mat m_M_chol_lower;
   };
