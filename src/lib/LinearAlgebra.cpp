@@ -371,6 +371,19 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::woodbury_solve(const arma::mat& U, co
   return DinvB - DinvU * arma::solve(M, U.t() * DinvB, LinearAlgebra::default_solve_opts);
 }
 
+LIBKRIGING_EXPORT LinearAlgebra::WoodburyFactorization::WoodburyFactorization(const arma::mat& U, const arma::vec& D)
+    : m_Dinv(1.0 / D), m_Ut(U.t()), m_DinvU(U.each_col() % m_Dinv) {
+  const arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + m_Ut * m_DinvU;  // I_k + U' Dinv U (k x k)
+  m_M_chol_lower = LinearAlgebra::safe_chol_lower(M);
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::solve(const arma::mat& B) const {
+  const arma::mat DinvB = B.each_col() % m_Dinv;                     // diag(Dinv) * B        (n x m)
+  const arma::mat y = LinearAlgebra::solve_lower(m_M_chol_lower, m_Ut * DinvB);
+  const arma::mat z = LinearAlgebra::solve_upper(m_M_chol_lower.t(), y);
+  return DinvB - m_DinvU * z;
+}
+
 LIBKRIGING_EXPORT double LinearAlgebra::woodbury_logdet(const arma::mat& U, const arma::vec& D) {
   const arma::vec Dinv = 1.0 / D;
   const arma::mat DinvU = U.each_col() % Dinv;
