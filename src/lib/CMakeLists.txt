@@ -22,11 +22,31 @@ if (ENABLE_CUDA_ITERATIVE)
             cuda/CudaLinearAlgebra.cpp cuda/CudaLinearAlgebra.cuh)
 endif ()
 
+# Same feature, AMD/ROCm backend (ENABLE_HIP_ITERATIVE) -- UNVERIFIED, see
+# src/lib/hip/HipLinearAlgebra.hpp. Mirrors the CUDA wiring above exactly,
+# including the "kernel file stays pointer-only" rule and its reason.
+set(LIBKRIGING_HIP_SOURCES "")
+if (ENABLE_HIP_ITERATIVE)
+    if (${CMAKE_VERSION} VERSION_LESS "3.21")
+        message(FATAL_ERROR "ENABLE_HIP_ITERATIVE requires CMake >= 3.21 for native HIP language support "
+                "(found ${CMAKE_VERSION}).")
+    endif ()
+    if (NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+        set(CMAKE_HIP_ARCHITECTURES native)
+    endif ()
+    enable_language(HIP)
+    find_package(hip REQUIRED)
+    set(LIBKRIGING_HIP_SOURCES
+            hip/HipLinearAlgebraKernel.hip.cpp hip/HipLinearAlgebraKernel.hpp
+            hip/HipLinearAlgebra.cpp hip/HipLinearAlgebra.hpp)
+endif ()
+
 # SHARED or STATIC type if defined using BUILD_SHARED_LIBS variable
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
         ${LIBKRIGING_CUDA_SOURCES}
+        ${LIBKRIGING_HIP_SOURCES}
         demo/DemoClass.cpp include/libKriging/demo/DemoClass.hpp
         demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
@@ -66,6 +86,11 @@ if (ENABLE_CUDA_ITERATIVE)
     target_link_libraries(Kriging PUBLIC CUDA::cudart)
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_CUDA_ITERATIVE)
     set_target_properties(Kriging PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif ()
+
+if (ENABLE_HIP_ITERATIVE)
+    target_link_libraries(Kriging PUBLIC hip::host hip::device)
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_HIP_ITERATIVE)
 endif ()
 
 # Link OpenMP if found (required for omp_set_num_threads calls in Kriging.cpp, etc.)
