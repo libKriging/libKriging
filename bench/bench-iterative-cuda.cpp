@@ -37,8 +37,11 @@ static double test_function(const arma::rowvec& x) {
   return sum;
 }
 
-static double time_fit(const arma::vec& y, const arma::mat& X, const std::string& objective,
-                       const arma::mat& theta0, int repeats) {
+static double time_fit(const arma::vec& y,
+                       const arma::mat& X,
+                       const std::string& objective,
+                       const arma::mat& theta0,
+                       int repeats) {
   const auto t0 = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < repeats; ++i) {
     Kriging::Parameters params;
@@ -61,7 +64,10 @@ static double time_fit(const arma::vec& y, const arma::mat& X, const std::string
 // LinearAlgebraCuda::conjugateGradient's docstring) -- with
 // use_nystrom_precond=true, cgSolve falls back to the CPU
 // LinearAlgebra::conjugateGradient regardless of LinearAlgebraCuda::enabled().
-static double time_predict(const Kriging& k, const arma::mat& Xt, int repeats, bool use_nystrom_precond = false,
+static double time_predict(const Kriging& k,
+                           const arma::mat& Xt,
+                           int repeats,
+                           bool use_nystrom_precond = false,
                            arma::uword precond_rank = 50) {
   const auto t0 = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < repeats; ++i) {
@@ -102,9 +108,11 @@ int main(int argc, char* argv[]) {
   // fit-loop's own kernel launches cluttering that trace).
   const bool skip_fit = std::getenv("BENCH_SKIP_FIT") != nullptr;
 
-  std::cout << std::setw(8) << "n" << " | " << std::setw(14) << "Cholesky (s)" << " | " << std::setw(14)
-            << "Iter CPU (s)" << " | " << std::setw(14) << "Iter CUDA (s)" << " | " << std::setw(12)
-            << "CUDA/Chol" << std::endl;
+  std::cout << std::setw(8) << "n"
+            << " | " << std::setw(14) << "Cholesky (s)"
+            << " | " << std::setw(14) << "Iter CPU (s)"
+            << " | " << std::setw(14) << "Iter CUDA (s)"
+            << " | " << std::setw(12) << "CUDA/Chol" << std::endl;
 
   for (arma::uword n : n_values) {
     if (skip_fit)
@@ -134,9 +142,13 @@ int main(int argc, char* argv[]) {
             << "predictIterative(return_stdev=true): CPU vs CUDA (unpreconditioned) vs "
                "Nystrom-preconditioned (CPU-only, no CUDA path yet)"
             << std::endl;
-  std::cout << std::setw(8) << "n" << " | " << std::setw(6) << "n_n" << " | " << std::setw(14) << "CPU (s)" << " | "
-            << std::setw(14) << "CUDA (s)" << " | " << std::setw(16) << "Nystrom-pc (s)" << " | " << std::setw(11)
-            << "CUDA/CPU" << " | " << std::setw(13) << "pc/CUDA" << std::endl;
+  std::cout << std::setw(8) << "n"
+            << " | " << std::setw(6) << "n_n"
+            << " | " << std::setw(14) << "CPU (s)"
+            << " | " << std::setw(14) << "CUDA (s)"
+            << " | " << std::setw(16) << "Nystrom-pc (s)"
+            << " | " << std::setw(11) << "CUDA/CPU"
+            << " | " << std::setw(13) << "pc/CUDA" << std::endl;
 
   for (arma::uword n : n_values) {
     arma::arma_rng::set_seed(123);
@@ -173,10 +185,11 @@ int main(int argc, char* argv[]) {
     const double t_precond = time_predict(k, Xt, repeats, /*use_nystrom_precond=*/true, /*precond_rank=*/50);
 
     std::cout << std::setw(8) << n << " | " << std::setw(6) << n_n << " | " << std::setw(14) << std::fixed
-              << std::setprecision(4) << t_cpu << " | " << std::setw(14) << std::fixed << std::setprecision(4)
-              << t_cuda << " | " << std::setw(16) << std::fixed << std::setprecision(4) << t_precond << " | "
-              << std::setw(10) << std::fixed << std::setprecision(2) << (t_cpu / t_cuda) << "x" << " | "
-              << std::setw(12) << std::fixed << std::setprecision(2) << (t_precond / t_cuda) << "x" << std::endl;
+              << std::setprecision(4) << t_cpu << " | " << std::setw(14) << std::fixed << std::setprecision(4) << t_cuda
+              << " | " << std::setw(16) << std::fixed << std::setprecision(4) << t_precond << " | " << std::setw(10)
+              << std::fixed << std::setprecision(2) << (t_cpu / t_cuda) << "x"
+              << " | " << std::setw(12) << std::fixed << std::setprecision(2) << (t_precond / t_cuda) << "x"
+              << std::endl;
   }
 
   return 0;
