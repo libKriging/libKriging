@@ -681,6 +681,7 @@ update.Kriging <- function(object, y_u, ..., X_u = NULL, noise_u = NULL, refit =
 #'
 #' outfile = tempfile("k.json") 
 #' save(k,outfile)
+#' unlink(outfile)
 save.Kriging <- function(object, filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
@@ -715,6 +716,7 @@ save.Kriging <- function(object, filename, ...) {
 #' save(k,outfile)
 #'
 #' print(load.Kriging(outfile)) 
+#' unlink(outfile)
 load.Kriging <- function(filename, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.character(filename))
