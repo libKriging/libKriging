@@ -18,10 +18,11 @@
     if (methods::isGeneric("simulate") &&
         !is.null(tryCatch(methods::getGeneric("simulate"), error = function(e) NULL)) &&
         !methods::existsMethod("simulate", "WarpKriging")) {
+      methods::setOldClass("WarpKriging")
       methods::setMethod(
         "simulate", "WarpKriging",
         function(object, nsim = 1, seed = 123, x, will_update = FALSE, ...) {
-          rlibkriging:::simulate.WarpKriging(object,
+          simulate.WarpKriging(object,
                                nsim = nsim, seed = seed, x = x,
                                will_update = will_update, ...)
         },
