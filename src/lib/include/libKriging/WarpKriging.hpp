@@ -609,14 +609,18 @@ class WarpKriging : protected KrigingImpl {
                              const std::string& objective = "LL",
                              const std::map<std::string, std::string>& parameters = {});
 
-  /// Typed-parameters overload: lets callers seed θ / warp params.
+  /// Typed-parameters overload: lets callers seed θ / warp params / noise.
+  /// @param tuning optional string knobs ("adam_lr", "max_iter_adam",
+  ///        "max_iter_bfgs"), applied before optimisation. This lets a caller
+  ///        pass both typed seeds and optimiser knobs in a single fit() call.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel,
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
-                             const Parameters& parameters);
+                             const Parameters& parameters,
+                             const std::map<std::string, std::string>& tuning = {});
 
   // -----------------------------------------------------------------------
   //  Prediction
@@ -706,6 +710,11 @@ class WarpKriging : protected KrigingImpl {
   bool is_fitted() const { return m_fitted; }
   arma::uword feature_dim() const { return m_feature_dim; }
   const std::vector<WarpSpec>& warping() const { return m_warp_specs; }
+
+  // Re-expose the fit-configuration getters from the (protected) base so that
+  // WarpKriging carries the same accessor surface as Kriging.
+  using KrigingImpl::objective;
+  using KrigingImpl::optim;
 
   /// Get warping specs as a vector of strings
   std::vector<std::string> warping_strings() const {
