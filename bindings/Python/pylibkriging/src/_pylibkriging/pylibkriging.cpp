@@ -368,8 +368,18 @@ discards n - n_max points outright.)pbdoc")
            py::arg("seed") = 123,
            py::arg("X"),
            py::arg("will_update") = false)
-      .def("update_simulate", &PyWarpKriging::update_simulate, py::arg("y_u"), py::arg("X_u"))
-      .def("update", &PyWarpKriging::update, py::arg("y_u"), py::arg("X_u"), py::arg("refit") = true)
+      .def("update_simulate",
+           &PyWarpKriging::update_simulate,
+           py::arg("y_u"),
+           py::arg("X_u"),
+           py::arg("noise_u") = py::none())
+      .def("update",
+           &PyWarpKriging::update,
+           py::arg("y_u"),
+           py::arg("X_u"),
+           py::arg("refit") = true,
+           py::arg("noise_u") = py::none())
+      .def("covMat", &PyWarpKriging::covMat, py::arg("X1"), py::arg("X2"))
       .def("summary", &PyWarpKriging::summary)
       .def("logLikelihood", &PyWarpKriging::logLikelihood)
       .def("logLikelihoodFun",
@@ -378,6 +388,10 @@ discards n - n_max points outright.)pbdoc")
            py::arg("return_grad") = false,
            py::arg("return_hess") = false)
       .def("kernel", &PyWarpKriging::kernel)
+      .def("optim", &PyWarpKriging::optim)
+      .def("objective", &PyWarpKriging::objective)
+      .def("noise", &PyWarpKriging::noise)
+      .def("warp_params", &PyWarpKriging::warp_params)
       .def("X", &PyWarpKriging::X)
       .def("centerX", &PyWarpKriging::centerX)
       .def("scaleX", &PyWarpKriging::scaleX)

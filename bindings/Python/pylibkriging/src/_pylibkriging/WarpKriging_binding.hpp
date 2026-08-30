@@ -53,9 +53,14 @@ class PyWarpKriging {
                                const py::array_t<double>& X_n,
                                const bool will_update = false);
 
-  py::array_t<double> update_simulate(const py::array_t<double>& y_u, const py::array_t<double>& X_u);
+  py::array_t<double> update_simulate(const py::array_t<double>& y_u,
+                                      const py::array_t<double>& X_u,
+                                      py::object noise_u = py::none());
 
-  void update(const py::array_t<double>& y_u, const py::array_t<double>& X_u, const bool refit = true);
+  void update(const py::array_t<double>& y_u,
+              const py::array_t<double>& X_u,
+              const bool refit = true,
+              py::object noise_u = py::none());
 
   std::string summary() const;
 
@@ -65,7 +70,13 @@ class PyWarpKriging {
                                                                                 const bool return_grad,
                                                                                 const bool return_hess);
 
+  py::array_t<double> covMat(const py::array_t<double>& X1, const py::array_t<double>& X2);
+
   std::string kernel();
+  std::string optim();
+  std::string objective();
+  py::array_t<double> noise();
+  py::array_t<double> warp_params();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

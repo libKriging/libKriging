@@ -311,3 +311,80 @@ def test_copy():
     X_test = _as_col(np.linspace(0.1, 0.9, 5))
     mean2, _, _, _, _ = k2.predict(X_test, True, False, False)
     assert np.all(np.isfinite(mean2))
+
+
+# ---------------------------------------------------------------------------
+#  New binding surface: accessors, covMat, warping recycling, numeric
+#  parameter seeds, optim="none", per-obs noise and noise_u on update.
+# ---------------------------------------------------------------------------
+def test_config_accessors():
+    X = _as_col(np.linspace(0.01, 0.99, 8))
+    y = f1d(X)
+    k = lk.WarpKriging(y, X, ["kumaraswamy"], "gauss",
+                       parameters={"max_iter_adam": "80"})
+    assert k.optim() == "BFGS+Adam"
+    assert k.objective() == "LL"
+    assert np.asarray(k.noise()).size == 0
+    wp = np.asarray(k.warp_params())
+    assert wp.size > 0 and np.all(np.isfinite(wp))
+
+
+def test_covmat_symmetric_psd():
+    X = _as_col(np.linspace(0.01, 0.99, 8))
+    y = f1d(X)
+    k = lk.WarpKriging(y, X, ["affine"], "matern3_2",
+                       parameters={"max_iter_adam": "80"})
+    A = _as_col(np.linspace(0.1, 0.9, 5))
+    C = np.asarray(k.covMat(A, A))
+    assert C.shape == (5, 5)
+    assert np.allclose(C, C.T)
+    assert np.allclose(np.diag(C), k.sigma2(), rtol=1e-5)
+
+
+def test_single_warping_spec_is_recycled():
+    rng = np.random.default_rng(1)
+    X = rng.random((10, 3))
+    y = (X ** 2).sum(axis=1)
+    k = lk.WarpKriging(y, X, ["affine"], "gauss",
+                       parameters={"max_iter_adam": "60"})
+    assert list(k.warping()) == ["affine", "affine", "affine"]
+
+
+def test_numeric_seeds_with_optim_none_freeze_hyperparameters():
+    X = _as_col(np.linspace(0.01, 0.99, 10))
+    y = f1d(X)
+    k = lk.WarpKriging(y, X, ["kumaraswamy"], "gauss",
+                       parameters={"max_iter_adam": "120"})
+    th = np.array(k.theta(), copy=True).ravel()
+    wp = np.array(k.warp_params(), copy=True).ravel()
+
+    k2 = lk.WarpKriging(y, X, ["kumaraswamy"], "gauss", optim="none",
+                        parameters={"theta": th, "warp_params": wp})
+    assert np.allclose(np.asarray(k2.theta()).ravel(), th)
+    assert np.allclose(np.asarray(k2.warp_params()).ravel(), wp)
+    A = _as_col(np.linspace(0.05, 0.95, 7))
+    m1, _, _, _, _ = k.predict(A, True, False, False)
+    m2, _, _, _, _ = k2.predict(A, True, False, False)
+    assert np.allclose(m1, m2, atol=1e-6)
+
+
+def test_per_observation_noise_and_noise_u_on_update():
+    X = _as_col(np.linspace(0.01, 0.79, 8))
+    y = f1d(X)
+    nv = np.full(8, 1e-4)
+    k = lk.WarpKriging(y, X, ["affine"], "gauss", noise=nv,
+                       parameters={"max_iter_adam": "60"})
+    assert np.allclose(np.array(k.noise(), copy=True).ravel(), nv)
+
+    Xu = _as_col([0.85, 0.92])
+    yu = f1d(Xu)
+    with pytest.raises(Exception):
+        k.copy().update(yu, Xu, refit=False)          # noise_u required
+    k.copy().update(yu, Xu, refit=False, noise_u=np.full(2, 1e-4))
+
+
+def test_noise_string_is_rejected_with_clear_message():
+    X = _as_col(np.linspace(0.01, 0.99, 8))
+    y = f1d(X)
+    with pytest.raises(Exception, match="nugget"):
+        lk.WarpKriging(y, X, ["affine"], "gauss", noise="nugget")
