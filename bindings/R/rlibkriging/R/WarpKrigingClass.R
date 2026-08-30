@@ -16,7 +16,7 @@ setOldClass("WarpKriging")
 classWarpKriging <- function(obj) {
     class(obj) <- "WarpKriging"
     # Allow `k$method(...)` as well as R-style `method(k, ...)`
-    for (f in c('as.list','copy','fit','save',
+    for (f in c('as.list','copy','fit','save','covMat',
                 'logLikelihood','logLikelihoodFun',
                 'predict','print','show','simulate','update','update_simulate',
                 'is_fitted')) {
@@ -25,9 +25,14 @@ classWarpKriging <- function(obj) {
     # Allow `k$prop()` data accessors
     for (d in c('kernel','theta','sigma2','warping','feature_dim',
                 'X','centerX','scaleX','y','centerY','scaleY',
-                'normalize','regmodel','F_','T_','M','z','beta')) {
+                'normalize','regmodel','F_','T_','M','z','beta',
+                'noise','warp_params')) {
         eval(parse(text=paste0("obj$", d, " <- function() ", d, "(obj)")))
     }
+    # Config accessors exposed as plain binding calls (no S3 generic, so that
+    # `optim` does not mask stats::optim), matching the Kriging binding style.
+    obj$optim <- function() warpKriging_optim(obj$ptr)
+    obj$objective <- function() warpKriging_objective(obj$ptr)
     obj
 }
 
@@ -230,14 +235,27 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #' @param kernel covariance kernel: "gauss", "matern3_2", "matern5_2", "exp"
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise continuous inputs?
-#' @param optim optimiser (currently only one bi-level strategy)
+#' @param optim optimiser (currently only one bi-level strategy). Use
+#'   \code{"none"} to skip optimisation and keep the values passed in
+#'   \code{parameters} (e.g. to rebuild a model with frozen hyper-parameters).
 #' @param objective "LL" (log-likelihood)
-#' @param parameters optional named list of tuning parameters,
-#'   e.g. \code{list(max_iter_adam = "300", adam_lr = "0.001",
-#'                   max_iter_bfgs = "50")}
-#' @param noise Either a numeric vector of per-observation noise variances,
-#'   or \code{"nugget"} to estimate a homogeneous nugget, or
-#'   \code{NULL} (default) for noise-free interpolation.
+#' @param parameters optional named list of initial hyper-parameter values
+#'   and/or optimiser knobs. Recognised entries:
+#'   \itemize{
+#'     \item \code{theta}: numeric vector of GP range parameters (length
+#'       \code{feature_dim}), used as the L-BFGS start point (or kept as-is
+#'       when \code{optim = "none"}).
+#'     \item \code{warp_params}: numeric vector of packed warping parameters
+#'       (see \code{warp_params()}), same convention as \code{theta}.
+#'     \item \code{noise}: numeric vector of per-observation noise variances
+#'       (length n); equivalent to passing \code{noise=}.
+#'     \item \code{adam_lr}, \code{max_iter_adam}, \code{max_iter_bfgs}:
+#'       optimiser knobs, numeric or string.
+#'   }
+#' @param noise numeric vector of per-observation noise variances (length n),
+#'   or \code{NULL} (default) for noise-free interpolation. When set, the GP
+#'   uses the NoiseKriging likelihood \eqn{diag(C) = \sigma^2 + noise_i}.
+#'   (Homogeneous-nugget \emph{estimation} is not available for WarpKriging.)
 #'
 #' @return An S3 object of class "WarpKriging".
 #'
@@ -277,6 +295,10 @@ WarpKriging <- function(y, X, warping,
     X <- as.matrix(X)
   }
 
+  # Recycle a single warp spec to one per input dimension.
+  if (length(warping) == 1L && ncol(X) > 1L)
+    warping <- rep(warping, ncol(X))
+
   ptr <- warpKriging_new(y, X, warping, kernel,
                          regmodel, normalize, optim, objective,
                          parameters, noise)
@@ -312,12 +334,14 @@ summary.WarpKriging <- function(object, ...) {
 #' @param X numeric matrix of inputs (n x d)
 #' @param regmodel trend: "constant", "linear", "quadratic"
 #' @param normalize logical; normalise continuous inputs?
-#' @param optim optimiser
+#' @param optim optimiser; \code{"none"} keeps the values from \code{parameters}
 #' @param objective "LL" (log-likelihood)
-#' @param parameters optional named list of tuning parameters
-#' @param noise Either a numeric vector of per-observation noise variances,
-#'   or \code{"nugget"} to estimate a homogeneous nugget, or
-#'   \code{NULL} (default) for noise-free interpolation.
+#' @param parameters optional named list of initial hyper-parameter values
+#'   (\code{theta}, \code{warp_params}, \code{noise}) and/or optimiser knobs
+#'   (\code{adam_lr}, \code{max_iter_adam}, \code{max_iter_bfgs}). See
+#'   \code{\link{WarpKriging}}.
+#' @param noise numeric vector of per-observation noise variances (length n),
+#'   or \code{NULL} (default) for noise-free interpolation.
 #' @param ... ignored
 #'
 #' @return No return value. WarpKriging object argument is modified.
@@ -393,27 +417,37 @@ simulate.WarpKriging <- function(object, nsim = 1, seed = 123, x,
 #' @param object WarpKriging object (must have called simulate with will_update=TRUE)
 #' @param y_u new observations
 #' @param X_u new input matrix
+#' @param noise_u optional numeric vector of per-observation noise variances
+#'   for the update points (length nrow(X_u)); required when the model was
+#'   fitted with \code{noise}.
 #' @param ... ignored
 #' @return matrix (m x nsim) of updated simulated paths
 #' @method update_simulate WarpKriging
 #' @export
-update_simulate.WarpKriging <- function(object, y_u, X_u, ...) {
+update_simulate.WarpKriging <- function(object, y_u, X_u, noise_u = NULL, ...) {
   X_u <- .encode_X_from_warping(X_u, warpKriging_warping(object$ptr))
-  warpKriging_update_simulate(object$ptr, as.numeric(y_u), X_u)
+  warpKriging_update_simulate(object$ptr, as.numeric(y_u), X_u,
+                              if (is.null(noise_u)) NULL else as.numeric(noise_u))
 }
 
 #' @title Update a WarpKriging model with new observations
 #' @param object WarpKriging object
 #' @param y_u new observations
 #' @param X_u new input matrix
-#' @param refit logical; if TRUE (default), re-optimise hyperparameters
+#' @param refit logical; if TRUE (default), re-optimise hyperparameters.
+#'   Set to FALSE for a fast incremental Cholesky update that keeps all
+#'   hyper-parameters (and warping parameters) fixed.
+#' @param noise_u optional numeric vector of per-observation noise variances
+#'   for the update points (length nrow(X_u)). Required when the model was
+#'   fitted with \code{noise}; must be omitted otherwise.
 #' @param ... ignored
 #' @method update WarpKriging
 #' @export
-update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, ...) {
+update.WarpKriging <- function(object, y_u, X_u, refit = TRUE, noise_u = NULL, ...) {
   X_u <- .encode_X_from_warping(X_u, warpKriging_warping(object$ptr))
   warpKriging_update(object$ptr, as.numeric(y_u), X_u,
-                     as.logical(refit))
+                     as.logical(refit),
+                     if (is.null(noise_u)) NULL else as.numeric(noise_u))
   invisible(object)
 }
 
@@ -715,6 +749,56 @@ beta <- function(object, ...) UseMethod("beta")
 #' @export
 beta.WarpKriging <- function(object, ...) {
   warpKriging_beta(object$ptr)
+}
+
+#' @title Get per-observation noise variances
+#' @param object A WarpKriging model object.
+#' @param ... Unused.
+#' @return numeric vector of per-observation noise variances, or a length-0
+#'   vector when the model was fitted noise-free.
+#' @export
+noise <- function(object, ...) UseMethod("noise")
+
+#' @title Get per-observation noise variances for a WarpKriging model
+#' @param object A WarpKriging model object.
+#' @param ... Unused.
+#' @method noise WarpKriging
+#' @export
+noise.WarpKriging <- function(object, ...) {
+  warpKriging_noise(object$ptr)
+}
+
+#' @title Get the packed warping parameters
+#' @param object A WarpKriging model object.
+#' @param ... Unused.
+#' @return numeric vector of packed per-dimension warping parameters, in the
+#'   optimiser layout (concatenation of each warp's own parameters). Can be
+#'   passed back through \code{parameters = list(warp_params = ...)}.
+#' @export
+warp_params <- function(object, ...) UseMethod("warp_params")
+
+#' @title Get the packed warping parameters for a WarpKriging model
+#' @param object A WarpKriging model object.
+#' @param ... Unused.
+#' @method warp_params WarpKriging
+#' @export
+warp_params.WarpKriging <- function(object, ...) {
+  warpKriging_warpParams(object$ptr)
+}
+
+#' @title Covariance matrix between two sets of points (warped kernel)
+#' @param object A WarpKriging model object.
+#' @param X1 numeric matrix (n1 x d) of input points.
+#' @param X2 numeric matrix (n2 x d) of input points.
+#' @param ... Unused.
+#' @return the n1 x n2 covariance matrix \eqn{\sigma^2 k(\Phi(X1), \Phi(X2))}.
+#' @method covMat WarpKriging
+#' @export
+covMat.WarpKriging <- function(object, X1, X2, ...) {
+  w <- warpKriging_warping(object$ptr)
+  X1 <- .encode_X_from_warping(X1, w)
+  X2 <- .encode_X_from_warping(X2, w)
+  warpKriging_covMat(object$ptr, X1, X2)
 }
 
 #' @title Deep copy of WarpKriging model

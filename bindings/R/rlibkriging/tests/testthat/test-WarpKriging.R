@@ -430,3 +430,91 @@ test_that("copy creates an independent WarpKriging model", {
   expect_true(all(is.finite(p2$mean)))
 })
 
+
+# ===========================================================================
+#  Test 19: New binding surface — accessors, covMat, warping recycling,
+#           numeric parameter seeds, optim="none", per-obs noise, noise_u.
+# ===========================================================================
+test_that("noise(), warp_params(), optim(), objective() accessors work", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
+                   parameters = list(max_iter_adam = "80"))
+
+  expect_identical(k$optim(), "BFGS+Adam")
+  expect_identical(k$objective(), "LL")
+  expect_length(noise(k), 0L)             # fitted noise-free
+  wp <- warp_params(k)
+  expect_true(length(wp) > 0 && all(is.finite(wp)))
+})
+
+test_that("covMat() returns a valid warped-kernel covariance", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 8))
+  y <- f1d(X)
+  k <- WarpKriging(y, X, warping = "affine", kernel = "matern3_2",
+                   parameters = list(max_iter_adam = "80"))
+  A <- as.matrix(seq(0.1, 0.9, length.out = 5))
+  C <- covMat(k, A, A)
+  expect_equal(dim(C), c(5, 5))
+  expect_true(all(is.finite(C)))
+  expect_lt(max(abs(C - t(C))), 1e-10)
+  expect_equal(diag(covMat(k, A, A)), rep(sigma2(k), 5), tolerance = 1e-6)
+})
+
+test_that("a single warping spec is recycled to every input dimension", {
+  set.seed(1)
+  X <- matrix(runif(30), ncol = 3)
+  y <- rowSums(X^2)
+  k <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                   parameters = list(max_iter_adam = "60"))
+  expect_length(warping(k), 3L)
+  expect_true(all(warping(k) == "affine"))
+})
+
+test_that("numeric theta/warp_params seeds + optim='none' freeze hyper-parameters", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 10))
+  y <- f1d(X)
+  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
+                   parameters = list(max_iter_adam = "120"))
+
+  th <- theta(k); wp <- warp_params(k)
+  k2 <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
+                    optim = "none",
+                    parameters = list(theta = th, warp_params = wp))
+  expect_equal(theta(k2), th, tolerance = 1e-8)
+  expect_equal(warp_params(k2), wp, tolerance = 1e-8)
+  # same GP => same predictions
+  A <- as.matrix(seq(0.05, 0.95, length.out = 7))
+  expect_equal(predict(k2, A)$mean, predict(k, A)$mean, tolerance = 1e-6)
+})
+
+test_that("per-observation noise vector is accepted and stored", {
+  X <- as.matrix(seq(0.01, 0.99, length.out = 12))
+  y <- f1d(X) + rnorm(12, sd = 0.01)
+  nv <- rep(0.01^2, 12)
+  k <- WarpKriging(y, X, warping = "affine", kernel = "matern3_2",
+                   noise = nv, parameters = list(max_iter_adam = "80"))
+  expect_equal(as.numeric(noise(k)), nv, tolerance = 1e-10)
+})
+
+test_that("update(refit=FALSE) keeps hyper-parameters fixed; noise_u round-trips", {
+  X <- as.matrix(seq(0.01, 0.79, length.out = 8))
+  y <- f1d(X)
+  k <- WarpKriging(y, X, warping = "kumaraswamy", kernel = "gauss",
+                   parameters = list(max_iter_adam = "120"))
+  th0 <- theta(k); s0 <- sigma2(k); b0 <- beta(k)
+
+  Xu <- as.matrix(c(0.85, 0.92)); yu <- f1d(Xu)
+  k2 <- copy(k)
+  update(k2, yu, Xu, refit = FALSE)
+  expect_equal(theta(k2),  th0, tolerance = 1e-10)
+  expect_equal(sigma2(k2), s0,  tolerance = 1e-10)
+  expect_equal(beta(k2),   b0,  tolerance = 1e-10)
+  expect_equal(nrow(k2$X()), nrow(k$X()) + 2L)
+
+  # a noise-fitted model requires noise_u on update
+  kn <- WarpKriging(y, X, warping = "affine", kernel = "gauss",
+                    noise = rep(1e-4, 8), parameters = list(max_iter_adam = "60"))
+  expect_error(update(copy(kn), yu, Xu, refit = FALSE), regexp = "noise")
+  expect_no_error(update(copy(kn), yu, Xu, refit = FALSE, noise_u = rep(1e-4, 2)))
+})
