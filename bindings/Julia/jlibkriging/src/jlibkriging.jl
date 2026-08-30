@@ -856,6 +856,22 @@ z(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_z, wk.ptr)
 beta(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_beta, wk.ptr)
 theta(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_theta, wk.ptr)
 sigma2(wk::WarpKriging) = ccall(dlsym(_lk(), :lk_warp_kriging_get_sigma2), Float64, (Ptr{Nothing},), wk.ptr)
+noise(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_noise, wk.ptr)
+warp_params(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_warp_params, wk.ptr)
+optim(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_optim), Cstring, (Ptr{Nothing},), wk.ptr))
+objective(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_objective), Cstring, (Ptr{Nothing},), wk.ptr))
+
+function cov_mat(wk::WarpKriging, X1::Matrix{Float64}, X2::Matrix{Float64})
+    n1, d1 = size(X1)
+    n2, d2 = size(X2)
+    @assert d1 == d2
+    out = Matrix{Float64}(undef, n1, n2)
+    ret = ccall(dlsym(_lk(), :lk_warp_kriging_cov_mat), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                wk.ptr, X1, n1, d1, X2, n2, d2, out)
+    _check_error(ret)
+    return out
+end
 
 # Deprecated aliases for WarpKriging
 for (_old, _new) in [(:get_X, :X), (:get_y, :y), (:get_theta, :theta), (:get_sigma2, :sigma2), (:get_warping, :warping)]
@@ -1389,7 +1405,7 @@ export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
 export nystrom_rank
 export X, centerX, scaleX, y, centerY, scaleY
-export F, T, M, z, beta, theta, sigma2
+export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim
 export nugget, is_nugget_estim, noise
 export is_fitted, feature_dim, warping

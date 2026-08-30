@@ -296,7 +296,22 @@ int lk_warp_kriging_get_z(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_beta(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_warp_kriging_get_sigma2(void* ptr);
+int lk_warp_kriging_get_noise(void* ptr, double* out, int* n);
+int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n);
+const char* lk_warp_kriging_get_optim(void* ptr);
+const char* lk_warp_kriging_get_objective(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
+
+/* Covariance matrix (n1 x n2) between two designs, using the warped kernel.
+ * `out` must have room for n1 * n2 doubles (column-major). */
+int lk_warp_kriging_cov_mat(void* ptr,
+                           const double* X1,
+                           int n1,
+                           int d1,
+                           const double* X2,
+                           int n2,
+                           int d2,
+                           double* out);
 
 int lk_warp_kriging_save(void* ptr, const char* filename);
 void* lk_warp_kriging_load(const char* filename);

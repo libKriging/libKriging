@@ -1189,6 +1189,62 @@ int lk_warp_kriging_get_theta(void* ptr, double* out, int* n) {
   }
   CATCH_RETURN
 }
+int lk_warp_kriging_get_noise(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<WarpKriging*>(ptr)->noise();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n) {
+  try {
+    arma::vec v = static_cast<WarpKriging*>(ptr)->warp_params();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+const char* lk_warp_kriging_get_optim(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<WarpKriging*>(ptr)->optim();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+const char* lk_warp_kriging_get_objective(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<WarpKriging*>(ptr)->objective();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+int lk_warp_kriging_cov_mat(void* ptr,
+                           const double* X1,
+                           int n1,
+                           int d1,
+                           const double* X2,
+                           int n2,
+                           int d2,
+                           double* out) {
+  try {
+    arma::mat X1_mat(const_cast<double*>(X1), n1, d1, false, true);
+    arma::mat X2_mat(const_cast<double*>(X2), n2, d2, false, true);
+    arma::mat cov = static_cast<WarpKriging*>(ptr)->covMat(X1_mat, X2_mat);
+    if (out)
+      std::memcpy(out, cov.memptr(), cov.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
 
 double lk_warp_kriging_get_sigma2(void* ptr) {
   try {
