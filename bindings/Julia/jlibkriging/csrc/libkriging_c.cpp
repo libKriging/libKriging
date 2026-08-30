@@ -1228,13 +1228,13 @@ const char* lk_warp_kriging_get_objective(void* ptr) {
   CATCH_RETURN_NULL
 }
 int lk_warp_kriging_cov_mat(void* ptr,
-                           const double* X1,
-                           int n1,
-                           int d1,
-                           const double* X2,
-                           int n2,
-                           int d2,
-                           double* out) {
+                            const double* X1,
+                            int n1,
+                            int d1,
+                            const double* X2,
+                            int n2,
+                            int d2,
+                            double* out) {
   try {
     arma::mat X1_mat(const_cast<double*>(X1), n1, d1, false, true);
     arma::mat X2_mat(const_cast<double*>(X2), n2, d2, false, true);

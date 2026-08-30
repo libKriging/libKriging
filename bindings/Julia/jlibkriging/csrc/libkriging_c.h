@@ -304,14 +304,7 @@ int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
 
 /* Covariance matrix (n1 x n2) between two designs, using the warped kernel.
  * `out` must have room for n1 * n2 doubles (column-major). */
-int lk_warp_kriging_cov_mat(void* ptr,
-                           const double* X1,
-                           int n1,
-                           int d1,
-                           const double* X2,
-                           int n2,
-                           int d2,
-                           double* out);
+int lk_warp_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double* X2, int n2, int d2, double* out);
 
 int lk_warp_kriging_save(void* ptr, const char* filename);
 void* lk_warp_kriging_load(const char* filename);
