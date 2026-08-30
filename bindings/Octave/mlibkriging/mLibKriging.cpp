@@ -253,6 +253,16 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::z(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::beta"_hash:
       return WarpKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::noise"_hash:
+      return WarpKrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::warp_params"_hash:
+      return WarpKrigingBinding::warp_params(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::optim"_hash:
+      return WarpKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::objective"_hash:
+      return WarpKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::covMat"_hash:
+      return WarpKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::theta"_hash:
       return WarpKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::sigma2"_hash:
