@@ -255,13 +255,25 @@ int lk_warp_kriging_predict(void* ptr,
 
 int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
 
-int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
+/* noise_u: per-update-point noise variances (NULL / noise_u_n = 0 when the
+ * model was fitted noise-free; required otherwise). */
+int lk_warp_kriging_update(void* ptr,
+                           const double* y_u,
+                           int n,
+                           const double* X_u,
+                           int nX,
+                           int d,
+                           int refit,
+                           const double* noise_u,
+                           int noise_u_n);
 int lk_warp_kriging_update_simulate(void* ptr,
                                     const double* y_u,
                                     int n,
                                     const double* X_u,
                                     int nX,
                                     int d,
+                                    const double* noise_u,
+                                    int noise_u_n,
                                     double* sim_out,
                                     int* nsim_out,
                                     int* m_out);
@@ -296,7 +308,15 @@ int lk_warp_kriging_get_z(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_beta(void* ptr, double* out, int* n);
 int lk_warp_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_warp_kriging_get_sigma2(void* ptr);
+int lk_warp_kriging_get_noise(void* ptr, double* out, int* n);
+int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n);
+const char* lk_warp_kriging_get_optim(void* ptr);
+const char* lk_warp_kriging_get_objective(void* ptr);
 int lk_warp_kriging_get_warping(void* ptr, char** out, int* n_warping);
+
+/* Covariance matrix (n1 x n2) between two designs, using the warped kernel.
+ * `out` must have room for n1 * n2 doubles (column-major). */
+int lk_warp_kriging_cov_mat(void* ptr, const double* X1, int n1, int d1, const double* X2, int n2, int d2, double* out);
 
 int lk_warp_kriging_save(void* ptr, const char* filename);
 void* lk_warp_kriging_load(const char* filename);

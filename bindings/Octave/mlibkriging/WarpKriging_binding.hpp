@@ -16,7 +16,12 @@ void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void noise(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void warp_params(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void centerX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void scaleX(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

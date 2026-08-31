@@ -5,42 +5,54 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include "common_binding.hpp"
 #include "tools/MxMapper.hpp"
 #include "tools/ObjectAccessor.hpp"
+#include "tools/mx_accessor.hpp"
 
 using libKriging::WarpKriging;
 
-// Convert a MATLAB struct to std::map<std::string, std::string>
-static std::map<std::string, std::string> structToStringMap(const mxArray* s) {
-  std::map<std::string, std::string> result;
+// Split a MATLAB `parameters` struct into WarpKriging's typed seeds
+// (numeric `theta` / `warp_params` / `noise` fields) and the string optimiser
+// knobs (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`). Numeric knob values
+// are stringified so both struct('max_iter_adam', 300) and '...', "300" work.
+static std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> structToWarpParameters(const mxArray* s) {
+  WarpKriging::Parameters wp;
+  std::map<std::string, std::string> tuning;
   if (s == nullptr || mxIsEmpty(s))
-    return result;
+    return {wp, tuning};
   if (!mxIsStruct(s)) {
     throw MxException(LOCATION(), "mLibKriging:badType", "parameters must be a struct");
   }
   int nfields = mxGetNumberOfFields(s);
   for (int i = 0; i < nfields; ++i) {
-    const char* fname = mxGetFieldNameByNumber(s, i);
+    const std::string fname = mxGetFieldNameByNumber(s, i);
     mxArray* val = mxGetFieldByNumber(s, 0, i);
     if (val == nullptr)
       continue;
-    char* str = mxArrayToString(val);
-    if (str == nullptr) {
-      // try numeric → string conversion
-      if (mxIsNumeric(val) && mxGetNumberOfElements(val) == 1) {
-        double dval = mxGetScalar(val);
-        result[fname] = std::to_string(dval);
+    if (fname == "theta") {
+      wp.theta = converter<arma::vec>(val, "theta");
+    } else if (fname == "warp_params") {
+      wp.warp_params = converter<arma::vec>(val, "warp_params");
+    } else if (fname == "noise") {
+      wp.noise = converter<arma::vec>(val, "noise");
+    } else if (fname == "adam_lr" || fname == "max_iter_adam" || fname == "max_iter_bfgs") {
+      char* str = mxArrayToString(val);
+      if (str != nullptr) {
+        tuning[fname] = std::string(str);
+        mxFree(str);
+      } else if (mxIsNumeric(val) && mxGetNumberOfElements(val) == 1) {
+        tuning[fname] = std::to_string(mxGetScalar(val));
       } else {
         throw MxException(
             LOCATION(), "mLibKriging:badType", "parameter value for '", fname, "' must be a string or scalar");
       }
     } else {
-      result[fname] = std::string(str);
-      mxFree(str);
+      throw MxException(LOCATION(), "mLibKriging:badType", "unknown WarpKriging parameter '", fname, "'");
     }
   }
-  return result;
+  return {wp, tuning};
 }
 
 // Convert a MATLAB cell array of strings to std::vector<std::string>
@@ -103,21 +115,15 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(9, "noise");
 
-  if (noise_opt.has_value()) {
-    auto wk = buildObject<WarpKriging>(warping, kernel);
-    auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
-    WarpKriging::Parameters wparams;
+  auto [wparams, tuning] = (nrhs > 8) ? structToWarpParameters(prhs[8])
+                                      : std::pair<WarpKriging::Parameters, std::map<std::string, std::string>>{};
+  if (noise_opt.has_value())  // explicit `noise` argument takes precedence
     wparams.noise = noise_opt.value();
-    wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams);
-    output.set(0, wk, "new object reference");
-  } else {
-    std::map<std::string, std::string> params;
-    if (nrhs > 8)
-      params = structToStringMap(prhs[8]);
-    auto wk = buildObject<WarpKriging>(
-        y_vec, X_mat, warping, kernel, Trend::fromString(regmodel), normalize, optim, objective, params);
-    output.set(0, wk, "new object reference");
-  }
+
+  auto wk = buildObject<WarpKriging>(warping, kernel);
+  auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
+  wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  output.set(0, wk, "new object reference");
 }
 
 void copy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -153,28 +159,20 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(8, "noise");
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  if (noise_opt.has_value()) {
-    WarpKriging::Parameters wparams;
+
+  auto [wparams, tuning] = (nrhs > 7) ? structToWarpParameters(prhs[7])
+                                      : std::pair<WarpKriging::Parameters, std::map<std::string, std::string>>{};
+  if (noise_opt.has_value())  // explicit `noise` argument takes precedence
     wparams.noise = noise_opt.value();
-    wk->fit(input.get<arma::vec>(1, "y vector"),
-            input.get<arma::mat>(2, "X matrix"),
-            Trend::fromString(regmodel),
-            normalize,
-            optim,
-            objective,
-            wparams);
-  } else {
-    std::map<std::string, std::string> params;
-    if (nrhs > 7)
-      params = structToStringMap(prhs[7]);
-    wk->fit(input.get<arma::vec>(1, "y vector"),
-            input.get<arma::mat>(2, "X matrix"),
-            Trend::fromString(regmodel),
-            normalize,
-            optim,
-            objective,
-            params);
-  }
+
+  wk->fit(input.get<arma::vec>(1, "y vector"),
+          input.get<arma::mat>(2, "X matrix"),
+          Trend::fromString(regmodel),
+          normalize,
+          optim,
+          objective,
+          wparams,
+          tuning);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -216,10 +214,11 @@ void update_simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{3}};
+                 RequiresArg::Range{3, 4}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
-  auto result = wk->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"));
+  auto noise_u = input.getOptional<arma::vec>(3, "noise_u").value_or(arma::vec{});
+  auto result = wk->update_simulate(input.get<arma::vec>(1, "y_u"), input.get<arma::mat>(2, "X_u"), noise_u);
   output.set(0, result, "updated simulated values");
 }
 
@@ -227,11 +226,12 @@ void update(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 4}};
+                 RequiresArg::Range{3, 5}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   bool refit = input.getOptional<bool>(3, "refit").value_or(true);
-  wk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), refit);
+  auto noise_u = input.getOptional<arma::vec>(4, "noise_u").value_or(arma::vec{});
+  wk->update(input.get<arma::vec>(1, "y vector"), input.get<arma::mat>(2, "X matrix"), refit, noise_u);
 }
 
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -414,6 +414,52 @@ void beta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   output.set(0, wk->beta(), "beta");
+}
+void noise(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->noise(), "noise variances");
+}
+void warp_params(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->warp_params(), "packed warping parameters");
+}
+void optim(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->optim(), "optimiser name");
+}
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->objective(), "objective name");
+}
+void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{3}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  auto result = wk->covMat(input.get<arma::mat>(1, "X1 matrix"), input.get<arma::mat>(2, "X2 matrix"));
+  output.set(0, result, "covariance matrix");
 }
 
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

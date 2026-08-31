@@ -270,6 +270,30 @@ classdef WarpKriging < handle
             [varargout{1:nargout}] = mLibKriging("WarpKriging::warping", obj.ref, varargin{:});
         end
 
+        function varargout = optim(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::optim", obj.ref, varargin{:});
+        end
+
+        function varargout = objective(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::objective", obj.ref, varargin{:});
+        end
+
+        function varargout = noise(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::noise", obj.ref, varargin{:});
+        end
+
+        function varargout = warp_params(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::warp_params", obj.ref, varargin{:});
+        end
+
+        function varargout = covMat(obj, varargin)
+            % covMat(obj, X1, X2)
+            ws = mLibKriging("WarpKriging::warping", obj.ref);
+            X1 = WarpKriging.encode_X_from_warping(varargin{1}, ws);
+            X2 = WarpKriging.encode_X_from_warping(varargin{2}, ws);
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::covMat", obj.ref, X1, X2);
+        end
+
         function varargout = save(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::save", obj.ref, varargin{:});
         end

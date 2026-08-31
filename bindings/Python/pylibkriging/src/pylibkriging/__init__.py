@@ -204,12 +204,28 @@ class WarpKriging:
     All other arguments and methods are forwarded to the C++ binding.
     """
 
+    @staticmethod
+    def _normalize_warping(warping, X):
+        """Accept a single spec (str) and recycle it to one per input column."""
+        if isinstance(warping, str):
+            warping = [warping]
+        else:
+            warping = list(warping)
+        try:
+            ncol = _np.asarray(X).shape[1]
+        except (IndexError, ValueError):
+            ncol = 1
+        if len(warping) == 1 and ncol > 1:
+            warping = warping * ncol
+        return warping
+
     def __init__(self, *args, warping=None, **kwargs):
         # Dispatch: (warping, kernel) or (y, X, warping, ...)
         if warping is not None and len(args) >= 2:
             # (y, X, warping=..., ...)
             y, X = args[0], args[1]
             rest = args[2:]
+            warping = self._normalize_warping(warping, X)
             if _has_string_columns(X):
                 X, warping = _encode_string_columns(X, warping)
             else:
@@ -218,11 +234,14 @@ class WarpKriging:
                 _np.asarray(y, dtype=_np.float64), X, warping, *rest, **kwargs)
         elif warping is not None:
             # (warping, kernel=...) — no data
-            self._impl = WrappedPyWarpKriging(warping, **kwargs)
+            if isinstance(warping, str):
+                warping = [warping]
+            self._impl = WrappedPyWarpKriging(list(warping), **kwargs)
         elif len(args) >= 3:
             # Positional: (y, X, warping, ...)
             y, X, warping = args[0], args[1], args[2]
             rest = args[3:]
+            warping = self._normalize_warping(warping, X)
             if _has_string_columns(X):
                 X, warping = _encode_string_columns(X, warping)
             else:
@@ -241,7 +260,7 @@ class WarpKriging:
         return X_enc
 
     def fit(self, y, X, regmodel="constant", normalize=False,
-            optim="BFGS+Adam", objective="LL", parameters=None):
+            optim="BFGS+Adam", objective="LL", parameters=None, noise=None):
         if parameters is None:
             parameters = {}
         if _has_string_columns(X):
@@ -250,7 +269,7 @@ class WarpKriging:
         else:
             X = _np.asarray(X, dtype=_np.float64)
         self._impl.fit(_np.asarray(y, dtype=_np.float64), X,
-                       regmodel, normalize, optim, objective, parameters)
+                       regmodel, normalize, optim, objective, parameters, noise)
 
     def predict(self, X, return_stdev=True, return_cov=False, return_deriv=False):
         return self._impl.predict(self._encode_X(X),
@@ -261,15 +280,20 @@ class WarpKriging:
             X = self._encode_X(X)
         return self._impl.simulate(nsim, seed, X, will_update)
 
-    def update(self, y_u, X_u, refit=True):
+    def update(self, y_u, X_u, refit=True, noise_u=None):
         self._impl.update(
             _np.asarray(y_u, dtype=_np.float64),
-            self._encode_X(X_u), refit)
+            self._encode_X(X_u), refit,
+            None if noise_u is None else _np.asarray(noise_u, dtype=_np.float64))
 
-    def update_simulate(self, y_u, X_u):
+    def update_simulate(self, y_u, X_u, noise_u=None):
         return self._impl.update_simulate(
             _np.asarray(y_u, dtype=_np.float64),
-            self._encode_X(X_u))
+            self._encode_X(X_u),
+            None if noise_u is None else _np.asarray(noise_u, dtype=_np.float64))
+
+    def covMat(self, X1, X2):
+        return self._impl.covMat(self._encode_X(X1), self._encode_X(X2))
 
     def copy(self):
         c = WarpKriging.__new__(WarpKriging)
@@ -308,3 +332,7 @@ class WarpKriging:
     def is_fitted(self): return self._impl.is_fitted()
     def feature_dim(self): return self._impl.feature_dim()
     def warping(self): return self._impl.warping()
+    def optim(self): return self._impl.optim()
+    def objective(self): return self._impl.objective()
+    def noise(self): return self._impl.noise()
+    def warp_params(self): return self._impl.warp_params()

@@ -2474,19 +2474,12 @@ void WarpKriging::fit(const arma::vec& y,
                       const std::string& optim,
                       const std::string& objective,
                       const std::map<std::string, std::string>& parameters) {
-  for (const auto& [key, val] : parameters) {
-    if (key == "adam_lr")
-      m_adam_lr = std::stod(val);
-    if (key == "max_iter_adam")
-      m_max_iter_adam = std::stoul(val);
-    if (key == "max_iter_bfgs")
-      m_max_iter_bfgs = std::stoul(val);
-  }
-  fit(y, X, regmodel, normalize, optim, objective, Parameters{});
+  fit(y, X, regmodel, normalize, optim, objective, Parameters{}, parameters);
 }
 
 // -------------------------------------------------------------------------
-//  fit()  —  typed-parameters overload (θ / warp-params seeds)
+//  fit()  —  typed-parameters overload (θ / warp-params / noise seeds),
+//            optionally combined with string optimiser knobs via `tuning`.
 // -------------------------------------------------------------------------
 void WarpKriging::fit(const arma::vec& y,
                       const arma::mat& X,
@@ -2494,7 +2487,17 @@ void WarpKriging::fit(const arma::vec& y,
                       bool normalize,
                       const std::string& optim,
                       const std::string& /*objective*/,
-                      const Parameters& parameters) {
+                      const Parameters& parameters,
+                      const std::map<std::string, std::string>& tuning) {
+  for (const auto& [key, val] : tuning) {
+    if (key == "adam_lr")
+      m_adam_lr = std::stod(val);
+    else if (key == "max_iter_adam")
+      m_max_iter_adam = std::stoul(val);
+    else if (key == "max_iter_bfgs")
+      m_max_iter_bfgs = std::stoul(val);
+  }
+
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("fit: y/X size mismatch");
 

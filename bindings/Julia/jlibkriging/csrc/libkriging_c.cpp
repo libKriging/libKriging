@@ -8,10 +8,13 @@
 #include <libKriging/WarpKriging.hpp>
 #include <libKriging/utils/ExplicitCopySpecifier.hpp>
 
+#include <cctype>
 #include <cstring>
 #include <limits>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 static thread_local std::string g_last_error;
 
@@ -747,6 +750,50 @@ static std::map<std::string, std::string> to_param_map(const char** keys, const 
   return m;
 }
 
+// Parse a whitespace/comma-separated list of doubles ("1.2 3.4" or "1.2,3.4").
+static arma::vec parse_double_list(const std::string& s) {
+  std::vector<double> v;
+  std::string tok;
+  for (char c : s) {
+    if (c == ',' || std::isspace(static_cast<unsigned char>(c))) {
+      if (!tok.empty()) {
+        v.push_back(std::stod(tok));
+        tok.clear();
+      }
+    } else {
+      tok += c;
+    }
+  }
+  if (!tok.empty())
+    v.push_back(std::stod(tok));
+  return arma::vec(v);
+}
+
+// Split the Julia key/value string pairs into WarpKriging's typed seeds
+// (numeric `theta` / `warp_params` / `noise`, passed as number-list strings)
+// and the string optimiser knobs. Consistent with the Julia binding's
+// string-map convention for WarpKriging parameters.
+static std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> to_warp_params(const char** keys,
+                                                                                             const char** vals,
+                                                                                             int n) {
+  WarpKriging::Parameters wp;
+  std::map<std::string, std::string> tuning;
+  if (keys && vals) {
+    for (int i = 0; i < n; ++i) {
+      const std::string key = keys[i];
+      if (key == "theta")
+        wp.theta = parse_double_list(vals[i]);
+      else if (key == "warp_params")
+        wp.warp_params = parse_double_list(vals[i]);
+      else if (key == "noise")
+        wp.noise = parse_double_list(vals[i]);
+      else
+        tuning[key] = vals[i];
+    }
+  }
+  return {wp, tuning};
+}
+
 // Per-object storage for strings returned to the caller
 static thread_local std::string g_wk_summary;
 static thread_local std::string g_wk_kernel;
@@ -778,15 +825,17 @@ void* lk_warp_kriging_new_fit(const double* y,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    return new WarpKriging(y_vec,
-                           X_mat,
-                           to_string_vec(warping, n_warping),
-                           kernel,
-                           Trend::fromString(regmodel ? regmodel : "constant"),
-                           normalize != 0,
-                           optim,
-                           objective,
-                           to_param_map(param_keys, param_vals, n_params));
+    auto [wparams, tuning] = to_warp_params(param_keys, param_vals, n_params);
+    auto* wk = new WarpKriging(to_string_vec(warping, n_warping), kernel);
+    wk->fit(y_vec,
+            X_mat,
+            Trend::fromString(regmodel ? regmodel : "constant"),
+            normalize != 0,
+            optim,
+            objective,
+            wparams,
+            tuning);
+    return wk;
   }
   CATCH_RETURN_NULL
 }
@@ -812,9 +861,16 @@ void* lk_warp_kriging_new_fit_noise(const double* y,
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
     auto* wk = new WarpKriging(to_string_vec(warping, n_warping), kernel);
-    WarpKriging::Parameters wparams;
+    auto [wparams, tuning] = to_warp_params(param_keys, param_vals, n_params);
     wparams.noise = arma::vec(const_cast<double*>(noise), n_noise, false, true);
-    wk->fit(y_vec, X_mat, Trend::fromString(regmodel ? regmodel : "constant"), normalize != 0, optim, objective, wparams);
+    wk->fit(y_vec,
+            X_mat,
+            Trend::fromString(regmodel ? regmodel : "constant"),
+            normalize != 0,
+            optim,
+            objective,
+            wparams,
+            tuning);
     return wk;
   }
   CATCH_RETURN_NULL
@@ -838,9 +894,16 @@ int lk_warp_kriging_fit_noise(void* ptr,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
-    WarpKriging::Parameters wparams;
+    auto [wparams, tuning] = to_warp_params(param_keys, param_vals, n_params);
     wparams.noise = arma::vec(const_cast<double*>(noise), n_noise, false, true);
-    static_cast<WarpKriging*>(ptr)->fit(y_vec, X_mat, Trend::fromString(regmodel ? regmodel : "constant"), normalize != 0, optim, objective, wparams);
+    static_cast<WarpKriging*>(ptr)->fit(y_vec,
+                                        X_mat,
+                                        Trend::fromString(regmodel ? regmodel : "constant"),
+                                        normalize != 0,
+                                        optim,
+                                        objective,
+                                        wparams,
+                                        tuning);
     return 0;
   }
   CATCH_RETURN
@@ -853,11 +916,10 @@ void lk_warp_kriging_delete(void* ptr) {
 void* lk_warp_kriging_copy(void* ptr) {
   try {
     auto* wk = static_cast<WarpKriging*>(ptr);
-    auto* clone = new WarpKriging(wk->warping_strings(), wk->kernel());
-    if (wk->is_fitted()) {
-      clone->fit(wk->y(), wk->X());
-    }
-    return clone;
+    // Deep copy (theta / warp params / noise / GP cache), NOT a re-fit.
+    if (wk->is_fitted())
+      return new WarpKriging(wk->clone_for_thread());
+    return new WarpKriging(wk->warping_strings(), wk->kernel());
   }
   CATCH_RETURN_NULL
 }
@@ -878,13 +940,15 @@ int lk_warp_kriging_fit(void* ptr,
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
+    auto [wparams, tuning] = to_warp_params(param_keys, param_vals, n_params);
     static_cast<WarpKriging*>(ptr)->fit(y_vec,
                                         X_mat,
                                         Trend::fromString(regmodel ? regmodel : "constant"),
                                         normalize != 0,
                                         optim,
                                         objective,
-                                        to_param_map(param_keys, param_vals, n_params));
+                                        wparams,
+                                        tuning);
     return 0;
   }
   CATCH_RETURN
@@ -932,11 +996,22 @@ int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, i
   CATCH_RETURN
 }
 
-int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit) {
+int lk_warp_kriging_update(void* ptr,
+                           const double* y_u,
+                           int n,
+                           const double* X_u,
+                           int nX,
+                           int d,
+                           int refit,
+                           const double* noise_u,
+                           int noise_u_n) {
   try {
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
-    static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat, refit != 0);
+    arma::vec noise_vec;
+    if (noise_u && noise_u_n > 0)
+      noise_vec = arma::vec(const_cast<double*>(noise_u), noise_u_n, false, true);
+    static_cast<WarpKriging*>(ptr)->update(y_vec, X_mat, refit != 0, noise_vec);
     return 0;
   }
   CATCH_RETURN
@@ -948,6 +1023,8 @@ int lk_warp_kriging_update_simulate(void* ptr,
                                     const double* X_u,
                                     int nX,
                                     int d,
+                                    const double* noise_u,
+                                    int noise_u_n,
                                     double* sim_out,
                                     int* nsim_out,
                                     int* m_out) {
@@ -955,7 +1032,10 @@ int lk_warp_kriging_update_simulate(void* ptr,
     auto* wk = static_cast<WarpKriging*>(ptr);
     arma::vec y_vec(const_cast<double*>(y_u), n, false, true);
     arma::mat X_mat(const_cast<double*>(X_u), nX, d, false, true);
-    arma::mat sim = wk->update_simulate(y_vec, X_mat);
+    arma::vec noise_vec;
+    if (noise_u && noise_u_n > 0)
+      noise_vec = arma::vec(const_cast<double*>(noise_u), noise_u_n, false, true);
+    arma::mat sim = wk->update_simulate(y_vec, X_mat, noise_vec);
     if (nsim_out)
       *nsim_out = static_cast<int>(sim.n_cols);
     if (m_out)
@@ -1185,6 +1265,62 @@ int lk_warp_kriging_get_theta(void* ptr, double* out, int* n) {
       *n = static_cast<int>(v.n_elem);
     if (out)
       std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+int lk_warp_kriging_get_noise(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<WarpKriging*>(ptr)->noise();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+int lk_warp_kriging_get_warp_params(void* ptr, double* out, int* n) {
+  try {
+    arma::vec v = static_cast<WarpKriging*>(ptr)->warp_params();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+const char* lk_warp_kriging_get_optim(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<WarpKriging*>(ptr)->optim();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+const char* lk_warp_kriging_get_objective(void* ptr) {
+  try {
+    static thread_local std::string buf;
+    buf = static_cast<WarpKriging*>(ptr)->objective();
+    return buf.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+int lk_warp_kriging_cov_mat(void* ptr,
+                            const double* X1,
+                            int n1,
+                            int d1,
+                            const double* X2,
+                            int n2,
+                            int d2,
+                            double* out) {
+  try {
+    arma::mat X1_mat(const_cast<double*>(X1), n1, d1, false, true);
+    arma::mat X2_mat(const_cast<double*>(X2), n2, d2, false, true);
+    arma::mat cov = static_cast<WarpKriging*>(ptr)->covMat(X1_mat, X2_mat);
+    if (out)
+      std::memcpy(out, cov.memptr(), cov.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN

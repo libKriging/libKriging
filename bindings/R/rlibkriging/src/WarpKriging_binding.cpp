@@ -3,6 +3,9 @@
 #include <RcppArmadillo.h>
 // clang-format on
 
+#include <iomanip>
+#include <sstream>
+
 #include "libKriging/Trend.hpp"
 #include "libKriging/WarpKriging.hpp"
 
@@ -10,6 +13,48 @@ using namespace libKriging;
 
 // Store C++ object via Rcpp::XPtr
 typedef Rcpp::XPtr<WarpKriging> WarpKrigingPtr;
+
+namespace {
+
+// Split an R `parameters` list into WarpKriging's typed seeds (numeric
+// `theta` / `warp_params` / `noise`) and the string optimiser knobs
+// (`adam_lr`, `max_iter_adam`, `max_iter_bfgs`). Numeric knob values are
+// accepted and stringified so that both `list(max_iter_adam = 300)` and
+// `list(max_iter_adam = "300")` work.
+std::pair<WarpKriging::Parameters, std::map<std::string, std::string>> wk_split_parameters(
+    const Rcpp::Nullable<Rcpp::List>& parameters) {
+  WarpKriging::Parameters wp;
+  std::map<std::string, std::string> tuning;
+  if (parameters.isNull())
+    return {wp, tuning};
+
+  Rcpp::List plist(parameters);
+  Rcpp::CharacterVector names = plist.names();
+  for (int i = 0; i < plist.size(); ++i) {
+    const std::string key = Rcpp::as<std::string>(names[i]);
+    if (key == "theta") {
+      wp.theta = Rcpp::as<arma::vec>(plist[i]);
+    } else if (key == "warp_params") {
+      wp.warp_params = Rcpp::as<arma::vec>(plist[i]);
+    } else if (key == "noise") {
+      wp.noise = Rcpp::as<arma::vec>(plist[i]);
+    } else if (key == "adam_lr" || key == "max_iter_adam" || key == "max_iter_bfgs") {
+      SEXP v = plist[i];
+      if (TYPEOF(v) == STRSXP) {
+        tuning[key] = Rcpp::as<std::string>(v);
+      } else {
+        std::ostringstream os;
+        os << std::setprecision(17) << Rcpp::as<double>(v);
+        tuning[key] = os.str();
+      }
+    } else {
+      Rcpp::warning("WarpKriging: ignoring unknown parameter '" + key + "'");
+    }
+  }
+  return {wp, tuning};
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 //  Constructor:  warping is a character vector of spec strings
@@ -33,20 +78,10 @@ SEXP warpKriging_new(const arma::vec& y,
 
   WarpKriging* model = new WarpKriging(warp_strs, kernel);
 
-  if (noise.isNotNull()) {
-    WarpKriging::Parameters wparams;
+  auto [wparams, tuning] = wk_split_parameters(parameters);
+  if (noise.isNotNull())  // explicit `noise=` argument takes precedence
     wparams.noise = Rcpp::as<arma::vec>(noise);
-    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
-  } else {
-    std::map<std::string, std::string> params;
-    if (parameters.isNotNull()) {
-      Rcpp::List plist(parameters);
-      Rcpp::CharacterVector names = plist.names();
-      for (int i = 0; i < plist.size(); ++i)
-        params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
-    }
-    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
-  }
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
 
   return WarpKrigingPtr(model, true);
 }
@@ -67,20 +102,10 @@ void warpKriging_fit(SEXP model_ptr,
                      Rcpp::Nullable<arma::vec> noise = R_NilValue) {
   WarpKrigingPtr model(model_ptr);
 
-  if (noise.isNotNull()) {
-    WarpKriging::Parameters wparams;
+  auto [wparams, tuning] = wk_split_parameters(parameters);
+  if (noise.isNotNull())  // explicit `noise=` argument takes precedence
     wparams.noise = Rcpp::as<arma::vec>(noise);
-    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams);
-  } else {
-    std::map<std::string, std::string> params;
-    if (parameters.isNotNull()) {
-      Rcpp::List plist(parameters);
-      Rcpp::CharacterVector names = plist.names();
-      for (int i = 0; i < plist.size(); ++i)
-        params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
-    }
-    model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
-  }
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,8 +145,13 @@ arma::mat warpKriging_simulate(SEXP model_ptr, int nsim, int seed, const arma::m
 }
 
 // [[Rcpp::export]]
-arma::mat warpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_u) {
+arma::mat warpKriging_update_simulate(SEXP model_ptr,
+                                      const arma::vec& y_u,
+                                      const arma::mat& X_u,
+                                      Rcpp::Nullable<arma::vec> noise_u = R_NilValue) {
   WarpKrigingPtr model(model_ptr);
+  if (noise_u.isNotNull())
+    return model->update_simulate(y_u, X_u, Rcpp::as<arma::vec>(noise_u));
   return model->update_simulate(y_u, X_u);
 }
 
@@ -130,9 +160,16 @@ arma::mat warpKriging_update_simulate(SEXP model_ptr, const arma::vec& y_u, cons
 // ---------------------------------------------------------------------------
 
 // [[Rcpp::export]]
-void warpKriging_update(SEXP model_ptr, const arma::vec& y_u, const arma::mat& X_u, bool refit = true) {
+void warpKriging_update(SEXP model_ptr,
+                        const arma::vec& y_u,
+                        const arma::mat& X_u,
+                        bool refit = true,
+                        Rcpp::Nullable<arma::vec> noise_u = R_NilValue) {
   WarpKrigingPtr model(model_ptr);
-  model->update(y_u, X_u, refit);
+  if (noise_u.isNotNull())
+    model->update(y_u, X_u, refit, Rcpp::as<arma::vec>(noise_u));
+  else
+    model->update(y_u, X_u, refit);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +325,36 @@ arma::vec warpKriging_z(SEXP model_ptr) {
 arma::vec warpKriging_beta(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
   return model->beta();
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_noise(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->noise();
+}
+
+// [[Rcpp::export]]
+arma::vec warpKriging_warpParams(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->warp_params();
+}
+
+// [[Rcpp::export]]
+std::string warpKriging_optim(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->optim();
+}
+
+// [[Rcpp::export]]
+std::string warpKriging_objective(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->objective();
+}
+
+// [[Rcpp::export]]
+arma::mat warpKriging_covMat(SEXP model_ptr, const arma::mat& X1, const arma::mat& X2) {
+  WarpKrigingPtr model(model_ptr);
+  return model->covMat(X1, X2);
 }
 
 // [[Rcpp::export]]
