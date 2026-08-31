@@ -916,11 +916,10 @@ void lk_warp_kriging_delete(void* ptr) {
 void* lk_warp_kriging_copy(void* ptr) {
   try {
     auto* wk = static_cast<WarpKriging*>(ptr);
-    auto* clone = new WarpKriging(wk->warping_strings(), wk->kernel());
-    if (wk->is_fitted()) {
-      clone->fit(wk->y(), wk->X());
-    }
-    return clone;
+    // Deep copy (theta / warp params / noise / GP cache), NOT a re-fit.
+    if (wk->is_fitted())
+      return new WarpKriging(wk->clone_for_thread());
+    return new WarpKriging(wk->warping_strings(), wk->kernel());
   }
   CATCH_RETURN_NULL
 }
