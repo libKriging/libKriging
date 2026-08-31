@@ -255,13 +255,25 @@ int lk_warp_kriging_predict(void* ptr,
 
 int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
 
-int lk_warp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
+/* noise_u: per-update-point noise variances (NULL / noise_u_n = 0 when the
+ * model was fitted noise-free; required otherwise). */
+int lk_warp_kriging_update(void* ptr,
+                           const double* y_u,
+                           int n,
+                           const double* X_u,
+                           int nX,
+                           int d,
+                           int refit,
+                           const double* noise_u,
+                           int noise_u_n);
 int lk_warp_kriging_update_simulate(void* ptr,
                                     const double* y_u,
                                     int n,
                                     const double* X_u,
                                     int nX,
                                     int d,
+                                    const double* noise_u,
+                                    int noise_u_n,
                                     double* sim_out,
                                     int* nsim_out,
                                     int* m_out);

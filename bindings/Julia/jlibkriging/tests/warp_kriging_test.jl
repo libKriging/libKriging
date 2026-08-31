@@ -1,4 +1,5 @@
 using Test
+using LinearAlgebra
 using jlibkriging
 
 f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 0.7)
@@ -324,5 +325,46 @@ end
         @test length(theta(k)) > 0
         @test sigma2(k) > 0.0
         @test feature_dim(k) > 0
+    end
+
+    @testset "New binding surface (libKriging #361)" begin
+        X = reshape(collect(range(0.01, 0.99; length=10)), :, 1)
+        y = [f_test(x) for x in X[:, 1]]
+        k = WarpKriging(y, X, ["kumaraswamy"], "gauss";
+                        parameters=Dict("max_iter_adam" => "120"))
+
+        # accessors
+        @test optim(k) == "BFGS+Adam"
+        @test objective(k) == "LL"
+        @test isempty(noise(k))                 # fitted noise-free
+        wp = warp_params(k)
+        @test length(wp) > 0 && all(isfinite.(wp))
+
+        # cov_mat
+        A = reshape(collect(range(0.1, 0.9; length=5)), :, 1)
+        C = cov_mat(k, A, A)
+        @test size(C) == (5, 5)
+        @test maximum(abs.(C - C')) < 1e-10
+        @test all(isapprox.(diag(C), sigma2(k); rtol=1e-6))
+
+        # numeric theta / warp_params seeds + optim="none" => frozen rebuild
+        th = collect(theta(k))
+        k2 = WarpKriging(y, X, ["kumaraswamy"], "gauss";
+                         optim="none", theta=th, warp_params=collect(wp))
+        @test isapprox(collect(theta(k2)), th; atol=1e-9)
+        @test isapprox(collect(warp_params(k2)), collect(wp); atol=1e-9)
+        m1 = predict(k, A).mean
+        m2 = predict(k2, A).mean
+        @test isapprox(m1, m2; atol=1e-6)
+
+        # per-observation noise + noise_u on update
+        nv = fill(1e-4, 10)
+        kn = WarpKriging(y, X, ["affine"], "gauss"; noise=nv,
+                         parameters=Dict("max_iter_adam" => "60"))
+        @test isapprox(collect(noise(kn)), nv; atol=1e-10)
+        Xu = reshape([0.995, 0.998], :, 1)
+        yu = [f_test(0.995), f_test(0.998)]
+        @test_throws Exception update!(Base.copy(kn), yu, Xu; refit=false)
+        update!(Base.copy(kn), yu, Xu; refit=false, noise_u=fill(1e-4, 2))
     end
 end
