@@ -349,6 +349,12 @@ class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
 
+  /// Affinely map inputs from [lo, hi] onto [0, 1] before the network. The
+  /// weight init and softplus assume O(1) inputs; on a wider scale the fit
+  /// diverges or the Cholesky fails. Default: identity on [0, 1]. No clamp,
+  /// so predictions extrapolate smoothly outside the training range.
+  void set_input_range(double lo, double hi) override;
+
  private:
   arma::uword m_H;
   // Architecture:  x → |W1| x + b1 → softplus → |W2| h + b2
@@ -357,6 +363,9 @@ class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
   arma::vec m_b1;      ///< (H)   bias layer 1
   arma::vec m_raw_W2;  ///< (H)   weights layer 2 (unconstrained)
   double m_b2 = 0.0;   ///< scalar bias layer 2
+  double m_xlo = 0.0;  ///< lower end of the variable's training range
+  double m_xhi = 1.0;  ///< upper end of the variable's training range
+  double to_scaled(double x) const;
 };
 
 /**
@@ -401,6 +410,11 @@ class LIBKRIGING_EXPORT WarpMLP final : public IWarp {
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
 
+  /// Affinely map inputs from [lo, hi] onto [0, 1] before the network (the
+  /// weight init and activations assume O(1) inputs). Default: identity on
+  /// [0, 1]. No clamp, so predictions extrapolate smoothly.
+  void set_input_range(double lo, double hi) override;
+
   /// Parse activation name from string
   static Act parse_act(const std::string& s);
 
@@ -415,8 +429,11 @@ class LIBKRIGING_EXPORT WarpMLP final : public IWarp {
 
   std::vector<arma::mat> m_W;
   std::vector<arma::vec> m_b;
+  double m_xlo = 0.0;  ///< lower end of the variable's training range
+  double m_xhi = 1.0;  ///< upper end of the variable's training range
 
   void count_params();
+  double to_scaled(double x) const;
 };
 
 /**

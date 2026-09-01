@@ -40,20 +40,22 @@ past release, see the corresponding entry on the
   of being picked at runtime (#339, libKriging/carma#1).
 
 ### Fixed
-- `WarpKriging`: the two domain-bounded per-variable warpings — `knots(k)`
-  (Xiong et al. 2007, defined on `[0, 1]`) and `kumaraswamy` (a CDF on
-  `[0, 1]`) — now map inputs from their training range onto `[0, 1]`
+- `WarpKriging`: the per-variable warpings whose parametrisation assumes an
+  `O(1)` / `[0, 1]` input — `knots(k)` (Xiong et al. 2007, on `[0, 1]`),
+  `kumaraswamy` (a CDF on `[0, 1]`), `neural_mono` and `mlp` (weight init +
+  softplus / tanh) — now map inputs from their training range onto `[0, 1]`
   internally, like `DiceKriging`'s `knots` argument. Previously inputs on any
-  other scale were all clamped to the `[0, 1]` boundary, collapsing the
-  design: the warp diverged (`knots`: `|params|` to ~15, `theta` to its
-  bound) instead of settling on the identity, and the fit was >100 nats /
-  40x–300x RMSE worse than a plain stationary GP. Models fit on `[0, 1]`
-  inputs are bit-for-bit unchanged (the default range is the identity map).
-  New regression test `test_domain_bounded_warp_input_scale_invariance` in
-  `WarpKrigingTest` (invariance across `[0,1]`, `[100,300]`, `[-50,50]`).
-  `boxcox` (needs `x > 0`) and the neural warps (`neural_mono`, `mlp`, which
-  saturate off `O(1)` inputs) remain input-scale sensitive — normalise the
-  design, or use `affine`, for those.
+  other scale collapsed onto the clamp / saturation boundary: `knots` and
+  `kumaraswamy` diverged (`knots`: `|params|` to ~15, `theta` to its bound)
+  instead of settling on the identity, the fit was >100 nats / 40x–300x RMSE
+  worse than a plain stationary GP, and `neural_mono` could fail the Cholesky
+  outright. Models fit on `[0, 1]` inputs are unchanged (the default range is
+  the identity map); `knots` / `kumaraswamy` are bit-for-bit identical, the
+  neural warps to numerical precision. New regression test
+  `test_warp_input_scale_invariance` in `WarpKrigingTest` (invariance across
+  `[0,1]`, `[100,300]`, `[-50,50]`). `boxcox` still assumes `x > 0` and is
+  left as a follow-up (its remap changes behaviour for existing positive-`x`
+  users); `mlp_joint` (all inputs jointly) is likewise unchanged.
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a

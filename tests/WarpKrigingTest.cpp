@@ -1639,22 +1639,22 @@ static void test_clone_preserves_parameters() {
 }
 
 // ==========================================================================
-//  Test: domain-bounded warps are invariant to the input scale
+//  Test: warps whose parametrisation assumes an O(1) / [0,1] input are now
+//        invariant to the input scale
 //
-//  The knots (Xiong et al. 2007) and kumaraswamy warps are both defined on
-//  the unit interval and map inputs from their training range onto [0, 1]
-//  internally. A model fit on inputs living on any native scale must behave
-//  exactly like the same model fit on those inputs squeezed into [0, 1]:
-//    - equal fitted log-likelihood,
-//    - equal predictions (after the trivial input rescale),
-//    - and never worse than a stationary ("none") warp, since the identity
-//      map is representable.
+//  knots (Xiong et al. 2007) and kumaraswamy are defined on the unit
+//  interval; neural_mono and mlp assume O(1) inputs (weight init + softplus /
+//  tanh). All four now map inputs from their training range onto [0, 1]
+//  internally, so a model fit on inputs on any native scale must behave like
+//  the same model fit on those inputs squeezed into [0, 1] — same predictive
+//  RMSE, and clearly better than a stationary ("none") warp.
 //
-//  Before the internal input-range mapping, off-[0,1] inputs all collapsed
-//  onto the clamp boundary: LL fell by >100 nats and RMSE grew ~40x-300x.
+//  Before the mapping, off-[0,1] inputs collapsed onto the clamp / saturation
+//  boundary: LL fell well below `none` and RMSE grew ~40x-300x (or the
+//  Cholesky failed outright for neural_mono).
 // ==========================================================================
-static void test_domain_bounded_warp_input_scale_invariance() {
-  std::cout << "=== Test: domain-bounded warp input-scale invariance ===" << std::endl;
+static void test_warp_input_scale_invariance() {
+  std::cout << "=== Test: warp input-scale invariance ===" << std::endl;
 
   // Truth: smooth in a piecewise-linear warped coordinate of x in [0,1].
   auto Fwarp = [](double x) {
@@ -1692,32 +1692,50 @@ static void test_domain_bounded_warp_input_scale_invariance() {
   };
   std::vector<std::pair<double, double>> RANGES = {{0.0, 1.0}, {100.0, 300.0}, {-50.0, 50.0}};
 
-  for (const std::string& spec : {std::string("knots(4)"), std::string("kumaraswamy")}) {
-    double ll_ref = std::numeric_limits<double>::quiet_NaN();
+  // Stationary baseline is scale-invariant by construction; take it once.
+  double ll_none;
+  {
+    WarpKriging none({"none"}, "matern5_2");
+    none.fit(y, scaled(u, 0.0, 1.0), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    ll_none = none.logLikelihood();
+  }
+
+  // knots / kumaraswamy: deterministic → LL and predictions must match to
+  //   numerical precision across input scales.
+  // neural_mono / mlp: multistart uses the (shared) RNG, so the exact optimum
+  //   can drift between fits; assert instead that predictive RMSE is stable
+  //   and the fit still clearly beats the stationary warp — i.e. the off-[0,1]
+  //   collapse (RMSE 0.56, LL far below `none`) is gone.
+  struct Spec {
+    std::string name;
+    bool deterministic;
+  };
+  for (const Spec& sp : {Spec{"knots(4)", true}, Spec{"kumaraswamy", true}, Spec{"neural_mono(6)", false},
+                         Spec{"mlp(6,1,tanh)", false}}) {
+    double ll_ref = std::numeric_limits<double>::quiet_NaN(), rmse_ref = 0.0;
     arma::vec pred_ref;
     for (const auto& [lo, hi] : RANGES) {
-      WarpKriging wk({spec}, "matern5_2");
+      WarpKriging wk({sp.name}, "matern5_2");
       wk.fit(y, scaled(u, lo, hi), Trend::RegressionModel::Constant, false, "BFGS", "LL");
       double ll = wk.logLikelihood();
       auto [m, s, _c, _m, _s] = wk.predict(scaled(ug, lo, hi), true, false);
+      double er = rmse(m);
 
-      WarpKriging none({"none"}, "matern5_2");
-      none.fit(y, scaled(u, lo, hi), Trend::RegressionModel::Constant, false, "BFGS", "LL");
-      double ll_none = none.logLikelihood();
-
-      std::cout << "  " << spec << "  range=[" << lo << "," << hi << "]  LL=" << ll << "  RMSE=" << rmse(m)
+      std::cout << "  " << sp.name << "  range=[" << lo << "," << hi << "]  LL=" << ll << "  RMSE=" << er
                 << "  (LL none=" << ll_none << ")" << std::endl;
 
       if (std::isnan(ll_ref)) {
         ll_ref = ll;
+        rmse_ref = er;
         pred_ref = m;
+      } else if (sp.deterministic) {
+        assert(std::abs(ll - ll_ref) < 1e-4 && "warp fit must not depend on the input scale");
+        assert(arma::norm(m - pred_ref, "inf") < 1e-3 && "warp predictions must not depend on the input scale");
       } else {
-        double ll_diff = std::abs(ll - ll_ref);
-        double pred_diff = arma::norm(m - pred_ref, "inf");
-        assert(ll_diff < 1e-4 && "domain-bounded warp: fitted LL must not depend on the input scale");
-        assert(pred_diff < 1e-3 && "domain-bounded warp: predictions must not depend on the input scale");
+        assert(std::abs(er - rmse_ref) < 5e-4 && "warp predictive RMSE must be stable across input scales");
       }
-      assert(ll > ll_none - 1.0 && "domain-bounded warp: fit should be at least as good as a stationary warp");
+      assert(ll > ll_none + 1.0 && "warp fit should clearly beat the stationary warp (no off-[0,1] collapse)");
+      assert(er < 0.02 && "warp must not collapse to the boundary on an off-[0,1] input scale");
     }
   }
 
@@ -1755,7 +1773,7 @@ int main() {
     test_none_warp_with_noise_vs_noise_kriging_ll();
     test_simulate_and_update_simulate_with_noise();
     test_clone_preserves_parameters();
-    test_domain_bounded_warp_input_scale_invariance();
+    test_warp_input_scale_invariance();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

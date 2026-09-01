@@ -653,6 +653,20 @@ void WarpNeuralMono::set_params(const arma::vec& p) {
   m_b2 = p(idx);
 }
 
+void WarpNeuralMono::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpNeuralMono::to_scaled(double x) const {
+  return (x - m_xlo) / (m_xhi - m_xlo);  // affine only, no clamp
+}
+
 arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
   arma::vec W1 = arma::exp(m_raw_W1);  // positive weights
   arma::vec W2 = arma::exp(m_raw_W2);
@@ -661,8 +675,8 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
   arma::vec out(n);
 
   for (arma::uword i = 0; i < n; ++i) {
-    // hidden = softplus(W1 * x_i + b1)
-    arma::vec z = W1 * x(i) + m_b1;
+    // hidden = softplus(W1 * u(x_i) + b1)
+    arma::vec z = W1 * to_scaled(x(i)) + m_b1;
     arma::vec h(m_H);
     for (arma::uword j = 0; j < m_H; ++j)
       h(j) = std::log1p(std::exp(z(j)));  // softplus
@@ -675,15 +689,15 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
 arma::vec WarpNeuralMono::deriv_input(double x_val) const {
   arma::vec W1 = arma::exp(m_raw_W1);
   arma::vec W2 = arma::exp(m_raw_W2);
-  // out = W2 · softplus(W1*x + b1) + b2
-  // ∂out/∂x = W2 · sigmoid(W1*x + b1) · W1 = Σ_j W2_j * σ(W1_j*x + b1_j) * W1_j
-  arma::vec z = W1 * x_val + m_b1;
+  // out = W2 · softplus(W1*u + b1) + b2,  u = (x - xlo)/(xhi - xlo)
+  // ∂out/∂x = [Σ_j W2_j · σ(W1_j*u + b1_j) · W1_j] · du/dx
+  arma::vec z = W1 * to_scaled(x_val) + m_b1;
   double deriv = 0.0;
   for (arma::uword j = 0; j < m_H; ++j) {
     double sig_j = 1.0 / (1.0 + std::exp(-z(j)));
     deriv += W2(j) * sig_j * W1(j);
   }
-  return {deriv};
+  return {deriv / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -700,7 +714,8 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
 
   for (arma::uword i = 0; i < n; ++i) {
     double dl = dL_dPhi(i, 0);
-    arma::vec z = W1 * x(i) + m_b1;
+    double ui = to_scaled(x(i));
+    arma::vec z = W1 * ui + m_b1;
     arma::vec h(m_H), sig(m_H);
     for (arma::uword j = 0; j < m_H; ++j) {
       h(j) = std::log1p(std::exp(z(j)));       // softplus
@@ -717,8 +732,8 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
     // d(h_j)/d(z_j) = sigmoid(z_j)
     arma::vec dh_dz = sig;
 
-    // d(z_j)/d(W1_j) = x_i  → d/d(raw_W1) = x_i * W1 (chain via exp)
-    g_rW1 += dl * (dout_dh % dh_dz) * x(i) % W1;
+    // d(z_j)/d(W1_j) = u_i  → d/d(raw_W1) = u_i * W1 (chain via exp)
+    g_rW1 += dl * (dout_dh % dh_dz) * ui % W1;
     g_b1 += dl * (dout_dh % dh_dz);
   }
 
@@ -735,7 +750,7 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
 
 std::string WarpNeuralMono::describe() const {
   std::ostringstream s;
-  s << "NeuralMono(H=" << m_H << ", " << n_params() << " params)";
+  s << "NeuralMono(H=" << m_H << ", " << n_params() << " params, range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -863,6 +878,20 @@ void WarpMLP::count_params() {
     m_n_params += m_W[l].n_elem + m_b[l].n_elem;
 }
 
+void WarpMLP::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpMLP::to_scaled(double x) const {
+  return (x - m_xlo) / (m_xhi - m_xlo);  // affine only, no clamp
+}
+
 // -- param serialisation ----------------------------------------------------
 
 arma::vec WarpMLP::get_params() const {
@@ -890,9 +919,9 @@ void WarpMLP::set_params(const arma::vec& p) {
 // -- forward ----------------------------------------------------------------
 
 arma::mat WarpMLP::forward(const arma::vec& x) const {
-  // x is (n × 1) scalar input; reshape to matrix for batched matmul
+  // x is (n × 1) scalar input; affinely map to [0,1] then reshape for matmul
   arma::mat H(x.n_elem, 1);
-  H.col(0) = x;
+  H.col(0) = (x - m_xlo) / (m_xhi - m_xlo);
 
   const arma::uword L = m_W.size();
   for (arma::uword l = 0; l < L; ++l) {
@@ -914,7 +943,7 @@ arma::vec WarpMLP::deriv_input(double x_val) const {
   // Forward pass for single scalar input — cache pre-activations
   std::vector<arma::mat> Z_cache(L);
   arma::mat H(1, 1);
-  H(0, 0) = x_val;
+  H(0, 0) = to_scaled(x_val);
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
     Z.each_row() += m_b[l].t();
@@ -930,7 +959,8 @@ arma::vec WarpMLP::deriv_input(double x_val) const {
     J.each_row() %= act_d;
     J = J * m_W[l].t();
   }
-  return J.col(0);  // (d_out)-vector (d_in=1 for per-dim warp)
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  return J.col(0) / (m_xhi - m_xlo);  // (d_out)-vector (d_in=1 for per-dim warp)
 }
 
 // -- backward ---------------------------------------------------------------
@@ -942,7 +972,7 @@ arma::vec WarpMLP::backward(const arma::vec& x, const arma::mat& dL_dPhi) const 
   std::vector<arma::mat> Z_cache(L);
   std::vector<arma::mat> H_cache(L + 1);
   H_cache[0] = arma::mat(x.n_elem, 1);
-  H_cache[0].col(0) = x;
+  H_cache[0].col(0) = (x - m_xlo) / (m_xhi - m_xlo);
 
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H_cache[l] * m_W[l];
@@ -991,7 +1021,7 @@ std::string WarpMLP::describe() const {
   s << "MLP(1";
   for (arma::uword l = 0; l < m_W.size(); ++l)
     s << " -> " << m_W[l].n_cols;
-  s << ", " << m_n_params << " params)";
+  s << ", " << m_n_params << " params, range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -1293,6 +1323,7 @@ std::unique_ptr<IWarp> WarpKumaraswamy::clone() const {
 std::unique_ptr<IWarp> WarpNeuralMono::clone() const {
   auto c = std::make_unique<WarpNeuralMono>(m_H);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
@@ -1304,6 +1335,7 @@ std::unique_ptr<IWarp> WarpMLP::clone() const {
     hidden_dims.push_back(m_W[i].n_cols);
   auto c = std::make_unique<WarpMLP>(hidden_dims, m_d_out, m_act);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
