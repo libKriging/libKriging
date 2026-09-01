@@ -311,7 +311,10 @@ WarpSpec WarpSpec::from_string(const std::string& str) {
       // Could be an integer K or a single float knot position
       bool is_int = true;
       for (char c : kparts[0]) {
-        if (!std::isdigit(c)) { is_int = false; break; }
+        if (!std::isdigit(c)) {
+          is_int = false;
+          break;
+        }
       }
       if (is_int) {
         arma::uword K = static_cast<arma::uword>(std::stoul(kparts[0]));
@@ -1341,8 +1344,9 @@ WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positi
 
   for (arma::uword k = 0; k < m_K + 1; ++k) {
     if (m_breaks[k] >= m_breaks[k + 1])
-      throw std::invalid_argument("WarpKnots: breakpoints must be strictly increasing; "
-                                  "knot positions must lie strictly in (0,1)");
+      throw std::invalid_argument(
+          "WarpKnots: breakpoints must be strictly increasing; "
+          "knot positions must lie strictly in (0,1)");
   }
 
   m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
@@ -2623,6 +2627,27 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> WarpKriging::p
                       /*var_scale=*/m_sigma2,
                       phi_fn,
                       jac_fn);
+}
+
+// -------------------------------------------------------------------------
+//  predictIterative()
+// -------------------------------------------------------------------------
+std::tuple<arma::vec, arma::vec> WarpKriging::predictIterative(const arma::mat& X_n,
+                                                               bool return_stdev,
+                                                               arma::uword max_iter,
+                                                               double tol,
+                                                               bool use_nystrom_precond,
+                                                               arma::uword precond_rank) const {
+  if (!m_fitted)
+    throw std::runtime_error("predictIterative: model not fitted");
+  if (!m_noise.is_empty())
+    throw std::runtime_error("predictIterative: only available without a per-point noise channel");
+  validate_discrete_columns(X_n, "predictIterative");
+
+  // Same phi_fn as predict() -- predictIterative_impl needs no jac (no derivatives).
+  auto phi_fn = [this](const arma::mat& Xnorm) -> arma::mat { return apply_warping(Xnorm); };
+
+  return predictIterative_impl(X_n, return_stdev, max_iter, tol, use_nystrom_precond, precond_rank, phi_fn);
 }
 
 // -------------------------------------------------------------------------

@@ -413,12 +413,12 @@ TEST_CASE("LLNystrom large-n smoke test", "[nystrom][kriging][intensive]") {
   CHECK(rmse < 0.3 * arma::stddev(y));
 }
 
-// Same general contract as the sibling regression test in
-// KrigingVecchiaTest.cpp: whatever objective is
+// Same general contract as the sibling regression tests in
+// KrigingIterativeTest.cpp/KrigingVecchiaTest.cpp: whatever objective is
 // given at fit time is what predict()/etc actually use afterwards, for EVERY
 // supported value of optim, not just the free-fit "BFGS" path exercised by
 // the "permanent light fit" test above. LLNystrom already honored this
-// correctly (it was the reference implementation the other was fixed to
+// correctly (it was the reference implementation the other two were fixed to
 // match); this test just makes that guarantee explicit and pins it down.
 TEST_CASE("LLNystrom honors optim=none identically to optim=BFGS", "[nystrom][kriging]") {
   arma::mat X;

@@ -531,9 +531,9 @@ class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
   std::unique_ptr<IWarp> clone() const override;
 
  private:
-  arma::uword m_K;              ///< number of interior knots
-  std::vector<double> m_breaks; ///< K+2 breakpoints (including 0 and 1)
-  arma::vec m_log_slopes;       ///< K+1 unconstrained log-slopes
+  arma::uword m_K;               ///< number of interior knots
+  std::vector<double> m_breaks;  ///< K+2 breakpoints (including 0 and 1)
+  arma::vec m_log_slopes;        ///< K+1 unconstrained log-slopes
 
   /// Find the interval index k such that m_breaks[k] <= x < m_breaks[k+1]
   arma::uword find_interval(double x) const;
@@ -631,6 +631,18 @@ class WarpKriging : protected KrigingImpl {
                                                                                               bool return_cov = false,
                                                                                               bool return_deriv
                                                                                               = false) const;
+
+  /** Predict-only alternative to `predict`, using matrix-free conjugate
+   * gradient instead of the stored O(n^2) Cholesky factor -- see
+   * `Kriging::predictIterative`'s doc for the general idea and parameters; same
+   * signature and defaults, only available when there is no per-point noise
+   * channel (`m_noise` empty). */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictIterative(const arma::mat& X_n,
+                                                                      bool return_stdev = false,
+                                                                      arma::uword max_iter = 0,
+                                                                      double tol = 1e-8,
+                                                                      bool use_nystrom_precond = false,
+                                                                      arma::uword precond_rank = 50) const;
 
   // -----------------------------------------------------------------------
   //  Simulation

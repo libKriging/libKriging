@@ -180,6 +180,24 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
+      .def("predictIterative",
+           &PyKriging::predictIterative,
+           py::arg("X"),
+           py::arg("return_stdev") = false,
+           py::arg("max_iter") = 0,
+           py::arg("tol") = 1e-8,
+           py::arg("use_nystrom_precond") = false,
+           py::arg("precond_rank") = 50,
+           R"pbdoc(Predict-only, matrix-free conjugate-gradient alternative to
+predict(): solves each prediction with CG instead of using a stored dense
+factor. return_stdev=True runs one extra CG solve PER prediction point
+(much more expensive than the mean-only path), so it defaults to False.
+use_nystrom_precond=True builds a rank-precond_rank Nystrom factor of R at
+the model's own (already-fitted) theta and uses it as a CG preconditioner
+(fewer CG iterations to reach tol on the typically ill-conditioned R, at a
+one-time setup cost); off by default. Only available for models fitted
+without a nugget/noise channel (NoiseModel.none). See docs/math/PredictIterative.md
+and docs/math/Nystrom.md.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -190,7 +208,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
 centroids snapped to the nearest real point, or a uniform random subsample),
 returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
 for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+LLVecchia/LLNystrom/LLIterative (which still use every point), this
 discards n - n_max points outright.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
@@ -231,6 +249,8 @@ discards n - n_max points outright.)pbdoc")
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
       .def("nystrom_rank", &PyKriging::nystrom_rank)
+      .def("iterative_nprobe", &PyKriging::iterative_nprobe)
+      .def("is_iterative_light", &PyKriging::is_iterative_light)
       .def("X", &PyKriging::X)
       .def("centerX", &PyKriging::centerX)
       .def("scaleX", &PyKriging::scaleX)

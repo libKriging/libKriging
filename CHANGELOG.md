@@ -21,10 +21,17 @@ past release, see the corresponding entry on the
   scikit-learn/GPy/SMT/OpenTURNS (Python) and DiceKriging/RobustGaSP (R) on
   shared randomized LHS designs (Branin, Hartmann-3/6, Borehole), reporting
   fit/predict time, RMSE, Q², NLPD; runs on a manual/monthly CI workflow (#335).
-- `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting for
-  large designs. Available in the core C++ API and all four bindings
-  (Python/R/Julia/Octave-MATLAB); see `docs/math/SubsetOfData.md` and
-  `Scalability.md` (#358).
+- `predictIterative`: matrix-free conjugate-gradient alternative to `predict()`
+  that solves each prediction on the fly instead of keeping a dense Cholesky
+  factor resident, with optional Nystrom-preconditioned CG. `LLIterative(m)`:
+  matching matrix-free fit objective (CG linear solves, stochastic Lanczos
+  quadrature log-determinant, Hutchinson trace-gradient estimator), also with
+  optional Nystrom preconditioning, plus `updateIterative` for incremental
+  refits. `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting
+  for large designs. Available in the core C++ API and all four bindings
+  (Python/R/Julia/Octave-MATLAB); see `docs/math/Iterative.md`,
+  `PredictIterative.md`, `SubsetOfData.md`, `Scalability.md` and the
+  comparison-vs-GPyTorch notebooks (#347).
 - `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
   bindings (Python already had it); worked notebooks
   `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
@@ -40,6 +47,22 @@ past release, see the corresponding entry on the
   of being picked at runtime (#339, libKriging/carma#1).
 
 ### Fixed
+- Windows: Python binding processes silently hanging (looking like ~1h CI
+  timeouts) were actually undetected heap corruption from Armadillo's
+  aligned allocator never being routed through libKriging's own allocator
+  indirection (`lkalloc`) despite the Python binding requesting it at module
+  init — re-enabled the wiring (#354, #357). The MSVC Debug CRT's blocking
+  error dialog is now also redirected to stderr so any future corruption
+  fails fast with a diagnosable message instead of hanging CI (#356).
+- Windows: Python binding CI jobs hanging on OpenMP thread-pool churn from
+  repeated parallel regions during BFGS, the same mechanism as an earlier
+  Octave Windows fix — forced `OMP_NUM_THREADS=1` for Windows Python builds
+  (#351, #352).
+- Octave Windows: flaky `predictNystrom` test assertion caused by free-BFGS
+  convergence varying across platforms/compilers — compared against a
+  deterministic fixed-theta fit instead; also fixed `optim="none"` silently
+  ignoring `LLNystrom(k)` and doing an exact fit instead of honoring the
+  requested objective (#353).
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a

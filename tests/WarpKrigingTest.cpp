@@ -216,6 +216,49 @@ static void test_continuous_kumaraswamy() {
 }
 
 // ==========================================================================
+//  Test 2b: predictIterative matches predict() (matrix-free CG vs Cholesky)
+// ==========================================================================
+static void test_predictIterative() {
+  std::cout << "=== Test 2b: predictIterative matches predict() ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 8);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  // Seed theta at a moderate value: a free Adam/BFGS fit on this small,
+  // noise-free, smooth dataset is prone to drifting toward a large-theta
+  // degenerate optimum (near-singular R, cond ~1e17) -- the same well-known
+  // GP-MLE degeneracy documented in docs/math/Nystrom.md's limitations
+  // section, unrelated to predictIterative itself. Seeding keeps the fit in a
+  // well-conditioned regime so this test isolates predictIterative's own accuracy.
+  WarpKriging model({"kumaraswamy"}, "gauss");
+  WarpKriging::Parameters params;
+  params.theta = arma::vec{0.3};
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, false, "Adam", "LL", params);
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 20);
+  arma::mat xp(20, 1);
+  xp.col(0) = x_pred;
+
+  auto [mean_ex, stdev_ex, _cov, _md, _sd] = model.predict(xp, true, false);
+  // Generous iteration budget so CG actually converges (predictIterative's formula
+  // correctness, not the default budget's accuracy, is what this checks).
+  auto [mean_cg, stdev_cg] = model.predictIterative(xp, true, /*max_iter=*/2000, /*tol=*/1e-12);
+
+  double mean_err = arma::abs(mean_cg - mean_ex).max();
+  double stdev_err = arma::abs(stdev_cg - stdev_ex).max();
+  std::cout << "  max |mean diff|  = " << mean_err << std::endl;
+  std::cout << "  max |stdev diff| = " << stdev_err << std::endl;
+  assert(mean_err < 1e-4 * arma::stddev(y));
+  assert(stdev_err < 1e-4 * arma::stddev(y));
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
 //  Test 3: categorical-only
 // ==========================================================================
 static void test_categorical_only() {
@@ -1646,6 +1689,7 @@ int main() {
   try {
     test_warp_functions();
     test_continuous_kumaraswamy();
+    test_predictIterative();
     test_categorical_only();
     test_categorical_predict_at_train();
     test_mixed();

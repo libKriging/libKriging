@@ -146,6 +146,28 @@ PyKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool retur
                          carma::mat_to_arr(y_stderr_deriv, true));
 }
 
+// --- predictIterative ---
+
+std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::predictIterative(const py::array_t<double>& X_n,
+                                                                                 bool return_stdev,
+                                                                                 int max_iter,
+                                                                                 double tol,
+                                                                                 bool use_nystrom_precond,
+                                                                                 int precond_rank) {
+  if (max_iter < 0)
+    throw std::invalid_argument("predictIterative: max_iter must be >= 0 (0 means the default, 2n)");
+  if (precond_rank < 0)
+    throw std::invalid_argument("predictIterative: precond_rank must be >= 0");
+  arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+  auto [mean, stdev] = m_internal->predictIterative(mat_X,
+                                                    return_stdev,
+                                                    static_cast<arma::uword>(max_iter),
+                                                    tol,
+                                                    use_nystrom_precond,
+                                                    static_cast<arma::uword>(precond_rank));
+  return std::make_tuple(carma::col_to_arr(mean, true), carma::col_to_arr(stdev, true));
+}
+
 // --- subsetOfData ---
 
 py::array_t<int> PyKriging::subsetOfData(const py::array_t<double>& X, int n_max, const std::string& method, int seed) {
@@ -305,6 +327,14 @@ std::string PyKriging::objective() {
 
 int PyKriging::nystrom_rank() {
   return static_cast<int>(m_internal->nystrom_rank());
+}
+
+int PyKriging::iterative_nprobe() {
+  return static_cast<int>(m_internal->iterative_nprobe());
+}
+
+bool PyKriging::is_iterative_light() {
+  return m_internal->is_iterative_light();
 }
 
 py::array_t<double> PyKriging::X() {
