@@ -253,6 +253,13 @@ class LIBKRIGING_EXPORT IWarp {
 
   /// Deep copy
   virtual std::unique_ptr<IWarp> clone() const = 0;
+
+  /// Inform the warp of the training-input range [lo, hi] of its variable.
+  /// Warps whose parametrisation is tied to a fixed reference domain
+  /// (currently only Knots, defined on [0, 1]) override this to map inputs
+  /// into that domain before warping; all other warps ignore it.
+  /// Called by WarpKriging at fit / refit / load time.
+  virtual void set_input_range(double /*lo*/, double /*hi*/) {}
 };
 
 // --- Concrete warp implementations ----------------------------------------
@@ -530,10 +537,22 @@ class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
 
+  /// Map inputs from [lo, hi] onto the reference domain [0, 1] before warping.
+  /// Xiong et al. (2007) define the piecewise-linear warp on the unit
+  /// interval; without this, inputs on their native scale are all clamped to
+  /// the [0, 1] boundary and the warp collapses. Defaults to the identity
+  /// map (lo = 0, hi = 1) so models fit on [0, 1] inputs are unaffected.
+  void set_input_range(double lo, double hi) override;
+
  private:
   arma::uword m_K;              ///< number of interior knots
   std::vector<double> m_breaks; ///< K+2 breakpoints (including 0 and 1)
   arma::vec m_log_slopes;       ///< K+1 unconstrained log-slopes
+  double m_xlo = 0.0;          ///< lower end of the variable's training range
+  double m_xhi = 1.0;          ///< upper end of the variable's training range
+
+  /// Affinely map a raw input value into the reference domain [0, 1] and clamp.
+  double to_unit(double x) const;
 
   /// Find the interval index k such that m_breaks[k] <= x < m_breaks[k+1]
   arma::uword find_interval(double x) const;
@@ -821,6 +840,10 @@ class WarpKriging : protected KrigingImpl {
   static WarpBaseKernel parse_kernel(const std::string& name);
   std::unique_ptr<IWarp> make_warp(const WarpSpec& spec) const;
   void build_warps();
+  /// Push the per-variable training-input range into each warp (see
+  /// IWarp::set_input_range). Called after normalise_data() at fit / refit
+  /// time and at the end of load_from_json().
+  void calibrate_warps();
 
   /// Validate that discrete (categorical/ordinal) columns of X contain only
   /// non-negative integers in [0, n_levels).  Called from fit/predict/simulate/update.

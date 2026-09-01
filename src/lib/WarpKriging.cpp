@@ -1317,8 +1317,14 @@ std::unique_ptr<IWarp> WarpOrdinal::clone() const {
 //  Breakpoints:  0 = t₀ < t₁ < … < t_K < t_{K+1} = 1
 //  Parameters:   log-slopes r₀, …, r_K  (unconstrained)
 //  Slopes:       sₖ = exp(rₖ) > 0
-//  Warp:         w(x) = Σ_{j<k} sⱼ·Δtⱼ  +  sₖ·(x − tₖ)
-//                for x ∈ [tₖ, t_{k+1})
+//  Input map:    u(x) = clamp((x − xlo) / (xhi − xlo), 0, 1)     [xlo,xhi] = training range
+//  Warp:         w(u) = Σ_{j<k} sⱼ·Δtⱼ  +  sₖ·(u − tₖ)
+//                for u ∈ [tₖ, t_{k+1})
+//
+//  The reference domain of the warp is the unit interval. Inputs are affinely
+//  mapped from their training range [xlo, xhi] onto [0, 1] first (set via
+//  set_input_range()); the default identity range [0, 1] keeps models fit on
+//  unit-cube inputs bit-for-bit unchanged.
 // *************************************************************************
 
 WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positions) : m_K(n_knots) {
@@ -1346,6 +1352,22 @@ WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positi
   }
 
   m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
+}
+
+void WarpKnots::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else {
+    // Degenerate / unusable range → fall back to the identity map on [0, 1].
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpKnots::to_unit(double x) const {
+  double u = (x - m_xlo) / (m_xhi - m_xlo);
+  return std::clamp(u, 0.0, 1.0);
 }
 
 arma::uword WarpKnots::find_interval(double x) const {
@@ -1380,7 +1402,7 @@ arma::mat WarpKnots::forward(const arma::vec& x) const {
 
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    double xi = to_unit(x(i));
     arma::uword k = find_interval(xi);
     out(i) = cum(k) + slopes(k) * (xi - m_breaks[k]);
   }
@@ -1388,9 +1410,10 @@ arma::mat WarpKnots::forward(const arma::vec& x) const {
 }
 
 arma::vec WarpKnots::deriv_input(double x_val) const {
-  double xi = std::clamp(x_val, m_breaks[0], m_breaks[m_K + 1]);
+  double xi = to_unit(x_val);
   arma::uword k = find_interval(xi);
-  return {std::exp(m_log_slopes(k))};
+  // Chain rule through the affine input map u(x): dΦ/dx = s_k · du/dx.
+  return {std::exp(m_log_slopes(k)) / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpKnots::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -1399,7 +1422,7 @@ arma::vec WarpKnots::backward(const arma::vec& x, const arma::mat& dL_dPhi) cons
   arma::vec grad(K1, arma::fill::zeros);
 
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    double xi = to_unit(x(i));
     double g = dL_dPhi(i, 0);
     arma::uword k = find_interval(xi);
 
@@ -1429,7 +1452,7 @@ std::string WarpKnots::describe() const {
       s << ",";
     s << std::setprecision(4) << std::exp(m_log_slopes(k));
   }
-  s << "])";
+  s << "], range=[" << std::setprecision(4) << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -1439,6 +1462,7 @@ std::unique_ptr<IWarp> WarpKnots::clone() const {
     pos[k] = m_breaks[k + 1];
   auto c = std::make_unique<WarpKnots>(m_K, pos);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
@@ -1510,6 +1534,23 @@ void WarpKriging::build_warps() {
     m_feature_dim += w->output_dim();
     m_warps.push_back(std::move(w));
     m_is_continuous.push_back(spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal);
+  }
+}
+
+// -------------------------------------------------------------------------
+//  Push the per-variable training-input range into each warp.
+//  Uses m_X_raw as it stands *after* normalise_data() (so the range is in the
+//  same coordinates the warp actually receives at fit and predict time). Only
+//  Knots reacts; every other warp's set_input_range() is a no-op.
+// -------------------------------------------------------------------------
+void WarpKriging::calibrate_warps() {
+  if (m_is_joint || m_warps.empty() || m_X_raw.n_rows == 0)
+    return;
+  for (arma::uword j = 0; j < m_warps.size() && j < m_X_raw.n_cols; ++j) {
+    if (j < m_is_continuous.size() && !m_is_continuous[j])
+      continue;
+    const arma::vec col = m_X_raw.col(j);
+    m_warps[j]->set_input_range(col.min(), col.max());
   }
 }
 
@@ -2533,6 +2574,7 @@ void WarpKriging::fit(const arma::vec& y,
     ensure_joint_warp(X.n_cols);
 
   normalise_data();
+  calibrate_warps();  // tie domain-bounded warps (Knots) to the input range
 
   // Scale noise to normalized-y space (matches NoiseKriging::fit).
   if (!m_noise.is_empty() && m_normalize) {
@@ -2793,6 +2835,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
     m_X_raw = X_all;
     m_noise = noise_all;  // empty if no model noise
     normalise_data();
+    calibrate_warps();  // re-tie Knots to the enlarged input range before re-fit
     if (!m_noise.is_empty() && m_normalize)
       m_noise /= (m_scaleY * m_scaleY);
     refresh_cache();
@@ -2949,6 +2992,9 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
     ensure_joint_warp(m_X_raw.n_cols);
   arma::vec wp = colvec_from_json(j["warp_params"]);
   unpack_warp_params(wp);
+  // Domain-bounded warps (Knots) carry no serialised state of their own; the
+  // input range is recovered deterministically from the restored m_X_raw.
+  calibrate_warps();
 }
 
 // -------------------------------------------------------------------------

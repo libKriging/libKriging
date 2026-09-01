@@ -40,6 +40,15 @@ past release, see the corresponding entry on the
   of being picked at runtime (#339, libKriging/carma#1).
 
 ### Fixed
+- `WarpKriging` `knots(k)` warping (Xiong et al. 2007) now maps inputs from
+  their training range onto its reference domain `[0, 1]` internally, like
+  `DiceKriging`'s `knots` argument. Previously inputs on any other scale were
+  all clamped to the `[0, 1]` boundary, collapsing the design: the warp
+  diverged (`|params|` to ~15, `theta` to its bound) instead of settling on
+  the identity, and the fit was tens of nats / ~40x RMSE worse than a plain
+  stationary GP. Models fit on `[0, 1]` inputs are bit-for-bit unchanged
+  (the default range is the identity map). New regression test
+  `test_knots_input_scale_invariance` in `WarpKrigingTest`.
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a
