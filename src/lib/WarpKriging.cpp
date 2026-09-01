@@ -541,12 +541,27 @@ void WarpKumaraswamy::set_params(const arma::vec& p) {
   m_log_b = p(1);
 }
 
+void WarpKumaraswamy::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpKumaraswamy::to_unit(double x) const {
+  double u = (x - m_xlo) / (m_xhi - m_xlo);
+  return std::clamp(u, 1e-10, 1.0 - 1e-10);
+}
+
 arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
   double a = std::exp(m_log_a);
   double b = std::exp(m_log_b);
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), 1e-10, 1.0 - 1e-10);
+    double xi = to_unit(x(i));
     out(i) = 1.0 - std::pow(1.0 - std::pow(xi, a), b);
   }
   return arma::mat(out);
@@ -555,10 +570,11 @@ arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
 arma::vec WarpKumaraswamy::deriv_input(double x_val) const {
   double a = std::exp(m_log_a);
   double b = std::exp(m_log_b);
-  double xi = std::clamp(x_val, 1e-10, 1.0 - 1e-10);
+  double xi = to_unit(x_val);
   double xa = std::pow(xi, a);
   double u = 1.0 - xa;
-  return {a * b * std::pow(xi, a - 1.0) * std::pow(u, b - 1.0)};
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  return {a * b * std::pow(xi, a - 1.0) * std::pow(u, b - 1.0) / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -567,7 +583,7 @@ arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi
   double grad_log_a = 0.0, grad_log_b = 0.0;
 
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), 1e-10, 1.0 - 1e-10);
+    double xi = to_unit(x(i));
     double xa = std::pow(xi, a);
     double u = 1.0 - xa;         // 1 - x^a
     double ub = std::pow(u, b);  // (1 - x^a)^b
@@ -587,7 +603,8 @@ arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi
 
 std::string WarpKumaraswamy::describe() const {
   std::ostringstream s;
-  s << "Kumaraswamy(a=" << std::exp(m_log_a) << ", b=" << std::exp(m_log_b) << ")";
+  s << "Kumaraswamy(a=" << std::exp(m_log_a) << ", b=" << std::exp(m_log_b) << ", range=[" << m_xlo << "," << m_xhi
+    << "])";
   return s.str();
 }
 
@@ -1269,6 +1286,7 @@ std::unique_ptr<IWarp> WarpBoxCox::clone() const {
 std::unique_ptr<IWarp> WarpKumaraswamy::clone() const {
   auto c = std::make_unique<WarpKumaraswamy>();
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 

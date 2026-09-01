@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 using namespace libKriging;
 
@@ -1638,26 +1639,25 @@ static void test_clone_preserves_parameters() {
 }
 
 // ==========================================================================
-//  Test: knots warp is invariant to the input scale
+//  Test: domain-bounded warps are invariant to the input scale
 //
-//  The knots warp (Xiong et al. 2007) is defined on the unit interval and
-//  used to map inputs from their training range onto [0, 1] internally. A
-//  model fit on inputs living on some wide native scale must therefore behave
+//  The knots (Xiong et al. 2007) and kumaraswamy warps are both defined on
+//  the unit interval and map inputs from their training range onto [0, 1]
+//  internally. A model fit on inputs living on any native scale must behave
 //  exactly like the same model fit on those inputs squeezed into [0, 1]:
 //    - equal fitted log-likelihood,
 //    - equal predictions (after the trivial input rescale),
 //    - and never worse than a stationary ("none") warp, since the identity
-//      map is representable (all log-slopes = 0).
+//      map is representable.
 //
-//  Before the internal input-range mapping, the raw-scale fit collapsed onto
-//  the [0, 1] clamp boundary: LL fell by hundreds of nats and RMSE by ~40x.
+//  Before the internal input-range mapping, off-[0,1] inputs all collapsed
+//  onto the clamp boundary: LL fell by >100 nats and RMSE grew ~40x-300x.
 // ==========================================================================
-static void test_knots_input_scale_invariance() {
-  std::cout << "=== Test: knots warp input-scale invariance ===" << std::endl;
+static void test_domain_bounded_warp_input_scale_invariance() {
+  std::cout << "=== Test: domain-bounded warp input-scale invariance ===" << std::endl;
 
   // Truth: smooth in a piecewise-linear warped coordinate of x in [0,1].
   auto Fwarp = [](double x) {
-    // cumulative of a density that is ~1 on [0,0.5] and ~6 on [0.5,1], normed
     double a = std::min(x, 0.5);
     double b = std::max(0.0, x - 0.5);
     double v = 1.0 * a + 6.0 * b;
@@ -1667,56 +1667,59 @@ static void test_knots_input_scale_invariance() {
   auto truth01 = [&](double x) { return std::sin(2.0 * M_PI * Fwarp(x)) + 0.3 * x; };
 
   const arma::uword n = 40;
-  arma::vec u = arma::linspace(0.0, 1.0, n);      // design in [0,1]
+  arma::vec u = arma::linspace(0.0, 1.0, n);
   arma::vec y(n);
   for (arma::uword i = 0; i < n; ++i)
     y(i) = truth01(u(i));
-
-  // Same design & response, inputs affinely blown up to [100, 300].
-  const double LO = 100.0, HI = 300.0;
-  arma::mat X01(n, 1);
-  X01.col(0) = u;
-  arma::mat Xwide(n, 1);
-  Xwide.col(0) = LO + (HI - LO) * u;
 
   arma::vec ug = arma::linspace(0.01, 0.99, 97);
   arma::vec yg(ug.n_elem);
   for (arma::uword i = 0; i < ug.n_elem; ++i)
     yg(i) = truth01(ug(i));
-  arma::mat G01(ug.n_elem, 1);
-  G01.col(0) = ug;
-  arma::mat Gwide(ug.n_elem, 1);
-  Gwide.col(0) = LO + (HI - LO) * ug;
-
   auto rmse = [&](const arma::vec& p) { return std::sqrt(arma::mean(arma::square(p - yg))); };
 
-  WarpKriging wk01({"knots(4)"}, "matern5_2");
-  wk01.fit(y, X01, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  auto scaled = [&](const arma::vec& t, double lo, double hi) {
+    arma::mat M(t.n_elem, 1);
+    M.col(0) = lo + (hi - lo) * t;
+    return M;
+  };
 
-  WarpKriging wkw({"knots(4)"}, "matern5_2");
-  wkw.fit(y, Xwide, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  // Reference fit on [0,1] inputs for each warp.
+  struct Ref {
+    std::string spec;
+    double ll;
+    arma::vec pred;
+  };
+  std::vector<std::pair<double, double>> RANGES = {{0.0, 1.0}, {100.0, 300.0}, {-50.0, 50.0}};
 
-  double ll01 = wk01.logLikelihood();
-  double llw = wkw.logLikelihood();
-  auto [m01, s01, _c1, _m1, _s1] = wk01.predict(G01, true, false);
-  auto [mw, sw, _c2, _m2, _s2] = wkw.predict(Gwide, true, false);
+  for (const std::string& spec : {std::string("knots(4)"), std::string("kumaraswamy")}) {
+    double ll_ref = std::numeric_limits<double>::quiet_NaN();
+    arma::vec pred_ref;
+    for (const auto& [lo, hi] : RANGES) {
+      WarpKriging wk({spec}, "matern5_2");
+      wk.fit(y, scaled(u, lo, hi), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double ll = wk.logLikelihood();
+      auto [m, s, _c, _m, _s] = wk.predict(scaled(ug, lo, hi), true, false);
 
-  double ll_diff = std::abs(ll01 - llw);
-  double pred_diff = arma::norm(m01 - mw, "inf");
-  std::cout << "  LL(unit)=" << ll01 << "  LL(wide)=" << llw << "  |diff|=" << ll_diff << std::endl;
-  std::cout << "  max|pred(unit) - pred(wide)|=" << pred_diff << std::endl;
-  std::cout << "  RMSE(unit)=" << rmse(m01) << "  RMSE(wide)=" << rmse(mw) << std::endl;
+      WarpKriging none({"none"}, "matern5_2");
+      none.fit(y, scaled(u, lo, hi), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double ll_none = none.logLikelihood();
 
-  assert(ll_diff < 1e-4 && "knots: fitted LL must not depend on the input scale");
-  assert(pred_diff < 1e-3 && "knots: predictions must not depend on the input scale");
+      std::cout << "  " << spec << "  range=[" << lo << "," << hi << "]  LL=" << ll << "  RMSE=" << rmse(m)
+                << "  (LL none=" << ll_none << ")" << std::endl;
 
-  // The wide-scale knots fit must not be worse than a stationary warp on the
-  // very same wide-scale data (identity warp is in the knots family).
-  WarpKriging none_wide({"none"}, "matern5_2");
-  none_wide.fit(y, Xwide, Trend::RegressionModel::Constant, false, "BFGS", "LL");
-  double ll_none = none_wide.logLikelihood();
-  std::cout << "  LL(none, wide)=" << ll_none << "  LL(knots, wide)=" << llw << std::endl;
-  assert(llw > ll_none - 1.0 && "knots: wide-scale fit should be at least as good as a stationary warp");
+      if (std::isnan(ll_ref)) {
+        ll_ref = ll;
+        pred_ref = m;
+      } else {
+        double ll_diff = std::abs(ll - ll_ref);
+        double pred_diff = arma::norm(m - pred_ref, "inf");
+        assert(ll_diff < 1e-4 && "domain-bounded warp: fitted LL must not depend on the input scale");
+        assert(pred_diff < 1e-3 && "domain-bounded warp: predictions must not depend on the input scale");
+      }
+      assert(ll > ll_none - 1.0 && "domain-bounded warp: fit should be at least as good as a stationary warp");
+    }
+  }
 
   std::cout << "  PASSED\n" << std::endl;
 }
@@ -1752,7 +1755,7 @@ int main() {
     test_none_warp_with_noise_vs_noise_kriging_ll();
     test_simulate_and_update_simulate_with_noise();
     test_clone_preserves_parameters();
-    test_knots_input_scale_invariance();
+    test_domain_bounded_warp_input_scale_invariance();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"

@@ -324,8 +324,16 @@ class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
 
+  /// Map inputs from [lo, hi] onto (0, 1) before the Kumaraswamy CDF, which is
+  /// a distribution on the unit interval; without this, inputs on any other
+  /// scale are all clamped to the (0, 1) boundary. Default: identity on [0, 1].
+  void set_input_range(double lo, double hi) override;
+
  private:
   double m_log_a = 0.0, m_log_b = 0.0;  ///< a,b > 0 via exp()
+  double m_xlo = 0.0;                   ///< lower end of the variable's training range
+  double m_xhi = 1.0;                   ///< upper end of the variable's training range
+  double to_unit(double x) const;
 };
 
 class LIBKRIGING_EXPORT WarpNeuralMono final : public IWarp {
