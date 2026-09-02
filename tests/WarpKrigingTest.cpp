@@ -1710,8 +1710,11 @@ static void test_warp_input_scale_invariance() {
     std::string name;
     bool deterministic;
   };
-  for (const Spec& sp : {Spec{"knots(4)", true}, Spec{"kumaraswamy", true}, Spec{"boxcox", true},
-                         Spec{"neural_mono(6)", false}, Spec{"mlp(6,1,tanh)", false},
+  for (const Spec& sp : {Spec{"knots(4)", true},
+                         Spec{"kumaraswamy", true},
+                         Spec{"boxcox", true},
+                         Spec{"neural_mono(6)", false},
+                         Spec{"mlp(6,1,tanh)", false},
                          Spec{"mlp_joint(6,1,tanh)", false}}) {
     double ll_ref = std::numeric_limits<double>::quiet_NaN(), rmse_ref = 0.0;
     arma::vec pred_ref;
@@ -1887,8 +1890,10 @@ static void test_warp_input_scale_hardening() {
       std::vector<std::string> specs;
       bool deterministic;
     };
-    for (const Case& c : {Case{{"knots(3)", "kumaraswamy"}, true}, Case{{"boxcox", "boxcox"}, true},
-                          Case{{"knots(3)", "boxcox"}, true}, Case{{"mlp_joint(4,1,tanh)"}, false}}) {
+    for (const Case& c : {Case{{"knots(3)", "kumaraswamy"}, true},
+                          Case{{"boxcox", "boxcox"}, true},
+                          Case{{"knots(3)", "boxcox"}, true},
+                          Case{{"mlp_joint(4,1,tanh)"}, false}}) {
       WarpKriging a(c.specs, "matern5_2");
       a.fit(y2, U, Trend::RegressionModel::Constant, false, "BFGS", "LL");
       double rmse_unit = std::sqrt(arma::mean(arma::square(std::get<0>(a.predict(Ug, false, false)) - yg2)));

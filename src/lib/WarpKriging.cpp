@@ -1670,21 +1670,40 @@ void WarpKriging::build_warps() {
 //  ranges go in one shot.
 // -------------------------------------------------------------------------
 void WarpKriging::calibrate_warps() {
-  if (m_X_raw.n_rows == 0)
+  calibrate_warps(m_X_raw);
+}
+
+void WarpKriging::calibrate_warps(const arma::mat& Xn) {
+  if (Xn.n_rows == 0)
     return;
   if (m_is_joint) {
     if (m_joint_warp)
-      m_joint_warp->set_input_ranges(arma::min(m_X_raw, 0), arma::max(m_X_raw, 0));
+      m_joint_warp->set_input_ranges(arma::min(Xn, 0), arma::max(Xn, 0));
     return;
   }
   if (m_warps.empty())
     return;
-  for (arma::uword j = 0; j < m_warps.size() && j < m_X_raw.n_cols; ++j) {
+  for (arma::uword j = 0; j < m_warps.size() && j < Xn.n_cols; ++j) {
     if (j < m_is_continuous.size() && !m_is_continuous[j])
       continue;
-    const arma::vec col = m_X_raw.col(j);
+    const arma::vec col = Xn.col(j);
     m_warps[j]->set_input_range(col.min(), col.max());
   }
+}
+
+void WarpKriging::recalibrate_warps(const arma::mat& X_ref) {
+  if (!m_fitted || X_ref.n_rows == 0)
+    return;
+  // Bring X_ref into the same (normalised) coordinates the warps see, then
+  // recompute Φ / Cholesky / β̂ / σ̂² on the new warp so training-point
+  // predictions stay consistent. Used by NestedKriging so every warped
+  // submodel shares one input-range calibration alongside the shared
+  // (theta, warp_params).
+  arma::mat Xn = X_ref;
+  Xn.each_row() -= m_centerX;
+  Xn.each_row() /= m_scaleX;
+  calibrate_warps(Xn);
+  refresh_cache();
 }
 
 void WarpKriging::ensure_joint_warp(arma::uword d_in) {

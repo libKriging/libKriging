@@ -592,8 +592,8 @@ class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
   arma::uword m_K;              ///< number of interior knots
   std::vector<double> m_breaks; ///< K+2 breakpoints (including 0 and 1)
   arma::vec m_log_slopes;       ///< K+1 unconstrained log-slopes
-  double m_xlo = 0.0;          ///< lower end of the variable's training range
-  double m_xhi = 1.0;          ///< upper end of the variable's training range
+  double m_xlo = 0.0;           ///< lower end of the variable's training range
+  double m_xhi = 1.0;           ///< upper end of the variable's training range
 
   /// Affinely map a raw input value into the reference domain [0, 1] and clamp.
   double to_unit(double x) const;
@@ -810,6 +810,13 @@ class WarpKriging : protected KrigingImpl {
   /// Deep copy — preserves all fitted parameters (theta, sigma2, beta, warp params)
   LIBKRIGING_EXPORT WarpKriging clone_for_thread() const;
 
+  /// Re-tie the (domain-bounded / neural) warps to the per-column range of an
+  /// external reference design and rebuild the GP cache at the fixed
+  /// hyper-parameters. NestedKriging calls this so all warped submodels, which
+  /// already share (theta, warp_params), also share one input-range
+  /// calibration and thus one Φ map. No-op on an unfitted model.
+  LIBKRIGING_EXPORT void recalibrate_warps(const arma::mat& X_ref);
+
  private:
   // ---- data ---------------------------------------------------------------
   // m_y, m_X (Φ-space), m_dX (pairwise diffs), m_centerX/Y, m_scaleX/Y,
@@ -886,8 +893,10 @@ class WarpKriging : protected KrigingImpl {
   void build_warps();
   /// Push the per-variable training-input range into each warp (see
   /// IWarp::set_input_range). Called after normalise_data() at fit / refit
-  /// time and at the end of load_from_json().
+  /// time and at the end of load_from_json(). The overload calibrates from an
+  /// explicit (already-normalised) design instead of m_X_raw.
   void calibrate_warps();
+  void calibrate_warps(const arma::mat& Xn);
 
   /// Validate that discrete (categorical/ordinal) columns of X contain only
   /// non-negative integers in [0, n_levels).  Called from fit/predict/simulate/update.
