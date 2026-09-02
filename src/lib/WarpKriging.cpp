@@ -494,6 +494,11 @@ void WarpBoxCox::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
     m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
   } else {
     m_xlo = 0.0;
     m_xhi = 1.0;
@@ -566,6 +571,11 @@ void WarpKumaraswamy::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
     m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
   } else {
     m_xlo = 0.0;
     m_xhi = 1.0;
@@ -678,6 +688,11 @@ void WarpNeuralMono::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
     m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
   } else {
     m_xlo = 0.0;
     m_xhi = 1.0;
@@ -903,6 +918,11 @@ void WarpMLP::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
     m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
   } else {
     m_xlo = 0.0;
     m_xhi = 1.0;
@@ -1116,6 +1136,10 @@ void WarpMLPJoint::set_input_ranges(const arma::rowvec& lo, const arma::rowvec& 
     if (std::isfinite(lo(j)) && std::isfinite(hi(j)) && (hi(j) - lo(j)) > 1e-12) {
       m_xlo(j) = lo(j);
       m_xhi(j) = hi(j);
+    } else if (std::isfinite(lo(j))) {
+      // Degenerate column → centre it in the reference interval.
+      m_xlo(j) = lo(j) - 0.5;
+      m_xhi(j) = lo(j) + 0.5;
     }
   }
 }
@@ -1454,8 +1478,12 @@ void WarpKnots::set_input_range(double lo, double hi) {
   if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
     m_xlo = lo;
     m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
   } else {
-    // Degenerate / unusable range → fall back to the identity map on [0, 1].
     m_xlo = 0.0;
     m_xhi = 1.0;
   }
