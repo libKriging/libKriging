@@ -469,9 +469,16 @@ std::string WarpAffine::describe() const {
 }
 
 // *************************************************************************
-//  WarpBoxCox  :  w(x) = (x^λ − 1)/λ   (λ via unconstrained param)
-//  If λ ≈ 0 → log(x)
+//  WarpBoxCox  :  w(x) = (u^λ − 1)/λ   (λ via unconstrained param)
+//  If λ ≈ 0 → log(u).   u(x) = max((x − xlo)/(xhi − xlo), 1e-10) maps the
+//  training range onto (0, 1], so the transform stays well-posed for x <= 0
+//  and for inputs far from O(1). The default range [0, 1] reproduces the
+//  historical  u = max(x, 1e-10)  exactly.
 // *************************************************************************
+
+namespace {
+constexpr double kBoxCoxFloor = 1e-10;
+}
 
 WarpBoxCox::WarpBoxCox() : m_lambda(1.0) {}
 
@@ -483,10 +490,29 @@ void WarpBoxCox::set_params(const arma::vec& p) {
   m_lambda = p(0);
 }
 
+void WarpBoxCox::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpBoxCox::to_pos(double x) const {
+  return std::max((x - m_xlo) / (m_xhi - m_xlo), kBoxCoxFloor);
+}
+
 arma::mat WarpBoxCox::forward(const arma::vec& x) const {
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::max(x(i), 1e-10);  // ensure positivity
+    double xi = to_pos(x(i));
     if (std::abs(m_lambda) < 1e-6)
       out(i) = std::log(xi);
     else
@@ -496,17 +522,17 @@ arma::mat WarpBoxCox::forward(const arma::vec& x) const {
 }
 
 arma::vec WarpBoxCox::deriv_input(double x_val) const {
-  double xi = std::max(x_val, 1e-10);
-  if (std::abs(m_lambda) < 1e-6)
-    return {1.0 / xi};
-  return {std::pow(xi, m_lambda - 1.0)};
+  double xi = to_pos(x_val);
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  double dphi_du = (std::abs(m_lambda) < 1e-6) ? 1.0 / xi : std::pow(xi, m_lambda - 1.0);
+  return {dphi_du / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
-  // dw/dλ = [x^λ (λ ln(x) − 1) + 1] / λ²  (for λ ≠ 0)
+  // dw/dλ = [u^λ (λ ln(u) − 1) + 1] / λ²  (for λ ≠ 0)
   double grad_lambda = 0.0;
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::max(x(i), 1e-10);
+    double xi = to_pos(x(i));
     double dw_dl;
     if (std::abs(m_lambda) < 1e-6) {
       dw_dl = 0.5 * std::log(xi) * std::log(xi);  // Taylor approx
@@ -521,7 +547,7 @@ arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) con
 
 std::string WarpBoxCox::describe() const {
   std::ostringstream s;
-  s << "BoxCox(lambda=" << m_lambda << ")";
+  s << "BoxCox(lambda=" << m_lambda << ", range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -541,12 +567,32 @@ void WarpKumaraswamy::set_params(const arma::vec& p) {
   m_log_b = p(1);
 }
 
+void WarpKumaraswamy::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpKumaraswamy::to_unit(double x) const {
+  double u = (x - m_xlo) / (m_xhi - m_xlo);
+  return std::clamp(u, 1e-10, 1.0 - 1e-10);
+}
+
 arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
   double a = std::exp(m_log_a);
   double b = std::exp(m_log_b);
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), 1e-10, 1.0 - 1e-10);
+    double xi = to_unit(x(i));
     out(i) = 1.0 - std::pow(1.0 - std::pow(xi, a), b);
   }
   return arma::mat(out);
@@ -555,10 +601,11 @@ arma::mat WarpKumaraswamy::forward(const arma::vec& x) const {
 arma::vec WarpKumaraswamy::deriv_input(double x_val) const {
   double a = std::exp(m_log_a);
   double b = std::exp(m_log_b);
-  double xi = std::clamp(x_val, 1e-10, 1.0 - 1e-10);
+  double xi = to_unit(x_val);
   double xa = std::pow(xi, a);
   double u = 1.0 - xa;
-  return {a * b * std::pow(xi, a - 1.0) * std::pow(u, b - 1.0)};
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  return {a * b * std::pow(xi, a - 1.0) * std::pow(u, b - 1.0) / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -567,7 +614,7 @@ arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi
   double grad_log_a = 0.0, grad_log_b = 0.0;
 
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), 1e-10, 1.0 - 1e-10);
+    double xi = to_unit(x(i));
     double xa = std::pow(xi, a);
     double u = 1.0 - xa;         // 1 - x^a
     double ub = std::pow(u, b);  // (1 - x^a)^b
@@ -587,7 +634,8 @@ arma::vec WarpKumaraswamy::backward(const arma::vec& x, const arma::mat& dL_dPhi
 
 std::string WarpKumaraswamy::describe() const {
   std::ostringstream s;
-  s << "Kumaraswamy(a=" << std::exp(m_log_a) << ", b=" << std::exp(m_log_b) << ")";
+  s << "Kumaraswamy(a=" << std::exp(m_log_a) << ", b=" << std::exp(m_log_b) << ", range=[" << m_xlo << "," << m_xhi
+    << "])";
   return s.str();
 }
 
@@ -636,6 +684,25 @@ void WarpNeuralMono::set_params(const arma::vec& p) {
   m_b2 = p(idx);
 }
 
+void WarpNeuralMono::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpNeuralMono::to_scaled(double x) const {
+  return (x - m_xlo) / (m_xhi - m_xlo);  // affine only, no clamp
+}
+
 arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
   arma::vec W1 = arma::exp(m_raw_W1);  // positive weights
   arma::vec W2 = arma::exp(m_raw_W2);
@@ -644,8 +711,8 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
   arma::vec out(n);
 
   for (arma::uword i = 0; i < n; ++i) {
-    // hidden = softplus(W1 * x_i + b1)
-    arma::vec z = W1 * x(i) + m_b1;
+    // hidden = softplus(W1 * u(x_i) + b1)
+    arma::vec z = W1 * to_scaled(x(i)) + m_b1;
     arma::vec h(m_H);
     for (arma::uword j = 0; j < m_H; ++j)
       h(j) = std::log1p(std::exp(z(j)));  // softplus
@@ -658,15 +725,15 @@ arma::mat WarpNeuralMono::forward(const arma::vec& x) const {
 arma::vec WarpNeuralMono::deriv_input(double x_val) const {
   arma::vec W1 = arma::exp(m_raw_W1);
   arma::vec W2 = arma::exp(m_raw_W2);
-  // out = W2 · softplus(W1*x + b1) + b2
-  // ∂out/∂x = W2 · sigmoid(W1*x + b1) · W1 = Σ_j W2_j * σ(W1_j*x + b1_j) * W1_j
-  arma::vec z = W1 * x_val + m_b1;
+  // out = W2 · softplus(W1*u + b1) + b2,  u = (x - xlo)/(xhi - xlo)
+  // ∂out/∂x = [Σ_j W2_j · σ(W1_j*u + b1_j) · W1_j] · du/dx
+  arma::vec z = W1 * to_scaled(x_val) + m_b1;
   double deriv = 0.0;
   for (arma::uword j = 0; j < m_H; ++j) {
     double sig_j = 1.0 / (1.0 + std::exp(-z(j)));
     deriv += W2(j) * sig_j * W1(j);
   }
-  return {deriv};
+  return {deriv / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -683,7 +750,8 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
 
   for (arma::uword i = 0; i < n; ++i) {
     double dl = dL_dPhi(i, 0);
-    arma::vec z = W1 * x(i) + m_b1;
+    double ui = to_scaled(x(i));
+    arma::vec z = W1 * ui + m_b1;
     arma::vec h(m_H), sig(m_H);
     for (arma::uword j = 0; j < m_H; ++j) {
       h(j) = std::log1p(std::exp(z(j)));       // softplus
@@ -700,8 +768,8 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
     // d(h_j)/d(z_j) = sigmoid(z_j)
     arma::vec dh_dz = sig;
 
-    // d(z_j)/d(W1_j) = x_i  → d/d(raw_W1) = x_i * W1 (chain via exp)
-    g_rW1 += dl * (dout_dh % dh_dz) * x(i) % W1;
+    // d(z_j)/d(W1_j) = u_i  → d/d(raw_W1) = u_i * W1 (chain via exp)
+    g_rW1 += dl * (dout_dh % dh_dz) * ui % W1;
     g_b1 += dl * (dout_dh % dh_dz);
   }
 
@@ -718,7 +786,7 @@ arma::vec WarpNeuralMono::backward(const arma::vec& x, const arma::mat& dL_dPhi)
 
 std::string WarpNeuralMono::describe() const {
   std::ostringstream s;
-  s << "NeuralMono(H=" << m_H << ", " << n_params() << " params)";
+  s << "NeuralMono(H=" << m_H << ", " << n_params() << " params, range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -846,6 +914,25 @@ void WarpMLP::count_params() {
     m_n_params += m_W[l].n_elem + m_b[l].n_elem;
 }
 
+void WarpMLP::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpMLP::to_scaled(double x) const {
+  return (x - m_xlo) / (m_xhi - m_xlo);  // affine only, no clamp
+}
+
 // -- param serialisation ----------------------------------------------------
 
 arma::vec WarpMLP::get_params() const {
@@ -873,9 +960,9 @@ void WarpMLP::set_params(const arma::vec& p) {
 // -- forward ----------------------------------------------------------------
 
 arma::mat WarpMLP::forward(const arma::vec& x) const {
-  // x is (n × 1) scalar input; reshape to matrix for batched matmul
+  // x is (n × 1) scalar input; affinely map to [0,1] then reshape for matmul
   arma::mat H(x.n_elem, 1);
-  H.col(0) = x;
+  H.col(0) = (x - m_xlo) / (m_xhi - m_xlo);
 
   const arma::uword L = m_W.size();
   for (arma::uword l = 0; l < L; ++l) {
@@ -897,7 +984,7 @@ arma::vec WarpMLP::deriv_input(double x_val) const {
   // Forward pass for single scalar input — cache pre-activations
   std::vector<arma::mat> Z_cache(L);
   arma::mat H(1, 1);
-  H(0, 0) = x_val;
+  H(0, 0) = to_scaled(x_val);
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
     Z.each_row() += m_b[l].t();
@@ -913,7 +1000,8 @@ arma::vec WarpMLP::deriv_input(double x_val) const {
     J.each_row() %= act_d;
     J = J * m_W[l].t();
   }
-  return J.col(0);  // (d_out)-vector (d_in=1 for per-dim warp)
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  return J.col(0) / (m_xhi - m_xlo);  // (d_out)-vector (d_in=1 for per-dim warp)
 }
 
 // -- backward ---------------------------------------------------------------
@@ -925,7 +1013,7 @@ arma::vec WarpMLP::backward(const arma::vec& x, const arma::mat& dL_dPhi) const 
   std::vector<arma::mat> Z_cache(L);
   std::vector<arma::mat> H_cache(L + 1);
   H_cache[0] = arma::mat(x.n_elem, 1);
-  H_cache[0].col(0) = x;
+  H_cache[0].col(0) = (x - m_xlo) / (m_xhi - m_xlo);
 
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H_cache[l] * m_W[l];
@@ -974,7 +1062,7 @@ std::string WarpMLP::describe() const {
   s << "MLP(1";
   for (arma::uword l = 0; l < m_W.size(); ++l)
     s << " -> " << m_W[l].n_cols;
-  s << ", " << m_n_params << " params)";
+  s << ", " << m_n_params << " params, range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -993,6 +1081,9 @@ WarpMLPJoint::WarpMLPJoint(arma::uword d_in,
     : m_d_in(d_in), m_d_out(d_out), m_act(activation) {
   if (hidden_dims.empty())
     throw std::invalid_argument("WarpMLPJoint: need at least one hidden layer");
+
+  m_xlo = arma::zeros<arma::rowvec>(d_in);  // default: identity input map on [0, 1]
+  m_xhi = arma::ones<arma::rowvec>(d_in);
 
   arma::arma_rng::set_seed(seed);
 
@@ -1038,8 +1129,30 @@ void WarpMLPJoint::set_params(const arma::vec& p) {
   }
 }
 
+void WarpMLPJoint::set_input_ranges(const arma::rowvec& lo, const arma::rowvec& hi) {
+  m_xlo = arma::zeros<arma::rowvec>(m_d_in);
+  m_xhi = arma::ones<arma::rowvec>(m_d_in);
+  for (arma::uword j = 0; j < m_d_in && j < lo.n_elem && j < hi.n_elem; ++j) {
+    if (std::isfinite(lo(j)) && std::isfinite(hi(j)) && (hi(j) - lo(j)) > 1e-12) {
+      m_xlo(j) = lo(j);
+      m_xhi(j) = hi(j);
+    } else if (std::isfinite(lo(j))) {
+      // Degenerate column → centre it in the reference interval.
+      m_xlo(j) = lo(j) - 0.5;
+      m_xhi(j) = lo(j) + 0.5;
+    }
+  }
+}
+
+arma::mat WarpMLPJoint::to_scaled(const arma::mat& X) const {
+  arma::mat U = X;
+  U.each_row() -= m_xlo;
+  U.each_row() /= (m_xhi - m_xlo);  // affine only, no clamp
+  return U;
+}
+
 arma::mat WarpMLPJoint::forward(const arma::mat& X) const {
-  arma::mat H = X;  // (n × d_in)
+  arma::mat H = to_scaled(X);  // (n × d_in)
   const arma::uword L = m_W.size();
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
@@ -1055,10 +1168,10 @@ arma::mat WarpMLPJoint::forward(const arma::mat& X) const {
 arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) const {
   const arma::uword L = m_W.size();
 
-  // Forward with caching
+  // Forward with caching (H_cache[0] = affinely scaled inputs)
   std::vector<arma::mat> Z_cache(L);
   std::vector<arma::mat> H_cache(L + 1);
-  H_cache[0] = X;
+  H_cache[0] = to_scaled(X);
 
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H_cache[l] * m_W[l];
@@ -1070,7 +1183,8 @@ arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) c
       H_cache[l + 1] = Z;
   }
 
-  // Backward
+  // Backward — param gradients only (∂/∂W, ∂/∂b), unaffected by the fixed
+  // affine input map beyond the scaled values already in H_cache[0].
   arma::vec grad(m_n_params, arma::fill::zeros);
   arma::mat delta = dL_dPhi;
   arma::uword idx = m_n_params;
@@ -1097,10 +1211,9 @@ arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) c
 arma::mat WarpMLPJoint::jacobian_input(const arma::rowvec& x) const {
   const arma::uword L = m_W.size();
 
-  // Forward pass — cache pre-activations Z_l for derivative computation
+  // Forward pass on the affinely scaled input — cache pre-activations Z_l
   std::vector<arma::mat> Z_cache(L);
-  arma::mat H(1, x.n_elem);
-  H.row(0) = x;
+  arma::mat H = to_scaled(arma::mat(x));
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
     Z.each_row() += m_b[l].t();
@@ -1116,6 +1229,8 @@ arma::mat WarpMLPJoint::jacobian_input(const arma::rowvec& x) const {
     J.each_row() %= act_d;
     J = J * m_W[l].t();
   }
+  // Chain rule through the per-column affine input map: ∂Φ/∂x_j = (∂Φ/∂u_j) / (xhi_j - xlo_j)
+  J.each_row() /= (m_xhi - m_xlo);
   return J;  // (d_out × d_in)
 }
 
@@ -1124,7 +1239,7 @@ std::string WarpMLPJoint::describe() const {
   s << "MLPJoint(" << m_d_in;
   for (arma::uword l = 0; l < m_W.size(); ++l)
     s << " -> " << m_W[l].n_cols;
-  s << ", " << m_n_params << " params)";
+  s << ", " << m_n_params << " params, ranges=[" << m_xlo << "; " << m_xhi << "])";
   return s.str();
 }
 
@@ -1263,18 +1378,21 @@ std::unique_ptr<IWarp> WarpAffine::clone() const {
 std::unique_ptr<IWarp> WarpBoxCox::clone() const {
   auto c = std::make_unique<WarpBoxCox>();
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
 std::unique_ptr<IWarp> WarpKumaraswamy::clone() const {
   auto c = std::make_unique<WarpKumaraswamy>();
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
 std::unique_ptr<IWarp> WarpNeuralMono::clone() const {
   auto c = std::make_unique<WarpNeuralMono>(m_H);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
@@ -1286,6 +1404,7 @@ std::unique_ptr<IWarp> WarpMLP::clone() const {
     hidden_dims.push_back(m_W[i].n_cols);
   auto c = std::make_unique<WarpMLP>(hidden_dims, m_d_out, m_act);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
@@ -1296,6 +1415,7 @@ std::unique_ptr<WarpMLPJoint> WarpMLPJoint::clone() const {
     hidden_dims.push_back(m_W[i].n_cols);
   auto c = std::make_unique<WarpMLPJoint>(m_d_in, hidden_dims, m_d_out, m_act);
   c->set_params(get_params());
+  c->set_input_ranges(m_xlo, m_xhi);
   return c;
 }
 
@@ -1317,8 +1437,14 @@ std::unique_ptr<IWarp> WarpOrdinal::clone() const {
 //  Breakpoints:  0 = t₀ < t₁ < … < t_K < t_{K+1} = 1
 //  Parameters:   log-slopes r₀, …, r_K  (unconstrained)
 //  Slopes:       sₖ = exp(rₖ) > 0
-//  Warp:         w(x) = Σ_{j<k} sⱼ·Δtⱼ  +  sₖ·(x − tₖ)
-//                for x ∈ [tₖ, t_{k+1})
+//  Input map:    u(x) = clamp((x − xlo) / (xhi − xlo), 0, 1)     [xlo,xhi] = training range
+//  Warp:         w(u) = Σ_{j<k} sⱼ·Δtⱼ  +  sₖ·(u − tₖ)
+//                for u ∈ [tₖ, t_{k+1})
+//
+//  The reference domain of the warp is the unit interval. Inputs are affinely
+//  mapped from their training range [xlo, xhi] onto [0, 1] first (set via
+//  set_input_range()); the default identity range [0, 1] keeps models fit on
+//  unit-cube inputs bit-for-bit unchanged.
 // *************************************************************************
 
 WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positions) : m_K(n_knots) {
@@ -1346,6 +1472,26 @@ WarpKnots::WarpKnots(arma::uword n_knots, const std::vector<double>& knot_positi
   }
 
   m_log_slopes = arma::zeros<arma::vec>(m_K + 1);
+}
+
+void WarpKnots::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else if (std::isfinite(lo)) {
+    // Degenerate span (e.g. a constant column): centre it in the reference
+    // interval so the warp sees a well-posed mid-domain value.
+    m_xlo = lo - 0.5;
+    m_xhi = lo + 0.5;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpKnots::to_unit(double x) const {
+  double u = (x - m_xlo) / (m_xhi - m_xlo);
+  return std::clamp(u, 0.0, 1.0);
 }
 
 arma::uword WarpKnots::find_interval(double x) const {
@@ -1380,7 +1526,7 @@ arma::mat WarpKnots::forward(const arma::vec& x) const {
 
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    double xi = to_unit(x(i));
     arma::uword k = find_interval(xi);
     out(i) = cum(k) + slopes(k) * (xi - m_breaks[k]);
   }
@@ -1388,9 +1534,10 @@ arma::mat WarpKnots::forward(const arma::vec& x) const {
 }
 
 arma::vec WarpKnots::deriv_input(double x_val) const {
-  double xi = std::clamp(x_val, m_breaks[0], m_breaks[m_K + 1]);
+  double xi = to_unit(x_val);
   arma::uword k = find_interval(xi);
-  return {std::exp(m_log_slopes(k))};
+  // Chain rule through the affine input map u(x): dΦ/dx = s_k · du/dx.
+  return {std::exp(m_log_slopes(k)) / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpKnots::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
@@ -1399,7 +1546,7 @@ arma::vec WarpKnots::backward(const arma::vec& x, const arma::mat& dL_dPhi) cons
   arma::vec grad(K1, arma::fill::zeros);
 
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::clamp(x(i), m_breaks[0], m_breaks[m_K + 1]);
+    double xi = to_unit(x(i));
     double g = dL_dPhi(i, 0);
     arma::uword k = find_interval(xi);
 
@@ -1429,7 +1576,7 @@ std::string WarpKnots::describe() const {
       s << ",";
     s << std::setprecision(4) << std::exp(m_log_slopes(k));
   }
-  s << "])";
+  s << "], range=[" << std::setprecision(4) << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -1439,6 +1586,7 @@ std::unique_ptr<IWarp> WarpKnots::clone() const {
     pos[k] = m_breaks[k + 1];
   auto c = std::make_unique<WarpKnots>(m_K, pos);
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
@@ -1511,6 +1659,51 @@ void WarpKriging::build_warps() {
     m_warps.push_back(std::move(w));
     m_is_continuous.push_back(spec.type != WarpType::Embedding && spec.type != WarpType::Ordinal);
   }
+}
+
+// -------------------------------------------------------------------------
+//  Push the per-variable training-input range into each warp.
+//  Uses m_X_raw as it stands *after* normalise_data() (so the range is in the
+//  same coordinates the warp actually receives at fit and predict time).
+//  Continuous per-variable warps that have no reference domain (none, affine)
+//  ignore it; discrete columns are skipped. For the joint MLP the per-column
+//  ranges go in one shot.
+// -------------------------------------------------------------------------
+void WarpKriging::calibrate_warps() {
+  calibrate_warps(m_X_raw);
+}
+
+void WarpKriging::calibrate_warps(const arma::mat& Xn) {
+  if (Xn.n_rows == 0)
+    return;
+  if (m_is_joint) {
+    if (m_joint_warp)
+      m_joint_warp->set_input_ranges(arma::min(Xn, 0), arma::max(Xn, 0));
+    return;
+  }
+  if (m_warps.empty())
+    return;
+  for (arma::uword j = 0; j < m_warps.size() && j < Xn.n_cols; ++j) {
+    if (j < m_is_continuous.size() && !m_is_continuous[j])
+      continue;
+    const arma::vec col = Xn.col(j);
+    m_warps[j]->set_input_range(col.min(), col.max());
+  }
+}
+
+void WarpKriging::recalibrate_warps(const arma::mat& X_ref) {
+  if (!m_fitted || X_ref.n_rows == 0)
+    return;
+  // Bring X_ref into the same (normalised) coordinates the warps see, then
+  // recompute Φ / Cholesky / β̂ / σ̂² on the new warp so training-point
+  // predictions stay consistent. Used by NestedKriging so every warped
+  // submodel shares one input-range calibration alongside the shared
+  // (theta, warp_params).
+  arma::mat Xn = X_ref;
+  Xn.each_row() -= m_centerX;
+  Xn.each_row() /= m_scaleX;
+  calibrate_warps(Xn);
+  refresh_cache();
 }
 
 void WarpKriging::ensure_joint_warp(arma::uword d_in) {
@@ -2533,6 +2726,7 @@ void WarpKriging::fit(const arma::vec& y,
     ensure_joint_warp(X.n_cols);
 
   normalise_data();
+  calibrate_warps();  // tie domain-bounded warps (Knots) to the input range
 
   // Scale noise to normalized-y space (matches NoiseKriging::fit).
   if (!m_noise.is_empty() && m_normalize) {
@@ -2793,6 +2987,7 @@ void WarpKriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool 
     m_X_raw = X_all;
     m_noise = noise_all;  // empty if no model noise
     normalise_data();
+    calibrate_warps();  // re-tie Knots to the enlarged input range before re-fit
     if (!m_noise.is_empty() && m_normalize)
       m_noise /= (m_scaleY * m_scaleY);
     refresh_cache();
@@ -2949,6 +3144,9 @@ void WarpKriging::load_from_json(const nlohmann::json& j) {
     ensure_joint_warp(m_X_raw.n_cols);
   arma::vec wp = colvec_from_json(j["warp_params"]);
   unpack_warp_params(wp);
+  // Domain-bounded warps (Knots) carry no serialised state of their own; the
+  // input range is recovered deterministically from the restored m_X_raw.
+  calibrate_warps();
 }
 
 // -------------------------------------------------------------------------

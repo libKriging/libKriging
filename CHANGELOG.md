@@ -40,6 +40,27 @@ past release, see the corresponding entry on the
   of being picked at runtime (#339, libKriging/carma#1).
 
 ### Fixed
+- `WarpKriging`: every per-variable warping whose parametrisation assumes an
+  `O(1)` / `[0, 1]` input — `knots(k)` (Xiong et al. 2007, on `[0, 1]`),
+  `kumaraswamy` (a CDF on `[0, 1]`), `boxcox` (needs `x > 0`), `neural_mono`,
+  `mlp` and `mlp_joint` (weight init + softplus / tanh) — now maps inputs
+  from their training range onto `[0, 1]` internally, like `DiceKriging`'s
+  `knots` argument. Previously inputs on any other scale collapsed onto the clamp /
+  positivity / saturation boundary: `knots` and `kumaraswamy` diverged
+  (`knots`: `|params|` to ~15, `theta` to its bound) instead of settling on
+  the identity, the fit was >100 nats / 40x–300x RMSE worse than a plain
+  stationary GP, and `neural_mono` could fail the Cholesky outright. The
+  default range `[0, 1]` is the identity map, so a model fit on inputs
+  spanning exactly `[0, 1]` is unchanged (`knots` / `kumaraswamy` / `boxcox`
+  bit-for-bit; the neural warps to numerical precision); for any other range
+  the transform is calibrated to the data range. New regression tests
+  `test_warp_input_scale_invariance` / `test_warp_input_scale_hardening` in
+  `WarpKrigingTest` (invariance across `[0,1]`, `[100,300]`, `[-50,50]`; plus
+  save/load, `update()`, multistart, 2-D, `normalize=true` and derivative
+  checks). `NestedKriging`'s warped submodels, which share one
+  `(theta, warp_params)`, now also share one input-range calibration
+  (`WarpKriging::recalibrate_warps()`), so the aggregate still interpolates
+  the design.
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a

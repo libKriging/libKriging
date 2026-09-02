@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 using namespace libKriging;
 
@@ -1637,6 +1638,340 @@ static void test_clone_preserves_parameters() {
   std::cout << "  PASSED\n" << std::endl;
 }
 
+// ==========================================================================
+//  Test: warps whose parametrisation assumes an O(1) / [0,1] input are now
+//        invariant to the input scale
+//
+//  knots (Xiong et al. 2007) and kumaraswamy are defined on the unit
+//  interval; neural_mono and mlp assume O(1) inputs (weight init + softplus /
+//  tanh). All four now map inputs from their training range onto [0, 1]
+//  internally, so a model fit on inputs on any native scale must behave like
+//  the same model fit on those inputs squeezed into [0, 1] — same predictive
+//  RMSE, and clearly better than a stationary ("none") warp.
+//
+//  Before the mapping, off-[0,1] inputs collapsed onto the clamp / saturation
+//  boundary: LL fell well below `none` and RMSE grew ~40x-300x (or the
+//  Cholesky failed outright for neural_mono).
+// ==========================================================================
+static void test_warp_input_scale_invariance() {
+  std::cout << "=== Test: warp input-scale invariance ===" << std::endl;
+
+  // Truth: smooth in a piecewise-linear warped coordinate of x in [0,1].
+  auto Fwarp = [](double x) {
+    double a = std::min(x, 0.5);
+    double b = std::max(0.0, x - 0.5);
+    double v = 1.0 * a + 6.0 * b;
+    double vmax = 1.0 * 0.5 + 6.0 * 0.5;
+    return v / vmax;
+  };
+  auto truth01 = [&](double x) { return std::sin(2.0 * M_PI * Fwarp(x)) + 0.3 * x; };
+
+  const arma::uword n = 40;
+  arma::vec u = arma::linspace(0.0, 1.0, n);
+  arma::vec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = truth01(u(i));
+
+  arma::vec ug = arma::linspace(0.01, 0.99, 97);
+  arma::vec yg(ug.n_elem);
+  for (arma::uword i = 0; i < ug.n_elem; ++i)
+    yg(i) = truth01(ug(i));
+  auto rmse = [&](const arma::vec& p) { return std::sqrt(arma::mean(arma::square(p - yg))); };
+
+  auto scaled = [&](const arma::vec& t, double lo, double hi) {
+    arma::mat M(t.n_elem, 1);
+    M.col(0) = lo + (hi - lo) * t;
+    return M;
+  };
+
+  // Reference fit on [0,1] inputs for each warp.
+  struct Ref {
+    std::string spec;
+    double ll;
+    arma::vec pred;
+  };
+  std::vector<std::pair<double, double>> RANGES = {{0.0, 1.0}, {100.0, 300.0}, {-50.0, 50.0}};
+
+  // Stationary baseline is scale-invariant by construction; take it once.
+  double ll_none;
+  {
+    WarpKriging none({"none"}, "matern5_2");
+    none.fit(y, scaled(u, 0.0, 1.0), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    ll_none = none.logLikelihood();
+  }
+
+  // knots / kumaraswamy: deterministic → LL and predictions must match to
+  //   numerical precision across input scales.
+  // neural_mono / mlp: multistart uses the (shared) RNG, so the exact optimum
+  //   can drift between fits; assert instead that predictive RMSE is stable
+  //   and the fit still clearly beats the stationary warp — i.e. the off-[0,1]
+  //   collapse (RMSE 0.56, LL far below `none`) is gone.
+  struct Spec {
+    std::string name;
+    bool deterministic;
+  };
+  for (const Spec& sp : {Spec{"knots(4)", true},
+                         Spec{"kumaraswamy", true},
+                         Spec{"boxcox", true},
+                         Spec{"neural_mono(6)", false},
+                         Spec{"mlp(6,1,tanh)", false},
+                         Spec{"mlp_joint(6,1,tanh)", false}}) {
+    double ll_ref = std::numeric_limits<double>::quiet_NaN(), rmse_ref = 0.0;
+    arma::vec pred_ref;
+    for (const auto& [lo, hi] : RANGES) {
+      WarpKriging wk({sp.name}, "matern5_2");
+      wk.fit(y, scaled(u, lo, hi), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double ll = wk.logLikelihood();
+      auto [m, s, _c, _m, _s] = wk.predict(scaled(ug, lo, hi), true, false);
+      double er = rmse(m);
+
+      std::cout << "  " << sp.name << "  range=[" << lo << "," << hi << "]  LL=" << ll << "  RMSE=" << er
+                << "  (LL none=" << ll_none << ")" << std::endl;
+
+      if (std::isnan(ll_ref)) {
+        ll_ref = ll;
+        rmse_ref = er;
+        pred_ref = m;
+      } else if (sp.deterministic) {
+        assert(std::abs(ll - ll_ref) < 1e-4 && "warp fit must not depend on the input scale");
+        assert(arma::norm(m - pred_ref, "inf") < 1e-3 && "warp predictions must not depend on the input scale");
+      } else {
+        assert(std::abs(er - rmse_ref) < 5e-4 && "warp predictive RMSE must be stable across input scales");
+      }
+      assert(ll > ll_none + 1.0 && "warp fit should clearly beat the stationary warp (no off-[0,1] collapse)");
+      assert(er < 0.02 && "warp must not collapse to the boundary on an off-[0,1] input scale");
+    }
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
+//  Test: input-range mapping survives every stateful path
+//
+//  The training range is not serialised — it is recomputed from m_X_raw by
+//  WarpKriging::calibrate_warps() after normalise_data() in fit()/update() and
+//  at the end of load_from_json(). These checks pin that down on inputs that
+//  are NOT in [0, 1], for every affected warp:
+//    A. save → load round-trip reproduces predictions exactly;
+//    B. update(refit = true) keeps the warp working (calibrated to the grown
+//       range) — still beats a stationary warp;
+//    C. update(refit = false) fast path stays finite and interpolating;
+//    D. clone_for_thread() / parallel multistart carry the range;
+//    E. 2-D with heterogeneous per-column ranges matches the [0,1]^2 fit;
+//    F. normalize = true still yields a scale-invariant fit;
+//    G. a constant (degenerate-range) column falls back to identity, no NaN;
+//    H. predict(return_deriv) matches finite differences in physical units
+//       (the 1/(xhi - xlo) chain-rule factor).
+// ==========================================================================
+static void test_warp_input_scale_hardening() {
+  std::cout << "=== Test: warp input-range mapping hardening ===" << std::endl;
+
+  auto Fwarp = [](double x) {
+    double a = std::min(x, 0.5), b = std::max(0.0, x - 0.5);
+    return (1.0 * a + 6.0 * b) / (0.5 + 3.0);
+  };
+  auto truth01 = [&](double x) { return std::sin(2.0 * M_PI * Fwarp(x)) + 0.3 * x; };
+
+  const arma::uword n = 32;
+  arma::vec u = arma::linspace(0.0, 1.0, n);
+  arma::vec y(n);
+  for (arma::uword i = 0; i < n; ++i)
+    y(i) = truth01(u(i));
+  arma::vec ug = arma::linspace(0.02, 0.98, 60);
+  arma::vec yg(ug.n_elem);
+  for (arma::uword i = 0; i < ug.n_elem; ++i)
+    yg(i) = truth01(ug(i));
+  auto rmse = [&](const arma::vec& p) { return std::sqrt(arma::mean(arma::square(p - yg))); };
+  auto col = [](const arma::vec& v) {
+    arma::mat M(v.n_elem, 1);
+    M.col(0) = v;
+    return M;
+  };
+  auto affine = [](const arma::vec& t, double lo, double hi) {
+    arma::mat M(t.n_elem, 1);
+    M.col(0) = lo + (hi - lo) * t;
+    return M;
+  };
+
+  const std::vector<std::string> WARPS
+      = {"knots(3)", "kumaraswamy", "boxcox", "neural_mono(6)", "mlp(6,1,tanh)", "mlp_joint(6,1,tanh)"};
+
+  double ll_none;
+  {
+    WarpKriging none({"none"}, "matern5_2");
+    none.fit(y, col(u), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    ll_none = none.logLikelihood();
+  }
+
+  // ---- A. save / load round-trip on a wide input scale --------------------
+  for (const auto& spec : WARPS) {
+    const double LO = 100.0, HI = 300.0;
+    WarpKriging wk({spec}, "matern5_2");
+    wk.fit(y, affine(u, LO, HI), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    arma::vec p0 = std::get<0>(wk.predict(affine(ug, LO, HI), false, false));
+
+    std::string f = "wk_scale_roundtrip_" + std::to_string(std::hash<std::string>{}(spec)) + ".json";
+    wk.save(f);
+    WarpKriging loaded = WarpKriging::load(f);
+    std::remove(f.c_str());
+    arma::vec p1 = std::get<0>(loaded.predict(affine(ug, LO, HI), false, false));
+
+    double d = arma::norm(p0 - p1, "inf");
+    std::cout << "  A save/load  " << spec << "  max|Δpred| = " << d << std::endl;
+    assert(d < 1e-7 && "save/load must reproduce predictions on an off-[0,1] scale");
+  }
+
+  // ---- B/C. update() on a wide input scale, both paths -------------------
+  for (const auto& spec : WARPS) {
+    bool deterministic = (spec == "knots(3)" || spec == "kumaraswamy" || spec == "boxcox");
+    const double LO = -40.0, HI = 60.0;
+    arma::uword n0 = 24;
+    arma::vec u0 = arma::linspace(0.0, 1.0, n0), y0(n0);
+    for (arma::uword i = 0; i < n0; ++i)
+      y0(i) = truth01(u0(i));
+    arma::vec uadd = {0.13, 0.37, 0.61, 0.83};
+    arma::vec yadd(uadd.n_elem);
+    for (arma::uword i = 0; i < uadd.n_elem; ++i)
+      yadd(i) = truth01(uadd(i));
+
+    WarpKriging wkR({spec}, "matern5_2");
+    wkR.fit(y0, affine(u0, LO, HI), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    wkR.update(yadd, affine(uadd, LO, HI), /*refit=*/true);
+    double llR = wkR.logLikelihood();
+    arma::vec pR = std::get<0>(wkR.predict(affine(ug, LO, HI), false, false));
+    assert(std::isfinite(llR) && pR.is_finite());
+    if (deterministic)
+      assert(llR > ll_none - 5.0 && "update(refit=true) must keep the warp working off-[0,1]");
+    assert(rmse(pR) < 0.05 && "update(refit=true) off-[0,1] must not collapse");
+
+    WarpKriging wkF({spec}, "matern5_2");
+    wkF.fit(y0, affine(u0, LO, HI), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    wkF.update(yadd, affine(uadd, LO, HI), /*refit=*/false);
+    arma::vec pF = std::get<0>(wkF.predict(affine(u0, LO, HI), false, false));
+    assert(pF.is_finite());
+    assert(arma::norm(pF - y0, "inf") < 0.05 && "update(refit=false) off-[0,1] must stay interpolating");
+    std::cout << "  B/C update   " << spec << "  LL(refit) = " << llR << "  RMSE(refit) = " << rmse(pR)
+              << "  |interp err|(no-refit) = " << arma::norm(pF - y0, "inf") << std::endl;
+  }
+
+  // ---- D. clone_for_thread() carries the calibrated range --------------
+  //  (parallel multistart clones every submodel through this path)
+  for (const auto& spec : WARPS) {
+    const double LO = 500.0, HI = 900.0;
+    WarpKriging wk({spec}, "matern5_2");
+    wk.fit(y, affine(u, LO, HI), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+
+    WarpKriging cl = wk.clone_for_thread();
+    // describe() surfaces the calibrated bounds — must survive the clone
+    assert(wk.summary().find("900") != std::string::npos && cl.summary().find("900") != std::string::npos
+           && "clone_for_thread() must carry the calibrated input range");
+    // and the clone must predict identically
+    arma::vec p0 = std::get<0>(wk.predict(affine(ug, LO, HI), false, false));
+    arma::vec p1 = std::get<0>(cl.predict(affine(ug, LO, HI), false, false));
+    assert(arma::norm(p0 - p1, "inf") < 1e-9 && "clone_for_thread() predictions must match");
+    std::cout << "  D clone      " << spec << "  LL = " << wk.logLikelihood()
+              << "  max|Δpred(clone)| = " << arma::norm(p0 - p1, "inf") << std::endl;
+  }
+
+  // ---- E. 2-D heterogeneous per-column ranges vs the [0,1]^2 fit --------
+  {
+    arma::arma_rng::set_seed(7);
+    arma::uword m = 40;
+    arma::mat U = arma::randu<arma::mat>(m, 2);
+    arma::vec y2(m);
+    for (arma::uword i = 0; i < m; ++i)
+      y2(i) = std::sin(3.0 * Fwarp(U(i, 0))) + 0.6 * U(i, 1);
+    arma::mat Ug = arma::randu<arma::mat>(50, 2);
+    arma::vec yg2(Ug.n_rows);
+    for (arma::uword i = 0; i < Ug.n_rows; ++i)
+      yg2(i) = std::sin(3.0 * Fwarp(Ug(i, 0))) + 0.6 * Ug(i, 1);
+
+    auto het = [](const arma::mat& A) {
+      arma::mat B = A;
+      B.col(0) = 1000.0 + 1000.0 * A.col(0);  // [1000, 2000]
+      B.col(1) = -5.0 + 10.0 * A.col(1);      // [-5, 5]
+      return B;
+    };
+
+    // Deterministic warps only: a heterogeneous per-column range must give the
+    // exact same fit as the unit cube. (The joint MLP's non-convex optimum is
+    // not reproducible enough for an RMSE comparison here — its per-column
+    // mapping is covered by blocks A/B/C/D/F and by
+    // test_warp_input_scale_invariance.)
+    for (const std::vector<std::string>& specs : std::vector<std::vector<std::string>>{
+             {"knots(3)", "kumaraswamy"}, {"boxcox", "boxcox"}, {"knots(3)", "boxcox"}}) {
+      WarpKriging a(specs, "matern5_2");
+      a.fit(y2, U, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double rmse_unit = std::sqrt(arma::mean(arma::square(std::get<0>(a.predict(Ug, false, false)) - yg2)));
+
+      WarpKriging b(specs, "matern5_2");
+      b.fit(y2, het(U), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double rmse_het = std::sqrt(arma::mean(arma::square(std::get<0>(b.predict(het(Ug), false, false)) - yg2)));
+
+      std::cout << "  E 2-D het    {" << specs[0] << ",…}  RMSE unit = " << rmse_unit << "  het = " << rmse_het
+                << std::endl;
+      assert(std::isfinite(rmse_het) && std::abs(rmse_het - rmse_unit) < 5e-4
+             && "heterogeneous per-column ranges must match the unit-cube fit");
+    }
+  }
+
+  // ---- F. normalize = true stays scale-invariant -----------------------
+  for (const auto& spec : WARPS) {
+    bool deterministic = (spec == "knots(3)" || spec == "kumaraswamy" || spec == "boxcox");
+    WarpKriging a({spec}, "matern5_2");
+    a.fit(y, col(u), Trend::RegressionModel::Constant, /*normalize=*/true, "BFGS", "LL");
+    double ra = rmse(std::get<0>(a.predict(col(ug), false, false)));
+
+    WarpKriging b({spec}, "matern5_2");
+    b.fit(y, affine(u, 100.0, 300.0), Trend::RegressionModel::Constant, /*normalize=*/true, "BFGS", "LL");
+    double rb = rmse(std::get<0>(b.predict(affine(ug, 100.0, 300.0), false, false)));
+
+    std::cout << "  F normalize  " << spec << "  RMSE unit = " << ra << "  wide = " << rb << std::endl;
+    // Deterministic warps match to numerical precision; the neural warps' optimum
+    // drifts with the shared RNG, so only require that no scale-dependent
+    // collapse is reintroduced.
+    assert(std::abs(ra - rb) < (deterministic ? 5e-4 : 5e-3) && "normalize=true must not reintroduce scale dependence");
+  }
+
+  // ---- G. constant (degenerate-range) column -> centred fallback -------
+  //  A constant column carries no information and is degenerate for any GP;
+  //  the domain-bounded warps must at least stay numerically well-posed
+  //  (the fallback centres the constant at the middle of the reference
+  //  interval rather than pinning it to a boundary). The neural warps feed
+  //  the raw value into a network and were ill-posed here before this PR
+  //  too, so they are out of scope for this check.
+  {
+    arma::uword m = 20;
+    arma::mat X2(m, 2);
+    X2.col(0) = arma::linspace(0.0, 1.0, m);
+    X2.col(1).fill(7.0);  // zero-range column
+    arma::vec y2(m);
+    for (arma::uword i = 0; i < m; ++i)
+      y2(i) = truth01(X2(i, 0));
+    for (const auto& s0 : {std::string("knots(3)"), std::string("kumaraswamy"), std::string("boxcox")}) {
+      WarpKriging wk({s0, s0}, "matern5_2");
+      wk.fit(y2, X2, Trend::RegressionModel::Constant, false, "BFGS", "LL");
+      double ll = wk.logLikelihood();
+      arma::vec p = std::get<0>(wk.predict(X2, false, false));
+      std::cout << "  G degenerate " << s0 << "  LL = " << ll << std::endl;
+      assert(std::isfinite(ll) && p.is_finite() && "a constant input column must not NaN a domain-bounded warp");
+    }
+  }
+
+  // ---- H. predict-derivative vs FD in physical units ------------------
+  for (const auto& spec : {std::string("knots(3)"), std::string("kumaraswamy"), std::string("boxcox")}) {
+    const double LO = 10.0, HI = 20.0;
+    WarpKriging wk({spec}, "matern5_2");
+    wk.fit(y, affine(u, LO, HI), Trend::RegressionModel::Constant, false, "BFGS", "LL");
+    arma::mat Xd = affine(arma::vec{0.2, 0.45, 0.7}, LO, HI);
+    check_deriv_vs_fd(wk, Xd, {0}, "H:" + spec, /*h=*/1e-3, /*rel_tol=*/0.15, /*abs_tol=*/0.05);
+    std::cout << "  H deriv-FD   " << spec << "  OK" << std::endl;
+  }
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
 int main() {
   std::cout << "============================================\n"
             << "  WarpKriging test suite\n"
@@ -1668,6 +2003,8 @@ int main() {
     test_none_warp_with_noise_vs_noise_kriging_ll();
     test_simulate_and_update_simulate_with_noise();
     test_clone_preserves_parameters();
+    test_warp_input_scale_invariance();
+    test_warp_input_scale_hardening();
 
     std::cout << "============================================\n"
               << "  ALL TESTS PASSED\n"
