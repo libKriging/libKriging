@@ -42,10 +42,10 @@ past release, see the corresponding entry on the
 ### Fixed
 - `WarpKriging`: every per-variable warping whose parametrisation assumes an
   `O(1)` / `[0, 1]` input — `knots(k)` (Xiong et al. 2007, on `[0, 1]`),
-  `kumaraswamy` (a CDF on `[0, 1]`), `boxcox` (needs `x > 0`), `neural_mono`
-  and `mlp` (weight init + softplus / tanh) — now maps inputs from their
-  training range onto `[0, 1]` internally, like `DiceKriging`'s `knots`
-  argument. Previously inputs on any other scale collapsed onto the clamp /
+  `kumaraswamy` (a CDF on `[0, 1]`), `boxcox` (needs `x > 0`), `neural_mono`,
+  `mlp` and `mlp_joint` (weight init + softplus / tanh) — now maps inputs
+  from their training range onto `[0, 1]` internally, like `DiceKriging`'s
+  `knots` argument. Previously inputs on any other scale collapsed onto the clamp /
   positivity / saturation boundary: `knots` and `kumaraswamy` diverged
   (`knots`: `|params|` to ~15, `theta` to its bound) instead of settling on
   the identity, the fit was >100 nats / 40x–300x RMSE worse than a plain
@@ -55,8 +55,7 @@ past release, see the corresponding entry on the
   bit-for-bit; the neural warps to numerical precision); for any other range
   the transform is calibrated to the data range. New regression test
   `test_warp_input_scale_invariance` in `WarpKrigingTest` (invariance across
-  `[0,1]`, `[100,300]`, `[-50,50]`). `mlp_joint` (all inputs jointly, not an
-  `IWarp`) is unchanged.
+  `[0,1]`, `[100,300]`, `[-50,50]`).
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a

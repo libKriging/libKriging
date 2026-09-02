@@ -1,0 +1,129 @@
+make: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[1]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[2]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[  4%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/blas.c.o
+[  8%] Building CXX object dependencies/armadillo-code/CMakeFiles/armadillo.dir/src/wrapper1.cpp.o
+[  8%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/lbfgsb.c.o
+[  8%] Building CXX object dependencies/armadillo-code/CMakeFiles/armadillo.dir/src/wrapper2.cpp.o
+[ 13%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/s_copy.c.o
+[ 17%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/linpack.c.o
+[ 21%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/s_cmp.c.o
+[ 21%] Building C object dependencies/lbfgsb_cpp/CMakeFiles/lbfgsb_cpp.dir/Lbfgsb.3.0/timer.c.o
+[ 26%] Linking C static library liblbfgsb_cpp.a
+[ 30%] Linking CXX shared library libarmadillo.so
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 30%] Built target lbfgsb_cpp
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 30%] Built target armadillo
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 34%] Building CXX object src/lib/CMakeFiles/Kriging.dir/demo/DemoClass.cpp.o
+[ 34%] Building CXX object src/lib/CMakeFiles/Kriging.dir/demo/DemoFunction.cpp.o
+[ 39%] Building CXX object src/lib/CMakeFiles/Kriging.dir/demo/DemoArmadilloClass.cpp.o
+[ 43%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Trend.cpp.o
+[ 43%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Optim.cpp.o
+[ 47%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Random.cpp.o
+[ 52%] Building CXX object src/lib/CMakeFiles/Kriging.dir/LinearAlgebra.cpp.o
+[ 56%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Covariance.cpp.o
+[ 56%] Building CXX object src/lib/CMakeFiles/Kriging.dir/KrigingImpl.cpp.o
+[ 60%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Kriging.cpp.o
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/LinearAlgebra.cpp: In static member function 'static void LinearAlgebra::covMat_rect(arma::mat*, const arma::mat&, const arma::mat&, const arma::vec&, std::function<double(const arma::Col<double>&, const arma::Col<double>&)>, double)':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/LinearAlgebra.cpp:633:54: warning: comparison of integer expressions of different signedness: 'unsigned int' and 'arma::sword' {aka 'int'} [-Wsign-compare]
+  633 |           arma::uword block_end_i = (bi + BLOCK_SIZE < static_cast<arma::sword>(n1)) ? bi + BLOCK_SIZE : n1;
+      |                                      ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/LinearAlgebra.cpp:634:54: warning: comparison of integer expressions of different signedness: 'unsigned int' and 'arma::sword' {aka 'int'} [-Wsign-compare]
+  634 |           arma::uword block_end_j = (bj + BLOCK_SIZE < static_cast<arma::sword>(n2)) ? bj + BLOCK_SIZE : n2;
+      |                                      ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 65%] Building CXX object src/lib/CMakeFiles/Kriging.dir/NestedKriging.cpp.o
+[ 65%] Building CXX object src/lib/CMakeFiles/Kriging.dir/WarpKriging.cpp.o
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp: In member function 'std::tuple<arma::Col<double>, arma::Col<double> > Kriging::leaveOneOutVec(const arma::vec&)':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp:522:10: warning: variable 'loo' set but not used [-Wunused-but-set-variable]
+  522 |   double loo = -1;
+      |          ^~~
+[ 69%] Building CXX object src/lib/CMakeFiles/Kriging.dir/MLPKriging.cpp.o
+[ 73%] Building CXX object src/lib/CMakeFiles/Kriging.dir/KrigingLoader.cpp.o
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp: In lambda function:
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp:2130:20: warning: unused variable 'sol_to_b' [-Wunused-variable]
+ 2130 |             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
+      |                    ^~~~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp: In member function 'void Kriging::fit(const arma::vec&, const arma::mat&, const Trend::RegressionModel&, bool, const std::string&, const std::string&, const Parameters&)':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/src/lib/Kriging.cpp:1676:23: warning: unused variable 'scaleX' [-Wunused-variable]
+ 1676 |   const arma::rowvec& scaleX = m_scaleX;
+      |                       ^~~~~~
+[ 78%] Building CXX object src/lib/CMakeFiles/Kriging.dir/lkalloc.cpp.o
+[ 78%] Building CXX object src/lib/CMakeFiles/Kriging.dir/Bench.cpp.o
+[ 82%] Building CXX object src/lib/CMakeFiles/Kriging.dir/utils/base64.cpp.o
+[ 86%] Building CXX object src/lib/CMakeFiles/Kriging.dir/utils/jsonutils.cpp.o
+[ 86%] Building CXX object src/lib/CMakeFiles/Kriging.dir/__/__/version.cpp.o
+[ 91%] Linking CXX shared library libKriging.so
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 91%] Built target Kriging
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 95%] Building CXX object tests/CMakeFiles/WarpKrigingTest.dir/WarpKrigingTest.cpp.o
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp: In function 'void test_from_string_roundtrip()':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:827:8: warning: variable 'caught' set but not used [-Wunused-but-set-variable]
+  827 |   bool caught = false;
+      |        ^~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp: In function 'void check_deriv_vs_fd(const libKriging::WarpKriging&, const arma::mat&, const std::vector<unsigned int>&, const std::string&, double, double, double)':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:901:21: warning: unused variable 'd' [-Wunused-variable]
+  901 |   const arma::uword d = X_new.n_cols;
+      |                     ^
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp: In function 'void test_level_names()':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1253:10: warning: variable 'caught' set but not used [-Wunused-but-set-variable]
+ 1253 |     bool caught = false;
+      |          ^~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1271:10: warning: variable 'caught' set but not used [-Wunused-but-set-variable]
+ 1271 |     bool caught = false;
+      |          ^~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1290:10: warning: variable 'caught' set but not used [-Wunused-but-set-variable]
+ 1290 |     bool caught = false;
+      |          ^~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp: In function 'void test_simulate_and_update_simulate_with_noise()':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1560:8: warning: variable 'threw_empty' set but not used [-Wunused-but-set-variable]
+ 1560 |   bool threw_empty = false;
+      |        ^~~~~~~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1569:8: warning: variable 'threw_neg' set but not used [-Wunused-but-set-variable]
+ 1569 |   bool threw_neg = false;
+      |        ^~~~~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1581:15: warning: unused variable 'n_before' [-Wunused-variable]
+ 1581 |   arma::uword n_before = wk.X().n_rows;
+      |               ^~~~~~~~
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp: In function 'void test_warp_input_scale_invariance()':
+/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/tests/WarpKrigingTest.cpp:1716:63: warning: variable 'rmse_ref' set but not used [-Wunused-but-set-variable]
+ 1716 |     double ll_ref = std::numeric_limits<double>::quiet_NaN(), rmse_ref = 0.0;
+      |                                                               ^~~~~~~~
+[100%] Linking CXX executable WarpKrigingTest
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[100%] Built target WarpKrigingTest
+make[2]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[1]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[1]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[2]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 31%] Built target armadillo
+[ 31%] Built target lbfgsb_cpp
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[ 95%] Built target Kriging
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[3]: Entering directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[100%] Building CXX object tests/CMakeFiles/WarpKrigingPerWarpTest.dir/WarpKrigingPerWarpTest.cpp.o
+[100%] Linking CXX executable WarpKrigingPerWarpTest
+make[3]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+[100%] Built target WarpKrigingPerWarpTest
+make[2]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make[1]: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'
+make: Leaving directory '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build'

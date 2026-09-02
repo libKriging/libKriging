@@ -488,12 +488,21 @@ class LIBKRIGING_EXPORT WarpMLPJoint {
   /// Deep copy
   std::unique_ptr<WarpMLPJoint> clone() const;
 
+  /// Affinely map each input column from [lo_j, hi_j] onto [0, 1] before the
+  /// network (Kaiming/Glorot init + activations assume O(1) inputs). lo/hi are
+  /// (1 × d_in) row vectors. Default: identity on [0, 1]. No clamp, so
+  /// predictions extrapolate smoothly.
+  void set_input_ranges(const arma::rowvec& lo, const arma::rowvec& hi);
+
  private:
   arma::uword m_d_in, m_d_out, m_n_params = 0;
   Act m_act;
   std::vector<arma::mat> m_W;
   std::vector<arma::vec> m_b;
+  arma::rowvec m_xlo;  ///< (1 × d_in) lower end of each variable's training range
+  arma::rowvec m_xhi;  ///< (1 × d_in) upper end of each variable's training range
   void count_params();
+  arma::mat to_scaled(const arma::mat& X) const;
 };
 
 class LIBKRIGING_EXPORT WarpEmbedding final : public IWarp {

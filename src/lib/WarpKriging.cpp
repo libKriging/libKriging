@@ -1062,6 +1062,9 @@ WarpMLPJoint::WarpMLPJoint(arma::uword d_in,
   if (hidden_dims.empty())
     throw std::invalid_argument("WarpMLPJoint: need at least one hidden layer");
 
+  m_xlo = arma::zeros<arma::rowvec>(d_in);  // default: identity input map on [0, 1]
+  m_xhi = arma::ones<arma::rowvec>(d_in);
+
   arma::arma_rng::set_seed(seed);
 
   arma::uword prev = d_in;
@@ -1106,8 +1109,26 @@ void WarpMLPJoint::set_params(const arma::vec& p) {
   }
 }
 
+void WarpMLPJoint::set_input_ranges(const arma::rowvec& lo, const arma::rowvec& hi) {
+  m_xlo = arma::zeros<arma::rowvec>(m_d_in);
+  m_xhi = arma::ones<arma::rowvec>(m_d_in);
+  for (arma::uword j = 0; j < m_d_in && j < lo.n_elem && j < hi.n_elem; ++j) {
+    if (std::isfinite(lo(j)) && std::isfinite(hi(j)) && (hi(j) - lo(j)) > 1e-12) {
+      m_xlo(j) = lo(j);
+      m_xhi(j) = hi(j);
+    }
+  }
+}
+
+arma::mat WarpMLPJoint::to_scaled(const arma::mat& X) const {
+  arma::mat U = X;
+  U.each_row() -= m_xlo;
+  U.each_row() /= (m_xhi - m_xlo);  // affine only, no clamp
+  return U;
+}
+
 arma::mat WarpMLPJoint::forward(const arma::mat& X) const {
-  arma::mat H = X;  // (n × d_in)
+  arma::mat H = to_scaled(X);  // (n × d_in)
   const arma::uword L = m_W.size();
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
@@ -1123,10 +1144,10 @@ arma::mat WarpMLPJoint::forward(const arma::mat& X) const {
 arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) const {
   const arma::uword L = m_W.size();
 
-  // Forward with caching
+  // Forward with caching (H_cache[0] = affinely scaled inputs)
   std::vector<arma::mat> Z_cache(L);
   std::vector<arma::mat> H_cache(L + 1);
-  H_cache[0] = X;
+  H_cache[0] = to_scaled(X);
 
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H_cache[l] * m_W[l];
@@ -1138,7 +1159,8 @@ arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) c
       H_cache[l + 1] = Z;
   }
 
-  // Backward
+  // Backward — param gradients only (∂/∂W, ∂/∂b), unaffected by the fixed
+  // affine input map beyond the scaled values already in H_cache[0].
   arma::vec grad(m_n_params, arma::fill::zeros);
   arma::mat delta = dL_dPhi;
   arma::uword idx = m_n_params;
@@ -1165,10 +1187,9 @@ arma::vec WarpMLPJoint::backward(const arma::mat& X, const arma::mat& dL_dPhi) c
 arma::mat WarpMLPJoint::jacobian_input(const arma::rowvec& x) const {
   const arma::uword L = m_W.size();
 
-  // Forward pass — cache pre-activations Z_l for derivative computation
+  // Forward pass on the affinely scaled input — cache pre-activations Z_l
   std::vector<arma::mat> Z_cache(L);
-  arma::mat H(1, x.n_elem);
-  H.row(0) = x;
+  arma::mat H = to_scaled(arma::mat(x));
   for (arma::uword l = 0; l < L; ++l) {
     arma::mat Z = H * m_W[l];
     Z.each_row() += m_b[l].t();
@@ -1184,6 +1205,8 @@ arma::mat WarpMLPJoint::jacobian_input(const arma::rowvec& x) const {
     J.each_row() %= act_d;
     J = J * m_W[l].t();
   }
+  // Chain rule through the per-column affine input map: ∂Φ/∂x_j = (∂Φ/∂u_j) / (xhi_j - xlo_j)
+  J.each_row() /= (m_xhi - m_xlo);
   return J;  // (d_out × d_in)
 }
 
@@ -1192,7 +1215,7 @@ std::string WarpMLPJoint::describe() const {
   s << "MLPJoint(" << m_d_in;
   for (arma::uword l = 0; l < m_W.size(); ++l)
     s << " -> " << m_W[l].n_cols;
-  s << ", " << m_n_params << " params)";
+  s << ", " << m_n_params << " params, ranges=[" << m_xlo << "; " << m_xhi << "])";
   return s.str();
 }
 
@@ -1368,6 +1391,7 @@ std::unique_ptr<WarpMLPJoint> WarpMLPJoint::clone() const {
     hidden_dims.push_back(m_W[i].n_cols);
   auto c = std::make_unique<WarpMLPJoint>(m_d_in, hidden_dims, m_d_out, m_act);
   c->set_params(get_params());
+  c->set_input_ranges(m_xlo, m_xhi);
   return c;
 }
 
@@ -1612,11 +1636,20 @@ void WarpKriging::build_warps() {
 // -------------------------------------------------------------------------
 //  Push the per-variable training-input range into each warp.
 //  Uses m_X_raw as it stands *after* normalise_data() (so the range is in the
-//  same coordinates the warp actually receives at fit and predict time). Only
-//  Knots reacts; every other warp's set_input_range() is a no-op.
+//  same coordinates the warp actually receives at fit and predict time).
+//  Continuous per-variable warps that have no reference domain (none, affine)
+//  ignore it; discrete columns are skipped. For the joint MLP the per-column
+//  ranges go in one shot.
 // -------------------------------------------------------------------------
 void WarpKriging::calibrate_warps() {
-  if (m_is_joint || m_warps.empty() || m_X_raw.n_rows == 0)
+  if (m_X_raw.n_rows == 0)
+    return;
+  if (m_is_joint) {
+    if (m_joint_warp)
+      m_joint_warp->set_input_ranges(arma::min(m_X_raw, 0), arma::max(m_X_raw, 0));
+    return;
+  }
+  if (m_warps.empty())
     return;
   for (arma::uword j = 0; j < m_warps.size() && j < m_X_raw.n_cols; ++j) {
     if (j < m_is_continuous.size() && !m_is_continuous[j])

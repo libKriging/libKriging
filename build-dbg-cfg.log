@@ -1,0 +1,128 @@
+-- [31mC[32mo[33ml[34mo[35mr [36mm[37mo[1;31md[1;32me [1;33me[1;34mn[1;35ma[1;36mb[1;37ml[31me[32md[m
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found OpenMP_C: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP: TRUE (found version "4.5")  
+-- OpenMP found - enabling parallel multistart optimization
+-- Using global-dynamic TLS model for OpenMP (Python dlopen compatibility)
+-- Armadillo's internal OpenMP disabled (see line 189)
+-- Using standard allocator
+-- *** set cmake policy CMP0025 to NEW
+-- CMAKE_CXX_STANDARD = 14
+-- Configuring Armadillo 15.0.1
+-- 
+-- *** WARNING: variable 'CMAKE_CXX_FLAGS' is not empty; this may cause problems!
+-- 
+-- 
+-- CMAKE_SYSTEM_NAME          = Linux
+-- CMAKE_CXX_COMPILER_ID      = GNU
+-- CMAKE_CXX_COMPILER_VERSION = 12.2.0
+-- CMAKE_COMPILER_IS_GNUCXX   = 1
+-- 
+-- *** options:
+-- HEADER_ONLY               = OFF
+-- STATIC_LIB                = OFF
+-- OPENBLAS_PROVIDES_LAPACK  = OFF
+-- ALLOW_FLEXIBLAS_LINUX     = ON
+-- ALLOW_OPENBLAS_MACOS      = OFF
+-- ALLOW_BLAS_LAPACK_MACOS   = OFF
+-- BUILD_SMOKE_TEST          = OFF
+-- 
+-- *** Looking for external libraries
+-- Found OpenBLAS: /usr/lib/x86_64-linux-gnu/libopenblas.so
+-- Found BLAS: /usr/lib/x86_64-linux-gnu/libblas.so
+-- Found LAPACK: /usr/lib/x86_64-linux-gnu/liblapack.so
+-- FlexiBLAS_FOUND = NO
+--       MKL_FOUND = NO
+--  OpenBLAS_FOUND = YES
+--     ATLAS_FOUND = NO
+--      BLAS_FOUND = YES
+--    LAPACK_FOUND = YES
+-- 
+-- *** NOTE: found both OpenBLAS and BLAS; BLAS will not be used
+-- 
+-- *** NOTE: if OpenBLAS is known to provide LAPACK functions, recommend to
+-- *** NOTE: rerun cmake with the OPENBLAS_PROVIDES_LAPACK option enabled:
+-- *** NOTE: cmake -D OPENBLAS_PROVIDES_LAPACK=true .
+-- 
+-- *** If the OpenBLAS library is installed in
+-- *** /usr/local/lib or /usr/local/lib64
+-- *** make sure the run-time linker can find it.
+-- *** On Linux systems this can be done by editing /etc/ld.so.conf
+-- *** or modifying the LD_LIBRARY_PATH environment variable.
+-- 
+-- Found ARPACK: /usr/lib/x86_64-linux-gnu/libarpack.so
+-- ARPACK_FOUND = YES
+-- Looking for suitable version of SuperLU
+-- Found SuperLU library: /usr/lib/x86_64-linux-gnu/libsuperlu.so
+-- SuperLU_FOUND = YES
+-- SuperLU_INCLUDE_DIR = /usr/include/superlu
+-- 
+-- *** Result of configuration:
+-- *** ARMA_USE_WRAPPER = true
+-- *** ARMA_USE_LAPACK  = true
+-- *** ARMA_USE_BLAS    = true
+-- *** ARMA_USE_ATLAS   = false
+-- *** ARMA_USE_ARPACK  = true
+-- *** ARMA_USE_SUPERLU = true
+-- 
+-- *** Armadillo wrapper library links with these libraries:
+-- *** ARMA_LIBS = /usr/lib/x86_64-linux-gnu/libopenblas.so;/usr/lib/x86_64-linux-gnu/liblapack.so;/usr/lib/x86_64-linux-gnu/libarpack.so;/usr/lib/x86_64-linux-gnu/libsuperlu.so
+-- 
+-- Copying /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/dependencies/armadillo-code/include/ to /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/tmp/include/
+-- Generating /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/tmp/include/armadillo_bits/config.hpp
+-- 
+-- CMAKE_CXX_FLAGS           =  -fopenmp -ftls-model=global-dynamic -O2
+-- CMAKE_SHARED_LINKER_FLAGS =  -Wl,--no-as-needed
+-- CMAKE_REQUIRED_INCLUDES   = /usr/include/superlu
+-- 
+-- CMAKE_INSTALL_PREFIX     = /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/installed
+-- CMAKE_INSTALL_LIBDIR     = lib
+-- CMAKE_INSTALL_INCLUDEDIR = include
+-- CMAKE_INSTALL_DATADIR    = share
+-- CMAKE_INSTALL_BINDIR     = bin
+-- *** copying /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/dependencies/armadillo-code/misc/ to /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/tmp/misc/
+-- *** generating '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/tmp/misc/armadillo.pc'
+-- Generating '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/ArmadilloConfig.cmake'
+-- Generating '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/ArmadilloConfigVersion.cmake'
+-- Generating '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/InstallFiles/ArmadilloConfig.cmake'
+-- Generating '/home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg/dependencies/armadillo-code/InstallFiles/ArmadilloConfigVersion.cmake'
+-- Build shared library
+-- Static analysis available but disabled as requested.
+-- Octave binding not available
+-- Could NOT find Matlab (missing: Matlab_INCLUDE_DIRS Matlab_MEX_LIBRARY Matlab_MEX_EXTENSION Matlab_ROOT_DIR Matlab_MX_LIBRARY MAIN_PROGRAM) (found version "NOTFOUND")
+-- Matlab binding not available
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.11.2", minimum required is "3.7") 
+-- Checking Python requirements
+   ✔ Module numpy>=1.18 is available
+   ✔ Module pytest is available
+   ✔ Module setuptools is available
+   ✔ Module packaging is available
+   ✔ Module wheel is available
+-- PYTHON binding available but disabled as requested.
+-- Julia binding enabled
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
+-- Benchmark tests are disabled; to enable them use -DLIBKRIGING_BENCHMARK_TESTS=ON option
+-- Configuring benchmark executables
+-- Benchmark executables configured successfully
+-- clang-format target for updating code format is available
+-- doc target for documentation generation is available
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/richet/tmp/claude-10208/-home-richet-Sync-Travail-CRISTAL-CristAlgoV210-2026-cristalgo/58f56b85-8203-4eb3-8072-d0e431053176/scratchpad/lk/build-dbg

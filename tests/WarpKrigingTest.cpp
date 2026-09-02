@@ -1711,7 +1711,8 @@ static void test_warp_input_scale_invariance() {
     bool deterministic;
   };
   for (const Spec& sp : {Spec{"knots(4)", true}, Spec{"kumaraswamy", true}, Spec{"boxcox", true},
-                         Spec{"neural_mono(6)", false}, Spec{"mlp(6,1,tanh)", false}}) {
+                         Spec{"neural_mono(6)", false}, Spec{"mlp(6,1,tanh)", false},
+                         Spec{"mlp_joint(6,1,tanh)", false}}) {
     double ll_ref = std::numeric_limits<double>::quiet_NaN(), rmse_ref = 0.0;
     arma::vec pred_ref;
     for (const auto& [lo, hi] : RANGES) {
