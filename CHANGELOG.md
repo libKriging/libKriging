@@ -53,9 +53,14 @@ past release, see the corresponding entry on the
   default range `[0, 1]` is the identity map, so a model fit on inputs
   spanning exactly `[0, 1]` is unchanged (`knots` / `kumaraswamy` / `boxcox`
   bit-for-bit; the neural warps to numerical precision); for any other range
-  the transform is calibrated to the data range. New regression test
-  `test_warp_input_scale_invariance` in `WarpKrigingTest` (invariance across
-  `[0,1]`, `[100,300]`, `[-50,50]`).
+  the transform is calibrated to the data range. New regression tests
+  `test_warp_input_scale_invariance` / `test_warp_input_scale_hardening` in
+  `WarpKrigingTest` (invariance across `[0,1]`, `[100,300]`, `[-50,50]`; plus
+  save/load, `update()`, multistart, 2-D, `normalize=true` and derivative
+  checks). `NestedKriging`'s warped submodels, which share one
+  `(theta, warp_params)`, now also share one input-range calibration
+  (`WarpKriging::recalibrate_warps()`), so the aggregate still interpolates
+  the design.
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a
