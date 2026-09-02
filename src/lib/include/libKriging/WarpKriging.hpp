@@ -307,8 +307,18 @@ class LIBKRIGING_EXPORT WarpBoxCox final : public IWarp {
   std::string describe() const override;
   std::unique_ptr<IWarp> clone() const override;
 
+  /// Affinely map inputs from [lo, hi] onto (0, 1] before the Box-Cox
+  /// transform, which requires x > 0. The default range [0, 1] reproduces the
+  /// historical  u = max(x, 1e-10)  exactly; any other input scale — negatives
+  /// included — now lands in that same well-posed interval instead of
+  /// collapsing onto the positivity floor.
+  void set_input_range(double lo, double hi) override;
+
  private:
   double m_lambda = 1.0;  ///< stored as unconstrained (real line)
+  double m_xlo = 0.0;     ///< lower end of the variable's training range
+  double m_xhi = 1.0;     ///< upper end of the variable's training range
+  double to_pos(double x) const;
 };
 
 class LIBKRIGING_EXPORT WarpKumaraswamy final : public IWarp {

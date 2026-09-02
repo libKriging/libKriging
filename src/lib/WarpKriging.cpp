@@ -469,9 +469,16 @@ std::string WarpAffine::describe() const {
 }
 
 // *************************************************************************
-//  WarpBoxCox  :  w(x) = (x^λ − 1)/λ   (λ via unconstrained param)
-//  If λ ≈ 0 → log(x)
+//  WarpBoxCox  :  w(x) = (u^λ − 1)/λ   (λ via unconstrained param)
+//  If λ ≈ 0 → log(u).   u(x) = max((x − xlo)/(xhi − xlo), 1e-10) maps the
+//  training range onto (0, 1], so the transform stays well-posed for x <= 0
+//  and for inputs far from O(1). The default range [0, 1] reproduces the
+//  historical  u = max(x, 1e-10)  exactly.
 // *************************************************************************
+
+namespace {
+constexpr double kBoxCoxFloor = 1e-10;
+}
 
 WarpBoxCox::WarpBoxCox() : m_lambda(1.0) {}
 
@@ -483,10 +490,24 @@ void WarpBoxCox::set_params(const arma::vec& p) {
   m_lambda = p(0);
 }
 
+void WarpBoxCox::set_input_range(double lo, double hi) {
+  if (std::isfinite(lo) && std::isfinite(hi) && (hi - lo) > 1e-12) {
+    m_xlo = lo;
+    m_xhi = hi;
+  } else {
+    m_xlo = 0.0;
+    m_xhi = 1.0;
+  }
+}
+
+double WarpBoxCox::to_pos(double x) const {
+  return std::max((x - m_xlo) / (m_xhi - m_xlo), kBoxCoxFloor);
+}
+
 arma::mat WarpBoxCox::forward(const arma::vec& x) const {
   arma::vec out(x.n_elem);
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::max(x(i), 1e-10);  // ensure positivity
+    double xi = to_pos(x(i));
     if (std::abs(m_lambda) < 1e-6)
       out(i) = std::log(xi);
     else
@@ -496,17 +517,17 @@ arma::mat WarpBoxCox::forward(const arma::vec& x) const {
 }
 
 arma::vec WarpBoxCox::deriv_input(double x_val) const {
-  double xi = std::max(x_val, 1e-10);
-  if (std::abs(m_lambda) < 1e-6)
-    return {1.0 / xi};
-  return {std::pow(xi, m_lambda - 1.0)};
+  double xi = to_pos(x_val);
+  // Chain rule through the affine input map u(x): dΦ/dx = (dΦ/du) / (xhi - xlo).
+  double dphi_du = (std::abs(m_lambda) < 1e-6) ? 1.0 / xi : std::pow(xi, m_lambda - 1.0);
+  return {dphi_du / (m_xhi - m_xlo)};
 }
 
 arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) const {
-  // dw/dλ = [x^λ (λ ln(x) − 1) + 1] / λ²  (for λ ≠ 0)
+  // dw/dλ = [u^λ (λ ln(u) − 1) + 1] / λ²  (for λ ≠ 0)
   double grad_lambda = 0.0;
   for (arma::uword i = 0; i < x.n_elem; ++i) {
-    double xi = std::max(x(i), 1e-10);
+    double xi = to_pos(x(i));
     double dw_dl;
     if (std::abs(m_lambda) < 1e-6) {
       dw_dl = 0.5 * std::log(xi) * std::log(xi);  // Taylor approx
@@ -521,7 +542,7 @@ arma::vec WarpBoxCox::backward(const arma::vec& x, const arma::mat& dL_dPhi) con
 
 std::string WarpBoxCox::describe() const {
   std::ostringstream s;
-  s << "BoxCox(lambda=" << m_lambda << ")";
+  s << "BoxCox(lambda=" << m_lambda << ", range=[" << m_xlo << "," << m_xhi << "])";
   return s.str();
 }
 
@@ -1310,6 +1331,7 @@ std::unique_ptr<IWarp> WarpAffine::clone() const {
 std::unique_ptr<IWarp> WarpBoxCox::clone() const {
   auto c = std::make_unique<WarpBoxCox>();
   c->set_params(get_params());
+  c->set_input_range(m_xlo, m_xhi);
   return c;
 }
 
