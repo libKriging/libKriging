@@ -1,5 +1,17 @@
 # Agent Instructions
 
+## Claude Code plugin
+
+This repo ships a Claude Code plugin (`.claude-plugin/`) bundling the
+`libkriging` skill and the commands `/libkriging:fit`, `/libkriging:predict`,
+`/libkriging:simulate`, `/libkriging:update` and `/libkriging:build`. Install
+it with:
+
+```
+/plugin marketplace add libKriging/libKriging
+/plugin install libkriging@libkriging
+```
+
 ## API usage guidance
 
 Before writing or reviewing code that fits/predicts/simulates a Kriging

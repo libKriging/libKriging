@@ -1,0 +1,25 @@
+{
+  "name": "libkriging",
+  "version": "1.1.0",
+  "description": "libKriging usage guidance for Claude Code: which Kriging / Gaussian-process class and options to use, and the exact call syntax for the C++ core and the Python, R, Julia, Octave and MATLAB bindings.",
+  "author": {
+    "name": "libKriging contributors",
+    "url": "https://github.com/libKriging/libKriging"
+  },
+  "homepage": "https://github.com/libKriging/libKriging",
+  "repository": "https://github.com/libKriging/libKriging",
+  "license": "Apache-2.0",
+  "keywords": [
+    "kriging",
+    "gaussian-process",
+    "surrogate-model",
+    "emulator",
+    "machine-learning",
+    "cpp",
+    "python",
+    "r",
+    "julia",
+    "octave",
+    "matlab"
+  ]
+}
