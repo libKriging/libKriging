@@ -51,12 +51,47 @@ LIBKRIGING_EXPORT bool supports(const std::string& covType);
 // batched launch can't cheaply shrink its own column count mid-loop. Same
 // convergence contract as LinearAlgebra::conjugateGradient (relative
 // residual < tol or max_iter iterations, periodic exact-residual restart).
+// When precU is non-empty, runs PRECONDITIONED CG with the Nystrom/Woodbury
+// preconditioner z = precDinv .* (r - precU M^-1 precU^T (precDinv .* r)),
+// M = precMcholLower precMcholLower^T -- pass the factors straight from a
+// LinearAlgebra::WoodburyFactorization (U(), Dinv(), McholLower()) so the
+// GPU apply is bit-for-bit the same preconditioner as the CPU path.
 LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::vec& theta,
                                               const std::string& covType,
                                               const arma::mat& B,
                                               arma::uword max_iter,
-                                              double tol = 1e-8);
+                                              double tol = 1e-8,
+                                              const arma::mat& precU = arma::mat(),
+                                              const arma::vec& precDinv = arma::vec(),
+                                              const arma::mat& precMcholLower = arma::mat());
+
+// Batched matrix-free matvec: returns R(Xt,theta) * V (V is n x ncols,
+// column-major; result n x ncols) in ONE device launch covering every
+// column, R never materialized -- the same lk_cuda_rmul_batched kernel the
+// CG loop uses, exposed for callers that need R*V outside a CG solve
+// (Stochastic Lanczos Quadrature log-determinant, Hutchinson trace). Xt is
+// uploaded once per call; the O(n*ncols) result is the only download.
+// Falls back to the caller's CPU path when covType is unsupported (same
+// contract as conjugateGradient) -- callers must check supports() first.
+LIBKRIGING_EXPORT arma::mat rmulBatched(const arma::mat& Xt,
+                                        const arma::vec& theta,
+                                        const std::string& covType,
+                                        const arma::mat& V);
+
+// Batched d(R)/d(theta) . V for the Hutchinson gradient trace: returns an
+// n x (dimX * V.n_cols) matrix whose column-c block [c*dimX, (c+1)*dimX)
+// is d(R)/d(theta) . V[:,c] (n x dimX), matching
+// Kriging::_logLikelihoodIterative's CPU dRmul_all. Requires dimX <= 32 and
+// a device-supported covType (callers check supports() / dimX first).
+LIBKRIGING_EXPORT arma::mat dRmulBatched(const arma::mat& Xt,
+                                         const arma::vec& theta,
+                                         const std::string& covType,
+                                         const arma::mat& V);
+
+// Largest ARD dimension dRmulBatched supports (mirrors LK_CUDA_MAX_DIMX in
+// the kernel TU).
+constexpr int kMaxDimX = 32;
 
 }  // namespace LinearAlgebraCuda
 

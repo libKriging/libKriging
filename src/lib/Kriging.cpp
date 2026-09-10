@@ -1601,8 +1601,13 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       // (single-column solves, e.g. the 2-column F,y solve) -- profiling at
       // n=400 found it otherwise leaving most of a 20-core machine idle
       // while doing real, substantial per-row work (each row now does
-      // roughly n/2 pairs after the symmetric-matvec change).
-      const int optimal_threads = get_optimal_threads(8);
+      // roughly n/2 pairs after the symmetric-matvec change). This matvec
+      // IS the whole cost of a matrix-free LLIterative evaluation (called
+      // ~lanczos_steps*nprobe + CG-iteration times per objective), so let
+      // OMP_NUM_THREADS govern it directly instead of the conservative
+      // get_optimal_threads() cap -- on a many-core node the old cap of 8
+      // left the machine ~idle for minutes during the SLQ log-determinant.
+      const int optimal_threads = get_optimal_threads(omp_get_max_threads());
       std::vector<arma::vec> thread_out(static_cast<std::size_t>(optimal_threads), arma::vec(n, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
       {
@@ -1692,8 +1697,12 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
   auto cgSolve = [&](const arma::mat& B) -> arma::mat {
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-    if (!Pinv && LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+    if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
+      if (woodbury_pc)  // Nystrom-preconditioned CG, now also on the GPU
+        return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,
+                                                    woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower());
       return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
+    }
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
     if (!Pinv && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
@@ -1701,6 +1710,23 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 #endif
     return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
   };
+
+  // Stochastic Lanczos Quadrature log-determinant and the Hutchinson
+  // gradient trace both need R*V for the fixed probe block. On the GPU that
+  // is the SAME batched matvec cgSolve already runs -- route it there too
+  // (one launch per Lanczos step, all probes at once) so the SLQ term stops
+  // being the CPU-only bottleneck it was. `slq_on_gpu` gates BOTH the
+  // log-determinant and the gradient trace below.
+  bool slq_on_gpu = false;
+  std::function<arma::mat(const arma::mat&)> rmulBatched;
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
+    slq_on_gpu = true;
+    rmulBatched = [&](const arma::mat& V) -> arma::mat {
+      return LinearAlgebraCuda::rmulBatched(Xt, theta, m_covType, V);
+    };
+  }
+#endif
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
   // columns): p+1 right-hand sides sharing the same matvec, each an
@@ -1721,7 +1747,10 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const double sigma2 = SSE / n;
 
   const double logdetR
-      = LinearAlgebra::stochasticLogDet(Rmul, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
+      = slq_on_gpu
+            ? LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps,
+                                                     m_iterative_probes)
+            : LinearAlgebra::stochasticLogDet(Rmul, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
 
   if (beta_out != nullptr)
     *beta_out = beta;
@@ -1764,7 +1793,10 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       const double* v_mem = v.memptr();
 #ifdef _OPENMP
       if (n >= 32 && !omp_in_parallel()) {
-        const int optimal_threads = get_optimal_threads(8);
+        // Same reasoning as Rmul above: this dR/dtheta matvec is the
+        // gradient's dominant cost -- let OMP_NUM_THREADS govern it, not
+        // the conservative get_optimal_threads() cap.
+        const int optimal_threads = get_optimal_threads(omp_get_max_threads());
         std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
                                           arma::mat(n, d, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
@@ -1813,12 +1845,32 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       return out;
     };
 
-    const arma::rowvec term1 = x.t() * dRmul_all(x);  // 1 x d, all dimensions at once
-
+    arma::rowvec term1(d, arma::fill::zeros);
     arma::rowvec trace(d, arma::fill::zeros);
-    for (arma::uword p = 0; p < nprobe; ++p)
-      trace += W.col(p).t() * dRmul_all(m_iterative_probes.col(p));
-    trace /= static_cast<double>(nprobe);
+
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+    // Same GPU routing as the SLQ log-determinant: the Hutchinson trace's
+    // dR/dtheta matvec is the gradient's dominant cost. One batched device
+    // call on [x | probe_0 | ... | probe_{nprobe-1}] returns, per column c,
+    // an n x d block dR/dtheta . column_c; the small dot products against x
+    // and W stay on the host.
+    if (slq_on_gpu && dimX == d && d <= static_cast<arma::uword>(LinearAlgebraCuda::kMaxDimX)) {
+      const arma::mat B_grad = arma::join_rows(x, m_iterative_probes);           // n x (1 + nprobe)
+      const arma::mat Og = LinearAlgebraCuda::dRmulBatched(Xt, theta, m_covType, B_grad);  // n x (d*(1+nprobe))
+      for (arma::uword kk = 0; kk < d; ++kk)
+        term1(kk) = arma::dot(x, Og.col(0 * d + kk));
+      for (arma::uword p = 0; p < nprobe; ++p)
+        for (arma::uword kk = 0; kk < d; ++kk)
+          trace(kk) += arma::dot(W.col(p), Og.col((p + 1) * d + kk));
+      trace /= static_cast<double>(nprobe);
+    } else
+#endif
+    {
+      term1 = x.t() * dRmul_all(x);  // 1 x d, all dimensions at once
+      for (arma::uword p = 0; p < nprobe; ++p)
+        trace += W.col(p).t() * dRmul_all(m_iterative_probes.col(p));
+      trace /= static_cast<double>(nprobe);
+    }
 
     for (arma::uword kk = 0; kk < d; ++kk)
       (*grad_out)(kk) = 0.5 * (term1(kk) / sigma2 - trace(kk));
@@ -2145,12 +2197,17 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   // Nystrom/Iterative never touch m_dX (they work straight from m_X via
   // covMat_sym_X/covMat_rect or a matrix-free matvec); a light Vecchia fit
   // (exact_commit=false) skips the exact factorization that would otherwise
-  // need it. All are only true when optim != "none": that path always does
-  // one exact make_Model call regardless of objective (see below), so it
-  // always needs m_dX.
-  const bool build_dX = (optim == "none")
-                        || !((objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLIterative", 0) == 0)
-                             || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit));
+  // need it. This holds for BOTH optim paths: the optim="none" branch for
+  // these objectives (see the LLNystrom/LLVecchia/LLIterative blocks below)
+  // returns early without an exact make_Model, and their free-optim path is
+  // matrix-free/structured. So the O(n^2*d) m_dX tensor is pure waste for
+  // them -- earlier code forced it whenever optim=="none", which is what
+  // made an optim="none" LLIterative fit allocate (and fill, and reduce
+  // over) up to several GB it never reads.
+  const bool objective_is_light
+      = (objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLIterative", 0) == 0)
+        || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit);
+  const bool build_dX = !objective_is_light;
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
 

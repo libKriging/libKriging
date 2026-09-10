@@ -92,6 +92,14 @@ class PyKriging {
                                                                                 const bool return_grad,
                                                                                 const bool want_hess = false);
 
+  // Matrix-free CG + SLQ log-determinant concentrated log-likelihood
+  // (objective="LLIterative(m)"). Unlike logLikelihoodFun (which always
+  // evaluates the EXACT dense-Cholesky objective), this is the O(n^2)
+  // iterative estimate -- only valid on a model fitted with an LLIterative
+  // objective.
+  std::tuple<double, py::array_t<double>> logLikelihoodIterativeFun(const py::array_t<double>& theta,
+                                                                    const bool return_grad);
+
   std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
 
   double logLikelihood();
