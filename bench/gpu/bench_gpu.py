@@ -9,18 +9,23 @@ Goal
 ----
 Compare, over ``n in {250, 500, 1000, 2000}`` at a shared fixed
 ``theta = 0.15`` (a regime where *every* method converges with sane
-settings), the cost and accuracy of:
+settings), the cost and accuracy of five backends, each named
+``<lib>-<method>-<linalg lib>`` (the linalg name is auto-detected):
 
-* **libkriging-chol** -- the exact dense-Cholesky path (``objective="LL"``).
-  This is the **reference**: its log-likelihood value and its posterior
-  mean are what the iterative methods are measured against.
-* **libkriging-gpu / libkriging-cpu** -- the matrix-free iterative path
-  (``objective="LLIterative(30,0,40)"``: 30 SLQ probes, no CG preconditioner,
-  40 Lanczos steps per probe so the stochastic log-determinant stays close
-  to exact), light fit (no dense R factor), CUDA backend on / off.
-* **gpytorch-gpu / gpytorch-cpu** -- GPyTorch's ``ExactGP`` + BBMM
-  (CG + pivoted-Cholesky preconditioner + SLQ log-det), on ``cuda`` / ``cpu``,
-  with *raised* CG/Lanczos/preconditioner settings so it actually converges.
+* **libKriging-Cholesky-<BLAS>** -- the exact dense-Cholesky path
+  (``objective="LL"``), the dense BLAS/LAPACK named. This is the
+  **reference**: its log-likelihood value and its posterior mean are what
+  the iterative methods are measured against.
+* **libKriging-Iterative-CUDA** / **libKriging-Iterative-OpenMP** -- the
+  matrix-free iterative path (``objective="LLIterative(30,0,40)"``: 30 SLQ
+  probes, no CG preconditioner, 40 Lanczos steps per probe so the stochastic
+  log-determinant stays close to exact), light fit (no dense R factor),
+  ``set_cuda_iterative_enabled(True/False)``. The matvec kernels are
+  hand-written (CUDA / OpenMP), not cuBLAS / a CPU BLAS.
+* **GPyTorch-BBMM-CUDA** / **GPyTorch-BBMM-<BLAS>** -- GPyTorch's ``ExactGP``
+  + BBMM (CG + pivoted-Cholesky preconditioner + SLQ log-det), on ``cuda``
+  or ``cpu`` (torch's own BLAS named), with *raised*
+  CG/Lanczos/preconditioner settings so it actually converges.
 
 Three timings per backend, plus accuracy
 ----------------------------------------
@@ -30,16 +35,17 @@ Three timings per backend, plus accuracy
 * ``logLik``  -- one log-likelihood **+ gradient** evaluation at ``theta``:
   ``logLikelihoodFun`` / ``logLikelihoodIterativeFun`` / one
   ``-mll(...).backward()``.
-* ``predict`` -- posterior mean on 300 held-out points: ``predict`` /
-  ``predictIterative`` (CG to ``tol`` with a raised ``max_iter`` +
+* ``predict`` -- a *cold* posterior mean on 300 held-out points: ``predict``
+  / ``predictIterative`` (CG to ``tol`` with a raised ``max_iter`` +
   Nystrom preconditioner) / GPyTorch ``.eval()`` posterior.
-* ``RMSE`` / ``Q2`` on the test set; and, vs the chol reference,
+* All timings are the **min of up to 5 reps** (1 rep once a call exceeds 3 s).
+* ``RMSE`` / ``Q2`` on the test set; and, vs the Cholesky reference,
   ``dLogLik/n`` (``|ll - ll_chol| / n``; not comparable for GPyTorch's
   differently-normalised ``-mll``, shown as ``--``) and ``dMean/rms``
   (``max|mean - mean_chol| / rms(y_test)``).
 
-Requires ``pylibkriging`` (built with a GPU iterative backend for the
-``*-gpu`` rows), ``torch`` and ``gpytorch`` importable in one environment.
+Requires ``pylibkriging`` (built with a GPU iterative backend for the CUDA
+rows), ``torch`` and ``gpytorch`` importable in one environment.
 See ``bench/gpu/README.md``.
 """
 
@@ -66,7 +72,6 @@ TEST_SEED = 999
 TRAIN_SEED = 123
 NOISE_SEED = 0
 LK_ITER_OBJECTIVE = "LLIterative(30,0,40)"  # 30 probes, no CG precond, 40 SLQ Lanczos steps
-BACKENDS_ALL = ["libkriging-chol", "libkriging-gpu", "libkriging-cpu", "gpytorch-gpu", "gpytorch-cpu"]
 
 
 # --------------------------------------------------------------------------
@@ -120,6 +125,81 @@ def slug(name: str | None, maxlen: int = 48) -> str:
     s = re.sub(r"\b\d+-Core\b.*$", "", s, flags=re.I)
     s = re.sub(r"[^A-Za-z0-9]+", "-", s).strip("-")
     return (s[:maxlen].strip("-")) or "unknown"
+
+
+# --------------------------------------------------------------------------
+# dense-linear-algebra backend detection (the "<linalg lib>" name component)
+# --------------------------------------------------------------------------
+def _blas_from_ldd(sofile: str) -> str | None:
+    try:
+        out = subprocess.check_output(["ldd", sofile], text=True, stderr=subprocess.DEVNULL).lower()
+    except Exception:
+        return None
+    for token, name in (("libmkl", "MKL"), ("libopenblas", "OpenBLAS"), ("libflexiblas", "FlexiBLAS"),
+                        ("libblis", "BLIS"), ("libatlas", "ATLAS"), ("libarmpl", "ArmPL"),
+                        ("libnvpl", "NVPL"), ("libaccelerate", "Accelerate")):
+        if token in out:
+            return name
+    if "liblapack" in out or "libblas" in out:  # reference netlib
+        return "LAPACK"
+    return None
+
+
+def detect_libkriging_blas() -> str | None:
+    """Name the BLAS/LAPACK libKriging's dense-Cholesky path links against."""
+    import glob
+    import os
+
+    cands: list[str] = []
+    try:
+        import pylibkriging as _lk
+
+        pkg = os.path.dirname(_lk.__file__)
+        cands += glob.glob(os.path.join(pkg, "**", "_pylibkriging*.so"), recursive=True)
+        cands += glob.glob(os.path.join(pkg, "..", "_pylibkriging*.so"))
+    except Exception:
+        pass
+    for d in os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep):
+        if d:
+            cands += glob.glob(os.path.join(d, "libKriging.so*"))
+    for c in cands:
+        b = _blas_from_ldd(c)
+        if b:
+            return b
+    return None
+
+
+def detect_torch_cpu_blas() -> str | None:
+    try:
+        import torch
+
+        cfg = torch.__config__.show()
+    except Exception:
+        return None
+    m = re.search(r"BLAS_INFO=(\w+)", cfg)
+    if m:
+        return {"mkl": "MKL", "open": "OpenBLAS", "openblas": "OpenBLAS", "blis": "BLIS",
+                "accelerate": "Accelerate", "eigen": "Eigen", "nvpl": "NVPL",
+                "flexiblas": "FlexiBLAS", "generic": "BLAS"}.get(m.group(1).lower(), m.group(1))
+    if "USE_MKL=ON" in cfg:
+        return "MKL"
+    return None
+
+
+# backend keys used by --backends / dispatch, and how each maps to the
+# "<lib>-<method>-<linalg lib>" display label (the linalg part is filled in
+# at runtime for the CPU/Cholesky rows).
+BACKEND_KEYS = ["chol", "iter-cuda", "iter-omp", "gpt-cuda", "gpt-cpu"]
+
+
+def backend_label(key: str, lk_blas: str, torch_blas: str) -> str:
+    return {
+        "chol": f"libKriging-Cholesky-{lk_blas}",
+        "iter-cuda": "libKriging-Iterative-CUDA",   # hand-written CUDA CG / SLQ / dR-dtheta kernels
+        "iter-omp": "libKriging-Iterative-OpenMP",  # hand-written OpenMP matvec loops (not a BLAS)
+        "gpt-cuda": "GPyTorch-BBMM-CUDA",           # PyTorch CUDA (cuBLAS/cuSOLVER) + BBMM
+        "gpt-cpu": f"GPyTorch-BBMM-{torch_blas}",
+    }[key]
 
 
 # --------------------------------------------------------------------------
@@ -301,40 +381,40 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda):
 # --------------------------------------------------------------------------
 # sweep
 # --------------------------------------------------------------------------
-def one_point(backend, n, theta, Xte, yte):
+def one_point(key, n, theta, Xte, yte):
     X = lhs(n, D_CG, seed=TRAIN_SEED)
     y = sine_sum(X) + np.random.default_rng(NOISE_SEED).normal(scale=1e-3, size=n)
-    if backend == "libkriging-chol":
+    if key == "chol":
         return run_libkriging_chol(X, y, Xte, yte, theta)
-    if backend == "libkriging-gpu":
+    if key == "iter-cuda":
         return run_libkriging_iter(X, y, Xte, yte, theta, use_cuda=True)
-    if backend == "libkriging-cpu":
+    if key == "iter-omp":
         return run_libkriging_iter(X, y, Xte, yte, theta, use_cuda=False)
-    if backend == "gpytorch-gpu":
+    if key == "gpt-cuda":
         return run_gpytorch(X, y, Xte, yte, theta, "cuda")
-    if backend == "gpytorch-cpu":
+    if key == "gpt-cpu":
         return run_gpytorch(X, y, Xte, yte, theta, "cpu")
-    raise ValueError(backend)
+    raise ValueError(key)
 
 
-def sweep(backends, sizes, theta):
+def sweep(keys, sizes, theta, labels):
     Xte = lhs(N_TEST, D_CG, seed=TEST_SEED)
     yte = sine_sum(Xte)
     yte_rms = float(np.sqrt(np.mean(yte ** 2)))
     rows = []
     ref = {}  # n -> (ll_chol, mean_chol)
-    # run libkriging-chol first at every n so it can serve as the reference
-    order = (["libkriging-chol"] if "libkriging-chol" in backends else []) + \
-            [b for b in backends if b != "libkriging-chol"]
-    for backend in order:
+    order = (["chol"] if "chol" in keys else []) + [k for k in keys if k != "chol"]  # chol first = reference
+    for key in order:
+        label = labels[key]
         for n in sizes:
-            print(f"  {backend:15s} n={n:5d}  ...", end="", flush=True)
+            print(f"  {label:30s} n={n:5d}  ...", end="", flush=True)
             t0 = time.perf_counter()
             try:
-                res = one_point(backend, n, theta, Xte, yte)
-                res.update(backend=backend, n=n, status="ok", wall_s=time.perf_counter() - t0)
+                res = one_point(key, n, theta, Xte, yte)
+                res.update(backend=label, backend_key=key, n=n, status="ok",
+                           wall_s=time.perf_counter() - t0)
                 pm = res.pop("pred_mean")
-                if backend == "libkriging-chol":
+                if key == "chol":
                     ref[n] = (res["ll"], pm)
                 if n in ref:
                     ll_chol, mean_chol = ref[n]
@@ -347,8 +427,8 @@ def sweep(backends, sizes, theta):
                       f" dLogLik/n={res.get('dloglik_n') if res.get('dloglik_n') is not None else float('nan'):.1e}",
                       flush=True)
             except Exception as exc:  # noqa: BLE001
-                rows.append(dict(backend=backend, n=n, status=f"error: {exc!r}",
-                                 wall_s=time.perf_counter() - t0))
+                rows.append(dict(backend=label, backend_key=key, n=n,
+                                 status=f"error: {exc!r}", wall_s=time.perf_counter() - t0))
                 print(f" FAILED: {exc!r}", flush=True)
     return rows
 
@@ -396,7 +476,7 @@ def _f(x, spec=".4f"):
 
 
 def write_csv(path, rows):
-    cols = ["backend", "n", "status", "fit_s", "loglik_s", "predict_s", "wall_s",
+    cols = ["backend", "backend_key", "n", "status", "fit_s", "loglik_s", "predict_s", "wall_s",
             "ll", "ll_comparable", "rmse", "q2", "dloglik_n", "dmean_rms"]
     with open(path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
@@ -408,9 +488,11 @@ def write_csv(path, rows):
 def write_markdown(path, rows, meta):
     ok = [r for r in rows if r.get("status") == "ok"]
     ns = sorted({r["n"] for r in rows})
-    got = lambda b: {r["n"]: r for r in ok if r["backend"] == b}
-    chol, lkg, lkc = got("libkriging-chol"), got("libkriging-gpu"), got("libkriging-cpu")
-    gtg, gtc = got("gpytorch-gpu"), got("gpytorch-cpu")
+    got = lambda k: {r["n"]: r for r in ok if r.get("backend_key") == k}
+    chol, lkg, lkc = got("chol"), got("iter-cuda"), got("iter-omp")
+    gtg, gtc = got("gpt-cuda"), got("gpt-cpu")
+    lbl = {r["backend_key"]: r["backend"] for r in rows if r.get("backend_key")}
+    name = lambda k: lbl.get(k, k)
 
     L = []
     ap = L.append
@@ -436,12 +518,13 @@ def write_markdown(path, rows, meta):
        "log-likelihood **+ gradient** evaluation at theta. `predict` = a *cold* posterior "
        f"mean on {N_TEST} held-out points (GPyTorch's per-fit prediction cache is dropped "
        "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "
-       "exceeds 3 s). `libkriging-chol` is the **reference**: `dLogLik/n` = "
+       "exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. "
+       f"`{name('chol')}` is the **reference**: `dLogLik/n` = "
        "`|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised "
        "quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`.")
     ap("")
 
-    ap("## Reference — `libkriging-chol` (exact dense Cholesky)")
+    ap(f"## Reference — `{name('chol')}` (exact dense Cholesky)")
     ap("")
     ap("| n | fit (s) | logLik (s) | predict (s) | logLik value | RMSE | Q² |")
     ap("|--:|--:|--:|--:|--:|--:|--:|")
@@ -480,7 +563,8 @@ def write_markdown(path, rows, meta):
 
     ap("## Speed-ups (logLik-eval time)")
     ap("")
-    ap("| n | chol | libk-gpu | libk-cpu | **cpu/gpu** | **libk-gpu / chol** | gpytorch-gpu | gpytorch-cpu |")
+    ap(f"| n | {name('chol')} | {name('iter-cuda')} | {name('iter-omp')} | "
+       f"**OpenMP / CUDA** | **CUDA / Cholesky** | {name('gpt-cuda')} | {name('gpt-cpu')} |")
     ap("|--:|--:|--:|--:|--:|--:|--:|--:|")
     for n in ns:
         c = chol.get(n, {}).get("loglik_s")
@@ -495,8 +579,8 @@ def write_markdown(path, rows, meta):
 
     ap("## Verdict — did everything converge?")
     ap("")
-    iters = [r for r in ok if r["backend"] in ("libkriging-gpu", "libkriging-cpu")]
-    gpts = [r for r in ok if r["backend"] in ("gpytorch-gpu", "gpytorch-cpu")]
+    iters = [r for r in ok if r.get("backend_key") in ("iter-cuda", "iter-omp")]
+    gpts = [r for r in ok if r.get("backend_key") in ("gpt-cuda", "gpt-cpu")]
     if iters:
         m_dll = max((r["dloglik_n"] for r in iters if r.get("dloglik_n") is not None), default=float("nan"))
         m_dm = max((r["dmean_rms"] for r in iters if r.get("dmean_rms") is not None), default=float("nan"))
@@ -509,19 +593,23 @@ def write_markdown(path, rows, meta):
            f"reference (a roughly n-independent offset from the covariance-argument "
            f"convention, *not* under-convergence), Q² ≥ `{gq:.4f}`. Its `-mll` value is a "
            f"different normalisation and is not compared.")
-    ap("- **libkriging-chol** is fastest on all three ops at these n — the iterative path "
-       "is for n where the dense factor no longer fits / is too slow, not this range.")
+    ap(f"- **`{name('chol')}`** is fastest on all three ops at these n — the iterative "
+       "path is for n where the dense factor no longer fits / is too slow, not this range.")
     ap("")
 
     ap("## Notes")
     ap("")
+    ap("- Backend names are `<lib>-<method>-<linalg lib>`. `libKriging-Iterative-CUDA` "
+       "and `-OpenMP` use hand-written matvec kernels (not cuBLAS / a CPU BLAS); "
+       f"`{name('chol')}` and `{name('gpt-cpu')}` name the actual dense BLAS/LAPACK "
+       "each links against.")
     ap(f"- theta={meta['theta']} is chosen so the SLQ log-determinant's Lanczos "
        "quadrature and GPyTorch's BBMM CG both converge with sane iteration budgets; "
        "at longer theta (better-fitting but more ill-conditioned R) both need far more "
        "iterations / Lanczos steps. The `,0,40` in the libKriging objective is the "
        "third `LLIterative` argument (SLQ Lanczos steps per probe), added so the "
        "iterative log-likelihood *value* also tracks the exact one here.")
-    ap("- `libkriging-gpu` vs `libkriging-cpu` is the same binary with "
+    ap(f"- `{name('iter-cuda')}` vs `{name('iter-omp')}` is the same binary with "
        "`set_cuda_iterative_enabled(...)` toggled — identical results, different device "
        "for the batched CG / SLQ / gradient matvecs.")
     ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary + the "
@@ -541,8 +629,9 @@ def main(argv=None):
                    help="comma-separated training sizes (default: %(default)s)")
     p.add_argument("--theta", type=float, default=THETA_DEFAULT,
                    help="shared fixed length-scale (default: %(default)s)")
-    p.add_argument("--backends", default=",".join(BACKENDS_ALL),
-                   help="comma-separated subset of: " + ", ".join(BACKENDS_ALL))
+    p.add_argument("--backends", default=",".join(BACKEND_KEYS),
+                   help="comma-separated subset of these keys: " + ", ".join(BACKEND_KEYS)
+                        + "  (chol / iter-cuda / iter-omp / gpt-cuda / gpt-cpu)")
     p.add_argument("--outdir", default=None, help="output directory (default: <this file>/results)")
     p.add_argument("--tag", default=None, help="extra tag appended to the output file name")
     args = p.parse_args(argv)
@@ -554,10 +643,10 @@ def main(argv=None):
     os.makedirs(outdir, exist_ok=True)
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
-    backends = [b.strip() for b in args.backends.split(",") if b.strip()]
-    for b in backends:
-        if b not in BACKENDS_ALL:
-            p.error(f"unknown backend {b!r}; choose from {BACKENDS_ALL}")
+    keys = [b.strip() for b in args.backends.split(",") if b.strip()]
+    for k in keys:
+        if k not in BACKEND_KEYS:
+            p.error(f"unknown backend {k!r}; choose from {BACKEND_KEYS}")
 
     gpu_name, cpu_name = detect_gpu_name(), detect_cpu_name()
     try:
@@ -567,22 +656,28 @@ def main(argv=None):
     except Exception:
         have_cuda = False
     if not have_cuda:
-        dropped = [b for b in backends if b.endswith("-gpu")]
-        backends = [b for b in backends if not b.endswith("-gpu")]
+        dropped = [k for k in keys if k.endswith("-cuda")]
+        keys = [k for k in keys if not k.endswith("-cuda")]
         if dropped:
             print(f"note: no CUDA -> dropping {dropped}", flush=True)
+
+    lk_blas = detect_libkriging_blas() or "BLAS"
+    torch_blas = detect_torch_cpu_blas() or "CPU"
+    labels = {k: backend_label(k, lk_blas, torch_blas) for k in BACKEND_KEYS}
 
     meta = dict(
         gpu=gpu_name, cpu=cpu_name, host=socket.gethostname(),
         nproc=os.cpu_count(), omp=os.environ.get("OMP_NUM_THREADS", "(unset)"),
         when=_dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),
-        theta=args.theta, sizes=sizes, versions=_versions(),
+        theta=args.theta, sizes=sizes, lk_blas=lk_blas, torch_blas=torch_blas,
+        versions=_versions(),
     )
     print("machine:", meta["gpu"], "|", meta["cpu"], "| host", meta["host"])
-    print("backends:", backends, "| sizes:", sizes, "| theta:", args.theta, flush=True)
+    print("linalg: libKriging dense ->", lk_blas, "| torch CPU ->", torch_blas)
+    print("backends:", [labels[k] for k in keys], "| sizes:", sizes, "| theta:", args.theta, flush=True)
 
     # warm up CUDA contexts so the first real timing isn't polluted by init
-    if have_cuda and any(b.endswith("-gpu") for b in backends):
+    if have_cuda and any(k.endswith("-cuda") for k in keys):
         try:
             Xw = lhs(64, D_CG, seed=1)
             yw = sine_sum(Xw)
@@ -592,7 +687,7 @@ def main(argv=None):
             print(f"warmup skipped: {exc!r}", flush=True)
 
     t0 = time.perf_counter()
-    rows = sweep(backends, sizes, args.theta)
+    rows = sweep(keys, sizes, args.theta, labels)
     print(f"\ntotal wall time: {time.perf_counter() - t0:.0f}s", flush=True)
 
     base = f"{slug(gpu_name)}__{slug(cpu_name)}"
