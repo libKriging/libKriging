@@ -228,6 +228,11 @@ void NestedKriging::fit(const arma::vec& y,
       const arma::uvec& idx = m_groups[g];
       auto wk = std::make_unique<libKriging::WarpKriging>(m_warping, m_covType);
       wk->fit(m_y(idx), m_X.rows(idx), regmodel, /*normalize=*/false, "none", objective, fixed);
+      // The submodels share (theta, warp_params); they must also share one
+      // input-range calibration so Φ(x) is a single function across groups
+      // (otherwise the aggregate no longer interpolates the design). Tie every
+      // warp to the full-design range and rebuild the cache at the fixed prior.
+      wk->recalibrate_warps(m_X);
       m_wsubmodels.push_back(std::move(wk));
     }
   } else if (vll_unified) {

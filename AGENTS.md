@@ -1,5 +1,17 @@
 # Agent Instructions
 
+## Claude Code plugin
+
+This repo ships a Claude Code plugin (`.claude-plugin/`) bundling the
+`libkriging` skill and the commands `/libkriging:fit`, `/libkriging:predict`,
+`/libkriging:simulate`, `/libkriging:update` and `/libkriging:build`. Install
+it with:
+
+```
+/plugin marketplace add libKriging/libKriging
+/plugin install libkriging@libkriging
+```
+
 ## API usage guidance
 
 Before writing or reviewing code that fits/predicts/simulates a Kriging
@@ -23,7 +35,7 @@ The following tools are pre-approved and may be used freely without asking for u
 
 ## Git usage
 
-Never run `git push` or any variant that pushes commits to a remote (e.g. `git push --force`, `git push origin`). If a task requires pushing, stop and ask the user to do it manually.
+Never run `git push` or any variant that pushes commits to a remote (e.g. `git push --force`, `git push origin`) master or main. If a task requires pushing on main branch, stop and ask the user to do it manually. But accept push on other branches, especially ones behind pull requests.
 
 ## Known pitfalls
 

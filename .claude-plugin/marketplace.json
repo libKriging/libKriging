@@ -1,0 +1,16 @@
+{
+  "name": "libkriging",
+  "owner": {
+    "name": "libKriging contributors",
+    "url": "https://github.com/libKriging/libKriging"
+  },
+  "plugins": [
+    {
+      "name": "libkriging",
+      "source": "./",
+      "description": "libKriging usage guidance: which Kriging / Gaussian-process class and options to use, plus exact call syntax for the C++ core and the Python, R, Julia, Octave and MATLAB bindings. Bundles build/pitfall notes from AGENTS.md.",
+      "category": "development",
+      "keywords": ["kriging", "gaussian-process", "surrogate-model", "machine-learning"]
+    }
+  ]
+}
