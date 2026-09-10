@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 // clang-format on
 
 #include "libKriging/utils/lk_armadillo.hpp"
@@ -1494,6 +1495,114 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 // noisy/non-smooth between BFGS iterations.
 // =============================================================================
 
+namespace {
+
+// Materialize the dense n x n correlation matrix R (and, when dR != nullptr,
+// the d elementwise theta-derivative blocks dR[k] = dR/dtheta_k) for a
+// SEPARABLE kernel Cov(dx, theta) = exp(-sum_k s_k(|dx_k| / theta_k)), so
+// _logLikelihoodIterative can turn every CG iteration / Lanczos step into a
+// BLAS-3 R*V instead of a fresh O(n^2) matrix-free covariance sweep. The
+// per-pair kernel is inlined here (no std::function indirection, unlike the
+// matrix-free Rmul closures) and the symmetric build is parallelized so
+// paying it ONCE per objective evaluation is cheap next to the dozens-to-
+// hundreds of matvecs that follow.
+//
+// Covers the four separable kernels (gauss / exp / matern3_2 / matern5_2);
+// returns false for anything else (whitenoise, future kernels), leaving the
+// caller on its matrix-free fallback. dR[k] uses the same
+// d(ln Cov)/d(theta_k) formulas as Covariance::DlnCovDtheta_*, so
+// dR[k] = R % H_k with H_k the (nonnegative) log-derivative matrix.
+bool build_separable_cov(const std::string& covType,
+                         const arma::mat& Xt,     // d x n, observations in columns
+                         const arma::vec& theta,  // d
+                         arma::mat& R,
+                         std::vector<arma::mat>* dR) {
+  const bool is_gauss = (covType == "gauss");
+  const bool is_exp = (covType == "exp");
+  const bool is_m32 = (covType == "matern3_2");
+  const bool is_m52 = (covType == "matern5_2");
+  if (!(is_gauss || is_exp || is_m32 || is_m52))
+    return false;
+
+  constexpr arma::uword kMaxD = 64;  // per-pair stack scratch; ARD dims never approach this
+  const arma::uword d = Xt.n_rows;
+  const arma::uword n = Xt.n_cols;
+  if (d == 0 || d > kMaxD)
+    return false;
+
+  const double SQ3 = std::sqrt(3.0);
+  const double SQ5 = std::sqrt(5.0);
+  const double* Xtm = Xt.memptr();
+  const double* th = theta.memptr();
+
+  R.set_size(n, n);
+  if (dR != nullptr)
+    dR->assign(d, arma::mat(n, n, arma::fill::none));
+
+  auto s_of = [&](double uk) -> double {
+    if (is_gauss)
+      return 0.5 * uk * uk;
+    if (is_exp)
+      return uk;
+    if (is_m32) {
+      const double dd = SQ3 * uk;
+      return dd - std::log1p(dd);
+    }
+    const double dd = SQ5 * uk;  // matern5_2
+    return dd - std::log1p(dd + dd * dd / 3.0);
+  };
+  auto h_of = [&](double uk, double thk) -> double {  // d(ln Cov)/d(theta_k), >= 0
+    if (is_gauss)
+      return uk * uk / thk;
+    if (is_exp)
+      return uk / thk;
+    if (is_m32) {
+      const double dd = SQ3 * uk;
+      return (dd * dd / (1.0 + dd)) / thk;
+    }
+    const double dd = SQ5 * uk;  // matern5_2
+    const double a = 1.0 + dd;
+    const double b = dd * dd / 3.0;
+    return (a * b / (a + b)) / thk;
+  };
+
+  // Column j is written entirely by the thread that owns it (both R(i,j) for
+  // i>j and the mirrored R(j,i)); disjoint threads touch disjoint pairs, so
+  // the symmetric double-write is race-free without per-thread accumulators.
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 16) if (n >= 128)
+#endif
+  for (arma::sword sj = 0; sj < static_cast<arma::sword>(n); ++sj) {
+    const arma::uword j = static_cast<arma::uword>(sj);
+    double u[kMaxD];
+    for (arma::uword i = j + 1; i < n; ++i) {
+      double S = 0.0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double uk = std::abs(Xtm[k + i * d] - Xtm[k + j * d]) / th[k];
+        u[k] = uk;
+        S += s_of(uk);
+      }
+      const double rij = std::exp(-S);
+      R.at(i, j) = rij;
+      R.at(j, i) = rij;
+      if (dR != nullptr) {
+        for (arma::uword k = 0; k < d; ++k) {
+          const double v = rij * h_of(u[k], th[k]);
+          (*dR)[k].at(i, j) = v;
+          (*dR)[k].at(j, i) = v;
+        }
+      }
+    }
+    R.at(j, j) = 1.0;
+    if (dR != nullptr)
+      for (arma::uword k = 0; k < d; ++k)
+        (*dR)[k].at(j, j) = 0.0;  // dR/dtheta_k vanishes at dx = 0
+  }
+  return true;
+}
+
+}  // namespace
+
 arma::uword Kriging::parse_iterative_m(const std::string& objective,
                                       arma::uword* precond_rank_out,
                                       arma::uword* lanczos_steps_out) {
@@ -1603,13 +1712,27 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const arma::uword dimX = Xt.n_rows;
   const arma::vec& theta = _theta;
   const auto& cov = _Cov;
-  // RmulBatched applies R to a WHOLE block V (n x k) at once. It is called
+
+  // Fast path (populated after the GPU-dispatch block below, only when no GPU
+  // backend is bound): for a separable kernel and an n whose dense n x n R
+  // -- plus the d theta-derivative blocks when a gradient is wanted -- fits a
+  // memory budget, materialize them ONCE with an inlined, parallelized
+  // symmetric build so every matvec is a BLAS-3 R*V instead of a fresh
+  // transcendental-heavy covariance sweep (dozens-to-hundreds of sweeps
+  // collapse to one). A deliberate departure from the strictly-matrix-free
+  // design (docs/math/lliterative_vs_cholesky.ipynb measured the O(n) path);
+  // the budget keeps it to n where O(n^2) storage is unremarkable next to
+  // what a dense fit would need. Override the 6 GiB default with
+  // LK_ITERATIVE_DENSE_MAX_MB=0 (force matrix-free) or a larger value.
+  arma::mat R_dense;
+  std::vector<arma::mat> dR_dense;
+  bool dense = false;
+
+  // RmulBatched applies R to a WHOLE block V (n x k) at once. On the fast
+  // path it is a single R_dense * V (BLAS-3). Otherwise it is called
   // O(CG iterations) times per objective/gradient evaluation, each time
-  // recomputing every R_ij from scratch (matrix-free BY DESIGN: R is never
-  // cached as an n x n array, not even transiently during one evaluation --
-  // see the LLIterative memory measurement in
-  // docs/math/lliterative_vs_cholesky.ipynb, which this would invalidate).
-  // Three things ARE free to exploit without giving that up:
+  // recomputing every R_ij from scratch (strictly matrix-free: R is never
+  // cached as an n x n array). Three things the matrix-free loop exploits:
   //   1. All k right-hand sides share the SAME R: evaluate each
   //      (transcendental-function-heavy) R_ij ONCE and apply it to all k
   //      columns. This is the batched analogue of GPyTorch's BBMM and is
@@ -1626,7 +1749,9 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // processed is a write-write hazard under parallelization: give each
   // thread its own O(n*k) accumulator and sum them once at the end.
   const double* Xt_mem = Xt.memptr();
-  auto RmulBatched = [Xt_mem, &theta, &cov, n, dimX](const arma::mat& V) -> arma::mat {
+  auto RmulBatched = [Xt_mem, &theta, &cov, n, dimX, &dense, &R_dense](const arma::mat& V) -> arma::mat {
+    if (dense)
+      return R_dense * V;  // BLAS-3, R materialized once above
     const arma::uword k = V.n_cols;
     arma::mat out(V);  // diag of R is 1: out starts at V, off-diagonal terms added below
 #ifdef _OPENMP
@@ -1769,6 +1894,24 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 #endif
 #undef LK_ITER_GPU_BIND
 
+  // Materialize the dense fast-path operators (see the R_dense declaration
+  // above) when the CPU path will run them -- skipped entirely if a GPU
+  // backend is bound (it has its own device matvecs).
+  if (!slq_on_gpu) {
+    std::size_t budget_mb = 6144;
+    if (const char* e = std::getenv("LK_ITERATIVE_DENSE_MAX_MB")) {
+      try {
+        budget_mb = static_cast<std::size_t>(std::stoull(e));
+      } catch (...) { /* keep default */
+      }
+    }
+    const bool want_dR = (grad_out != nullptr);
+    const double blocks = 1.0 + (want_dR ? static_cast<double>(dimX) : 0.0);
+    const double need_mb = blocks * static_cast<double>(n) * static_cast<double>(n) * 8.0 / (1024.0 * 1024.0);
+    if (budget_mb > 0 && need_mb <= static_cast<double>(budget_mb))
+      dense = build_separable_cov(m_covType, Xt, theta, R_dense, want_dR ? &dR_dense : nullptr);
+  }
+
   auto cgSolve = [&](const arma::mat& B) -> arma::mat {
     if (gpuCgSolve)
       return gpuCgSolve(B);
@@ -1848,8 +1991,18 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // matches the GPU dRmulBatched: column (c*d + kk) is dR/dtheta_kk .
     // V.col(c). Mirrors RmulBatched's per-thread accumulator / symmetric /
     // raw-memptr / schedule(static,1) pattern (see its comment).
-    auto dRmulBatched_cpu = [Xt_mem, &theta, &cov, this, n, dimX, d](const arma::mat& V) -> arma::mat {
+    auto dRmulBatched_cpu
+        = [Xt_mem, &theta, &cov, this, n, dimX, d, &dense, &dR_dense](const arma::mat& V) -> arma::mat {
       const arma::uword k = V.n_cols;
+      if (dense && dR_dense.size() == d) {
+        arma::mat out(n, d * k, arma::fill::none);
+        for (arma::uword kk = 0; kk < d; ++kk) {
+          const arma::mat Mk = dR_dense[kk] * V;  // n x k, BLAS-3
+          for (arma::uword col = 0; col < k; ++col)
+            out.col(col * d + kk) = Mk.col(col);
+        }
+        return out;
+      }
       arma::mat out(n, d * k, arma::fill::zeros);
 #ifdef _OPENMP
       if (n >= 32 && !omp_in_parallel()) {
