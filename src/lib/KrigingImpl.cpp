@@ -413,8 +413,12 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
     }
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-    if (!Pinv && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+    if (LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
+      if (woodbury_pc)
+        return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),
+                                                   woodbury_pc->Dinv(), woodbury_pc->McholLower());
       return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);
+    }
 #endif
     return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, solve_tol, Pinv);
   };
