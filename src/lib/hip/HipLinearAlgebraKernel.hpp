@@ -1,25 +1,35 @@
+// UNVERIFIED HIP/ROCm port of src/lib/cuda/CudaLinearAlgebraKernel.cuh -- see src/lib/hip/HipLinearAlgebra.hpp
+// for the full caveat. Mechanical cuda*->hip* / .cuh->.hpp translation of
+// the CUDA backend; identical algorithm, batching and preconditioner math.
+// Never compiled or run (no ROCm toolchain / AMD GPU here).
 #ifndef LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRAKERNEL_HPP
 #define LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRAKERNEL_HPP
 
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
 
-// UNVERIFIED port of src/lib/cuda/CudaLinearAlgebraKernel.cuh -- see
-// HipLinearAlgebra.hpp for why. Plain-C, pointer-only surface between the
-// hipcc-compiled kernels (HipLinearAlgebraKernel.hip.cpp) and the
-// host-compiler-compiled orchestration code (HipLinearAlgebra.cpp, built
-// by the SAME compiler as the rest of libKriging). No Armadillo (or other
-// non-POD C++) type may cross this boundary: the HIP compiler and the
-// project's host compiler can silently disagree on class layout for a
-// nontrivial type like arma::Col/Mat (this bit the CUDA backend in
-// practice -- arma::vec::memptr() came back null on the nvcc side despite
-// n_elem reading correctly -- a genuine ABI mismatch, not a logic bug, and
-// nothing about HIP's toolchain makes that risk go away). Raw
-// pointers/ints/doubles have no such ambiguity.
+// Plain-C, pointer-only surface between the hipcc-compiled kernels
+// (HipLinearAlgebraKernel.hip.cpp) and the host-compiler-compiled orchestration
+// code (HipLinearAlgebra.cpp, built by the SAME compiler as the rest of
+// libKriging). No Armadillo (or other non-POD C++) type may cross this
+// boundary: hipcc and the project's host compiler can silently disagree on
+// class layout for a nontrivial type like arma::Col/Mat (different feature-
+// detection macros picked up while compiling Armadillo's headers), which
+// showed up in practice as arma::vec::memptr() returning a null pointer on
+// the hipcc side while n_elem still read correctly -- a genuine ABI mismatch,
+// not a logic bug. Raw pointers/ints/doubles have no such ambiguity.
 //
 // All of these are BATCHED across a matrix's ncols columns in one launch,
-// rather than looping one column at a time on the host -- see
-// CudaLinearAlgebraKernel.cuh's file comment for the full rationale (the
-// HIP and CUDA kernels are otherwise line-for-line the same algorithm).
+// rather than looping one column at a time on the host: conjugateGradient's
+// CG loop (HipLinearAlgebra.cpp) solves every column of a right-hand-side
+// matrix B "in lockstep" (columns that converge early are frozen via a
+// zeroed alpha/beta rather than dropped, since CUDA has no cheap per-column
+// early-exit mid-launch), replacing what used to be ncols independent CG
+// loops -- each launching its own matvec + several cuBLAS calls, so ncols
+// separate rounds of kernel-launch and host-sync overhead -- with ONE
+// matvec + a couple of reductions per iteration, regardless of ncols.
+// Profiling (see HipLinearAlgebraKernel.hip.cpp's rmul_batched_kernel comment)
+// found kernel-launch/host-sync overhead, not FLOPs, as the dominant cost
+// at the n this project targets, which is exactly what batching amortizes.
 extern "C" {
 
 // Length (in doubles) of the scratch buffer lk_hip_rmul_batched_launch
@@ -41,15 +51,8 @@ int lk_hip_rmul_batched_scratch_elems(int n, int ncols);
 // null otherwise). All pointers are device pointers. Launches
 // asynchronously; the caller is responsible for checking
 // hipGetLastError()/hipDeviceSynchronize() afterward.
-void lk_hip_rmul_batched_launch(const double* d_Xt,
-                                int n,
-                                int dimX,
-                                const double* d_theta,
-                                int covKind,
-                                const double* d_P,
-                                int ncols,
-                                double* d_Ap,
-                                double* d_scratch);
+void lk_hip_rmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
+                                 const double* d_P, int ncols, double* d_Ap, double* d_scratch);
 
 // out[c] = sum_i A[i,c]*B[i,c] for every column c (A, B are n x ncols,
 // column-major); pass the same pointer for A and B to get a per-column
@@ -64,6 +67,53 @@ void lk_hip_batched_axpy_launch(const double* d_alpha, const double* d_X, double
 // for CG's search-direction update). beta is a device pointer of length
 // ncols; R, P are n x ncols, column-major.
 void lk_hip_batched_update_p_launch(const double* d_R, const double* d_beta, double* d_P, int n, int ncols);
+
+// --- CG per-iteration scalar updates, done ON DEVICE ----------------------
+// All operate on ncols-length device vectors so the CG loop never has to
+// round-trip pAp / r.r / alpha / beta through the host. See
+// HipLinearAlgebraKernel.hip.cpp for the exact per-column semantics (they
+// mirror the host loop's, breakdown guard and relative-residual
+// convergence test included). d_active is int (0/1) per column.
+
+// alpha[c] = active[c] && pAp[c] > 0 ? rz_old[c]/pAp[c] : 0 ; neg_alpha[c] = -alpha[c].
+// Marks active[c]=0 on the pAp[c] <= 0 breakdown.
+void lk_hip_cg_alpha_launch(const double* d_rz_old, const double* d_pAp, int ncols, int* d_active, double* d_alpha,
+                             double* d_neg_alpha);
+
+// If active[c]: converged when sqrt(rr_new[c])/bnorm[c] < tol (then active[c]=0, beta[c]=0,
+// rz_old unchanged); else beta[c] = rr_new[c]/rz_old[c] and rz_old[c] = rr_new[c].
+void lk_hip_cg_beta_launch(const double* d_rr_new, const double* d_bnorm, double tol, int ncols, int* d_active,
+                            double* d_rz_old, double* d_beta);
+
+// Restart-iteration variant: if active[c], rz_old[c] = rr[c] and active[c]=0 when converged.
+void lk_hip_cg_restart_launch(const double* d_rr, const double* d_bnorm, double tol, int ncols, int* d_active,
+                               double* d_rz_old);
+
+// d_flag (single int) must be zeroed by the caller first; set to 1 if any active[c] != 0.
+void lk_hip_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
+
+// Batched d(R)/d(theta) . V : d_Out[i, k + c*dimX] = sum_{j!=i}
+// d(R_ij)/d(theta_k) * V[j,c], for k in [0,dimX), one launch over all
+// (i, c). d_Out is n x (dimX*ncols) column-major (see the .cu). dimX must
+// be <= 32. Matches Kriging::_logLikelihoodIterative's CPU dRmul_all.
+void lk_hip_drmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
+                                  const double* d_V, int ncols, double* d_Out);
+
+// Nystrom/Woodbury preconditioner apply: d_z = Dinv .* (r - U M^-1 U^T (Dinv .* r)),
+// M = d_Mchol d_Mchol^T (k x k lower). d_U is n x k col-major, d_Dinv is n,
+// d_r/d_z are n x ncols. d_scratch_nc must be >= n*ncols doubles,
+// d_scratch_kc >= k*ncols. Matches LinearAlgebra::WoodburyFactorization::solve.
+void lk_hip_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
+                                  const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc);
+
+// Preconditioned-CG beta update: beta[c] = rz_new/rz_old, rz_old <- rz_new,
+// convergence tested on the TRUE residual norm rr[c]/bnorm[c].
+void lk_hip_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm, double tol,
+                                    int ncols, int* d_active, double* d_rz_old, double* d_beta);
+
+// Restart variant for preconditioned CG: rz_old <- rz[c], converge on rr[c].
+void lk_hip_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm, double tol,
+                                       int ncols, int* d_active, double* d_rz_old);
 
 }  // extern "C"
 
