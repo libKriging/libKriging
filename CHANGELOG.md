@@ -104,8 +104,18 @@ past release, see the corresponding entry on the
   lockstep Lanczos through the same engine), instead of one full
   covariance sweep per column — every transcendental `Cov(x_i - x_j, theta)`
   is reused across all `nprobe` probes / all `d` gradient directions. The
-  `dR/dtheta` matvec is batched the same way. ~7-9x faster `logLik` +
-  gradient evaluation at `n <= 1000` on a many-core host, identical results.
+  `dR/dtheta` matvec is batched the same way.
+- `LLIterative` CPU objective/gradient, dense fast path: for a separable
+  kernel (`gauss` / `exp` / `matern3_2` / `matern5_2`) and an `n` whose
+  dense `n x n` `R` — plus the `d` `dR/dtheta_k` blocks when a gradient is
+  wanted — fits a memory budget (6 GiB default, `LK_ITERATIVE_DENSE_MAX_MB`;
+  `0` forces the strictly matrix-free path), `R` is materialized ONCE with
+  an inlined, parallelized symmetric build and every subsequent CG
+  iteration / Lanczos step is a BLAS-3 `R * V` instead of a fresh
+  transcendental-heavy covariance sweep. Combined with the batching above,
+  ~100x faster `logLik` + gradient at `n = 2000` (235 s → ~2 s at
+  `OMP_NUM_THREADS=32`); results unchanged to the SLQ noise floor. GPU
+  path unaffected (it has its own device matvecs).
 - `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via

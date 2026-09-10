@@ -5,12 +5,13 @@
 Unlike `LLVecchia`/`LLNystrom` (which each replace R by a cheaper
 *structured* approximation — local conditioning / global low rank),
 `LLIterative` keeps R itself exact: every term of the concentrated
-log-likelihood except `log|R|` is computed via matrix-free conjugate
-gradient (`LinearAlgebra::conjugateGradientBatched` — all right-hand
-sides share one covariance sweep per iteration) instead of a dense O(n³)
-Cholesky factorization, mathematically the same quantity a full
-factorization would give (up to CG's own convergence tolerance) but
-computed via O(n²) matvecs. `log|R|` — the one term CG cannot produce
+log-likelihood except `log|R|` is computed via conjugate gradient
+(`LinearAlgebra::conjugateGradientBatched` — all right-hand sides share
+one matvec per iteration) instead of a dense O(n³) Cholesky
+factorization, mathematically the same quantity a full factorization
+would give (up to CG's own convergence tolerance) but computed via
+O(n²) matvecs — matrix-free by default, or against a `R` materialized
+once per evaluation when it fits (see *Dense fast path* below). `log|R|` — the one term CG cannot produce
 directly — is replaced by a Stochastic Lanczos Quadrature (SLQ) estimate,
 and the gradient's `trace(R⁻¹ ∂R/∂θₖ)` term by a Hutchinson estimate
 sharing the same probe vectors. This is the same overall strategy as
@@ -124,10 +125,27 @@ Where this sits relative to the other scaling methods:
   fixed-rank Nystrom `P` approximates `R` (little at small `n`, where the
   θ-neutral reference kernel yields few above-tolerance pivots; more as
   `n` grows — which is the regime the iterative path is for).
+- **Dense fast path (CPU)**: strictly matrix-free (R never stored) is the
+  fallback, not the only mode. For a *separable* kernel — `gauss`, `exp`,
+  `matern3_2`, `matern5_2`, i.e. `Cov(dx,θ) = exp(-Σₖ sₖ(|dxₖ|/θₖ))` — and
+  an `n` whose dense `n×n` `R` (plus the `d` `∂R/∂θₖ` blocks when a
+  gradient is wanted) fits a memory budget (`LK_ITERATIVE_DENSE_MAX_MB`,
+  default 6144; `0` forces matrix-free), `_logLikelihoodIterative`
+  materializes `R` **once** with an inlined, OpenMP-parallel symmetric
+  build and then runs every CG iteration / Lanczos step as a BLAS-3
+  `R·V`. The dozens-to-hundreds of transcendental covariance sweeps a
+  single objective+gradient evaluation would otherwise do collapse to
+  one; results are unchanged to the SLQ/Hutchinson noise floor (only the
+  matvec summation order differs). This is the regime the iterative path
+  targets anyway — `n` large enough that a *resident* Cholesky factor is
+  the problem, not `O(n²)` scratch that a dense fit would also allocate.
+  Non-separable kernels and `n` past the budget stay on the matrix-free
+  loops; the GPU backends have their own device matvecs and ignore this.
 - **Cost model**: a gradient evaluation is a CG solve over `nprobe`
   right-hand sides (each up to `2n` Krylov iterations, each an O(n²)
-  matvec, or cheaper per-iteration with the preconditioner enabled but
-  at extra O(n·precond_rank²) setup cost per evaluation). A free BFGS
+  matvec on the dense-fast-path `R` or a matrix-free covariance sweep,
+  or cheaper per-iteration with the preconditioner enabled but at extra
+  O(n·precond_rank²) setup cost per evaluation). A free BFGS
   fit multiplies that by however many iterations BFGS needs against a
   somewhat noisy stochastic objective surface — this can get expensive
   fast for anything beyond small/moderate `n`/`nprobe`. Prefer
