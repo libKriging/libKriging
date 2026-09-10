@@ -35,7 +35,7 @@ The following tools are pre-approved and may be used freely without asking for u
 
 ## Git usage
 
-Never run `git push` or any variant that pushes commits to a remote (e.g. `git push --force`, `git push origin`). If a task requires pushing, stop and ask the user to do it manually.
+Never run `git push` or any variant that pushes commits to a remote (e.g. `git push --force`, `git push origin`) master or main. If a task requires pushing on main branch, stop and ask the user to do it manually. But accept push on other branches, especially ones behind pull requests.
 
 ## Known pitfalls
 
