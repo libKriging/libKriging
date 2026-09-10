@@ -277,6 +277,38 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
   CHECK(arma::abs(grad_plain - grad_pc).max() < 0.02 * arma::abs(grad_plain).max() + 0.05);
 }
 
+TEST_CASE("LLIterative(m,precond_rank): the Nystrom preconditioner is applied to the SLQ log-determinant",
+          "[iterative][kriging]") {
+  // With objective "LLIterative(m,precond_rank)" the SLQ Lanczos runs on the
+  // whitened Rtilde = L^-1 R L^-T (L L' = P = D + U U', LinearAlgebra::
+  // WoodburyFactorization::whitenL/whitenLt), and log|P| is added back
+  // exactly (LinearAlgebra::woodbury_logdet). The identity
+  //   log|R| = log|P| + log|P^-1 R|
+  // must hold, so the preconditioned concentrated log-likelihood tracks the
+  // exact one at least as closely as the unpreconditioned SLQ estimate at
+  // the same Lanczos-step budget -- it is never made worse by preconditioning
+  // (and on a well-approximated R it is markedly better; see
+  // docs/comparisons/libKriging_vs_GPyTorch.ipynb / bench/gpu for the
+  // theta=0.15 sweep where LLIterative(30,50) beats LLIterative(30,0,40)).
+  arma::mat X;
+  arma::vec y;
+  make_data(150, X, y);
+  const double th = 0.2;
+  const arma::vec theta{th, th};
+
+  const double ll_exact
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24)", th).logLikelihoodFun(theta, false, false));
+  const double err_plain = std::abs(
+      std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,16)", th).logLikelihoodIterativeFun(theta, false))
+      - ll_exact);
+  const double err_pc = std::abs(
+      std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,80,16)", th).logLikelihoodIterativeFun(theta, false))
+      - ll_exact);
+
+  INFO("|ll_iter - ll_exact|: unpreconditioned = " << err_plain << ", preconditioned = " << err_pc);
+  CHECK(err_pc <= err_plain + 0.02 * std::abs(ll_exact) + 1.0);  // never materially worse
+}
+
 // The "light fit" flag (and everything gated behind it: predictIterative routing,
 // blocking simulate/update/save) is set on BOTH the multistart-BFGS commit
 // path and the optim="none" fixed-theta commit path -- exactly like

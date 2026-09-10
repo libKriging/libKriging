@@ -1480,13 +1480,20 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 // solve, mathematically the same quantity a dense Cholesky factorization
 // would give (up to CG's own convergence tolerance), just computed via
 // O(n^2) matvecs instead of an O(n^3) factorization. Only the log-
-// determinant -- the one term CG cannot produce directly -- is replaced by
-// a Stochastic Lanczos Quadrature (SLQ) estimate
-// (LinearAlgebra::stochasticLogDet), and correspondingly the gradient's
+// determinant -- the one term CG cannot produce directly -- is a Stochastic
+// Lanczos Quadrature (SLQ) estimate, and correspondingly the gradient's
 // trace(Rinv * dR/dtheta_k) term is a Hutchinson estimate sharing the SAME
-// probe vectors as the log-det (both are computed from the same
-// LinearAlgebra::conjugateGradient(Rmul, probes, ...) batch solve). This is
-// the same overall strategy as GPyTorch's BBMM/Lanczos-based inference.
+// probe vectors as the log-det. All of it -- the [F|y] solve, the probe
+// solve, and the SLQ Lanczos -- goes through ONE batched matvec engine
+// (LinearAlgebra::conjugateGradientBatched / stochasticLogDetBatched, or the
+// GPU backend): every R_ij is evaluated once and applied to all right-hand
+// sides at once, the batched analogue of GPyTorch's BBMM. When a Nystrom
+// preconditioner is enabled (objective "LLIterative(m,precond_rank)") the
+// SLQ Lanczos runs on the symmetric whitened Rtilde = L^-1 R L^-T
+// (L L' = P = D + U U', WoodburyFactorization::whitenL/whitenLt) -- its SLQ
+// estimate is log|R| - log|P| -- and log|P| (LinearAlgebra::woodbury_logdet)
+// is added back exactly, so the preconditioner tightens the log-determinant
+// as well as accelerating the solves.
 //
 // Probes are drawn ONCE per fit (make_iterative_probes, fixed seed) and
 // held fixed across every theta evaluation during optimization, for the
@@ -1604,78 +1611,65 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const arma::uword dimX = Xt.n_rows;
   const arma::vec& theta = _theta;
   const auto& cov = _Cov;
-  // Rmul is called O(CG iterations x CG solves) times per objective/gradient
-  // evaluation -- often several thousand times, each recomputing every R_ij
-  // from scratch (matrix-free BY DESIGN: R is never cached as an n x n array,
-  // not even transiently during one evaluation -- see the LLIterative memory
-  // measurement in docs/math/lliterative_vs_cholesky.ipynb, which this would
-  // invalidate). Two things ARE free to exploit without giving that up:
-  //   1. R is symmetric (R_ij = R_ji): looping over unordered pairs i<j and
-  //      writing BOTH out(i) and out(j) from one cov() call halves the number
-  //      of (expensive, transcendental-function-heavy) covariance evaluations
-  //      per matvec, vs. the previous i,j-independent double loop that
-  //      evaluated every pair twice.
-  //   2. The (d,)-sized delta vector cov() expects doesn't need reallocating
-  //      per pair -- one reusable buffer per row (serial) / per thread
-  //      (parallel) suffices, and going through raw memptr() indexing avoids
-  //      armadillo subview overhead entirely (Xt.col(i) - Xt.col(j) both
-  //      allocates a temporary AND goes through subview machinery).
-  // Accumulating into out(j) from whichever i<j is currently being processed
-  // is a genuine write-write hazard under parallelization (unlike writing
-  // into a dense n x n matrix's distinct (i,j)/(j,i) cells, e.g. in
-  // LinearAlgebra::covMat_sym_X): different threads working on different i
-  // can target the SAME j concurrently. Give each thread its own O(n)
-  // (not O(n^2)) accumulator and sum them once at the end instead.
+  // RmulBatched applies R to a WHOLE block V (n x k) at once. It is called
+  // O(CG iterations) times per objective/gradient evaluation, each time
+  // recomputing every R_ij from scratch (matrix-free BY DESIGN: R is never
+  // cached as an n x n array, not even transiently during one evaluation --
+  // see the LLIterative memory measurement in
+  // docs/math/lliterative_vs_cholesky.ipynb, which this would invalidate).
+  // Three things ARE free to exploit without giving that up:
+  //   1. All k right-hand sides share the SAME R: evaluate each
+  //      (transcendental-function-heavy) R_ij ONCE and apply it to all k
+  //      columns. This is the batched analogue of GPyTorch's BBMM and is
+  //      what lets the batched CG solves and the lockstep-Lanczos SLQ
+  //      log-determinant pay one covariance sweep per iteration instead of
+  //      one per right-hand side.
+  //   2. R is symmetric (R_ij = R_ji): looping over unordered pairs i<j and
+  //      writing BOTH out.row(i) and out.row(j) from one cov() call halves
+  //      the covariance evaluations vs. an i,j-independent double loop.
+  //   3. The (d,)-sized delta vector cov() expects doesn't need reallocating
+  //      per pair -- one reusable buffer per thread suffices, and raw
+  //      memptr() indexing avoids armadillo subview overhead entirely.
+  // Accumulating into out.row(j) from whichever i<j is currently being
+  // processed is a write-write hazard under parallelization: give each
+  // thread its own O(n*k) accumulator and sum them once at the end.
   const double* Xt_mem = Xt.memptr();
-  auto Rmul = [Xt_mem, &theta, &cov, n, dimX](const arma::vec& v) -> arma::vec {
-    arma::vec out(v);  // diag = 1 (out(i) = v(i) before adding off-diagonal terms)
-    const double* v_mem = v.memptr();
+  auto RmulBatched = [Xt_mem, &theta, &cov, n, dimX](const arma::mat& V) -> arma::mat {
+    const arma::uword k = V.n_cols;
+    arma::mat out(V);  // diag of R is 1: out starts at V, off-diagonal terms added below
 #ifdef _OPENMP
-    // Skip the inner parallel region when already running inside one (e.g.
-    // LinearAlgebra::conjugateGradient parallelizing across probe columns,
-    // each column calling this Rmul many times): avoids nested-parallelism
-    // oversubscription without depending on the OpenMP runtime's default
-    // (implementation-defined) nested-parallel-region behavior.
+    // Skip the inner parallel region when already running inside one: avoids
+    // nested-parallelism oversubscription without depending on the OpenMP
+    // runtime's (implementation-defined) nested-parallel behavior.
     if (n >= 32 && !omp_in_parallel()) {
-      // Capped higher than the historical default of 2: this only fires
-      // when NOT already inside conjugateGradient's column-parallel region
-      // (single-column solves, e.g. the 2-column F,y solve) -- profiling at
-      // n=400 found it otherwise leaving most of a 20-core machine idle
-      // while doing real, substantial per-row work (each row now does
-      // roughly n/2 pairs after the symmetric-matvec change). This matvec
-      // IS the whole cost of a matrix-free LLIterative evaluation (called
-      // ~lanczos_steps*nprobe + CG-iteration times per objective), so let
-      // OMP_NUM_THREADS govern it directly instead of the conservative
-      // get_optimal_threads() cap -- on a many-core node the old cap of 8
-      // left the machine ~idle for minutes during the SLQ log-determinant.
+      // Let OMP_NUM_THREADS govern this matvec directly -- it IS the whole
+      // cost of a matrix-free LLIterative evaluation.
       const int optimal_threads = get_optimal_threads(omp_get_max_threads());
-      std::vector<arma::vec> thread_out(static_cast<std::size_t>(optimal_threads), arma::vec(n, arma::fill::zeros));
+      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
+                                        arma::mat(n, k, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
       {
-        double* local = thread_out[static_cast<std::size_t>(omp_get_thread_num())].memptr();
+        arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
         arma::vec dx(dimX, arma::fill::none);
         double* dx_mem = dx.memptr();
-        // static,1 (round-robin over i) rather than dynamic: this loop's
-        // workload is triangular (row i does n-1-i pairs), so round-robin
-        // still balances reasonably well, but -- unlike dynamic -- always
-        // assigns the SAME i's to the SAME thread regardless of runtime
-        // timing. Dynamic scheduling here made the exact floating-point
-        // rounding of each matvec (and hence of CG's accumulated result)
-        // depend on non-deterministic thread-scheduling order: harmless in
-        // principle (both orderings are valid roundings of the same sum),
-        // but it intermittently pushed the "Nystrom-preconditioned CG
-        // matches the unpreconditioned objective/gradient" test's tolerance
-        // over the edge on some runs and not others -- a real, if subtle,
-        // reproducibility regression, not just test flakiness to ignore.
+        // static,1 (round-robin over i): the triangular workload still
+        // balances reasonably, and -- unlike dynamic -- assigns the same i's
+        // to the same thread regardless of runtime timing, so the
+        // floating-point rounding of each matvec is reproducible (dynamic
+        // scheduling here intermittently pushed the
+        // "Nystrom-preconditioned CG matches the unpreconditioned
+        // objective/gradient" test over its tolerance).
 #pragma omp for schedule(static, 1)
         for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
           const arma::uword ii = static_cast<arma::uword>(i);
           for (arma::uword j = ii + 1; j < n; ++j) {
-            for (arma::uword k = 0; k < dimX; ++k)
-              dx_mem[k] = Xt_mem[k + ii * dimX] - Xt_mem[k + j * dimX];
+            for (arma::uword q = 0; q < dimX; ++q)
+              dx_mem[q] = Xt_mem[q + ii * dimX] - Xt_mem[q + j * dimX];
             const double c = cov(dx, theta);
-            local[ii] += c * v_mem[j];
-            local[j] += c * v_mem[ii];
+            for (arma::uword col = 0; col < k; ++col) {
+              local(ii, col) += c * V(j, col);
+              local(j, col) += c * V(ii, col);
+            }
           }
         }
       }
@@ -1687,11 +1681,13 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       double* dx_mem = dx.memptr();
       for (arma::uword i = 0; i < n; ++i) {
         for (arma::uword j = i + 1; j < n; ++j) {
-          for (arma::uword k = 0; k < dimX; ++k)
-            dx_mem[k] = Xt_mem[k + i * dimX] - Xt_mem[k + j * dimX];
+          for (arma::uword q = 0; q < dimX; ++q)
+            dx_mem[q] = Xt_mem[q + i * dimX] - Xt_mem[q + j * dimX];
           const double c = cov(dx, theta);
-          out(i) += c * v_mem[j];
-          out(j) += c * v_mem[i];
+          for (arma::uword col = 0; col < k; ++col) {
+            out(i, col) += c * V(j, col);
+            out(j, col) += c * V(i, col);
+          }
         }
       }
 #ifdef _OPENMP
@@ -1707,7 +1703,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // once in make_iterative_precond_landmarks -- keeping the preconditioner,
   // and hence the CG-converged objective/gradient, smooth in theta.
   std::unique_ptr<LinearAlgebra::WoodburyFactorization> woodbury_pc;
-  std::function<arma::vec(const arma::vec&)> Pinv;
+  std::function<arma::mat(const arma::mat&)> PinvBatched;
+  double logdetP_pc = 0.0;  // log|P| for the preconditioner P = D + U U' (0 when not preconditioning)
   if (m_iterative_precond_rank > 0) {
     const arma::mat X_land = m_X.rows(m_iterative_precond_landmarks);
     arma::mat R_ss(m_iterative_precond_landmarks.n_elem, m_iterative_precond_landmarks.n_elem, arma::fill::none);
@@ -1720,12 +1717,15 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     const arma::vec captured = arma::sum(arma::square(U_pc), 1);
     const arma::vec D_pc = arma::clamp(1.0 - captured, LinearAlgebra::num_nugget, arma::datum::inf);
     // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
-    // for every CG iteration's Pinv(v) call (O(n*k + k^2) each) -- calling
-    // LinearAlgebra::woodbury_solve fresh per apply would redo that
-    // factorization every iteration, making the "cheap" preconditioner
+    // for every CG iteration's PinvBatched(V) call (O(n*k + k^2) per column)
+    // -- calling LinearAlgebra::woodbury_solve fresh per apply would redo
+    // that factorization every iteration, making the "cheap" preconditioner
     // apply as expensive as the O(n^2) matvec it's meant to help avoid.
     woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
-    Pinv = [&woodbury_pc](const arma::vec& v) -> arma::vec { return woodbury_pc->solve(v).col(0); };
+    PinvBatched = [&woodbury_pc](const arma::mat& V) -> arma::mat { return woodbury_pc->solve(V); };
+    // Exact log|P| via the matrix-determinant lemma -- added back to the
+    // preconditioned SLQ estimate of log|P^-1 R| to recover log|R| (item 4).
+    logdetP_pc = LinearAlgebra::woodbury_logdet(U_pc, D_pc);
   }
 
   // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON or
@@ -1735,7 +1735,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // / HipLinearAlgebraKernel.hip.cpp). CUDA is tried first when both are
   // compiled in (won't happen in practice -- a machine has one vendor's GPU
   // or the other -- but there's no reason to forbid it). Falls back to the
-  // CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
+  // CPU RmulBatched-based LinearAlgebra::conjugateGradientBatched otherwise.
   // GPU dispatch for the whole iterative path, expressed as backend-agnostic
   // std::function objects so a new backend is one localised #ifdef block
   // instead of an extra branch in every call site. All three (the CG solve,
@@ -1780,7 +1780,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   auto cgSolve = [&](const arma::mat& B) -> arma::mat {
     if (gpuCgSolve)
       return gpuCgSolve(B);
-    return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
+    return LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, m_iterative_cg_tol, PinvBatched);
   };
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
@@ -1801,11 +1801,37 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   const double SSE = arma::dot(e, x);
   const double sigma2 = SSE / n;
 
-  const double logdetR
-      = slq_on_gpu
-            ? LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps,
-                                                     m_iterative_probes)
-            : LinearAlgebra::stochasticLogDet(Rmul, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
+  // log|R| via SLQ, run through the SAME batched matvec engine as the solves
+  // (RmulBatched on the CPU, rmulBatched on the GPU): a reorthogonalized
+  // Lanczos advancing all nprobe probes in lockstep, so it pays ONE
+  // covariance sweep per Lanczos step instead of nprobe (what the old scalar
+  // stochasticLogDet did). Raw CG-scalar mBCG fusion was tried and dropped:
+  // without full reorthogonalization the reconstructed tridiagonal loses
+  // accuracy as cond(R) grows with n. With a Nystrom preconditioner the
+  // Lanczos runs on the symmetric whitened Rtilde = L^-1 R L^-T (L L' = P) --
+  // whose SLQ estimate is log|R| - log|P| -- so preconditioning tightens the
+  // log-determinant, not just the CG solves (log|P| added back exactly).
+  double logdetR;
+  if (slq_on_gpu) {
+    logdetR = LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps,
+                                                     m_iterative_probes);
+  } else if (woodbury_pc) {
+    auto RtildeMulBatched = [&](const arma::mat& V) -> arma::mat {
+      return woodbury_pc->whitenL(RmulBatched(woodbury_pc->whitenLt(V)));
+    };
+    logdetR = logdetP_pc
+              + LinearAlgebra::stochasticLogDetBatched(RtildeMulBatched, n, nprobe, m_iterative_lanczos_steps,
+                                                       m_iterative_probes);
+  } else {
+    logdetR = LinearAlgebra::stochasticLogDetBatched(RmulBatched, n, nprobe, m_iterative_lanczos_steps,
+                                                     m_iterative_probes);
+  }
+
+  // W = R^-1 * probes, only needed for the gradient's Hutchinson trace
+  // (preconditioned batched CG when a Nystrom preconditioner is enabled).
+  arma::mat W;
+  if (grad_out != nullptr)
+    W = cgSolve(m_iterative_probes);
 
   if (beta_out != nullptr)
     *beta_out = beta;
@@ -1823,37 +1849,21 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     const arma::uword d = _theta.n_elem;
     grad_out->set_size(d);
 
-    const arma::mat W = cgSolve(m_iterative_probes);
-
-    // dR/dtheta_k * v for ALL d dimensions at once, in one O(n^2/2) pass
-    // over unordered pairs (i,j) instead of one O(n^2) pass PER dimension
-    // (the previous per-kk dRmul_k closure, called from a `for kk` loop
-    // wrapping this whole block). Two things were being wasted there:
-    //   1. _DlnCovDtheta(dx,theta) returns the FULL d-length gradient of
-    //      log-covariance in one call, but the old code called it once per
-    //      (i,j) pair PER kk and threw away d-1 of its d components each
-    //      time -- d-1 wasted calls (each allocating its own arma::vec)
-    //      out of every d.
-    //   2. Unlike Rmul (see its comment above), the old loop visited every
-    //      (i,j) pair in both directions instead of exploiting dR/dtheta_k's
-    //      symmetry (it's built from cov()/DlnCovDtheta(), both even
-    //      functions of dx, same reasoning as Rmul's own symmetry).
-    // Combined, this cuts total cov()/DlnCovDtheta() evaluations by a
-    // factor of ~2*d (mirrors Rmul's parallel/symmetric/raw-memptr pattern,
-    // including the schedule(static,1) determinism fix and the
-    // !omp_in_parallel() nested-parallelism guard -- see Rmul's comment for
-    // why both matter).
-    auto dRmul_all = [Xt_mem, &theta, &cov, this, n, dimX, d](const arma::vec& v) -> arma::mat {
-      arma::mat out(n, d, arma::fill::zeros);
-      const double* v_mem = v.memptr();
+    // dR/dtheta_k applied to a WHOLE block V (n x k) for ALL d dimensions at
+    // once: one O(n^2/2) pass over unordered pairs (i,j), each evaluating
+    // cov() and the full d-length _DlnCovDtheta() ONCE and applying the
+    // result to every column of V and every theta dimension. Output layout
+    // matches the GPU dRmulBatched: column (c*d + kk) is dR/dtheta_kk .
+    // V.col(c). Mirrors RmulBatched's per-thread accumulator / symmetric /
+    // raw-memptr / schedule(static,1) pattern (see its comment).
+    auto dRmulBatched_cpu = [Xt_mem, &theta, &cov, this, n, dimX, d](const arma::mat& V) -> arma::mat {
+      const arma::uword k = V.n_cols;
+      arma::mat out(n, d * k, arma::fill::zeros);
 #ifdef _OPENMP
       if (n >= 32 && !omp_in_parallel()) {
-        // Same reasoning as Rmul above: this dR/dtheta matvec is the
-        // gradient's dominant cost -- let OMP_NUM_THREADS govern it, not
-        // the conservative get_optimal_threads() cap.
         const int optimal_threads = get_optimal_threads(omp_get_max_threads());
         std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
-                                          arma::mat(n, d, arma::fill::zeros));
+                                          arma::mat(n, d * k, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
         {
           arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
@@ -1863,14 +1873,18 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
           for (arma::sword i = 0; i < static_cast<arma::sword>(n); ++i) {
             const arma::uword ii = static_cast<arma::uword>(i);
             for (arma::uword j = ii + 1; j < n; ++j) {
-              for (arma::uword k = 0; k < dimX; ++k)
-                dx_mem[k] = Xt_mem[k + ii * dimX] - Xt_mem[k + j * dimX];
+              for (arma::uword q = 0; q < dimX; ++q)
+                dx_mem[q] = Xt_mem[q + ii * dimX] - Xt_mem[q + j * dimX];
               const double c = cov(dx, theta);
               const arma::vec dlncov = _DlnCovDtheta(dx, theta);  // all d components, ONE call
-              for (arma::uword kk = 0; kk < d; ++kk) {
-                const double cd = c * dlncov(kk);
-                local(ii, kk) += cd * v_mem[j];
-                local(j, kk) += cd * v_mem[ii];
+              for (arma::uword col = 0; col < k; ++col) {
+                const double vj = V(j, col);
+                const double vi = V(ii, col);
+                for (arma::uword kk = 0; kk < d; ++kk) {
+                  const double cd = c * dlncov(kk);
+                  local(ii, col * d + kk) += cd * vj;
+                  local(j, col * d + kk) += cd * vi;
+                }
               }
             }
           }
@@ -1883,14 +1897,18 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
         double* dx_mem = dx.memptr();
         for (arma::uword i = 0; i < n; ++i) {
           for (arma::uword j = i + 1; j < n; ++j) {
-            for (arma::uword k = 0; k < dimX; ++k)
-              dx_mem[k] = Xt_mem[k + i * dimX] - Xt_mem[k + j * dimX];
+            for (arma::uword q = 0; q < dimX; ++q)
+              dx_mem[q] = Xt_mem[q + i * dimX] - Xt_mem[q + j * dimX];
             const double c = cov(dx, theta);
             const arma::vec dlncov = _DlnCovDtheta(dx, theta);
-            for (arma::uword kk = 0; kk < d; ++kk) {
-              const double cd = c * dlncov(kk);
-              out(i, kk) += cd * v_mem[j];
-              out(j, kk) += cd * v_mem[i];
+            for (arma::uword col = 0; col < k; ++col) {
+              const double vj = V(j, col);
+              const double vi = V(i, col);
+              for (arma::uword kk = 0; kk < d; ++kk) {
+                const double cd = c * dlncov(kk);
+                out(i, col * d + kk) += cd * vj;
+                out(j, col * d + kk) += cd * vi;
+              }
             }
           }
         }
@@ -1903,26 +1921,20 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     arma::rowvec term1(d, arma::fill::zeros);
     arma::rowvec trace(d, arma::fill::zeros);
 
-    // Same GPU routing as the SLQ log-determinant: the Hutchinson trace's
-    // dR/dtheta matvec is the gradient's dominant cost. One batched device
-    // call on [x | probe_0 | ... | probe_{nprobe-1}] returns, per column c,
-    // an n x d block dR/dtheta . column_c; the small dot products against x
-    // and W stay on the host.
-    if (dRmulBatched && dimX == d && d <= gpu_max_dimx) {
-      const arma::mat B_grad = arma::join_rows(x, m_iterative_probes);  // n x (1 + nprobe)
-      const arma::mat Og = dRmulBatched(B_grad);                        // n x (d*(1+nprobe))
+    // One batched dR/dtheta matvec on [x | probe_0 | ... | probe_{nprobe-1}]
+    // (GPU device call when available, else the batched CPU closure above):
+    // column (c*d + kk) is dR/dtheta_kk . column_c. The small dot products
+    // against x and W stay on the host. term1 feeds x' dR/dtheta x / sigma2;
+    // the probe columns feed the Hutchinson trace estimate.
+    const arma::mat B_grad = arma::join_rows(x, m_iterative_probes);  // n x (1 + nprobe)
+    const bool dR_on_gpu = static_cast<bool>(dRmulBatched) && dimX == d && d <= gpu_max_dimx;
+    const arma::mat Og = dR_on_gpu ? dRmulBatched(B_grad) : dRmulBatched_cpu(B_grad);  // n x (d*(1+nprobe))
+    for (arma::uword kk = 0; kk < d; ++kk)
+      term1(kk) = arma::dot(x, Og.col(0 * d + kk));
+    for (arma::uword p = 0; p < nprobe; ++p)
       for (arma::uword kk = 0; kk < d; ++kk)
-        term1(kk) = arma::dot(x, Og.col(0 * d + kk));
-      for (arma::uword p = 0; p < nprobe; ++p)
-        for (arma::uword kk = 0; kk < d; ++kk)
-          trace(kk) += arma::dot(W.col(p), Og.col((p + 1) * d + kk));
-      trace /= static_cast<double>(nprobe);
-    } else {
-      term1 = x.t() * dRmul_all(x);  // 1 x d, all dimensions at once
-      for (arma::uword p = 0; p < nprobe; ++p)
-        trace += W.col(p).t() * dRmul_all(m_iterative_probes.col(p));
-      trace /= static_cast<double>(nprobe);
-    }
+        trace(kk) += arma::dot(W.col(p), Og.col((p + 1) * d + kk));
+    trace /= static_cast<double>(nprobe);
 
     for (arma::uword kk = 0; kk < d; ++kk)
       (*grad_out)(kk) = 0.5 * (term1(kk) / sigma2 - trace(kk));

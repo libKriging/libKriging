@@ -5,6 +5,9 @@
 
 #include "libKriging/libKriging_exports.h"
 
+#include <functional>
+#include <vector>
+
 class LinearAlgebra {
  public:
   static arma::solve_opts::opts default_solve_opts;
@@ -97,6 +100,19 @@ class LinearAlgebra {
     LIBKRIGING_EXPORT WoodburyFactorization(const arma::mat& U, const arma::vec& D);
     LIBKRIGING_EXPORT arma::mat solve(const arma::mat& B) const;
 
+    // L^{-1} * B  (whitenL) and L^{-T} * B  (whitenLt) for a square factor L
+    // of P = D + U*U.t() with L*L.t() == P (L is not symmetric or
+    // triangular). Each applies in O(n*k) after a shared O(n*k^2 + k^3)
+    // one-time setup (built lazily) -- a thin-QR + k x k eigendecomposition
+    // of the low-rank structure, never an n x n factor. Lets
+    // Kriging::_logLikelihoodIterative run its SLQ log-determinant on the
+    // symmetric whitened operator Rtilde = L^{-1} R L^{-T}, whose SLQ
+    // estimate is log|R| - log|P| (log|P| added back via woodbury_logdet) --
+    // so the Nystrom preconditioner tightens the log-determinant, not just
+    // the CG solves.
+    LIBKRIGING_EXPORT arma::mat whitenL(const arma::mat& B) const;
+    LIBKRIGING_EXPORT arma::mat whitenLt(const arma::mat& B) const;
+
     // Read-only access to the factors, so a matching preconditioner apply
     // can be run elsewhere (e.g. on the GPU, in LinearAlgebraCuda's
     // preconditioned CG) without re-deriving safe_chol_lower(M) and risking
@@ -106,11 +122,19 @@ class LinearAlgebra {
     LIBKRIGING_EXPORT const arma::mat& McholLower() const { return m_M_chol_lower; }
 
    private:
+    void ensure_whiten_factors() const;  // lazily builds the whitenL/whitenLt factors
+
     arma::mat m_U;   // the n x k Nystrom factor, kept for U()/GPU apply
     arma::vec m_Dinv;
     arma::mat m_Ut;  // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
     arma::mat m_DinvU;
     arma::mat m_M_chol_lower;
+    // whitenL()/whitenLt()'s lazily-built low-rank factors: K^{-1/2} acts as
+    // I + Q*m_whiten_core*Q', then scaled by D^{-1/2} (mutable: a pure
+    // cache, the accessors stay logically const).
+    mutable arma::vec m_whiten_Dinvhalf;
+    mutable arma::mat m_whiten_Q;
+    mutable arma::mat m_whiten_core;
   };
 
   LIBKRIGING_EXPORT static arma::mat solve(const arma::mat& A, const arma::mat& B);
@@ -188,6 +212,20 @@ class LinearAlgebra {
                                                        double tol = 1e-8,
                                                        const std::function<arma::vec(const arma::vec&)>& Pinv
                                                        = std::function<arma::vec(const arma::vec&)>());
+
+  // Block CG with a SHARED matvec: same per-column convergence contract as
+  // conjugateGradient (each column an independent Krylov solve, no block-CG
+  // subspace sharing), but every active column is advanced in lockstep so
+  // `AmulBatched` / `PinvBatched` are called once per iteration on the whole
+  // n x ncols block -- one covariance sweep instead of ncols for LLIterative's
+  // matrix-free R*V. Used for LLIterative's [F|y] and probe solves.
+  LIBKRIGING_EXPORT static arma::mat conjugateGradientBatched(
+      const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+      const arma::mat& B,
+      arma::uword max_iter,
+      double tol = 1e-8,
+      const std::function<arma::mat(const arma::mat&)>& PinvBatched
+      = std::function<arma::mat(const arma::mat&)>());
 
   // Stochastic Lanczos Quadrature (SLQ) estimate of log|A| for an SPD matrix
   // A of size n, given only as a matrix-vector product `Amul` -- A itself is
