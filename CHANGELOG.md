@@ -67,6 +67,21 @@ past release, see the corresponding entry on the
   matvecs are no longer capped at 2/8 OpenMP threads (`OMP_NUM_THREADS`
   governs them now); `predictIterative`'s posterior-variance CG solves use
   `sqrt(tol)` (the variance needs far less accuracy than the mean).
+- `LLIterative` CPU objective/gradient: the matrix-free `R * V` is now
+  evaluated once per iteration for the *whole* right-hand-side block
+  (`LinearAlgebra::conjugateGradientBatched`, and the SLQ log-determinant's
+  lockstep Lanczos through the same engine), instead of one full
+  covariance sweep per column — every transcendental `Cov(x_i - x_j, theta)`
+  is reused across all `nprobe` probes / all `d` gradient directions. The
+  `dR/dtheta` matvec is batched the same way. ~7-9x faster `logLik` +
+  gradient evaluation at `n <= 1000` on a many-core host, identical results.
+- `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
+  to the SLQ log-determinant too, not only the CG solves — the Lanczos
+  quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
+  the new `WoodburyFactorization::whitenL`/`whitenLt`) and `log|P|` is added
+  back exactly, so a preconditioner also curbs the `log|R|` bias on an
+  ill-conditioned R (previously only `lanczos_steps` did). GPU path
+  unchanged. See `docs/math/Iterative.md`.
 - Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
   Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
   submodules, since both hardcode offsets into NumPy's C-API function table

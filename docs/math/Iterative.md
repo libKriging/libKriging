@@ -6,7 +6,8 @@ Unlike `LLVecchia`/`LLNystrom` (which each replace R by a cheaper
 *structured* approximation — local conditioning / global low rank),
 `LLIterative` keeps R itself exact: every term of the concentrated
 log-likelihood except `log|R|` is computed via matrix-free conjugate
-gradient (`LinearAlgebra::conjugateGradient`) instead of a dense O(n³)
+gradient (`LinearAlgebra::conjugateGradientBatched` — all right-hand
+sides share one covariance sweep per iteration) instead of a dense O(n³)
 Cholesky factorization, mathematically the same quantity a full
 factorization would give (up to CG's own convergence tolerance) but
 computed via O(n²) matvecs. `log|R|` — the one term CG cannot produce
@@ -42,10 +43,19 @@ Where this sits relative to the other scaling methods:
   subspace sharing, but far cheaper than p+1 separate O(n³)
   factorizations either way). β̂ and σ̂² then follow the usual GLS
   formulas, same as the exact objective.
-- **SLQ log-determinant**: `LinearAlgebra::stochasticLogDet` estimates
-  `log|R| ≈ (n/nprobe) Σᵢ zᵢᵀ log(R) zᵢ` via Lanczos quadrature on each
-  Rademacher probe `zᵢ` (Ubaru, Chen & Saad 2017) — R is only ever
-  accessed through matvecs.
+- **SLQ log-determinant**: `LinearAlgebra::stochasticLogDetBatched`
+  estimates `log|R| ≈ (n/nprobe) Σᵢ zᵢᵀ log(R) zᵢ` via a
+  reorthogonalized Lanczos quadrature on each Rademacher probe `zᵢ`
+  (Ubaru, Chen & Saad 2017) — R is only ever accessed through matvecs.
+  Every probe's Lanczos recurrence is advanced **in lockstep** so the
+  matvec `R·[z₁|…|z_nprobe]` is evaluated once per step on the whole
+  block, sharing a single covariance sweep across all probes — the same
+  batched matvec engine (`LinearAlgebra::conjugateGradientBatched` /
+  the GPU backend) used by the CG solves. (An earlier attempt to read
+  the quadrature straight off the CG scalars — true "matrix-free BBMM"
+  mBCG, no extra matvecs — was dropped: without full reorthogonalization
+  the reconstructed tridiagonal loses accuracy as `cond(R)` grows, and
+  restoring orthogonality *is* running Lanczos again.)
 - **Hutchinson gradient trace term**: the envelope-theorem gradient
   (same principle as `_logLikelihoodVecchia`/`_logLikelihoodNystrom` —
   β̂/σ̂²'s own θ-dependence doesn't contribute at their profiled values)
@@ -82,6 +92,19 @@ Where this sits relative to the other scaling methods:
   *set* is what's held fixed (for the same θ-smoothness reason as
   `LLNystrom`'s landmarks), not the factorization itself. Off by
   default (`precond_rank` omitted or 0).
+  The preconditioner is also applied to the **SLQ log-determinant**, not
+  just the CG solves: the Lanczos quadrature then runs on the whitened
+  operator `R̃ = L⁻¹ R L⁻ᵀ` where `L L' = P = D + U U'` (a square,
+  non-symmetric factor whose inverse applies in O(n·precond_rank) via
+  `WoodburyFactorization::whitenL`/`whitenLt` — a thin-QR + k×k
+  eigendecomposition of the low-rank structure, never an n×n factor),
+  and `log|R| = log|P| + log|P⁻¹R|` with `log|P|` added back exactly
+  (`LinearAlgebra::woodbury_logdet`). `R̃` is far better conditioned than
+  `R`, so its quadrature needs fewer Lanczos steps for the same
+  accuracy — preconditioning tightens the log-determinant bias too, not
+  only the solve iteration count. (The Hutchinson trace still needs
+  plain isotropic probes, so it keeps its own separate preconditioned
+  solve on the unwhitened probes.)
 - **SLQ Lanczos steps**:
   `objective="LLIterative(m,precond_rank,lanczos_steps)"` sets the number
   of Lanczos steps per probe in the stochastic log-determinant estimate
@@ -93,8 +116,14 @@ Where this sits relative to the other scaling methods:
   the iterative log-likelihood drifts from the exact `"LL"` objective at
   large `n` / long θ; the cost per probe grows ~linearly in
   `lanczos_steps` (plus an `O(lanczos_steps²)` tridiagonal `eig_sym`,
-  negligible). The preconditioner (2nd arg) does **not** touch the SLQ
-  matvec, so it does not help this bias — only `lanczos_steps` does.
+  negligible). A non-zero `precond_rank` (2nd arg) *also* reduces this
+  bias — the quadrature then runs on the well-conditioned whitened `R̃`
+  (see the preconditioner bullet) — so `LLIterative(m,precond_rank)` and
+  `LLIterative(m,0,lanczos_steps)` are two independent levers on the same
+  drift; how much the preconditioner helps depends on how well the
+  fixed-rank Nystrom `P` approximates `R` (little at small `n`, where the
+  θ-neutral reference kernel yields few above-tolerance pivots; more as
+  `n` grows — which is the regime the iterative path is for).
 - **Cost model**: a gradient evaluation is a CG solve over `nprobe`
   right-hand sides (each up to `2n` Krylov iterations, each an O(n²)
   matvec, or cheaper per-iteration with the preconditioner enabled but
