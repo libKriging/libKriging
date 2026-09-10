@@ -309,6 +309,50 @@ TEST_CASE("LLIterative(m,precond_rank): the Nystrom preconditioner is applied to
   CHECK(err_pc <= err_plain + 0.02 * std::abs(ll_exact) + 1.0);  // never materially worse
 }
 
+TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[iterative][kriging]") {
+  // For a separable kernel and small enough n, _logLikelihoodIterative
+  // materializes R (and the dR/dtheta_k blocks) once and runs every matvec
+  // as a BLAS-3 R*V. LK_ITERATIVE_DENSE_MAX_MB=0 forces the strictly
+  // matrix-free per-pair path instead. Same probes, same theta => the two
+  // must agree on both the concentrated log-likelihood and its gradient to
+  // well within the SLQ/Hutchinson stochastic-estimator noise (the only
+  // difference is BLAS vs pair-loop summation order).
+  arma::mat X;
+  arma::vec y;
+  make_data(160, X, y);
+  const arma::vec theta{0.25, 0.3};
+
+  const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
+
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
+  auto [ll_mf, g_mf] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24)").logLikelihoodIterativeFun(theta, true);
+
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
+  auto [ll_de, g_de] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24)").logLikelihoodIterativeFun(theta, true);
+
+  if (old_env)
+    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
+  else
+    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+
+  INFO("ll matrix-free = " << ll_mf << ", ll dense = " << ll_de);
+  CHECK(std::abs(ll_mf - ll_de) < 1e-6 * std::abs(ll_mf) + 1e-6);
+  CHECK(arma::abs(g_mf - g_de).max() < 1e-5 * arma::abs(g_mf).max() + 1e-5);
+
+  // and the preconditioned path (whitened SLQ + separate probe solve) too
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
+  const double llp_mf
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24)").logLikelihoodIterativeFun(theta, false));
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
+  const double llp_de
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24)").logLikelihoodIterativeFun(theta, false));
+  if (old_env)
+    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
+  else
+    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+  CHECK(std::abs(llp_mf - llp_de) < 1e-6 * std::abs(llp_mf) + 1e-6);
+}
+
 // The "light fit" flag (and everything gated behind it: predictIterative routing,
 // blocking simulate/update/save) is set on BOTH the multistart-BFGS commit
 // path and the optim="none" fixed-theta commit path -- exactly like

@@ -17,11 +17,13 @@ settings), the cost and accuracy of five backends, each named
   **reference**: its log-likelihood value and its posterior mean are what
   the iterative methods are measured against.
 * **libKriging-Iterative-CUDA** / **libKriging-Iterative-OpenMP** -- the
-  matrix-free iterative path (``objective="LLIterative(30,0,40)"``: 30 SLQ
-  probes, no CG preconditioner, 40 Lanczos steps per probe so the stochastic
-  log-determinant stays close to exact), light fit (no dense R factor),
-  ``set_cuda_iterative_enabled(True/False)``. The matvec kernels are
-  hand-written (CUDA / OpenMP), not cuBLAS / a CPU BLAS.
+  iterative path (``objective="LLIterative(30,0,40)"``: 30 SLQ probes, no CG
+  preconditioner, 40 Lanczos steps per probe so the stochastic
+  log-determinant stays close to exact), light fit (no dense R *factor*),
+  ``set_cuda_iterative_enabled(True/False)``. CUDA uses hand-written device
+  matvec kernels; OpenMP materializes R once per evaluation and runs the
+  matvecs as BLAS-3 ``R*V`` (separable kernels, ``LK_ITERATIVE_DENSE_MAX_MB``
+  budget), falling back to a hand-written OpenMP matvec otherwise.
 * **GPyTorch-BBMM-CUDA** / **GPyTorch-BBMM-<BLAS>** -- GPyTorch's ``ExactGP``
   + BBMM (CG + pivoted-Cholesky preconditioner + SLQ log-det), on ``cuda``
   or ``cpu`` (torch's own BLAS named), with *raised*
@@ -600,7 +602,10 @@ def write_markdown(path, rows, meta):
     ap("## Notes")
     ap("")
     ap("- Backend names are `<lib>-<method>-<linalg lib>`. `libKriging-Iterative-CUDA` "
-       "and `-OpenMP` use hand-written matvec kernels (not cuBLAS / a CPU BLAS); "
+       "uses hand-written CUDA matvec kernels; `libKriging-Iterative-OpenMP` "
+       "materializes R once per evaluation and runs the matvecs as BLAS-3 `R*V` "
+       "(hence `-OpenMP`, the BLAS it links) for separable kernels within the "
+       "`LK_ITERATIVE_DENSE_MAX_MB` budget, else a hand-written OpenMP matvec. "
        f"`{name('chol')}` and `{name('gpt-cpu')}` name the actual dense BLAS/LAPACK "
        "each links against.")
     ap(f"- theta={meta['theta']} is chosen so the SLQ log-determinant's Lanczos "
@@ -610,8 +615,9 @@ def write_markdown(path, rows, meta):
        "third `LLIterative` argument (SLQ Lanczos steps per probe), added so the "
        "iterative log-likelihood *value* also tracks the exact one here.")
     ap(f"- `{name('iter-cuda')}` vs `{name('iter-omp')}` is the same binary with "
-       "`set_cuda_iterative_enabled(...)` toggled — identical results, different device "
-       "for the batched CG / SLQ / gradient matvecs.")
+       "`set_cuda_iterative_enabled(...)` toggled — identical results, different path "
+       "for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU "
+       "dense-`R` BLAS path).")
     ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these "
        "results + the GPyTorch code libKriging mimics).")
     ap("")
