@@ -48,6 +48,93 @@ __device__ __forceinline__ double lk_cov_pair(CovKind kind,
   return c;
 }
 
+// Largest ARD input dimension the dR/dtheta kernel keeps a per-thread stack
+// accumulator for. Far beyond any realistic GP (checked host-side in
+// LinearAlgebraCuda::dRmulBatched, which falls back to the CPU path above
+// this).
+#define LK_CUDA_MAX_DIMX 32
+
+// out[k] = d(ln cov)/d(theta_k) for the pair (Xi, Xj), matching
+// Covariance::DlnCovDtheta_{gauss,exp,matern32,matern52} in
+// src/lib/Covariance.cpp EXACTLY (same closed forms). cov()*out[k] is then
+// d(cov)/d(theta_k), the quantity Kriging::_logLikelihoodIterative's CPU
+// dRmul_all accumulates.
+__device__ __forceinline__ void lk_dlncov_pair(CovKind kind,
+                                               const double* __restrict__ Xi,
+                                               const double* __restrict__ Xj,
+                                               const double* __restrict__ theta,
+                                               int dimX,
+                                               double* __restrict__ out) {
+  switch (kind) {
+    case CovKind::Gauss:
+      for (int k = 0; k < dimX; ++k) {
+        double dx = Xi[k] - Xj[k];
+        out[k] = (dx * dx) / (theta[k] * theta[k] * theta[k]);
+      }
+      break;
+    case CovKind::Exp:
+      for (int k = 0; k < dimX; ++k)
+        out[k] = fabs(Xi[k] - Xj[k]) / (theta[k] * theta[k]);
+      break;
+    case CovKind::Matern32:
+      for (int k = 0; k < dimX; ++k) {
+        double d = 1.7320508075688772 * fabs((Xi[k] - Xj[k]) / theta[k]);
+        out[k] = (d * d) / (1.0 + d) / theta[k];
+      }
+      break;
+    case CovKind::Matern52:
+    default:
+      for (int k = 0; k < dimX; ++k) {
+        double d = 2.23606797749979 * fabs((Xi[k] - Xj[k]) / theta[k]);
+        double a = 1.0 + d;
+        double b = (d * d) / 3.0;
+        out[k] = (a * b) / (a + b) / theta[k];
+      }
+      break;
+  }
+}
+
+// One thread per (row i, column c): Out[i, k + c*dimX] = sum_{j != i}
+// d(R_ij)/d(theta_k) * V[j, c], for every k in [0, dimX). R is never
+// materialized (matrix-free, matching the CPU dRmul_all). Out is
+// n x (dimX*ncols) column-major -- column c's dimX-wide block of
+// d(R)/d(theta) . V[:,c] lives at Out + c*dimX*n. Diagonal j==i contributes
+// nothing (d(1)/d(theta) = 0), same as the CPU loop's j = i+1 start.
+__global__ void drmul_batched_kernel(const double* __restrict__ Xt,
+                                     int n,
+                                     int dimX,
+                                     const double* __restrict__ theta,
+                                     CovKind kind,
+                                     const double* __restrict__ V,
+                                     int ncols,
+                                     double* __restrict__ Out) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int c = blockIdx.y;
+  if (i >= n || c >= ncols)
+    return;
+
+  double acc[LK_CUDA_MAX_DIMX];
+  for (int k = 0; k < dimX; ++k)
+    acc[k] = 0.0;
+  double dln[LK_CUDA_MAX_DIMX];
+
+  const double* Vc = V + static_cast<std::size_t>(c) * n;
+  const double* Xi = Xt + static_cast<std::size_t>(i) * dimX;
+  for (int j = 0; j < n; ++j) {
+    if (j == i)
+      continue;
+    const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
+    const double cij = lk_cov_pair(kind, Xi, Xj, theta, dimX);
+    lk_dlncov_pair(kind, Xi, Xj, theta, dimX, dln);
+    const double vj = Vc[j];
+    for (int k = 0; k < dimX; ++k)
+      acc[k] += cij * dln[k] * vj;
+  }
+  double* Oc = Out + static_cast<std::size_t>(c) * dimX * n;
+  for (int k = 0; k < dimX; ++k)
+    Oc[static_cast<std::size_t>(k) * n + i] = acc[k];
+}
+
 // One thread per (row i, column c): R is never materialized (matching the
 // CPU Rmul's O(n) memory invariant) -- each thread recomputes R(i,j) on the
 // fly while walking j = 0..n-1 and accumulates R(i,:) . P[:,c] into
@@ -331,6 +418,262 @@ extern "C" void lk_cuda_batched_update_p_launch(const double* d_R,
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   batched_update_p_kernel<<<grid, block>>>(d_R, d_beta, d_P, n);
+}
+
+// --- CG per-iteration scalar updates, kept ON DEVICE ------------------------
+// The CG loop's alpha/beta/convergence arithmetic is one value per column
+// (ncols small). Doing it on the host meant a blocking cudaMemcpy of the
+// ncols-long pAp / r.r vectors D2H and the alpha/beta vectors H2D on EVERY
+// iteration -- ~4 device synchronizations per step. These kernels do that
+// arithmetic in place on device buffers so the host only needs a single
+// int ("any column still active?") copied back every few iterations. Each
+// mirrors LinearAlgebra::conjugateGradient's / the host loop's logic
+// exactly, including the pAp<=0 breakdown guard and the relative-residual
+// convergence test.
+
+__global__ void cg_alpha_kernel(const double* __restrict__ rz_old,
+                                const double* __restrict__ pAp,
+                                int ncols,
+                                int* __restrict__ active,
+                                double* __restrict__ alpha,
+                                double* __restrict__ neg_alpha) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c]) {
+    alpha[c] = 0.0;
+    neg_alpha[c] = 0.0;
+    return;
+  }
+  const double q = pAp[c];
+  if (!(q > 0.0)) {  // breakdown guard: freeze this column
+    active[c] = 0;
+    alpha[c] = 0.0;
+    neg_alpha[c] = 0.0;
+    return;
+  }
+  const double a = rz_old[c] / q;
+  alpha[c] = a;
+  neg_alpha[c] = -a;
+}
+
+__global__ void cg_beta_kernel(const double* __restrict__ rr_new,
+                               const double* __restrict__ bnorm,
+                               double tol,
+                               int ncols,
+                               int* __restrict__ active,
+                               double* __restrict__ rz_old,
+                               double* __restrict__ beta) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c]) {
+    beta[c] = 0.0;
+    return;
+  }
+  const double rn = rr_new[c];
+  if (sqrt(rn) / bnorm[c] < tol) {  // converged: freeze (rz_old left as-is, matches host 'continue')
+    active[c] = 0;
+    beta[c] = 0.0;
+    return;
+  }
+  beta[c] = rn / rz_old[c];
+  rz_old[c] = rn;
+}
+
+__global__ void cg_restart_kernel(const double* __restrict__ rr,
+                                  const double* __restrict__ bnorm,
+                                  double tol,
+                                  int ncols,
+                                  int* __restrict__ active,
+                                  double* __restrict__ rz_old) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c])
+    return;
+  rz_old[c] = rr[c];
+  if (sqrt(rr[c]) / bnorm[c] < tol)
+    active[c] = 0;
+}
+
+__global__ void cg_any_active_kernel(const int* __restrict__ active, int ncols, int* __restrict__ flag) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (active[c])
+    atomicOr(flag, 1);
+}
+
+extern "C" void lk_cuda_cg_alpha_launch(const double* d_rz_old,
+                                        const double* d_pAp,
+                                        int ncols,
+                                        int* d_active,
+                                        double* d_alpha,
+                                        double* d_neg_alpha) {
+  const int block = 128;
+  cg_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_rz_old, d_pAp, ncols, d_active, d_alpha, d_neg_alpha);
+}
+
+extern "C" void lk_cuda_cg_beta_launch(const double* d_rr_new,
+                                       const double* d_bnorm,
+                                       double tol,
+                                       int ncols,
+                                       int* d_active,
+                                       double* d_rz_old,
+                                       double* d_beta) {
+  const int block = 128;
+  cg_beta_kernel<<<(ncols + block - 1) / block, block>>>(d_rr_new, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
+}
+
+extern "C" void lk_cuda_cg_restart_launch(const double* d_rr,
+                                          const double* d_bnorm,
+                                          double tol,
+                                          int ncols,
+                                          int* d_active,
+                                          double* d_rz_old) {
+  const int block = 128;
+  cg_restart_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_bnorm, tol, ncols, d_active, d_rz_old);
+}
+
+extern "C" void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int* d_flag) {
+  const int block = 128;
+  cg_any_active_kernel<<<(ncols + block - 1) / block, block>>>(d_active, ncols, d_flag);
+}
+
+// --- Nystrom/Woodbury preconditioner apply, ON DEVICE --------------------
+// z = Dinv .* (r - U * (M^-1 (U^T (Dinv .* r)))), M = Mchol Mchol^T, k x k.
+// Matches LinearAlgebra::WoodburyFactorization::solve exactly (same
+// factors, passed in from the host). Lets LLIterative(m,precond_rank) /
+// predictIterative(use_nystrom_precond=True) run their CG on the GPU
+// instead of falling back to the CPU path.
+
+// DinvR[i,c] = Dinv[i] * R[i,c]  (n x ncols)
+__global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double* __restrict__ R, int n, double* __restrict__ Out) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int c = blockIdx.y;
+  if (i >= n)
+    return;
+  const std::size_t idx = static_cast<std::size_t>(c) * n + i;
+  Out[idx] = Dinv[i] * R[idx];
+}
+
+// t[kk,c] = sum_i U[i,kk] * Z[i,c]   (U n x k col-major; t k x ncols col-major)
+__global__ void gemm_Ut_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Z, int ncols, double* __restrict__ t) {
+  const int kk = blockIdx.x * blockDim.x + threadIdx.x;
+  const int c = blockIdx.y;
+  if (kk >= k || c >= ncols)
+    return;
+  const double* Uk = U + static_cast<std::size_t>(kk) * n;
+  const double* Zc = Z + static_cast<std::size_t>(c) * n;
+  double acc = 0.0;
+  for (int i = 0; i < n; ++i)
+    acc += Uk[i] * Zc[i];
+  t[static_cast<std::size_t>(c) * k + kk] = acc;
+}
+
+// In place per column c: solve (L L^T) s = t, L = Mchol lower (k x k col-major).
+__global__ void trisolve_MMt_kernel(const double* __restrict__ Mchol, int k, int ncols, double* __restrict__ t) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  double* tc = t + static_cast<std::size_t>(c) * k;
+  for (int i = 0; i < k; ++i) {  // forward: L y = t
+    double s = tc[i];
+    for (int j = 0; j < i; ++j)
+      s -= Mchol[static_cast<std::size_t>(j) * k + i] * tc[j];
+    tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
+  }
+  for (int i = k - 1; i >= 0; --i) {  // back: L^T s = y
+    double s = tc[i];
+    for (int j = i + 1; j < k; ++j)
+      s -= Mchol[static_cast<std::size_t>(i) * k + j] * tc[j];
+    tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
+  }
+}
+
+// z[i,c] = Dinv[i] * (r[i,c] - sum_kk U[i,kk] * s[kk,c])
+__global__ void precond_combine_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Dinv, const double* __restrict__ r, int ncols, const double* __restrict__ s, double* __restrict__ z) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int c = blockIdx.y;
+  if (i >= n || c >= ncols)
+    return;
+  const double* sc = s + static_cast<std::size_t>(c) * k;
+  double acc = 0.0;
+  for (int kk = 0; kk < k; ++kk)
+    acc += U[static_cast<std::size_t>(kk) * n + i] * sc[kk];
+  const std::size_t idx = static_cast<std::size_t>(c) * n + i;
+  z[idx] = Dinv[i] * (r[idx] - acc);
+}
+
+// beta[c] = active ? rz_new[c]/rz_old[c] : 0 ; rz_old[c] = rz_new[c] ;
+// convergence tested on the TRUE residual norm rr[c] (not rz). Matches the
+// preconditioned branch of LinearAlgebra::conjugateGradient.
+__global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz_new, const double* __restrict__ bnorm, double tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old, double* __restrict__ beta) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c]) {
+    beta[c] = 0.0;
+    return;
+  }
+  if (sqrt(rr[c]) / bnorm[c] < tol) {
+    active[c] = 0;
+    beta[c] = 0.0;
+    return;
+  }
+  beta[c] = rz_new[c] / rz_old[c];
+  rz_old[c] = rz_new[c];
+}
+
+extern "C" void lk_cuda_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
+                                             const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc) {
+  const dim3 blk(128, 1, 1);
+  const dim3 grid_n((n + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
+  const dim3 grid_k((k + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
+  scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_r, n, d_scratch_nc);       // d_scratch_nc = Dinv .* r
+  gemm_Ut_kernel<<<grid_k, blk>>>(d_U, n, k, d_scratch_nc, ncols, d_scratch_kc);  // d_scratch_kc = U^T (Dinv .* r)
+  trisolve_MMt_kernel<<<(ncols + blk.x - 1) / blk.x, blk>>>(d_Mchol, k, ncols, d_scratch_kc);  // <- s in place
+  precond_combine_kernel<<<grid_n, blk>>>(d_U, n, k, d_Dinv, d_r, ncols, d_scratch_kc, d_z);   // d_z
+}
+
+extern "C" void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
+                                               double tol, int ncols, int* d_active, double* d_rz_old, double* d_beta) {
+  const int block = 128;
+  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz_new, d_bnorm, tol, ncols, d_active, d_rz_old,
+                                                                d_beta);
+}
+
+// Restart-iteration variant for preconditioned CG: rz_old <- rz[c] (the
+// preconditioned inner product), converge on the true residual rr[c].
+__global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz, const double* __restrict__ bnorm, double tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols || !active[c])
+    return;
+  rz_old[c] = rz[c];
+  if (sqrt(rr[c]) / bnorm[c] < tol)
+    active[c] = 0;
+}
+
+extern "C" void lk_cuda_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
+                                                  double tol, int ncols, int* d_active, double* d_rz_old) {
+  const int block = 128;
+  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, tol, ncols, d_active, d_rz_old);
+}
+
+// dimX must be <= LK_CUDA_MAX_DIMX (guaranteed by the host caller). d_Out
+// must be sized n * dimX * ncols doubles.
+extern "C" void lk_cuda_drmul_batched_launch(const double* d_Xt,
+                                             int n,
+                                             int dimX,
+                                             const double* d_theta,
+                                             int covKind,
+                                             const double* d_V,
+                                             int ncols,
+                                             double* d_Out) {
+  const dim3 block(128, 1, 1);
+  const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
+  drmul_batched_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_V, ncols, d_Out);
 }
 
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE

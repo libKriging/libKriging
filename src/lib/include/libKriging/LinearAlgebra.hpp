@@ -97,7 +97,16 @@ class LinearAlgebra {
     LIBKRIGING_EXPORT WoodburyFactorization(const arma::mat& U, const arma::vec& D);
     LIBKRIGING_EXPORT arma::mat solve(const arma::mat& B) const;
 
+    // Read-only access to the factors, so a matching preconditioner apply
+    // can be run elsewhere (e.g. on the GPU, in LinearAlgebraCuda's
+    // preconditioned CG) without re-deriving safe_chol_lower(M) and risking
+    // a subtly different jittering.
+    LIBKRIGING_EXPORT const arma::mat& U() const { return m_U; }
+    LIBKRIGING_EXPORT const arma::vec& Dinv() const { return m_Dinv; }
+    LIBKRIGING_EXPORT const arma::mat& McholLower() const { return m_M_chol_lower; }
+
    private:
+    arma::mat m_U;   // the n x k Nystrom factor, kept for U()/GPU apply
     arma::vec m_Dinv;
     arma::mat m_Ut;  // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
     arma::mat m_DinvU;
@@ -200,6 +209,18 @@ class LinearAlgebra {
                                                    arma::uword nprobe,
                                                    arma::uword lanczos_steps,
                                                    const arma::mat& probes);
+
+  // Same estimator, every probe's Lanczos advanced in lockstep so the
+  // caller's `AmulBatched` is invoked once per Lanczos step on the whole
+  // n x nprobe block instead of nprobe times on single vectors -- lets the
+  // matvec (and hence the SLQ log-determinant) run batched on the GPU. See
+  // LinearAlgebra.cpp and docs/math/Iterative.md.
+  LIBKRIGING_EXPORT static double stochasticLogDetBatched(
+      const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+      arma::uword n,
+      arma::uword nprobe,
+      arma::uword lanczos_steps,
+      const arma::mat& probes);
 
   // Generates `nprobe` Rademacher (+-1 entries) probe vectors of length n,
   // as columns of an n x nprobe matrix -- meant to be generated ONCE (fixed

@@ -37,6 +37,10 @@ list(APPEND pylibkriging_SRCS
 
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
 target_link_libraries(_pylibkriging PRIVATE Kriging carma)
+# For the optional #include "cuda/CudaLinearAlgebra.cuh" in pylibkriging.cpp
+# (guarded by LIBKRIGING_USE_CUDA_ITERATIVE, which propagates from the
+# Kriging target when built with -DENABLE_CUDA_ITERATIVE=ON).
+target_include_directories(_pylibkriging PRIVATE ${LIBKRIGING_SOURCE_DIR}/src/lib)
 
 # Fix "cannot allocate memory in static TLS block" error
 # This occurs because OpenMP (libgomp) uses static TLS which has limited space when loaded via dlopen()

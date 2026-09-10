@@ -45,6 +45,18 @@ past release, see the corresponding entry on the
   (Python/R/Julia/Octave-MATLAB); see `docs/math/Iterative.md`,
   `PredictIterative.md`, `SubsetOfData.md`, `Scalability.md` and the
   comparison-vs-GPyTorch notebooks (#347).
+- GPU acceleration for the iterative path (`objective="LLIterative(m)"` /
+  `predictIterative`), opt-in only (`-DENABLE_CUDA_ITERATIVE=ON`, or the
+  unverified `-DENABLE_HIP_ITERATIVE=ON`): the matrix-free CG solves, the
+  Stochastic Lanczos Quadrature log-determinant (via a lockstep-Lanczos
+  `LinearAlgebra::stochasticLogDetBatched`), the Hutchinson trace-gradient
+  `dR/dtheta` matvec, and a device-side Nystrom/Woodbury CG preconditioner
+  all run batched on the device, with the CG's per-iteration alpha/beta and
+  convergence scalars kept on-device (no host round-trip per iteration).
+  New `pylibkriging` binding `logLikelihoodIterativeFun` (the O(n^2)
+  iterative objective, distinct from `logLikelihoodFun`'s exact O(n^3) one).
+  New local GPU benchmark `bench/comparison-gpu/` (GPyTorch vs libKriging,
+  n > 1000, theta_frac / kernel / CPU-vs-GPU sweeps).
 - `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
   bindings (Python already had it); worked notebooks
   `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
@@ -69,6 +81,12 @@ past release, see the corresponding entry on the
   skill, installable through `/plugin marketplace add libKriging/libKriging`.
 
 ### Changed
+- Iterative path (`LLIterative` / `predictIterative`), CPU as well as GPU:
+  an `optim="none"` light fit no longer builds the dense `d x n^2` pairwise
+  distance tensor it never reads (was several GB at n=8000); the matrix-free
+  matvecs are no longer capped at 2/8 OpenMP threads (`OMP_NUM_THREADS`
+  governs them now); `predictIterative`'s posterior-variance CG solves use
+  `sqrt(tol)` (the variance needs far less accuracy than the mean).
 - Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
   Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
   submodules, since both hardcode offsets into NumPy's C-API function table
