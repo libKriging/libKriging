@@ -27,7 +27,12 @@ past release, see the corresponding entry on the
   matching matrix-free fit objective (CG linear solves, stochastic Lanczos
   quadrature log-determinant, Hutchinson trace-gradient estimator), also with
   optional Nystrom preconditioning, plus `updateIterative` for incremental
-  refits. `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting
+  refits. The objective string also takes an optional third argument,
+  `LLIterative(m,precond_rank,lanczos_steps)`, exposing the SLQ Lanczos
+  step count per probe (default 20) on every binding — raise it when the
+  stochastic log-determinant drifts from the exact objective on an
+  ill-conditioned covariance; `precond_rank` now also accepts 0 (= no
+  preconditioner). `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting
   for large designs. Available in the core C++ API and all four bindings
   (Python/R/Julia/Octave-MATLAB); see `docs/math/Iterative.md`,
   `PredictIterative.md`, `SubsetOfData.md`, `Scalability.md` and the

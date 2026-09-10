@@ -7,17 +7,21 @@
 # Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)", the
 # Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
 # and the matrix-free CG/SLQ approximated log-likelihood "LLIterative" /
-# "LLIterative(m)" / "LLIterative(m,precond_rank)" (the last form opts into a
-# Nystrom-preconditioned CG for the fit's own solves), in addition to the
-# classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia
+# "LLIterative(m)" / "LLIterative(m,precond_rank)" /
+# "LLIterative(m,precond_rank,lanczos_steps)" (2nd form opts into a
+# Nystrom-preconditioned CG for the fit's own solves; 3rd form also sets the
+# number of SLQ Lanczos steps per probe, default 20 -- raise it if the
+# stochastic log-determinant drifts on an ill-conditioned R), in addition to
+# the classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia
 # bindings, which pass `objective` as a free string).
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?|LLIterative(\\([0-9]+(,[0-9]+)?\\))?)$",
+    if (!grepl(paste0("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?",
+                      "|LLIterative(\\([0-9]+(,[0-9]+(,[0-9]+)?)?\\))?)$"),
                objective))
         stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
-             "\"LLNystrom\", \"LLNystrom(k)\", \"LLIterative\", \"LLIterative(m)\" or ",
-             "\"LLIterative(m,precond_rank)\" (got \"",
+             "\"LLNystrom\", \"LLNystrom(k)\", \"LLIterative\", \"LLIterative(m)\", ",
+             "\"LLIterative(m,precond_rank)\" or \"LLIterative(m,precond_rank,lanczos_steps)\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -76,10 +80,19 @@ classKriging <- function(nk) {
 #'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
 #'     log-likelihood with \code{m} conditioning neighbors (default 30):
 #'     each evaluation costs O(n m^3) instead of O(n^3), recommended for
-#'     large designs in low dimension; and \code{"LLNystrom"} or
+#'     large designs in low dimension; \code{"LLNystrom"} or
 #'     \code{"LLNystrom(k)"} for the Nystrom (global low-rank) approximated
 #'     log-likelihood with rank \code{k} (default 50): each evaluation costs
-#'     O(n k^2) instead of O(n^3), also recommended for large designs.
+#'     O(n k^2) instead of O(n^3), also recommended for large designs; and
+#'     \code{"LLIterative"} / \code{"LLIterative(m)"} /
+#'     \code{"LLIterative(m,precond_rank)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} for the matrix-free
+#'     conjugate-gradient log-likelihood with \code{m} stochastic-trace probes
+#'     (default 30), an optional rank-\code{precond_rank} Nystrom CG
+#'     preconditioner (0 = off), and \code{lanczos_steps} Lanczos steps per
+#'     probe in the stochastic log-determinant estimate (default 20; raise it
+#'     if the estimate drifts on an ill-conditioned covariance): keeps R exact
+#'     and never factorizes it.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -259,9 +272,12 @@ print.Kriging <- function(x, ...) {
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares, \code{"LMP"} for the Log-Marginal Posterior,
 #'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
-#'     log-likelihood (see \code{\link{Kriging}}), and \code{"LLNystrom"} or
+#'     log-likelihood (see \code{\link{Kriging}}), \code{"LLNystrom"} or
 #'     \code{"LLNystrom(k)"} for the Nystrom approximated log-likelihood
-#'     (see \code{\link{Kriging}}).
+#'     (see \code{\link{Kriging}}), and \code{"LLIterative"} /
+#'     \code{"LLIterative(m)"} / \code{"LLIterative(m,precond_rank)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} for the matrix-free
+#'     CG log-likelihood (see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
