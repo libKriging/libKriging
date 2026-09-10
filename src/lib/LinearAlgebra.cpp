@@ -372,7 +372,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::woodbury_solve(const arma::mat& U, co
 }
 
 LIBKRIGING_EXPORT LinearAlgebra::WoodburyFactorization::WoodburyFactorization(const arma::mat& U, const arma::vec& D)
-    : m_Dinv(1.0 / D), m_Ut(U.t()), m_DinvU(U.each_col() % m_Dinv) {
+    : m_U(U), m_Dinv(1.0 / D), m_Ut(U.t()), m_DinvU(U.each_col() % m_Dinv) {
   const arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + m_Ut * m_DinvU;  // I_k + U' Dinv U (k x k)
   m_M_chol_lower = LinearAlgebra::safe_chol_lower(M);
 }
@@ -570,6 +570,107 @@ LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDet(const std::function<arm
       quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
     }
     total += quad;  // the leading znorm^2 == n for exact Rademacher entries is folded into the (n/nprobe) below
+  }
+  return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDetBatched(
+    const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+    arma::uword n,
+    arma::uword nprobe,
+    arma::uword lanczos_steps,
+    const arma::mat& probes) {
+  // Same estimator as stochasticLogDet above, but every probe's Lanczos
+  // recurrence is advanced IN LOCKSTEP: one batched R*[v_1|...|v_nprobe]
+  // matvec per step instead of nprobe separate ones. The point is the same
+  // as conjugateGradient's column batching -- one device launch (+ one
+  // upload) per step instead of nprobe, so kernel-launch/host-sync overhead
+  // is amortized -- and it lets the SLQ log-determinant run on the GPU at
+  // all (the scalar Amul above only ever ran on the CPU). Bit-for-bit
+  // identical to the scalar version up to the matvec backend's own
+  // rounding.
+  lanczos_steps = std::min(lanczos_steps, n);
+
+  std::vector<arma::mat> V(nprobe);
+  arma::mat alpha(lanczos_steps, nprobe, arma::fill::zeros);
+  arma::mat beta(lanczos_steps, nprobe, arma::fill::zeros);
+  arma::mat v_prev(n, nprobe, arma::fill::zeros);
+  arma::vec beta_prev(nprobe, arma::fill::zeros);
+  arma::vec znorm(nprobe, arma::fill::zeros);
+  arma::uvec m_eff(nprobe);
+  m_eff.fill(lanczos_steps);
+  // iterating(p): still advancing probe p's Lanczos (false once znorm==0 or
+  // an invariant subspace is hit). A non-iterating, non-zero-norm probe is
+  // still accumulated below with its m_eff(p).
+  std::vector<char> iterating(nprobe, 1);
+
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    znorm(p) = arma::norm(probes.col(p));
+    if (znorm(p) == 0.0) {
+      iterating[p] = 0;
+      continue;
+    }
+    V[p].set_size(n, lanczos_steps);
+    V[p].col(0) = probes.col(p) / znorm(p);
+  }
+
+  for (arma::uword j = 0; j < lanczos_steps; ++j) {
+    arma::mat Vj(n, nprobe, arma::fill::zeros);
+    bool any = false;
+    for (arma::uword p = 0; p < nprobe; ++p)
+      if (iterating[p]) {
+        Vj.col(p) = V[p].col(j);
+        any = true;
+      }
+    if (!any)
+      break;
+
+    const arma::mat W = AmulBatched(Vj);  // R * Vj, all probes in one launch
+
+    for (arma::uword p = 0; p < nprobe; ++p) {
+      if (!iterating[p])
+        continue;
+      arma::vec w = W.col(p) - beta_prev(p) * v_prev.col(p);
+      alpha(j, p) = arma::dot(w, V[p].col(j));
+      w -= alpha(j, p) * V[p].col(j);
+      for (arma::uword i = 0; i <= j; ++i)
+        w -= arma::dot(w, V[p].col(i)) * V[p].col(i);  // full reorthogonalization
+      const double bj = arma::norm(w);
+      if (j + 1 == lanczos_steps)
+        continue;  // last step: alpha(j) computed, no further recurrence
+      if (bj < 1e-12) {
+        m_eff(p) = j + 1;  // invariant subspace
+        iterating[p] = 0;
+        continue;
+      }
+      beta(j, p) = bj;
+      V[p].col(j + 1) = w / bj;
+      v_prev.col(p) = V[p].col(j);
+      beta_prev(p) = bj;
+    }
+  }
+
+  double total = 0.0;
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    if (znorm(p) == 0.0)
+      continue;
+    const arma::uword me = m_eff(p);
+    arma::mat T(me, me, arma::fill::zeros);
+    for (arma::uword j = 0; j < me; ++j)
+      T(j, j) = alpha(j, p);
+    for (arma::uword j = 0; j + 1 < me; ++j) {
+      T(j, j + 1) = beta(j, p);
+      T(j + 1, j) = beta(j, p);
+    }
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, T);
+    double quad = 0.0;
+    for (arma::uword j = 0; j < me; ++j) {
+      const double lambda = std::max(eigval(j), LinearAlgebra::num_nugget);
+      quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
+    }
+    total += quad;
   }
   return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
 }

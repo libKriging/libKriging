@@ -296,6 +296,13 @@ PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_
   return {llo, carma::col_to_arr(grad), {}};
 }
 
+std::tuple<double, py::array_t<double>>
+PyKriging::logLikelihoodIterativeFun(const py::array_t<double>& theta, const bool return_grad) {
+  arma::vec vec_theta = carma::arr_to_col<double>(theta);
+  auto [llo, grad] = m_internal->logLikelihoodIterativeFun(vec_theta, return_grad);
+  return {llo, carma::col_to_arr(grad)};
+}
+
 double PyKriging::logLikelihood() {
   return m_internal->logLikelihood();
 }

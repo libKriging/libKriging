@@ -8,6 +8,10 @@
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
 
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+#include "cuda/CudaLinearAlgebra.cuh"
+#endif
+
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
 #include "DictTest.hpp"
@@ -99,6 +103,29 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
+
+  // --- CUDA-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Exposes the runtime on/off switch of src/lib/cuda/CudaLinearAlgebra so a
+  // single build can benchmark the CPU vs GPU matrix-free CG path without
+  // recompiling. All three are always defined; on a build without
+  // -DENABLE_CUDA_ITERATIVE they report "no CUDA" and set_enabled is a no-op.
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+  m.attr("__cuda_iterative__") = true;
+  m.def("cuda_iterative_available", &LinearAlgebraCuda::available,
+        "True iff libKriging was built with -DENABLE_CUDA_ITERATIVE and a CUDA device is visible at runtime.");
+  m.def("cuda_iterative_enabled", &LinearAlgebraCuda::enabled,
+        "True iff the CUDA matrix-free CG backend is currently active (defaults to cuda_iterative_available()).");
+  m.def("set_cuda_iterative_enabled", &LinearAlgebraCuda::set_enabled, py::arg("value"),
+        "Turn the CUDA matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__cuda_iterative__") = false;
+  m.def("cuda_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def("cuda_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def("set_cuda_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_CUDA_ITERATIVE.");
+#endif
 
   m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");
 
@@ -238,6 +265,15 @@ discards n - n_max points outright.)pbdoc")
            py::arg("theta"),
            py::arg("return_grad") = false,
            py::arg("want_hess") = false)
+      .def("logLikelihoodIterativeFun",
+           &PyKriging::logLikelihoodIterativeFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           R"pbdoc(Matrix-free CG + SLQ log-determinant concentrated log-likelihood
+(the objective="LLIterative(m)" estimate). Unlike logLikelihoodFun, which always
+evaluates the exact O(n^3) dense-Cholesky objective, this is the O(n^2) iterative
+approximation actually optimized by an LLIterative fit. Only valid on a model
+fitted with an LLIterative objective. See docs/math/Iterative.md.)pbdoc")
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
       .def("logMargPost", &PyKriging::logMargPost)
