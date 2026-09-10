@@ -1,59 +1,71 @@
-# `bench/gpu/` — manual GPU vs CPU vs GPyTorch benchmark
+# `bench/gpu/` — manual libKriging vs GPyTorch benchmark
 
 `bench_gpu.py` is a **standalone, run-by-hand** benchmark (not wired into
-CI) for libKriging's iterative matrix-free CG path
-(`objective="LLIterative(m)"` → `logLikelihoodIterativeFun`). It runs one
-fixed sweep — `sine_sum`, d=4, matern5_2, shared `theta=0.3`,
-n ∈ {250, 500, 1000, 2000, 4000, 8000} — for four backends:
+CI). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
+`theta=0.15`, n ∈ {250, 500, 1000, 2000} — and compares five backends,
+each named `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected
+from the shared-library linkage / `torch.__config__`):
 
 | backend | what it exercises |
 |---|---|
-| `libkriging-gpu` | `set_cuda_iterative_enabled(True)` — device-batched CG + SLQ log-det + Hutchinson gradient |
-| `libkriging-cpu` | `set_cuda_iterative_enabled(False)` — the OpenMP CPU path |
-| `gpytorch-gpu` | GPyTorch BBMM (`-mll` forward+backward) on `cuda` |
-| `gpytorch-cpu` | GPyTorch BBMM on `cpu` |
+| `libKriging-Cholesky-<BLAS>` | exact dense path (`objective="LL"`) — the **reference** for the log-likelihood value and posterior mean |
+| `libKriging-Iterative-CUDA` | `set_cuda_iterative_enabled(True)` — device-batched CG + SLQ log-det + Hutchinson gradient (hand-written CUDA kernels, not cuBLAS) |
+| `libKriging-Iterative-OpenMP` | `set_cuda_iterative_enabled(False)` — the same, on hand-written OpenMP matvec loops |
+| `GPyTorch-BBMM-CUDA` | GPyTorch `ExactGP` + BBMM on `cuda`, raised CG/Lanczos/preconditioner settings |
+| `GPyTorch-BBMM-<BLAS>` | same on `cpu` (torch's own BLAS named) |
 
-Each run writes `results/<GPU-slug>__<CPU-slug>.md` (+ a `.csv`) — the file
-name encodes the machine, so results from several machines can be committed
-side by side and compared. Re-running on the same machine overwrites its
-file.
+`theta=0.15` is the largest length-scale at which the SLQ log-determinant's
+Lanczos quadrature, `predictIterative`'s CG and GPyTorch's BBMM CG all
+converge with sane iteration budgets — so this is an "everything actually
+converges" comparison.
+
+Each run writes `results/<GPU-slug>__<CPU-slug>.md` (+ `.csv`) — the file
+name encodes the machine, so results from several machines are committed
+side by side (`bench/gpu/results/` is de-ignored in `.gitignore` for this).
+Re-running on the same machine overwrites its file.
 
 ## Running it
 
-Needs `pylibkriging` (built with a GPU iterative backend for the `*-gpu`
-rows — `-DENABLE_CUDA_ITERATIVE=ON`, etc.), plus `torch` and `gpytorch`
-importable from the same environment. See
+Needs `pylibkriging` (built with `-DENABLE_CUDA_ITERATIVE=ON` for the CUDA
+row), plus `torch` and `gpytorch` importable from the same environment. See
 [`bench/comparison-gpu/README.md`](../comparison-gpu/README.md) and the
 `gpu-bench-env` project note for the build/env recipe used on the reference
 machine.
 
 ```sh
-# whole sweep, all backends, auto-named output
+# whole sweep, all five backends, auto-named output
 python bench/gpu/bench_gpu.py
 
-# quicker smoke run
-python bench/gpu/bench_gpu.py --sizes 250,500,1000 --backends libkriging-gpu,libkriging-cpu
+# quick smoke run, iterative backends only
+python bench/gpu/bench_gpu.py --sizes 250,500 --backends chol,iter-cuda,iter-omp
 
-# machine with no CUDA: the *-gpu backends are dropped automatically
+# machine with no CUDA: the -cuda backends are dropped automatically
 python bench/gpu/bench_gpu.py
 ```
 
-Useful flags: `--sizes`, `--theta`, `--nprobe`, `--backends`,
-`--cpu-budget` / `--gpu-budget` (seconds; a backend stops once the next
-size projects to exceed it — the CPU iterative path is O(n³)-ish in this
-ill-conditioned regime), `--tag`, `--outdir`.
+Flags: `--sizes`, `--theta`, `--backends` (keys: `chol`, `iter-cuda`,
+`iter-omp`, `gpt-cuda`, `gpt-cpu`), `--tag`, `--outdir`.
 
 ## Reading the output
 
-* `fit` — one `logLikelihoodIterativeFun` (libKriging) or one `-mll`
-  forward+backward (GPyTorch). This is the head-to-head number.
-* `build` — libKriging's `Kriging(...)` constructor (always factorizes the
-  exact dense R at `optim="none"`, regardless of objective).
-* `RMSE`/`Q²`/`LOO` — libKriging's **exact** `predict()` / `leaveOneOut()`,
-  *not* the iterative path; the iterative objective's own fidelity is the
-  `llErr/pt` column (|iterative − exact| concentrated log-likelihood per
-  training point, n ≤ 2000).
-* The `theta=0.3` regime is deliberately ill-conditioned — see the Notes
-  section each report emits, and
-  [`docs/comparisons/libKriging_vs_GPyTorch.ipynb`](../../docs/comparisons/libKriging_vs_GPyTorch.ipynb)
-  §4 / [`../comparison-gpu/ANALYSIS.md`](../comparison-gpu/ANALYSIS.md).
+Three timings per backend, plus accuracy vs the Cholesky reference:
+
+* **`fit`** — the `Kriging(...)` constructor: dense Cholesky for `LL`; one
+  CG+SLQ commit for the light `LLIterative` fit (no dense R factor);
+  GPyTorch model/likelihood build (near zero).
+* **`logLik`** — one log-likelihood **+ gradient** evaluation at `theta`
+  (`logLikelihoodFun` / `logLikelihoodIterativeFun` / one `-mll().backward()`).
+* **`predict`** — a *cold* posterior mean on the 300-point test set
+  (`predict` / `predictIterative` with a raised `max_iter` + Nyström
+  preconditioner / GPyTorch `.eval()` posterior; GPyTorch's per-fit cache is
+  dropped each rep).
+* All timings are the **min of up to 5 reps** (1 rep once a call > 3 s).
+* **`RMSE`/`Q²`** on the test set; **`dLogLik/n`** = `|ll − ll_chol|/n`
+  (blank for GPyTorch — its `-mll` is differently normalised); **`dMean/rms`**
+  = `max|mean − mean_chol| / rms(y_test)`.
+
+The libKriging iterative objective is `LLIterative(30,0,40)` — the third
+argument (40 SLQ Lanczos steps per probe) keeps the iterative log-likelihood
+*value* close to exact at `theta=0.15`; see
+[`docs/math/Iterative.md`](../../docs/math/Iterative.md) and
+[`docs/comparisons/libKriging_vs_GPyTorch.ipynb`](../../docs/comparisons/libKriging_vs_GPyTorch.ipynb).
