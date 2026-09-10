@@ -74,7 +74,10 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   // no-grad evaluation happen, no CG-heavy optimization)
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative"));
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8)"));
-  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5)"));  // opt-in Nystrom CG precond
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5)"));    // opt-in Nystrom CG precond
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0)"));    // 0 = preconditioning off (== "LLIterative(8)")
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5,30)"));  // + explicit SLQ Lanczos steps
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40)"));  // Lanczos steps without a preconditioner
 
   // malformed specs throw
   for (const std::string bad : {"LLIterative()",
@@ -82,9 +85,13 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
                                 "LLIterative(0)",
                                 "LLIterative(-3)",
                                 "LLIterative(10",
-                                "LLIterative(8,0)",
+                                "LLIterative(8x)",
                                 "LLIterative(8,-2)",
-                                "LLIterative(8,x)"}) {
+                                "LLIterative(8,x)",
+                                "LLIterative(8,5,1)",       // lanczos_steps must be >= 2
+                                "LLIterative(8,5,x)",
+                                "LLIterative(8,5,-4)",
+                                "LLIterative(8,5,30,2)"}) {  // at most 3 arguments
     CHECK_THROWS_AS(make_fixed_theta_iterative(y, X, bad), std::invalid_argument);
   }
 
@@ -92,6 +99,33 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLIterative(8)", {}),
                   std::invalid_argument);
+}
+
+TEST_CASE("LLIterative(m,precond_rank,lanczos_steps): more SLQ Lanczos steps tighten the log-det estimate",
+          "[iterative][kriging]") {
+  // On an ill-conditioned R the default 20-step Lanczos quadrature
+  // under-resolves the spectrum and the concentrated log-likelihood is
+  // biased; raising lanczos_steps must move it toward the exact value
+  // (Lanczos quadrature -> exact as steps -> n). Fixed probe seed, fixed
+  // theta => fully deterministic.
+  arma::mat X;
+  arma::vec y;
+  make_data(120, X, y);
+  const arma::vec theta{0.3, 0.3};
+
+  const double ll_exact
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24)").logLikelihoodFun(theta, false, false));
+  const double err_default = std::abs(
+      std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24)").logLikelihoodIterativeFun(theta, false))
+      - ll_exact);
+  const double err_more = std::abs(
+      std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,120)").logLikelihoodIterativeFun(theta, false))
+      - ll_exact);
+
+  INFO("|ll_iter - ll_exact|: default 20 steps = " << err_default << ", 120 steps = " << err_more);
+  CHECK(err_more <= err_default + 1e-6);  // more Lanczos steps are never meaningfully worse
+  if (err_default > 0.02 * std::abs(ll_exact) + 1.0)
+    CHECK(err_more < 0.75 * err_default);  // and materially better when the default is biased
 }
 
 TEST_CASE("LLIterative(m) approximates the exact concentrated log-likelihood", "[iterative][kriging]") {

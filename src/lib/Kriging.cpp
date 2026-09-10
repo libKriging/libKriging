@@ -3,6 +3,7 @@
 #define _USE_MATH_DEFINES // required for Visual Studio
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 // clang-format on
 
@@ -1494,29 +1495,65 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 // noisy/non-smooth between BFGS iterations.
 // =============================================================================
 
-arma::uword Kriging::parse_iterative_m(const std::string& objective, arma::uword* precond_rank_out) {
-  // "LLIterative" -> default 30, no precond ; "LLIterative(m)" -> m, no
-  // precond ; "LLIterative(m,precond_rank)" -> m and an opt-in Nystrom CG
-  // preconditioner of the given rank.
+arma::uword Kriging::parse_iterative_m(const std::string& objective,
+                                      arma::uword* precond_rank_out,
+                                      arma::uword* lanczos_steps_out) {
+  // "LLIterative"                              -> m=30, no precond, default SLQ Lanczos steps
+  // "LLIterative(m)"                           -> m Hutchinson/SLQ probes
+  // "LLIterative(m,precond_rank)"              -> + opt-in Nystrom-preconditioned CG
+  //                                              (precond_rank 0 = no preconditioner)
+  // "LLIterative(m,precond_rank,lanczos_steps)"-> + SLQ Lanczos steps per probe (>= 2);
+  //                                              raise it when the default 20 is too few
+  //                                              to resolve an ill-conditioned R's spectrum
+  //                                              (log-det estimate biased -- see docs/math/Iterative.md).
+  // *precond_rank_out / *lanczos_steps_out are set to 0 when the field is absent
+  // (0 = "keep the caller's default").
   if (precond_rank_out != nullptr)
     *precond_rank_out = 0;
+  if (lanczos_steps_out != nullptr)
+    *lanczos_steps_out = 0;
   if (objective == "LLIterative")
     return 30;
   if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
     const std::string inside = objective.substr(12, objective.size() - 13);
-    const std::size_t comma = inside.find(',');
+    std::vector<std::string> fields;
+    for (std::size_t start = 0;;) {
+      const std::size_t comma = inside.find(',', start);
+      fields.push_back(inside.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+      if (comma == std::string::npos)
+        break;
+      start = comma + 1;
+    }
+    // parse a whole field as a non-negative-or-signed integer, rejecting trailing junk
+    const auto parse_field = [](const std::string& s) -> long {
+      std::size_t pos = 0;
+      const long v = std::stol(s, &pos);
+      while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
+        ++pos;
+      if (pos != s.size())
+        throw std::invalid_argument("trailing characters");
+      return v;
+    };
     try {
-      const std::string m_str = (comma == std::string::npos) ? inside : inside.substr(0, comma);
-      const long m = std::stol(m_str);
+      if (fields.empty() || fields.size() > 3)
+        throw std::invalid_argument("expected 1 to 3 comma-separated arguments");
+      const long m = parse_field(fields[0]);
       if (m < 1)
         throw std::invalid_argument("m must be >= 1");
-      if (comma == std::string::npos)
-        return static_cast<arma::uword>(m);
-      const long precond_rank = std::stol(inside.substr(comma + 1));
-      if (precond_rank < 1)
-        throw std::invalid_argument("precond_rank must be >= 1");
-      if (precond_rank_out != nullptr)
-        *precond_rank_out = static_cast<arma::uword>(precond_rank);
+      if (fields.size() >= 2) {
+        const long precond_rank = parse_field(fields[1]);
+        if (precond_rank < 0)
+          throw std::invalid_argument("precond_rank must be >= 0");
+        if (precond_rank_out != nullptr)
+          *precond_rank_out = static_cast<arma::uword>(precond_rank);
+      }
+      if (fields.size() == 3) {
+        const long lanczos_steps = parse_field(fields[2]);
+        if (lanczos_steps < 2)
+          throw std::invalid_argument("lanczos_steps must be >= 2");
+        if (lanczos_steps_out != nullptr)
+          *lanczos_steps_out = static_cast<arma::uword>(lanczos_steps);
+      }
       return static_cast<arma::uword>(m);
     } catch (const std::exception&) {
       // fall through to the throw below
@@ -1524,8 +1561,10 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective, arma::uword
   }
   throw std::invalid_argument(
       "Invalid Iterative objective '" + objective
-      + "': expected \"LLIterative\", \"LLIterative(m)\" or \"LLIterative(m,precond_rank)\" with m >= 1 "
-        "and precond_rank >= 1 (e.g. \"LLIterative(30)\" or \"LLIterative(30,50)\")");
+      + "': expected \"LLIterative\", \"LLIterative(m)\", \"LLIterative(m,precond_rank)\" or "
+        "\"LLIterative(m,precond_rank,lanczos_steps)\" with m >= 1, precond_rank >= 0 "
+        "(0 = no preconditioner) and lanczos_steps >= 2 "
+        "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\" or \"LLIterative(30,0,40)\")");
 }
 
 void Kriging::make_iterative_probes() {
@@ -2179,7 +2218,7 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
     throw std::invalid_argument(
         "Unsupported fit objective: " + objective
         + " (supported are: LL, LOO, LMP, LLVecchia, LLVecchia(m), LLNystrom, LLNystrom(k), LLIterative, "
-          "LLIterative(m))");
+          "LLIterative(m), LLIterative(m,precond_rank), LLIterative(m,precond_rank,lanczos_steps))");
 }
 
 /** Fit the kriging object on (X,y):
@@ -2245,7 +2284,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     make_nystrom_landmarks();
   }
   if (objective.rfind("LLIterative", 0) == 0) {
-    m_iterative_nprobe = parse_iterative_m(objective, &m_iterative_precond_rank);
+    arma::uword lanczos_steps = 0;
+    m_iterative_nprobe = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps);
+    if (lanczos_steps > 0)  // 0 = spec omitted the field -> keep the default
+      m_iterative_lanczos_steps = lanczos_steps;
     make_iterative_probes();
     if (m_iterative_precond_rank > 0)
       make_iterative_precond_landmarks();
