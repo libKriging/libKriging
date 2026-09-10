@@ -3,7 +3,7 @@
 - **GPU**: NVIDIA H100 NVL
 - **CPU**: INTEL(R) XEON(R) PLATINUM 8558
 - **host**: `farux-gpu04.cluster`  ·  logical CPUs: 192  ·  OMP_NUM_THREADS: `32`
-- **when**: 2026-09-10 18:30 CEST
+- **when**: 2026-09-10 21:10 CEST
 - **sweep**: `sine_sum` d=4, matern5_2, shared theta=0.15; n = 250, 500, 1000, 2000; test n=300
 - **libKriging iterative objective**: `LLIterative(30,0,40)`  ·  `predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)`
 - **GPyTorch**: raised settings so BBMM converges — `max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, max_lanczos_quadrature_iterations=32, num_trace_samples=32, max_preconditioner_size=100, min_preconditioning_size=1`
@@ -15,35 +15,35 @@
 
 | n | fit (s) | logLik (s) | predict (s) | logLik value | RMSE | Q² |
 |--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.009 | 0.010 | 0.005 | -317.241 | 0.4773 | 0.8952 |
-| 500 | 0.030 | 0.029 | 0.009 | -463.222 | 0.3402 | 0.9468 |
-| 1000 | 0.127 | 0.115 | 0.020 | -512.857 | 0.2111 | 0.9795 |
-| 2000 | 0.550 | 0.493 | 0.042 | -60.627 | 0.0955 | 0.9958 |
+| 250 | 0.009 | 0.009 | 0.004 | -317.241 | 0.4773 | 0.8952 |
+| 500 | 0.028 | 0.027 | 0.008 | -463.222 | 0.3402 | 0.9468 |
+| 1000 | 0.107 | 0.098 | 0.018 | -512.857 | 0.2111 | 0.9795 |
+| 2000 | 0.508 | 0.413 | 0.041 | -60.627 | 0.0955 | 0.9958 |
 
 ## Timing — seconds
 
 | backend | n | fit | logLik | predict |
 |---|--:|--:|--:|--:|
-| libKriging-Cholesky-OpenBLAS | 250 | 0.009 | 0.010 | 0.005 |
-| libKriging-Cholesky-OpenBLAS | 500 | 0.030 | 0.029 | 0.009 |
-| libKriging-Cholesky-OpenBLAS | 1000 | 0.127 | 0.115 | 0.020 |
-| libKriging-Cholesky-OpenBLAS | 2000 | 0.550 | 0.493 | 0.042 |
-| libKriging-Iterative-CUDA | 250 | 0.283 | 0.294 | 0.043 |
-| libKriging-Iterative-CUDA | 500 | 0.338 | 0.484 | 0.195 |
-| libKriging-Iterative-CUDA | 1000 | 0.533 | 1.662 | 0.344 |
-| libKriging-Iterative-CUDA | 2000 | 1.803 | 11.038 | 1.256 |
-| libKriging-Iterative-OpenMP | 250 | 0.303 | 0.509 | 0.034 |
-| libKriging-Iterative-OpenMP | 500 | 0.918 | 3.067 | 0.115 |
-| libKriging-Iterative-OpenMP | 1000 | 4.095 | 22.583 | 0.702 |
-| libKriging-Iterative-OpenMP | 2000 | 20.949 | 235.405 | 9.840 |
-| GPyTorch-BBMM-CUDA | 250 | 0.005 | 0.004 | 0.007 |
-| GPyTorch-BBMM-CUDA | 500 | 0.009 | 0.004 | 0.004 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.013 | 0.454 | 0.798 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.013 | 0.846 | 1.086 |
+| libKriging-Cholesky-OpenBLAS | 250 | 0.009 | 0.009 | 0.004 |
+| libKriging-Cholesky-OpenBLAS | 500 | 0.028 | 0.027 | 0.008 |
+| libKriging-Cholesky-OpenBLAS | 1000 | 0.107 | 0.098 | 0.018 |
+| libKriging-Cholesky-OpenBLAS | 2000 | 0.508 | 0.413 | 0.041 |
+| libKriging-Iterative-CUDA | 250 | 0.140 | 0.166 | 0.027 |
+| libKriging-Iterative-CUDA | 500 | 0.224 | 0.311 | 0.136 |
+| libKriging-Iterative-CUDA | 1000 | 0.428 | 1.317 | 0.243 |
+| libKriging-Iterative-CUDA | 2000 | 1.306 | 9.607 | 0.936 |
+| libKriging-Iterative-OpenMP | 250 | 0.052 | 0.081 | 0.034 |
+| libKriging-Iterative-OpenMP | 500 | 0.146 | 0.359 | 0.112 |
+| libKriging-Iterative-OpenMP | 1000 | 0.663 | 2.566 | 0.502 |
+| libKriging-Iterative-OpenMP | 2000 | 6.291 | 22.281 | 7.519 |
+| GPyTorch-BBMM-CUDA | 250 | 0.008 | 0.003 | 0.005 |
+| GPyTorch-BBMM-CUDA | 500 | 0.008 | 0.006 | 0.004 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.006 | 0.321 | 0.504 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.008 | 0.497 | 0.707 |
 | GPyTorch-BBMM-MKL | 250 | 0.001 | 0.005 | 0.005 |
 | GPyTorch-BBMM-MKL | 500 | 0.001 | 0.006 | 0.006 |
-| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.107 | 0.070 |
-| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.373 | 0.178 |
+| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.107 | 0.073 |
+| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.278 | 0.114 |
 
 ## Accuracy
 
@@ -63,21 +63,21 @@
 | libKriging-Iterative-OpenMP | 2000 | 0.0955 | 0.9958 | -64.867 | 2.12e-03 | 4.90e-08 |
 | GPyTorch-BBMM-CUDA | 250 | 0.4223 | 0.9179 | -1.182 | — | 1.98e-01 |
 | GPyTorch-BBMM-CUDA | 500 | 0.3022 | 0.9580 | -0.923 | — | 2.29e-01 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.090 | — | 1.58e-01 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.719 | — | 7.02e-02 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.108 | — | 1.58e-01 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.716 | — | 7.02e-02 |
 | GPyTorch-BBMM-MKL | 250 | 0.4223 | 0.9179 | -1.182 | — | 1.98e-01 |
 | GPyTorch-BBMM-MKL | 500 | 0.3022 | 0.9580 | -0.923 | — | 2.29e-01 |
-| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.115 | — | 1.58e-01 |
-| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.728 | — | 7.02e-02 |
+| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.118 | — | 1.58e-01 |
+| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.729 | — | 7.02e-02 |
 
 ## Speed-ups (logLik-eval time)
 
 | n | libKriging-Cholesky-OpenBLAS | libKriging-Iterative-CUDA | libKriging-Iterative-OpenMP | **OpenMP / CUDA** | **CUDA / Cholesky** | GPyTorch-BBMM-CUDA | GPyTorch-BBMM-MKL |
 |--:|--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.010 | 0.294 | 0.509 | 1.7× | 30× | 0.004 | 0.005 |
-| 500 | 0.029 | 0.484 | 3.067 | 6.3× | 16× | 0.004 | 0.006 |
-| 1000 | 0.115 | 1.662 | 22.583 | 13.6× | 14× | 0.454 | 0.107 |
-| 2000 | 0.493 | 11.038 | 235.405 | 21.3× | 22× | 0.846 | 0.373 |
+| 250 | 0.009 | 0.166 | 0.081 | 0.5× | 19× | 0.003 | 0.005 |
+| 500 | 0.027 | 0.311 | 0.359 | 1.2× | 11× | 0.006 | 0.006 |
+| 1000 | 0.098 | 1.317 | 2.566 | 1.9× | 13× | 0.321 | 0.107 |
+| 2000 | 0.413 | 9.607 | 22.281 | 2.3× | 23× | 0.497 | 0.278 |
 
 ## Verdict — did everything converge?
 
