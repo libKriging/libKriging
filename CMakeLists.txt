@@ -115,6 +115,16 @@ option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative 
 # >= 3.21 (native HIP language support) and a ROCm install providing
 # CMAKE_PREFIX_PATH/hip-config.cmake.
 option(ENABLE_HIP_ITERATIVE "Enable HIP/ROCm-accelerated matvec/CG for LLIterative and predictIterative (requires ROCm; UNVERIFIED, see src/lib/hip/HipLinearAlgebra.hpp)" OFF)
+# Same feature, Intel oneAPI / SYCL backend. Explicit opt-in only, never
+# auto-detected. UNVERIFIED (no oneAPI toolchain or Intel GPU to build/run
+# against -- see src/lib/sycl/SyclLinearAlgebra.hpp). Requires the C++
+# compiler to accept -fsycl (icpx, or an oneAPI clang++).
+option(ENABLE_SYCL_ITERATIVE "Enable SYCL/oneAPI-accelerated matvec/CG for LLIterative and predictIterative (requires an -fsycl compiler; UNVERIFIED, see src/lib/sycl/SyclLinearAlgebra.hpp)" OFF)
+# Same feature, Apple Metal backend. Explicit opt-in only. UNVERIFIED (no
+# macOS / Metal toolchain to build/run against -- see
+# src/lib/metal/MetalLinearAlgebra.hpp). Requires macOS with Metal and the
+# metal-cpp headers (METAL_CPP_DIR).
+option(ENABLE_METAL_ITERATIVE "Enable Apple-Metal-accelerated matvec/CG for LLIterative and predictIterative (macOS only; UNVERIFIED, see src/lib/metal/MetalLinearAlgebra.hpp)" OFF)
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 

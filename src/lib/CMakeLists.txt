@@ -41,12 +41,37 @@ if (ENABLE_HIP_ITERATIVE)
             hip/HipLinearAlgebra.cpp hip/HipLinearAlgebra.hpp)
 endif ()
 
+# Intel oneAPI / SYCL backend (ENABLE_SYCL_ITERATIVE) -- UNVERIFIED, see
+# src/lib/sycl/SyclLinearAlgebra.hpp. Single-source: only the *Kernel.cpp
+# gets -fsycl; SyclLinearAlgebra.cpp is host-only (armadillo, no SYCL
+# header) and compiled like the rest of the library, same rule as CUDA/HIP.
+set(LIBKRIGING_SYCL_SOURCES "")
+if (ENABLE_SYCL_ITERATIVE)
+    set(LIBKRIGING_SYCL_SOURCES
+            sycl/SyclLinearAlgebraKernel.cpp sycl/SyclLinearAlgebraKernel.hpp
+            sycl/SyclLinearAlgebra.cpp sycl/SyclLinearAlgebra.hpp)
+endif ()
+
+# Apple Metal backend (ENABLE_METAL_ITERATIVE) -- UNVERIFIED, see
+# src/lib/metal/MetalLinearAlgebra.hpp. MetalLinearAlgebra.cpp is host-only;
+# MetalLinearAlgebraKernel.cpp uses metal-cpp (METAL_CPP_DIR) and embeds the
+# .metal shader source as a string it compiles at runtime.
+set(LIBKRIGING_METAL_SOURCES "")
+if (ENABLE_METAL_ITERATIVE)
+    set(LIBKRIGING_METAL_SOURCES
+            metal/MetalLinearAlgebraKernel.cpp metal/MetalLinearAlgebraKernel.hpp
+            metal/MetalLinearAlgebra.cpp metal/MetalLinearAlgebra.hpp
+            metal/lk_metal_kernels.metal)
+endif ()
+
 # SHARED or STATIC type if defined using BUILD_SHARED_LIBS variable
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
         ${LIBKRIGING_CUDA_SOURCES}
         ${LIBKRIGING_HIP_SOURCES}
+        ${LIBKRIGING_SYCL_SOURCES}
+        ${LIBKRIGING_METAL_SOURCES}
         demo/DemoClass.cpp include/libKriging/demo/DemoClass.hpp
         demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
@@ -91,6 +116,30 @@ endif ()
 if (ENABLE_HIP_ITERATIVE)
     target_link_libraries(Kriging PUBLIC hip::host hip::device)
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_HIP_ITERATIVE)
+endif ()
+
+if (ENABLE_SYCL_ITERATIVE)
+    # Only the kernel TU is a SYCL translation unit; SyclLinearAlgebra.cpp
+    # is host-only (see its header). -fsycl must also be a link option.
+    set_source_files_properties(sycl/SyclLinearAlgebraKernel.cpp PROPERTIES COMPILE_OPTIONS "-fsycl")
+    target_link_options(Kriging PUBLIC -fsycl)
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_SYCL_ITERATIVE)
+endif ()
+
+if (ENABLE_METAL_ITERATIVE)
+    if (NOT DEFINED METAL_CPP_DIR)
+        message(FATAL_ERROR "ENABLE_METAL_ITERATIVE requires -DMETAL_CPP_DIR=<path to metal-cpp headers>")
+    endif ()
+    # Embed the .metal shader source as a string, compiled at runtime by
+    # MTL::Device::newLibrary(source:) -- keeps lk_metal_kernels.metal the
+    # single source of truth without a .metallib build step.
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels.metal LK_METAL_MSL_SRC)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels_msl.hpp.in
+            ${CMAKE_CURRENT_BINARY_DIR}/lk_metal_kernels_msl.hpp @ONLY)
+    target_include_directories(Kriging PRIVATE ${METAL_CPP_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(Kriging PUBLIC "-framework Metal" "-framework Foundation" "-framework QuartzCore")
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_METAL_ITERATIVE)
+    set_source_files_properties(metal/lk_metal_kernels.metal PROPERTIES HEADER_FILE_ONLY ON)
 endif ()
 
 # Link OpenMP if found (required for omp_set_num_threads calls in Kriging.cpp, etc.)
