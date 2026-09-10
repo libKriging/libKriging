@@ -110,8 +110,11 @@ JLibKriging.jl.
   `PredictIterative.md`, `SubsetOfData.md`, `Scalability.md` and the
   comparison-vs-GPyTorch notebooks (#347).
 - GPU acceleration for the iterative path (`objective="LLIterative(m)"` /
-  `predictIterative`), opt-in only (`-DENABLE_CUDA_ITERATIVE=ON`, or the
-  unverified `-DENABLE_HIP_ITERATIVE=ON`): the matrix-free CG solves, the
+  `predictIterative`), opt-in only (`-DENABLE_CUDA_ITERATIVE=ON`; also the
+  UNVERIFIED `-DENABLE_HIP_ITERATIVE` / `-DENABLE_SYCL_ITERATIVE` (Intel
+  oneAPI) / `-DENABLE_METAL_ITERATIVE` (Apple, float32-only — MSL has no
+  double) ports, none of which have a toolchain to build/run against): the
+  matrix-free CG solves, the
   Stochastic Lanczos Quadrature log-determinant (via a lockstep-Lanczos
   `LinearAlgebra::stochasticLogDetBatched`), the Hutchinson trace-gradient
   `dR/dtheta` matvec, and a device-side Nystrom/Woodbury CG preconditioner

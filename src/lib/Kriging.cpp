@@ -23,6 +23,8 @@
 
 #include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
 #include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
+#include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
+#include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -1695,52 +1697,52 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // compiled in (won't happen in practice -- a machine has one vendor's GPU
   // or the other -- but there's no reason to forbid it). Falls back to the
   // CPU Rmul-based LinearAlgebra::conjugateGradient otherwise.
-  auto cgSolve = [&](const arma::mat& B) -> arma::mat {
-#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-    if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
-      if (woodbury_pc)  // Nystrom-preconditioned CG, now also on the GPU
-        return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,
-                                                    woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower());
-      return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
-    }
-#endif
-#ifdef LIBKRIGING_USE_HIP_ITERATIVE
-    if (LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
-      if (woodbury_pc)
-        return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,
-                                                   woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower());
-      return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
-    }
-#endif
-    return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
-  };
-
-  // Stochastic Lanczos Quadrature log-determinant and the Hutchinson
-  // gradient trace both need R*V for the fixed probe block. On the GPU that
-  // is the SAME batched matvec cgSolve already runs -- route it there too
-  // (one launch per Lanczos step, all probes at once) so the SLQ term stops
-  // being the CPU-only bottleneck it was. `slq_on_gpu` gates BOTH the
-  // log-determinant and the gradient trace below.
+  // GPU dispatch for the whole iterative path, expressed as backend-agnostic
+  // std::function objects so a new backend is one localised #ifdef block
+  // instead of an extra branch in every call site. All three (the CG solve,
+  // the SLQ log-determinant / Hutchinson-trace batched R*V matvec, the
+  // dR/dtheta matvec) run on the SAME device queue; `slq_on_gpu` gates the
+  // SLQ term and the gradient trace below, `gpuCgSolve` the CG solves.
   bool slq_on_gpu = false;
   arma::uword gpu_max_dimx = 0;
-  std::function<arma::mat(const arma::mat&)> rmulBatched;     // R * V
-  std::function<arma::mat(const arma::mat&)> dRmulBatched;    // [dR/dtheta_k . V]_k, n x (d*ncols)
+  std::function<arma::mat(const arma::mat&)> gpuCgSolve;   // R^-1 * B (preconditioned iff woodbury_pc)
+  std::function<arma::mat(const arma::mat&)> rmulBatched;  // R * V
+  std::function<arma::mat(const arma::mat&)> dRmulBatched; // [dR/dtheta_k . V]_k, n x (d*ncols)
+#define LK_ITER_GPU_BIND(NS)                                                                                    \
+  do {                                                                                                          \
+    slq_on_gpu = true;                                                                                          \
+    gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                       \
+    gpuCgSolve = [&](const arma::mat& B) {                                                                       \
+      return woodbury_pc ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,          \
+                                                 woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower()) \
+                         : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);         \
+    };                                                                                                          \
+    rmulBatched = [&](const arma::mat& V) { return NS::rmulBatched(Xt, theta, m_covType, V); };                 \
+    dRmulBatched = [&](const arma::mat& V) { return NS::dRmulBatched(Xt, theta, m_covType, V); };               \
+  } while (0)
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
-    slq_on_gpu = true;
-    gpu_max_dimx = static_cast<arma::uword>(LinearAlgebraCuda::kMaxDimX);
-    rmulBatched = [&](const arma::mat& V) { return LinearAlgebraCuda::rmulBatched(Xt, theta, m_covType, V); };
-    dRmulBatched = [&](const arma::mat& V) { return LinearAlgebraCuda::dRmulBatched(Xt, theta, m_covType, V); };
-  }
+  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+    LK_ITER_GPU_BIND(LinearAlgebraCuda);
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-  if (!slq_on_gpu && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
-    slq_on_gpu = true;
-    gpu_max_dimx = static_cast<arma::uword>(LinearAlgebraHip::kMaxDimX);
-    rmulBatched = [&](const arma::mat& V) { return LinearAlgebraHip::rmulBatched(Xt, theta, m_covType, V); };
-    dRmulBatched = [&](const arma::mat& V) { return LinearAlgebraHip::dRmulBatched(Xt, theta, m_covType, V); };
-  }
+  if (!slq_on_gpu && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+    LK_ITER_GPU_BIND(LinearAlgebraHip);
 #endif
+#ifdef LIBKRIGING_USE_SYCL_ITERATIVE
+  if (!slq_on_gpu && LinearAlgebraSycl::enabled() && LinearAlgebraSycl::supports(m_covType))
+    LK_ITER_GPU_BIND(LinearAlgebraSycl);
+#endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  if (!slq_on_gpu && LinearAlgebraMetal::enabled() && LinearAlgebraMetal::supports(m_covType))
+    LK_ITER_GPU_BIND(LinearAlgebraMetal);
+#endif
+#undef LK_ITER_GPU_BIND
+
+  auto cgSolve = [&](const arma::mat& B) -> arma::mat {
+    if (gpuCgSolve)
+      return gpuCgSolve(B);
+    return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
+  };
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
   // columns): p+1 right-hand sides sharing the same matvec, each an

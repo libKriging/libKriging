@@ -18,6 +18,8 @@
 
 #include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
 #include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
+#include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
+#include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
 
 #include <memory>
 #include <tuple>
@@ -414,23 +416,36 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // / HipLinearAlgebraKernel.hip.cpp). CUDA is tried first when both are
   // compiled in. Falls back to the CPU Rmul-based
   // LinearAlgebra::conjugateGradient otherwise.
-  auto cgSolve = [&](const arma::mat& B, double solve_tol) -> arma::mat {
+  // GPU dispatch as a backend-agnostic std::function (see the same pattern
+  // in Kriging::_logLikelihoodIterative). Empty -> CPU fallback.
+  std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;
+#define LK_PRED_GPU_BIND(NS)                                                                                    \
+  gpuCgSolve = [&](const arma::mat& B, double solve_tol) {                                                      \
+    return woodbury_pc ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),  \
+                                               woodbury_pc->Dinv(), woodbury_pc->McholLower())                  \
+                       : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);                   \
+  }
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-    if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
-      if (woodbury_pc)  // Nystrom-preconditioned CG, now also on the GPU
-        return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),
-                                                    woodbury_pc->Dinv(), woodbury_pc->McholLower());
-      return LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);
-    }
+  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraCuda);
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-    if (LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
-      if (woodbury_pc)
-        return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),
-                                                   woodbury_pc->Dinv(), woodbury_pc->McholLower());
-      return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);
-    }
+  if (!gpuCgSolve && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraHip);
 #endif
+#ifdef LIBKRIGING_USE_SYCL_ITERATIVE
+  if (!gpuCgSolve && LinearAlgebraSycl::enabled() && LinearAlgebraSycl::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraSycl);
+#endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  if (!gpuCgSolve && LinearAlgebraMetal::enabled() && LinearAlgebraMetal::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraMetal);
+#endif
+#undef LK_PRED_GPU_BIND
+
+  auto cgSolve = [&](const arma::mat& B, double solve_tol) -> arma::mat {
+    if (gpuCgSolve)
+      return gpuCgSolve(B, solve_tol);
     return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, solve_tol, Pinv);
   };
 
