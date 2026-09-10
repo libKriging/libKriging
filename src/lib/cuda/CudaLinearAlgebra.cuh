@@ -18,9 +18,10 @@
 // matrix-free R*v matvec used by LLIterative (Kriging::_logLikelihoodIterative)
 // and predictIterative (KrigingImpl::predictIterative_impl). R is never
 // materialized on the GPU either -- see CudaLinearAlgebra.cu's rmul_kernel --
-// matching the CPU path's O(n) memory invariant. Only handles the
-// no-preconditioner case; callers fall back to LinearAlgebra::conjugateGradient
-// otherwise (unsupported covType, or a Nystrom preconditioner requested).
+// matching the CPU path's O(n) memory invariant. Covers the SLQ
+// log-determinant matvec, the dR/dtheta trace matvec, and the optional
+// Nystrom/Woodbury CG preconditioner; callers fall back to
+// LinearAlgebra::conjugateGradient only for an unsupported covType.
 namespace LinearAlgebraCuda {
 
 // True iff a CUDA device was found at runtime (lazy-initialized, cached).

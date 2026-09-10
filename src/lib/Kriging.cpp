@@ -1705,8 +1705,12 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     }
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-    if (!Pinv && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+    if (LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
+      if (woodbury_pc)
+        return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,
+                                                   woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower());
       return LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);
+    }
 #endif
     return LinearAlgebra::conjugateGradient(Rmul, B, max_iter, m_iterative_cg_tol, Pinv);
   };
@@ -1718,13 +1722,23 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // being the CPU-only bottleneck it was. `slq_on_gpu` gates BOTH the
   // log-determinant and the gradient trace below.
   bool slq_on_gpu = false;
-  std::function<arma::mat(const arma::mat&)> rmulBatched;
+  arma::uword gpu_max_dimx = 0;
+  std::function<arma::mat(const arma::mat&)> rmulBatched;     // R * V
+  std::function<arma::mat(const arma::mat&)> dRmulBatched;    // [dR/dtheta_k . V]_k, n x (d*ncols)
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
   if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
     slq_on_gpu = true;
-    rmulBatched = [&](const arma::mat& V) -> arma::mat {
-      return LinearAlgebraCuda::rmulBatched(Xt, theta, m_covType, V);
-    };
+    gpu_max_dimx = static_cast<arma::uword>(LinearAlgebraCuda::kMaxDimX);
+    rmulBatched = [&](const arma::mat& V) { return LinearAlgebraCuda::rmulBatched(Xt, theta, m_covType, V); };
+    dRmulBatched = [&](const arma::mat& V) { return LinearAlgebraCuda::dRmulBatched(Xt, theta, m_covType, V); };
+  }
+#endif
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+  if (!slq_on_gpu && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType)) {
+    slq_on_gpu = true;
+    gpu_max_dimx = static_cast<arma::uword>(LinearAlgebraHip::kMaxDimX);
+    rmulBatched = [&](const arma::mat& V) { return LinearAlgebraHip::rmulBatched(Xt, theta, m_covType, V); };
+    dRmulBatched = [&](const arma::mat& V) { return LinearAlgebraHip::dRmulBatched(Xt, theta, m_covType, V); };
   }
 #endif
 
@@ -1848,24 +1862,21 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     arma::rowvec term1(d, arma::fill::zeros);
     arma::rowvec trace(d, arma::fill::zeros);
 
-#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
     // Same GPU routing as the SLQ log-determinant: the Hutchinson trace's
     // dR/dtheta matvec is the gradient's dominant cost. One batched device
     // call on [x | probe_0 | ... | probe_{nprobe-1}] returns, per column c,
     // an n x d block dR/dtheta . column_c; the small dot products against x
     // and W stay on the host.
-    if (slq_on_gpu && dimX == d && d <= static_cast<arma::uword>(LinearAlgebraCuda::kMaxDimX)) {
-      const arma::mat B_grad = arma::join_rows(x, m_iterative_probes);           // n x (1 + nprobe)
-      const arma::mat Og = LinearAlgebraCuda::dRmulBatched(Xt, theta, m_covType, B_grad);  // n x (d*(1+nprobe))
+    if (dRmulBatched && dimX == d && d <= gpu_max_dimx) {
+      const arma::mat B_grad = arma::join_rows(x, m_iterative_probes);  // n x (1 + nprobe)
+      const arma::mat Og = dRmulBatched(B_grad);                        // n x (d*(1+nprobe))
       for (arma::uword kk = 0; kk < d; ++kk)
         term1(kk) = arma::dot(x, Og.col(0 * d + kk));
       for (arma::uword p = 0; p < nprobe; ++p)
         for (arma::uword kk = 0; kk < d; ++kk)
           trace(kk) += arma::dot(W.col(p), Og.col((p + 1) * d + kk));
       trace /= static_cast<double>(nprobe);
-    } else
-#endif
-    {
+    } else {
       term1 = x.t() * dRmul_all(x);  // 1 x d, all dimensions at once
       for (arma::uword p = 0; p < nprobe; ++p)
         trace += W.col(p).t() * dRmul_all(m_iterative_probes.col(p));
