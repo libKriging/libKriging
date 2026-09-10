@@ -82,6 +82,19 @@ Where this sits relative to the other scaling methods:
   *set* is what's held fixed (for the same θ-smoothness reason as
   `LLNystrom`'s landmarks), not the factorization itself. Off by
   default (`precond_rank` omitted or 0).
+- **SLQ Lanczos steps**:
+  `objective="LLIterative(m,precond_rank,lanczos_steps)"` sets the number
+  of Lanczos steps per probe in the stochastic log-determinant estimate
+  (default 20). The Lanczos quadrature converges to the exact `log|R|` as
+  `lanczos_steps → n`; 20 steps under-resolve the spectrum of a strongly
+  ill-conditioned R, biasing `log|R|` (and hence the concentrated
+  log-likelihood *value* — the gradient's Hutchinson trace is a separate,
+  less affected estimator). Raise it (e.g. `LLIterative(30,0,40)`) when
+  the iterative log-likelihood drifts from the exact `"LL"` objective at
+  large `n` / long θ; the cost per probe grows ~linearly in
+  `lanczos_steps` (plus an `O(lanczos_steps²)` tridiagonal `eig_sym`,
+  negligible). The preconditioner (2nd arg) does **not** touch the SLQ
+  matvec, so it does not help this bias — only `lanczos_steps` does.
 - **Cost model**: a gradient evaluation is a CG solve over `nprobe`
   right-hand sides (each up to `2n` Krylov iterations, each an O(n²)
   matvec, or cheaper per-iteration with the preconditioner enabled but

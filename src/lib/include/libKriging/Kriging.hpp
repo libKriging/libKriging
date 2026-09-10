@@ -456,6 +456,8 @@ class Kriging : public KrigingImpl {
   arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictIterative)
   double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
   arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
+                                               ///< (default; override via
+                                               ///< objective="LLIterative(m,precond_rank,lanczos_steps)")
 
   arma::uword m_iterative_precond_rank = 0;  ///< Nystrom preconditioner rank (0 = no preconditioning)
   /// Landmark row-indices (into m_X) for the CG preconditioner, chosen ONCE
@@ -467,10 +469,14 @@ class Kriging : public KrigingImpl {
   /// unlike m_nystrom_U/D which are only committed once at theta*.
   arma::uvec m_iterative_precond_landmarks;
 
-  /// Parse "LLIterative" (default m=30), "LLIterative(m)" or
-  /// "LLIterative(m,precond_rank)"; throws on malformed spec. precond_rank
-  /// defaults to 0 (preconditioning off) when omitted.
-  static arma::uword parse_iterative_m(const std::string& objective, arma::uword* precond_rank_out = nullptr);
+  /// Parse "LLIterative" (default m=30), "LLIterative(m)",
+  /// "LLIterative(m,precond_rank)" or
+  /// "LLIterative(m,precond_rank,lanczos_steps)"; throws on malformed spec.
+  /// Returns m; writes precond_rank (0 = preconditioning off) and
+  /// lanczos_steps (0 = field omitted, keep the default) to the out-params.
+  static arma::uword parse_iterative_m(const std::string& objective,
+                                       arma::uword* precond_rank_out = nullptr,
+                                       arma::uword* lanczos_steps_out = nullptr);
   /// Draw m_iterative_probes from m_X's row count (call once, after
   /// fit_setup_impl, before optimization starts).
   void make_iterative_probes();

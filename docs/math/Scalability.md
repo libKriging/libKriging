@@ -15,7 +15,7 @@ method has its own page with the full derivation.
 |---|---|---|---|---|---|
 | `LLVecchia(m)` | fit objective | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
 | `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
-| `LLIterative(m[,r])` | fit objective | O(n²·iters) per CG solve, m+1 solves/eval | *nothing* structural — R stays exact; only `log\|R\|` is a stochastic (SLQ) estimate | none (doesn't touch the covariance structure) | [Iterative.md](Iterative.md) |
+| `LLIterative(m[,r[,s]])` | fit objective | O(n²·iters) per CG solve, m+1 solves/eval; SLQ log-det is `s` (default 20) Lanczos steps/probe | *nothing* structural — R stays exact; only `log\|R\|` is a stochastic (SLQ) estimate (raise `s` if it drifts on ill-conditioned R) | none (doesn't touch the covariance structure) | [Iterative.md](Iterative.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
 | `predictIterative` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictIterative.md](PredictIterative.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
@@ -53,7 +53,9 @@ combinable — none of them require opting out of the others.
      would eventually need, but never materializes R and never
      factorizes it. Optionally add a Nystrom-preconditioned CG
      (`"LLIterative(m,precond_rank)"`) to cut the iteration count on
-     ill-conditioned fits.
+     ill-conditioned fits, and/or raise the SLQ Lanczos step count
+     (`"LLIterative(m,precond_rank,lanczos_steps)"`, default 20) when the
+     stochastic `log|R|` drifts from the exact objective.
    - **Willing to lose information rather than approximate it**:
      `subsetOfData(X, n_max)` picks `n_max` representative rows
      (k-means, snapped to real points) and hands them to an ordinary
