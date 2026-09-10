@@ -27,10 +27,7 @@ Re-running on the same machine overwrites its file.
 ## Running it
 
 Needs `pylibkriging` (built with `-DENABLE_CUDA_ITERATIVE=ON` for the CUDA
-row), plus `torch` and `gpytorch` importable from the same environment. See
-[`bench/comparison-gpu/README.md`](../comparison-gpu/README.md) and the
-`gpu-bench-env` project note for the build/env recipe used on the reference
-machine.
+row), plus `torch` and `gpytorch` importable from the same environment.
 
 ```sh
 # whole sweep, all five backends, auto-named output

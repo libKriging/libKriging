@@ -50,12 +50,11 @@ past release, see the corresponding entry on the
   convergence scalars kept on-device (no host round-trip per iteration).
   New `pylibkriging` binding `logLikelihoodIterativeFun` (the O(n^2)
   iterative objective, distinct from `logLikelihoodFun`'s exact O(n^3) one).
-  New local GPU benchmarks: `bench/comparison-gpu/` (GPyTorch vs libKriging,
-  n > 1000, theta_frac / kernel / CPU-vs-GPU sweeps) and `bench/gpu/`
-  (standalone, non-CI: one fixed matrix-free sweep — light `LLIterative` fit
-  + `predictIterative` — for `libkriging-gpu` / `libkriging-cpu` /
-  `gpytorch-gpu` / `gpytorch-cpu`, writing a per-machine Markdown/CSV to
-  `bench/gpu/results/`).
+  New standalone (non-CI) GPU benchmark `bench/gpu/`: one fixed sweep at
+  `theta=0.15` comparing `libKriging-Cholesky-<BLAS>` (reference),
+  `libKriging-Iterative-CUDA` / `-OpenMP` and `GPyTorch-BBMM-CUDA` / `-<BLAS>`
+  on fit / logLik / predict time and accuracy, writing a per-machine
+  Markdown/CSV to `bench/gpu/results/`.
 - `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
   bindings (Python already had it); worked notebooks
   `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`

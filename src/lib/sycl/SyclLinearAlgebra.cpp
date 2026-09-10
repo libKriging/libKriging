@@ -155,8 +155,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // Per-column CG scalars, kept ON DEVICE so the loop never round-trips
   // pAp / r.r / alpha / beta through the host (that was ~4 blocking
   // cudaMemcpy per iteration -- the dominant cost of an ill-conditioned
-  // solve that runs thousands of iterations, see
-  // bench/comparison-gpu/ANALYSIS.md). The host only pulls back a single
+  // solve that runs thousands of iterations). The host only pulls back a single
   // "any column still active?" int, every `sync_every` iterations.
   const std::size_t col_bytes = sizeof(double) * static_cast<std::size_t>(ncols);
   const std::size_t col_bytes_i = sizeof(int) * static_cast<std::size_t>(ncols);
