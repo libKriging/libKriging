@@ -384,6 +384,50 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::solve(const ar
   return DinvB - m_DinvU * z;
 }
 
+void LinearAlgebra::WoodburyFactorization::ensure_whiten_factors() const {
+  // O(n*k^2 + k^3) setup for a square factor L of P = D + U U' (L L' = P,
+  // L NOT symmetric) whose inverse applies in O(n*k), never forming an
+  // n x n factor. Write P = D^{1/2} K D^{1/2} with K = I + W W',
+  // W = D^{-1/2} U (n x k). K has a low-rank SYMMETRIC square root (I
+  // commutes, unlike D^{1/2}): thin-QR W = Q S, k x k eig S S' = G Lam G',
+  // then with Phi = Q G (orthonormal columns)
+  //   K^{+-1/2} = I + Phi ( (1+Lam)^{+-1/2} - I ) Phi'.
+  // Take L = D^{1/2} K^{1/2}: L L' = D^{1/2} K D^{1/2} = P exactly. Hence
+  //   L^{-1}  B = K^{-1/2} (D^{-1/2} B)       (whitenL)
+  //   L^{-T} B = D^{-1/2} (K^{-1/2} B)        (whitenLt)
+  // and Rtilde = L^{-1} R L^{-T} is symmetric with
+  //   log det Rtilde = log det R - log det P.
+  if (!m_whiten_Q.is_empty())
+    return;
+  const arma::vec Dinvhalf = arma::sqrt(m_Dinv);       // D^{-1/2}
+  const arma::mat W = m_U.each_col() % Dinvhalf;        // D^{-1/2} U
+  arma::mat Q, S;
+  arma::qr_econ(Q, S, W);
+  arma::vec Lam;
+  arma::mat G;
+  arma::eig_sym(Lam, G, S * S.t());                     // eigenvalues of S S' (>= 0)
+  Lam = arma::clamp(Lam, 0.0, arma::datum::inf);
+  m_whiten_Dinvhalf = Dinvhalf;
+  m_whiten_Q = Q;
+  // K^{-1/2} = I + Q [ G diag(1/sqrt(1+Lam) - 1) G' ] Q'
+  m_whiten_core = G * arma::diagmat(1.0 / arma::sqrt(1.0 + Lam) - 1.0) * G.t();  // k x k
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenL(const arma::mat& B) const {
+  ensure_whiten_factors();
+  arma::mat t = B.each_col() % m_whiten_Dinvhalf;             // D^{-1/2} B
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} (...)
+  return t;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenLt(const arma::mat& B) const {
+  ensure_whiten_factors();
+  arma::mat t = B;
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} B
+  t.each_col() %= m_whiten_Dinvhalf;                          // D^{-1/2} (...)
+  return t;
+}
+
 LIBKRIGING_EXPORT double LinearAlgebra::woodbury_logdet(const arma::mat& U, const arma::vec& D) {
   const arma::vec Dinv = 1.0 / D;
   const arma::mat DinvU = U.each_col() % Dinv;
@@ -673,6 +717,97 @@ LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDetBatched(
     total += quad;
   }
   return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
+    const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+    const arma::mat& B,
+    arma::uword max_iter,
+    double tol,
+    const std::function<arma::mat(const arma::mat&)>& PinvBatched) {
+  // Block conjugate gradient with a SHARED matvec: every right-hand side
+  // (column of B) is still an independent Krylov solve -- no block-CG
+  // subspace sharing -- but all still-active columns are advanced in lockstep
+  // so AmulBatched / PinvBatched are each invoked ONCE per iteration on the
+  // whole n x ncols block instead of once per column. For LLIterative's
+  // matrix-free R*V (which recomputes every transcendental-heavy R_ij on the
+  // fly) that turns ncols redundant covariance sweeps per iteration into one.
+  // Convergence contract matches LinearAlgebra::conjugateGradient: per
+  // column, stop once norm(A*x-b)/norm(b) < tol or after max_iter iterations;
+  // same periodic fresh exact-residual restart to correct round-off drift.
+  const bool preconditioned = static_cast<bool>(PinvBatched);
+  const arma::uword n = B.n_rows;
+  const arma::uword ncols = B.n_cols;
+  arma::mat Xc(n, ncols, arma::fill::zeros);
+  if (ncols == 0)
+    return Xc;
+
+  arma::mat R = B;                                     // residual b - A*x0, x0 = 0
+  arma::mat Z = preconditioned ? PinvBatched(R) : R;   // z = M^-1 r
+  arma::mat P = Z;
+  const arma::rowvec bnorm = arma::sqrt(arma::sum(arma::square(B), 0));
+  arma::rowvec rz_old(ncols, arma::fill::zeros);
+  for (arma::uword c = 0; c < ncols; ++c)
+    rz_old(c) = arma::dot(R.col(c), Z.col(c));
+
+  std::vector<char> active(ncols, 1);
+  for (arma::uword c = 0; c < ncols; ++c)
+    if (bnorm(c) == 0.0)
+      active[c] = 0;  // x = 0 already solves A*x = 0
+
+  constexpr arma::uword restart_every = 50;
+  arma::rowvec alpha_it(ncols, arma::fill::zeros);  // this iteration's step lengths, pass 1 -> pass 2
+
+  for (arma::uword it = 0; it < max_iter; ++it) {
+    bool any_active = false;
+    for (arma::uword c = 0; c < ncols; ++c)
+      any_active = any_active || active[c];
+    if (!any_active)
+      break;
+
+    const arma::mat AP = AmulBatched(P);  // one shared matvec for all columns
+
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      const double pAp = arma::dot(P.col(c), AP.col(c));
+      if (pAp <= 0.0) {  // SPD breakdown guard: shouldn't happen for genuinely SPD A
+        active[c] = 0;
+        continue;
+      }
+      alpha_it(c) = rz_old(c) / pAp;
+      Xc.col(c) += alpha_it(c) * P.col(c);
+    }
+
+    const bool do_restart = ((it + 1) % restart_every == 0);
+    const arma::mat AX = do_restart ? AmulBatched(Xc) : arma::mat();
+
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      if (do_restart)
+        R.col(c) = B.col(c) - AX.col(c);  // fresh exact residual on the updated iterate
+      else
+        R.col(c) -= alpha_it(c) * AP.col(c);
+      if (arma::norm(R.col(c)) / bnorm(c) < tol)
+        active[c] = 0;
+    }
+
+    if (preconditioned)
+      Z = PinvBatched(R);
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      const arma::vec z_c = preconditioned ? Z.col(c) : R.col(c);
+      const double rz_new = arma::dot(R.col(c), z_c);
+      if (do_restart)
+        P.col(c) = z_c;  // plain restart: p = z, no Fletcher-Reeves blend
+      else
+        P.col(c) = z_c + (rz_new / rz_old(c)) * P.col(c);
+      rz_old(c) = rz_new;
+    }
+  }
+  return Xc;
 }
 
 // Solve X*A=B : X = B / A
