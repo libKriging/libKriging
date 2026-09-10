@@ -612,9 +612,8 @@ def write_markdown(path, rows, meta):
     ap(f"- `{name('iter-cuda')}` vs `{name('iter-omp')}` is the same binary with "
        "`set_cuda_iterative_enabled(...)` toggled — identical results, different device "
        "for the batched CG / SLQ / gradient matvecs.")
-    ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary + the "
-       "GPyTorch code libKriging mimics), `bench/comparison-gpu/` (multi-function "
-       "CI-style variant).")
+    ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these "
+       "results + the GPyTorch code libKriging mimics).")
     ap("")
 
     with open(path, "w") as fh:
