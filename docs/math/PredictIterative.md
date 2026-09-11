@@ -97,7 +97,20 @@ model with a per-point noise channel (`m_noise` non-empty).
   instead of a fresh covariance sweep -- all of the mean solve, the
   per-point stdev solves, and the GLS-correction solve share it. Measured
   ~40x faster at `n=4000` (50.7s → 1.3s) with results unchanged to ~1e-7;
-  skipped when a GPU backend is bound.
+  skipped when a GPU backend is bound (it has its own dense fast path, next).
+- **Dense fast path (CUDA)**: `LinearAlgebraCuda::conjugateGradient`
+  materializes `R` once per `predictIterative` call (its own
+  `build_cov_kernel` + `cublasDgemm`, governed by
+  `LK_ITERATIVE_CUDA_DENSE_MAX_MB`, default 4096 MiB) instead of
+  recomputing every covariance entry's transcendentals on every CG
+  iteration. Speedup grows with `n` (more CG iterations to amortize the
+  build over): ~1.4x at `n≤1000` up to ~3x at `n=4000` in this project's
+  own measurements, on top of the CUDA backend's existing per-iteration
+  launch/host-sync savings. See [Iterative.md](Iterative.md#mathematical-description)
+  for the same fast path applied to `LLIterative`'s objective/gradient,
+  where the effect is much larger (~25x at `n=2000`) because that path
+  runs many more matvecs per evaluation (SLQ Lanczos + multiple CG solves)
+  to amortize the build over.
 
 ## Usage
 

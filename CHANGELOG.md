@@ -94,6 +94,20 @@ past release, see the corresponding entry on the
   `LK_ITERATIVE_DENSE_MAX_MB` budget, run against a dense `R` materialized
   once per call instead of a matrix-free sweep per CG iteration. ~40x
   faster at `n = 4000` (50.7 s → 1.3 s); results unchanged to ~1e-7.
+- CUDA iterative path gets its own dense fast path (`build_cov_kernel` in
+  `CudaLinearAlgebraKernel.cu` + `cublasDgemm`, one CUDA thread per `(i,j)`
+  pair, governed by `LK_ITERATIVE_CUDA_DENSE_MAX_MB` (default 4096 MiB,
+  independent of the CPU budget)): `LinearAlgebraCuda::conjugateGradient`/
+  `rmulBatched`/`dRmulBatched` materialize `R` (or the `dR/dtheta_k`
+  blocks) once per call instead of recomputing every covariance entry's
+  transcendentals on every CG iteration / Lanczos step — the hand-written
+  `rmul_batched_kernel`/`drmul_batched_kernel` had never gotten this
+  treatment, so `libKriging-Iterative-CUDA` had fallen *behind* the CPU's
+  new dense path at every `n` in `bench/gpu`. Now ~25x faster at `n=2000`
+  logLik+gradient, ~114x at `n=4000` (8.0 s → 0.32 s, 137.5 s → 1.2 s);
+  `predictIterative` ~1.4-3x. Adds a `CUDA::cublas` link dependency
+  (`ENABLE_CUDA_ITERATIVE` builds only). Results unchanged to the SLQ/CG
+  noise floor.
 - `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
