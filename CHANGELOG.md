@@ -84,7 +84,16 @@ past release, see the corresponding entry on the
   transcendental-heavy covariance sweep. Combined with the batching above,
   ~100x faster `logLik` + gradient at `n = 2000` (235 s → ~2 s at
   `OMP_NUM_THREADS=32`); results unchanged to the SLQ noise floor. GPU
-  path unaffected (it has its own device matvecs).
+  path unaffected (it has its own device matvecs). The builder
+  (`KrigingImpl::build_separable_cov`) is shared with `predictIterative`
+  (below).
+- `predictIterative`: gets the same CPU speedups as `LLIterative` above —
+  its mean/stdev/GLS-correction CG solves now share one batched matvec
+  (`LinearAlgebra::conjugateGradientBatched`, replacing the old
+  thread-per-column `conjugateGradient`) and, within the same
+  `LK_ITERATIVE_DENSE_MAX_MB` budget, run against a dense `R` materialized
+  once per call instead of a matrix-free sweep per CG iteration. ~40x
+  faster at `n = 4000` (50.7 s → 1.3 s); results unchanged to ~1e-7.
 - `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
