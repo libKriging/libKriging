@@ -557,7 +557,13 @@ def write_markdown(path, rows, meta):
     ap("- **versions**: " + ", ".join(f"{k}=`{v}`" for k, v in meta["versions"].items()))
     ap("")
     ap("`fit` = the `Kriging(...)` constructor (dense Cholesky for `LL`; one CG+SLQ "
-       "commit for the light `LLIterative` fit) / GPyTorch model build. `logLik` = one "
+       "commit for the light `LLIterative` fit) / GPyTorch model build. **Not comparable "
+       "as a standalone column**: `gpytorch.models.ExactGP.__init__` does no linear "
+       "algebra at all (verified: flat ~1ms regardless of n) -- it only stores tensors "
+       "and builds the module tree, so ALL of GPyTorch's kernel/solve/backward cost that "
+       "libKriging pays inside its constructor instead shows up in GPyTorch's `logLik` "
+       "(its first forward call) here. Compare `fit + logLik` per backend for a fair "
+       "like-for-like \"time to a log-likelihood value\" total. `logLik` = one "
        "log-likelihood **+ gradient** evaluation at theta. `predict` = a *cold* posterior "
        f"mean on {N_TEST} held-out points (GPyTorch's per-fit prediction cache is dropped "
        "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "

@@ -158,6 +158,15 @@ past release, see the corresponding entry on the
   generated report's Verdict section now reports the max BBMM-vs-its-own-
   Cholesky posterior-mean gap directly. `n=4000` also added to the sweep
   (`--sizes`, default unchanged).
+- `bench/gpu`: the `fit` column isn't comparable across libraries as a
+  standalone number — `gpytorch.models.ExactGP.__init__` does no linear
+  algebra (confirmed empirically: ~1ms flat regardless of `n`) while
+  libKriging's constructor eagerly factorizes/CG-fits, so all of
+  GPyTorch's kernel/solve/backward cost shows up in its `logLik` (first
+  forward call) instead. Documented in the generated report's header and
+  `bench/gpu/README.md`: compare `fit + logLik` per backend for a fair
+  "time to a log-likelihood value" total.
+- `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
   the new `WoodburyFactorization::whitenL`/`whitenLt`) and `log|P|` is added
