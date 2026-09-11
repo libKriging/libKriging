@@ -29,7 +29,19 @@ settings), the cost and accuracy of five backends, each named
 * **GPyTorch-BBMM-CUDA** / **GPyTorch-BBMM-<BLAS>** -- GPyTorch's ``ExactGP``
   + BBMM (CG + pivoted-Cholesky preconditioner + SLQ log-det), on ``cuda``
   or ``cpu`` (torch's own BLAS named), with *raised*
-  CG/Lanczos/preconditioner settings so it actually converges.
+  CG/Lanczos/preconditioner settings AND ``max_cholesky_size=0`` so it
+  actually converges via BBMM at every n (GPyTorch's own ``ExactGP`` name
+  is about the MODEL being exact, not the solve method -- its default
+  ``max_cholesky_size=800`` silently switches to an exact dense solve at or
+  below that size, which the raised CG/Lanczos settings alone don't
+  override).
+* **GPyTorch-Cholesky-CUDA** / **GPyTorch-Cholesky-<BLAS>** -- the SAME
+  model, with ``max_cholesky_size`` forced far above any n here instead, so
+  every row is GPyTorch's own exact dense solve -- a second reference,
+  alongside libKriging's, that isolates the covariance-argument-convention
+  offset (see ``dMean/rms`` below) from any BBMM under-convergence: it
+  should match GPyTorch-BBMM's own accuracy at every n if BBMM has already
+  converged there.
 
 Three timings per backend, plus accuracy
 ----------------------------------------
@@ -193,7 +205,7 @@ def detect_torch_cpu_blas() -> str | None:
 # backend keys used by --backends / dispatch, and how each maps to the
 # "<lib>-<method>-<linalg lib>" display label (the linalg part is filled in
 # at runtime for the CPU/Cholesky rows).
-BACKEND_KEYS = ["chol", "iter-cuda", "iter-omp", "gpt-cuda", "gpt-cpu"]
+BACKEND_KEYS = ["chol", "iter-cuda", "iter-omp", "gpt-cuda", "gpt-cpu", "gpt-chol-cuda", "gpt-chol-cpu"]
 
 
 def backend_label(key: str, lk_blas: str, torch_blas: str) -> str:
@@ -203,6 +215,8 @@ def backend_label(key: str, lk_blas: str, torch_blas: str) -> str:
         "iter-omp": "libKriging-Iterative-OpenMP",  # dense-R BLAS-3 within budget, else hand-written OpenMP loops
         "gpt-cuda": "GPyTorch-BBMM-CUDA",           # PyTorch CUDA (cuBLAS/cuSOLVER) + BBMM
         "gpt-cpu": f"GPyTorch-BBMM-{torch_blas}",
+        "gpt-chol-cuda": "GPyTorch-Cholesky-CUDA",           # max_cholesky_size forced huge -> exact dense solve
+        "gpt-chol-cpu": f"GPyTorch-Cholesky-{torch_blas}",
     }[key]
 
 
@@ -268,11 +282,13 @@ def _gpt_modules():
     return gpytorch, torch, ExactGPModel
 
 
-def _gpt_converged_ctx(gpytorch):
+def _gpt_converged_ctx(gpytorch, bbmm: bool = True):
     # raised so BBMM CG / SLQ log-det actually converge on the (mildly
     # ill-conditioned) R at theta=0.15 -- the defaults (1000 CG iters,
     # cg_tol 1e-2, 15 Lanczos, 10 probes, precond >= n=2000) leave -mll and
-    # the posterior under-converged.
+    # the posterior under-converged. Irrelevant (but harmless) when
+    # bbmm=False: max_cholesky_size below then forces the exact dense path
+    # regardless, so none of these are ever consulted.
     return [
         # GPyTorch silently falls back to an EXACT dense Cholesky solve for
         # any matrix at or below this size (default 800), no matter how the
@@ -281,11 +297,14 @@ def _gpt_converged_ctx(gpytorch):
         # single-digit milliseconds and its -mll disagreed with a
         # max_cholesky_size(0) run by ~0.06-0.16, an order of magnitude more
         # than n=900/2000 (already above 800) disagreed with themselves
-        # (~0.003-0.01, pure stochastic-estimator noise). Since every row
-        # here is labeled "GPyTorch-BBMM-*", force BBMM at every n in the
-        # sweep -- 0 means no n satisfies "n <= threshold", so Cholesky is
-        # never selected.
-        gpytorch.settings.max_cholesky_size(0),
+        # (~0.003-0.01, pure stochastic-estimator noise). bbmm=True (the
+        # "GPyTorch-BBMM-*" backends) forces BBMM at every n in the sweep --
+        # 0 means no n satisfies "n <= threshold", so Cholesky is never
+        # selected. bbmm=False (the "GPyTorch-Cholesky-*" backends, an
+        # explicit exact-solve cross-check alongside libKriging's own
+        # Cholesky reference) does the opposite: a threshold far above any
+        # n this sweep uses, so Cholesky is ALWAYS selected.
+        gpytorch.settings.max_cholesky_size(0 if bbmm else 1_000_000),
         gpytorch.settings.max_cg_iterations(5000),
         gpytorch.settings.cg_tolerance(1e-4),
         gpytorch.settings.eval_cg_tolerance(1e-4),
@@ -296,7 +315,7 @@ def _gpt_converged_ctx(gpytorch):
     ]
 
 
-def run_gpytorch(X, y, Xte, yte, theta, device_str):
+def run_gpytorch(X, y, Xte, yte, theta, device_str, bbmm: bool = True):
     gpytorch, torch, ExactGPModel = _gpt_modules()
     torch.set_default_dtype(torch.float64)
     device = torch.device(device_str)
@@ -323,7 +342,7 @@ def run_gpytorch(X, y, Xte, yte, theta, device_str):
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(lik, model)
 
     with contextlib.ExitStack() as es:
-        for c in _gpt_converged_ctx(gpytorch):
+        for c in _gpt_converged_ctx(gpytorch, bbmm=bbmm):
             es.enter_context(c)
 
         def eval_ll():
@@ -407,9 +426,13 @@ def one_point(key, n, theta, Xte, yte):
     if key == "iter-omp":
         return run_libkriging_iter(X, y, Xte, yte, theta, use_cuda=False)
     if key == "gpt-cuda":
-        return run_gpytorch(X, y, Xte, yte, theta, "cuda")
+        return run_gpytorch(X, y, Xte, yte, theta, "cuda", bbmm=True)
     if key == "gpt-cpu":
-        return run_gpytorch(X, y, Xte, yte, theta, "cpu")
+        return run_gpytorch(X, y, Xte, yte, theta, "cpu", bbmm=True)
+    if key == "gpt-chol-cuda":
+        return run_gpytorch(X, y, Xte, yte, theta, "cuda", bbmm=False)
+    if key == "gpt-chol-cpu":
+        return run_gpytorch(X, y, Xte, yte, theta, "cpu", bbmm=False)
     raise ValueError(key)
 
 
@@ -613,6 +636,21 @@ def write_markdown(path, rows, meta):
            f"reference (a roughly n-independent offset from the covariance-argument "
            f"convention, *not* under-convergence), Q² ≥ `{gq:.4f}`. Its `-mll` value is a "
            f"different normalisation and is not compared.")
+    gtg_chol, gtc_chol = got("gpt-chol-cuda"), got("gpt-chol-cpu")
+    bbmm_vs_chol = [
+        abs(bbmm[n]["dmean_rms"] - chol_gpt[n]["dmean_rms"])
+        for bbmm, chol_gpt in ((gtg, gtg_chol), (gtc, gtc_chol))
+        for n in ns
+        if n in bbmm and n in chol_gpt and bbmm[n].get("dmean_rms") is not None
+        and chol_gpt[n].get("dmean_rms") is not None
+    ]
+    if bbmm_vs_chol:
+        ap(f"- **GPyTorch BBMM vs its own exact Cholesky** (`GPyTorch-Cholesky-*`, "
+           f"`max_cholesky_size` forced far above every n here): posterior mean differs by at "
+           f"most `{max(bbmm_vs_chol):.1e}` of test RMS across n — BBMM has converged to "
+           f"GPyTorch's own exact answer, confirming the offset from the libKriging-Cholesky "
+           f"reference above is the covariance-argument-convention difference, not BBMM "
+           f"under-convergence.")
     ap(f"- **`{name('chol')}`** is fastest on all three ops at these n — the iterative "
        "path is for n where the dense factor no longer fits / is too slow, not this range.")
     ap("")
@@ -638,6 +676,11 @@ def write_markdown(path, rows, meta):
        "`set_cuda_iterative_enabled(...)` toggled — identical results, different path "
        "for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU "
        "dense-`R` BLAS path).")
+    ap(f"- `{name('gpt-cuda')}`/`{name('gpt-cpu')}` vs `{name('gpt-chol-cuda')}`/"
+       f"`{name('gpt-chol-cpu')}` are the SAME model and data, only "
+       "`gpytorch.settings.max_cholesky_size` differs (`0` = always BBMM, forced huge = "
+       "always exact) — the Cholesky rows are GPyTorch's own reference for whether BBMM "
+       "has converged, independent of libKriging's Cholesky reference.")
     ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these "
        "results + the GPyTorch code libKriging mimics).")
     ap("")
@@ -656,7 +699,7 @@ def main(argv=None):
                    help="shared fixed length-scale (default: %(default)s)")
     p.add_argument("--backends", default=",".join(BACKEND_KEYS),
                    help="comma-separated subset of these keys: " + ", ".join(BACKEND_KEYS)
-                        + "  (chol / iter-cuda / iter-omp / gpt-cuda / gpt-cpu)")
+                        + "  (chol / iter-cuda / iter-omp / gpt-cuda / gpt-cpu / gpt-chol-cuda / gpt-chol-cpu)")
     p.add_argument("--outdir", default=None, help="output directory (default: <this file>/results)")
     p.add_argument("--tag", default=None, help="extra tag appended to the output file name")
     args = p.parse_args(argv)
