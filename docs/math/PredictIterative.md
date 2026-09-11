@@ -9,9 +9,11 @@ from a stored dense O(n²) Cholesky factor -- fast to reuse across many
 kept resident in the first place.
 
 `predictIterative` is a predict-*only* alternative: it solves `R x = v` with
-matrix-free conjugate gradient (`LinearAlgebra::conjugateGradient`)
-instead, evaluating `R * p` on the fly (O(n²) time per matvec, O(n)
-memory -- R itself is never materialized). Useful when a model's dense
+conjugate gradient (`LinearAlgebra::conjugateGradientBatched`) instead of a
+stored factor -- matrix-free by default (evaluating `R * p` on the fly,
+O(n²) time per matvec, O(n) memory, R itself never materialized), or
+against an `R` materialized once per call for a separable kernel within a
+memory budget (see *Dense fast path* below). Useful when a model's dense
 factor either was never computed (e.g. after a light Vecchia/Nystrom fit
 -- though `predictVecchia`/`predictNystrom` are cheaper still there,
 since they only need the fit's own O(n·m³)/O(n·k²) factors, not a fresh
@@ -86,6 +88,16 @@ model with a per-point noise channel (`m_noise` non-empty).
   `KrigingPredictIterativeTest.cpp`.
 - **Scope**: `NoiseModel::None` only (no nugget/noise channel); throws if
   the model wasn't fitted, or on `X_n` dimension mismatch.
+- **Dense fast path (CPU)**: shared with `Kriging::_logLikelihoodIterative`
+  (`KrigingImpl::build_separable_cov`, see [Iterative.md](Iterative.md#mathematical-description)) --
+  for a separable kernel (`gauss`/`exp`/`matern3_2`/`matern5_2`) and an `n`
+  whose dense `n×n` `R` fits a memory budget (`LK_ITERATIVE_DENSE_MAX_MB`,
+  default 6144 MiB; `0` forces matrix-free), `R` is materialized ONCE per
+  `predictIterative` call and every CG iteration becomes a BLAS-3 `R·V`
+  instead of a fresh covariance sweep -- all of the mean solve, the
+  per-point stdev solves, and the GLS-correction solve share it. Measured
+  ~40x faster at `n=4000` (50.7s → 1.3s) with results unchanged to ~1e-7;
+  skipped when a GPU backend is bound.
 
 ## Usage
 
