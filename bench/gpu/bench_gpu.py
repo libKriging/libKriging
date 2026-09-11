@@ -335,15 +335,33 @@ def run_gpytorch(X, y, Xte, yte, theta, device_str, bbmm: bool = True):
             model.covar_module.outputscale = torch.tensor(1.0, dtype=torch.float64)
             model.mean_module.constant.fill_(float(np.mean(y)))  # match libKriging's constant trend
         model, lik = model.double().to(device), lik.double().to(device)
-        sync()
         return model, lik
-
-    fit_s, (model, lik) = timed_min(build)
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(lik, model)
 
     with contextlib.ExitStack() as es:
         for c in _gpt_converged_ctx(gpytorch, bbmm=bbmm):
             es.enter_context(c)
+
+        def fit():
+            # Mirrors libKriging's `Kriging(...)` constructor: with no
+            # hyperparameter optimization (theta is fixed here, same as
+            # libKriging's `optim="none"`), "fitting" still means solving
+            # R(theta) once -- one Cholesky factorization, or one CG+SLQ
+            # commit for BBMM (exactly what the light `LLIterative` fit does
+            # on the libKriging side). `ExactGP.__init__` itself does none of
+            # that -- it's pure lazy bookkeeping (verified: flat ~1ms
+            # regardless of n) -- so without this forced forward call
+            # `fit_s` measured object construction, not a fit, and all the
+            # real work silently landed in the first `logLik` call instead.
+            model, lik = build()
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(lik, model)
+            model.train()
+            lik.train()
+            with torch.no_grad():
+                mll(model(tx), ty)  # forces the R(theta) solve/logdet now, not on first logLik call
+            sync()
+            return model, lik, mll
+
+        fit_s, (model, lik, mll) = timed_min(fit)
 
         def eval_ll():
             model.train()
@@ -556,15 +574,20 @@ def write_markdown(path, rows, meta):
        "max_preconditioner_size=100, min_preconditioning_size=1`")
     ap("- **versions**: " + ", ".join(f"{k}=`{v}`" for k, v in meta["versions"].items()))
     ap("")
-    ap("`fit` = the `Kriging(...)` constructor (dense Cholesky for `LL`; one CG+SLQ "
-       "commit for the light `LLIterative` fit) / GPyTorch model build. **Not comparable "
-       "as a standalone column**: `gpytorch.models.ExactGP.__init__` does no linear "
-       "algebra at all (verified: flat ~1ms regardless of n) -- it only stores tensors "
-       "and builds the module tree, so ALL of GPyTorch's kernel/solve/backward cost that "
-       "libKriging pays inside its constructor instead shows up in GPyTorch's `logLik` "
-       "(its first forward call) here. Compare `fit + logLik` per backend for a fair "
-       "like-for-like \"time to a log-likelihood value\" total. `logLik` = one "
-       "log-likelihood **+ gradient** evaluation at theta. `predict` = a *cold* posterior "
+    ap("`fit` = solving `R(theta)` once at the fixed, given theta (no hyperparameter "
+       "optimization anywhere in this sweep): the `Kriging(...)` constructor (dense "
+       "Cholesky for `LL`; one CG+SLQ commit for the light `LLIterative` fit) / for "
+       "GPyTorch, model build **plus one forced no-grad `mll(model(x), y)` forward** "
+       "(Cholesky, or one BBMM CG+SLQ solve). That forced forward is needed because "
+       "`gpytorch.models.ExactGP.__init__` itself does no linear algebra at all "
+       "(verified: flat ~1ms regardless of n) -- without it, all of GPyTorch's "
+       "kernel/solve cost would silently land in `logLik` (its first forward call) "
+       "instead, making `fit` measure object construction rather than a fit. `logLik` = "
+       "a further, independent log-likelihood **+ gradient** evaluation at theta -- "
+       "GPyTorch's train-mode forward has no cache, so this genuinely re-solves "
+       "`R(theta)` from scratch, same as libKriging's `logLikelihoodFun`/"
+       "`logLikelihoodIterativeFun` re-solving independently of what `fit` did. "
+       "`predict` = a *cold* posterior "
        f"mean on {N_TEST} held-out points (GPyTorch's per-fit prediction cache is dropped "
        "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "
        "exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. "
