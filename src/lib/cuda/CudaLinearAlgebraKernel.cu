@@ -541,6 +541,42 @@ extern "C" void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int
   cg_any_active_kernel<<<(ncols + block - 1) / block, block>>>(d_active, ncols, d_flag);
 }
 
+// --- Dense fast-path build: materialize R (+ optionally dR/dtheta) --------
+// One thread per (i,j): both R[i,j] and R[j,i] are computed independently
+// (no symmetry exploited, unlike the CPU build_separable_cov's
+// thread-count-limited half-loop) -- with a GPU's thread count this is
+// cheap, and it avoids any write-write hazard entirely. i==j needs no
+// special case: Xi==Xj drives every kernel's u=|dx|/theta to 0, and
+// lk_cov_pair/lk_dlncov_pair already give R=1 / dlncov=0 there on their
+// own (same functions the matrix-free kernels above use per-pair, just
+// paid ONCE here instead of once per CG iteration / Lanczos step).
+__global__ void build_cov_kernel(const double* __restrict__ Xt,
+                                 int n,
+                                 int dimX,
+                                 const double* __restrict__ theta,
+                                 CovKind kind,
+                                 double* __restrict__ R,
+                                 double* __restrict__ dR) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i >= n || j >= n)
+    return;
+
+  const double* Xi = Xt + static_cast<std::size_t>(i) * dimX;
+  const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
+  const double c = lk_cov_pair(kind, Xi, Xj, theta, dimX);
+  const std::size_t idx = static_cast<std::size_t>(i) + static_cast<std::size_t>(j) * n;
+  if (R != nullptr)
+    R[idx] = c;
+  if (dR != nullptr) {
+    double dln[LK_CUDA_MAX_DIMX];
+    lk_dlncov_pair(kind, Xi, Xj, theta, dimX, dln);
+    const std::size_t n2 = static_cast<std::size_t>(n) * n;
+    for (int k = 0; k < dimX; ++k)
+      dR[static_cast<std::size_t>(k) * n2 + idx] = c * dln[k];
+  }
+}
+
 // --- Nystrom/Woodbury preconditioner apply, ON DEVICE --------------------
 // z = Dinv .* (r - U * (M^-1 (U^T (Dinv .* r)))), M = Mchol Mchol^T, k x k.
 // Matches LinearAlgebra::WoodburyFactorization::solve exactly (same
@@ -674,6 +710,20 @@ extern "C" void lk_cuda_drmul_batched_launch(const double* d_Xt,
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   drmul_batched_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_V, ncols, d_Out);
+}
+
+// d_dR (when non-null) must be sized n*n*dimX doubles and dimX <= 32 (same
+// bound as lk_cuda_drmul_batched_launch) -- checked by the host caller.
+extern "C" void lk_cuda_build_cov_launch(const double* d_Xt,
+                                         int n,
+                                         int dimX,
+                                         const double* d_theta,
+                                         int covKind,
+                                         double* d_R,
+                                         double* d_dR) {
+  const dim3 block(16, 16, 1);
+  const dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, 1);
+  build_cov_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_R, d_dR);
 }
 
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE

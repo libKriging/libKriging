@@ -20,10 +20,12 @@ settings), the cost and accuracy of five backends, each named
   iterative path (``objective="LLIterative(30,0,40)"``: 30 SLQ probes, no CG
   preconditioner, 40 Lanczos steps per probe so the stochastic
   log-determinant stays close to exact), light fit (no dense R *factor*),
-  ``set_cuda_iterative_enabled(True/False)``. CUDA uses hand-written device
-  matvec kernels; OpenMP materializes R once per evaluation and runs the
-  matvecs as BLAS-3 ``R*V`` (separable kernels, ``LK_ITERATIVE_DENSE_MAX_MB``
-  budget), falling back to a hand-written OpenMP matvec otherwise.
+  ``set_cuda_iterative_enabled(True/False)``. Both materialize R (or the
+  ``dR/dtheta_k`` blocks) once per evaluation for a separable kernel within a
+  memory budget -- CUDA via a device build kernel + ``cublasDgemm``
+  (``LK_ITERATIVE_CUDA_DENSE_MAX_MB``), OpenMP via BLAS-3 ``R*V``
+  (``LK_ITERATIVE_DENSE_MAX_MB``) -- falling back to a hand-written
+  matrix-free matvec kernel/loop otherwise.
 * **GPyTorch-BBMM-CUDA** / **GPyTorch-BBMM-<BLAS>** -- GPyTorch's ``ExactGP``
   + BBMM (CG + pivoted-Cholesky preconditioner + SLQ log-det), on ``cuda``
   or ``cpu`` (torch's own BLAS named), with *raised*
@@ -197,8 +199,8 @@ BACKEND_KEYS = ["chol", "iter-cuda", "iter-omp", "gpt-cuda", "gpt-cpu"]
 def backend_label(key: str, lk_blas: str, torch_blas: str) -> str:
     return {
         "chol": f"libKriging-Cholesky-{lk_blas}",
-        "iter-cuda": "libKriging-Iterative-CUDA",   # hand-written CUDA CG / SLQ / dR-dtheta kernels
-        "iter-omp": "libKriging-Iterative-OpenMP",  # hand-written OpenMP matvec loops (not a BLAS)
+        "iter-cuda": "libKriging-Iterative-CUDA",   # dense-R cublasDgemm within budget, else hand-written CUDA kernels
+        "iter-omp": "libKriging-Iterative-OpenMP",  # dense-R BLAS-3 within budget, else hand-written OpenMP loops
         "gpt-cuda": "GPyTorch-BBMM-CUDA",           # PyTorch CUDA (cuBLAS/cuSOLVER) + BBMM
         "gpt-cpu": f"GPyTorch-BBMM-{torch_blas}",
     }[key]
@@ -576,7 +578,7 @@ def write_markdown(path, rows, meta):
         gc = gtc.get(n, {}).get("loglik_s")
         ap(f"| {n} | {_f(c, '.3f')} | {_f(g, '.3f')} | {_f(cp, '.3f')} | "
            f"{(f'{cp / g:.1f}×' if (cp and g) else '—')} | "
-           f"{(f'{g / c:.0f}×' if (g and c) else '—')} | {_f(gg, '.3f')} | {_f(gc, '.3f')} |")
+           f"{(f'{g / c:.1f}×' if (g and c) else '—')} | {_f(gg, '.3f')} | {_f(gc, '.3f')} |")
     ap("")
 
     ap("## Verdict — did everything converge?")
@@ -601,11 +603,13 @@ def write_markdown(path, rows, meta):
 
     ap("## Notes")
     ap("")
-    ap("- Backend names are `<lib>-<method>-<linalg lib>`. `libKriging-Iterative-CUDA` "
-       "uses hand-written CUDA matvec kernels; `libKriging-Iterative-OpenMP` "
-       "materializes R once per evaluation and runs the matvecs as BLAS-3 `R*V` "
-       "(hence `-OpenMP`, the BLAS it links) for separable kernels within the "
-       "`LK_ITERATIVE_DENSE_MAX_MB` budget, else a hand-written OpenMP matvec. "
+    ap("- Backend names are `<lib>-<method>-<linalg lib>`. Both "
+       "`libKriging-Iterative-CUDA` (`LK_ITERATIVE_CUDA_DENSE_MAX_MB` budget) "
+       "and `-OpenMP` (`LK_ITERATIVE_DENSE_MAX_MB`) materialize R once per "
+       "evaluation for a separable kernel within their memory budget and run "
+       "the matvecs as a single `cublasDgemm` / BLAS-3 `R*V` (hence "
+       "`-OpenMP`, the BLAS it links), else fall back to a hand-written "
+       "matvec kernel. "
        f"`{name('chol')}` and `{name('gpt-cpu')}` name the actual dense BLAS/LAPACK "
        "each links against.")
     ap(f"- theta={meta['theta']} is chosen so the SLQ log-determinant's Lanczos "
