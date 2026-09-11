@@ -8,6 +8,28 @@
 #include "libKriging/Kriging.hpp"
 // clang-format on
 
+// Cross-platform environment variable functions (mirrors the same helper in
+// KrigingIterativeTest.cpp).
+#ifdef _WIN32
+#include <cstdlib>
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  if (!overwrite && std::getenv(name) != nullptr) {
+    return 0;
+  }
+  return _putenv_s(name, value);
+}
+inline int unsetenv_portable(const char* name) {
+  return _putenv_s(name, "");
+}
+#else
+inline int setenv_portable(const char* name, const char* value, int overwrite) {
+  return setenv(name, value, overwrite);
+}
+inline int unsetenv_portable(const char* name) {
+  return unsetenv(name);
+}
+#endif
+
 static double f2d(double x1, double x2) {
   return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2;
 }
@@ -68,6 +90,53 @@ TEST_CASE("predictIterative mean/stdev match exact predict at a moderate theta",
   // well-conditioned theta, default settings converge to ~1e-9.
   CHECK(arma::abs(m_cg - m_ex).max() < 1e-5 * arma::stddev(y));
   CHECK(arma::abs(s_cg - s_ex).max() < 1e-5 * arma::stddev(y));
+}
+
+TEST_CASE("predictIterative: the dense fast path matches the matrix-free path", "[predictiterative][kriging]") {
+  // For a separable kernel and small enough n, predictIterative_impl
+  // materializes R once (KrigingImpl::build_separable_cov, shared with
+  // Kriging::_logLikelihoodIterative) and solves via BLAS-3 R*V instead of
+  // the matrix-free per-pair matvec. LK_ITERATIVE_DENSE_MAX_MB=0 forces the
+  // matrix-free path. Same theta, same CG budget => the two must agree
+  // tightly (the only difference is BLAS vs pair-loop summation order).
+  arma::mat X;
+  arma::vec y;
+  make_data(60, X, y);
+  Kriging k = make_fixed_theta_model(y, X, "matern5_2", Trend::RegressionModel::Constant, 0.15);
+
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(15, Xt, yt, 456);
+
+  const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
+
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
+  auto [m_mf, s_mf] = k.predictIterative(Xt, true);
+
+  setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
+  auto [m_de, s_de] = k.predictIterative(Xt, true);
+
+  // and the preconditioned solve too
+  auto [m_mf_pc, s_mf_pc] = ([&] {
+    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
+    return k.predictIterative(Xt, true, 0, 1e-8, true, 20);
+  })();
+  auto [m_de_pc, s_de_pc] = ([&] {
+    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
+    return k.predictIterative(Xt, true, 0, 1e-8, true, 20);
+  })();
+
+  if (old_env)
+    setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
+  else
+    unsetenv_portable("LK_ITERATIVE_DENSE_MAX_MB");
+
+  INFO("max |mean diff| = " << arma::abs(m_mf - m_de).max());
+  INFO("max |stdev diff| = " << arma::abs(s_mf - s_de).max());
+  CHECK(arma::abs(m_mf - m_de).max() < 1e-8 * arma::stddev(y));
+  CHECK(arma::abs(s_mf - s_de).max() < 1e-8 * arma::stddev(y));
+  CHECK(arma::abs(m_mf_pc - m_de_pc).max() < 1e-8 * arma::stddev(y));
+  CHECK(arma::abs(s_mf_pc - s_de_pc).max() < 1e-8 * arma::stddev(y));
 }
 
 TEST_CASE("predictIterative defaults to mean only (stdev empty)", "[predictiterative][kriging]") {
