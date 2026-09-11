@@ -56,7 +56,14 @@ Three timings per backend, plus accuracy vs the Cholesky reference:
 
 * **`fit`** — the `Kriging(...)` constructor: dense Cholesky for `LL`; one
   CG+SLQ commit for the light `LLIterative` fit (no dense R factor);
-  GPyTorch model/likelihood build (near zero).
+  GPyTorch model/likelihood build. **Not comparable across libraries as a
+  standalone column**: `gpytorch.models.ExactGP.__init__` does no linear
+  algebra — it's lazy, so it's always ~1ms flat regardless of `n`
+  (confirmed empirically) — while libKriging's constructor eagerly
+  factorizes/CG-fits. All the kernel/solve/backward cost GPyTorch defers
+  out of `fit` shows up in its `logLik` (first forward call) instead;
+  compare `fit + logLik` per backend for a fair "time to a log-likelihood
+  value" total.
 * **`logLik`** — one log-likelihood **+ gradient** evaluation at `theta`
   (`logLikelihoodFun` / `logLikelihoodIterativeFun` / one `-mll().backward()`).
 * **`predict`** — a *cold* posterior mean on the 300-point test set
