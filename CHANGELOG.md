@@ -210,6 +210,16 @@ JLibKriging.jl.
   `predictIterative` ~1.4-3x. Adds a `CUDA::cublas` link dependency
   (`ENABLE_CUDA_ITERATIVE` builds only). Results unchanged to the SLQ/CG
   noise floor.
+- `bench/gpu`: GPyTorch's `max_cholesky_size` (default 800) was left at
+  its default, so the `GPyTorch-BBMM-*` rows at `n=250`/`500` — below that
+  threshold — were silently running an exact dense Cholesky solve instead
+  of BBMM despite the raised CG/Lanczos settings, confirmed empirically
+  (single-digit-millisecond eval time; `-mll` differing from a forced-BBMM
+  run by ~0.06-0.16, an order of magnitude more than `n=900`/`2000`
+  disagreed with themselves). Now forces `max_cholesky_size(0)` so every
+  `n` in the sweep genuinely runs BBMM, matching the `-BBMM` name; RMSE/Q²
+  are unchanged (BBMM already converges to the same accuracy at these
+  `n`/θ), only the previously-too-fast small-`n` timings correct upward.
 - `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via

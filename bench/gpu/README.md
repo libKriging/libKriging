@@ -11,7 +11,7 @@ from the shared-library linkage / `torch.__config__`):
 | `libKriging-Cholesky-<BLAS>` | exact dense path (`objective="LL"`) — the **reference** for the log-likelihood value and posterior mean |
 | `libKriging-Iterative-CUDA` | `set_cuda_iterative_enabled(True)` — device-batched CG + SLQ log-det + Hutchinson gradient; materializes R (or `dR/dtheta_k`) once per evaluation for a separable kernel within `LK_ITERATIVE_CUDA_DENSE_MAX_MB` and matvecs via `cublasDgemm`, else a hand-written CUDA kernel |
 | `libKriging-Iterative-OpenMP` | `set_cuda_iterative_enabled(False)` — the same, materializing R within `LK_ITERATIVE_DENSE_MAX_MB` and using BLAS-3 `R*V`, else a hand-written OpenMP matvec loop |
-| `GPyTorch-BBMM-CUDA` | GPyTorch `ExactGP` + BBMM on `cuda`, raised CG/Lanczos/preconditioner settings |
+| `GPyTorch-BBMM-CUDA` | GPyTorch `ExactGP` + BBMM on `cuda`, raised CG/Lanczos/preconditioner settings and `max_cholesky_size=0` (GPyTorch's default, 800, silently uses exact Cholesky at/below it — forced off so every `n` here genuinely runs BBMM) |
 | `GPyTorch-BBMM-<BLAS>` | same on `cpu` (torch's own BLAS named) |
 
 `theta=0.15` is the largest length-scale at which the SLQ log-determinant's

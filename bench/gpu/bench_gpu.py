@@ -274,6 +274,18 @@ def _gpt_converged_ctx(gpytorch):
     # cg_tol 1e-2, 15 Lanczos, 10 probes, precond >= n=2000) leave -mll and
     # the posterior under-converged.
     return [
+        # GPyTorch silently falls back to an EXACT dense Cholesky solve for
+        # any matrix at or below this size (default 800), no matter how the
+        # CG/Lanczos settings below are raised -- confirmed empirically:
+        # at n=250/500 (below the default threshold) the eval finished in
+        # single-digit milliseconds and its -mll disagreed with a
+        # max_cholesky_size(0) run by ~0.06-0.16, an order of magnitude more
+        # than n=900/2000 (already above 800) disagreed with themselves
+        # (~0.003-0.01, pure stochastic-estimator noise). Since every row
+        # here is labeled "GPyTorch-BBMM-*", force BBMM at every n in the
+        # sweep -- 0 means no n satisfies "n <= threshold", so Cholesky is
+        # never selected.
+        gpytorch.settings.max_cholesky_size(0),
         gpytorch.settings.max_cg_iterations(5000),
         gpytorch.settings.cg_tolerance(1e-4),
         gpytorch.settings.eval_cg_tolerance(1e-4),
@@ -511,7 +523,11 @@ def write_markdown(path, rows, meta):
        f"n = {', '.join(map(str, meta['sizes']))}; test n={N_TEST}")
     ap(f"- **libKriging iterative objective**: `{LK_ITER_OBJECTIVE}`  ·  "
        f"`predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)`")
-    ap("- **GPyTorch**: raised settings so BBMM converges — "
+    ap("- **GPyTorch**: raised settings so BBMM converges, and "
+       "`max_cholesky_size=0` so every n in the sweep actually USES BBMM "
+       "(GPyTorch's default, 800, silently falls back to exact dense "
+       "Cholesky at or below it, which would make an n=250/500 "
+       "\"GPyTorch-BBMM\" row misnamed) — "
        "`max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, "
        "max_lanczos_quadrature_iterations=32, num_trace_samples=32, "
        "max_preconditioner_size=100, min_preconditioning_size=1`")
