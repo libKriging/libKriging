@@ -229,14 +229,18 @@ JLibKriging.jl.
   generated report's Verdict section now reports the max BBMM-vs-its-own-
   Cholesky posterior-mean gap directly. `n=4000` also added to the sweep
   (`--sizes`, default unchanged).
-- `bench/gpu`: the `fit` column isn't comparable across libraries as a
-  standalone number — `gpytorch.models.ExactGP.__init__` does no linear
-  algebra (confirmed empirically: ~1ms flat regardless of `n`) while
-  libKriging's constructor eagerly factorizes/CG-fits, so all of
-  GPyTorch's kernel/solve/backward cost shows up in its `logLik` (first
-  forward call) instead. Documented in the generated report's header and
-  `bench/gpu/README.md`: compare `fit + logLik` per backend for a fair
-  "time to a log-likelihood value" total.
+- `bench/gpu`: GPyTorch's `fit` column was not a real fit — `gpytorch.models
+  .ExactGP.__init__` does no linear algebra (confirmed empirically: ~1ms
+  flat regardless of `n`), so all of GPyTorch's kernel/solve cost was
+  silently deferred to the first `logLik` call. `run_gpytorch` now forces
+  one no-grad `mll(model(x), y)` forward (a Cholesky, or one BBMM CG+SLQ
+  solve) inside the timed `fit` step, mirroring what libKriging's
+  `Kriging(...)` constructor already does at a fixed theta (one dense
+  Cholesky, or `LLIterative`'s one CG+SLQ commit) — `fit` now genuinely
+  scales with `n` for every GPyTorch backend (e.g. `GPyTorch-BBMM-CUDA`:
+  0.11s → 0.52s from `n=250` to `4000`, was flat ~0.001s before). `logLik`
+  still independently re-solves from scratch (GPyTorch's train-mode
+  forward has no cache), same as before.
 - `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
