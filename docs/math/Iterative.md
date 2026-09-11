@@ -159,7 +159,24 @@ Where this sits relative to the other scaling methods:
   faster at `n=2000`, ~114x at `n=4000` (results unchanged to the SLQ
   noise floor); `dRmulBatched`'s per-`k` `cublasDgemm` writes straight
   into its interleaved output slot via a `ldc = dimX*n` leading dimension,
-  no extra scatter kernel.
+  no extra scatter kernel. The `cublasDgemm` call is fp64 throughout, same
+  as everything else here — the dominant matvec is now the only place left
+  where a **TF32/fp32 matvec + fp64 residual correction** (mixed-precision
+  CG, using the existing 50-iteration exact-residual restart as the
+  correction step) could plausibly help further on an H100, at the cost of
+  actually changing the numerics rather than just how they're computed
+  (unlike every fast path above, which is bit-identical-to-noise-floor by
+  construction). Deliberately not done here — flagged as a candidate
+  follow-up, not started.
+- **CUDA batched CG scalar/vector kernels stay hand-written, not cuBLAS**:
+  `lk_cuda_batched_dot/axpy/update_p_launch` are custom kernels, not
+  `cublasDdot`/`cublasDaxpy` — tried once before (see the git history this
+  project's own `CMakeLists.txt` comment references) and reverted, because
+  looping ncols separate per-column cuBLAS calls paid ncols launches for
+  BLAS-1-sized work. With the dense fast path's `dgemm` now the dominant
+  O(n²·ncols) cost per iteration, these three are O(n·ncols) — well under
+  1% of an iteration at the `n` this sweep covers — so there is no case
+  for revisiting that decision.
 - **Cost model**: a gradient evaluation is a CG solve over `nprobe`
   right-hand sides (each up to `2n` Krylov iterations, each an O(n²)
   matvec on the dense-fast-path `R` or a matrix-free covariance sweep,

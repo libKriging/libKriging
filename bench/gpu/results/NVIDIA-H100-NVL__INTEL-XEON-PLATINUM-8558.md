@@ -3,7 +3,7 @@
 - **GPU**: NVIDIA H100 NVL
 - **CPU**: INTEL(R) XEON(R) PLATINUM 8558
 - **host**: `farux-gpu04.cluster`  ·  logical CPUs: 192  ·  OMP_NUM_THREADS: `32`
-- **when**: 2026-09-11 09:18 CEST
+- **when**: 2026-09-11 09:27 CEST
 - **sweep**: `sine_sum` d=4, matern5_2, shared theta=0.15; n = 250, 500, 1000, 2000; test n=300
 - **libKriging iterative objective**: `LLIterative(30,0,40)`  ·  `predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)`
 - **GPyTorch**: raised settings so BBMM converges — `max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, max_lanczos_quadrature_iterations=32, num_trace_samples=32, max_preconditioner_size=100, min_preconditioning_size=1`
@@ -15,35 +15,35 @@
 
 | n | fit (s) | logLik (s) | predict (s) | logLik value | RMSE | Q² |
 |--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.008 | 0.008 | 0.004 | -317.241 | 0.4773 | 0.8952 |
-| 500 | 0.026 | 0.025 | 0.008 | -463.222 | 0.3402 | 0.9468 |
-| 1000 | 0.103 | 0.092 | 0.017 | -512.857 | 0.2111 | 0.9795 |
-| 2000 | 0.489 | 0.429 | 0.038 | -60.627 | 0.0955 | 0.9958 |
+| 250 | 0.009 | 0.010 | 0.005 | -317.241 | 0.4773 | 0.8952 |
+| 500 | 0.028 | 0.032 | 0.009 | -463.222 | 0.3402 | 0.9468 |
+| 1000 | 0.107 | 0.116 | 0.019 | -512.857 | 0.2111 | 0.9795 |
+| 2000 | 0.512 | 0.475 | 0.042 | -60.627 | 0.0955 | 0.9958 |
 
 ## Timing — seconds
 
 | backend | n | fit | logLik | predict |
 |---|--:|--:|--:|--:|
-| libKriging-Cholesky-OpenBLAS | 250 | 0.008 | 0.008 | 0.004 |
-| libKriging-Cholesky-OpenBLAS | 500 | 0.026 | 0.025 | 0.008 |
-| libKriging-Cholesky-OpenBLAS | 1000 | 0.103 | 0.092 | 0.017 |
-| libKriging-Cholesky-OpenBLAS | 2000 | 0.489 | 0.429 | 0.038 |
-| libKriging-Iterative-CUDA | 250 | 0.025 | 0.026 | 0.015 |
-| libKriging-Iterative-CUDA | 500 | 0.035 | 0.038 | 0.067 |
-| libKriging-Iterative-CUDA | 1000 | 0.050 | 0.062 | 0.103 |
-| libKriging-Iterative-CUDA | 2000 | 0.087 | 0.122 | 0.307 |
-| libKriging-Iterative-OpenMP | 250 | 0.027 | 0.032 | 0.024 |
-| libKriging-Iterative-OpenMP | 500 | 0.036 | 0.060 | 0.023 |
-| libKriging-Iterative-OpenMP | 1000 | 0.067 | 0.200 | 0.047 |
-| libKriging-Iterative-OpenMP | 2000 | 0.239 | 1.304 | 0.170 |
-| GPyTorch-BBMM-CUDA | 250 | 0.001 | 0.002 | 0.003 |
-| GPyTorch-BBMM-CUDA | 500 | 0.001 | 0.002 | 0.003 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.001 | 0.057 | 0.071 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.001 | 0.082 | 0.094 |
-| GPyTorch-BBMM-MKL | 250 | 0.001 | 0.007 | 0.007 |
-| GPyTorch-BBMM-MKL | 500 | 0.001 | 0.007 | 0.008 |
-| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.101 | 0.066 |
-| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.259 | 0.103 |
+| libKriging-Cholesky-OpenBLAS | 250 | 0.009 | 0.010 | 0.005 |
+| libKriging-Cholesky-OpenBLAS | 500 | 0.028 | 0.032 | 0.009 |
+| libKriging-Cholesky-OpenBLAS | 1000 | 0.107 | 0.116 | 0.019 |
+| libKriging-Cholesky-OpenBLAS | 2000 | 0.512 | 0.475 | 0.042 |
+| libKriging-Iterative-CUDA | 250 | 0.048 | 0.063 | 0.021 |
+| libKriging-Iterative-CUDA | 500 | 0.087 | 0.092 | 0.100 |
+| libKriging-Iterative-CUDA | 1000 | 0.127 | 0.159 | 0.151 |
+| libKriging-Iterative-CUDA | 2000 | 0.221 | 0.308 | 0.476 |
+| libKriging-Iterative-OpenMP | 250 | 0.028 | 0.032 | 0.028 |
+| libKriging-Iterative-OpenMP | 500 | 0.038 | 0.055 | 0.027 |
+| libKriging-Iterative-OpenMP | 1000 | 0.075 | 0.208 | 0.058 |
+| libKriging-Iterative-OpenMP | 2000 | 0.255 | 1.370 | 0.189 |
+| GPyTorch-BBMM-CUDA | 250 | 0.001 | 0.003 | 0.004 |
+| GPyTorch-BBMM-CUDA | 500 | 0.001 | 0.003 | 0.004 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.001 | 0.167 | 0.243 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.001 | 0.261 | 0.332 |
+| GPyTorch-BBMM-MKL | 250 | 0.001 | 0.005 | 0.005 |
+| GPyTorch-BBMM-MKL | 500 | 0.001 | 0.006 | 0.005 |
+| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.101 | 0.072 |
+| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.282 | 0.140 |
 
 ## Accuracy
 
@@ -63,21 +63,21 @@
 | libKriging-Iterative-OpenMP | 2000 | 0.0955 | 0.9958 | -64.867 | 2.12e-03 | 7.63e-08 |
 | GPyTorch-BBMM-CUDA | 250 | 0.4223 | 0.9179 | -1.182 | — | 1.98e-01 |
 | GPyTorch-BBMM-CUDA | 500 | 0.3022 | 0.9580 | -0.923 | — | 2.29e-01 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.096 | — | 1.58e-01 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.717 | — | 7.02e-02 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.100 | — | 1.58e-01 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.722 | — | 7.02e-02 |
 | GPyTorch-BBMM-MKL | 250 | 0.4223 | 0.9179 | -1.182 | — | 1.98e-01 |
 | GPyTorch-BBMM-MKL | 500 | 0.3022 | 0.9580 | -0.923 | — | 2.29e-01 |
-| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.081 | — | 1.58e-01 |
-| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.731 | — | 7.02e-02 |
+| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.087 | — | 1.58e-01 |
+| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.729 | — | 7.02e-02 |
 
 ## Speed-ups (logLik-eval time)
 
 | n | libKriging-Cholesky-OpenBLAS | libKriging-Iterative-CUDA | libKriging-Iterative-OpenMP | **OpenMP / CUDA** | **CUDA / Cholesky** | GPyTorch-BBMM-CUDA | GPyTorch-BBMM-MKL |
 |--:|--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.008 | 0.026 | 0.032 | 1.2× | 3× | 0.002 | 0.007 |
-| 500 | 0.025 | 0.038 | 0.060 | 1.6× | 2× | 0.002 | 0.007 |
-| 1000 | 0.092 | 0.062 | 0.200 | 3.2× | 1× | 0.057 | 0.101 |
-| 2000 | 0.429 | 0.122 | 1.304 | 10.7× | 0× | 0.082 | 0.259 |
+| 250 | 0.010 | 0.063 | 0.032 | 0.5× | 6.1× | 0.003 | 0.005 |
+| 500 | 0.032 | 0.092 | 0.055 | 0.6× | 2.9× | 0.003 | 0.006 |
+| 1000 | 0.116 | 0.159 | 0.208 | 1.3× | 1.4× | 0.167 | 0.101 |
+| 2000 | 0.475 | 0.308 | 1.370 | 4.4× | 0.6× | 0.261 | 0.282 |
 
 ## Verdict — did everything converge?
 
@@ -87,7 +87,7 @@
 
 ## Notes
 
-- Backend names are `<lib>-<method>-<linalg lib>`. `libKriging-Iterative-CUDA` uses hand-written CUDA matvec kernels; `libKriging-Iterative-OpenMP` materializes R once per evaluation and runs the matvecs as BLAS-3 `R*V` (hence `-OpenMP`, the BLAS it links) for separable kernels within the `LK_ITERATIVE_DENSE_MAX_MB` budget, else a hand-written OpenMP matvec. `libKriging-Cholesky-OpenBLAS` and `GPyTorch-BBMM-MKL` name the actual dense BLAS/LAPACK each links against.
+- Backend names are `<lib>-<method>-<linalg lib>`. Both `libKriging-Iterative-CUDA` (`LK_ITERATIVE_CUDA_DENSE_MAX_MB` budget) and `-OpenMP` (`LK_ITERATIVE_DENSE_MAX_MB`) materialize R once per evaluation for a separable kernel within their memory budget and run the matvecs as a single `cublasDgemm` / BLAS-3 `R*V` (hence `-OpenMP`, the BLAS it links), else fall back to a hand-written matvec kernel. `libKriging-Cholesky-OpenBLAS` and `GPyTorch-BBMM-MKL` name the actual dense BLAS/LAPACK each links against.
 - theta=0.15 is chosen so the SLQ log-determinant's Lanczos quadrature and GPyTorch's BBMM CG both converge with sane iteration budgets; at longer theta (better-fitting but more ill-conditioned R) both need far more iterations / Lanczos steps. The `,0,40` in the libKriging objective is the third `LLIterative` argument (SLQ Lanczos steps per probe), added so the iterative log-likelihood *value* also tracks the exact one here.
 - `libKriging-Iterative-CUDA` vs `libKriging-Iterative-OpenMP` is the same binary with `set_cuda_iterative_enabled(...)` toggled — identical results, different path for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU dense-`R` BLAS path).
 - Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these results + the GPyTorch code libKriging mimics).
