@@ -3,63 +3,63 @@
 - **GPU**: NVIDIA H100 NVL
 - **CPU**: INTEL(R) XEON(R) PLATINUM 8558
 - **host**: `farux-gpu04.cluster`  ·  logical CPUs: 192  ·  OMP_NUM_THREADS: `32`
-- **when**: 2026-09-11 09:50 CEST
+- **when**: 2026-09-11 11:03 CEST
 - **sweep**: `sine_sum` d=4, matern5_2, shared theta=0.15; n = 250, 500, 1000, 2000, 4000; test n=300
 - **libKriging iterative objective**: `LLIterative(30,0,40)`  ·  `predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)`
 - **GPyTorch**: raised settings so BBMM converges, and `max_cholesky_size=0` so every n in the sweep actually USES BBMM (GPyTorch's default, 800, silently falls back to exact dense Cholesky at or below it, which would make an n=250/500 "GPyTorch-BBMM" row misnamed) — `max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, max_lanczos_quadrature_iterations=32, num_trace_samples=32, max_preconditioner_size=100, min_preconditioning_size=1`
 - **versions**: pylibkriging=`1.1.0`, cuda_iterative_available=`True`, torch=`2.8.0+cu126`, torch.cuda=`12.6`, torch.cuda.is_available=`True`, gpytorch=`1.15.2`
 
-`fit` = the `Kriging(...)` constructor (dense Cholesky for `LL`; one CG+SLQ commit for the light `LLIterative` fit) / GPyTorch model build. `logLik` = one log-likelihood **+ gradient** evaluation at theta. `predict` = a *cold* posterior mean on 300 held-out points (GPyTorch's per-fit prediction cache is dropped each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. `libKriging-Cholesky-OpenBLAS` is the **reference**: `dLogLik/n` = `|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`.
+`fit` = the `Kriging(...)` constructor (dense Cholesky for `LL`; one CG+SLQ commit for the light `LLIterative` fit) / GPyTorch model build. **Not comparable as a standalone column**: `gpytorch.models.ExactGP.__init__` does no linear algebra at all (verified: flat ~1ms regardless of n) -- it only stores tensors and builds the module tree, so ALL of GPyTorch's kernel/solve/backward cost that libKriging pays inside its constructor instead shows up in GPyTorch's `logLik` (its first forward call) here. Compare `fit + logLik` per backend for a fair like-for-like "time to a log-likelihood value" total. `logLik` = one log-likelihood **+ gradient** evaluation at theta. `predict` = a *cold* posterior mean on 300 held-out points (GPyTorch's per-fit prediction cache is dropped each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. `libKriging-Cholesky-OpenBLAS` is the **reference**: `dLogLik/n` = `|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`.
 
 ## Reference — `libKriging-Cholesky-OpenBLAS` (exact dense Cholesky)
 
 | n | fit (s) | logLik (s) | predict (s) | logLik value | RMSE | Q² |
 |--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.009 | 0.010 | 0.005 | -317.241 | 0.4773 | 0.8952 |
-| 500 | 0.029 | 0.028 | 0.009 | -463.222 | 0.3402 | 0.9468 |
-| 1000 | 0.109 | 0.096 | 0.020 | -512.857 | 0.2111 | 0.9795 |
-| 2000 | 0.519 | 0.454 | 0.042 | -60.627 | 0.0955 | 0.9958 |
-| 4000 | 2.585 | 2.306 | 0.100 | 2183.769 | 0.0421 | 0.9992 |
+| 250 | 0.009 | 0.009 | 0.004 | -317.241 | 0.4773 | 0.8952 |
+| 500 | 0.025 | 0.024 | 0.008 | -463.222 | 0.3402 | 0.9468 |
+| 1000 | 0.100 | 0.089 | 0.017 | -512.857 | 0.2111 | 0.9795 |
+| 2000 | 0.482 | 0.421 | 0.037 | -60.627 | 0.0955 | 0.9958 |
+| 4000 | 2.286 | 2.066 | 0.091 | 2183.769 | 0.0421 | 0.9992 |
 
 ## Timing — seconds
 
 | backend | n | fit | logLik | predict |
 |---|--:|--:|--:|--:|
-| libKriging-Cholesky-OpenBLAS | 250 | 0.009 | 0.010 | 0.005 |
-| libKriging-Cholesky-OpenBLAS | 500 | 0.029 | 0.028 | 0.009 |
-| libKriging-Cholesky-OpenBLAS | 1000 | 0.109 | 0.096 | 0.020 |
-| libKriging-Cholesky-OpenBLAS | 2000 | 0.519 | 0.454 | 0.042 |
-| libKriging-Cholesky-OpenBLAS | 4000 | 2.585 | 2.306 | 0.100 |
-| libKriging-Iterative-CUDA | 250 | 0.064 | 0.067 | 0.022 |
-| libKriging-Iterative-CUDA | 500 | 0.076 | 0.093 | 0.100 |
-| libKriging-Iterative-CUDA | 1000 | 0.127 | 0.153 | 0.145 |
-| libKriging-Iterative-CUDA | 2000 | 0.217 | 0.296 | 0.471 |
-| libKriging-Iterative-CUDA | 4000 | 0.533 | 1.142 | 2.237 |
-| libKriging-Iterative-OpenMP | 250 | 0.029 | 0.034 | 0.026 |
-| libKriging-Iterative-OpenMP | 500 | 0.039 | 0.066 | 0.027 |
-| libKriging-Iterative-OpenMP | 1000 | 0.074 | 0.215 | 0.056 |
-| libKriging-Iterative-OpenMP | 2000 | 0.265 | 1.424 | 0.184 |
-| libKriging-Iterative-OpenMP | 4000 | 2.418 | 24.064 | 1.351 |
-| GPyTorch-BBMM-CUDA | 250 | 0.001 | 0.112 | 0.176 |
-| GPyTorch-BBMM-CUDA | 500 | 0.001 | 0.126 | 0.196 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.001 | 0.177 | 0.226 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.001 | 0.252 | 0.305 |
-| GPyTorch-BBMM-CUDA | 4000 | 0.001 | 0.519 | 0.506 |
-| GPyTorch-BBMM-MKL | 250 | 0.001 | 0.037 | 0.061 |
-| GPyTorch-BBMM-MKL | 500 | 0.001 | 0.058 | 0.102 |
-| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.105 | 0.066 |
-| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.304 | 0.138 |
-| GPyTorch-BBMM-MKL | 4000 | 0.001 | 1.574 | 0.595 |
+| libKriging-Cholesky-OpenBLAS | 250 | 0.009 | 0.009 | 0.004 |
+| libKriging-Cholesky-OpenBLAS | 500 | 0.025 | 0.024 | 0.008 |
+| libKriging-Cholesky-OpenBLAS | 1000 | 0.100 | 0.089 | 0.017 |
+| libKriging-Cholesky-OpenBLAS | 2000 | 0.482 | 0.421 | 0.037 |
+| libKriging-Cholesky-OpenBLAS | 4000 | 2.286 | 2.066 | 0.091 |
+| libKriging-Iterative-CUDA | 250 | 0.027 | 0.028 | 0.015 |
+| libKriging-Iterative-CUDA | 500 | 0.033 | 0.038 | 0.068 |
+| libKriging-Iterative-CUDA | 1000 | 0.049 | 0.062 | 0.104 |
+| libKriging-Iterative-CUDA | 2000 | 0.092 | 0.128 | 0.309 |
+| libKriging-Iterative-CUDA | 4000 | 0.301 | 0.638 | 1.467 |
+| libKriging-Iterative-OpenMP | 250 | 0.023 | 0.026 | 0.022 |
+| libKriging-Iterative-OpenMP | 500 | 0.031 | 0.051 | 0.024 |
+| libKriging-Iterative-OpenMP | 1000 | 0.063 | 0.183 | 0.048 |
+| libKriging-Iterative-OpenMP | 2000 | 0.229 | 1.316 | 0.167 |
+| libKriging-Iterative-OpenMP | 4000 | 2.365 | 19.215 | 1.388 |
+| GPyTorch-BBMM-CUDA | 250 | 0.001 | 0.267 | 0.537 |
+| GPyTorch-BBMM-CUDA | 500 | 0.011 | 0.335 | 0.202 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.001 | 0.233 | 0.703 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.001 | 0.660 | 0.435 |
+| GPyTorch-BBMM-CUDA | 4000 | 0.001 | 1.094 | 0.535 |
+| GPyTorch-BBMM-MKL | 250 | 0.001 | 0.035 | 0.060 |
+| GPyTorch-BBMM-MKL | 500 | 0.001 | 0.058 | 0.100 |
+| GPyTorch-BBMM-MKL | 1000 | 0.001 | 0.111 | 0.077 |
+| GPyTorch-BBMM-MKL | 2000 | 0.001 | 0.291 | 0.154 |
+| GPyTorch-BBMM-MKL | 4000 | 0.001 | 1.441 | 0.546 |
 | GPyTorch-Cholesky-CUDA | 250 | 0.001 | 0.003 | 0.003 |
-| GPyTorch-Cholesky-CUDA | 500 | 0.001 | 0.003 | 0.005 |
-| GPyTorch-Cholesky-CUDA | 1000 | 0.001 | 0.008 | 0.005 |
+| GPyTorch-Cholesky-CUDA | 500 | 0.001 | 0.003 | 0.004 |
+| GPyTorch-Cholesky-CUDA | 1000 | 0.001 | 0.004 | 0.008 |
 | GPyTorch-Cholesky-CUDA | 2000 | 0.001 | 0.011 | 0.011 |
 | GPyTorch-Cholesky-CUDA | 4000 | 0.001 | 0.025 | 0.017 |
-| GPyTorch-Cholesky-MKL | 250 | 0.001 | 0.006 | 0.006 |
-| GPyTorch-Cholesky-MKL | 500 | 0.001 | 0.007 | 0.007 |
-| GPyTorch-Cholesky-MKL | 1000 | 0.001 | 0.020 | 0.018 |
-| GPyTorch-Cholesky-MKL | 2000 | 0.001 | 0.084 | 0.065 |
-| GPyTorch-Cholesky-MKL | 4000 | 0.001 | 0.772 | 0.491 |
+| GPyTorch-Cholesky-MKL | 250 | 0.001 | 0.006 | 0.005 |
+| GPyTorch-Cholesky-MKL | 500 | 0.001 | 0.006 | 0.006 |
+| GPyTorch-Cholesky-MKL | 1000 | 0.001 | 0.019 | 0.016 |
+| GPyTorch-Cholesky-MKL | 2000 | 0.001 | 0.079 | 0.063 |
+| GPyTorch-Cholesky-MKL | 4000 | 0.001 | 0.712 | 0.461 |
 
 ## Accuracy
 
@@ -80,15 +80,15 @@
 | libKriging-Iterative-OpenMP | 1000 | 0.2111 | 0.9795 | -510.848 | 2.01e-03 | 8.28e-08 |
 | libKriging-Iterative-OpenMP | 2000 | 0.0955 | 0.9958 | -64.867 | 2.12e-03 | 7.63e-08 |
 | libKriging-Iterative-OpenMP | 4000 | 0.0421 | 0.9992 | 2133.269 | 1.26e-02 | 8.26e-08 |
-| GPyTorch-BBMM-CUDA | 250 | 0.4223 | 0.9179 | -1.237 | — | 1.98e-01 |
-| GPyTorch-BBMM-CUDA | 500 | 0.3022 | 0.9580 | -1.165 | — | 2.29e-01 |
-| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.088 | — | 1.58e-01 |
-| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.724 | — | 7.02e-02 |
-| GPyTorch-BBMM-CUDA | 4000 | 0.0452 | 0.9991 | -0.327 | — | 4.21e-02 |
-| GPyTorch-BBMM-MKL | 250 | 0.4223 | 0.9179 | -1.305 | — | 1.98e-01 |
-| GPyTorch-BBMM-MKL | 500 | 0.3022 | 0.9580 | -1.150 | — | 2.29e-01 |
-| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.106 | — | 1.58e-01 |
-| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.725 | — | 7.02e-02 |
+| GPyTorch-BBMM-CUDA | 250 | 0.4223 | 0.9179 | -1.265 | — | 1.98e-01 |
+| GPyTorch-BBMM-CUDA | 500 | 0.3022 | 0.9580 | -1.162 | — | 2.29e-01 |
+| GPyTorch-BBMM-CUDA | 1000 | 0.1903 | 0.9833 | -1.105 | — | 1.58e-01 |
+| GPyTorch-BBMM-CUDA | 2000 | 0.0953 | 0.9958 | -0.733 | — | 7.02e-02 |
+| GPyTorch-BBMM-CUDA | 4000 | 0.0452 | 0.9991 | -0.335 | — | 4.21e-02 |
+| GPyTorch-BBMM-MKL | 250 | 0.4223 | 0.9179 | -1.137 | — | 1.98e-01 |
+| GPyTorch-BBMM-MKL | 500 | 0.3022 | 0.9580 | -1.125 | — | 2.29e-01 |
+| GPyTorch-BBMM-MKL | 1000 | 0.1903 | 0.9833 | -1.071 | — | 1.58e-01 |
+| GPyTorch-BBMM-MKL | 2000 | 0.0953 | 0.9958 | -0.715 | — | 7.02e-02 |
 | GPyTorch-BBMM-MKL | 4000 | 0.0452 | 0.9991 | -0.330 | — | 4.20e-02 |
 | GPyTorch-Cholesky-CUDA | 250 | 0.4223 | 0.9179 | -1.182 | — | 1.98e-01 |
 | GPyTorch-Cholesky-CUDA | 500 | 0.3022 | 0.9580 | -0.923 | — | 2.29e-01 |
@@ -105,11 +105,11 @@
 
 | n | libKriging-Cholesky-OpenBLAS | libKriging-Iterative-CUDA | libKriging-Iterative-OpenMP | **OpenMP / CUDA** | **CUDA / Cholesky** | GPyTorch-BBMM-CUDA | GPyTorch-BBMM-MKL |
 |--:|--:|--:|--:|--:|--:|--:|--:|
-| 250 | 0.010 | 0.067 | 0.034 | 0.5× | 7.0× | 0.112 | 0.037 |
-| 500 | 0.028 | 0.093 | 0.066 | 0.7× | 3.3× | 0.126 | 0.058 |
-| 1000 | 0.096 | 0.153 | 0.215 | 1.4× | 1.6× | 0.177 | 0.105 |
-| 2000 | 0.454 | 0.296 | 1.424 | 4.8× | 0.7× | 0.252 | 0.304 |
-| 4000 | 2.306 | 1.142 | 24.064 | 21.1× | 0.5× | 0.519 | 1.574 |
+| 250 | 0.009 | 0.028 | 0.026 | 0.9× | 3.3× | 0.267 | 0.035 |
+| 500 | 0.024 | 0.038 | 0.051 | 1.3× | 1.6× | 0.335 | 0.058 |
+| 1000 | 0.089 | 0.062 | 0.183 | 3.0× | 0.7× | 0.233 | 0.111 |
+| 2000 | 0.421 | 0.128 | 1.316 | 10.3× | 0.3× | 0.660 | 0.291 |
+| 4000 | 2.066 | 0.638 | 19.215 | 30.1× | 0.3× | 1.094 | 1.441 |
 
 ## Verdict — did everything converge?
 
