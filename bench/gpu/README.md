@@ -54,18 +54,23 @@ Flags: `--sizes`, `--theta`, `--backends` (keys: `chol`, `iter-cuda`,
 
 Three timings per backend, plus accuracy vs the Cholesky reference:
 
-* **`fit`** — the `Kriging(...)` constructor: dense Cholesky for `LL`; one
-  CG+SLQ commit for the light `LLIterative` fit (no dense R factor);
-  GPyTorch model/likelihood build. **Not comparable across libraries as a
-  standalone column**: `gpytorch.models.ExactGP.__init__` does no linear
-  algebra — it's lazy, so it's always ~1ms flat regardless of `n`
-  (confirmed empirically) — while libKriging's constructor eagerly
-  factorizes/CG-fits. All the kernel/solve/backward cost GPyTorch defers
-  out of `fit` shows up in its `logLik` (first forward call) instead;
-  compare `fit + logLik` per backend for a fair "time to a log-likelihood
-  value" total.
-* **`logLik`** — one log-likelihood **+ gradient** evaluation at `theta`
-  (`logLikelihoodFun` / `logLikelihoodIterativeFun` / one `-mll().backward()`).
+* **`fit`** — solving `R(theta)` once at the fixed, given theta (no
+  hyperparameter optimization anywhere in this sweep): the `Kriging(...)`
+  constructor (dense Cholesky for `LL`; one CG+SLQ commit for the light
+  `LLIterative` fit, no dense R factor); for GPyTorch, model/likelihood
+  build **plus one forced no-grad `mll(model(x), y)` forward** (a
+  Cholesky, or one BBMM CG+SLQ solve). The forced forward is needed
+  because `gpytorch.models.ExactGP.__init__` itself does no linear
+  algebra — it's lazy, always ~1ms flat regardless of `n` (confirmed
+  empirically) — so without it, all of GPyTorch's kernel/solve cost would
+  silently land in `logLik` (its first forward call) instead, making `fit`
+  measure object construction rather than an actual fit.
+* **`logLik`** — a further, independent log-likelihood **+ gradient**
+  evaluation at `theta` (`logLikelihoodFun` / `logLikelihoodIterativeFun` /
+  one `-mll().backward()`). GPyTorch's train-mode forward has no cache, so
+  this genuinely re-solves `R(theta)` from scratch, same as libKriging's
+  `logLikelihoodFun`/`logLikelihoodIterativeFun` re-solving independently
+  of what `fit` already did.
 * **`predict`** — a *cold* posterior mean on the 300-point test set
   (`predict` / `predictIterative` with a raised `max_iter` + Nyström
   preconditioner / GPyTorch `.eval()` posterior; GPyTorch's per-fit cache is
