@@ -106,9 +106,13 @@ endif ()
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
 if (ENABLE_CUDA_ITERATIVE)
-    # No cuBLAS: the batched CG kernels (CudaLinearAlgebraKernel.cu) replace
-    # what used to be per-column cublasDdot/Daxpy/Dscal/Dnrm2 calls.
-    target_link_libraries(Kriging PUBLIC CUDA::cudart)
+    # The batched CG scalar/vector kernels (CudaLinearAlgebraKernel.cu) stay
+    # hand-written -- they replace what used to be per-column
+    # cublasDdot/Daxpy/Dscal/Dnrm2 calls, which paid ncols separate launches.
+    # cuBLAS IS used for the dense-R fast path's matvec (CudaLinearAlgebra.cpp:
+    # ONE cublasDgemm per call, not one per column, so it doesn't reintroduce
+    # that per-column launch overhead).
+    target_link_libraries(Kriging PUBLIC CUDA::cudart CUDA::cublas)
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_CUDA_ITERATIVE)
     set_target_properties(Kriging PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif ()

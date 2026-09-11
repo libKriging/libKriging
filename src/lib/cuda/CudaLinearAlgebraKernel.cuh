@@ -95,6 +95,28 @@ void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
 void lk_cuda_drmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
                                   const double* d_V, int ncols, double* d_Out);
 
+// Dense fast-path build: fills d_R (n x n, column-major, element (i,j) at
+// i + j*n; pass nullptr to skip -- dRmulBatched only needs d_dR) with
+// R(Xt,theta)[i,j], for a SEPARABLE kernel -- gauss / exp / matern3_2 /
+// matern5_2, the same four covKind is a code for everywhere else in this
+// file. One thread per (i,j) pair (both halves computed
+// independently, no symmetry exploited -- GPU parallelism is cheap here,
+// unlike the CPU build_separable_cov's thread-count-limited symmetric
+// trick), so the diagonal needs no special case: Xi==Xj makes every
+// kernel's u=|dx|/theta term 0, and R(0)=1 falls out of lk_cov_pair on its
+// own. When d_dR is non-null, ALSO fills the dimX contiguous n x n blocks
+// d_dR[k*n*n + i + j*n] = R[i,j] * d(ln Cov)/d(theta_k)[i,j] (same
+// nonnegative log-derivative lk_dlncov_pair computes elsewhere in this
+// file) -- requires dimX <= 32 (the caller must check, same bound
+// lk_cuda_drmul_batched_launch already enforces). Lets
+// CudaLinearAlgebra.cpp replace the matrix-free rmul_batched_kernel /
+// drmul_batched_kernel calls with ONE build (paid once per host-side call,
+// which already batches many columns) + a cublasDgemm per matvec, instead
+// of recomputing every covariance entry's transcendentals on every
+// iteration.
+void lk_cuda_build_cov_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind, double* d_R,
+                              double* d_dR);
+
 // Nystrom/Woodbury preconditioner apply: d_z = Dinv .* (r - U M^-1 U^T (Dinv .* r)),
 // M = d_Mchol d_Mchol^T (k x k lower). d_U is n x k col-major, d_Dinv is n,
 // d_r/d_z are n x ncols. d_scratch_nc must be >= n*ncols doubles,

@@ -140,7 +140,26 @@ Where this sits relative to the other scaling methods:
   targets anyway — `n` large enough that a *resident* Cholesky factor is
   the problem, not `O(n²)` scratch that a dense fit would also allocate.
   Non-separable kernels and `n` past the budget stay on the matrix-free
-  loops; the GPU backends have their own device matvecs and ignore this.
+  loops.
+- **Dense fast path (CUDA)**: the same idea, independently, on the device
+  side. `LinearAlgebraCuda::conjugateGradient`/`rmulBatched`/`dRmulBatched`
+  materialize `R` (or the `dR/dtheta_k` blocks) ONCE per call with a
+  dedicated `build_cov_kernel` — one CUDA thread per `(i,j)` pair, no
+  symmetry trick needed since GPU parallelism is cheap — then every matvec
+  is a single `cublasDgemm` against it, instead of the hand-written
+  `rmul_batched_kernel`/`drmul_batched_kernel` recomputing every
+  transcendental on every CG iteration / Lanczos step. Governed by its own
+  memory budget, `LK_ITERATIVE_CUDA_DENSE_MAX_MB` (default 4096 MiB,
+  independent of the CPU path's host-RAM budget). This is what actually
+  makes the GPU faster than the CPU dense path at moderate-to-large `n` --
+  before it, `libKriging-Iterative-CUDA` was *slower* than
+  `libKriging-Iterative-OpenMP` (dense) at every `n` in `bench/gpu`'s
+  sweep, because the hand-written CUDA kernel paid the same
+  recompute-every-iteration cost the CPU path used to. Measured ~25x
+  faster at `n=2000`, ~114x at `n=4000` (results unchanged to the SLQ
+  noise floor); `dRmulBatched`'s per-`k` `cublasDgemm` writes straight
+  into its interleaved output slot via a `ldc = dimX*n` leading dimension,
+  no extra scatter kernel.
 - **Cost model**: a gradient evaluation is a CG solve over `nprobe`
   right-hand sides (each up to `2n` Krylov iterations, each an O(n²)
   matvec on the dense-fast-path `R` or a matrix-free covariance sweep,
