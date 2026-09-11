@@ -220,7 +220,15 @@ JLibKriging.jl.
   `n` in the sweep genuinely runs BBMM, matching the `-BBMM` name; RMSE/Q²
   are unchanged (BBMM already converges to the same accuracy at these
   `n`/θ), only the previously-too-fast small-`n` timings correct upward.
-- `LLIterative(m,precond_rank)`: the Nystrom preconditioner is now applied
+- `bench/gpu`: adds `GPyTorch-Cholesky-CUDA`/`-<BLAS>` backends — the same
+  model as `GPyTorch-BBMM-*` with `max_cholesky_size` forced far above
+  every `n` instead of `0`, so GPyTorch always solves exactly. A second,
+  GPyTorch-only reference (independent of libKriging's Cholesky) that
+  isolates whether BBMM has converged from the unrelated
+  covariance-argument-convention offset between the two libraries; the
+  generated report's Verdict section now reports the max BBMM-vs-its-own-
+  Cholesky posterior-mean gap directly. `n=4000` also added to the sweep
+  (`--sizes`, default unchanged).
   to the SLQ log-determinant too, not only the CG solves — the Lanczos
   quadrature runs on the whitened `Rtilde = L^-1 R L^-T` (`L L' = P`, via
   the new `WoodburyFactorization::whitenL`/`whitenLt`) and `log|P|` is added

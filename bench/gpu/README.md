@@ -2,17 +2,23 @@
 
 `bench_gpu.py` is a **standalone, run-by-hand** benchmark (not wired into
 CI). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
-`theta=0.15`, n ∈ {250, 500, 1000, 2000} — and compares five backends,
-each named `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected
-from the shared-library linkage / `torch.__config__`):
+`theta=0.15`, n ∈ {250, 500, 1000, 2000} by default (`--sizes` to change,
+e.g. to add 4000) — and compares seven backends, each named
+`<lib>-<method>-<linalg lib>` (the linalg name is auto-detected from the
+shared-library linkage / `torch.__config__`):
 
 | backend | what it exercises |
 |---|---|
 | `libKriging-Cholesky-<BLAS>` | exact dense path (`objective="LL"`) — the **reference** for the log-likelihood value and posterior mean |
 | `libKriging-Iterative-CUDA` | `set_cuda_iterative_enabled(True)` — device-batched CG + SLQ log-det + Hutchinson gradient; materializes R (or `dR/dtheta_k`) once per evaluation for a separable kernel within `LK_ITERATIVE_CUDA_DENSE_MAX_MB` and matvecs via `cublasDgemm`, else a hand-written CUDA kernel |
 | `libKriging-Iterative-OpenMP` | `set_cuda_iterative_enabled(False)` — the same, materializing R within `LK_ITERATIVE_DENSE_MAX_MB` and using BLAS-3 `R*V`, else a hand-written OpenMP matvec loop |
-| `GPyTorch-BBMM-CUDA` | GPyTorch `ExactGP` + BBMM on `cuda`, raised CG/Lanczos/preconditioner settings and `max_cholesky_size=0` (GPyTorch's default, 800, silently uses exact Cholesky at/below it — forced off so every `n` here genuinely runs BBMM) |
-| `GPyTorch-BBMM-<BLAS>` | same on `cpu` (torch's own BLAS named) |
+| `GPyTorch-BBMM-CUDA` / `-<BLAS>` | GPyTorch `ExactGP`, raised CG/Lanczos/preconditioner settings and `max_cholesky_size=0` (GPyTorch's default, 800, silently uses exact Cholesky at/below it — forced off so every `n` here genuinely runs BBMM), on `cuda` / `cpu` |
+| `GPyTorch-Cholesky-CUDA` / `-<BLAS>` | the SAME model, `max_cholesky_size` forced far above every `n` instead, so GPyTorch always solves exactly — a second reference (independent of libKriging's) for whether BBMM has converged |
+
+`GPyTorch-BBMM-*` and `GPyTorch-Cholesky-*` only ever differ in that one
+setting, so comparing them directly checks BBMM convergence without
+involving the covariance-argument-convention offset from libKriging's own
+Cholesky reference (see `dMean/rms` and the Verdict section below).
 
 `theta=0.15` is the largest length-scale at which the SLQ log-determinant's
 Lanczos quadrature, `predictIterative`'s CG and GPyTorch's BBMM CG all
@@ -30,7 +36,7 @@ Needs `pylibkriging` (built with `-DENABLE_CUDA_ITERATIVE=ON` for the CUDA
 row), plus `torch` and `gpytorch` importable from the same environment.
 
 ```sh
-# whole sweep, all five backends, auto-named output
+# whole sweep, all seven backends, auto-named output
 python bench/gpu/bench_gpu.py
 
 # quick smoke run, iterative backends only
@@ -41,7 +47,8 @@ python bench/gpu/bench_gpu.py
 ```
 
 Flags: `--sizes`, `--theta`, `--backends` (keys: `chol`, `iter-cuda`,
-`iter-omp`, `gpt-cuda`, `gpt-cpu`), `--tag`, `--outdir`.
+`iter-omp`, `gpt-cuda`, `gpt-cpu`, `gpt-chol-cuda`, `gpt-chol-cpu`),
+`--tag`, `--outdir`.
 
 ## Reading the output
 
