@@ -12,6 +12,8 @@
 
 #include "CudaLinearAlgebraKernel.cuh"
 
+#include "libKriging/LinearAlgebra.hpp"
+
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
@@ -179,7 +181,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             double tol,
                             const arma::mat& precU,
                             const arma::vec& precDinv,
-                            const arma::mat& precMcholLower) {
+                            const arma::mat& precMcholLower,
+                            arma::uword* n_unconverged_out) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: unsupported covType '" + covType + "'");
@@ -379,6 +382,21 @@ arma::mat conjugateGradient(const arma::mat& Xt,
 
   arma::mat X(n, ncols, arma::fill::none);
   LK_CUDA_CHECK(cudaMemcpy(X.memptr(), d_x, mat_bytes, cudaMemcpyDeviceToHost));
+
+  // d_active still holds, per column, whether the loop above exited via
+  // max_iter with that column not yet at tol (a converged/deactivated
+  // column was already zeroed) -- one small readback, same convergence
+  // contract/reporting as LinearAlgebra::conjugateGradientBatched.
+  std::vector<int> active_final(static_cast<std::size_t>(ncols));
+  LK_CUDA_CHECK(cudaMemcpy(active_final.data(), d_active, col_bytes_i, cudaMemcpyDeviceToHost));
+  arma::uword n_unconverged = 0;
+  for (int c = 0; c < ncols; ++c)
+    if (active_final[static_cast<std::size_t>(c)])
+      ++n_unconverged;
+  if (n_unconverged_out != nullptr)
+    *n_unconverged_out = n_unconverged;
+  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
+                                        static_cast<arma::uword>(n), max_iter);
 
   cudaFree(d_Xt);
   cudaFree(d_theta);

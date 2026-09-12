@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Standalone libKriging vs GPyTorch benchmark, matrix-free iterative path.
 
-Run this by hand on a machine, then commit the Markdown (+ CSV) it writes to
+Run this by hand on a machine, then commit the HTML report (+ CSV) it writes to
 ``bench/gpu/results/`` -- the file name encodes the machine's GPU and CPU so
 results from several machines can be compared side by side.
 
@@ -71,6 +71,8 @@ import argparse
 import contextlib
 import csv
 import datetime as _dt
+import html as _html
+import json
 import platform
 import re
 import socket
@@ -87,7 +89,15 @@ N_TEST = 300
 TEST_SEED = 999
 TRAIN_SEED = 123
 NOISE_SEED = 0
-LK_ITER_OBJECTIVE = "LLIterative(30,0,40)"  # 30 probes, no CG precond, 40 SLQ Lanczos steps
+LK_ITER_OBJECTIVE = "LLIterative(30,0,40,6)"  # 30 probes, no CG precond, 40 SLQ Lanczos steps, 6n CG budget
+# The 4th field (cg_max_iter_mult) raises the CG budget from the default 2n
+# to 6n: at n=8000 in this sweep the default 2n budget was NOT enough for
+# the gradient's 30-column Hutchinson probe solve to reach tol (confirmed by
+# LinearAlgebra::cgNonConvergenceWarning / Kriging::iterative_cg_converged()
+# firing) -- see docs/math/Iterative.md's "CG iteration budget /
+# non-convergence" section. 6n was empirically enough to converge cleanly up
+# to n=8000 at this sweep's theta; push it further if larger --sizes still
+# trip the warning.
 
 
 # --------------------------------------------------------------------------
@@ -542,7 +552,16 @@ def write_csv(path, rows):
             w.writerow(r)
 
 
-def write_markdown(path, rows, meta):
+def _md_inline(s: str) -> str:
+    """Minimal Markdown-inline -> HTML: escape, then `code`, **bold**, *italic*."""
+    s = _html.escape(s, quote=False)
+    s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+    s = re.sub(r"\*([^*]+)\*", r"<em>\1</em>", s)
+    return s
+
+
+def write_html(path, rows, meta):
     ok = [r for r in rows if r.get("status") == "ok"]
     ns = sorted({r["n"] for r in rows})
     got = lambda k: {r["n"]: r for r in ok if r.get("backend_key") == k}
@@ -550,121 +569,166 @@ def write_markdown(path, rows, meta):
     gtg, gtc = got("gpt-cuda"), got("gpt-cpu")
     lbl = {r["backend_key"]: r["backend"] for r in rows if r.get("backend_key")}
     name = lambda k: lbl.get(k, k)
+    md = _md_inline
 
     L = []
     ap = L.append
-    ap("# libKriging vs GPyTorch — iterative path, small n")
-    ap("")
-    ap(f"- **GPU**: {meta['gpu'] or '(none detected)'}")
-    ap(f"- **CPU**: {meta['cpu']}")
-    ap(f"- **host**: `{meta['host']}`  ·  logical CPUs: {meta['nproc']}  ·  "
-       f"OMP_NUM_THREADS: `{meta['omp']}`")
-    ap(f"- **when**: {meta['when']}")
-    ap(f"- **sweep**: `sine_sum` d={D_CG}, matern5_2, shared theta={meta['theta']}; "
-       f"n = {', '.join(map(str, meta['sizes']))}; test n={N_TEST}")
-    ap(f"- **libKriging iterative objective**: `{LK_ITER_OBJECTIVE}`  ·  "
-       f"`predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)`")
-    ap("- **GPyTorch**: raised settings so BBMM converges, and "
-       "`max_cholesky_size=0` so every n in the sweep actually USES BBMM "
+
+    def row(*cells, header=False):
+        tag = "th" if header else "td"
+        ap("<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>")
+
+    ap("<h1>libKriging vs GPyTorch — iterative path, small n</h1>")
+    ap("<ul class=\"meta\">")
+    ap(f"<li><strong>GPU</strong>: {_html.escape(meta['gpu'] or '(none detected)')}</li>")
+    ap(f"<li><strong>CPU</strong>: {_html.escape(meta['cpu'])}</li>")
+    ap(f"<li><strong>host</strong>: <code>{_html.escape(meta['host'])}</code>"
+       f"  ·  logical CPUs: {meta['nproc']}  ·  OMP_NUM_THREADS: <code>{meta['omp']}</code></li>")
+    ap(f"<li><strong>when</strong>: {_html.escape(meta['when'])}</li>")
+    ap(f"<li><strong>sweep</strong>: <code>sine_sum</code> d={D_CG}, matern5_2, shared theta={meta['theta']}; "
+       f"n = {', '.join(map(str, meta['sizes']))}; test n={N_TEST}</li>")
+    ap(f"<li><strong>libKriging iterative objective</strong>: <code>{LK_ITER_OBJECTIVE}</code>  ·  "
+       f"<code>predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)</code></li>")
+    ap("<li><strong>GPyTorch</strong>: raised settings so BBMM converges, and "
+       "<code>max_cholesky_size=0</code> so every n in the sweep actually USES BBMM "
        "(GPyTorch's default, 800, silently falls back to exact dense "
        "Cholesky at or below it, which would make an n=250/500 "
-       "\"GPyTorch-BBMM\" row misnamed) — "
-       "`max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, "
+       "“GPyTorch-BBMM” row misnamed) — "
+       "<code>max_cg_iterations=5000, cg_tolerance=1e-4, eval_cg_tolerance=1e-4, "
        "max_lanczos_quadrature_iterations=32, num_trace_samples=32, "
-       "max_preconditioner_size=100, min_preconditioning_size=1`")
-    ap("- **versions**: " + ", ".join(f"{k}=`{v}`" for k, v in meta["versions"].items()))
-    ap("")
-    ap("`fit` = solving `R(theta)` once at the fixed, given theta (no hyperparameter "
-       "optimization anywhere in this sweep): the `Kriging(...)` constructor (dense "
-       "Cholesky for `LL`; one CG+SLQ commit for the light `LLIterative` fit) / for "
-       "GPyTorch, model build **plus one forced no-grad `mll(model(x), y)` forward** "
-       "(Cholesky, or one BBMM CG+SLQ solve). That forced forward is needed because "
-       "`gpytorch.models.ExactGP.__init__` itself does no linear algebra at all "
-       "(verified: flat ~1ms regardless of n) -- without it, all of GPyTorch's "
-       "kernel/solve cost would silently land in `logLik` (its first forward call) "
-       "instead, making `fit` measure object construction rather than a fit. `logLik` = "
-       "a further, independent log-likelihood **+ gradient** evaluation at theta -- "
-       "GPyTorch's train-mode forward has no cache, so this genuinely re-solves "
-       "`R(theta)` from scratch, same as libKriging's `logLikelihoodFun`/"
-       "`logLikelihoodIterativeFun` re-solving independently of what `fit` did. "
-       "`predict` = a *cold* posterior "
-       f"mean on {N_TEST} held-out points (GPyTorch's per-fit prediction cache is dropped "
-       "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "
-       "exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. "
-       f"`{name('chol')}` is the **reference**: `dLogLik/n` = "
-       "`|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised "
-       "quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`.")
-    ap("")
+       "max_preconditioner_size=100, min_preconditioning_size=1</code></li>")
+    ap("<li><strong>versions</strong>: " + ", ".join(
+        f"{_html.escape(str(k))}=<code>{_html.escape(str(v))}</code>" for k, v in meta["versions"].items()) + "</li>")
+    ap("</ul>")
+    ap("<p>" + md(
+        "`fit` = solving `R(theta)` once at the fixed, given theta (no hyperparameter "
+        "optimization anywhere in this sweep): the `Kriging(...)` constructor (dense "
+        "Cholesky for `LL`; one CG+SLQ commit for the light `LLIterative` fit) / for "
+        "GPyTorch, model build **plus one forced no-grad `mll(model(x), y)` forward** "
+        "(Cholesky, or one BBMM CG+SLQ solve). That forced forward is needed because "
+        "`gpytorch.models.ExactGP.__init__` itself does no linear algebra at all "
+        "(verified: flat ~1ms regardless of n) -- without it, all of GPyTorch's "
+        "kernel/solve cost would silently land in `logLik` (its first forward call) "
+        "instead, making `fit` measure object construction rather than a fit. `logLik` = "
+        "a further, independent log-likelihood **+ gradient** evaluation at theta -- "
+        "GPyTorch's train-mode forward has no cache, so this genuinely re-solves "
+        "`R(theta)` from scratch, same as libKriging's `logLikelihoodFun`/"
+        "`logLikelihoodIterativeFun` re-solving independently of what `fit` did. "
+        "`predict` = a *cold* posterior "
+        f"mean on {N_TEST} held-out points (GPyTorch's per-fit prediction cache is dropped "
+        "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "
+        "exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. "
+        f"`{name('chol')}` is the **reference**: `dLogLik/n` = "
+        "`|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised "
+        "quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`.") + "</p>")
 
-    ap(f"## Reference — `{name('chol')}` (exact dense Cholesky)")
-    ap("")
-    ap("| n | fit (s) | logLik (s) | predict (s) | logLik value | RMSE | Q² |")
-    ap("|--:|--:|--:|--:|--:|--:|--:|")
+    # ---- interactive chart: time (log) vs n, one trace per backend, ----
+    # ---- metric switch (fit / logLik / predict) via a dropdown ----
+    metrics = [("fit_s", "Fit time (s)"), ("loglik_s", "LogLik+grad time (s)"), ("predict_s", "Predict time (s)")]
+    backend_order = list(dict.fromkeys(r["backend_key"] for r in rows if r.get("backend_key")))
+    traces = []
+    for mi, (mkey, _mlabel) in enumerate(metrics):
+        for bkey in backend_order:
+            pts = sorted((r["n"], r[mkey]) for r in ok if r.get("backend_key") == bkey and r.get(mkey) is not None)
+            traces.append(dict(
+                x=[p[0] for p in pts], y=[p[1] for p in pts],
+                name=name(bkey), mode="lines+markers", visible=(mi == 0),
+                hovertemplate=f"{name(bkey)}<br>n=%{{x}}<br>%{{y:.4g}} s<extra></extra>",
+            ))
+    n_backends = len(backend_order)
+    buttons = []
+    for mi, (_mkey, mlabel) in enumerate(metrics):
+        vis = [False] * (len(metrics) * n_backends)
+        for j in range(n_backends):
+            vis[mi * n_backends + j] = True
+        buttons.append(dict(label=mlabel, method="update",
+                             args=[{"visible": vis}, {"yaxis.title.text": mlabel}]))
+    ap("<h2>Timing trend — time (log scale) vs n</h2>")
+    ap("<p>Click a metric above the plot to switch; click legend entries to isolate/hide backends.</p>")
+    ap('<div id="timing-chart" style="width:100%;max-width:960px;height:560px;"></div>')
+    ap("<script>")
+    ap("Plotly.newPlot('timing-chart', " + json.dumps(traces) + ", {")
+    ap("  xaxis: {title: {text: 'n (training size)'}, type: 'log'},")
+    ap(f"  yaxis: {{title: {{text: {json.dumps(metrics[0][1])}}}, type: 'log'}},")
+    ap("  legend: {orientation: 'h', y: -0.2},")
+    ap("  margin: {t: 60},")
+    ap("  updatemenus: [{buttons: " + json.dumps(buttons) + ", direction: 'down', x: 0, y: 1.15}],")
+    ap("  template: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'plotly_dark' : 'plotly_white'")
+    ap("}, {responsive: true});")
+    ap("</script>")
+
+    ap(f"<h2>Reference — <code>{_html.escape(name('chol'))}</code> (exact dense Cholesky)</h2>")
+    ap('<table><thead>')
+    row("n", "fit (s)", "logLik (s)", "predict (s)", "logLik value", "RMSE", "Q²", header=True)
+    ap('</thead><tbody>')
     for n in ns:
         r = chol.get(n)
         if r:
-            ap(f"| {n} | {_f(r['fit_s'], '.3f')} | {_f(r['loglik_s'], '.3f')} | "
-               f"{_f(r['predict_s'], '.3f')} | {_f(r['ll'], '.3f')} | {_f(r['rmse'])} | {_f(r['q2'])} |")
+            row(n, _f(r['fit_s'], '.3f'), _f(r['loglik_s'], '.3f'), _f(r['predict_s'], '.3f'),
+                _f(r['ll'], '.3f'), _f(r['rmse']), _f(r['q2']))
         else:
-            ap(f"| {n} | — | — | — | — | — | — |")
-    ap("")
+            row(n, "—", "—", "—", "—", "—", "—")
+    ap('</tbody></table>')
 
-    ap("## Timing — seconds")
-    ap("")
-    ap("| backend | n | fit | logLik | predict |")
-    ap("|---|--:|--:|--:|--:|")
+    ap("<h2>Timing — seconds</h2>")
+    ap('<table><thead>')
+    row("backend", "n", "fit", "logLik", "predict", header=True)
+    ap('</thead><tbody>')
     for r in rows:
         if r.get("status") != "ok":
-            ap(f"| {r['backend']} | {r['n']} | — | — | _{r.get('status', '?')}_ |")
+            row(_html.escape(r['backend']), r['n'], "—", "—", f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
             continue
-        ap(f"| {r['backend']} | {r['n']} | {_f(r['fit_s'], '.3f')} | "
-           f"{_f(r['loglik_s'], '.3f')} | {_f(r['predict_s'], '.3f')} |")
-    ap("")
+        row(_html.escape(r['backend']), r['n'], _f(r['fit_s'], '.3f'), _f(r['loglik_s'], '.3f'), _f(r['predict_s'], '.3f'))
+    ap('</tbody></table>')
 
-    ap("## Accuracy")
-    ap("")
-    ap("| backend | n | RMSE | Q² | logLik value | dLogLik/n | dMean/rms |")
-    ap("|---|--:|--:|--:|--:|--:|--:|")
+    ap("<h2>Accuracy</h2>")
+    ap('<table><thead>')
+    row("backend", "n", "RMSE", "Q²", "logLik value", "dLogLik/n", "dMean/rms", header=True)
+    ap('</thead><tbody>')
     for r in rows:
         if r.get("status") != "ok":
-            ap(f"| {r['backend']} | {r['n']} | — | — | — | — | _{r.get('status', '?')}_ |")
+            row(_html.escape(r['backend']), r['n'], "—", "—", "—", "—", f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
             continue
-        ap(f"| {r['backend']} | {r['n']} | {_f(r['rmse'])} | {_f(r['q2'])} | "
-           f"{_f(r['ll'], '.3f')} | {_f(r.get('dloglik_n'), '.2e')} | {_f(r.get('dmean_rms'), '.2e')} |")
-    ap("")
+        row(_html.escape(r['backend']), r['n'], _f(r['rmse']), _f(r['q2']), _f(r['ll'], '.3f'),
+            _f(r.get('dloglik_n'), '.2e'), _f(r.get('dmean_rms'), '.2e'))
+    ap('</tbody></table>')
 
-    ap("## Speed-ups (logLik-eval time)")
-    ap("")
-    ap(f"| n | {name('chol')} | {name('iter-cuda')} | {name('iter-omp')} | "
-       f"**OpenMP / CUDA** | **CUDA / Cholesky** | {name('gpt-cuda')} | {name('gpt-cpu')} |")
-    ap("|--:|--:|--:|--:|--:|--:|--:|--:|")
+    ap("<h2>Speed-ups (logLik-eval time)</h2>")
+    ap('<table><thead>')
+    row("n", _html.escape(name('chol')), _html.escape(name('iter-cuda')), _html.escape(name('iter-omp')),
+        "<strong>OpenMP / CUDA</strong>", "<strong>CUDA / Cholesky</strong>",
+        _html.escape(name('gpt-cuda')), _html.escape(name('gpt-cpu')), header=True)
+    ap('</thead><tbody>')
     for n in ns:
         c = chol.get(n, {}).get("loglik_s")
         g = lkg.get(n, {}).get("loglik_s")
         cp = lkc.get(n, {}).get("loglik_s")
         gg = gtg.get(n, {}).get("loglik_s")
         gc = gtc.get(n, {}).get("loglik_s")
-        ap(f"| {n} | {_f(c, '.3f')} | {_f(g, '.3f')} | {_f(cp, '.3f')} | "
-           f"{(f'{cp / g:.1f}×' if (cp and g) else '—')} | "
-           f"{(f'{g / c:.1f}×' if (g and c) else '—')} | {_f(gg, '.3f')} | {_f(gc, '.3f')} |")
-    ap("")
+        row(n, _f(c, '.3f'), _f(g, '.3f'), _f(cp, '.3f'),
+            (f'{cp / g:.1f}×' if (cp and g) else '—'),
+            (f'{g / c:.1f}×' if (g and c) else '—'),
+            _f(gg, '.3f'), _f(gc, '.3f'))
+    ap('</tbody></table>')
 
-    ap("## Verdict — did everything converge?")
-    ap("")
+    ap("<h2>Verdict — did everything converge?</h2>")
+    ap("<ul>")
     iters = [r for r in ok if r.get("backend_key") in ("iter-cuda", "iter-omp")]
     gpts = [r for r in ok if r.get("backend_key") in ("gpt-cuda", "gpt-cpu")]
     if iters:
         m_dll = max((r["dloglik_n"] for r in iters if r.get("dloglik_n") is not None), default=float("nan"))
         m_dm = max((r["dmean_rms"] for r in iters if r.get("dmean_rms") is not None), default=float("nan"))
-        ap(f"- **libKriging iterative**: logLik within `{m_dll:.1e}` per point of the chol "
-           f"reference, posterior mean within `{m_dm:.1e}` of test RMS — converged.")
+        msg = ("**libKriging iterative**: logLik within `%.1e` per point of the chol "
+               "reference, posterior mean within `%.1e` of test RMS — converged." % (m_dll, m_dm))
+        ap(f"<li>{md(msg)}</li>")
     if gpts:
         m_dm = max((r["dmean_rms"] for r in gpts if r.get("dmean_rms") is not None), default=float("nan"))
         gq = min((r["q2"] for r in gpts), default=float("nan"))
-        ap(f"- **GPyTorch**: posterior mean within `{m_dm:.1e}` of test RMS of the chol "
-           f"reference (a roughly n-independent offset from the covariance-argument "
-           f"convention, *not* under-convergence), Q² ≥ `{gq:.4f}`. Its `-mll` value is a "
-           f"different normalisation and is not compared.")
+        msg = ("**GPyTorch**: posterior mean within `%.1e` of test RMS of the chol "
+               "reference (a roughly n-independent offset from the covariance-argument "
+               "convention, *not* under-convergence), Q² ≥ `%.4f`. Its `-mll` value is a "
+               "different normalisation and is not compared." % (m_dm, gq))
+        ap(f"<li>{md(msg)}</li>")
     gtg_chol, gtc_chol = got("gpt-chol-cuda"), got("gpt-chol-cpu")
     bbmm_vs_chol = [
         abs(bbmm[n]["dmean_rms"] - chol_gpt[n]["dmean_rms"])
@@ -674,48 +738,82 @@ def write_markdown(path, rows, meta):
         and chol_gpt[n].get("dmean_rms") is not None
     ]
     if bbmm_vs_chol:
-        ap(f"- **GPyTorch BBMM vs its own exact Cholesky** (`GPyTorch-Cholesky-*`, "
-           f"`max_cholesky_size` forced far above every n here): posterior mean differs by at "
-           f"most `{max(bbmm_vs_chol):.1e}` of test RMS across n — BBMM has converged to "
-           f"GPyTorch's own exact answer, confirming the offset from the libKriging-Cholesky "
-           f"reference above is the covariance-argument-convention difference, not BBMM "
-           f"under-convergence.")
-    ap(f"- **`{name('chol')}`** is fastest on all three ops at these n — the iterative "
-       "path is for n where the dense factor no longer fits / is too slow, not this range.")
-    ap("")
+        msg = ("**GPyTorch BBMM vs its own exact Cholesky** (`GPyTorch-Cholesky-*`, "
+               "`max_cholesky_size` forced far above every n here): posterior mean differs by at "
+               "most `%.1e` of test RMS across n — BBMM has converged to "
+               "GPyTorch's own exact answer, confirming the offset from the libKriging-Cholesky "
+               "reference above is the covariance-argument-convention difference, not BBMM "
+               "under-convergence." % max(bbmm_vs_chol))
+        ap(f"<li>{md(msg)}</li>")
+    msg = ("**`%s`** is fastest on all three ops at these n — the iterative "
+           "path is for n where the dense factor no longer fits / is too slow, not this range." % name("chol"))
+    ap(f"<li>{md(msg)}</li>")
+    ap("</ul>")
 
-    ap("## Notes")
-    ap("")
-    ap("- Backend names are `<lib>-<method>-<linalg lib>`. Both "
-       "`libKriging-Iterative-CUDA` (`LK_ITERATIVE_CUDA_DENSE_MAX_MB` budget) "
-       "and `-OpenMP` (`LK_ITERATIVE_DENSE_MAX_MB`) materialize R once per "
-       "evaluation for a separable kernel within their memory budget and run "
-       "the matvecs as a single `cublasDgemm` / BLAS-3 `R*V` (hence "
-       "`-OpenMP`, the BLAS it links), else fall back to a hand-written "
-       "matvec kernel. "
-       f"`{name('chol')}` and `{name('gpt-cpu')}` name the actual dense BLAS/LAPACK "
-       "each links against.")
-    ap(f"- theta={meta['theta']} is chosen so the SLQ log-determinant's Lanczos "
-       "quadrature and GPyTorch's BBMM CG both converge with sane iteration budgets; "
-       "at longer theta (better-fitting but more ill-conditioned R) both need far more "
-       "iterations / Lanczos steps. The `,0,40` in the libKriging objective is the "
-       "third `LLIterative` argument (SLQ Lanczos steps per probe), added so the "
-       "iterative log-likelihood *value* also tracks the exact one here.")
-    ap(f"- `{name('iter-cuda')}` vs `{name('iter-omp')}` is the same binary with "
-       "`set_cuda_iterative_enabled(...)` toggled — identical results, different path "
-       "for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU "
-       "dense-`R` BLAS path).")
-    ap(f"- `{name('gpt-cuda')}`/`{name('gpt-cpu')}` vs `{name('gpt-chol-cuda')}`/"
-       f"`{name('gpt-chol-cpu')}` are the SAME model and data, only "
-       "`gpytorch.settings.max_cholesky_size` differs (`0` = always BBMM, forced huge = "
-       "always exact) — the Cholesky rows are GPyTorch's own reference for whether BBMM "
-       "has converged, independent of libKriging's Cholesky reference.")
-    ap("- Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these "
-       "results + the GPyTorch code libKriging mimics).")
-    ap("")
+    ap("<h2>Notes</h2>")
+    ap("<ul>")
+    msg = ("Backend names are `<lib>-<method>-<linalg lib>`. Both "
+           "`libKriging-Iterative-CUDA` (`LK_ITERATIVE_CUDA_DENSE_MAX_MB` budget) "
+           "and `-OpenMP` (`LK_ITERATIVE_DENSE_MAX_MB`) materialize R once per "
+           "evaluation for a separable kernel within their memory budget and run "
+           "the matvecs as a single `cublasDgemm` / BLAS-3 `R*V` (hence "
+           "`-OpenMP`, the BLAS it links), else fall back to a hand-written "
+           "matvec kernel. "
+           "`%s` and `%s` name the actual dense BLAS/LAPACK "
+           "each links against." % (name("chol"), name("gpt-cpu")))
+    ap(f"<li>{md(msg)}</li>")
+    msg = ("theta=%s is chosen so the SLQ log-determinant's Lanczos "
+           "quadrature and GPyTorch's BBMM CG both converge with sane iteration budgets; "
+           "at longer theta (better-fitting but more ill-conditioned R) both need far more "
+           "iterations / Lanczos steps. The `,0,40` in the libKriging objective is the "
+           "third `LLIterative` argument (SLQ Lanczos steps per probe), added so the "
+           "iterative log-likelihood *value* also tracks the exact one here." % meta["theta"])
+    ap(f"<li>{md(msg)}</li>")
+    msg = ("`%s` vs `%s` is the same binary with "
+           "`set_cuda_iterative_enabled(...)` toggled — identical results, different path "
+           "for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU "
+           "dense-`R` BLAS path)." % (name("iter-cuda"), name("iter-omp")))
+    ap(f"<li>{md(msg)}</li>")
+    msg = ("`%s`/`%s` vs `%s`/`%s` are the SAME model and data, only "
+           "`gpytorch.settings.max_cholesky_size` differs (`0` = always BBMM, forced huge = "
+           "always exact) — the Cholesky rows are GPyTorch's own reference for whether BBMM "
+           "has converged, independent of libKriging's Cholesky reference."
+           % (name("gpt-cuda"), name("gpt-cpu"), name("gpt-chol-cuda"), name("gpt-chol-cpu")))
+    ap(f"<li>{md(msg)}</li>")
+    msg = ("Companion: `docs/comparisons/libKriging_vs_GPyTorch.ipynb` (summary of these "
+           "results + the GPyTorch code libKriging mimics).")
+    ap(f"<li>{md(msg)}</li>")
+    ap("</ul>")
 
+    title = f"libKriging vs GPyTorch — {meta['gpu'] or meta['cpu']}"
+    doc = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{_html.escape(title)}</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {{ color-scheme: light dark; }}
+  body {{ font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+          max-width: 980px; margin: 2rem auto; padding: 0 1rem; }}
+  h1 {{ font-size: 1.5rem; }}
+  h2 {{ font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .25rem; }}
+  ul.meta {{ list-style: none; padding: 0; }}
+  ul.meta li {{ margin: .2rem 0; }}
+  table {{ border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; font-size: .92rem; }}
+  th, td {{ border: 1px solid #8884; padding: .3rem .55rem; text-align: right; }}
+  th:first-child, td:first-child {{ text-align: left; }}
+  thead th {{ background: #8881; }}
+  code {{ font-size: .9em; }}
+</style>
+</head>
+<body>
+{chr(10).join(L)}
+</body>
+</html>
+"""
     with open(path, "w") as fh:
-        fh.write("\n".join(L))
+        fh.write(doc)
 
 
 # --------------------------------------------------------------------------
@@ -790,9 +888,9 @@ def main(argv=None):
     base = f"{slug(gpu_name)}__{slug(cpu_name)}"
     if args.tag:
         base += "__" + slug(args.tag, 24)
-    write_markdown(os.path.join(outdir, base + ".md"), rows, meta)
+    write_html(os.path.join(outdir, base + ".html"), rows, meta)
     write_csv(os.path.join(outdir, base + ".csv"), rows)
-    print("wrote", os.path.join(outdir, base + ".md"))
+    print("wrote", os.path.join(outdir, base + ".html"))
     print("wrote", os.path.join(outdir, base + ".csv"))
     return 0
 

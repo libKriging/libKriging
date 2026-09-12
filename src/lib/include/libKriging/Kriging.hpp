@@ -228,6 +228,18 @@ class Kriging : public KrigingImpl {
   [[nodiscard]] arma::uword iterative_nprobe() const { return m_iterative_nprobe; }
   /// True when the current fit is an Iterative (no exact O(n^3) factorization) fit
   [[nodiscard]] bool is_iterative_light() const { return m_iterative_light; }
+  /// True unless the most recent logLikelihoodIterativeFun/logLikelihoodFun
+  /// call had a CG solve (the [F|y] solve, or -- when a gradient was
+  /// requested -- the Hutchinson probe solve) hit max_iter without reaching
+  /// tol, in which case that call's log-likelihood/gradient/beta/sigma2 may
+  /// be inaccurate (also printed as a [WARNING] unless
+  /// LinearAlgebra::set_cg_warning(false)). Always true for a non-iterative
+  /// fit (m_iterative_nprobe == 0). See LLIterative's cg_max_iter_mult
+  /// objective field and the Nystrom preconditioner field to address this.
+  [[nodiscard]] bool iterative_cg_converged() const { return m_iterative_last_cg_unconverged == 0; }
+  /// Number of CG columns that hit max_iter on the most recent call (0 =
+  /// fully converged); see iterative_cg_converged().
+  [[nodiscard]] arma::uword iterative_cg_n_unconverged() const { return m_iterative_last_cg_unconverged; }
 
   /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
    * (U, D) from the LLNystrom(k) fit via the Woodbury identity instead of the
@@ -469,14 +481,31 @@ class Kriging : public KrigingImpl {
   /// unlike m_nystrom_U/D which are only committed once at theta*.
   arma::uvec m_iterative_precond_landmarks;
 
+  /// Set by the most recent _logLikelihoodIterative call: how many CG
+  /// columns (across the [F|y] solve and, when a gradient was requested,
+  /// the probe solve) hit max_iter without reaching m_iterative_cg_tol.
+  /// 0 means every solve fully converged. See iterative_cg_converged().
+  /// mutable: _logLikelihoodIterative is const (same rationale as any other
+  /// cache written from inside a const evaluation, e.g. m_iterative_probes
+  /// is only ever written outside a const context, but this diagnostic is
+  /// a genuine side effect of the const solve itself, not a value the
+  /// caller passed in).
+  mutable arma::uword m_iterative_last_cg_unconverged = 0;
+
   /// Parse "LLIterative" (default m=30), "LLIterative(m)",
-  /// "LLIterative(m,precond_rank)" or
-  /// "LLIterative(m,precond_rank,lanczos_steps)"; throws on malformed spec.
-  /// Returns m; writes precond_rank (0 = preconditioning off) and
-  /// lanczos_steps (0 = field omitted, keep the default) to the out-params.
+  /// "LLIterative(m,precond_rank)", "LLIterative(m,precond_rank,lanczos_steps)"
+  /// or "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"; throws
+  /// on malformed spec. Returns m; writes precond_rank (0 = preconditioning
+  /// off), lanczos_steps (0 = field omitted, keep the default) and
+  /// cg_max_iter_mult (0 = field omitted, keep the default 2*n CG budget;
+  /// otherwise the CG budget becomes cg_max_iter_mult*n -- see the
+  /// n=4000->8000 non-convergence dig in bench/gpu's history for why a
+  /// fixed 2n budget can be too tight once R is ill-conditioned enough) to
+  /// the out-params.
   static arma::uword parse_iterative_m(const std::string& objective,
                                        arma::uword* precond_rank_out = nullptr,
-                                       arma::uword* lanczos_steps_out = nullptr);
+                                       arma::uword* lanczos_steps_out = nullptr,
+                                       arma::uword* cg_max_iter_mult_out = nullptr);
   /// Draw m_iterative_probes from m_X's row count (call once, after
   /// fit_setup_impl, before optimization starts).
   void make_iterative_probes();

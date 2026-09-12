@@ -19,6 +19,25 @@ class LinearAlgebra {
   static bool warn_chol;
   LIBKRIGING_EXPORT static void set_chol_warning(bool warn);
 
+  // Whether conjugateGradient(Batched) prints a [WARNING] when a solve hits
+  // max_iter without every column reaching tol (see cgNonConvergenceWarning).
+  // Defaults to true (unlike warn_chol): a non-converged iterative solve is
+  // a silent-by-default correctness issue -- log-likelihood, gradient and
+  // predictions all become quietly wrong -- not a routine numerical detail,
+  // so this stays on unless a caller deliberately opts out (e.g. a
+  // benchmark exploring a known-non-converging regime on purpose).
+  LIBKRIGING_EXPORT static bool warn_cg;
+  LIBKRIGING_EXPORT static void set_cg_warning(bool warn);
+
+  // Shared by every conjugateGradient(Batched) implementation -- CPU and
+  // every GPU backend (CUDA/HIP/SYCL/Metal) -- so the same message/format
+  // is used everywhere a CG solve can silently under-converge. Prints
+  // nothing when n_unconverged == 0 or warn_cg is false.
+  LIBKRIGING_EXPORT static void cgNonConvergenceWarning(arma::uword n_unconverged,
+                                                        arma::uword ncols,
+                                                        arma::uword n,
+                                                        arma::uword max_iter);
+
   static bool chol_rcond_check;
   LIBKRIGING_EXPORT static void check_chol_rcond(bool c);
   LIBKRIGING_EXPORT static bool chol_rcond_checked();
@@ -219,13 +238,18 @@ class LinearAlgebra {
   // `AmulBatched` / `PinvBatched` are called once per iteration on the whole
   // n x ncols block -- one covariance sweep instead of ncols for LLIterative's
   // matrix-free R*V. Used for LLIterative's [F|y] and probe solves.
+  // n_unconverged_out, when non-null, receives the number of B's columns
+  // that still hadn't reached tol when the loop hit max_iter (0 = every
+  // column converged). A [WARNING] is also printed via
+  // cgNonConvergenceWarning whenever that count is > 0 (see warn_cg).
   LIBKRIGING_EXPORT static arma::mat conjugateGradientBatched(
       const std::function<arma::mat(const arma::mat&)>& AmulBatched,
       const arma::mat& B,
       arma::uword max_iter,
       double tol = 1e-8,
       const std::function<arma::mat(const arma::mat&)>& PinvBatched
-      = std::function<arma::mat(const arma::mat&)>());
+      = std::function<arma::mat(const arma::mat&)>(),
+      arma::uword* n_unconverged_out = nullptr);
 
   // Stochastic Lanczos Quadrature (SLQ) estimate of log|A| for an SPD matrix
   // A of size n, given only as a matrix-vector product `Amul` -- A itself is

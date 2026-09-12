@@ -1509,7 +1509,8 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 
 arma::uword Kriging::parse_iterative_m(const std::string& objective,
                                       arma::uword* precond_rank_out,
-                                      arma::uword* lanczos_steps_out) {
+                                      arma::uword* lanczos_steps_out,
+                                      arma::uword* cg_max_iter_mult_out) {
   // "LLIterative"                              -> m=30, no precond, default SLQ Lanczos steps
   // "LLIterative(m)"                           -> m Hutchinson/SLQ probes
   // "LLIterative(m,precond_rank)"              -> + opt-in Nystrom-preconditioned CG
@@ -1518,12 +1519,21 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
   //                                              raise it when the default 20 is too few
   //                                              to resolve an ill-conditioned R's spectrum
   //                                              (log-det estimate biased -- see docs/math/Iterative.md).
-  // *precond_rank_out / *lanczos_steps_out are set to 0 when the field is absent
-  // (0 = "keep the caller's default").
+  // "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)" -> CG budget
+  //                                              per solve becomes cg_max_iter_mult*n instead
+  //                                              of the default 2*n -- raise it when
+  //                                              LinearAlgebra::cgNonConvergenceWarning fires
+  //                                              (an ill-conditioned R needing more than 2n
+  //                                              CG iterations to reach tol; see
+  //                                              docs/math/Iterative.md).
+  // *precond_rank_out / *lanczos_steps_out / *cg_max_iter_mult_out are set to 0
+  // when the field is absent (0 = "keep the caller's default").
   if (precond_rank_out != nullptr)
     *precond_rank_out = 0;
   if (lanczos_steps_out != nullptr)
     *lanczos_steps_out = 0;
+  if (cg_max_iter_mult_out != nullptr)
+    *cg_max_iter_mult_out = 0;
   if (objective == "LLIterative")
     return 30;
   if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
@@ -1547,8 +1557,8 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
       return v;
     };
     try {
-      if (fields.empty() || fields.size() > 3)
-        throw std::invalid_argument("expected 1 to 3 comma-separated arguments");
+      if (fields.empty() || fields.size() > 4)
+        throw std::invalid_argument("expected 1 to 4 comma-separated arguments");
       const long m = parse_field(fields[0]);
       if (m < 1)
         throw std::invalid_argument("m must be >= 1");
@@ -1559,12 +1569,19 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
         if (precond_rank_out != nullptr)
           *precond_rank_out = static_cast<arma::uword>(precond_rank);
       }
-      if (fields.size() == 3) {
+      if (fields.size() >= 3) {
         const long lanczos_steps = parse_field(fields[2]);
         if (lanczos_steps < 2)
           throw std::invalid_argument("lanczos_steps must be >= 2");
         if (lanczos_steps_out != nullptr)
           *lanczos_steps_out = static_cast<arma::uword>(lanczos_steps);
+      }
+      if (fields.size() == 4) {
+        const long cg_max_iter_mult = parse_field(fields[3]);
+        if (cg_max_iter_mult < 1)
+          throw std::invalid_argument("cg_max_iter_mult must be >= 1");
+        if (cg_max_iter_mult_out != nullptr)
+          *cg_max_iter_mult_out = static_cast<arma::uword>(cg_max_iter_mult);
       }
       return static_cast<arma::uword>(m);
     } catch (const std::exception&) {
@@ -1573,10 +1590,13 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
   }
   throw std::invalid_argument(
       "Invalid Iterative objective '" + objective
-      + "': expected \"LLIterative\", \"LLIterative(m)\", \"LLIterative(m,precond_rank)\" or "
-        "\"LLIterative(m,precond_rank,lanczos_steps)\" with m >= 1, precond_rank >= 0 "
-        "(0 = no preconditioner) and lanczos_steps >= 2 "
-        "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\" or \"LLIterative(30,0,40)\")");
+      + "': expected \"LLIterative\", \"LLIterative(m)\", \"LLIterative(m,precond_rank)\", "
+        "\"LLIterative(m,precond_rank,lanczos_steps)\" or "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\" with m >= 1, "
+        "precond_rank >= 0 (0 = no preconditioner), lanczos_steps >= 2 and "
+        "cg_max_iter_mult >= 1 (CG budget = cg_max_iter_mult*n, default 2) "
+        "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\", \"LLIterative(30,0,40)\" or "
+        "\"LLIterative(30,0,40,6)\")");
 }
 
 void Kriging::make_iterative_probes() {
@@ -1750,13 +1770,21 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   }
 
   // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON or
-  // -DENABLE_HIP_ITERATIVE=ON, a device is available at runtime, no Nystrom
-  // preconditioner is in play (neither GPU path implements it yet), and the
+  // -DENABLE_HIP_ITERATIVE=ON, a device is available at runtime, and the
   // kernel has a device-side implementation (see CudaLinearAlgebraKernel.cu
-  // / HipLinearAlgebraKernel.hip.cpp). CUDA is tried first when both are
-  // compiled in (won't happen in practice -- a machine has one vendor's GPU
-  // or the other -- but there's no reason to forbid it). Falls back to the
-  // CPU RmulBatched-based LinearAlgebra::conjugateGradientBatched otherwise.
+  // / HipLinearAlgebraKernel.hip.cpp). The Nystrom/Woodbury CG
+  // preconditioner (woodbury_pc above) DOES run on every GPU backend here
+  // -- each one's conjugateGradient() takes the same U()/Dinv()/McholLower()
+  // factors as the CPU path and applies them device-side (see e.g.
+  // CudaLinearAlgebraKernel.cu's precond_apply_kernel) -- what does NOT
+  // (yet) happen on the GPU is preconditioning the SLQ log-determinant
+  // itself: that needs the whitened Rtilde = L^-1 R L^-T matvec, built just
+  // below from whichever rmulBatched got bound here plus the CPU-side
+  // (thin, O(n*k)) whitenL/whitenLt wrap -- see the logdetR dispatch after
+  // this block. CUDA is tried first when both are compiled in (won't happen
+  // in practice -- a machine has one vendor's GPU or the other -- but
+  // there's no reason to forbid it). Falls back to the CPU RmulBatched-based
+  // LinearAlgebra::conjugateGradientBatched otherwise.
   // GPU dispatch for the whole iterative path, expressed as backend-agnostic
   // std::function objects so a new backend is one localised #ifdef block
   // instead of an extra branch in every call site. All three (the CG solve,
@@ -1765,6 +1793,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // SLQ term and the gradient trace below, `gpuCgSolve` the CG solves.
   bool slq_on_gpu = false;
   arma::uword gpu_max_dimx = 0;
+  arma::uword gpu_cg_n_unconverged = 0;  // aggregated OR'd into m_iterative_last_cg_unconverged below
   std::function<arma::mat(const arma::mat&)> gpuCgSolve;   // R^-1 * B (preconditioned iff woodbury_pc)
   std::function<arma::mat(const arma::mat&)> rmulBatched;  // R * V
   std::function<arma::mat(const arma::mat&)> dRmulBatched; // [dR/dtheta_k . V]_k, n x (d*ncols)
@@ -1773,9 +1802,14 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     slq_on_gpu = true;                                                                                          \
     gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                       \
     gpuCgSolve = [&](const arma::mat& B) {                                                                       \
-      return woodbury_pc ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol,          \
-                                                 woodbury_pc->U(), woodbury_pc->Dinv(), woodbury_pc->McholLower()) \
-                         : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol);         \
+      arma::uword n_unconv = 0;                                                                                  \
+      arma::mat sol = woodbury_pc                                                                                \
+          ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol, woodbury_pc->U(),       \
+                                  woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)                     \
+          : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol, arma::mat(), arma::vec(), \
+                                  arma::mat(), &n_unconv);                                                        \
+      gpu_cg_n_unconverged += n_unconv;                                                                          \
+      return sol;                                                                                                \
     };                                                                                                          \
     rmulBatched = [&](const arma::mat& V) { return NS::rmulBatched(Xt, theta, m_covType, V); };                 \
     dRmulBatched = [&](const arma::mat& V) { return NS::dRmulBatched(Xt, theta, m_covType, V); };               \
@@ -1816,10 +1850,15 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       dense = build_separable_cov(m_covType, Xt, theta, R_dense, want_dR ? &dR_dense : nullptr);
   }
 
+  arma::uword cpu_cg_n_unconverged = 0;
   auto cgSolve = [&](const arma::mat& B) -> arma::mat {
     if (gpuCgSolve)
       return gpuCgSolve(B);
-    return LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, m_iterative_cg_tol, PinvBatched);
+    arma::uword n_unconv = 0;
+    arma::mat sol
+        = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, m_iterative_cg_tol, PinvBatched, &n_unconv);
+    cpu_cg_n_unconverged += n_unconv;
+    return sol;
   };
 
   // One batched CG call solves R^-1 * [F | y] together (F has p <= a few
@@ -1851,7 +1890,21 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // whose SLQ estimate is log|R| - log|P| -- so preconditioning tightens the
   // log-determinant, not just the CG solves (log|P| added back exactly).
   double logdetR;
-  if (slq_on_gpu) {
+  if (slq_on_gpu && woodbury_pc) {
+    // Same Nystrom-whitened SLQ as the CPU preconditioned branch below, just
+    // with the expensive O(n^2) R*V step running on whichever GPU backend
+    // got bound (rmulBatched) instead of RmulBatched -- the whitenL/whitenLt
+    // wrap itself stays on the host (O(n*k), k = precond_rank, negligible
+    // next to the matvec it wraps). Closes the gap where GPU dispatch used
+    // to silently run the SLQ term unpreconditioned even when a Nystrom
+    // preconditioner was requested and the CG solves above WERE using it.
+    auto RtildeMulBatchedGpu = [&](const arma::mat& V) -> arma::mat {
+      return woodbury_pc->whitenL(rmulBatched(woodbury_pc->whitenLt(V)));
+    };
+    logdetR = logdetP_pc
+              + LinearAlgebra::stochasticLogDetBatched(RtildeMulBatchedGpu, n, nprobe, m_iterative_lanczos_steps,
+                                                       m_iterative_probes);
+  } else if (slq_on_gpu) {
     logdetR = LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps,
                                                      m_iterative_probes);
   } else if (woodbury_pc) {
@@ -1988,6 +2041,11 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     for (arma::uword kk = 0; kk < d; ++kk)
       (*grad_out)(kk) = 0.5 * (term1(kk) / sigma2 - trace(kk));
   }
+
+  // Queryable alongside the printed [WARNING] (LinearAlgebra::warn_cg):
+  // iterative_cg_converged() lets callers (bindings, tests, benchmarks)
+  // check programmatically instead of parsing stdout.
+  m_iterative_last_cg_unconverged = cpu_cg_n_unconverged + gpu_cg_n_unconverged;
 
   return -0.5 * (n * std::log(2 * M_PI * sigma2) + logdetR + n);
 }
@@ -2334,6 +2392,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   m_iterative_probes.reset();
   m_iterative_precond_rank = 0;
   m_iterative_precond_landmarks.reset();
+  m_iterative_cg_max_iter = 0;
+  m_iterative_last_cg_unconverged = 0;
   if (objective.rfind("LLVecchia", 0) == 0) {
     m_vecchia_m = parse_vll_m(objective);
     make_vecchia_sets();
@@ -2346,9 +2406,13 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   }
   if (objective.rfind("LLIterative", 0) == 0) {
     arma::uword lanczos_steps = 0;
-    m_iterative_nprobe = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps);
+    arma::uword cg_max_iter_mult = 0;
+    m_iterative_nprobe
+        = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps, &cg_max_iter_mult);
     if (lanczos_steps > 0)  // 0 = spec omitted the field -> keep the default
       m_iterative_lanczos_steps = lanczos_steps;
+    if (cg_max_iter_mult > 0)  // 0 = spec omitted the field -> keep the default (2*n)
+      m_iterative_cg_max_iter = cg_max_iter_mult * m_X.n_rows;
     make_iterative_probes();
     if (m_iterative_precond_rank > 0)
       make_iterative_precond_landmarks();
