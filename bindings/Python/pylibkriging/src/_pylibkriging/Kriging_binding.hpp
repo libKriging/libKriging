@@ -116,6 +116,8 @@ class PyKriging {
   int nystrom_rank();
   int iterative_nprobe();
   bool is_iterative_light();
+  bool iterative_cg_converged();
+  int iterative_cg_n_unconverged();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

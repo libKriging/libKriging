@@ -344,6 +344,14 @@ bool PyKriging::is_iterative_light() {
   return m_internal->is_iterative_light();
 }
 
+bool PyKriging::iterative_cg_converged() {
+  return m_internal->iterative_cg_converged();
+}
+
+int PyKriging::iterative_cg_n_unconverged() {
+  return static_cast<int>(m_internal->iterative_cg_n_unconverged());
+}
+
 py::array_t<double> PyKriging::X() {
   return carma::mat_to_arr(m_internal->X());
 }

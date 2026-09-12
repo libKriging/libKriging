@@ -2,6 +2,8 @@
 // MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
 #define _USE_MATH_DEFINES // required for Visual Studio
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 // clang-format on
 
 #include "libKriging/LinearAlgebra.hpp"
@@ -49,6 +51,27 @@ LIBKRIGING_EXPORT bool LinearAlgebra::warn_chol = false;
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
   LinearAlgebra::warn_chol = warn;
 };
+
+LIBKRIGING_EXPORT bool LinearAlgebra::warn_cg = true;
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_cg_warning(bool warn) {
+  LinearAlgebra::warn_cg = warn;
+};
+
+LIBKRIGING_EXPORT void LinearAlgebra::cgNonConvergenceWarning(arma::uword n_unconverged,
+                                                              arma::uword ncols,
+                                                              arma::uword n,
+                                                              arma::uword max_iter) {
+  if (n_unconverged == 0 || !LinearAlgebra::warn_cg)
+    return;
+  arma::cout << "[WARNING] CG did not converge for " << n_unconverged << "/" << ncols
+             << " column(s) within max_iter=" << max_iter << " at n=" << n
+             << " -- the log-likelihood, gradient and/or prediction using this solve may be "
+                "inaccurate. Consider a larger cg_max_iter (LLIterative's 4th objective field), "
+                "a Nystrom CG preconditioner (LLIterative's 2nd field), or disable this warning "
+                "with LinearAlgebra::set_cg_warning(false) if this is expected."
+             << arma::endl;
+}
 
 LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_check = true;
 
@@ -724,7 +747,8 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     const arma::mat& B,
     arma::uword max_iter,
     double tol,
-    const std::function<arma::mat(const arma::mat&)>& PinvBatched) {
+    const std::function<arma::mat(const arma::mat&)>& PinvBatched,
+    arma::uword* n_unconverged_out) {
   // Block conjugate gradient with a SHARED matvec: every right-hand side
   // (column of B) is still an independent Krylov solve -- no block-CG
   // subspace sharing -- but all still-active columns are advanced in lockstep
@@ -758,12 +782,19 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
   constexpr arma::uword restart_every = 50;
   arma::rowvec alpha_it(ncols, arma::fill::zeros);  // this iteration's step lengths, pass 1 -> pass 2
 
+  // TEMP DIAGNOSTIC (LK_DEBUG_CG_ITERS=1): report how many of max_iter this
+  // call actually used, to check whether CG is converging early or running
+  // to the 2n cap as n grows -- see bench/gpu n=4000->8000 scaling dig.
+  static const bool debug_cg_iters = std::getenv("LK_DEBUG_CG_ITERS") != nullptr;
+  arma::uword it_used = 0;
+
   for (arma::uword it = 0; it < max_iter; ++it) {
     bool any_active = false;
     for (arma::uword c = 0; c < ncols; ++c)
       any_active = any_active || active[c];
     if (!any_active)
       break;
+    it_used = it + 1;
 
     const arma::mat AP = AmulBatched(P);  // one shared matvec for all columns
 
@@ -807,6 +838,23 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
       rz_old(c) = rz_new;
     }
   }
+  if (debug_cg_iters)
+    std::fprintf(stderr, "[LK_DEBUG_CG_ITERS] n=%zu ncols=%zu max_iter=%zu used=%zu\n",
+                 static_cast<size_t>(n), static_cast<size_t>(ncols),
+                 static_cast<size_t>(max_iter), static_cast<size_t>(it_used));
+
+  // A column left active when the loop ends (as opposed to converging to
+  // tol, or being deactivated by the SPD breakdown guard above) exhausted
+  // max_iter without meeting tol -- its entry in Xc is whatever CG had
+  // reached at that point, not a converged solve.
+  arma::uword n_unconverged = 0;
+  for (arma::uword c = 0; c < ncols; ++c)
+    if (active[c])
+      ++n_unconverged;
+  if (n_unconverged_out != nullptr)
+    *n_unconverged_out = n_unconverged;
+  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, ncols, n, max_iter);
+
   return Xc;
 }
 
