@@ -25,10 +25,14 @@ Lanczos quadrature, `predictIterative`'s CG and GPyTorch's BBMM CG all
 converge with sane iteration budgets — so this is an "everything actually
 converges" comparison.
 
-Each run writes `results/<GPU-slug>__<CPU-slug>.md` (+ `.csv`) — the file
+Each run writes `results/<GPU-slug>__<CPU-slug>.html` (+ `.csv`) — the file
 name encodes the machine, so results from several machines are committed
 side by side (`bench/gpu/results/` is de-ignored in `.gitignore` for this).
-Re-running on the same machine overwrites its file.
+Re-running on the same machine overwrites its file. The HTML report embeds
+an interactive Plotly chart (time, log scale, vs `n`) with a dropdown to
+switch between fit/logLik/predict and a legend to isolate/hide backends;
+open it directly in a browser (loads Plotly from a CDN, so needs network
+the first time, or vendor the script locally for offline viewing).
 
 ## Running it
 

@@ -125,6 +125,26 @@ Where this sits relative to the other scaling methods:
   fixed-rank Nystrom `P` approximates `R` (little at small `n`, where the
   θ-neutral reference kernel yields few above-tolerance pivots; more as
   `n` grows — which is the regime the iterative path is for).
+- **CG iteration budget / non-convergence**: every CG solve here (the
+  `[F|y]` solve and, when a gradient is requested, the Hutchinson probe
+  solve) defaults to `max_iter = 2n`, `tol = 1e-8`. That budget is not a
+  law of nature: at a long enough θ relative to `n` (`R` ill-conditioned
+  enough), the true number of CG iterations needed for `tol` can exceed
+  `2n` — observed directly at `n=8000` in `bench/gpu`'s sweep, where the
+  probe solve still hadn't reached `tol` at the full `2n=16000` budget.
+  `objective="LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"`
+  raises the budget to `cg_max_iter_mult * n` (default 2, so
+  `LLIterative(30,0,40,6)` gives a 6n budget) for exactly this case.
+  Hitting the budget without converging is no longer silent: every CG
+  solve (CPU and every GPU backend) prints a `[WARNING]` via
+  `LinearAlgebra::cgNonConvergenceWarning` (`LinearAlgebra::warn_cg`,
+  default on; `LinearAlgebra::set_cg_warning(false)` to opt out) and
+  `Kriging::iterative_cg_converged()` /
+  `iterative_cg_n_unconverged()` let a caller check this
+  programmatically after `logLikelihoodIterativeFun`/`logLikelihoodFun`
+  instead of parsing stdout. Only the `[F|y]`/probe solves are tracked
+  this way; `predictIterative`'s own CG solve still gets the printed
+  warning (same underlying function) but has no dedicated accessor yet.
 - **Dense fast path (CPU)**: strictly matrix-free (R never stored) is the
   fallback, not the only mode. For a *separable* kernel — `gauss`, `exp`,
   `matern3_2`, `matern5_2`, i.e. `Cov(dx,θ) = exp(-Σₖ sₖ(|dxₖ|/θₖ))` — and

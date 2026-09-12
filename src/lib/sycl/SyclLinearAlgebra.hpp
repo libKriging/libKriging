@@ -62,6 +62,9 @@ LIBKRIGING_EXPORT bool supports(const std::string& covType);
 // M = precMcholLower precMcholLower^T -- pass the factors straight from a
 // LinearAlgebra::WoodburyFactorization (U(), Dinv(), McholLower()) so the
 // GPU apply is bit-for-bit the same preconditioner as the CPU path.
+// n_unconverged_out, when non-null, receives how many of B's columns were
+// still active when the loop hit max_iter -- see
+// CudaLinearAlgebra.cuh's matching parameter.
 LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::vec& theta,
                                               const std::string& covType,
@@ -70,7 +73,8 @@ LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               double tol = 1e-8,
                                               const arma::mat& precU = arma::mat(),
                                               const arma::vec& precDinv = arma::vec(),
-                                              const arma::mat& precMcholLower = arma::mat());
+                                              const arma::mat& precMcholLower = arma::mat(),
+                                              arma::uword* n_unconverged_out = nullptr);
 
 // Batched matrix-free matvec: returns R(Xt,theta) * V (V is n x ncols,
 // column-major; result n x ncols) in ONE device launch covering every
