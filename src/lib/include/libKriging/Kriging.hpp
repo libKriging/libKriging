@@ -466,7 +466,21 @@ class Kriging : public KrigingImpl {
   /// between BFGS iterations.
   arma::mat m_iterative_probes;
   arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictIterative)
-  double m_iterative_cg_tol = 1e-8;            ///< CG relative residual tolerance
+  /// CG relative-residual tolerance for the iterative objective's linear
+  /// solves. Settable through LLIterative's 5th objective field.
+  ///
+  /// 1e-4, not the 1e-8 this used to be hardcoded to, because the tolerance
+  /// is spent on solves that sit next to a *stochastic* quantity: the SLQ
+  /// log-determinant estimate, whose own sampling error is O(1e-3) at the
+  /// usual probe/Lanczos counts. Driving CG eight orders of magnitude tighter
+  /// than the term it is added to buys iterations, not accuracy. Measured on
+  /// an H100 at n=4000, d=4, matern5_2, theta=0.15: 6550 CG iterations on the
+  /// 30 Hutchinson probes at 1e-8 against ~100 at 1e-4, for a log-likelihood
+  /// identical to 4 significant digits (relative error 6.6e-03 either way --
+  /// the SLQ bias, not the solve). GPyTorch's BBMM makes the same trade with
+  /// its cg_tolerance default. Lower it only when the solve *outputs* (beta,
+  /// sigma2, the gradient) are what needs the precision.
+  double m_iterative_cg_tol = 1e-4;
   arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
                                                ///< (default; override via
                                                ///< objective="LLIterative(m,precond_rank,lanczos_steps)")
@@ -500,12 +514,15 @@ class Kriging : public KrigingImpl {
   /// cg_max_iter_mult (0 = field omitted, keep the default 2*n CG budget;
   /// otherwise the CG budget becomes cg_max_iter_mult*n -- see the
   /// n=4000->8000 non-convergence dig in bench/gpu's history for why a
-  /// fixed 2n budget can be too tight once R is ill-conditioned enough) to
-  /// the out-params.
+  /// fixed 2n budget can be too tight once R is ill-conditioned enough) and
+  /// cg_tol (0.0 = field omitted, keep the default m_iterative_cg_tol) to
+  /// the out-params. Also accepts the 5-field form
+  /// "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)".
   static arma::uword parse_iterative_m(const std::string& objective,
                                        arma::uword* precond_rank_out = nullptr,
                                        arma::uword* lanczos_steps_out = nullptr,
-                                       arma::uword* cg_max_iter_mult_out = nullptr);
+                                       arma::uword* cg_max_iter_mult_out = nullptr,
+                                       double* cg_tol_out = nullptr);
   /// Draw m_iterative_probes from m_X's row count (call once, after
   /// fit_setup_impl, before optimization starts).
   void make_iterative_probes();

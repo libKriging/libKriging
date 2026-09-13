@@ -1510,7 +1510,8 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 arma::uword Kriging::parse_iterative_m(const std::string& objective,
                                       arma::uword* precond_rank_out,
                                       arma::uword* lanczos_steps_out,
-                                      arma::uword* cg_max_iter_mult_out) {
+                                      arma::uword* cg_max_iter_mult_out,
+                                      double* cg_tol_out) {
   // "LLIterative"                              -> m=30, no precond, default SLQ Lanczos steps
   // "LLIterative(m)"                           -> m Hutchinson/SLQ probes
   // "LLIterative(m,precond_rank)"              -> + opt-in Nystrom-preconditioned CG
@@ -1526,14 +1527,25 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
   //                                              (an ill-conditioned R needing more than 2n
   //                                              CG iterations to reach tol; see
   //                                              docs/math/Iterative.md).
+  // "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" -> CG
+  //                                              relative-residual tolerance per solve,
+  //                                              instead of the default 1e-4. Lower it
+  //                                              only if the *linear solves* (beta, sigma2)
+  //                                              need it: the SLQ log-determinant next to
+  //                                              them is a stochastic estimate whose own
+  //                                              error swamps anything below ~1e-4, so a
+  //                                              tighter tol buys iterations, not accuracy
+  //                                              (see docs/math/Iterative.md).
   // *precond_rank_out / *lanczos_steps_out / *cg_max_iter_mult_out are set to 0
-  // when the field is absent (0 = "keep the caller's default").
+  // and *cg_tol_out to 0.0 when the field is absent (0 = "keep the caller's default").
   if (precond_rank_out != nullptr)
     *precond_rank_out = 0;
   if (lanczos_steps_out != nullptr)
     *lanczos_steps_out = 0;
   if (cg_max_iter_mult_out != nullptr)
     *cg_max_iter_mult_out = 0;
+  if (cg_tol_out != nullptr)
+    *cg_tol_out = 0.0;
   if (objective == "LLIterative")
     return 30;
   if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
@@ -1557,8 +1569,8 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
       return v;
     };
     try {
-      if (fields.empty() || fields.size() > 4)
-        throw std::invalid_argument("expected 1 to 4 comma-separated arguments");
+      if (fields.empty() || fields.size() > 5)
+        throw std::invalid_argument("expected 1 to 5 comma-separated arguments");
       const long m = parse_field(fields[0]);
       if (m < 1)
         throw std::invalid_argument("m must be >= 1");
@@ -1576,12 +1588,25 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
         if (lanczos_steps_out != nullptr)
           *lanczos_steps_out = static_cast<arma::uword>(lanczos_steps);
       }
-      if (fields.size() == 4) {
+      if (fields.size() >= 4) {
         const long cg_max_iter_mult = parse_field(fields[3]);
         if (cg_max_iter_mult < 1)
           throw std::invalid_argument("cg_max_iter_mult must be >= 1");
         if (cg_max_iter_mult_out != nullptr)
           *cg_max_iter_mult_out = static_cast<arma::uword>(cg_max_iter_mult);
+      }
+      if (fields.size() == 5) {
+        // a real, not an integer -- parsed separately from parse_field
+        std::size_t pos = 0;
+        const double cg_tol = std::stod(fields[4], &pos);
+        while (pos < fields[4].size() && std::isspace(static_cast<unsigned char>(fields[4][pos])))
+          ++pos;
+        if (pos != fields[4].size())
+          throw std::invalid_argument("trailing characters");
+        if (!(cg_tol > 0.0) || !(cg_tol < 1.0))
+          throw std::invalid_argument("cg_tol must be in (0,1)");
+        if (cg_tol_out != nullptr)
+          *cg_tol_out = cg_tol;
       }
       return static_cast<arma::uword>(m);
     } catch (const std::exception&) {
@@ -1591,12 +1616,14 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
   throw std::invalid_argument(
       "Invalid Iterative objective '" + objective
       + "': expected \"LLIterative\", \"LLIterative(m)\", \"LLIterative(m,precond_rank)\", "
-        "\"LLIterative(m,precond_rank,lanczos_steps)\" or "
-        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\" with m >= 1, "
-        "precond_rank >= 0 (0 = no preconditioner), lanczos_steps >= 2 and "
-        "cg_max_iter_mult >= 1 (CG budget = cg_max_iter_mult*n, default 2) "
-        "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\", \"LLIterative(30,0,40)\" or "
-        "\"LLIterative(30,0,40,6)\")");
+        "\"LLIterative(m,precond_rank,lanczos_steps)\", "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\" or "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)\" with m >= 1, "
+        "precond_rank >= 0 (0 = no preconditioner), lanczos_steps >= 2, "
+        "cg_max_iter_mult >= 1 (CG budget = cg_max_iter_mult*n, default 2) and "
+        "0 < cg_tol < 1 (CG relative-residual tolerance, default 1e-4) "
+        "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\", \"LLIterative(30,0,40)\", "
+        "\"LLIterative(30,0,40,6)\" or \"LLIterative(30,0,40,2,1e-6)\")");
 }
 
 void Kriging::make_iterative_probes() {
@@ -2407,12 +2434,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   if (objective.rfind("LLIterative", 0) == 0) {
     arma::uword lanczos_steps = 0;
     arma::uword cg_max_iter_mult = 0;
+    double cg_tol = 0.0;
     m_iterative_nprobe
-        = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps, &cg_max_iter_mult);
+        = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps, &cg_max_iter_mult, &cg_tol);
     if (lanczos_steps > 0)  // 0 = spec omitted the field -> keep the default
       m_iterative_lanczos_steps = lanczos_steps;
     if (cg_max_iter_mult > 0)  // 0 = spec omitted the field -> keep the default (2*n)
       m_iterative_cg_max_iter = cg_max_iter_mult * m_X.n_rows;
+    if (cg_tol > 0.0)  // 0 = spec omitted the field -> keep the default (1e-4)
+      m_iterative_cg_tol = cg_tol;
     make_iterative_probes();
     if (m_iterative_precond_rank > 0)
       make_iterative_precond_landmarks();

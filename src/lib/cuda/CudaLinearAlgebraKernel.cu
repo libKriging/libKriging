@@ -594,52 +594,14 @@ __global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double*
   Out[idx] = Dinv[i] * R[idx];
 }
 
-// t[kk,c] = sum_i U[i,kk] * Z[i,c]   (U n x k col-major; t k x ncols col-major)
-__global__ void gemm_Ut_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Z, int ncols, double* __restrict__ t) {
-  const int kk = blockIdx.x * blockDim.x + threadIdx.x;
-  const int c = blockIdx.y;
-  if (kk >= k || c >= ncols)
-    return;
-  const double* Uk = U + static_cast<std::size_t>(kk) * n;
-  const double* Zc = Z + static_cast<std::size_t>(c) * n;
-  double acc = 0.0;
-  for (int i = 0; i < n; ++i)
-    acc += Uk[i] * Zc[i];
-  t[static_cast<std::size_t>(c) * k + kk] = acc;
-}
-
-// In place per column c: solve (L L^T) s = t, L = Mchol lower (k x k col-major).
-__global__ void trisolve_MMt_kernel(const double* __restrict__ Mchol, int k, int ncols, double* __restrict__ t) {
-  const int c = blockIdx.x * blockDim.x + threadIdx.x;
-  if (c >= ncols)
-    return;
-  double* tc = t + static_cast<std::size_t>(c) * k;
-  for (int i = 0; i < k; ++i) {  // forward: L y = t
-    double s = tc[i];
-    for (int j = 0; j < i; ++j)
-      s -= Mchol[static_cast<std::size_t>(j) * k + i] * tc[j];
-    tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
-  }
-  for (int i = k - 1; i >= 0; --i) {  // back: L^T s = y
-    double s = tc[i];
-    for (int j = i + 1; j < k; ++j)
-      s -= Mchol[static_cast<std::size_t>(i) * k + j] * tc[j];
-    tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
-  }
-}
-
-// z[i,c] = Dinv[i] * (r[i,c] - sum_kk U[i,kk] * s[kk,c])
-__global__ void precond_combine_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Dinv, const double* __restrict__ r, int ncols, const double* __restrict__ s, double* __restrict__ z) {
+// z[i,c] = Dinv[i] * (r[i,c] - Us[i,c])  (all n x ncols)
+__global__ void precond_finish_kernel(const double* __restrict__ Dinv, const double* __restrict__ r, const double* __restrict__ Us, int n, double* __restrict__ z) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
-  if (i >= n || c >= ncols)
+  if (i >= n)
     return;
-  const double* sc = s + static_cast<std::size_t>(c) * k;
-  double acc = 0.0;
-  for (int kk = 0; kk < k; ++kk)
-    acc += U[static_cast<std::size_t>(kk) * n + i] * sc[kk];
   const std::size_t idx = static_cast<std::size_t>(c) * n + i;
-  z[idx] = Dinv[i] * (r[idx] - acc);
+  z[idx] = Dinv[i] * (r[idx] - Us[idx]);
 }
 
 // beta[c] = active ? rz_new[c]/rz_old[c] : 0 ; rz_old[c] = rz_new[c] ;
@@ -662,15 +624,17 @@ __global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const doub
   rz_old[c] = rz_new[c];
 }
 
-extern "C" void lk_cuda_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
-                                             const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc) {
+extern "C" void lk_cuda_scale_rows_launch(const double* d_Dinv, const double* d_R, int n, int ncols, double* d_Out) {
   const dim3 blk(128, 1, 1);
   const dim3 grid_n((n + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
-  const dim3 grid_k((k + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
-  scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_r, n, d_scratch_nc);       // d_scratch_nc = Dinv .* r
-  gemm_Ut_kernel<<<grid_k, blk>>>(d_U, n, k, d_scratch_nc, ncols, d_scratch_kc);  // d_scratch_kc = U^T (Dinv .* r)
-  trisolve_MMt_kernel<<<(ncols + blk.x - 1) / blk.x, blk>>>(d_Mchol, k, ncols, d_scratch_kc);  // <- s in place
-  precond_combine_kernel<<<grid_n, blk>>>(d_U, n, k, d_Dinv, d_r, ncols, d_scratch_kc, d_z);   // d_z
+  scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_R, n, d_Out);
+}
+
+extern "C" void lk_cuda_precond_finish_launch(const double* d_Dinv, const double* d_r, const double* d_Us, int n,
+                                              int ncols, double* d_z) {
+  const dim3 blk(128, 1, 1);
+  const dim3 grid_n((n + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
+  precond_finish_kernel<<<grid_n, blk>>>(d_Dinv, d_r, d_Us, n, d_z);
 }
 
 extern "C" void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,

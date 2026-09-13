@@ -80,6 +80,8 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40)"));  // Lanczos steps without a preconditioner
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5,30,4)"));  // + explicit CG max_iter multiplier
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,1)"));  // multiplier without a preconditioner
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,1e-6)"));  // + explicit CG tolerance
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,0.01)"));  // non-scientific notation too
 
   // malformed specs throw
   for (const std::string bad : {"LLIterative()",
@@ -96,7 +98,11 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
                                 "LLIterative(8,5,30,0)",    // cg_max_iter_mult must be >= 1
                                 "LLIterative(8,5,30,-2)",
                                 "LLIterative(8,5,30,x)",
-                                "LLIterative(8,5,30,4,1)"}) {  // at most 4 arguments
+                                "LLIterative(8,5,30,4,1)",       // cg_tol must be in (0,1)
+                                "LLIterative(8,5,30,4,0)",
+                                "LLIterative(8,5,30,4,-1e-4)",
+                                "LLIterative(8,5,30,4,x)",
+                                "LLIterative(8,5,30,4,1e-4,7)"}) {  // at most 5 arguments
     CHECK_THROWS_AS(make_fixed_theta_iterative(y, X, bad), std::invalid_argument);
   }
 
@@ -104,6 +110,27 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLIterative(8)", {}),
                   std::invalid_argument);
+}
+
+TEST_CASE("LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol): looser CG costs no accuracy", "[iterative][kriging]") {
+  // The default CG tolerance is 1e-4, not 1e-8, because the log-determinant
+  // it is paired with is a stochastic SLQ estimate whose bias dominates: the
+  // linear solves are NOT the accuracy-limiting step, so tightening them
+  // only buys iterations. Guard that property -- if a future change makes
+  // the log-det exact enough that cg_tol starts to matter, this test is
+  // where that shows up.
+  arma::mat X;
+  arma::vec y;
+  make_data(120, X, y);
+  const arma::vec theta{0.3, 0.3};
+
+  const double ll_tight
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-10)").logLikelihoodIterativeFun(theta, false));
+  const double ll_default
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,60)").logLikelihoodIterativeFun(theta, false));
+
+  INFO("ll(cg_tol=1e-10) = " << ll_tight << ", ll(default cg_tol) = " << ll_default);
+  CHECK(std::abs(ll_default - ll_tight) <= 1e-3 * std::abs(ll_tight) + 1e-6);
 }
 
 TEST_CASE("LLIterative(m,precond_rank,lanczos_steps): more SLQ Lanczos steps tighten the log-det estimate",
@@ -255,8 +282,8 @@ TEST_CASE("LLIterative(m,precond_rank) Nystrom-preconditioned CG matches the unp
   arma::vec y;
   make_data(35, X, y);
 
-  Kriging k_plain = make_fixed_theta_iterative(y, X, "LLIterative(30)");
-  Kriging k_pc = make_fixed_theta_iterative(y, X, "LLIterative(30,15)");
+  Kriging k_plain = make_fixed_theta_iterative(y, X, "LLIterative(30,0,20,2,1e-10)");
+  Kriging k_pc = make_fixed_theta_iterative(y, X, "LLIterative(30,15,20,2,1e-10)");
 
   const arma::vec theta{0.35, 0.3};
   auto [ll_plain, grad_plain] = k_plain.logLikelihoodIterativeFun(theta, true);
@@ -326,6 +353,22 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   // must agree on both the concentrated log-likelihood and its gradient to
   // well within the SLQ/Hutchinson stochastic-estimator noise (the only
   // difference is BLAS vs pair-loop summation order).
+  //
+  // cg_tol is pinned at 1e-10 rather than left at the default so that the
+  // comparison stays about summation order even if that default moves: an
+  // under-converged solve stops at an iterate, not at a solution, and two
+  // iterates sharing a residual norm need not share any digits beyond it.
+  //
+  // KNOWN FAILURE (pre-existing on this branch, reproducible at the branch
+  // HEAD without any of the changes around it, and bit-identical at
+  // cg_tol=1e-8 and 1e-10 -- so it is NOT a convergence artefact): on the
+  // CPU backend ll_mf and ll_de differ by ~3e-5 relative and the gradients
+  // by ~2.6e-2 relative, both well past these 1e-6/1e-5 bounds. Note the
+  // test is vacuous when a GPU backend is live, since
+  // LK_ITERATIVE_DENSE_MAX_MB only gates the CPU dense path (the CUDA one
+  // has its own LK_ITERATIVE_CUDA_DENSE_MAX_MB), so both halves then run
+  // the same device code and agree trivially -- which is why this went
+  // unnoticed. Tracked in todo_reach_gpytorch.md.
   arma::mat X;
   arma::vec y;
   make_data(160, X, y);
@@ -334,10 +377,10 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
 
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
-  auto [ll_mf, g_mf] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24)").logLikelihoodIterativeFun(theta, true);
+  auto [ll_mf, g_mf] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24,2,1e-10)").logLikelihoodIterativeFun(theta, true);
 
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
-  auto [ll_de, g_de] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24)").logLikelihoodIterativeFun(theta, true);
+  auto [ll_de, g_de] = make_fixed_theta_iterative(y, X, "LLIterative(30,0,24,2,1e-10)").logLikelihoodIterativeFun(theta, true);
 
   if (old_env)
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
@@ -351,10 +394,10 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   // and the preconditioned path (whitened SLQ + separate probe solve) too
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
   const double llp_mf
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,2,1e-10)").logLikelihoodIterativeFun(theta, false));
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
   const double llp_de
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,2,1e-10)").logLikelihoodIterativeFun(theta, false));
   if (old_env)
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
   else

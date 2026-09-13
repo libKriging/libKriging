@@ -93,12 +93,17 @@ of O(n^3), recommended for large designs in low dimension — or
 `"LLNystrom"`/`"LLNystrom(k)"` for the Nystrom (global low-rank) approximated
 log-likelihood with rank `k` (default 50) — O(n k^2) per evaluation instead
 of O(n^3), also recommended for large designs — or
-`"LLIterative"`/`"LLIterative(m)"`/`"LLIterative(m,precond_rank)"`/`"LLIterative(m,precond_rank,lanczos_steps)"`
+`"LLIterative"`/`"LLIterative(m)"`/`"LLIterative(m,precond_rank)"`/`"LLIterative(m,precond_rank,lanczos_steps)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"`
 for the matrix-free conjugate-gradient log-likelihood: `m` stochastic-trace
 probes (default 30), an optional rank-`precond_rank` Nystrom CG preconditioner
-(0 = off), and `lanczos_steps` Lanczos steps per probe in the stochastic
+(0 = off), `lanczos_steps` Lanczos steps per probe in the stochastic
 log-determinant estimate (default 20; raise it if that estimate drifts on an
-ill-conditioned covariance). Keeps R exact and never factorizes it.
+ill-conditioned covariance), a CG iteration budget of `cg_max_iter_mult * n`
+(default 2) and a CG relative-residual tolerance `cg_tol` (default 1e-4 --
+deliberately loose, since the stochastic log-determinant next to the solves
+carries a far larger error of its own; tighten it only when the solve outputs
+`beta`/`sigma2`/gradient are what needs the precision). Keeps R exact and
+never factorizes it.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
 `theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same
