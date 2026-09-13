@@ -1,7 +1,8 @@
-// UNVERIFIED HIP/ROCm port of src/lib/cuda/CudaLinearAlgebraKernel.cuh -- see src/lib/hip/HipLinearAlgebra.hpp
-// for the full caveat. Mechanical cuda*->hip* / .cuh->.hpp translation of
-// the CUDA backend; identical algorithm, batching and preconditioner math.
-// Never compiled or run (no ROCm toolchain / AMD GPU here).
+// HIP/ROCm port of src/lib/cuda/CudaLinearAlgebraKernel.cuh -- see
+// src/lib/hip/HipLinearAlgebra.hpp for the full caveat (verification status,
+// build recipe, and the tiled-matvec bug found and fixed 2026-09-13).
+// Mechanical cuda*->hip* / .cuh->.hpp translation of the CUDA backend;
+// identical algorithm, batching and preconditioner math.
 #ifndef LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRAKERNEL_HPP
 #define LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRAKERNEL_HPP
 

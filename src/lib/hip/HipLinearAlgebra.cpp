@@ -1,7 +1,8 @@
-// UNVERIFIED HIP/ROCm port of src/lib/cuda/CudaLinearAlgebra.cpp -- see src/lib/hip/HipLinearAlgebra.hpp
-// for the full caveat. Mechanical cuda*->hip* / .cuh->.hpp translation of
-// the CUDA backend; identical algorithm, batching and preconditioner math.
-// Never compiled or run (no ROCm toolchain / AMD GPU here).
+// HIP/ROCm port of src/lib/cuda/CudaLinearAlgebra.cpp -- see
+// src/lib/hip/HipLinearAlgebra.hpp for the full caveat (verification status,
+// build recipe, and the tiled-matvec bug found and fixed 2026-09-13).
+// Mechanical cuda*->hip* / .cuh->.hpp translation of the CUDA backend;
+// identical algorithm, batching and preconditioner math.
 // Host-compiler-compiled (NOT hipcc) on purpose: this file touches
 // arma::mat/arma::vec (via .memptr()/.n_elem/etc), and must be compiled by
 // the SAME compiler as the rest of libKriging to guarantee it agrees with
