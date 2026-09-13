@@ -98,7 +98,7 @@ import time
 
 import numpy as np
 
-SWEEP_DEFAULT = [250, 500, 1000, 2000]
+SWEEP_DEFAULT = [250, 500, 1000, 2000, 4000, 8000]
 D_CG = 4
 THETA_DEFAULT = 0.15
 N_TEST = 300

@@ -2,8 +2,8 @@
 
 `bench_gpu.py` is a **standalone, run-by-hand** benchmark (not wired into
 CI). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
-`theta=0.15`, n ∈ {250, 500, 1000, 2000} by default (`--sizes` to change,
-e.g. to add 4000) — and compares seven backends, each named
+`theta=0.15`, n ∈ {250, 500, 1000, 2000, 4000, 8000} by default (`--sizes` to
+change) — and compares seven backends, each named
 `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected from the
 shared-library linkage / `torch.__config__`):
 
