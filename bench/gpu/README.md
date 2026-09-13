@@ -71,15 +71,34 @@ regression.
 Needs `pylibkriging` (built with `-DENABLE_CUDA_ITERATIVE=ON` for the CUDA
 row), plus `torch` and `gpytorch` importable from the same environment.
 
+`bench/bench_gpu.sh` wraps `bench_gpu.py` for this: it picks (or configures) a
+build dir, rebuilds `_pylibkriging` if the C++ sources are newer than what's
+built, wires up `LD_LIBRARY_PATH`/`PYTHONPATH`, checks `numpy`/`torch`/
+`gpytorch` are importable (erroring out with the `pip install` to run if not —
+it won't guess a CUDA wheel for you), and forwards every argument to
+`bench_gpu.py`:
+
 ```sh
 # whole sweep, all seven backends, auto-named output
-python bench/gpu/bench_gpu.py
+./bench/bench_gpu.sh
 
 # quick smoke run, iterative backends only
-python bench/gpu/bench_gpu.py --sizes 250,500 --backends chol,iter-cuda,iter-omp
+./bench/bench_gpu.sh --sizes 250,500 --backends chol,iter-cuda,iter-omp
 
 # machine with no CUDA: the -cuda backends are dropped automatically
-python bench/gpu/bench_gpu.py
+./bench/bench_gpu.sh
+
+# pick a build dir / interpreter explicitly, or skip the build check
+BUILD_DIR=./build_cuda_iterative PYTHON_BIN=/usr/bin/python3.12 ./bench/bench_gpu.sh
+SKIP_BUILD=1 ./bench/bench_gpu.sh
+```
+
+Calling `bench_gpu.py` directly (e.g. from a notebook or a differently-set-up
+environment) still works the same way it always did — the wrapper only
+automates the env plumbing:
+
+```sh
+python bench/gpu/bench_gpu.py --sizes 250,500 --backends chol,iter-cuda,iter-omp
 ```
 
 Flags: `--sizes`, `--theta`, `--cg-tol`, `--lk-precond-rank`, `--backends`
@@ -142,6 +161,57 @@ seven backends — so the remaining `dMean/rms` on the `-BBMM` and `-Iterative`
 rows is solver convergence and nothing else. Cost: about **+13% on GPyTorch's
 `predict`** (`d` lazily-evaluated kernels instead of one fused one), which is
 the price of a valid comparison.
+
+#### The actual GPyTorch model code
+
+Both alignments live in `_gpt_modules()` / `run_gpytorch()` in `bench_gpu.py`.
+The kernel — a `ProductKernel` of 1-D Matérn-5/2 factors, one per input
+dimension, instead of `MaternKernel(ard_num_dims=d)`:
+
+```python
+d = train_x.shape[1]
+base = gpytorch.kernels.ProductKernel(
+    *[gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[k]) for k in range(d)]
+)
+self.covar_module = gpytorch.kernels.ScaleKernel(base)
+```
+
+The trend — `ConstantMean` pinned to libKriging's GLS `beta` (from the
+Cholesky reference fit), not `mean(y)`:
+
+```python
+model.mean_module.constant.fill_(
+    float(np.mean(y)) if trend_const is None else float(trend_const))
+```
+
+`trend_const` is `m.beta()` read off the `libKriging-Cholesky-*` run for the
+same `n` (see `run_backend`/`beta_ref` in `bench_gpu.py`), so every GPyTorch
+backend is fit against the exact same trend constant, not its own estimate.
+
+`fit` is forced to actually solve `R(theta)` once — `ExactGP.__init__` alone
+does no linear algebra, so without this the cost silently landed in the first
+`logLik` call instead:
+
+```python
+model, lik = build()
+mll = gpytorch.mlls.ExactMarginalLogLikelihood(lik, model)
+model.train(); lik.train()
+with torch.no_grad():
+    mll(model(tx), ty)  # forces the R(theta) solve/logdet now, not on first logLik call
+```
+
+BBMM vs. exact Cholesky is a single setting (everything else — CG/Lanczos
+budgets, preconditioner size, `cg_tolerance`/`eval_cg_tolerance` tied to
+`--cg-tol` — held fixed between the two, see `_gpt_converged_ctx()`):
+
+```python
+gpytorch.settings.max_cholesky_size(0 if bbmm else 1_000_000)
+```
+
+`0` means "never small enough to fall back to exact Cholesky" (GPyTorch's own
+default, 800, would silently do that at every `n` in this sweep); a huge value
+means "always small enough", forcing the exact solve GPyTorch-Cholesky is
+supposed to be.
 
 The libKriging iterative objective is `LLIterative(30,0,40)` — the third
 argument (40 SLQ Lanczos steps per probe) keeps the iterative log-likelihood
