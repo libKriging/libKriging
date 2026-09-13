@@ -263,6 +263,73 @@ JLibKriging.jl.
   (#363).
 
 ### Fixed
+- R binding: `Kriging`'s `objective` validator rejected every `LLIterative` form
+  with more than three fields *before* the string ever reached C++, so the
+  `cg_max_iter_mult` and `cg_tol` fields were unusable from R. The regex now
+  accepts all five, including the real-valued `cg_tol` (`1e-6`, `0.01`), and
+  carries a comment pointing at `Kriging::parse_iterative_m` as the thing it
+  must stay in sync with.
+- `bench/gpu`: the GPyTorch side of the comparison was not fitting libKriging's
+  model, which made the harness's `dMean/rms` accuracy column meaningless. Two
+  mismatches: (1) `MaternKernel(nu=2.5, ard_num_dims=d)` is *radial after
+  scaling* — a single Matern function of `||dx/l||_2` — whereas libKriging's
+  `matern5_2` is *separable*, `prod_k f(|dx_k|/theta_k)`; at d=4, theta=0.15,
+  dx=(0.05,0.10,0.02,0.07) these are 0.589472 vs 0.556929. (2) GPyTorch's fixed
+  `ConstantMean` was set to `mean(y)`, the OLS constant, while libKriging does
+  universal kriging and profiles out the *GLS* trend `beta`. Together these put
+  a constant O(1e-2) posterior-mean offset on every GPyTorch row — including
+  the **exact** `GPyTorch-Cholesky` ones, which is the tell — drowning the
+  ~1e-3 iterative-convergence signal the column exists to show. GPyTorch now
+  runs a `ProductKernel` of one-dimensional Matern-5/2 factors with
+  `ConstantMean = beta`; `GPyTorch-Cholesky`'s `dMean/rms` against the
+  libKriging Cholesky reference drops from 4.2e-02 to **4.1e-08**, and RMSE/Q2
+  now agree to six digits across all seven backends. Costs GPyTorch ~13% on
+  `predict` (d lazily-evaluated kernels instead of one fused one).
+- `LLIterative` objective: the CG relative-residual tolerance was hardcoded to
+  `1e-8` and unreachable from any binding, so every evaluation drove its linear
+  solves eight orders of magnitude tighter than the *stochastic* SLQ
+  log-determinant sitting next to them — accuracy the returned log-likelihood
+  cannot use. Measured on an H100 at n=4000, d=4, matern5_2, theta=0.15, that
+  was 6550 CG iterations on the 30 Hutchinson probes against ~100 at `1e-4`,
+  for a log-likelihood identical to 4 significant digits. The default is now
+  `1e-4` (GPyTorch's BBMM makes the same trade with its `cg_tolerance`), and it
+  is settable as a 5th field:
+  `objective="LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"`.
+  Log-likelihood
+  + gradient at n=4000 on an H100: 0.94 s -> 0.40 s; on the OpenMP backend the
+  same benchmark point went 15.9 s -> 7.1 s.
+- CUDA iterative backend: `conjugateGradient`, `rmulBatched` and `dRmulBatched`
+  were stateless, each re-uploading `X`/`theta` and rebuilding the dense `R`
+  from scratch (a 128 MB allocation and 16 M fp64 `exp`/`log1p` at n=4000) on
+  every call. Since one objective evaluation runs three Krylov passes at a fixed
+  `theta`, and the SLQ recurrence calls `rmulBatched` once per Lanczos step,
+  that constant matrix was being rebuilt 40+ times per evaluation for ~0.02 ms
+  of useful GEMM each time. `R` is now cached on the device and keyed by value
+  on `(n, dimX, covType, X, theta)`, so it is built once per `theta`.
+- CUDA iterative backend: the Nyström/Woodbury preconditioner applied its
+  `k x k` triangular solve with one thread per right-hand-side column running
+  an `O(k^2)` strictly serial substitution (`trisolve_MMt_kernel`), plus two
+  hand-written GEMMs — so a 300-column solve kept ~300 threads busy on a
+  132-SM device and the preconditioner cost an order of magnitude more than
+  the CG iterations it was meant to save. It is now `cublasDgemm` /
+  `cublasDtrsm` / `cublasDgemm` around two elementwise kernels. Measured on an
+  H100 at n=4000, d=4, matern5_2, theta=0.15: `predictIterative` with a rank-128
+  Nyström preconditioner 1.78 s -> 0.46 s, rank-512 9.20 s -> 0.80 s;
+  `LLIterative(30,128,40)` log-likelihood + gradient 12.08 s -> 2.21 s. The
+  preconditioned path now costs ~2.2x the unpreconditioned one instead of ~13x,
+  for bit-comparable results (log-likelihood value unchanged; CUDA-vs-CPU
+  posterior means agree to 6e-08, i.e. to the requested CG tolerance).
+- `bench/gpu/bench_gpu.py` benchmarked libKriging's `predictIterative` at
+  `tol=1e-8` against GPyTorch's BBMM at `eval_cg_tolerance=1e-4` — a solver
+  converged four orders of magnitude tighter against a deliberately truncated
+  one, with the difference reported as speed. The CG tolerance is now a single
+  `--cg-tol` option (default `1e-4`) driving **both** libraries, the Nyström
+  rank is `--lk-precond-rank` instead of a hardcoded 128, the generated report
+  states the shared budget, and the "the dense Cholesky path is fastest on all
+  three operations" verdict — which no longer holds — is computed from the
+  measurements instead of hardcoded. The `run_libkriging_iter` warm-up call was
+  also silently failing, so the first GPyTorch point absorbed CUDA context
+  initialisation.
 - `WarpKriging`: every per-variable warping whose parametrisation assumes an
   `O(1)` / `[0, 1]` input — `knots(k)` (Xiong et al. 2007, on `[0, 1]`),
   `kumaraswamy` (a CDF on `[0, 1]`), `boxcox` (needs `x > 0`), `neural_mono`,

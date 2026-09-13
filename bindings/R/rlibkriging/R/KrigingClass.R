@@ -8,20 +8,33 @@
 # Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
 # and the matrix-free CG/SLQ approximated log-likelihood "LLIterative" /
 # "LLIterative(m)" / "LLIterative(m,precond_rank)" /
-# "LLIterative(m,precond_rank,lanczos_steps)" (2nd form opts into a
-# Nystrom-preconditioned CG for the fit's own solves; 3rd form also sets the
-# number of SLQ Lanczos steps per probe, default 20 -- raise it if the
-# stochastic log-determinant drifts on an ill-conditioned R), in addition to
-# the classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia
-# bindings, which pass `objective` as a free string).
+# "LLIterative(m,precond_rank,lanczos_steps)" /
+# "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)" /
+# "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" (2nd form
+# opts into a Nystrom-preconditioned CG for the fit's own solves; 3rd form also
+# sets the number of SLQ Lanczos steps per probe, default 20 -- raise it if the
+# stochastic log-determinant drifts on an ill-conditioned R; 4th raises the CG
+# iteration budget to cg_max_iter_mult*n, default 2; 5th sets the CG
+# relative-residual tolerance, default 1e-4), in addition to the classic
+# "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia bindings, which
+# pass `objective` as a free string).
+#
+# This regex must stay in sync with Kriging::parse_iterative_m: it runs BEFORE
+# the C++ parser, so anything it rejects never reaches C++ at all, and a
+# newly-added objective field silently becomes unusable from R until it is
+# added here too. Note the 5th field is a REAL (e.g. "1e-6", "0.01"), not an
+# integer like the first four.
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
     if (!grepl(paste0("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?",
-                      "|LLIterative(\\([0-9]+(,[0-9]+(,[0-9]+)?)?\\))?)$"),
+                      "|LLIterative(\\([0-9]+(,[0-9]+(,[0-9]+(,[0-9]+",
+                      "(,[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)?)?)?)?\\))?)$"),
                objective))
         stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
              "\"LLNystrom\", \"LLNystrom(k)\", \"LLIterative\", \"LLIterative(m)\", ",
-             "\"LLIterative(m,precond_rank)\" or \"LLIterative(m,precond_rank,lanczos_steps)\" (got \"",
+             "\"LLIterative(m,precond_rank)\", \"LLIterative(m,precond_rank,lanczos_steps)\", ",
+             "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\" or ",
+             "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -86,13 +99,21 @@ classKriging <- function(nk) {
 #'     O(n k^2) instead of O(n^3), also recommended for large designs; and
 #'     \code{"LLIterative"} / \code{"LLIterative(m)"} /
 #'     \code{"LLIterative(m,precond_rank)"} /
-#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} for the matrix-free
-#'     conjugate-gradient log-likelihood with \code{m} stochastic-trace probes
-#'     (default 30), an optional rank-\code{precond_rank} Nystrom CG
-#'     preconditioner (0 = off), and \code{lanczos_steps} Lanczos steps per
-#'     probe in the stochastic log-determinant estimate (default 20; raise it
-#'     if the estimate drifts on an ill-conditioned covariance): keeps R exact
-#'     and never factorizes it.
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"}
+#'     for the matrix-free conjugate-gradient log-likelihood with \code{m}
+#'     stochastic-trace probes (default 30), an optional
+#'     rank-\code{precond_rank} Nystrom CG preconditioner (0 = off),
+#'     \code{lanczos_steps} Lanczos steps per probe in the stochastic
+#'     log-determinant estimate (default 20; raise it if the estimate drifts
+#'     on an ill-conditioned covariance), a CG iteration budget of
+#'     \code{cg_max_iter_mult * n} (default 2) and a CG relative-residual
+#'     tolerance \code{cg_tol} (default 1e-4 -- deliberately loose, since the
+#'     stochastic log-determinant sitting next to the solves has a far larger
+#'     error of its own; tighten it only when the solve outputs
+#'     \code{beta}/\code{sigma2}/gradient are what needs the precision):
+#'     keeps R exact and never factorizes it.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -276,8 +297,10 @@ print.Kriging <- function(x, ...) {
 #'     \code{"LLNystrom(k)"} for the Nystrom approximated log-likelihood
 #'     (see \code{\link{Kriging}}), and \code{"LLIterative"} /
 #'     \code{"LLIterative(m)"} / \code{"LLIterative(m,precond_rank)"} /
-#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} for the matrix-free
-#'     CG log-likelihood (see \code{\link{Kriging}}).
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"}
+#'     for the matrix-free CG log-likelihood (see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
