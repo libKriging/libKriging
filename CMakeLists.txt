@@ -109,12 +109,14 @@ option(LBFGSB_SHOW_BUILD OFF)
 # docs/math/Iterative.md.
 option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative (requires CUDA toolkit)" OFF)
 # Same feature, AMD/ROCm backend. Explicit opt-in only, never auto-detected.
-# UNVERIFIED: written as a mechanical port of the CUDA backend with no
-# ROCm toolchain or AMD GPU available to build/run it against -- see
-# src/lib/hip/HipLinearAlgebra.hpp for the full caveat. Requires CMake
-# >= 3.21 (native HIP language support) and a ROCm install providing
-# CMAKE_PREFIX_PATH/hip-config.cmake.
-option(ENABLE_HIP_ITERATIVE "Enable HIP/ROCm-accelerated matvec/CG for LLIterative and predictIterative (requires ROCm; UNVERIFIED, see src/lib/hip/HipLinearAlgebra.hpp)" OFF)
+# Verified 2026-09-13 on an AMD Radeon RX 6600 (gfx1032, Windows, ROCm/HIP SDK
+# 6.2.4 -- gfx1032 itself is NOT on AMD's officially supported list, but the
+# 6.2.4 runtime detects and runs on it fine; see src/lib/hip/HipLinearAlgebra.hpp
+# for the full history) -- builds with CMake's Ninja generator (no VS/MSBuild
+# HIP toolset was available) and passes KrigingIterativeTest/
+# KrigingPredictIterativeTest in full. Requires CMake >= 3.21 (native HIP
+# language support) and a ROCm install providing CMAKE_PREFIX_PATH/hip-config.cmake.
+option(ENABLE_HIP_ITERATIVE "Enable HIP/ROCm-accelerated matvec/CG for LLIterative and predictIterative (requires ROCm; see src/lib/hip/HipLinearAlgebra.hpp)" OFF)
 # Same feature, Intel oneAPI / SYCL backend. Explicit opt-in only, never
 # auto-detected. UNVERIFIED (no oneAPI toolchain or Intel GPU to build/run
 # against -- see src/lib/sycl/SyclLinearAlgebra.hpp). Requires the C++

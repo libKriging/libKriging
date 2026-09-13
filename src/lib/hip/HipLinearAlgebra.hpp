@@ -1,7 +1,25 @@
-// UNVERIFIED HIP/ROCm port of src/lib/cuda/CudaLinearAlgebra.cuh -- see src/lib/hip/HipLinearAlgebra.hpp
-// for the full caveat. Mechanical cuda*->hip* / .cuh->.hpp translation of
-// the CUDA backend; identical algorithm, batching and preconditioner math.
-// Never compiled or run (no ROCm toolchain / AMD GPU here).
+// HIP/ROCm port of src/lib/cuda/CudaLinearAlgebra.cuh -- mechanical
+// cuda*->hip* / .cuh->.hpp translation of the CUDA backend; identical
+// algorithm, batching and preconditioner math.
+//
+// Verified 2026-09-13 on real hardware: AMD Radeon RX 6600 (gfx1032),
+// Windows, ROCm/HIP SDK 6.2.4 (gfx1032 is not on AMD's officially supported
+// GPU list for any HIP SDK release, but the 6.2.4 runtime detects and runs
+// on it fine -- newer ROCm 7.x reportedly does not). Built with CMake's
+// Ninja generator + plain (non -cl) Clang for C/CXX/HIP -- this machine had
+// no VS/MSBuild HIP toolset integration, and CMake 3.31's HIP-language ABI
+// detection has a real bug when the HIP compiler is clang-cl (no
+// CMAKE_HIP_SIMULATE_VERSION branch in Windows-MSVC.cmake). All of
+// LinearAlgebraTest, KrigingIterativeTest and KrigingPredictIterativeTest
+// pass. This run also found and fixed a real bug (now fixed here and in the
+// identical CUDA original, CudaLinearAlgebraKernel.cu): rmul_batched_tiled_kernel
+// could leave a trailing d_partial slice unwritten when j_tile*j_blocks
+// overshot n, and sum_partials_kernel summed that uninitialized device
+// memory into the matvec result -- surfaced as a negative SSE (hence a NaN
+// log-likelihood) in the LLIterative gradient/SLQ path at n=35, ncols=2 on
+// this GPU's 14 CUs. Not yet exercised: SYCL/Metal remain UNVERIFIED, and
+// this was only tried on gfx1032 with one small-n test suite -- other GPUs/
+// problem sizes may still expose new issues.
 #ifndef LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRA_HPP
 #define LIBKRIGING_SRC_LIB_HIP_HIPLINEARALGEBRA_HPP
 
