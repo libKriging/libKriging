@@ -131,10 +131,55 @@ Three timings per backend, plus accuracy vs the Cholesky reference:
   preconditioner / GPyTorch `.eval()` posterior; GPyTorch's per-fit cache is
   dropped each rep).
 * All timings are the **min of up to 5 reps** (1 rep once a call > 3 s).
-* **`RMSE`/`Q²`** on the test set; **`dLogLik/n`** = `|ll − ll_chol|/n`
-  (blank for GPyTorch — its `-mll` is differently normalised); **`dMean/rms`**
-  = `max|mean − mean_chol| / rms(y_test)`, against the **libKriging** Cholesky
-  mean.
+* **`RMSE`/`Q²`** on the test set; **`dLogLik/n`** = `|ll − ll_chol|/n`;
+  **`dMean/rms`** = `max|mean − mean_chol| / rms(y_test)`, against the
+  **libKriging** Cholesky mean.
+
+### The two log-likelihood columns
+
+`logLik (native)` is what each library returns as-is, and the two sides look
+nothing alike — e.g. `2183.8` against `−0.29` at n=4000. That gap is **pure
+convention**, not disagreement:
+
+* GPyTorch's `ExactMarginalLogLikelihood` returns `log p(y|X) / n`, a
+  **per-datapoint** figure.
+* libKriging returns the **concentrated** likelihood: `σ²` is profiled out
+  analytically, so the quadratic form `q = r′K⁻¹r` is replaced by
+  `n·log(q/n) + n`.
+
+`logLik (libK conv.)` undoes both, via
+`ll_libK = n·mll + q/2 − (n·log(q/n) + n)/2`, with `q` taken from GPyTorch's
+*own* solve so a BBMM row keeps its own CG error rather than borrowing
+libKriging's. Verified: the exact `GPyTorch-Cholesky` rows land within
+**5e-09 … 2e-08** per point of the libKriging Cholesky reference. This is the
+column `dLogLik/n` is computed from.
+
+Making it comparable exposed something the previously-blank column hid. At an
+**identical** stochastic budget — 30 Hutchinson probes and 40 SLQ Lanczos
+steps per probe on both sides (GPyTorch's `num_trace_samples` /
+`max_lanczos_quadrature_iterations` are set from libKriging's `LLIterative`
+fields, not left at their own defaults) and the same CG tolerance —
+libKriging's log-determinant estimate is roughly **two orders of magnitude**
+more accurate than GPyTorch BBMM's:
+
+| n | libKriging-Iterative `dLogLik/n` | GPyTorch-BBMM `dLogLik/n` |
+|--:|--:|--:|
+| 250 | 4.1e-03 | 2.2e-02 |
+| 500 | 9.0e-03 | 2.1e-03 |
+| 1000 | 2.0e-03 | 3.6e-01 |
+| 2000 | 2.1e-03 | 2.7e-01 |
+| 4000 | 1.3e-02 | 1.6e-01 |
+
+Both estimators are stochastic, so individual cells move between runs (note
+GPyTorch's n=500, which happened to land well) — but the *envelope* is stable
+and reproduces on both the H100 and the L40S: libKriging stays in the low
+`1e-03`…`1e-02` band at every n, GPyTorch BBMM reaches `1e-01` at n ≥ 1000.
+
+The two libraries are better at different things: BBMM's posterior **mean** is
+slightly closer to exact (`dMean/rms` 2.6e-04 vs 6.5e-04 at n=4000),
+libKriging's **log-likelihood** markedly so — which matters, because the
+log-likelihood is what hyperparameter optimization actually descends, and this
+sweep deliberately holds `theta` fixed and so never exercises that.
 
 ### Both libraries must fit the same model, or `dMean/rms` means nothing
 
