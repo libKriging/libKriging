@@ -216,19 +216,29 @@ __global__ void rmul_batched_tiled_kernel(const double* __restrict__ Xt,
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   const int jb = blockIdx.z;
-  const int j_start = jb * j_tile;
-  if (i >= n || c >= ncols || j_start >= n)
+  if (i >= n || c >= ncols)
     return;
-  const int j_end = min(j_start + j_tile, n);
+  const int j_start = jb * j_tile;
 
   const double* Pc = P + static_cast<std::size_t>(c) * n;
   const double* Xi = Xt + static_cast<std::size_t>(i) * dimX;
   double partial = (jb == 0) ? Pc[i] : 0.0;  // diag = 1, added exactly once
-  for (int j = j_start; j < j_end; ++j) {
-    if (j == i)
-      continue;
-    const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
-    partial += lk_cov_pair(kind, Xi, Xj, theta, dimX) * Pc[j];
+  // j_tile = ceil(n / j_blocks) can overshoot n (e.g. n=35, j_blocks=8 ->
+  // j_tile=5, last slice's j_start=35 == n): that slice covers no columns
+  // but must still WRITE its d_partial slot (as 0, or the lone diag term for
+  // jb==0) -- sum_partials_kernel unconditionally sums all j_blocks slots,
+  // and cuda/hipMalloc doesn't zero-init, so skipping the write here left
+  // sum_partials_kernel adding garbage device memory into the matvec result
+  // (confirmed on the HIP port at n=35/ncols=2 -- the LLIterative(60) CG
+  // solve for [F|y] -- which produced a negative SSE; see git history).
+  if (j_start < n) {
+    const int j_end = min(j_start + j_tile, n);
+    for (int j = j_start; j < j_end; ++j) {
+      if (j == i)
+        continue;
+      const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
+      partial += lk_cov_pair(kind, Xi, Xj, theta, dimX) * Pc[j];
+    }
   }
   d_partial[(static_cast<std::size_t>(jb) * ncols + c) * n + i] = partial;
 }
