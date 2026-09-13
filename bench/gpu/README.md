@@ -230,7 +230,7 @@ model.mean_module.constant.fill_(
 ```
 
 `trend_const` is `m.beta()` read off the `libKriging-Cholesky-*` run for the
-same `n` (see `run_backend`/`beta_ref` in `bench_gpu.py`), so every GPyTorch
+same `n` (see `one_point`/`beta_ref` in `bench_gpu.py`), so every GPyTorch
 backend is fit against the exact same trend constant, not its own estimate.
 
 `fit` is forced to actually solve `R(theta)` once — `ExactGP.__init__` alone
