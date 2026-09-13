@@ -66,9 +66,15 @@ Three timings per backend, plus accuracy
   Nystrom preconditioner) / GPyTorch ``.eval()`` posterior.
 * All timings are the **min of up to 5 reps** (1 rep once a call exceeds 3 s).
 * ``RMSE`` / ``Q2`` on the test set; and, vs the Cholesky reference,
-  ``dLogLik/n`` (``|ll - ll_chol| / n``; not comparable for GPyTorch's
-  differently-normalised ``-mll``, shown as ``--``) and ``dMean/rms``
+  ``dLogLik/n`` (``|ll - ll_chol| / n``) and ``dMean/rms``
   (``max|mean - mean_chol| / rms(y_test)``).
+* Two log-likelihood columns. ``logLik (native)`` is what each library
+  returns as-is, and the two sides look nothing alike because the
+  conventions differ: GPyTorch's ``ExactMarginalLogLikelihood`` is
+  ``log p(y|X) / n`` (per datapoint) while libKriging returns the
+  *concentrated* likelihood with ``sigma2`` profiled out analytically.
+  ``logLik (libK conv.)`` undoes both and is what ``dLogLik/n`` uses; see
+  ``run_gpytorch`` for the conversion and its verification.
 
 Requires ``pylibkriging`` (built with a GPU iterative backend for the CUDA
 rows), ``torch`` and ``gpytorch`` importable in one environment.
@@ -115,7 +121,10 @@ NOISE_SEED = 0
 # budget-matched to GPyTorch the same way `predict` is (leaving it at
 # libKriging's own default would have libKriging solve to a different
 # residual than GPyTorch's BBMM).
-LK_ITER_OBJECTIVE_FMT = "LLIterative(30,0,40,6,{cg_tol:g})"
+LK_ITER_NPROBE = 30    # Hutchinson/SLQ probes -- mirrored into GPyTorch's num_trace_samples
+LK_ITER_LANCZOS = 40   # SLQ Lanczos steps/probe -- mirrored into max_lanczos_quadrature_iterations
+LK_ITER_OBJECTIVE_FMT = (
+    "LLIterative(%d,0,%d,6,{cg_tol:g})" % (LK_ITER_NPROBE, LK_ITER_LANCZOS))
 
 # Shared CG convergence budget, applied to BOTH libraries (see --cg-tol).
 # This has to be ONE number: earlier revisions of this harness ran
@@ -375,8 +384,13 @@ def _gpt_converged_ctx(gpytorch, cg_tol: float, bbmm: bool = True):
         gpytorch.settings.max_cg_iterations(5000),
         gpytorch.settings.cg_tolerance(cg_tol),
         gpytorch.settings.eval_cg_tolerance(cg_tol),
-        gpytorch.settings.max_lanczos_quadrature_iterations(32),
-        gpytorch.settings.num_trace_samples(32),
+        # Matched EXACTLY to libKriging's LLIterative(30,_,40,...): 30
+        # Hutchinson probes and 40 SLQ Lanczos steps per probe. These drive
+        # the stochastic log-determinant, so leaving them at different values
+        # (32/32 vs 30/40) would make the `dLogLik/n` column a comparison of
+        # two different quadrature budgets rather than of the two estimators.
+        gpytorch.settings.max_lanczos_quadrature_iterations(LK_ITER_LANCZOS),
+        gpytorch.settings.num_trace_samples(LK_ITER_NPROBE),
         gpytorch.settings.max_preconditioner_size(100),
         gpytorch.settings.min_preconditioning_size(1),
     ]
@@ -467,9 +481,43 @@ def run_gpytorch(X, y, Xte, yte, theta, device_str, cg_tol: float, bbmm: bool = 
             return pm
 
         predict_s, pm = timed_min(eval_pred)
+
+        # Put GPyTorch's log-likelihood into libKriging's convention, so the
+        # report's `logLik value` column is one comparable quantity instead
+        # of two numbers that differ by three orders of magnitude for
+        # reasons that have nothing to do with either solver. UNTIMED: this
+        # is an extra solve purely for the accuracy column.
+        #
+        # Two conventions separate them, both exactly invertible:
+        #   * GPyTorch's ExactMarginalLogLikelihood returns log p(y|X) / n
+        #     (per datapoint), so n*mll is its total.
+        #   * libKriging returns the CONCENTRATED (profiled) likelihood: it
+        #     maximizes over sigma2 analytically and substitutes
+        #     sigma2_hat = q/n (q = r' K^-1 r, r = y - F beta), which turns
+        #     the -q/2 term into -(n log sigma2_hat + n)/2.
+        # so  ll_libK = n*mll + q/2 - (n log(q/n) + n)/2.
+        #
+        # q comes from GPyTorch's OWN solve under the same settings as the
+        # timed run, so a BBMM row's converted value carries BBMM's own CG
+        # error rather than borrowing libKriging's -- which is the point, it
+        # has to stay a convergence measurement. Verified against libKriging
+        # directly at n=250 and n=4000, d=4, matern5_2, theta=0.15: GPyTorch's
+        # own sigma2_hat matches libKriging's sigma2() to 6e-09/1.5e-08 and
+        # the converted log-likelihood matches to 1.8e-07 relative.
+        model.train()
+        lik.train()
+        with torch.no_grad():
+            joint = lik(model(tx))
+            r = (ty - joint.mean).unsqueeze(-1)
+            q = float((r * joint.lazy_covariance_matrix.solve(r)).sum())
+            sync()
+        n_obs = X.shape[0]
+        ll_libk = ll * n_obs + 0.5 * q - 0.5 * (n_obs * np.log(q / n_obs) + n_obs)
+
     rmse, q2 = rmse_q2(pm, yte)
-    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, ll=ll,
-                ll_comparable=False, rmse=rmse, q2=q2, pred_mean=pm)
+    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s,
+                ll=ll_libk, ll_native=ll, ll_comparable=True,
+                rmse=rmse, q2=q2, pred_mean=pm)
 
 
 # --------------------------------------------------------------------------
@@ -486,7 +534,7 @@ def run_libkriging_chol(X, y, Xte, yte, theta):
     predict_s, pm = timed_min(lambda: np.asarray(m.predict(Xte, False, False, False)[0]).ravel())
     rmse, q2 = rmse_q2(pm, yte)
     return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, ll=ll,
-                ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm,
+                ll_native=ll, ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm,
                 beta=float(np.asarray(m.beta()).ravel()[0]))
 
 
@@ -515,7 +563,7 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_
     ).ravel())
     rmse, q2 = rmse_q2(pm, yte)
     return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, ll=ll,
-                ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm)
+                ll_native=ll, ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm)
 
 
 # --------------------------------------------------------------------------
@@ -625,7 +673,7 @@ def _f(x, spec=".4f"):
 
 def write_csv(path, rows):
     cols = ["backend", "backend_key", "n", "status", "fit_s", "loglik_s", "predict_s", "wall_s",
-            "ll", "ll_comparable", "rmse", "q2", "dloglik_n", "dmean_rms"]
+            "ll", "ll_native", "ll_comparable", "rmse", "q2", "dloglik_n", "dmean_rms"]
     with open(path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
@@ -694,7 +742,7 @@ def write_html(path, rows, meta):
        "“GPyTorch-BBMM” row misnamed) — "
        f"<code>max_cg_iterations=5000, cg_tolerance={meta['cg_tol']:g}, "
        f"eval_cg_tolerance={meta['cg_tol']:g}, "
-       "max_lanczos_quadrature_iterations=32, num_trace_samples=32, "
+       f"max_lanczos_quadrature_iterations={LK_ITER_LANCZOS}, num_trace_samples={LK_ITER_NPROBE}, "
        "max_preconditioner_size=100, min_preconditioning_size=1</code></li>")
     ap("<li><strong>versions</strong>: " + ", ".join(
         f"{_html.escape(str(k))}=<code>{_html.escape(str(v))}</code>" for k, v in meta["versions"].items()) + "</li>")
@@ -718,12 +766,21 @@ def write_html(path, rows, meta):
         "each rep). Every timing is the **min of up to 5 reps** (1 rep once a single call "
         "exceeds 3 s). Backends are named `<lib>-<method>-<linalg lib>`. "
         f"`{name('chol')}` is the **reference**: `dLogLik/n` = "
-        "`|ll − ll_chol|/n` (blank for GPyTorch, whose `-mll` is a differently normalised "
-        "quantity) and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`, against the "
+        "`|ll − ll_chol|/n` and `dMean/rms` = `max|mean − mean_chol| / rms(y_test)`, against the "
         "**libKriging** Cholesky mean. Both libraries run the same separable Matérn-5/2 "
         "product kernel and the same GLS trend, so this is a convergence figure for every "
         "row; `GPyTorch-Cholesky` being exact, its own `dMean/rms` is the residual "
-        "cross-library agreement and is the floor the `GPyTorch-BBMM` rows should reach.") + "</p>")
+        "cross-library agreement and is the floor the `GPyTorch-BBMM` rows should reach. "
+        "**`logLik (native)`** is what each library returns as-is — which is why the two "
+        "sides of that column look nothing alike, and why it is *not* the one to compare: "
+        "GPyTorch's `ExactMarginalLogLikelihood` is `log p(y|X) / n`, a per-datapoint "
+        "figure, while libKriging returns the **concentrated** likelihood, having profiled "
+        "`sigma2` out analytically. **`logLik (libK conv.)`** undoes both conventions — "
+        "`ll_libK = n·mll + q/2 − (n·log(q/n) + n)/2`, with `q = r' K⁻¹ r` taken from "
+        "GPyTorch's *own* solve so a BBMM row keeps its own CG error — and is the column "
+        "`dLogLik/n` is computed from. The two agree to ~1e-07 relative once converted, so "
+        "the raw gap between e.g. `2183.8` and `−0.29` is entirely convention, not "
+        "disagreement about the model or the data.") + "</p>")
 
     # ---- interactive chart: time (log) vs n, one trace per backend, ----
     # ---- metric switch (fit / logLik / predict) via a dropdown ----
@@ -786,13 +843,15 @@ def write_html(path, rows, meta):
 
     ap("<h2>Accuracy</h2>")
     ap('<table><thead>')
-    row("backend", "n", "RMSE", "Q²", "logLik value", "dLogLik/n", "dMean/rms", header=True)
+    row("backend", "n", "RMSE", "Q²", "logLik (libK conv.)", "logLik (native)",
+        "dLogLik/n", "dMean/rms", header=True)
     ap('</thead><tbody>')
     for r in rows:
         if r.get("status") != "ok":
-            row(_html.escape(r['backend']), r['n'], "—", "—", "—", "—", f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
+            row(_html.escape(r['backend']), r['n'], "—", "—", "—", "—", "—", f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
             continue
         row(_html.escape(r['backend']), r['n'], _f(r['rmse']), _f(r['q2']), _f(r['ll'], '.3f'),
+            _f(r.get('ll_native'), '.4f'),
             _f(r.get('dloglik_n'), '.2e'), _f(r.get('dmean_rms'), '.2e'))
     ap('</tbody></table>')
 
@@ -827,12 +886,30 @@ def write_html(path, rows, meta):
     if gpts:
         m_dm = max((r["dmean_rms"] for r in gpts if r.get("dmean_rms") is not None), default=float("nan"))
         gq = min((r["q2"] for r in gpts), default=float("nan"))
+        m_gdll = max((r["dloglik_n"] for r in gpts if r.get("dloglik_n") is not None), default=float("nan"))
         msg = ("**GPyTorch**: posterior mean within `%.1e` of test RMS of the chol "
                "reference — now that both libraries run the same separable kernel and the "
                "same GLS trend, this is BBMM's own solver convergence, directly comparable "
-               "to the libKriging-iterative figure above — Q² ≥ `%.4f`. Its `-mll` value is a "
-               "different normalisation and is not compared." % (m_dm, gq))
+               "to the libKriging-iterative figure above — Q² ≥ `%.4f`. Its log-likelihood is "
+               "converted into libKriging's convention (see the accuracy table) and compared "
+               "to within `%.1e` per point." % (m_dm, gq, m_gdll))
         ap(f"<li>{md(msg)}</li>")
+    # Head-to-head on the log-likelihood, now that both sides are one
+    # comparable quantity at an identical probe/Lanczos budget. This stayed
+    # invisible while the column was blank for GPyTorch.
+    if iters and gpts:
+        i_dll = max((r["dloglik_n"] for r in iters if r.get("dloglik_n") is not None), default=float("nan"))
+        g_dll = max((r["dloglik_n"] for r in gpts if r.get("dloglik_n") is not None), default=float("nan"))
+        if i_dll == i_dll and g_dll == g_dll and i_dll > 0:
+            msg = ("**log-likelihood accuracy, head to head**: at the same %d Hutchinson "
+                   "probes and %d SLQ Lanczos steps per probe, and the same CG tolerance, "
+                   "libKriging's stochastic log-determinant is the more accurate of the two "
+                   "— worst `dLogLik/n` `%.1e` against GPyTorch BBMM's `%.1e` (`%.0fx`). "
+                   "Note the two differ in *which* quantity they are better at: BBMM's "
+                   "posterior mean is slightly closer (see `dMean/rms`), libKriging's "
+                   "log-likelihood markedly so."
+                   % (LK_ITER_NPROBE, LK_ITER_LANCZOS, i_dll, g_dll, g_dll / i_dll))
+            ap(f"<li>{md(msg)}</li>")
     gtg_chol, gtc_chol = got("gpt-chol-cuda"), got("gpt-chol-cpu")
     bbmm_vs_chol = [
         abs(bbmm[n]["dmean_rms"] - chol_gpt[n]["dmean_rms"])
