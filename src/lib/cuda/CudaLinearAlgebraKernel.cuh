@@ -117,12 +117,20 @@ void lk_cuda_drmul_batched_launch(const double* d_Xt, int n, int dimX, const dou
 void lk_cuda_build_cov_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind, double* d_R,
                               double* d_dR);
 
-// Nystrom/Woodbury preconditioner apply: d_z = Dinv .* (r - U M^-1 U^T (Dinv .* r)),
-// M = d_Mchol d_Mchol^T (k x k lower). d_U is n x k col-major, d_Dinv is n,
-// d_r/d_z are n x ncols. d_scratch_nc must be >= n*ncols doubles,
-// d_scratch_kc >= k*ncols. Matches LinearAlgebra::WoodburyFactorization::solve.
-void lk_cuda_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
-                                  const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc);
+// Nystrom/Woodbury preconditioner apply, elementwise halves only: the two
+// GEMMs (U^T Z, U S) and the k x k triangular solve in between are issued
+// from CudaLinearAlgebra.cpp as cublasDgemm/cublasDtrsm -- a hand-written
+// kernel for those was one thread per right-hand-side column doing an O(k^2)
+// strictly serial substitution (300 threads busy on a 132-SM device), which
+// made the preconditioner an order of magnitude more expensive than the CG
+// iterations it was meant to save.
+//
+// d_Out[i,c] = d_Dinv[i] * d_R[i,c]  (n x ncols)
+void lk_cuda_scale_rows_launch(const double* d_Dinv, const double* d_R, int n, int ncols, double* d_Out);
+
+// d_z[i,c] = d_Dinv[i] * (d_r[i,c] - d_Us[i,c])  (all n x ncols)
+void lk_cuda_precond_finish_launch(const double* d_Dinv, const double* d_r, const double* d_Us, int n, int ncols,
+                                   double* d_z);
 
 // Preconditioned-CG beta update: beta[c] = rz_new/rz_old, rz_old <- rz_new,
 // convergence tested on the TRUE residual norm rr[c]/bnorm[c].

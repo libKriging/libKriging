@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <mutex>
 #include <sstream>
@@ -115,6 +116,105 @@ bool denseFitsBudget(double need_mb) {
   return budget_mb > 0 && need_mb <= static_cast<double>(budget_mb);
 }
 
+// Device-resident cache of the materialized dense R for the LAST
+// (Xt, theta, covType) seen.
+//
+// Every entry point below used to be stateless: conjugateGradient,
+// rmulBatched and dRmulBatched each cudaMalloc'd d_Xt/d_theta/d_Rmat,
+// rebuilt R from scratch, then cudaFree'd everything before returning.
+// That is fine for a single solve, but it is NOT what the iterative
+// objective does: one _logLikelihoodIterative evaluation runs three Krylov
+// passes at a FIXED theta (CG on [F|y], the SLQ Lanczos recurrence, then CG
+// on the Hutchinson probes), and the SLQ recurrence calls rmulBatched once
+// per Lanczos step -- 40 steps in the benchmark. So a constant n x n matrix
+// was being re-allocated (128 MB at n = 4000) and re-evaluated (16 M fp64
+// exp/log1p) 40+ times per objective evaluation, for ~0.02 ms of actually
+// useful GEMM each time.
+//
+// Caching on (n, dimX, kind, Xt, theta) collapses all of that to one build
+// per theta. The key is compared by VALUE, not by pointer: callers pass
+// temporaries and Armadillo reuses freed memory, so a pointer/shape
+// comparison would alias two different designs onto the same cached R.
+// Comparing contents is O(n*dimX + dimX) -- 16 k doubles at n = 4000, d = 4
+// -- i.e. nothing next to the O(n^2) build it guards.
+//
+// Only R is kept resident. The dRmulBatched blocks (dimX * n^2, 512 MB at
+// n = 4000, d = 4) are deliberately NOT cached: they are used exactly once
+// per gradient evaluation, so there is nothing to amortize, and holding
+// them would quintuple the steady-state device footprint.
+struct DenseCovCache {
+  int n = 0;
+  int dimX = 0;
+  int kind = -1;
+  std::vector<double> xt;
+  std::vector<double> theta;
+  double* d_Xt = nullptr;
+  double* d_theta = nullptr;
+  double* d_R = nullptr;
+};
+
+DenseCovCache& covCache() {
+  static DenseCovCache cache;
+  return cache;
+}
+
+bool covCacheMatches(const DenseCovCache& c, const arma::mat& Xt, const arma::vec& theta, CovKind kind) {
+  if (c.d_Xt == nullptr || c.n != static_cast<int>(Xt.n_cols) || c.dimX != static_cast<int>(Xt.n_rows)
+      || c.kind != static_cast<int>(kind))
+    return false;
+  if (c.xt.size() != Xt.n_elem || c.theta.size() != theta.n_elem)
+    return false;
+  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr()) && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
+}
+
+// Binds the cache to (Xt, theta, kind), uploading Xt/theta if the key
+// changed, and returns it. d_R is left null on a key change; covCacheR()
+// below is what actually materializes it (callers that only need the
+// matrix-free path must not pay for a build they won't use).
+DenseCovCache& covCacheBind(const arma::mat& Xt, const arma::vec& theta, CovKind kind) {
+  DenseCovCache& c = covCache();
+  if (covCacheMatches(c, Xt, theta, kind))
+    return c;
+
+  if (c.d_Xt)
+    cudaFree(c.d_Xt);
+  if (c.d_theta)
+    cudaFree(c.d_theta);
+  if (c.d_R)
+    cudaFree(c.d_R);
+  c.d_Xt = c.d_theta = c.d_R = nullptr;
+
+  const int n = static_cast<int>(Xt.n_cols);
+  const int dimX = static_cast<int>(Xt.n_rows);
+  LK_CUDA_CHECK(cudaMalloc(&c.d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
+  LK_CUDA_CHECK(cudaMalloc(&c.d_theta, sizeof(double) * dimX));
+  LK_CUDA_CHECK(
+      cudaMemcpy(c.d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
+  LK_CUDA_CHECK(cudaMemcpy(c.d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
+
+  c.n = n;
+  c.dimX = dimX;
+  c.kind = static_cast<int>(kind);
+  c.xt.assign(Xt.memptr(), Xt.memptr() + Xt.n_elem);
+  c.theta.assign(theta.memptr(), theta.memptr() + theta.n_elem);
+  return c;
+}
+
+// Cached dense R for the bound key, built on first use. Returns nullptr
+// when the dense path is over budget, so callers keep their matrix-free
+// fallback.
+double* covCacheR(DenseCovCache& c) {
+  if (c.d_R)
+    return c.d_R;
+  const double need_mb = static_cast<double>(c.n) * c.n * 8.0 / (1024.0 * 1024.0);
+  if (!denseFitsBudget(need_mb))
+    return nullptr;
+  LK_CUDA_CHECK(cudaMalloc(&c.d_R, sizeof(double) * static_cast<std::size_t>(c.n) * c.n));
+  lk_cuda_build_cov_launch(c.d_Xt, c.n, c.dimX, c.d_theta, c.kind, c.d_R, nullptr);
+  LK_CUDA_CHECK(cudaGetLastError());
+  return c.d_R;
+}
+
 }  // namespace
 
 namespace LinearAlgebraCuda {
@@ -193,28 +293,16 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   const bool preconditioned = (precU.n_elem > 0);
   const int pk = preconditioned ? static_cast<int>(precU.n_cols) : 0;
 
-  // Upload X and theta once -- reused for every CG iteration, never
-  // re-transferred mid-solve.
-  double *d_Xt, *d_theta;
-  LK_CUDA_CHECK(cudaMalloc(&d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
-  LK_CUDA_CHECK(cudaMalloc(&d_theta, sizeof(double) * dimX));
-  LK_CUDA_CHECK(
-      cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
-  LK_CUDA_CHECK(cudaMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
-
-  // Dense fast path: materialize R ONCE for this whole solve (every
-  // iteration of THIS loop shares it), then every matvec is a cublasDgemm
-  // instead of a fresh matrix-free covariance sweep. See denseFitsBudget's
-  // comment. Named d_Rmat (not d_R) to avoid any confusion with the CG
-  // residual buffer d_r declared just below.
-  const double r_need_mb = static_cast<double>(n) * n * 8.0 / (1024.0 * 1024.0);
-  const bool dense = denseFitsBudget(r_need_mb);
-  double* d_Rmat = nullptr;
-  if (dense) {
-    LK_CUDA_CHECK(cudaMalloc(&d_Rmat, sizeof(double) * static_cast<std::size_t>(n) * n));
-    lk_cuda_build_cov_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_Rmat, nullptr);
-    LK_CUDA_CHECK(cudaGetLastError());
-  }
+  // X, theta and R now come from the process-wide dense cache (see
+  // DenseCovCache): a whole objective evaluation runs at a fixed theta, so
+  // the first pass pays the upload + build and the SLQ/probe passes that
+  // follow reuse them. Nothing here is freed on the way out -- the cache
+  // owns d_Xt/d_theta/d_Rmat and drops them when theta next moves.
+  DenseCovCache& cov = covCacheBind(Xt, theta, kind);
+  double* d_Xt = cov.d_Xt;
+  double* d_theta = cov.d_theta;
+  double* d_Rmat = covCacheR(cov);
+  const bool dense = (d_Rmat != nullptr);
 
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
   double *d_b, *d_x, *d_r, *d_p, *d_Ap;
@@ -262,8 +350,34 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_CUDA_CHECK(cudaMemcpy(d_precMchol, precMcholLower.memptr(), sizeof(double) * static_cast<std::size_t>(pk) * pk,
                              cudaMemcpyHostToDevice));
   }
+  // z = P^-1 r with P = D + U U^T, applied by the Woodbury identity:
+  //   z = Dinv .* (r - U (L L^T)^-1 U^T (Dinv .* r))
+  // Everything that is not elementwise goes through cuBLAS: two DGEMMs and
+  // one DTRSM pair on the k x ncols block. The previous hand-written
+  // kernels made this the dominant cost of a preconditioned solve -- the
+  // k x k triangular solve in particular ran one thread per right-hand-side
+  // column with an O(k^2) serial substitution inside it, i.e. `ncols`
+  // threads total (300 on a 132-SM H100) and O(k^2) serialized FLOPs each,
+  // so `LLIterative(30,128,40)` cost 13x `LLIterative(30,0,40)` for an
+  // identical log-likelihood value. DTRSM solves exactly this shape with
+  // the whole device.
+  const double prec_one = 1.0, prec_zero = 0.0;
   auto precondApply = [&](const double* d_in, double* d_out) {
-    lk_cuda_precond_apply_launch(d_precU, n, pk, d_precDinv, d_precMchol, d_in, ncols, d_out, d_prec_nc, d_prec_kc);
+    lk_cuda_scale_rows_launch(d_precDinv, d_in, n, ncols, d_prec_nc);  // d_prec_nc = Dinv .* r
+    LK_CUDA_CHECK(cudaGetLastError());
+    // t = U^T (Dinv .* r)   (k x ncols)
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_T, CUBLAS_OP_N, pk, ncols, n, &prec_one, d_precU, n, d_prec_nc,
+                                n, &prec_zero, d_prec_kc, pk));
+    // s = (L L^T)^-1 t, in place: L y = t then L^T s = y
+    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_N,
+                                CUBLAS_DIAG_NON_UNIT, pk, ncols, &prec_one, d_precMchol, pk, d_prec_kc, pk));
+    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_T,
+                                CUBLAS_DIAG_NON_UNIT, pk, ncols, &prec_one, d_precMchol, pk, d_prec_kc, pk));
+    // d_prec_nc is free again (its Dinv .* r content was consumed by the
+    // first DGEMM): reuse it for U s (n x ncols) instead of a 7th buffer.
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, pk, &prec_one, d_precU, n, d_prec_kc,
+                                pk, &prec_zero, d_prec_nc, n));
+    lk_cuda_precond_finish_launch(d_precDinv, d_in, d_prec_nc, n, ncols, d_out);
     LK_CUDA_CHECK(cudaGetLastError());
   };
 
@@ -321,7 +435,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   constexpr arma::uword sync_every = 10;     // host "any active?" poll cadence
   int host_flag = any_active_h ? 1 : 0;
 
+  arma::uword iters_done = 0;
   for (arma::uword it = 0; host_flag && it < max_iter; ++it) {
+    iters_done = it + 1;
     matvec(d_p, d_Ap);  // Ap = R*p
     lk_cuda_batched_dot_launch(d_p, d_Ap, n, ncols, d_scratch);  // pAp
     LK_CUDA_CHECK(cudaGetLastError());
@@ -380,6 +496,15 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     }
   }
 
+  // Opt-in diagnostic: the single most useful number when an iterative
+  // objective is slow is "did CG converge, or did it run to max_iter?".
+  // Reaching max_iter means every later quantity (Hutchinson trace, mean,
+  // variance) is built on an unconverged solve.
+  if (std::getenv("LK_ITERATIVE_VERBOSE") != nullptr)
+    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%g precond_rank=%d iters=%llu/%llu%s\n", n, ncols, tol, pk,
+                 static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
+                 iters_done >= max_iter ? "  <-- NOT CONVERGED" : "");
+
   arma::mat X(n, ncols, arma::fill::none);
   LK_CUDA_CHECK(cudaMemcpy(X.memptr(), d_x, mat_bytes, cudaMemcpyDeviceToHost));
 
@@ -398,8 +523,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
                                         static_cast<arma::uword>(n), max_iter);
 
-  cudaFree(d_Xt);
-  cudaFree(d_theta);
+  // d_Xt / d_theta / d_Rmat are owned by the dense cache, not by this call.
   cudaFree(d_b);
   cudaFree(d_x);
   cudaFree(d_r);
@@ -417,8 +541,6 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   cudaFree(d_flag);
   if (d_rmul_scratch)
     cudaFree(d_rmul_scratch);
-  if (d_Rmat)
-    cudaFree(d_Rmat);
   if (preconditioned) {
     cudaFree(d_precU);
     cudaFree(d_precDinv);
@@ -446,31 +568,22 @@ arma::mat rmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::st
     throw std::invalid_argument("LinearAlgebraCuda::rmulBatched: V has " + std::to_string(V.n_rows) + " rows, expected "
                                 + std::to_string(n));
 
-  double *d_Xt, *d_theta, *d_V, *d_Av;
-  LK_CUDA_CHECK(cudaMalloc(&d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
-  LK_CUDA_CHECK(cudaMalloc(&d_theta, sizeof(double) * dimX));
+  // X, theta and R come from the dense cache: the SLQ recurrence calls this
+  // once per Lanczos step at a FIXED theta, so R is built on the first step
+  // and reused by every later one (it used to be rebuilt, and a 128 MB
+  // buffer re-allocated, on all 40 of them).
+  DenseCovCache& cov = covCacheBind(Xt, theta, kind);
+  double* d_Rmat = covCacheR(cov);
+  const bool dense = (d_Rmat != nullptr);
+
+  double *d_V, *d_Av;
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
   LK_CUDA_CHECK(cudaMalloc(&d_V, mat_bytes));
   LK_CUDA_CHECK(cudaMalloc(&d_Av, mat_bytes));
-
-  LK_CUDA_CHECK(
-      cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
-  LK_CUDA_CHECK(cudaMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
   LK_CUDA_CHECK(cudaMemcpy(d_V, V.memptr(), mat_bytes, cudaMemcpyHostToDevice));
 
-  // Dense fast path: materialize R once for this single matvec call --
-  // still a win over the matrix-free kernel whenever ncols > 1 (SLQ/
-  // Hutchinson callers always pass ncols = nprobe), since it turns ncols
-  // covariance sweeps' worth of transcendentals into one build + a cheap
-  // GEMM. See denseFitsBudget's comment.
-  const double r_need_mb = static_cast<double>(n) * n * 8.0 / (1024.0 * 1024.0);
-  const bool dense = denseFitsBudget(r_need_mb);
-  double* d_Rmat = nullptr;
   double* d_scratch = nullptr;
   if (dense) {
-    LK_CUDA_CHECK(cudaMalloc(&d_Rmat, sizeof(double) * static_cast<std::size_t>(n) * n));
-    lk_cuda_build_cov_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_Rmat, nullptr);
-    LK_CUDA_CHECK(cudaGetLastError());
     const double one = 1.0, zero = 0.0;
     LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_Rmat, n, d_V, n, &zero,
                                 d_Av, n));
@@ -478,7 +591,7 @@ arma::mat rmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::st
     const int scratch_elems = lk_cuda_rmul_batched_scratch_elems(n, ncols);
     if (scratch_elems > 0)
       LK_CUDA_CHECK(cudaMalloc(&d_scratch, sizeof(double) * static_cast<std::size_t>(scratch_elems)));
-    lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_V, ncols, d_Av, d_scratch);
+    lk_cuda_rmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_V, ncols, d_Av, d_scratch);
     LK_CUDA_CHECK(cudaGetLastError());
   }
   LK_CUDA_CHECK(cudaDeviceSynchronize());
@@ -486,14 +599,10 @@ arma::mat rmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::st
   arma::mat Av(n, ncols, arma::fill::none);
   LK_CUDA_CHECK(cudaMemcpy(Av.memptr(), d_Av, mat_bytes, cudaMemcpyDeviceToHost));
 
-  cudaFree(d_Xt);
-  cudaFree(d_theta);
   cudaFree(d_V);
   cudaFree(d_Av);
   if (d_scratch)
     cudaFree(d_scratch);
-  if (d_Rmat)
-    cudaFree(d_Rmat);
   return Av;
 }
 
@@ -512,16 +621,15 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
     throw std::invalid_argument("LinearAlgebraCuda::dRmulBatched: V has " + std::to_string(V.n_rows)
                                 + " rows, expected " + std::to_string(n));
 
-  double *d_Xt, *d_theta, *d_V, *d_Out;
-  LK_CUDA_CHECK(cudaMalloc(&d_Xt, sizeof(double) * static_cast<std::size_t>(n) * dimX));
-  LK_CUDA_CHECK(cudaMalloc(&d_theta, sizeof(double) * dimX));
+  // Xt/theta are shared with the dense cache (the gradient pass runs at the
+  // same theta as the CG/SLQ passes that precede it, so they are already
+  // uploaded). The dR blocks themselves are NOT cached -- see DenseCovCache.
+  DenseCovCache& cov = covCacheBind(Xt, theta, kind);
+
+  double *d_V, *d_Out;
   LK_CUDA_CHECK(cudaMalloc(&d_V, sizeof(double) * static_cast<std::size_t>(n) * ncols));
   const std::size_t out_bytes = sizeof(double) * static_cast<std::size_t>(n) * dimX * ncols;
   LK_CUDA_CHECK(cudaMalloc(&d_Out, out_bytes));
-
-  LK_CUDA_CHECK(
-      cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
-  LK_CUDA_CHECK(cudaMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
   LK_CUDA_CHECK(cudaMemcpy(
       d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, cudaMemcpyHostToDevice));
 
@@ -536,7 +644,7 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
   if (dense) {
     double* d_dR = nullptr;
     LK_CUDA_CHECK(cudaMalloc(&d_dR, sizeof(double) * static_cast<std::size_t>(n) * n * dimX));
-    lk_cuda_build_cov_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), nullptr, d_dR);
+    lk_cuda_build_cov_launch(cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), nullptr, d_dR);
     LK_CUDA_CHECK(cudaGetLastError());
     const double one = 1.0, zero = 0.0;
     const std::size_t n2 = static_cast<std::size_t>(n) * n;
@@ -546,7 +654,7 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
     }
     cudaFree(d_dR);
   } else {
-    lk_cuda_drmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_V, ncols, d_Out);
+    lk_cuda_drmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_V, ncols, d_Out);
     LK_CUDA_CHECK(cudaGetLastError());
   }
   LK_CUDA_CHECK(cudaDeviceSynchronize());
@@ -554,8 +662,6 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
   arma::mat Out(static_cast<arma::uword>(n), static_cast<arma::uword>(dimX) * ncols, arma::fill::none);
   LK_CUDA_CHECK(cudaMemcpy(Out.memptr(), d_Out, out_bytes, cudaMemcpyDeviceToHost));
 
-  cudaFree(d_Xt);
-  cudaFree(d_theta);
   cudaFree(d_V);
   cudaFree(d_Out);
   return Out;

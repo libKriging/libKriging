@@ -127,7 +127,7 @@ Where this sits relative to the other scaling methods:
   `n` grows — which is the regime the iterative path is for).
 - **CG iteration budget / non-convergence**: every CG solve here (the
   `[F|y]` solve and, when a gradient is requested, the Hutchinson probe
-  solve) defaults to `max_iter = 2n`, `tol = 1e-8`. That budget is not a
+  solve) defaults to `max_iter = 2n`, `tol = 1e-4` (see the next bullet). That budget is not a
   law of nature: at a long enough θ relative to `n` (`R` ill-conditioned
   enough), the true number of CG iterations needed for `tol` can exceed
   `2n` — observed directly at `n=8000` in `bench/gpu`'s sweep, where the
@@ -145,6 +145,27 @@ Where this sits relative to the other scaling methods:
   instead of parsing stdout. Only the `[F|y]`/probe solves are tracked
   this way; `predictIterative`'s own CG solve still gets the printed
   warning (same underlying function) but has no dedicated accessor yet.
+- **CG tolerance**:
+  `objective="LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"`
+  sets the
+  relative-residual tolerance of the solves (default `1e-4`). This default
+  is deliberately loose, and it is loose for the same reason GPyTorch's
+  `cg_tolerance` is: the log-determinant it sits next to is a *stochastic*
+  SLQ estimate carrying a percent-level bias, so the linear solves are not
+  the accuracy-limiting step. Measured at `n = 4000`, `d = 4`,
+  `matern5_2`, θ = 0.15 (H100, CUDA backend):
+
+  | `cg_tol` | CG iterations (30 probes) | evaluation | `|ll−ll_exact|/|ll_exact|` |
+  |---|--:|--:|--:|
+  | `1e-8` | 6550 | 0.94 s | 6.6e-03 |
+  | `1e-6` | — | 0.66 s | 6.6e-03 |
+  | `1e-4` (default) | ~100 | 0.40 s | 6.6e-03 |
+  | `1e-2` | — | 0.22 s | 4.2e-03 |
+
+  i.e. eight orders of magnitude of extra residual accuracy buy nothing at
+  all in the returned log-likelihood, and cost 2.3x in time. Tighten it
+  only if you have first made the log-determinant itself exact enough that
+  the solves start to matter (more `lanczos_steps`, or a preconditioner).
 - **Dense fast path (CPU)**: strictly matrix-free (R never stored) is the
   fallback, not the only mode. For a *separable* kernel — `gauss`, `exp`,
   `matern3_2`, `matern5_2`, i.e. `Cov(dx,θ) = exp(-Σₖ sₖ(|dxₖ|/θₖ))` — and
