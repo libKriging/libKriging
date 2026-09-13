@@ -2,6 +2,8 @@
 // MUST BE at the beginning before any other <cmath> include (e.g. in armadillo's headers)
 #define _USE_MATH_DEFINES // required for Visual Studio
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 // clang-format on
 
 #include "libKriging/LinearAlgebra.hpp"
@@ -49,6 +51,27 @@ LIBKRIGING_EXPORT bool LinearAlgebra::warn_chol = false;
 LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
   LinearAlgebra::warn_chol = warn;
 };
+
+LIBKRIGING_EXPORT bool LinearAlgebra::warn_cg = true;
+
+LIBKRIGING_EXPORT void LinearAlgebra::set_cg_warning(bool warn) {
+  LinearAlgebra::warn_cg = warn;
+};
+
+LIBKRIGING_EXPORT void LinearAlgebra::cgNonConvergenceWarning(arma::uword n_unconverged,
+                                                              arma::uword ncols,
+                                                              arma::uword n,
+                                                              arma::uword max_iter) {
+  if (n_unconverged == 0 || !LinearAlgebra::warn_cg)
+    return;
+  arma::cout << "[WARNING] CG did not converge for " << n_unconverged << "/" << ncols
+             << " column(s) within max_iter=" << max_iter << " at n=" << n
+             << " -- the log-likelihood, gradient and/or prediction using this solve may be "
+                "inaccurate. Consider a larger cg_max_iter (LLIterative's 4th objective field), "
+                "a Nystrom CG preconditioner (LLIterative's 2nd field), or disable this warning "
+                "with LinearAlgebra::set_cg_warning(false) if this is expected."
+             << arma::endl;
+}
 
 LIBKRIGING_EXPORT bool LinearAlgebra::chol_rcond_check = true;
 
@@ -371,6 +394,63 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::woodbury_solve(const arma::mat& U, co
   return DinvB - DinvU * arma::solve(M, U.t() * DinvB, LinearAlgebra::default_solve_opts);
 }
 
+LIBKRIGING_EXPORT LinearAlgebra::WoodburyFactorization::WoodburyFactorization(const arma::mat& U, const arma::vec& D)
+    : m_U(U), m_Dinv(1.0 / D), m_Ut(U.t()), m_DinvU(U.each_col() % m_Dinv) {
+  const arma::mat M = arma::eye<arma::mat>(U.n_cols, U.n_cols) + m_Ut * m_DinvU;  // I_k + U' Dinv U (k x k)
+  m_M_chol_lower = LinearAlgebra::safe_chol_lower(M);
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::solve(const arma::mat& B) const {
+  const arma::mat DinvB = B.each_col() % m_Dinv;  // diag(Dinv) * B        (n x m)
+  const arma::mat y = LinearAlgebra::solve_lower(m_M_chol_lower, m_Ut * DinvB);
+  const arma::mat z = LinearAlgebra::solve_upper(m_M_chol_lower.t(), y);
+  return DinvB - m_DinvU * z;
+}
+
+void LinearAlgebra::WoodburyFactorization::ensure_whiten_factors() const {
+  // O(n*k^2 + k^3) setup for a square factor L of P = D + U U' (L L' = P,
+  // L NOT symmetric) whose inverse applies in O(n*k), never forming an
+  // n x n factor. Write P = D^{1/2} K D^{1/2} with K = I + W W',
+  // W = D^{-1/2} U (n x k). K has a low-rank SYMMETRIC square root (I
+  // commutes, unlike D^{1/2}): thin-QR W = Q S, k x k eig S S' = G Lam G',
+  // then with Phi = Q G (orthonormal columns)
+  //   K^{+-1/2} = I + Phi ( (1+Lam)^{+-1/2} - I ) Phi'.
+  // Take L = D^{1/2} K^{1/2}: L L' = D^{1/2} K D^{1/2} = P exactly. Hence
+  //   L^{-1}  B = K^{-1/2} (D^{-1/2} B)       (whitenL)
+  //   L^{-T} B = D^{-1/2} (K^{-1/2} B)        (whitenLt)
+  // and Rtilde = L^{-1} R L^{-T} is symmetric with
+  //   log det Rtilde = log det R - log det P.
+  if (!m_whiten_Q.is_empty())
+    return;
+  const arma::vec Dinvhalf = arma::sqrt(m_Dinv);       // D^{-1/2}
+  const arma::mat W = m_U.each_col() % Dinvhalf;        // D^{-1/2} U
+  arma::mat Q, S;
+  arma::qr_econ(Q, S, W);
+  arma::vec Lam;
+  arma::mat G;
+  arma::eig_sym(Lam, G, S * S.t());                     // eigenvalues of S S' (>= 0)
+  Lam = arma::clamp(Lam, 0.0, arma::datum::inf);
+  m_whiten_Dinvhalf = Dinvhalf;
+  m_whiten_Q = Q;
+  // K^{-1/2} = I + Q [ G diag(1/sqrt(1+Lam) - 1) G' ] Q'
+  m_whiten_core = G * arma::diagmat(1.0 / arma::sqrt(1.0 + Lam) - 1.0) * G.t();  // k x k
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenL(const arma::mat& B) const {
+  ensure_whiten_factors();
+  arma::mat t = B.each_col() % m_whiten_Dinvhalf;             // D^{-1/2} B
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} (...)
+  return t;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenLt(const arma::mat& B) const {
+  ensure_whiten_factors();
+  arma::mat t = B;
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} B
+  t.each_col() %= m_whiten_Dinvhalf;                          // D^{-1/2} (...)
+  return t;
+}
+
 LIBKRIGING_EXPORT double LinearAlgebra::woodbury_logdet(const arma::mat& U, const arma::vec& D) {
   const arma::vec Dinv = 1.0 / D;
   const arma::mat DinvU = U.each_col() % Dinv;
@@ -384,6 +464,398 @@ LIBKRIGING_EXPORT double LinearAlgebra::woodbury_logdet(const arma::mat& U, cons
 // Solve A*X=B : X = A \ B
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma::mat& B) {
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                             const arma::mat& B,
+                                                             arma::uword max_iter,
+                                                             double tol,
+                                                             const std::function<arma::vec(const arma::vec&)>& Pinv) {
+  const bool preconditioned = static_cast<bool>(Pinv);
+  const arma::uword n = B.n_rows;
+  arma::mat X(n, B.n_cols, arma::fill::zeros);
+
+  // One column's CG solve, factored out so it can be driven from either the
+  // parallel-across-columns loop below or a plain serial loop.
+  auto solve_one_column = [&](arma::uword c) {
+    const arma::vec b = B.col(c);
+    const double bnorm = arma::norm(b);
+    if (bnorm == 0.0)
+      return;  // x=0 already solves A*x=0
+
+    arma::vec x(n, arma::fill::zeros);
+    arma::vec r = b;  // b - A*x0, x0 = 0
+    arma::vec z = preconditioned ? Pinv(r) : r;
+    arma::vec p = z;
+    double rz_old = arma::dot(r, z);
+
+    // GP covariance matrices are typically ill-conditioned (smooth kernels,
+    // many points): the recursively-updated residual (r -= alpha*Ap) drifts
+    // from the true residual under round-off well before max_iter is
+    // reached, and pushing past that point can make x measurably WORSE, not
+    // better (observed empirically: unstable growth after ~2n iterations on
+    // a matern5_2 fit). Periodically recompute the exact residual from
+    // scratch (one extra matvec every `restart_every` iterations) -- a
+    // standard CG robustness fix -- to correct that drift.
+    constexpr arma::uword restart_every = 50;
+
+    for (arma::uword it = 0; it < max_iter; ++it) {
+      const arma::vec Ap = Amul(p);
+      const double pAp = arma::dot(p, Ap);
+      if (pAp <= 0.0)
+        break;  // breakdown guard: shouldn't happen for a genuinely SPD A
+      const double alpha = rz_old / pAp;
+      x += alpha * p;
+
+      if ((it + 1) % restart_every == 0) {
+        // Full restart: the just-recomputed residual reflects the TRUE
+        // state at x, so the previous rz_old (from the drifted residual) is
+        // no longer a meaningful reference for the Fletcher-Reeves ratio --
+        // blending it into beta (as the non-restart branch does) sends the
+        // search direction off in a bad direction instead of correcting it.
+        // Reset p = z, i.e. restart CG fresh from the current x.
+        r = b - Amul(x);
+        if (arma::norm(r) / bnorm < tol)
+          break;
+        z = preconditioned ? Pinv(r) : r;
+        rz_old = arma::dot(r, z);
+        p = z;
+        continue;
+      }
+
+      r -= alpha * Ap;
+      const double rnorm = arma::norm(r);
+      if (rnorm / bnorm < tol)
+        break;
+      z = preconditioned ? Pinv(r) : r;
+      const double rz_new = arma::dot(r, z);
+      p = z + (rz_new / rz_old) * p;
+      rz_old = rz_new;
+    }
+    X.col(c) = x;
+  };
+
+  // Each column of B is an independent linear solve against the SAME A
+  // (accessed only via Amul/Pinv, never mutated) -- for B.n_cols large
+  // enough (e.g. LLIterative's nprobe right-hand sides, previously solved
+  // one at a time here), that's an embarrassingly parallel loop across
+  // columns, distinct from and complementary to whatever row-level
+  // parallelism Amul/Pinv may already do internally for a SINGLE matvec
+  // (e.g. Kriging::_logLikelihoodIterative's Rmul). Those guard their own
+  // internal `#pragma omp parallel for` with `!omp_in_parallel()` so they
+  // fall back to serial when already invoked from here, avoiding nested
+  // oversubscription instead of relying on the OpenMP runtime's (not
+  // universally the same) default nested-parallelism behavior.
+#ifdef _OPENMP
+  if (B.n_cols >= 4) {
+    // Unlike row-level parallelism within a single matvec (capped low,
+    // get_optimal_threads(2), to stay conservative when many matvecs each
+    // pay thread-launch overhead), one thread per column here does real,
+    // substantial, independent work (an entire CG solve, not a single
+    // reduction step) -- undersubscribing this is pure waste. Cap at
+    // B.n_cols (no point starting more threads than there are columns).
+    const int optimal_threads = get_optimal_threads(static_cast<int>(B.n_cols));
+#pragma omp parallel for schedule(dynamic, 1) num_threads(optimal_threads) if (B.n_cols >= 4)
+    for (arma::sword sc = 0; sc < static_cast<arma::sword>(B.n_cols); ++sc)
+      solve_one_column(static_cast<arma::uword>(sc));
+  } else {
+#endif
+    for (arma::uword c = 0; c < B.n_cols; ++c)
+      solve_one_column(c);
+#ifdef _OPENMP
+  }
+#endif
+  return X;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::rademacherProbes(arma::uword n, arma::uword nprobe, unsigned seed) {
+  arma::arma_rng::set_seed(static_cast<arma::arma_rng::seed_type>(seed));
+  arma::mat probes(n, nprobe, arma::fill::none);
+  probes.randu();  // in [0,1)
+  probes.transform([](double v) { return v < 0.5 ? -1.0 : 1.0; });
+  return probes;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDet(const std::function<arma::vec(const arma::vec&)>& Amul,
+                                                         arma::uword n,
+                                                         arma::uword nprobe,
+                                                         arma::uword lanczos_steps,
+                                                         const arma::mat& probes) {
+  lanczos_steps = std::min(lanczos_steps, n);
+  double total = 0.0;
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    const double znorm = arma::norm(probes.col(p));
+    if (znorm == 0.0)
+      continue;
+
+    // m-step Lanczos tridiagonalization of A, starting from probes.col(p)/znorm,
+    // with full reorthogonalization (lanczos_steps stays modest relative to
+    // n, so the extra O(m^2*n) cost is cheap next to the O(m*n^2) matvecs).
+    arma::mat V(n, lanczos_steps, arma::fill::none);
+    arma::vec alpha(lanczos_steps, arma::fill::zeros);
+    arma::vec beta(lanczos_steps, arma::fill::zeros);  // beta(j) links v_{j+1} and v_j, beta(0) unused
+
+    V.col(0) = probes.col(p) / znorm;
+    arma::vec v_prev(n, arma::fill::zeros);
+    double beta_prev = 0.0;
+    arma::uword m_eff = lanczos_steps;
+    for (arma::uword j = 0; j < lanczos_steps; ++j) {
+      arma::vec w = Amul(V.col(j)) - beta_prev * v_prev;
+      alpha(j) = arma::dot(w, V.col(j));
+      w -= alpha(j) * V.col(j);
+      // full reorthogonalization against all previous Lanczos vectors
+      for (arma::uword i = 0; i <= j; ++i)
+        w -= arma::dot(w, V.col(i)) * V.col(i);
+      const double bj = arma::norm(w);
+      if (j + 1 == lanczos_steps)
+        break;
+      if (bj < 1e-12) {
+        m_eff = j + 1;  // invariant subspace found: A*V(:,0:j) stays within span(V(:,0:j))
+        break;
+      }
+      beta(j) = bj;
+      V.col(j + 1) = w / bj;
+      v_prev = V.col(j);
+      beta_prev = bj;
+    }
+
+    arma::mat T(m_eff, m_eff, arma::fill::zeros);
+    for (arma::uword j = 0; j < m_eff; ++j)
+      T(j, j) = alpha(j);
+    for (arma::uword j = 0; j + 1 < m_eff; ++j) {
+      T(j, j + 1) = beta(j);
+      T(j + 1, j) = beta(j);
+    }
+
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, T);
+
+    double quad = 0.0;
+    for (arma::uword j = 0; j < m_eff; ++j) {
+      const double lambda = std::max(eigval(j), LinearAlgebra::num_nugget);
+      quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
+    }
+    total += quad;  // the leading znorm^2 == n for exact Rademacher entries is folded into the (n/nprobe) below
+  }
+  return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
+LIBKRIGING_EXPORT double LinearAlgebra::stochasticLogDetBatched(
+    const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+    arma::uword n,
+    arma::uword nprobe,
+    arma::uword lanczos_steps,
+    const arma::mat& probes) {
+  // Same estimator as stochasticLogDet above, but every probe's Lanczos
+  // recurrence is advanced IN LOCKSTEP: one batched R*[v_1|...|v_nprobe]
+  // matvec per step instead of nprobe separate ones. The point is the same
+  // as conjugateGradient's column batching -- one device launch (+ one
+  // upload) per step instead of nprobe, so kernel-launch/host-sync overhead
+  // is amortized -- and it lets the SLQ log-determinant run on the GPU at
+  // all (the scalar Amul above only ever ran on the CPU). Bit-for-bit
+  // identical to the scalar version up to the matvec backend's own
+  // rounding.
+  lanczos_steps = std::min(lanczos_steps, n);
+
+  std::vector<arma::mat> V(nprobe);
+  arma::mat alpha(lanczos_steps, nprobe, arma::fill::zeros);
+  arma::mat beta(lanczos_steps, nprobe, arma::fill::zeros);
+  arma::mat v_prev(n, nprobe, arma::fill::zeros);
+  arma::vec beta_prev(nprobe, arma::fill::zeros);
+  arma::vec znorm(nprobe, arma::fill::zeros);
+  arma::uvec m_eff(nprobe);
+  m_eff.fill(lanczos_steps);
+  // iterating(p): still advancing probe p's Lanczos (false once znorm==0 or
+  // an invariant subspace is hit). A non-iterating, non-zero-norm probe is
+  // still accumulated below with its m_eff(p).
+  std::vector<char> iterating(nprobe, 1);
+
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    znorm(p) = arma::norm(probes.col(p));
+    if (znorm(p) == 0.0) {
+      iterating[p] = 0;
+      continue;
+    }
+    V[p].set_size(n, lanczos_steps);
+    V[p].col(0) = probes.col(p) / znorm(p);
+  }
+
+  for (arma::uword j = 0; j < lanczos_steps; ++j) {
+    arma::mat Vj(n, nprobe, arma::fill::zeros);
+    bool any = false;
+    for (arma::uword p = 0; p < nprobe; ++p)
+      if (iterating[p]) {
+        Vj.col(p) = V[p].col(j);
+        any = true;
+      }
+    if (!any)
+      break;
+
+    const arma::mat W = AmulBatched(Vj);  // R * Vj, all probes in one launch
+
+    for (arma::uword p = 0; p < nprobe; ++p) {
+      if (!iterating[p])
+        continue;
+      arma::vec w = W.col(p) - beta_prev(p) * v_prev.col(p);
+      alpha(j, p) = arma::dot(w, V[p].col(j));
+      w -= alpha(j, p) * V[p].col(j);
+      for (arma::uword i = 0; i <= j; ++i)
+        w -= arma::dot(w, V[p].col(i)) * V[p].col(i);  // full reorthogonalization
+      const double bj = arma::norm(w);
+      if (j + 1 == lanczos_steps)
+        continue;  // last step: alpha(j) computed, no further recurrence
+      if (bj < 1e-12) {
+        m_eff(p) = j + 1;  // invariant subspace
+        iterating[p] = 0;
+        continue;
+      }
+      beta(j, p) = bj;
+      V[p].col(j + 1) = w / bj;
+      v_prev.col(p) = V[p].col(j);
+      beta_prev(p) = bj;
+    }
+  }
+
+  double total = 0.0;
+  for (arma::uword p = 0; p < nprobe; ++p) {
+    if (znorm(p) == 0.0)
+      continue;
+    const arma::uword me = m_eff(p);
+    arma::mat T(me, me, arma::fill::zeros);
+    for (arma::uword j = 0; j < me; ++j)
+      T(j, j) = alpha(j, p);
+    for (arma::uword j = 0; j + 1 < me; ++j) {
+      T(j, j + 1) = beta(j, p);
+      T(j + 1, j) = beta(j, p);
+    }
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, T);
+    double quad = 0.0;
+    for (arma::uword j = 0; j < me; ++j) {
+      const double lambda = std::max(eigval(j), LinearAlgebra::num_nugget);
+      quad += eigvec(0, j) * eigvec(0, j) * std::log(lambda);
+    }
+    total += quad;
+  }
+  return (static_cast<double>(n) / static_cast<double>(nprobe)) * total;
+}
+
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
+    const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+    const arma::mat& B,
+    arma::uword max_iter,
+    double tol,
+    const std::function<arma::mat(const arma::mat&)>& PinvBatched,
+    arma::uword* n_unconverged_out) {
+  // Block conjugate gradient with a SHARED matvec: every right-hand side
+  // (column of B) is still an independent Krylov solve -- no block-CG
+  // subspace sharing -- but all still-active columns are advanced in lockstep
+  // so AmulBatched / PinvBatched are each invoked ONCE per iteration on the
+  // whole n x ncols block instead of once per column. For LLIterative's
+  // matrix-free R*V (which recomputes every transcendental-heavy R_ij on the
+  // fly) that turns ncols redundant covariance sweeps per iteration into one.
+  // Convergence contract matches LinearAlgebra::conjugateGradient: per
+  // column, stop once norm(A*x-b)/norm(b) < tol or after max_iter iterations;
+  // same periodic fresh exact-residual restart to correct round-off drift.
+  const bool preconditioned = static_cast<bool>(PinvBatched);
+  const arma::uword n = B.n_rows;
+  const arma::uword ncols = B.n_cols;
+  arma::mat Xc(n, ncols, arma::fill::zeros);
+  if (ncols == 0)
+    return Xc;
+
+  arma::mat R = B;                                     // residual b - A*x0, x0 = 0
+  arma::mat Z = preconditioned ? PinvBatched(R) : R;   // z = M^-1 r
+  arma::mat P = Z;
+  const arma::rowvec bnorm = arma::sqrt(arma::sum(arma::square(B), 0));
+  arma::rowvec rz_old(ncols, arma::fill::zeros);
+  for (arma::uword c = 0; c < ncols; ++c)
+    rz_old(c) = arma::dot(R.col(c), Z.col(c));
+
+  std::vector<char> active(ncols, 1);
+  for (arma::uword c = 0; c < ncols; ++c)
+    if (bnorm(c) == 0.0)
+      active[c] = 0;  // x = 0 already solves A*x = 0
+
+  constexpr arma::uword restart_every = 50;
+  arma::rowvec alpha_it(ncols, arma::fill::zeros);  // this iteration's step lengths, pass 1 -> pass 2
+
+  // TEMP DIAGNOSTIC (LK_DEBUG_CG_ITERS=1): report how many of max_iter this
+  // call actually used, to check whether CG is converging early or running
+  // to the 2n cap as n grows -- see bench/gpu n=4000->8000 scaling dig.
+  static const bool debug_cg_iters = std::getenv("LK_DEBUG_CG_ITERS") != nullptr;
+  arma::uword it_used = 0;
+
+  for (arma::uword it = 0; it < max_iter; ++it) {
+    bool any_active = false;
+    for (arma::uword c = 0; c < ncols; ++c)
+      any_active = any_active || active[c];
+    if (!any_active)
+      break;
+    it_used = it + 1;
+
+    const arma::mat AP = AmulBatched(P);  // one shared matvec for all columns
+
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      const double pAp = arma::dot(P.col(c), AP.col(c));
+      if (pAp <= 0.0) {  // SPD breakdown guard: shouldn't happen for genuinely SPD A
+        active[c] = 0;
+        continue;
+      }
+      alpha_it(c) = rz_old(c) / pAp;
+      Xc.col(c) += alpha_it(c) * P.col(c);
+    }
+
+    const bool do_restart = ((it + 1) % restart_every == 0);
+    const arma::mat AX = do_restart ? AmulBatched(Xc) : arma::mat();
+
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      if (do_restart)
+        R.col(c) = B.col(c) - AX.col(c);  // fresh exact residual on the updated iterate
+      else
+        R.col(c) -= alpha_it(c) * AP.col(c);
+      if (arma::norm(R.col(c)) / bnorm(c) < tol)
+        active[c] = 0;
+    }
+
+    if (preconditioned)
+      Z = PinvBatched(R);
+    for (arma::uword c = 0; c < ncols; ++c) {
+      if (!active[c])
+        continue;
+      const arma::vec z_c = preconditioned ? Z.col(c) : R.col(c);
+      const double rz_new = arma::dot(R.col(c), z_c);
+      if (do_restart)
+        P.col(c) = z_c;  // plain restart: p = z, no Fletcher-Reeves blend
+      else
+        P.col(c) = z_c + (rz_new / rz_old(c)) * P.col(c);
+      rz_old(c) = rz_new;
+    }
+  }
+  if (debug_cg_iters)
+    std::fprintf(stderr, "[LK_DEBUG_CG_ITERS] n=%zu ncols=%zu max_iter=%zu used=%zu\n",
+                 static_cast<size_t>(n), static_cast<size_t>(ncols),
+                 static_cast<size_t>(max_iter), static_cast<size_t>(it_used));
+
+  // A column left active when the loop ends (as opposed to converging to
+  // tol, or being deactivated by the SPD breakdown guard above) exhausted
+  // max_iter without meeting tol -- its entry in Xc is whatever CG had
+  // reached at that point, not a converged solve.
+  arma::uword n_unconverged = 0;
+  for (arma::uword c = 0; c < ncols; ++c)
+    if (active[c])
+      ++n_unconverged;
+  if (n_unconverged_out != nullptr)
+    *n_unconverged_out = n_unconverged;
+  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, ncols, n, max_iter);
+
+  return Xc;
 }
 
 // Solve X*A=B : X = B / A

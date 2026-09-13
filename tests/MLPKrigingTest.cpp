@@ -104,6 +104,47 @@ static void test_mlp_kriging_basic() {
 }
 
 // ==========================================================================
+//  Test 1b: predictIterative matches predict() (matrix-free CG vs Cholesky)
+// ==========================================================================
+static void test_predictIterative() {
+  std::cout << "=== Test 1b: predictIterative matches predict() ===" << std::endl;
+
+  arma::vec X_train = arma::linspace(0.01, 0.99, 10);
+  arma::mat X_mat(X_train.n_elem, 1);
+  X_mat.col(0) = X_train;
+  arma::vec y(X_train.n_elem);
+  for (arma::uword i = 0; i < X_train.n_elem; ++i)
+    y(i) = f1d(X_train(i));
+
+  // Seed theta at a moderate value to avoid the free-fit large-theta/
+  // near-singular-R degeneracy noted in WarpKrigingTest.cpp's predictIterative
+  // test (same underlying WarpKriging fit machinery, MLPKriging just wraps
+  // it with an MLPJoint warp).
+  MLPKriging model({16, 8}, 2, "selu", "gauss");
+  MLPKriging::Parameters params;
+  params.theta = arma::vec{0.3, 0.3};  // size d_out=2
+  model.fit(y, X_mat, Trend::RegressionModel::Constant, true, "Adam", "LL", params);
+
+  arma::vec x_pred = arma::linspace(0.01, 0.99, 20);
+  arma::mat xp(20, 1);
+  xp.col(0) = x_pred;
+
+  auto [mean_ex, stdev_ex, _cov, _md, _sd] = model.predict(xp, true, false);
+  // Generous iteration budget so CG actually converges (predictIterative's formula
+  // correctness, not the default budget's accuracy, is what this checks).
+  auto [mean_cg, stdev_cg] = model.predictIterative(xp, true, /*max_iter=*/2000, /*tol=*/1e-12);
+
+  double mean_err = arma::abs(mean_cg - mean_ex).max();
+  double stdev_err = arma::abs(stdev_cg - stdev_ex).max();
+  std::cout << "  max |mean diff|  = " << mean_err << std::endl;
+  std::cout << "  max |stdev diff| = " << stdev_err << std::endl;
+  assert(mean_err < 1e-4 * arma::stddev(y));
+  assert(stdev_err < 1e-4 * arma::stddev(y));
+
+  std::cout << "  PASSED\n" << std::endl;
+}
+
+// ==========================================================================
 //  Test 2: Derivative check vs finite differences
 // ==========================================================================
 static void check_deriv_vs_fd(const MLPKriging& model,
@@ -203,6 +244,7 @@ static void test_save_load_dispatch() {
 int main() {
   try {
     test_mlp_kriging_basic();
+    test_predictIterative();
     test_predict_derivative();
     test_save_load_dispatch();
 

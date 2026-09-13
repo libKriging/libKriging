@@ -119,8 +119,8 @@ pred <- predict(k, Xnew, stdev = TRUE)
 [llnystrom_vs_cholesky.ipynb](llnystrom_vs_cholesky.ipynb) for a worked,
 executed notebook: the math above illustrated on a running example, with
 rank-$k$ convergence/accuracy/timing plots and references.
-[Scalability.md](Scalability.md) for how this compares to `LLVecchia`
-and `NestedKriging`, and how to pick between them.
+[Scalability.md](Scalability.md) for how this compares to `LLVecchia`,
+`NestedKriging` and `predictIterative`, and how to pick between them.
 
 ## References
 

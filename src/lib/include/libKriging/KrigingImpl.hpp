@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -205,6 +206,44 @@ class KrigingImpl {
                                                                                  double var_scale,
                                                                                  const FeatureMap& phi = {},
                                                                                  const FeatureJacobian& jac = {}) const;
+
+  /// Materialize the dense n x n correlation matrix R (and, when dR !=
+  /// nullptr, the d elementwise theta-derivative blocks dR[k] = dR/dtheta_k)
+  /// for a SEPARABLE kernel Cov(dx,theta) = exp(-sum_k s_k(|dx_k|/theta_k)) --
+  /// gauss / exp / matern3_2 / matern5_2 -- with the per-pair kernel formula
+  /// inlined (no std::function indirection) and the symmetric build
+  /// OpenMP-parallelized. Shared by `Kriging::_logLikelihoodIterative` and
+  /// `predictIterative_impl` so both get a BLAS-3 R*V fast path instead of a
+  /// fresh matrix-free covariance sweep per CG iteration / Lanczos step.
+  /// Returns false (R/dR left untouched) for any other covType or d > 64,
+  /// leaving the caller on its matrix-free fallback. dR[k] = R % H_k with
+  /// H_k the same (nonnegative) d(ln Cov)/d(theta_k) matrix as
+  /// Covariance::DlnCovDtheta_*.
+  static bool build_separable_cov(const std::string& covType,
+                                  const arma::mat& Xt,     // d x n, observations in columns
+                                  const arma::vec& theta,  // d
+                                  arma::mat& R,
+                                  std::vector<arma::mat>* dR = nullptr);
+
+  /// Unified matrix-free conjugate-gradient predict, shared by any variant
+  /// with no per-point noise channel (plain correlation matrix, diag=1) --
+  /// callers are responsible for checking that precondition (nugget/noise
+  /// classes don't call this). Same mean/stdev formulas as `predict_impl`
+  /// (universal-kriging mean, GLS-corrected variance), just solved via
+  /// `LinearAlgebra::conjugateGradient` instead of the stored Cholesky
+  /// factor: needs only m_X/m_y/m_F/m_theta/m_beta/m_sigma2 (O(n) storage),
+  /// at the cost of O(n^2 * iters) compute per solve instead of a single
+  /// O(n^2) triangular solve. See `Kriging::predictIterative` for the parameter
+  /// docs (max_iter/tol/use_nystrom_precond/precond_rank); `phi` is the same
+  /// optional feature map as `predict_impl` (pass {} for identity -- m_X
+  /// must already store Φ(X_normalized) when phi is set).
+  std::tuple<arma::vec, arma::vec> predictIterative_impl(const arma::mat& X_n,
+                                                         bool return_stdev,
+                                                         arma::uword max_iter,
+                                                         double tol,
+                                                         bool use_nystrom_precond,
+                                                         arma::uword precond_rank,
+                                                         const FeatureMap& phi = {}) const;
 
   /// Unified simulate scaffolding shared by the three variants.  Builds R_nn,
   /// R_on, draws y_n ~ N(yhat_n, σ² · Sigma/Sigma_divisor), and (when

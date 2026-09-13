@@ -50,6 +50,13 @@ class PyKriging {
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
 
+  std::tuple<py::array_t<double>, py::array_t<double>> predictIterative(const py::array_t<double>& X_n,
+                                                                        bool return_stdev,
+                                                                        int max_iter,
+                                                                        double tol,
+                                                                        bool use_nystrom_precond,
+                                                                        int precond_rank);
+
   // Subset-of-data pre-fit reduction: k-means (or random) subset of n_max
   // rows of X, returned as 0-based row-indices to keep.
   static py::array_t<int> subsetOfData(const py::array_t<double>& X, int n_max, const std::string& method, int seed);
@@ -85,6 +92,14 @@ class PyKriging {
                                                                                 const bool return_grad,
                                                                                 const bool want_hess = false);
 
+  // Matrix-free CG + SLQ log-determinant concentrated log-likelihood
+  // (objective="LLIterative(m)"). Unlike logLikelihoodFun (which always
+  // evaluates the EXACT dense-Cholesky objective), this is the O(n^2)
+  // iterative estimate -- only valid on a model fitted with an LLIterative
+  // objective.
+  std::tuple<double, py::array_t<double>> logLikelihoodIterativeFun(const py::array_t<double>& theta,
+                                                                    const bool return_grad);
+
   std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
 
   double logLikelihood();
@@ -99,6 +114,10 @@ class PyKriging {
   std::string optim();
   std::string objective();
   int nystrom_rank();
+  int iterative_nprobe();
+  bool is_iterative_light();
+  bool iterative_cg_converged();
+  int iterative_cg_n_unconverged();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

@@ -16,6 +16,14 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
+#include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+#include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
+#include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
+#include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
+
+#include <cstdlib>
+#include <memory>
+#include <string>
 #include <tuple>
 #include <utility>
 
@@ -297,6 +305,330 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
                          std::move(Sigma_n),
                          std::move(Dyhat_n),
                          std::move(Dysd2_n / (2 * arma::sqrt(ysd2_n) * arma::mat(1, d_input, arma::fill::ones))));
+}
+
+bool KrigingImpl::build_separable_cov(const std::string& covType,
+                                      const arma::mat& Xt,
+                                      const arma::vec& theta,
+                                      arma::mat& R,
+                                      std::vector<arma::mat>* dR) {
+  const bool is_gauss = (covType == "gauss");
+  const bool is_exp = (covType == "exp");
+  const bool is_m32 = (covType == "matern3_2");
+  const bool is_m52 = (covType == "matern5_2");
+  if (!(is_gauss || is_exp || is_m32 || is_m52))
+    return false;
+
+  constexpr arma::uword kMaxD = 64;  // per-pair stack scratch; ARD dims never approach this
+  const arma::uword d = Xt.n_rows;
+  const arma::uword n = Xt.n_cols;
+  if (d == 0 || d > kMaxD)
+    return false;
+
+  const double SQ3 = std::sqrt(3.0);
+  const double SQ5 = std::sqrt(5.0);
+  const double* Xtm = Xt.memptr();
+  const double* th = theta.memptr();
+
+  R.set_size(n, n);
+  if (dR != nullptr)
+    dR->assign(d, arma::mat(n, n, arma::fill::none));
+
+  auto s_of = [&](double uk) -> double {
+    if (is_gauss)
+      return 0.5 * uk * uk;
+    if (is_exp)
+      return uk;
+    if (is_m32) {
+      const double dd = SQ3 * uk;
+      return dd - std::log1p(dd);
+    }
+    const double dd = SQ5 * uk;  // matern5_2
+    return dd - std::log1p(dd + dd * dd / 3.0);
+  };
+  auto h_of = [&](double uk, double thk) -> double {  // d(ln Cov)/d(theta_k), >= 0
+    if (is_gauss)
+      return uk * uk / thk;
+    if (is_exp)
+      return uk / thk;
+    if (is_m32) {
+      const double dd = SQ3 * uk;
+      return (dd * dd / (1.0 + dd)) / thk;
+    }
+    const double dd = SQ5 * uk;  // matern5_2
+    const double a = 1.0 + dd;
+    const double b = dd * dd / 3.0;
+    return (a * b / (a + b)) / thk;
+  };
+
+  // Column j is written entirely by the thread that owns it (both R(i,j) for
+  // i>j and the mirrored R(j,i)); disjoint threads touch disjoint pairs, so
+  // the symmetric double-write is race-free without per-thread accumulators.
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 16) if (n >= 128)
+#endif
+  for (arma::sword sj = 0; sj < static_cast<arma::sword>(n); ++sj) {
+    const arma::uword j = static_cast<arma::uword>(sj);
+    double u[kMaxD];
+    for (arma::uword i = j + 1; i < n; ++i) {
+      double S = 0.0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double uk = std::abs(Xtm[k + i * d] - Xtm[k + j * d]) / th[k];
+        u[k] = uk;
+        S += s_of(uk);
+      }
+      const double rij = std::exp(-S);
+      R.at(i, j) = rij;
+      R.at(j, i) = rij;
+      if (dR != nullptr) {
+        for (arma::uword k = 0; k < d; ++k) {
+          const double v = rij * h_of(u[k], th[k]);
+          (*dR)[k].at(i, j) = v;
+          (*dR)[k].at(j, i) = v;
+        }
+      }
+    }
+    R.at(j, j) = 1.0;
+    if (dR != nullptr)
+      for (arma::uword k = 0; k < d; ++k)
+        (*dR)[k].at(j, j) = 0.0;  // dR/dtheta_k vanishes at dx = 0
+  }
+  return true;
+}
+
+std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::mat& X_n,
+                                                                    bool return_stdev,
+                                                                    arma::uword max_iter,
+                                                                    double tol,
+                                                                    bool use_nystrom_precond,
+                                                                    arma::uword precond_rank,
+                                                                    const FeatureMap& phi) const {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  if (!phi && X_n.n_cols != d)
+    throw std::invalid_argument("predictIterative: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+
+  if (max_iter == 0)
+    // n is CG's exact-arithmetic convergence bound, but GP covariance
+    // matrices are commonly ill-conditioned enough (smooth kernels, many
+    // points) that round-off keeps the true error shrinking well past that
+    // point in practice (see LinearAlgebra::conjugateGradient's periodic
+    // residual-recompute comment) -- 2n is a more realistic default budget.
+    max_iter = 2 * n;
+
+  // RmulBatched applies R to a WHOLE block V (n x k) at once: R(i,j) =
+  // _Cov(X_i - X_j, theta) for i != j, 1 on the diagonal (correlation
+  // matrix, no noise channel). m_X is already in feature space when phi is
+  // set (same convention as predict_impl), so this needs no phi of its own.
+  // Matrix-free fallback: O(n) memory (R never materialized), O(n^2) time
+  // per call, batched the same way as Kriging::_logLikelihoodIterative's
+  // RmulBatched (every transcendental Cov() evaluated once, applied to all
+  // k columns -- shared across the n_n prediction points' stdev solve
+  // instead of paying k separate covariance sweeps). Superseded by the
+  // dense fast path below when it applies.
+  const arma::mat Xt = m_X.t();  // d x n, contiguous columns for cache-friendly access
+  const arma::vec& theta = m_theta;
+  const auto& cov = _Cov;
+  const double* Xt_mem = Xt.memptr();
+  arma::mat R_dense;  // populated below, after the GPU-dispatch block, iff `dense`
+  bool dense = false;
+  auto RmulBatched = [Xt_mem, &theta, &cov, n, d, &dense, &R_dense](const arma::mat& V) -> arma::mat {
+    if (dense)
+      return R_dense * V;  // BLAS-3, R materialized once below
+    const arma::uword k = V.n_cols;
+    arma::mat out(V);  // diag of R is 1
+#ifdef _OPENMP
+    // Skip the inner parallel region when already running inside one:
+    // avoids nested-parallelism oversubscription without depending on the
+    // OpenMP runtime's (implementation-defined) nested-parallel behavior.
+    if (n >= 32 && !omp_in_parallel()) {
+      const int optimal_threads = get_optimal_threads(omp_get_max_threads());
+      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
+                                        arma::mat(n, k, arma::fill::zeros));
+#pragma omp parallel num_threads(optimal_threads)
+      {
+        arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
+        arma::vec dx(d, arma::fill::none);
+        double* dx_mem = dx.memptr();
+#pragma omp for schedule(static, 1)
+        for (arma::sword si = 0; si < static_cast<arma::sword>(n); ++si) {
+          const arma::uword ii = static_cast<arma::uword>(si);
+          for (arma::uword j = ii + 1; j < n; ++j) {
+            for (arma::uword q = 0; q < d; ++q)
+              dx_mem[q] = Xt_mem[q + ii * d] - Xt_mem[q + j * d];
+            const double c = cov(dx, theta);
+            for (arma::uword col = 0; col < k; ++col) {
+              local(ii, col) += c * V(j, col);
+              local(j, col) += c * V(ii, col);
+            }
+          }
+        }
+      }
+      for (const auto& lo : thread_out)
+        out += lo;
+    } else {
+#endif
+      arma::vec dx(d, arma::fill::none);
+      double* dx_mem = dx.memptr();
+      for (arma::uword i = 0; i < n; ++i) {
+        for (arma::uword j = i + 1; j < n; ++j) {
+          for (arma::uword q = 0; q < d; ++q)
+            dx_mem[q] = Xt_mem[q + i * d] - Xt_mem[q + j * d];
+          const double c = cov(dx, theta);
+          for (arma::uword col = 0; col < k; ++col) {
+            out(i, col) += c * V(j, col);
+            out(j, col) += c * V(i, col);
+          }
+        }
+      }
+#ifdef _OPENMP
+    }
+#endif
+    return out;
+  };
+
+  // Optional Nystrom preconditioner: a rank-precond_rank factor of R at the
+  // model's own (fixed, already-fitted) theta -- unlike the LLNystrom
+  // objective's landmarks, no cross-theta smoothness constraint applies
+  // here, so this can legitimately be built exactly at the theta being used
+  // for prediction rather than at a generic reference. PinvBatched is left
+  // empty (== plain CG) when disabled, matching the prior behavior exactly.
+  std::unique_ptr<LinearAlgebra::WoodburyFactorization> woodbury_pc;
+  std::function<arma::mat(const arma::mat&)> PinvBatched;
+  if (use_nystrom_precond) {
+    arma::vec diag_resid;
+    arma::mat U_pc = LinearAlgebra::nystromFactor(
+        &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, ones, std::min(precond_rank, n), 1e-12);
+    arma::vec D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
+    // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
+    // for every CG iteration's PinvBatched(V) call (O(n*k + k^2) per column)
+    // -- calling LinearAlgebra::woodbury_solve fresh per apply would redo
+    // that factorization every iteration, making the "cheap" preconditioner
+    // apply as expensive as the O(n^2) matvec it's meant to help avoid.
+    woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
+    PinvBatched = [&woodbury_pc](const arma::mat& V) -> arma::mat { return woodbury_pc->solve(V); };
+  }
+
+  // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON or
+  // -DENABLE_HIP_ITERATIVE=ON, a device is available at runtime, no Nystrom
+  // preconditioner is in play (neither GPU path implements it yet), and the
+  // kernel has a device-side implementation (see CudaLinearAlgebraKernel.cu
+  // / HipLinearAlgebraKernel.hip.cpp). CUDA is tried first when both are
+  // compiled in. Falls back to the CPU RmulBatched-based
+  // LinearAlgebra::conjugateGradientBatched otherwise.
+  // GPU dispatch as a backend-agnostic std::function (see the same pattern
+  // in Kriging::_logLikelihoodIterative). Empty -> CPU fallback.
+  std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;
+#define LK_PRED_GPU_BIND(NS)                                                                                    \
+  gpuCgSolve = [&](const arma::mat& B, double solve_tol) {                                                      \
+    return woodbury_pc ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),  \
+                                               woodbury_pc->Dinv(), woodbury_pc->McholLower())                  \
+                       : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);                   \
+  }
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraCuda);
+#endif
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+  if (!gpuCgSolve && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraHip);
+#endif
+#ifdef LIBKRIGING_USE_SYCL_ITERATIVE
+  if (!gpuCgSolve && LinearAlgebraSycl::enabled() && LinearAlgebraSycl::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraSycl);
+#endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  if (!gpuCgSolve && LinearAlgebraMetal::enabled() && LinearAlgebraMetal::supports(m_covType))
+    LK_PRED_GPU_BIND(LinearAlgebraMetal);
+#endif
+#undef LK_PRED_GPU_BIND
+
+  // Materialize the dense fast-path R (see the R_dense/dense declarations
+  // above) when the CPU path will actually run the solves -- skipped when a
+  // GPU backend is bound (it has its own device matvecs). No gradient is
+  // ever needed here, so unlike _logLikelihoodIterative this never
+  // materializes the dR/dtheta_k blocks.
+  if (!gpuCgSolve) {
+    std::size_t budget_mb = 6144;
+    if (const char* e = std::getenv("LK_ITERATIVE_DENSE_MAX_MB")) {
+      try {
+        budget_mb = static_cast<std::size_t>(std::stoull(e));
+      } catch (...) { /* keep default */
+      }
+    }
+    const double need_mb = static_cast<double>(n) * static_cast<double>(n) * 8.0 / (1024.0 * 1024.0);
+    if (budget_mb > 0 && need_mb <= static_cast<double>(budget_mb))
+      dense = build_separable_cov(m_covType, Xt, theta, R_dense, nullptr);
+  }
+
+  auto cgSolve = [&](const arma::mat& B, double solve_tol) -> arma::mat {
+    if (gpuCgSolve)
+      return gpuCgSolve(B, solve_tol);
+    return LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, solve_tol, PinvBatched);
+  };
+
+  // The posterior MEAN solve gets the caller's full `tol`. The posterior
+  // VARIANCE only needs quad = sum(R_on % R^-1 R_on) to a few digits (its
+  // error in the returned stdev is ~ sqrt of the solve's relative
+  // residual), so its solves use sqrt(tol) -- roughly halves their CG
+  // iteration count, which is the whole cost of return_stdev=True (one
+  // solve per prediction point). Never tighter than `tol` itself.
+  const double stdev_tol = std::max(std::sqrt(std::max(tol, 0.0)), tol);
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  arma::mat F_n;
+  if (phi) {
+    arma::mat Xn_n_feat = phi(Xn_n);  // n_n × d
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n_feat);
+    Xn_n = trans(Xn_n_feat);  // d × n_n (phi-space from here on)
+  } else {
+    F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+    Xn_n = trans(Xn_n);  // d × n_n
+  }
+  const arma::uword n_n = X_n.n_rows;
+
+  // One CG solve, reused for every prediction point's mean.
+  const arma::vec resid = m_y - m_F * m_beta;
+  const arma::mat w = cgSolve(resid, tol);
+
+  arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
+  LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n, m_theta, _Cov, 1.0);
+
+  arma::vec mean = F_n * m_beta + R_on.t() * w.col(0);
+  mean = mean * m_scaleY + m_centerY;
+
+  arma::vec stdev;
+  if (return_stdev) {
+    // One CG solve PER prediction point (R_on's columns don't share a
+    // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in. Solved to
+    // the looser stdev_tol (see above).
+    const arma::mat V = cgSolve(R_on, stdev_tol);
+    const arma::vec quad = arma::sum(R_on % V, 0).t();
+
+    arma::vec gls_correction(n_n, arma::fill::zeros);
+    if (m_F.n_cols > 0) {
+      // GLS correction for the trend coefficients' own estimation
+      // uncertainty -- same u^T(F^T R^-1 F)^-1 u term predict_impl computes
+      // via m_circ/Ecirc_n, here via one extra shared CG solve (R^-1 F,
+      // m_F.n_cols right-hand sides) plus O(n_n * p^2) small dense linear
+      // algebra (p = m_F.n_cols). Without it, stdev reduces to the
+      // simple-kriging formula (correct only when the trend is known
+      // rather than estimated, i.e. regmodel == "none") and understates
+      // the prediction uncertainty otherwise.
+      const arma::mat W_F = cgSolve(m_F, stdev_tol);
+      const arma::mat FtRinvF = m_F.t() * W_F;
+      const arma::mat E = F_n - R_on.t() * W_F;
+      const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
+      gls_correction = arma::sum(E.t() % correction_rhs, 0).t();
+    }
+
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad + gls_correction), 0.0, arma::datum::inf));
+    stdev *= m_scaleY;
+  }
+  return {mean, stdev};
 }
 
 arma::mat KrigingImpl::simulate_impl(int nsim,
