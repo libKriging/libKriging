@@ -82,6 +82,10 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,1)"));  // multiplier without a preconditioner
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,1e-6)"));  // + explicit CG tolerance
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,0.01)"));  // non-scientific notation too
+  CHECK_NOTHROW(
+      make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,1e-4,1e-2)"));  // + separate probe-solve CG tolerance
+  CHECK_NOTHROW(
+      make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,0.01,0.01)"));  // probes_cg_tol == cg_tol, explicit
 
   // malformed specs throw
   for (const std::string bad : {"LLIterative()",
@@ -102,7 +106,11 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
                                 "LLIterative(8,5,30,4,0)",
                                 "LLIterative(8,5,30,4,-1e-4)",
                                 "LLIterative(8,5,30,4,x)",
-                                "LLIterative(8,5,30,4,1e-4,7)"}) {  // at most 5 arguments
+                                "LLIterative(8,5,30,4,1e-4,1)",     // probes_cg_tol must be in (0,1)
+                                "LLIterative(8,5,30,4,1e-4,0)",
+                                "LLIterative(8,5,30,4,1e-4,-1e-2)",
+                                "LLIterative(8,5,30,4,1e-4,x)",
+                                "LLIterative(8,5,30,4,1e-4,1e-2,7)"}) {  // at most 6 arguments
     CHECK_THROWS_AS(make_fixed_theta_iterative(y, X, bad), std::invalid_argument);
   }
 
@@ -131,6 +139,50 @@ TEST_CASE("LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol): lo
 
   INFO("ll(cg_tol=1e-10) = " << ll_tight << ", ll(default cg_tol) = " << ll_default);
   CHECK(std::abs(ll_default - ll_tight) <= 1e-3 * std::abs(ll_tight) + 1e-6);
+}
+
+TEST_CASE("LLIterative(...,cg_tol,probes_cg_tol): probes_cg_tol defaults to cg_tol and can be loosened on its own",
+          "[iterative][kriging]") {
+  // probes_cg_tol (6th field) only governs the gradient's Hutchinson-probe
+  // CG solve (W = R^-1*probes); the [F|y] solve always uses cg_tol (5th
+  // field). Two properties to guard:
+  //  1. omitting the 6th field must behave EXACTLY as if probes_cg_tol ==
+  //     cg_tol (backward compatibility with pre-6-field specs);
+  //  2. loosening ONLY probes_cg_tol (keeping cg_tol tight) must cost no
+  //     meaningful accuracy -- same "buys iterations, not accuracy"
+  //     argument as cg_tol itself (docs/math/Iterative.md), since the probe
+  //     solve only feeds a stochastic Hutchinson trace estimate.
+  arma::mat X;
+  arma::vec y;
+  make_data(120, X, y);
+  const arma::vec theta{0.3, 0.3};
+
+  const auto [ll_omitted, g_omitted]
+      = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6)").logLikelihoodIterativeFun(theta, true);
+  const auto [ll_explicit_same, g_explicit_same]
+      = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-6)").logLikelihoodIterativeFun(theta, true);
+
+  INFO("ll(5-field, cg_tol=1e-6) = " << ll_omitted << ", ll(6-field, probes_cg_tol=cg_tol=1e-6) = " << ll_explicit_same);
+  CHECK(ll_omitted == ll_explicit_same);  // same probe seed, same tol -> bit-identical CG trajectory
+  CHECK(arma::approx_equal(g_omitted, g_explicit_same, "absdiff", 0.0));
+
+  // probes_cg_tol only feeds W = R^-1*probes, used solely by the gradient's
+  // Hutchinson trace term -- it does NOT touch the log-likelihood VALUE at
+  // all (beta/sigma2/SSE/logdetR all come from the [F|y] solve and the SLQ
+  // matvec, never from W). Guard that invariant, then check the gradient
+  // itself degrades negligibly when only probes_cg_tol is loosened.
+  const auto [ll_tight_probes, g_tight_probes] = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-6)")
+                                                     .logLikelihoodIterativeFun(theta, true);
+  const auto [ll_loose_probes, g_loose_probes] = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-2)")
+                                                     .logLikelihoodIterativeFun(theta, true);
+
+  INFO("ll(probes_cg_tol=1e-6) = " << ll_tight_probes << ", ll(probes_cg_tol=1e-2) = " << ll_loose_probes);
+  CHECK(ll_tight_probes == ll_loose_probes);  // value is independent of probes_cg_tol by construction
+
+  const double g_err = arma::norm(g_loose_probes - g_tight_probes);
+  const double g_norm = arma::norm(g_tight_probes);
+  INFO("grad(probes_cg_tol=1e-6) = " << g_tight_probes.t() << "grad(probes_cg_tol=1e-2) = " << g_loose_probes.t());
+  CHECK(g_err <= 1e-3 * g_norm + 1e-6);
 }
 
 TEST_CASE("LLIterative(m,precond_rank,lanczos_steps): more SLQ Lanczos steps tighten the log-det estimate",

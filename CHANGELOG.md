@@ -227,6 +227,71 @@ past release, see the corresponding entry on the
   Log-likelihood
   + gradient at n=4000 on an H100: 0.94 s -> 0.40 s; on the OpenMP backend the
   same benchmark point went 15.9 s -> 7.1 s.
+- `LLIterative` objective: `cg_tol` (5th field, above) was shared by the
+  `[F|y]` solve AND the gradient's Hutchinson-probe solve
+  (`W = R⁻¹·probes`), but the two need very different iteration counts to
+  reach the SAME relative-residual tolerance — CG iterations-to-tolerance
+  depend on the right-hand side's spectral content, not just `cond(R)`:
+  `F`/`y` are smooth and project mostly onto `R`'s dominant eigenmodes, the
+  isotropic Rademacher probes don't, and the gap widens as `R` gets more
+  ill-conditioned (fixed θ, growing `n` in a fixed-volume domain). Measured
+  on an H100 at n=2000/4000/8000, d=4, matern5_2, θ=0.15, `cg_tol=1e-4`:
+  `[F|y]` iterations go 180 → 400 → 1100 (×2.2, ×2.75), the probe solve's go
+  900 → 2270 → 13470 (×2.5, ×5.9) — at n=8000 the probe solve alone
+  dominates the evaluation, and the shared `cg_tol` gave no way to loosen it
+  without also loosening `predictIterative`'s own (unrelated) tolerance.
+  `probes_cg_tol` is now a separate, optional 6th field
+  (`objective="LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"`,
+  defaults to `cg_tol` when omitted, so existing specs are unaffected). It
+  feeds the same stochastic Hutchinson trace estimate whose own sampling
+  error already swamps a tight tolerance (same argument as `cg_tol` itself),
+  so loosening it costs no measurable accuracy: at n=8000,
+  `probes_cg_tol=1e-2` keeps the relative gradient error (0.06%) an order of
+  magnitude below the 0.66% already accepted for `cg_tol` itself, while the
+  log-likelihood value is bit-identical (it does not depend on
+  `probes_cg_tol` at all — only the gradient does). `bench/gpu/bench_gpu.py`
+  exposes it as `--lk-probes-cg-tol`, now **defaulting to `1e-2`** (was:
+  tracked `--cg-tol`, libKriging-only, no GPyTorch equivalent, so it need
+  not be budget-matched) — regenerated H100 results:
+  `libKriging-Iterative-CUDA`'s `logLik` (value+gradient) drops from 3.19 s
+  to **1.49 s** at n=8000 (−53%) and 0.28 s to 0.19 s at n=4000 (−33%);
+  `dMean/rms`/`dLogLik/n` unchanged at every `n` in the sweep. Confirmed
+  this is unlike loosening the shared `--cg-tol`, which degrades
+  `predictIterative`'s `dMean/rms` by up to 35× with no compensating gain
+  (`predictIterative`'s CG has no stochastic floor to hide behind). See
+  `docs/math/Iterative.md`.
+- `bench/gpu/bench_gpu.py`: extended the sweep to n=16000 and n=32000
+  (`SWEEP_EXTRA_SIZES_BY_KEY`) for the two backends built to scale past
+  n=8000 — `libKriging-Iterative-CUDA` reaches n=32000,
+  `GPyTorch-BBMM-CUDA` reaches n=16000. The exact-Cholesky backends
+  (`libKriging-Cholesky-*`, `GPyTorch-Cholesky-*`) stay capped at n=8000
+  regardless of `--sizes`: an O(n³) dense factorization is not meant to
+  scale past that, and no `chol` reference row exists past it either, so
+  `dMean/rms`/`dLogLik/n` are simply absent for n>8000 (pure scalability
+  numbers, not an accuracy comparison). Two fixes were needed to get there:
+  - `libKriging-Iterative-CUDA`'s device dense-R cache
+    (`LK_ITERATIVE_CUDA_DENSE_MAX_MB`, default 4096 MiB) is too small for
+    the gradient's `dR/dtheta_k` blocks past n≈11585 (d=4) — at n=32000
+    they alone need ~31 GiB, so both the CG solves AND the gradient
+    silently fell back to a matrix-free kernel that recomputes the full
+    O(n²) covariance sum on every iteration instead of one dense build
+    reused via `cublasDgemm`. Raising the budget
+    (`LK_ITERATIVE_CUDA_DENSE_MAX_MB=40960`) cut n=32000's `logLik` from
+    open-ended (still running after 4+ hours) to **864 s**, and n=16000's
+    from 50.9 s to 38.6 s, on an H100.
+  - `GPyTorch-BBMM-CUDA`'s `max_cg_iterations` was hardcoded to 5000,
+    tuned for n≤8000 and silently meaningless past it: at n=32000 CG
+    terminated with an average residual norm of 0.857 against a 1e-4
+    target (essentially unsolved, not just under-tolerance). It now scales
+    with `n` the same way libKriging's own `cg_max_iter_mult` does
+    (`LK_ITER_CG_MAX_ITER_MULT * n`, floored at 5000), making the shared
+    n=16000 row an apples-to-apples comparison of the same iteration
+    budget. `GPyTorch-BBMM-CUDA` still stops at n=16000: n=32000 hits a
+    hard `CUDA out of memory` building the BBMM pipeline itself (~78 GiB,
+    confirmed independent of the CG iteration budget — 38x more
+    iterations changed nothing) on a card libKriging's matrix-free kernels
+    use ~1.5 GiB on at the same n; not something this script's settings
+    can address.
 - CUDA iterative backend: `conjugateGradient`, `rmulBatched` and `dRmulBatched`
   were stateless, each re-uploading `X`/`theta` and rebuilding the dense `R`
   from scratch (a 128 MB allocation and 16 M fp64 `exp`/`log1p` at n=4000) on

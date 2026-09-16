@@ -166,6 +166,32 @@ Where this sits relative to the other scaling methods:
   all in the returned log-likelihood, and cost 2.3x in time. Tighten it
   only if you have first made the log-determinant itself exact enough that
   the solves start to matter (more `lanczos_steps`, or a preconditioner).
+- **A separate tolerance for the probe solve**:
+  `objective="LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"`.
+  `cg_tol` (5th field) is shared by default between the `[F|y]` solve and
+  the gradient's Hutchinson-probe solve (`W = R⁻¹·probes`), but these two
+  do NOT need the same iteration count to reach the SAME relative-residual
+  tolerance: CG iterations-to-tolerance depend on the right-hand side's
+  spectral content, not just `cond(R)`. `F`/`y` are smooth and project
+  mostly onto `R`'s dominant eigenmodes; the isotropic Rademacher probes
+  don't, and this gap widens as `R` gets more ill-conditioned (fixed θ,
+  growing `n` in a fixed-volume domain). Measured on an H100, `d=4`,
+  `matern5_2`, θ=0.15, `cg_tol=1e-4`:
+
+  | `n` | `[F\|y]` CG iterations | probe-solve CG iterations |
+  |--:|--:|--:|
+  | 2000 | 180 | 900 |
+  | 4000 | 400 (×2.2) | 2270 (×2.5) |
+  | 8000 | 1100 (×2.75) | 13470 (×5.9) |
+
+  so at `n=8000` the probe solve alone dominates the evaluation's wall
+  time. `probes_cg_tol` (6th field, defaults to `cg_tol` when omitted) lets
+  it be loosened on its own — it feeds the SAME stochastic Hutchinson trace
+  whose own sampling error already swamps a tight tolerance (same argument
+  as `cg_tol` above), so there is no accuracy reason to keep it as tight as
+  `[F|y]`'s. Unlike `cg_tol`, do NOT loosen it via `predictIterative`'s own
+  `tol` parameter -- that solve has no equivalent stochastic floor and its
+  accuracy is exactly its CG tolerance.
 - **Dense fast path (CPU)**: strictly matrix-free (R never stored) is the
   fallback, not the only mode. For a *separable* kernel — `gauss`, `exp`,
   `matern3_2`, `matern5_2`, i.e. `Cov(dx,θ) = exp(-Σₖ sₖ(|dxₖ|/θₖ))` — and

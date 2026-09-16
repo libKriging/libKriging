@@ -93,16 +93,20 @@ of O(n^3), recommended for large designs in low dimension — or
 `"LLNystrom"`/`"LLNystrom(k)"` for the Nystrom (global low-rank) approximated
 log-likelihood with rank `k` (default 50) — O(n k^2) per evaluation instead
 of O(n^3), also recommended for large designs — or
-`"LLIterative"`/`"LLIterative(m)"`/`"LLIterative(m,precond_rank)"`/`"LLIterative(m,precond_rank,lanczos_steps)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"`
+`"LLIterative"`/`"LLIterative(m)"`/`"LLIterative(m,precond_rank)"`/`"LLIterative(m,precond_rank,lanczos_steps)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"`/`"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"`
 for the matrix-free conjugate-gradient log-likelihood: `m` stochastic-trace
 probes (default 30), an optional rank-`precond_rank` Nystrom CG preconditioner
 (0 = off), `lanczos_steps` Lanczos steps per probe in the stochastic
 log-determinant estimate (default 20; raise it if that estimate drifts on an
 ill-conditioned covariance), a CG iteration budget of `cg_max_iter_mult * n`
-(default 2) and a CG relative-residual tolerance `cg_tol` (default 1e-4 --
-deliberately loose, since the stochastic log-determinant next to the solves
-carries a far larger error of its own; tighten it only when the solve outputs
-`beta`/`sigma2`/gradient are what needs the precision). Keeps R exact and
+(default 2), a CG relative-residual tolerance `cg_tol` for the `[F|y]` solve
+(default 1e-4 -- deliberately loose, since the stochastic log-determinant
+next to the solves carries a far larger error of its own; tighten it only
+when the solve outputs `beta`/`sigma2`/gradient are what needs the
+precision), and a SEPARATE tolerance `probes_cg_tol` for the gradient's
+Hutchinson-probe solve (default: tracks `cg_tol` -- that solve needs far
+more CG iterations than `[F|y]` to reach the same tolerance as `n` grows, so
+it is the one worth loosening independently). Keeps R exact and
 never factorizes it.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,

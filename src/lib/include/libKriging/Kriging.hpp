@@ -481,6 +481,28 @@ class Kriging : public KrigingImpl {
   /// its cg_tolerance default. Lower it only when the solve *outputs* (beta,
   /// sigma2, the gradient) are what needs the precision.
   double m_iterative_cg_tol = 1e-4;
+  /// CG relative-residual tolerance for the gradient's Hutchinson probe
+  /// solve (W = R^-1 * probes) ONLY -- the [F|y] solve above always uses
+  /// m_iterative_cg_tol. Settable through LLIterative's 6th objective
+  /// field; tracks m_iterative_cg_tol (stays equal to it) when that field
+  /// is omitted, so existing "LLIterative(...)" specs with <=5 fields are
+  /// unaffected.
+  ///
+  /// Split out because the probe solve's CG iteration count grows FAR
+  /// faster with n than [F|y]'s at the same shared tolerance: measured on
+  /// an H100 at d=4, matern5_2, theta=0.15, cg_tol=1e-4: [F|y] iterations
+  /// go 180 -> 400 -> 1100 over n=2000 -> 4000 -> 8000 (x2.2, x2.75), the
+  /// probe solve's go 900 -> 2270 -> 13470 (x2.5, x5.9) -- CG iterations
+  /// to a relative-residual tolerance depend on the right-hand side's
+  /// spectral content, not just cond(R): F/y are smooth and live mostly in
+  /// R's dominant modes, the isotropic Rademacher probes don't, and this
+  /// gap widens as R gets more ill-conditioned (fixed theta, growing n in
+  /// a fixed-volume domain). Loosening this tolerance costs the SAME
+  /// stochastic trace estimate whose own sampling error already swamps it
+  /// (see m_iterative_cg_tol's comment) -- unlike predictIterative's own
+  /// `tol` (a distinct, already-independent parameter), which has no such
+  /// floor and should not be loosened the same way.
+  double m_iterative_probes_cg_tol = 1e-4;
   arma::uword m_iterative_lanczos_steps = 20;  ///< SLQ Lanczos steps per probe
                                                ///< (default; override via
                                                ///< objective="LLIterative(m,precond_rank,lanczos_steps)")
@@ -517,12 +539,18 @@ class Kriging : public KrigingImpl {
   /// fixed 2n budget can be too tight once R is ill-conditioned enough) and
   /// cg_tol (0.0 = field omitted, keep the default m_iterative_cg_tol) to
   /// the out-params. Also accepts the 5-field form
-  /// "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)".
+  /// "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" and
+  /// the 6-field form
+  /// "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"
+  /// -- probes_cg_tol (0.0 = field omitted, keep tracking cg_tol) is the
+  /// gradient's Hutchinson probe solve's OWN tolerance, see
+  /// m_iterative_probes_cg_tol's comment for why it needs one.
   static arma::uword parse_iterative_m(const std::string& objective,
                                        arma::uword* precond_rank_out = nullptr,
                                        arma::uword* lanczos_steps_out = nullptr,
                                        arma::uword* cg_max_iter_mult_out = nullptr,
-                                       double* cg_tol_out = nullptr);
+                                       double* cg_tol_out = nullptr,
+                                       double* probes_cg_tol_out = nullptr);
   /// Draw m_iterative_probes from m_X's row count (call once, after
   /// fit_setup_impl, before optimization starts).
   void make_iterative_probes();
