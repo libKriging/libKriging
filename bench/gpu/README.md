@@ -7,6 +7,40 @@ change) — and compares seven backends, each named
 `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected from the
 shared-library linkage / `torch.__config__`):
 
+The exact-Cholesky backends (`libKriging-Cholesky-*`, `GPyTorch-Cholesky-*`
+— `CHOL_FAMILY_KEYS`) are capped at n=8000 regardless of `--sizes`: an O(n³)
+dense factorization is not meant to scale past that. Two GPU backends go
+further (`SWEEP_EXTRA_SIZES_BY_KEY`), independently capped:
+`libKriging-Iterative-CUDA` up to **n=32000**, `GPyTorch-BBMM-CUDA` up to
+**n=16000** only. GPyTorch stops at 16000 because n=32000 hits a hard `CUDA
+out of memory` building its BBMM pipeline (~78 GiB, confirmed independent
+of the CG iteration budget — giving it 38x more iterations changed
+nothing) on a card libKriging's matrix-free kernels use ~1.5 GiB on at the
+same n; not something this script's settings can work around.
+`libKriging-Iterative-CUDA` reaches n=32000 only with
+`LK_ITERATIVE_CUDA_DENSE_MAX_MB` raised well past its 4096 MiB default (the
+`d` `dR/dtheta_k` blocks alone need ~31 GiB at n=32000, d=4 — see
+`docs/math/Iterative.md`), e.g.:
+
+```sh
+LK_ITERATIVE_CUDA_DENSE_MAX_MB=40960 CUDA_VISIBLE_DEVICES=1 python bench/gpu/bench_gpu.py
+```
+
+Both GPU iterative backends' `max_cg_iterations` (`LK_ITER_CG_MAX_ITER_MULT
+* n`, same multiplier as libKriging's own `cg_max_iter_mult`) scale with
+`n` too — GPyTorch's old fixed 5000-iteration cap left CG at an average
+residual norm of 0.857 against a 1e-4 target at n=32000 (essentially
+unsolved, not just under-tolerance), which is why the shared n=16000 row is
+what makes libKriging vs. GPyTorch there an apples-to-apples comparison of
+the same iteration budget. The CPU (OpenMP/MKL) iterative backends stay
+capped at the base `--sizes`: their unbatched O(n²)-per-iteration matvec
+makes n=16000/32000 impractically slow for a by-hand sweep. No `chol` row
+exists at n>8000, so there is no reference log-likelihood/posterior-mean to
+diff against: `dMean/rms`/`dLogLik/n` are simply absent there, and GPyTorch
+falls back to a `mean(y)` trend instead of
+libKriging's GLS `beta` (only computed by the `chol` row) — pure scalability
+numbers past n=8000, not an accuracy comparison.
+
 | backend | what it exercises |
 |---|---|
 | `libKriging-Cholesky-<BLAS>` | exact dense path (`objective="LL"`) — the **reference** for the log-likelihood value and posterior mean |
@@ -258,8 +292,17 @@ default, 800, would silently do that at every `n` in this sweep); a huge value
 means "always small enough", forcing the exact solve GPyTorch-Cholesky is
 supposed to be.
 
-The libKriging iterative objective is `LLIterative(30,0,40)` — the third
-argument (40 SLQ Lanczos steps per probe) keeps the iterative log-likelihood
-*value* close to exact at `theta=0.15`; see
+The libKriging iterative objective is
+`LLIterative(30,0,40,6,{cg_tol},{probes_cg_tol})` — the third argument (40 SLQ
+Lanczos steps per probe) keeps the iterative log-likelihood *value* close to
+exact at `theta=0.15`; the fourth raises the CG iteration budget to `6n`
+(needed for the probe solve to converge at all up to `n=8000`); the fifth is
+`--cg-tol`, shared with GPyTorch and `predictIterative` for a fair comparison;
+the sixth is `--lk-probes-cg-tol` (default `1e-2`, libKriging-only — no
+GPyTorch equivalent) which loosens ONLY the gradient's Hutchinson-probe CG
+solve, the term that otherwise dominates `logLik`'s cost at large `n` (its CG
+iteration count grows far faster with `n` than the `[F|y]` solve's — see
+`docs/math/Iterative.md`) with no measurable effect on `predictIterative`'s
+own accuracy, unlike loosening the shared `--cg-tol`. See
 [`docs/math/Iterative.md`](../../docs/math/Iterative.md) and
 [`docs/comparisons/libKriging_vs_GPyTorch.ipynb`](../../docs/comparisons/libKriging_vs_GPyTorch.ipynb).

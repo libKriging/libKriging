@@ -99,6 +99,42 @@ import time
 import numpy as np
 
 SWEEP_DEFAULT = [250, 500, 1000, 2000, 4000, 8000]
+# Extra sizes run ONLY for select GPU backends (SWEEP_EXTRA_SIZES_BY_KEY
+# below) -- an O(n^3) dense Cholesky factorization (both libKriging-
+# Cholesky and GPyTorch-Cholesky-*, see CHOL_FAMILY_KEYS) is not meant to
+# scale past n=8000 in this sweep; the whole point of the matrix-free
+# backends is to keep running where it can't. The CPU (OpenMP/MKL)
+# iterative backends are excluded too -- their unbatched O(n^2)-per-
+# iteration matvec makes n=16000/32000 impractically slow for a by-hand
+# sweep (n=8000 `logLik` alone already runs 45-425s depending on node
+# contention). No `chol` row exists at these sizes, so there is no
+# reference log-likelihood/posterior-mean to diff against -- `dmean_rms`/
+# `dloglik_n` are simply absent (see sweep()'s `if n in ref` gate) and the
+# GPyTorch row falls back to a `mean(y)` trend instead of libKriging's GLS
+# `beta` (only computed by the `chol` row) for the same reason: pure
+# scalability numbers, not an accuracy comparison.
+#
+# `iter-cuda` alone reaches n=32000 -- confirmed working (864s logLik,
+# raising LK_ITERATIVE_CUDA_DENSE_MAX_MB past its default 4096 MiB so R
+# AND the d dR/dtheta_k blocks fit the dense cuBLAS path instead of falling
+# back to a matrix-free kernel that recomputes O(n^2) covariance entries on
+# every CG/Lanczos step -- ~31 GiB needed for dR alone at n=32000, d=4; see
+# docs/math/Iterative.md). `gpt-cuda` stops at n=16000: even after scaling
+# GPyTorch's max_cg_iterations with n the same way (see
+# LK_ITER_CG_MAX_ITER_MULT), n=32000 hits a hard `CUDA out of memory`
+# building the BBMM pipeline itself (~78 GiB, independent of the CG
+# iteration budget -- confirmed by giving it 38x more iterations and
+# getting the exact same OOM) on a card libKriging's matrix-free kernels
+# use ~1.5 GiB on at the same n. Not something `bench_gpu.py`'s settings
+# can work around; a GPyTorch/architecture limit, not a tuning one.
+# `LK_ITERATIVE_CUDA_DENSE_MAX_MB` is NOT set here (env var, not a Python
+# default) -- pass it when invoking the sweep for the n=32000 row to
+# actually use the fast path; see bench/gpu/README.md.
+SWEEP_EXTRA_SIZES_BY_KEY = {
+    "iter-cuda": [16000, 32000],
+    "gpt-cuda": [16000],
+}
+CHOL_FAMILY_KEYS = {"chol", "gpt-chol-cuda", "gpt-chol-cpu"}
 D_CG = 4
 THETA_DEFAULT = 0.15
 N_TEST = 300
@@ -121,10 +157,40 @@ NOISE_SEED = 0
 # budget-matched to GPyTorch the same way `predict` is (leaving it at
 # libKriging's own default would have libKriging solve to a different
 # residual than GPyTorch's BBMM).
+#
+# The 6th field (probes_cg_tol) is a SEPARATE tolerance for the gradient's
+# Hutchinson-probe CG solve only -- --cg-tol still alone governs the [F|y]
+# solve AND predictIterative's own `tol` (unaffected by this field). Added
+# after the n=8000 dig in bench/gpu's history found the probe solve's CG
+# iteration count grows far faster with n than [F|y]'s at the SAME shared
+# tolerance (900->2270->13470 over n=2000->4000->8000 vs. 180->400->1100),
+# because CG iterations-to-tolerance depend on the right-hand side's
+# spectral content: F/y are smooth (dominant R eigenmodes), the isotropic
+# Rademacher probes aren't. Loosening ONLY this field costs the SAME
+# stochastic Hutchinson trace estimate that already swamps --cg-tol (see
+# above) -- confirmed at n=8000, H100: cg_tol=probes_cg_tol=1e-4 gives
+# logLik=3.97s, dLL/n=5.14e-2, |grad|=8.289e4; probes_cg_tol=1e-2 alone
+# gives logLik=1.71s (-57%), dLL/n UNCHANGED (independent of this field by
+# construction), |grad| within 0.06% (8.284e4) -- see docs/math/Iterative.md.
+# Defaults to --cg-tol when --lk-probes-cg-tol is not passed, so existing
+# invocations are unaffected.
 LK_ITER_NPROBE = 30    # Hutchinson/SLQ probes -- mirrored into GPyTorch's num_trace_samples
 LK_ITER_LANCZOS = 40   # SLQ Lanczos steps/probe -- mirrored into max_lanczos_quadrature_iterations
+# CG iteration budget multiplier: libKriging's cg_max_iter_mult AND
+# GPyTorch's max_cg_iterations (see _gpt_converged_ctx) are both
+# LK_ITER_CG_MAX_ITER_MULT * n -- fixed budgets do not scale to the
+# n>8000 rows (SWEEP_EXTRA_SIZES_BY_KEY): GPyTorch's old hardcoded
+# max_cg_iterations=5000 terminated with average residual norm 0.857 (vs.
+# a 1e-4 target) at n=32000 -- essentially unsolved, not just under-tol --
+# while libKriging's already-n-scaled 6n budget at least finished, with an
+# honest cgNonConvergenceWarning on the columns still short of tol. Scaling
+# GPyTorch's cap the same way makes the shared n=16000 row an apples-to-
+# apples comparison of the SAME iteration budget, not libKriging's scaled
+# budget against GPyTorch's fixed one.
+LK_ITER_CG_MAX_ITER_MULT = 6
 LK_ITER_OBJECTIVE_FMT = (
-    "LLIterative(%d,0,%d,6,{cg_tol:g})" % (LK_ITER_NPROBE, LK_ITER_LANCZOS))
+    "LLIterative(%d,0,%d,%d,{cg_tol:g},{probes_cg_tol:g})"
+    % (LK_ITER_NPROBE, LK_ITER_LANCZOS, LK_ITER_CG_MAX_ITER_MULT))
 
 # Shared CG convergence budget, applied to BOTH libraries (see --cg-tol).
 # This has to be ONE number: earlier revisions of this harness ran
@@ -139,6 +205,29 @@ CG_TOL_DEFAULT = 1e-4
 # Nystrom preconditioner rank for predictIterative, capped at n//4. 0 = off.
 # GPyTorch's comparable knob is max_preconditioner_size (100 below).
 LK_PRECOND_RANK_DEFAULT = 128
+# Separate, looser default for the objective's gradient Hutchinson-probe CG
+# solve (LLIterative's 6th field) -- libKriging-ONLY, no GPyTorch equivalent,
+# so it does not need to be budget-matched the way --cg-tol does. Chosen
+# from a direct sweep at n=8000, H100, comparing each candidate's gradient
+# against a probes_cg_tol=1e-8 reference (same cg_tol=1e-4 throughout):
+#
+#   probes_cg_tol | wall (logLik+grad) | |g-g_ref|/|g_ref|
+#   1e-4 (old shared default) |  4.00 s | 3.7e-06
+#   1e-3                      |  2.87 s | 4.1e-05
+#   1e-2 (chosen)             |  1.74 s | 6.1e-04
+#   3e-2                      |  1.26 s | 2.0e-03
+#   1e-1                      |  1.73 s | 8.5e-03
+#
+# 1e-2 keeps the relative gradient error an order of magnitude below the
+# 6.6e-3 level already accepted for cg_tol itself (see CG_TOL_DEFAULT's
+# comment / docs/math/Iterative.md) while recovering most of the available
+# speedup -- 3e-2 buys little extra (timings past 1e-2 are noisy on this
+# shared node and the error keeps growing), so 1e-2 is the safer pick.
+# Confirmed on the FULL sweep (n=250..8000) that predictIterative's
+# dMean/rms is completely unaffected at every n (it never depended on this
+# field), unlike loosening the shared --cg-tol (which degrades dMean/rms up
+# to 35x, see docs/math/Iterative.md).
+LK_PROBES_CG_TOL_DEFAULT = 1e-2
 
 
 # --------------------------------------------------------------------------
@@ -358,7 +447,7 @@ def _gpt_modules():
     return gpytorch, torch, ExactGPModel
 
 
-def _gpt_converged_ctx(gpytorch, cg_tol: float, bbmm: bool = True):
+def _gpt_converged_ctx(gpytorch, cg_tol: float, n: int, bbmm: bool = True):
     # raised so BBMM CG / SLQ log-det actually converge on the (mildly
     # ill-conditioned) R at theta=0.15 -- the defaults (1000 CG iters,
     # cg_tol 1e-2, 15 Lanczos, 10 probes, precond >= n=2000) leave -mll and
@@ -381,7 +470,12 @@ def _gpt_converged_ctx(gpytorch, cg_tol: float, bbmm: bool = True):
         # Cholesky reference) does the opposite: a threshold far above any
         # n this sweep uses, so Cholesky is ALWAYS selected.
         gpytorch.settings.max_cholesky_size(0 if bbmm else 1_000_000),
-        gpytorch.settings.max_cg_iterations(5000),
+        # Scaled with n like libKriging's cg_max_iter_mult (see
+        # LK_ITER_CG_MAX_ITER_MULT's comment) instead of a fixed cap that
+        # was tuned for n<=8000 and silently stopped meaning anything past
+        # it (5000 iterations at n=32000 left an average residual norm of
+        # 0.857 against a 1e-4 target -- essentially unsolved).
+        gpytorch.settings.max_cg_iterations(max(5000, LK_ITER_CG_MAX_ITER_MULT * n)),
         gpytorch.settings.cg_tolerance(cg_tol),
         gpytorch.settings.eval_cg_tolerance(cg_tol),
         # Matched EXACTLY to libKriging's LLIterative(30,_,40,...): 30
@@ -402,6 +496,7 @@ def run_gpytorch(X, y, Xte, yte, theta, device_str, cg_tol: float, bbmm: bool = 
     torch.set_default_dtype(torch.float64)
     device = torch.device(device_str)
     sync = torch.cuda.synchronize if device.type == "cuda" else (lambda: None)
+    n = X.shape[0]
 
     tx = torch.tensor(X, dtype=torch.float64, device=device)
     ty = torch.tensor(y, dtype=torch.float64, device=device)
@@ -435,7 +530,7 @@ def run_gpytorch(X, y, Xte, yte, theta, device_str, cg_tol: float, bbmm: bool = 
         return model, lik
 
     with contextlib.ExitStack() as es:
-        for c in _gpt_converged_ctx(gpytorch, cg_tol, bbmm=bbmm):
+        for c in _gpt_converged_ctx(gpytorch, cg_tol, n, bbmm=bbmm):
             es.enter_context(c)
 
         def fit():
@@ -538,7 +633,8 @@ def run_libkriging_chol(X, y, Xte, yte, theta):
                 beta=float(np.asarray(m.beta()).ravel()[0]))
 
 
-def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_rank: int):
+def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_rank: int,
+                        probes_cg_tol: float = None):
     import pylibkriging as lk
 
     lk.set_cuda_iterative_enabled(bool(use_cuda))
@@ -547,7 +643,9 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_
     params = {"theta": np.full((1, d), theta), "sigma2": 1.0}
 
     fit_s, m = timed_min(
-        lambda: lk.Kriging(y, X, "matern5_2", objective=LK_ITER_OBJECTIVE_FMT.format(cg_tol=cg_tol),
+        lambda: lk.Kriging(y, X, "matern5_2",
+                           objective=LK_ITER_OBJECTIVE_FMT.format(
+                               cg_tol=cg_tol, probes_cg_tol=probes_cg_tol if probes_cg_tol is not None else cg_tol),
                            optim="none", parameters=params))
     if not m.is_iterative_light():
         raise RuntimeError("expected an iterative-light fit (no dense R factor)")
@@ -569,15 +667,15 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_
 # --------------------------------------------------------------------------
 # sweep
 # --------------------------------------------------------------------------
-def one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, trend_const=None):
+def one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, probes_cg_tol=None, trend_const=None):
     X = lhs(n, D_CG, seed=TRAIN_SEED)
     y = sine_sum(X) + np.random.default_rng(NOISE_SEED).normal(scale=1e-3, size=n)
     if key == "chol":
         return run_libkriging_chol(X, y, Xte, yte, theta)
     if key == "iter-cuda":
-        return run_libkriging_iter(X, y, Xte, yte, theta, True, cg_tol, precond_rank)
+        return run_libkriging_iter(X, y, Xte, yte, theta, True, cg_tol, precond_rank, probes_cg_tol)
     if key == "iter-omp":
-        return run_libkriging_iter(X, y, Xte, yte, theta, False, cg_tol, precond_rank)
+        return run_libkriging_iter(X, y, Xte, yte, theta, False, cg_tol, precond_rank, probes_cg_tol)
     if key == "gpt-cuda":
         return run_gpytorch(X, y, Xte, yte, theta, "cuda", cg_tol, bbmm=True, trend_const=trend_const)
     if key == "gpt-cpu":
@@ -589,7 +687,7 @@ def one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, trend_const=None):
     raise ValueError(key)
 
 
-def sweep(keys, sizes, theta, labels, cg_tol, precond_rank):
+def sweep(keys, sizes, theta, labels, cg_tol, precond_rank, probes_cg_tol=None):
     Xte = lhs(N_TEST, D_CG, seed=TEST_SEED)
     yte = sine_sum(Xte)
     yte_rms = float(np.sqrt(np.mean(yte ** 2)))
@@ -599,11 +697,17 @@ def sweep(keys, sizes, theta, labels, cg_tol, precond_rank):
     order = (["chol"] if "chol" in keys else []) + [k for k in keys if k != "chol"]  # chol first = reference
     for key in order:
         label = labels[key]
-        for n in sizes:
+        if key in CHOL_FAMILY_KEYS:
+            key_sizes = [n for n in sizes if n <= 8000]
+        elif key in SWEEP_EXTRA_SIZES_BY_KEY:
+            key_sizes = sorted(set(sizes) | set(SWEEP_EXTRA_SIZES_BY_KEY[key]))
+        else:
+            key_sizes = sizes
+        for n in key_sizes:
             print(f"  {label:30s} n={n:5d}  ...", end="", flush=True)
             t0 = time.perf_counter()
             try:
-                res = one_point(key, n, theta, Xte, yte, cg_tol, precond_rank,
+                res = one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, probes_cg_tol,
                                 trend_const=beta_ref.get(n))
                 res.update(backend=label, backend_key=key, n=n, status="ok",
                            wall_s=time.perf_counter() - t0)
@@ -724,9 +828,14 @@ def write_html(path, rows, meta):
         "harness did — compares a solver converged four orders of magnitude tighter against a "
         "deliberately truncated one and reads the difference as speed." % meta["cg_tol"]) + "</li>")
     ap(f"<li><strong>libKriging iterative objective</strong>: "
-       f"<code>{_html.escape(LK_ITER_OBJECTIVE_FMT.format(cg_tol=meta['cg_tol']))}</code>  ·  "
+       f"<code>{_html.escape(LK_ITER_OBJECTIVE_FMT.format(cg_tol=meta['cg_tol'], probes_cg_tol=meta['lk_probes_cg_tol']))}</code>  ·  "
        f"<code>predictIterative(max_iter=8n, Nystrom precond rank ≤ {meta['lk_precond_rank']}"
-       f"{' = OFF' if meta['lk_precond_rank'] == 0 else ''})</code></li>")
+       f"{' = OFF' if meta['lk_precond_rank'] == 0 else ''})</code>"
+       + (f"  ·  6th field <code>probes_cg_tol={meta['lk_probes_cg_tol']:g}</code> loosens ONLY the "
+          "gradient's Hutchinson-probe CG solve (not <code>predictIterative</code>'s own tol above) -- "
+          "see docs/math/Iterative.md"
+          if meta["lk_probes_cg_tol"] != meta["cg_tol"] else "")
+       + "</li>")
     ap("<li>" + md(
         "**same model on both sides**: GPyTorch runs a `ProductKernel` of one-dimensional "
         "Matérn-5/2 factors — which is what libKriging's separable `matern5_2` is, unlike "
@@ -740,7 +849,7 @@ def write_html(path, rows, meta):
        "(GPyTorch's default, 800, silently falls back to exact dense "
        "Cholesky at or below it, which would make an n=250/500 "
        "“GPyTorch-BBMM” row misnamed) — "
-       f"<code>max_cg_iterations=5000, cg_tolerance={meta['cg_tol']:g}, "
+       f"<code>max_cg_iterations=max(5000,{LK_ITER_CG_MAX_ITER_MULT}n), cg_tolerance={meta['cg_tol']:g}, "
        f"eval_cg_tolerance={meta['cg_tol']:g}, "
        f"max_lanczos_quadrature_iterations={LK_ITER_LANCZOS}, num_trace_samples={LK_ITER_NPROBE}, "
        "max_preconditioner_size=100, min_preconditioning_size=1</code></li>")
@@ -1035,6 +1144,15 @@ def main(argv=None):
     p.add_argument("--lk-precond-rank", type=int, default=LK_PRECOND_RANK_DEFAULT,
                    help="Nystrom preconditioner rank for libKriging's predictIterative, capped at n//4; "
                         "0 disables it (default: %(default)s)")
+    p.add_argument("--lk-probes-cg-tol", type=float, default=LK_PROBES_CG_TOL_DEFAULT,
+                   help="SEPARATE relative-residual CG tolerance for libKriging's objective's gradient "
+                        "Hutchinson-probe solve ONLY (LLIterative's 6th field) -- does not affect --cg-tol's "
+                        "role for [F|y]/predictIterative/GPyTorch, and libKriging-only (no GPyTorch "
+                        "equivalent), so it need not be budget-matched. Looser than --cg-tol because this "
+                        "solve has far more slack (see LK_PROBES_CG_TOL_DEFAULT's comment): cuts n=8000 "
+                        "`logLik` roughly in half with no measurable effect on predictIterative's own "
+                        f"accuracy (see docs/math/Iterative.md). Pass --lk-probes-cg-tol {CG_TOL_DEFAULT:g} "
+                        "to restore the old shared-tolerance behavior (default: %(default)s)")
     p.add_argument("--outdir", default=None, help="output directory (default: <this file>/results)")
     p.add_argument("--tag", default=None, help="extra tag appended to the output file name")
     args = p.parse_args(argv)
@@ -1074,6 +1192,7 @@ def main(argv=None):
         when=_dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),
         theta=args.theta, sizes=sizes, lk_blas=lk_blas, torch_blas=torch_blas,
         cg_tol=args.cg_tol, lk_precond_rank=args.lk_precond_rank,
+        lk_probes_cg_tol=args.lk_probes_cg_tol if args.lk_probes_cg_tol is not None else args.cg_tol,
         versions=_versions(),
     )
     print("machine:", meta["gpu"], "|", meta["cpu"], "| host", meta["host"])
@@ -1086,13 +1205,13 @@ def main(argv=None):
             Xw = lhs(64, D_CG, seed=1)
             yw = sine_sum(Xw)
             run_libkriging_iter(Xw, yw, Xw[:8], sine_sum(Xw[:8]), args.theta, True,
-                                args.cg_tol, args.lk_precond_rank)
+                                args.cg_tol, args.lk_precond_rank, args.lk_probes_cg_tol)
             run_gpytorch(Xw, yw, Xw[:8], sine_sum(Xw[:8]), args.theta, "cuda", args.cg_tol)
         except Exception as exc:  # noqa: BLE001
             print(f"warmup skipped: {exc!r}", flush=True)
 
     t0 = time.perf_counter()
-    rows = sweep(keys, sizes, args.theta, labels, args.cg_tol, args.lk_precond_rank)
+    rows = sweep(keys, sizes, args.theta, labels, args.cg_tol, args.lk_precond_rank, args.lk_probes_cg_tol)
     print(f"\ntotal wall time: {time.perf_counter() - t0:.0f}s", flush=True)
 
     base = f"{slug(gpu_name)}__{slug(cpu_name)}"
