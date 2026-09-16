@@ -1503,7 +1503,8 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
                                       arma::uword* precond_rank_out,
                                       arma::uword* lanczos_steps_out,
                                       arma::uword* cg_max_iter_mult_out,
-                                      double* cg_tol_out) {
+                                      double* cg_tol_out,
+                                      double* probes_cg_tol_out) {
   // "LLIterative"                              -> m=30, no precond, default SLQ Lanczos steps
   // "LLIterative(m)"                           -> m Hutchinson/SLQ probes
   // "LLIterative(m,precond_rank)"              -> + opt-in Nystrom-preconditioned CG
@@ -1528,8 +1529,17 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
   //                                              error swamps anything below ~1e-4, so a
   //                                              tighter tol buys iterations, not accuracy
   //                                              (see docs/math/Iterative.md).
+  // "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"
+  //                                           -> a SEPARATE CG tolerance for the
+  //                                              gradient's Hutchinson probe solve, which
+  //                                              needs far more iterations than the [F|y]
+  //                                              solve to reach the SAME cg_tol as n grows
+  //                                              (isotropic probes vs. smooth F/y -- see
+  //                                              m_iterative_probes_cg_tol's comment).
+  //                                              Defaults to cg_tol when omitted.
   // *precond_rank_out / *lanczos_steps_out / *cg_max_iter_mult_out are set to 0
-  // and *cg_tol_out to 0.0 when the field is absent (0 = "keep the caller's default").
+  // and *cg_tol_out / *probes_cg_tol_out to 0.0 when the field is absent
+  // (0 = "keep the caller's default").
   if (precond_rank_out != nullptr)
     *precond_rank_out = 0;
   if (lanczos_steps_out != nullptr)
@@ -1538,6 +1548,8 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
     *cg_max_iter_mult_out = 0;
   if (cg_tol_out != nullptr)
     *cg_tol_out = 0.0;
+  if (probes_cg_tol_out != nullptr)
+    *probes_cg_tol_out = 0.0;
   if (objective == "LLIterative")
     return 30;
   if (objective.rfind("LLIterative(", 0) == 0 && objective.back() == ')') {
@@ -1561,8 +1573,8 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
       return v;
     };
     try {
-      if (fields.empty() || fields.size() > 5)
-        throw std::invalid_argument("expected 1 to 5 comma-separated arguments");
+      if (fields.empty() || fields.size() > 6)
+        throw std::invalid_argument("expected 1 to 6 comma-separated arguments");
       const long m = parse_field(fields[0]);
       if (m < 1)
         throw std::invalid_argument("m must be >= 1");
@@ -1587,18 +1599,27 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
         if (cg_max_iter_mult_out != nullptr)
           *cg_max_iter_mult_out = static_cast<arma::uword>(cg_max_iter_mult);
       }
-      if (fields.size() == 5) {
-        // a real, not an integer -- parsed separately from parse_field
+      // parse a whole field as a (0,1) real, rejecting trailing junk
+      const auto parse_tol_field = [](const std::string& s, const char* what) -> double {
         std::size_t pos = 0;
-        const double cg_tol = std::stod(fields[4], &pos);
-        while (pos < fields[4].size() && std::isspace(static_cast<unsigned char>(fields[4][pos])))
+        const double v = std::stod(s, &pos);
+        while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
           ++pos;
-        if (pos != fields[4].size())
+        if (pos != s.size())
           throw std::invalid_argument("trailing characters");
-        if (!(cg_tol > 0.0) || !(cg_tol < 1.0))
-          throw std::invalid_argument("cg_tol must be in (0,1)");
+        if (!(v > 0.0) || !(v < 1.0))
+          throw std::invalid_argument(std::string(what) + " must be in (0,1)");
+        return v;
+      };
+      if (fields.size() >= 5) {
+        const double cg_tol = parse_tol_field(fields[4], "cg_tol");
         if (cg_tol_out != nullptr)
           *cg_tol_out = cg_tol;
+      }
+      if (fields.size() == 6) {
+        const double probes_cg_tol = parse_tol_field(fields[5], "probes_cg_tol");
+        if (probes_cg_tol_out != nullptr)
+          *probes_cg_tol_out = probes_cg_tol;
       }
       return static_cast<arma::uword>(m);
     } catch (const std::exception&) {
@@ -1609,13 +1630,17 @@ arma::uword Kriging::parse_iterative_m(const std::string& objective,
       "Invalid Iterative objective '" + objective
       + "': expected \"LLIterative\", \"LLIterative(m)\", \"LLIterative(m,precond_rank)\", "
         "\"LLIterative(m,precond_rank,lanczos_steps)\", "
-        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\" or "
-        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)\" with m >= 1, "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\", "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)\" or "
+        "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)\" with m >= 1, "
         "precond_rank >= 0 (0 = no preconditioner), lanczos_steps >= 2, "
-        "cg_max_iter_mult >= 1 (CG budget = cg_max_iter_mult*n, default 2) and "
-        "0 < cg_tol < 1 (CG relative-residual tolerance, default 1e-4) "
+        "cg_max_iter_mult >= 1 (CG budget = cg_max_iter_mult*n, default 2), "
+        "0 < cg_tol < 1 ([F|y] CG relative-residual tolerance, default 1e-4) and "
+        "0 < probes_cg_tol < 1 (gradient's Hutchinson-probe CG tolerance, "
+        "default: tracks cg_tol) "
         "(e.g. \"LLIterative(30)\", \"LLIterative(30,50)\", \"LLIterative(30,0,40)\", "
-        "\"LLIterative(30,0,40,6)\" or \"LLIterative(30,0,40,2,1e-6)\")");
+        "\"LLIterative(30,0,40,6)\", \"LLIterative(30,0,40,2,1e-6)\" or "
+        "\"LLIterative(30,0,40,2,1e-4,1e-2)\")");
 }
 
 void Kriging::make_iterative_probes() {
@@ -1813,19 +1838,19 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   bool slq_on_gpu = false;
   arma::uword gpu_max_dimx = 0;
   arma::uword gpu_cg_n_unconverged = 0;  // aggregated OR'd into m_iterative_last_cg_unconverged below
-  std::function<arma::mat(const arma::mat&)> gpuCgSolve;   // R^-1 * B (preconditioned iff woodbury_pc)
+  std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;  // R^-1 * B (preconditioned iff woodbury_pc)
   std::function<arma::mat(const arma::mat&)> rmulBatched;  // R * V
   std::function<arma::mat(const arma::mat&)> dRmulBatched; // [dR/dtheta_k . V]_k, n x (d*ncols)
 #define LK_ITER_GPU_BIND(NS)                                                                                    \
   do {                                                                                                          \
     slq_on_gpu = true;                                                                                          \
     gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                       \
-    gpuCgSolve = [&](const arma::mat& B) {                                                                       \
+    gpuCgSolve = [&](const arma::mat& B, double tol) {                                                           \
       arma::uword n_unconv = 0;                                                                                  \
       arma::mat sol = woodbury_pc                                                                                \
-          ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol, woodbury_pc->U(),       \
+          ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, woodbury_pc->U(),                     \
                                   woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)                     \
-          : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, m_iterative_cg_tol, arma::mat(), arma::vec(), \
+          : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, arma::mat(), arma::vec(),             \
                                   arma::mat(), &n_unconv);                                                        \
       gpu_cg_n_unconverged += n_unconv;                                                                          \
       return sol;                                                                                                \
@@ -1870,12 +1895,11 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   }
 
   arma::uword cpu_cg_n_unconverged = 0;
-  auto cgSolve = [&](const arma::mat& B) -> arma::mat {
+  auto cgSolve = [&](const arma::mat& B, double tol) -> arma::mat {
     if (gpuCgSolve)
-      return gpuCgSolve(B);
+      return gpuCgSolve(B, tol);
     arma::uword n_unconv = 0;
-    arma::mat sol
-        = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, m_iterative_cg_tol, PinvBatched, &n_unconv);
+    arma::mat sol = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv);
     cpu_cg_n_unconverged += n_unconv;
     return sol;
   };
@@ -1885,7 +1909,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // independent Krylov solve (no block-CG subspace sharing, but far cheaper
   // than p+1 separate O(n^3) factorizations either way).
   arma::mat FY = arma::join_rows(m_F, m_y);
-  const arma::mat RinvFY = cgSolve(FY);
+  const arma::mat RinvFY = cgSolve(FY, m_iterative_cg_tol);
   const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
   const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
 
@@ -1940,9 +1964,16 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 
   // W = R^-1 * probes, only needed for the gradient's Hutchinson trace
   // (preconditioned batched CG when a Nystrom preconditioner is enabled).
+  // Uses its OWN tolerance (m_iterative_probes_cg_tol, LLIterative's 6th
+  // field): this solve only feeds a stochastic trace estimate, which has
+  // much more slack than the [F|y] solve above (see the member's doc
+  // comment and the n=8000 dig in bench/gpu's history -- this CG's
+  // iteration count grows far faster with n than [F|y]'s, because the
+  // isotropic Rademacher probes carry energy on R's whole spectrum while
+  // [F|y] is smooth and lives mostly in R's dominant modes).
   arma::mat W;
   if (grad_out != nullptr)
-    W = cgSolve(m_iterative_probes);
+    W = cgSolve(m_iterative_probes, m_iterative_probes_cg_tol);
 
   if (beta_out != nullptr)
     *beta_out = beta;
@@ -2427,14 +2458,18 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     arma::uword lanczos_steps = 0;
     arma::uword cg_max_iter_mult = 0;
     double cg_tol = 0.0;
-    m_iterative_nprobe
-        = parse_iterative_m(objective, &m_iterative_precond_rank, &lanczos_steps, &cg_max_iter_mult, &cg_tol);
+    double probes_cg_tol = 0.0;
+    m_iterative_nprobe = parse_iterative_m(
+        objective, &m_iterative_precond_rank, &lanczos_steps, &cg_max_iter_mult, &cg_tol, &probes_cg_tol);
     if (lanczos_steps > 0)  // 0 = spec omitted the field -> keep the default
       m_iterative_lanczos_steps = lanczos_steps;
     if (cg_max_iter_mult > 0)  // 0 = spec omitted the field -> keep the default (2*n)
       m_iterative_cg_max_iter = cg_max_iter_mult * m_X.n_rows;
     if (cg_tol > 0.0)  // 0 = spec omitted the field -> keep the default (1e-4)
       m_iterative_cg_tol = cg_tol;
+    // 0 = spec omitted the 6th field -> track cg_tol (same behavior as
+    // before this field existed: one shared tolerance for both CG solves).
+    m_iterative_probes_cg_tol = (probes_cg_tol > 0.0) ? probes_cg_tol : m_iterative_cg_tol;
     make_iterative_probes();
     if (m_iterative_precond_rank > 0)
       make_iterative_precond_landmarks();
