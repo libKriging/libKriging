@@ -139,6 +139,12 @@ Flags: `--sizes`, `--theta`, `--cg-tol`, `--lk-precond-rank`, `--backends`
 (keys: `chol`, `iter-cuda`, `iter-omp`, `gpt-cuda`, `gpt-cpu`,
 `gpt-chol-cuda`, `gpt-chol-cpu`), `--tag`, `--outdir`.
 
+By default every backend is capped to exactly `--sizes` (the `*-Cholesky-*`
+backends are further capped to n<=8000 regardless, see `CHOL_FAMILY_KEYS`).
+Pass `--extra-sizes` to additionally run `iter-cuda` at n=16000/32000 and
+`gpt-cuda` at n=16000 (`SWEEP_EXTRA_SIZES_BY_KEY`) — these rows can take well
+over an hour and need tens of GiB of GPU memory, so they're opt-in.
+
 ## Reading the output
 
 Three timings per backend, plus accuracy vs the Cholesky reference:

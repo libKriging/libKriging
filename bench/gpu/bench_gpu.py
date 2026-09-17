@@ -687,7 +687,7 @@ def one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, probes_cg_tol=None,
     raise ValueError(key)
 
 
-def sweep(keys, sizes, theta, labels, cg_tol, precond_rank, probes_cg_tol=None):
+def sweep(keys, sizes, theta, labels, cg_tol, precond_rank, probes_cg_tol=None, extra_sizes=False):
     Xte = lhs(N_TEST, D_CG, seed=TEST_SEED)
     yte = sine_sum(Xte)
     yte_rms = float(np.sqrt(np.mean(yte ** 2)))
@@ -699,7 +699,7 @@ def sweep(keys, sizes, theta, labels, cg_tol, precond_rank, probes_cg_tol=None):
         label = labels[key]
         if key in CHOL_FAMILY_KEYS:
             key_sizes = [n for n in sizes if n <= 8000]
-        elif key in SWEEP_EXTRA_SIZES_BY_KEY:
+        elif extra_sizes and key in SWEEP_EXTRA_SIZES_BY_KEY:
             key_sizes = sorted(set(sizes) | set(SWEEP_EXTRA_SIZES_BY_KEY[key]))
         else:
             key_sizes = sizes
@@ -1155,6 +1155,13 @@ def main(argv=None):
                         "to restore the old shared-tolerance behavior (default: %(default)s)")
     p.add_argument("--outdir", default=None, help="output directory (default: <this file>/results)")
     p.add_argument("--tag", default=None, help="extra tag appended to the output file name")
+    p.add_argument("--extra-sizes", action="store_true",
+                   help="also run the n=16000/32000 stress sizes hardcoded for iter-cuda/gpt-cuda "
+                        "(SWEEP_EXTRA_SIZES_BY_KEY) on top of --sizes. Off by default: those rows can "
+                        "take well over an hour and need tens of GiB of GPU memory (see the comment "
+                        "above SWEEP_EXTRA_SIZES_BY_KEY). With this flag unset, every backend is capped "
+                        "to exactly --sizes (still further capped to n<=8000 for the *-Cholesky-* "
+                        "backends, see CHOL_FAMILY_KEYS).")
     args = p.parse_args(argv)
 
     import os
@@ -1211,7 +1218,8 @@ def main(argv=None):
             print(f"warmup skipped: {exc!r}", flush=True)
 
     t0 = time.perf_counter()
-    rows = sweep(keys, sizes, args.theta, labels, args.cg_tol, args.lk_precond_rank, args.lk_probes_cg_tol)
+    rows = sweep(keys, sizes, args.theta, labels, args.cg_tol, args.lk_precond_rank, args.lk_probes_cg_tol,
+                 extra_sizes=args.extra_sizes)
     print(f"\ntotal wall time: {time.perf_counter() - t0:.0f}s", flush=True)
 
     base = f"{slug(gpu_name)}__{slug(cpu_name)}"
