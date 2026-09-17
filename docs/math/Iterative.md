@@ -230,14 +230,31 @@ Where this sits relative to the other scaling methods:
   noise floor); `dRmulBatched`'s per-`k` `cublasDgemm` writes straight
   into its interleaved output slot via a `ldc = dimX*n` leading dimension,
   no extra scatter kernel. The `cublasDgemm` call is fp64 throughout, same
-  as everything else here — the dominant matvec is now the only place left
-  where a **TF32/fp32 matvec + fp64 residual correction** (mixed-precision
-  CG, using the existing 50-iteration exact-residual restart as the
-  correction step) could plausibly help further on an H100, at the cost of
-  actually changing the numerics rather than just how they're computed
-  (unlike every fast path above, which is bit-identical-to-noise-floor by
-  construction). Deliberately not done here — flagged as a candidate
-  follow-up, not started.
+  as everything else here by default — the dominant matvec is also where
+  a **TF32/fp32 matvec + fp64 residual correction** (mixed-precision CG,
+  using the existing 50-iteration exact-residual restart as the
+  correction step) can help further, at the cost of actually changing
+  the numerics rather than just how they're computed (unlike every fast
+  path above, which is bit-identical-to-noise-floor by construction).
+  Implemented as an **opt-in** `LK_ITERATIVE_CUDA_MIXED_PRECISION`
+  environment variable (default off, nothing above changes unless it's
+  set): ~5x faster on an L40S (fp64-throttled relative to TF32), only
+  ~1.1x on an H100 (fp64 there isn't nearly as throttled), at the
+  project's typical `cg_tol`/`probes_cg_tol` (`~1e-4` and looser) — but
+  it degrades much faster than plain fp64 at a tight tolerance (`1e-6`
+  and below), a real accuracy floor from TF32's reduced mantissa that
+  the periodic restart correction can't fully compensate for. See
+  `CHANGELOG.md` for the measurements.
+- **Column compaction in the batched CG**: a column that has already
+  converged still rode along in every subsequent iteration's matvec
+  until this was fixed — it now drops out at the next periodic restart
+  instead (same `restart_every=50` checkpoint), gathering the survivors
+  to the front of their buffers and scattering finished columns' values
+  into the output. ~7.4x on the matrix-free path (large `n`, many
+  right-hand-side columns converging at different rates — the probe
+  solve above, or `predictIterative`'s hundreds of test points); no
+  effect on the dense fast path (its matvec is memory-bandwidth-bound
+  on `R` itself, not on the column count). See `CHANGELOG.md`.
 - **CUDA batched CG scalar/vector kernels stay hand-written, not cuBLAS**:
   `lk_cuda_batched_dot/axpy/update_p_launch` are custom kernels, not
   `cublasDdot`/`cublasDaxpy` — tried once before (see the git history this
