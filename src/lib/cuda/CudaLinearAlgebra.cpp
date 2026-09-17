@@ -311,6 +311,15 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   double* d_Rmat = covCacheR(cov);
   const bool dense = (d_Rmat != nullptr);
 
+  // Current working-set width: starts at ncols, shrinks as columns
+  // converge and get compacted out (see compactConverged below). Declared
+  // this early because matvec/precondApply (defined further down) capture
+  // it by reference and must see it already in scope.
+  int ncols_cur = ncols;
+  auto matBytesCur = [&] {
+    return sizeof(double) * static_cast<std::size_t>(n) * static_cast<std::size_t>(ncols_cur);
+  };
+
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
   double *d_b, *d_x, *d_r, *d_p, *d_Ap;
   LK_CUDA_CHECK(cudaMalloc(&d_b, mat_bytes));
@@ -372,21 +381,21 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // the whole device.
   const double prec_one = 1.0, prec_zero = 0.0;
   auto precondApply = [&](const double* d_in, double* d_out) {
-    lk_cuda_scale_rows_launch(d_precDinv, d_in, n, ncols, d_prec_nc);  // d_prec_nc = Dinv .* r
+    lk_cuda_scale_rows_launch(d_precDinv, d_in, n, ncols_cur, d_prec_nc);  // d_prec_nc = Dinv .* r
     LK_CUDA_CHECK(cudaGetLastError());
-    // t = U^T (Dinv .* r)   (k x ncols)
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_T, CUBLAS_OP_N, pk, ncols, n, &prec_one, d_precU, n, d_prec_nc,
-                                n, &prec_zero, d_prec_kc, pk));
+    // t = U^T (Dinv .* r)   (k x ncols_cur)
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_T, CUBLAS_OP_N, pk, ncols_cur, n, &prec_one, d_precU, n,
+                                d_prec_nc, n, &prec_zero, d_prec_kc, pk));
     // s = (L L^T)^-1 t, in place: L y = t then L^T s = y
     LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_N,
-                                CUBLAS_DIAG_NON_UNIT, pk, ncols, &prec_one, d_precMchol, pk, d_prec_kc, pk));
+                                CUBLAS_DIAG_NON_UNIT, pk, ncols_cur, &prec_one, d_precMchol, pk, d_prec_kc, pk));
     LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_T,
-                                CUBLAS_DIAG_NON_UNIT, pk, ncols, &prec_one, d_precMchol, pk, d_prec_kc, pk));
+                                CUBLAS_DIAG_NON_UNIT, pk, ncols_cur, &prec_one, d_precMchol, pk, d_prec_kc, pk));
     // d_prec_nc is free again (its Dinv .* r content was consumed by the
-    // first DGEMM): reuse it for U s (n x ncols) instead of a 7th buffer.
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, pk, &prec_one, d_precU, n, d_prec_kc,
-                                pk, &prec_zero, d_prec_nc, n));
-    lk_cuda_precond_finish_launch(d_precDinv, d_in, d_prec_nc, n, ncols, d_out);
+    // first DGEMM): reuse it for U s (n x ncols_cur) instead of a 7th buffer.
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, pk, &prec_one, d_precU, n,
+                                d_prec_kc, pk, &prec_zero, d_prec_nc, n));
+    lk_cuda_precond_finish_launch(d_precDinv, d_in, d_prec_nc, n, ncols_cur, d_out);
     LK_CUDA_CHECK(cudaGetLastError());
   };
 
@@ -394,21 +403,28 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // own scratch requirement (see lk_cuda_rmul_batched_scratch_elems) is
   // fixed too -- allocate it once here rather than inside the per-iteration
   // matvec call. Not needed at all on the dense path (no tiled reduction).
-  const int rmul_scratch_elems = dense ? 0 : lk_cuda_rmul_batched_scratch_elems(n, ncols);
+  // Mutable: column compaction (below) shrinks ncols_cur mid-solve, and
+  // chooseJBlocks can pick a DIFFERENT tile count for a smaller column
+  // count, so this gets recomputed and reallocated at every compaction
+  // rather than assumed to still fit the allocation sized for the original
+  // ncols.
+  int rmul_scratch_elems = dense ? 0 : lk_cuda_rmul_batched_scratch_elems(n, ncols);
   double* d_rmul_scratch = nullptr;
   if (rmul_scratch_elems > 0)
     LK_CUDA_CHECK(cudaMalloc(&d_rmul_scratch, sizeof(double) * static_cast<std::size_t>(rmul_scratch_elems)));
 
   // Ap = R * V, either a single cublasDgemm against the materialized d_Rmat
   // or the matrix-free rmul_batched_kernel -- the only difference the rest
-  // of this CG loop needs to know about.
+  // of this CG loop needs to know about. Reads ncols_cur (not ncols): after
+  // a compaction this is the current, possibly-shrunk, working-set width.
   const double gemm_one = 1.0, gemm_zero = 0.0;
   auto matvec = [&](const double* d_in, double* d_out) {
     if (dense) {
-      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &gemm_one, d_Rmat, n, d_in, n,
-                                  &gemm_zero, d_out, n));
+      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one, d_Rmat, n,
+                                  d_in, n, &gemm_zero, d_out, n));
     } else {
-      lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_in, ncols, d_out, d_rmul_scratch);
+      lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_in, ncols_cur, d_out,
+                                  d_rmul_scratch);
       LK_CUDA_CHECK(cudaGetLastError());
     }
   };
@@ -444,62 +460,180 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   constexpr arma::uword sync_every = 10;     // host "any active?" poll cadence
   int host_flag = any_active_h ? 1 : 0;
 
+  // Every column of a batched CG solve is an independent solve, coupled
+  // only through the shared matvec -- and that matvec is itself
+  // columnwise-independent, (A*P)[:,c] = A*P[:,c]. So dropping an already
+  // converged/frozen column out of the working set changes nothing about
+  // the remaining columns' math, only how many columns the next
+  // matvec/dot/axpy touch. col_map[k] is the ORIGINAL column index of
+  // working-set slot k; X_out accumulates each column's final value at its
+  // original position as it leaves the working set (by compaction or, for
+  // whatever remains, at loop exit).
+  std::vector<int> col_map(static_cast<std::size_t>(ncols));
+  for (int c = 0; c < ncols; ++c)
+    col_map[static_cast<std::size_t>(c)] = c;
+  arma::mat X_out(n, ncols, arma::fill::zeros);
+
+  // Piggybacks on the restart's existing host sync -- not a new
+  // synchronization point. Gathers every persistent per-column and
+  // per-(row,column) CG state buffer (x, r, p, z, rz_old, bnorm, tol) into
+  // the front of their allocations, keeping only the still-active columns,
+  // and writes the just-deactivated ones' frozen x into X_out. A host
+  // round trip of the working n x ncols_cur matrices, but only when a
+  // restart's exact-residual recompute reveals the active set actually
+  // shrank -- i.e. at most once per restart_every=50 iterations.
+  auto compactConverged = [&]() {
+    std::vector<int> active_h_cur(static_cast<std::size_t>(ncols_cur));
+    LK_CUDA_CHECK(cudaMemcpy(active_h_cur.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur),
+                             cudaMemcpyDeviceToHost));
+    int n_still_active = 0;
+    for (int c = 0; c < ncols_cur; ++c)
+      n_still_active += active_h_cur[static_cast<std::size_t>(c)];
+    if (n_still_active == 0 || n_still_active == ncols_cur)
+      return;  // nothing to compact: either the loop exits next, or nothing dropped
+
+    const std::size_t cur_bytes = matBytesCur();
+    // d_b (the right-hand side) must be compacted too: the restart branch
+    // recomputes r = b - A*x by copying straight from d_b's leading
+    // ncols_cur columns, so once the working set is reordered, b needs the
+    // SAME reorder or a later restart reads the wrong right-hand side for
+    // a kept column.
+    arma::mat Xh(n, ncols_cur, arma::fill::none), Rh(n, ncols_cur, arma::fill::none),
+        Ph(n, ncols_cur, arma::fill::none), Bh(n, ncols_cur, arma::fill::none);
+    LK_CUDA_CHECK(cudaMemcpy(Xh.memptr(), d_x, cur_bytes, cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(Rh.memptr(), d_r, cur_bytes, cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(Ph.memptr(), d_p, cur_bytes, cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(Bh.memptr(), d_b, cur_bytes, cudaMemcpyDeviceToHost));
+    arma::mat Zh;
+    if (preconditioned) {
+      Zh.set_size(n, ncols_cur);
+      LK_CUDA_CHECK(cudaMemcpy(Zh.memptr(), d_z, cur_bytes, cudaMemcpyDeviceToHost));
+    }
+    const std::size_t cur_col_bytes = sizeof(double) * static_cast<std::size_t>(ncols_cur);
+    std::vector<double> rz_old_h(static_cast<std::size_t>(ncols_cur)), bnorm_h(static_cast<std::size_t>(ncols_cur)),
+        tol_h(static_cast<std::size_t>(ncols_cur));
+    LK_CUDA_CHECK(cudaMemcpy(rz_old_h.data(), d_rz_old, cur_col_bytes, cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(bnorm_h.data(), d_bnorm, cur_col_bytes, cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(tol_h.data(), d_tol, cur_col_bytes, cudaMemcpyDeviceToHost));
+
+    std::vector<int> keep;
+    keep.reserve(static_cast<std::size_t>(n_still_active));
+    std::vector<int> new_col_map(static_cast<std::size_t>(n_still_active));
+    for (int c = 0; c < ncols_cur; ++c) {
+      if (active_h_cur[static_cast<std::size_t>(c)]) {
+        new_col_map[keep.size()] = col_map[static_cast<std::size_t>(c)];
+        keep.push_back(c);
+      } else {
+        X_out.col(static_cast<arma::uword>(col_map[static_cast<std::size_t>(c)])) = Xh.col(c);
+      }
+    }
+    const arma::uvec keep_u = arma::conv_to<arma::uvec>::from(keep);
+    const arma::mat Xh2 = Xh.cols(keep_u);
+    const arma::mat Rh2 = Rh.cols(keep_u);
+    const arma::mat Ph2 = Ph.cols(keep_u);
+    const arma::mat Bh2 = Bh.cols(keep_u);
+    std::vector<double> rz_old2(static_cast<std::size_t>(n_still_active)),
+        bnorm2(static_cast<std::size_t>(n_still_active)), tol2(static_cast<std::size_t>(n_still_active));
+    for (std::size_t k = 0; k < keep.size(); ++k) {
+      rz_old2[k] = rz_old_h[static_cast<std::size_t>(keep[k])];
+      bnorm2[k] = bnorm_h[static_cast<std::size_t>(keep[k])];
+      tol2[k] = tol_h[static_cast<std::size_t>(keep[k])];
+    }
+
+    ncols_cur = n_still_active;
+    const std::size_t new_bytes = matBytesCur();
+    LK_CUDA_CHECK(cudaMemcpy(d_x, Xh2.memptr(), new_bytes, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_r, Rh2.memptr(), new_bytes, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_p, Ph2.memptr(), new_bytes, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_b, Bh2.memptr(), new_bytes, cudaMemcpyHostToDevice));
+    if (preconditioned) {
+      const arma::mat Zh2 = Zh.cols(keep_u);
+      LK_CUDA_CHECK(cudaMemcpy(d_z, Zh2.memptr(), new_bytes, cudaMemcpyHostToDevice));
+    }
+    const std::size_t new_col_bytes = sizeof(double) * static_cast<std::size_t>(ncols_cur);
+    LK_CUDA_CHECK(cudaMemcpy(d_rz_old, rz_old2.data(), new_col_bytes, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_bnorm, bnorm2.data(), new_col_bytes, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_tol, tol2.data(), new_col_bytes, cudaMemcpyHostToDevice));
+    const std::vector<int> ones(static_cast<std::size_t>(ncols_cur), 1);  // every kept column is, by construction, active
+    LK_CUDA_CHECK(cudaMemcpy(d_active, ones.data(), sizeof(int) * static_cast<std::size_t>(ncols_cur),
+                             cudaMemcpyHostToDevice));
+    col_map = std::move(new_col_map);
+
+    // The matrix-free matvec's tiling scratch requirement depends on
+    // ncols_cur (chooseJBlocks may pick MORE tiles for a smaller column
+    // count to keep the GPU busy) -- reallocate for the new width rather
+    // than assume it still fits inside the allocation sized for the
+    // original ncols.
+    if (!dense) {
+      const int new_scratch_elems = lk_cuda_rmul_batched_scratch_elems(n, ncols_cur);
+      if (new_scratch_elems != rmul_scratch_elems) {
+        if (d_rmul_scratch)
+          cudaFree(d_rmul_scratch);
+        d_rmul_scratch = nullptr;
+        rmul_scratch_elems = new_scratch_elems;
+        if (rmul_scratch_elems > 0)
+          LK_CUDA_CHECK(cudaMalloc(&d_rmul_scratch, sizeof(double) * static_cast<std::size_t>(rmul_scratch_elems)));
+      }
+    }
+  };
+
   arma::uword iters_done = 0;
   for (arma::uword it = 0; host_flag && it < max_iter; ++it) {
     iters_done = it + 1;
     matvec(d_p, d_Ap);  // Ap = R*p
-    lk_cuda_batched_dot_launch(d_p, d_Ap, n, ncols, d_scratch);  // pAp
+    lk_cuda_batched_dot_launch(d_p, d_Ap, n, ncols_cur, d_scratch);  // pAp
     LK_CUDA_CHECK(cudaGetLastError());
-    lk_cuda_cg_alpha_launch(d_rz_old, d_scratch, ncols, d_active, d_alpha, d_neg_alpha);
+    lk_cuda_cg_alpha_launch(d_rz_old, d_scratch, ncols_cur, d_active, d_alpha, d_neg_alpha);
     LK_CUDA_CHECK(cudaGetLastError());
-    lk_cuda_batched_axpy_launch(d_alpha, d_p, d_x, n, ncols);  // x += alpha*p
+    lk_cuda_batched_axpy_launch(d_alpha, d_p, d_x, n, ncols_cur);  // x += alpha*p
     LK_CUDA_CHECK(cudaGetLastError());
 
     if ((it + 1) % restart_every == 0) {
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's).
       matvec(d_x, d_Ap);  // Ap = R*x
-      LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b
-      lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);             // r = b - A*x
+      LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, matBytesCur(), cudaMemcpyDeviceToDevice));  // r = b
+      lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols_cur);             // r = b - A*x
       LK_CUDA_CHECK(cudaGetLastError());
-      lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_scratch);  // r.r (true residual)
+      lk_cuda_batched_dot_launch(d_r, d_r, n, ncols_cur, d_scratch);  // r.r (true residual)
       LK_CUDA_CHECK(cudaGetLastError());
       if (preconditioned) {
         precondApply(d_r, d_z);
-        lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z
+        lk_cuda_batched_dot_launch(d_r, d_z, n, ncols_cur, d_scratch2);  // r.z
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+        lk_cuda_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols_cur, d_active, d_rz_old);
         LK_CUDA_CHECK(cudaGetLastError());
-        LK_CUDA_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = z
+        LK_CUDA_CHECK(cudaMemcpy(d_p, d_z, matBytesCur(), cudaMemcpyDeviceToDevice));  // restart: p = z
       } else {
-        lk_cuda_cg_restart_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+        lk_cuda_cg_restart_launch(d_scratch, d_bnorm, d_tol, ncols_cur, d_active, d_rz_old);
         LK_CUDA_CHECK(cudaGetLastError());
-        LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = r
+        LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, matBytesCur(), cudaMemcpyDeviceToDevice));  // restart: p = r
       }
+      compactConverged();
     } else {
-      lk_cuda_batched_axpy_launch(d_neg_alpha, d_Ap, d_r, n, ncols);  // r -= alpha*Ap
+      lk_cuda_batched_axpy_launch(d_neg_alpha, d_Ap, d_r, n, ncols_cur);  // r -= alpha*Ap
       LK_CUDA_CHECK(cudaGetLastError());
-      lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_scratch);  // r.r (true residual)
+      lk_cuda_batched_dot_launch(d_r, d_r, n, ncols_cur, d_scratch);  // r.r (true residual)
       LK_CUDA_CHECK(cudaGetLastError());
       if (preconditioned) {
         precondApply(d_r, d_z);
-        lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z == rz_new
+        lk_cuda_batched_dot_launch(d_r, d_z, n, ncols_cur, d_scratch2);  // r.z == rz_new
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
+        lk_cuda_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols_cur, d_active, d_rz_old, d_beta);
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_batched_update_p_launch(d_z, d_beta, d_p, n, ncols);  // p = z + beta*p
+        lk_cuda_batched_update_p_launch(d_z, d_beta, d_p, n, ncols_cur);  // p = z + beta*p
         LK_CUDA_CHECK(cudaGetLastError());
       } else {
-        lk_cuda_cg_beta_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
+        lk_cuda_cg_beta_launch(d_scratch, d_bnorm, d_tol, ncols_cur, d_active, d_rz_old, d_beta);
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_batched_update_p_launch(d_r, d_beta, d_p, n, ncols);  // p = r + beta*p
+        lk_cuda_batched_update_p_launch(d_r, d_beta, d_p, n, ncols_cur);  // p = r + beta*p
         LK_CUDA_CHECK(cudaGetLastError());
       }
     }
 
     if ((it + 1) % sync_every == 0 || (it + 1) % restart_every == 0) {
       LK_CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(int)));
-      lk_cuda_cg_any_active_launch(d_active, ncols, d_flag);
+      lk_cuda_cg_any_active_launch(d_active, ncols_cur, d_flag);
       LK_CUDA_CHECK(cudaGetLastError());
       LK_CUDA_CHECK(cudaMemcpy(&host_flag, d_flag, sizeof(int), cudaMemcpyDeviceToHost));
     }
@@ -520,22 +654,36 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       std::snprintf(tol_str, sizeof(tol_str), "%g", tol_min);
     else
       std::snprintf(tol_str, sizeof(tol_str), "%g..%g", tol_min, tol_max);
-    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu%s\n", n, ncols, tol_str,
-                 pk, static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
-                 iters_done >= max_iter ? "  <-- NOT CONVERGED" : "");
+    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu compacted_to=%d%s\n", n,
+                 ncols, tol_str, pk, static_cast<unsigned long long>(iters_done),
+                 static_cast<unsigned long long>(max_iter), ncols_cur, iters_done >= max_iter ? "  <-- NOT CONVERGED" : "");
   }
 
-  arma::mat X(n, ncols, arma::fill::none);
-  LK_CUDA_CHECK(cudaMemcpy(X.memptr(), d_x, mat_bytes, cudaMemcpyDeviceToHost));
+  // Whatever remains in the (possibly compacted-down) working set is each
+  // column's final value, whether it converged on the last iteration or
+  // hit max_iter still active -- scatter it into X_out at col_map[c], same
+  // as every earlier compaction did for the columns that dropped out
+  // before it.
+  if (ncols_cur > 0) {
+    arma::mat Xh_final(n, ncols_cur, arma::fill::none);
+    LK_CUDA_CHECK(cudaMemcpy(Xh_final.memptr(), d_x, matBytesCur(), cudaMemcpyDeviceToHost));
+    for (int c = 0; c < ncols_cur; ++c)
+      X_out.col(static_cast<arma::uword>(col_map[static_cast<std::size_t>(c)])) = Xh_final.col(c);
+  }
 
-  // d_active still holds, per column, whether the loop above exited via
-  // max_iter with that column not yet at tol (a converged/deactivated
-  // column was already zeroed) -- one small readback, same convergence
-  // contract/reporting as LinearAlgebra::conjugateGradientBatched.
-  std::vector<int> active_final(static_cast<std::size_t>(ncols));
-  LK_CUDA_CHECK(cudaMemcpy(active_final.data(), d_active, col_bytes_i, cudaMemcpyDeviceToHost));
+  // d_active still holds, per (working-set) column, whether the loop above
+  // exited via max_iter with that column not yet at tol -- a column
+  // dropped by compactConverged was, by construction, already converged,
+  // so it can never contribute to n_unconverged; reading the final,
+  // possibly-shrunk d_active gives the same count as reading the original
+  // ncols-wide one would. Same convergence contract/reporting as
+  // LinearAlgebra::conjugateGradientBatched.
+  std::vector<int> active_final(static_cast<std::size_t>(ncols_cur));
+  if (ncols_cur > 0)
+    LK_CUDA_CHECK(cudaMemcpy(active_final.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur),
+                             cudaMemcpyDeviceToHost));
   arma::uword n_unconverged = 0;
-  for (int c = 0; c < ncols; ++c)
+  for (int c = 0; c < ncols_cur; ++c)
     if (active_final[static_cast<std::size_t>(c)])
       ++n_unconverged;
   if (n_unconverged_out != nullptr)
@@ -571,7 +719,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     cudaFree(d_prec_kc);
   }
 
-  return X;
+  return X_out;
 }
 
 // Scalar-tol convenience overload for the common case (every column shares
