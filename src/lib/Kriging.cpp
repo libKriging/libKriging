@@ -1836,6 +1836,12 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // dR/dtheta matvec) run on the SAME device queue; `slq_on_gpu` gates the
   // SLQ term and the gradient trace below, `gpuCgSolve` the CG solves.
   bool slq_on_gpu = false;
+  // Set only inside the CUDA-specific bind below (unlike slq_on_gpu, which
+  // any of CUDA/HIP/SYCL/Metal can set): gates the fully device-resident
+  // SLQ Lanczos path (LinearAlgebraCuda::stochasticLogDetBatched), which
+  // only exists for CUDA so far -- HIP/SYCL/Metal keep using the generic
+  // rmulBatched-ping-pong SLQ below via slq_on_gpu.
+  bool slq_on_cuda = false;
   arma::uword gpu_max_dimx = 0;
   arma::uword gpu_cg_n_unconverged = 0;  // aggregated OR'd into m_iterative_last_cg_unconverged below
   std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;  // R^-1 * B (preconditioned iff woodbury_pc)
@@ -1859,8 +1865,10 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     dRmulBatched = [&](const arma::mat& V) { return NS::dRmulBatched(Xt, theta, m_covType, V); };               \
   } while (0)
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
+  if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
     LK_ITER_GPU_BIND(LinearAlgebraCuda);
+    slq_on_cuda = true;
+  }
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
   if (!slq_on_gpu && LinearAlgebraHip::enabled() && LinearAlgebraHip::supports(m_covType))
@@ -1933,7 +1941,22 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // whose SLQ estimate is log|R| - log|P| -- so preconditioning tightens the
   // log-determinant, not just the CG solves (log|P| added back exactly).
   double logdetR;
-  if (slq_on_gpu && woodbury_pc) {
+  if (slq_on_cuda && !woodbury_pc) {
+    // Fully device-resident Lanczos (see
+    // LinearAlgebraCuda::stochasticLogDetBatched's doc comment): every
+    // probe's Krylov history stays on the GPU for the whole recurrence
+    // instead of round-tripping through rmulBatched once per step for the
+    // host to do reorthogonalization/bookkeeping in Armadillo. Same
+    // estimator/numerics as the branches below, just without the
+    // host<->device ping-pong -- scoped to the unpreconditioned case for
+    // now (see that function's doc comment for why).
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+    logdetR = LinearAlgebraCuda::stochasticLogDetBatched(Xt, theta, m_covType, m_iterative_lanczos_steps,
+                                                          m_iterative_probes);
+#else
+    logdetR = 0.0;  // unreachable: slq_on_cuda is only ever set true inside a CUDA build
+#endif
+  } else if (slq_on_gpu && woodbury_pc) {
     // Same Nystrom-whitened SLQ as the CPU preconditioned branch below, just
     // with the expensive O(n^2) R*V step running on whichever GPU backend
     // got bound (rmulBatched) instead of RmulBatched -- the whitenL/whitenLt

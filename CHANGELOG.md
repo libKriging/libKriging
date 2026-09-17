@@ -12,6 +12,39 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- CUDA iterative backend: the SLQ log-determinant's batched Lanczos
+  recurrence (`LLIterative`'s log-det term) is now fully device-resident
+  (`LinearAlgebraCuda::stochasticLogDetBatched`) instead of round-tripping
+  through the host once per Lanczos step. Previously, even with a GPU
+  backend bound, the SLQ term called the CPU-orchestrated
+  `LinearAlgebra::stochasticLogDetBatched` with the GPU matvec as its
+  `AmulBatched` callback: every one of the 40 (default) Lanczos steps
+  uploaded that step's probe vectors, computed `R*V` on device, downloaded
+  the result, then did reorthogonalization/dot-products/bookkeeping on the
+  host in Armadillo before uploading again for the next step. The new path
+  keeps every probe's entire Krylov history resident in one device buffer
+  for the whole recurrence: step j's vectors are a contiguous n×nprobe
+  block (feeds the matvec directly, no gather needed) and, in the SAME
+  buffer, probe p's history across steps is a standard column-major matrix
+  with leading dimension `nprobe*n` (feeds `cublasDgemmStridedBatched`
+  directly) — full reorthogonalization against every prior step becomes two
+  batched cuBLAS calls instead of `nprobe*(j+1)` separate host-side
+  dot/axpy pairs. Only `nprobe*lanczos_steps` scalars (α/β) come back to
+  the host, once, for the final small tridiagonal eigendecompositions.
+  Same estimator/numerics as before (bit-matching cross-checked against the
+  prior implementation; +10 assertions in `KrigingIterativeTest.cpp`), pure
+  performance change. Measured on an H100 (isolated, uncontended timings —
+  the shared node's GPUs otherwise carry heavy multi-tenant noise): the
+  no-grad path (`[F|y]` CG + SLQ, unaffected by the separate probe-CG cost)
+  is 1.6-2.4x faster at n=2000/4000/8000; on the full log-likelihood+
+  gradient evaluation the gain shrinks to ~10% at n=8000 and becomes
+  negligible at n=16000/32000, because the gradient's Hutchinson-probe CG
+  solve (untouched by this change) dominates total time at that scale —
+  the next lever for those sizes is fusing `[F|y|probes]` into one Krylov
+  pass (mBCG) rather than three, not the SLQ term. Scoped to the
+  unpreconditioned CUDA case for now: HIP/SYCL/Metal and the
+  Nystrom-preconditioned SLQ path still use the prior CPU-orchestrated
+  ping-pong (documented in the new function's doc comment).
 - Python: scikit-learn compatible estimators for all four Kriging classes —
   `KrigingRegressor`, `WarpKrigingRegressor`, `MLPKrigingRegressor`,
   `NestedKrigingRegressor` in `pylibkriging.sklearn`, implementing the

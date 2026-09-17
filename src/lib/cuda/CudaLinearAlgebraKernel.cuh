@@ -141,6 +141,34 @@ void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, 
 void lk_cuda_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm, double tol,
                                        int ncols, int* d_active, double* d_rz_old);
 
+// --- Device-resident batched Lanczos (Stochastic Lanczos Quadrature) ------
+// Lets LinearAlgebraCuda::stochasticLogDetBatched keep every probe's Krylov
+// vectors resident on the GPU across the whole recurrence (see
+// CudaLinearAlgebra.cpp) instead of round-tripping the matvec result through
+// the host every step to do reorthogonalization/bookkeeping there (the old
+// scheme: LinearAlgebra::stochasticLogDetBatched called with rmulBatched as
+// AmulBatched, each call its own upload/download).
+
+// alpha[c] = active[c] ? dot[c] : 0 ; neg_alpha[c] = -alpha[c].
+void lk_cuda_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
+                                  double* d_neg_alpha);
+
+// Per-probe end-of-step bookkeeping, mirroring
+// LinearAlgebra::stochasticLogDetBatched's host loop body exactly:
+//   bj = sqrt(dot2[c])
+//   if active[c]:
+//     if bj < 1e-12: active[c] = 0 ; m_eff[c] = step_idx + 1  (invariant subspace, frozen from here on)
+//     beta_out[c]      = (is_last_step || bj < 1e-12) ? 0 : bj        -- this step's T off-diagonal
+//     inv_bj_out[c]    = (is_last_step || bj < 1e-12) ? 0 : 1/bj      -- normalizes w into V[:, step_idx+1]
+//     neg_beta_prev_out[c] = (is_last_step || bj < 1e-12) ? 0 : -bj   -- feeds next step's w -= beta_prev*v_prev
+//   else: beta_out[c] = inv_bj_out[c] = neg_beta_prev_out[c] = 0 (no-ops: that probe's V columns
+//     stay exactly zero from m_eff[c] on, since the caller zero-initializes the whole V buffer
+//     once and every later write to it is gated by inv_bj_out being 0 here).
+// active/m_eff are both read-modify-write (int, length ncols); m_eff must be
+// pre-filled with lanczos_steps (the "never went inactive" default) by the caller.
+void lk_cuda_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step, int* d_active,
+                                 int* d_m_eff, double* d_beta_out, double* d_inv_bj_out, double* d_neg_beta_prev_out);
+
 }  // extern "C"
 
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE

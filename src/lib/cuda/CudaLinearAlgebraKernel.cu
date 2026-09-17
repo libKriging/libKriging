@@ -671,6 +671,75 @@ extern "C" void lk_cuda_cg_restart_precond_launch(const double* d_rr, const doub
   cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, tol, ncols, d_active, d_rz_old);
 }
 
+// alpha[c] = active[c] ? dot[c] : 0 ; neg_alpha[c] = -alpha[c]. See
+// LinearAlgebraCuda::stochasticLogDetBatched (CudaLinearAlgebra.cpp): alpha
+// is a per-probe DOT PRODUCT (w . V_j), not a ratio like CG's, so it needs
+// its own tiny kernel rather than reusing cg_alpha_kernel.
+__global__ void lanczos_alpha_kernel(const double* __restrict__ dot,
+                                     int ncols,
+                                     const int* __restrict__ active,
+                                     double* __restrict__ alpha,
+                                     double* __restrict__ neg_alpha) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  const double a = active[c] ? dot[c] : 0.0;
+  alpha[c] = a;
+  neg_alpha[c] = -a;
+}
+
+extern "C" void lk_cuda_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
+                                             double* d_neg_alpha) {
+  const int block = 128;
+  lanczos_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_dot, ncols, d_active, d_alpha, d_neg_alpha);
+}
+
+// End-of-step Lanczos bookkeeping -- see the .cuh doc comment for the exact
+// semantics (mirrors LinearAlgebra::stochasticLogDetBatched's host loop
+// body). Once active[c] is 0, every output is 0: the caller's V buffer was
+// zero-initialized once up front, and inv_bj_out=0 is what keeps every
+// later normalization write a no-op, so an inactive probe's Krylov vectors
+// stay exactly zero from m_eff[c] on -- matching the CPU version's explicit
+// "Vj.col(p) = 0 for a non-iterating probe" without needing a separate
+// per-step zeroing pass.
+__global__ void lanczos_beta_kernel(const double* __restrict__ dot2,
+                                    int ncols,
+                                    int step_idx,
+                                    int is_last_step,
+                                    int* __restrict__ active,
+                                    int* __restrict__ m_eff,
+                                    double* __restrict__ beta_out,
+                                    double* __restrict__ inv_bj_out,
+                                    double* __restrict__ neg_beta_prev_out) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c]) {
+    beta_out[c] = 0.0;
+    inv_bj_out[c] = 0.0;
+    neg_beta_prev_out[c] = 0.0;
+    return;
+  }
+  const double bj = sqrt(dot2[c]);
+  const bool invariant = bj < 1e-12;
+  if (invariant) {
+    active[c] = 0;
+    m_eff[c] = step_idx + 1;
+  }
+  const bool no_next = is_last_step || invariant;
+  beta_out[c] = no_next ? 0.0 : bj;
+  inv_bj_out[c] = no_next ? 0.0 : 1.0 / bj;
+  neg_beta_prev_out[c] = no_next ? 0.0 : -bj;
+}
+
+extern "C" void lk_cuda_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step,
+                                            int* d_active, int* d_m_eff, double* d_beta_out, double* d_inv_bj_out,
+                                            double* d_neg_beta_prev_out) {
+  const int block = 128;
+  lanczos_beta_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_dot2, ncols, step_idx, is_last_step, d_active, d_m_eff, d_beta_out, d_inv_bj_out, d_neg_beta_prev_out);
+}
+
 // dimX must be <= LK_CUDA_MAX_DIMX (guaranteed by the host caller). d_Out
 // must be sized n * dimX * ncols doubles.
 extern "C" void lk_cuda_drmul_batched_launch(const double* d_Xt,
