@@ -128,6 +128,21 @@ JLibKriging.jl.
   already-materialized R, which is memory-bandwidth-bound on streaming R
   itself rather than on `ncols` — reducing the column count there measured
   as no change either way.
+  Follow-up fix (same change, caught while benchmarking): the first version
+  called the compaction check unconditionally at every `restart_every`
+  checkpoint, even when nothing had converged since the last one — an
+  extra host round trip that measurably *slowed down* solves that never
+  need to compact (the dense path, where columns tend to converge in
+  lockstep). Fixed by reusing the loop's existing single-int
+  active-column poll (already paid for every `sync_every`/`restart_every`
+  iterations) to get an active *count*, not just a 0/1 flag, and only
+  running the (comparatively expensive) gather/scatter when that count
+  shows the active set actually shrank. Regenerated official
+  `bench/gpu/results/*.{csv,html}` on both GPUs afterward: every
+  `libKriging-Iterative-CUDA` row now matches or beats the pre-item-7
+  baseline (H100 n=8000/16000/32000 `logLik`: 1.20/35.0/825.9s →
+  1.09/31.5/765.7s; L40S n=8000 `logLik`: 14.06s → 10.71s), values
+  (`RMSE`/`Q2`/`dMean`/`dLogLik`) unchanged.
 - CUDA iterative backend: `build_cov_kernel` (the dense fast-path builder
   behind `LinearAlgebraCuda`'s `R`/`dR` cache) now computes each covariance
   pair once instead of twice. `R` and every `∂R/∂θₖ` block are symmetric
