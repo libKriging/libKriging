@@ -609,7 +609,6 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         LK_CUDA_CHECK(cudaGetLastError());
         LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, matBytesCur(), cudaMemcpyDeviceToDevice));  // restart: p = r
       }
-      compactConverged();
     } else {
       lk_cuda_batched_axpy_launch(d_neg_alpha, d_Ap, d_r, n, ncols_cur);  // r -= alpha*Ap
       LK_CUDA_CHECK(cudaGetLastError());
@@ -632,10 +631,23 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     }
 
     if ((it + 1) % sync_every == 0 || (it + 1) % restart_every == 0) {
+      // A COUNT, not just a 0/1 flag: the same single-int round trip this
+      // loop already pays for every sync_every/restart_every iterations
+      // also tells us whether the active set actually shrank, so
+      // compactConverged's (comparatively expensive) full gather/scatter
+      // only runs when it has something to do -- calling it unconditionally
+      // every restart, even when nothing had converged since the last one,
+      // measurably slowed down solves that never need to compact at all
+      // (e.g. the dense path, where every column tends to converge in
+      // lockstep) with a host round trip that bought nothing.
       LK_CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(int)));
-      lk_cuda_cg_any_active_launch(d_active, ncols_cur, d_flag);
+      lk_cuda_cg_active_count_launch(d_active, ncols_cur, d_flag);
       LK_CUDA_CHECK(cudaGetLastError());
-      LK_CUDA_CHECK(cudaMemcpy(&host_flag, d_flag, sizeof(int), cudaMemcpyDeviceToHost));
+      int active_count = 0;
+      LK_CUDA_CHECK(cudaMemcpy(&active_count, d_flag, sizeof(int), cudaMemcpyDeviceToHost));
+      host_flag = active_count > 0 ? 1 : 0;
+      if (active_count > 0 && active_count < ncols_cur)
+        compactConverged();
     }
   }
 

@@ -515,6 +515,20 @@ __global__ void cg_any_active_kernel(const int* __restrict__ active, int ncols, 
     atomicOr(flag, 1);
 }
 
+// Same poll as cg_any_active_kernel, but a COUNT rather than a 0/1 flag:
+// lets the host tell "still active, same set" from "still active, set
+// shrank" using the SAME single-int round trip the loop already pays for
+// every sync_every/restart_every iterations, instead of an extra
+// unconditional full per-column readback on every restart just to check
+// whether anything is worth compacting.
+__global__ void cg_active_count_kernel(const int* __restrict__ active, int ncols, int* __restrict__ count) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (active[c])
+    atomicAdd(count, 1);
+}
+
 extern "C" void lk_cuda_cg_alpha_launch(const double* d_rz_old,
                                         const double* d_pAp,
                                         int ncols,
@@ -549,6 +563,11 @@ extern "C" void lk_cuda_cg_restart_launch(const double* d_rr,
 extern "C" void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int* d_flag) {
   const int block = 128;
   cg_any_active_kernel<<<(ncols + block - 1) / block, block>>>(d_active, ncols, d_flag);
+}
+
+extern "C" void lk_cuda_cg_active_count_launch(const int* d_active, int ncols, int* d_count) {
+  const int block = 128;
+  cg_active_count_kernel<<<(ncols + block - 1) / block, block>>>(d_active, ncols, d_count);
 }
 
 // --- Dense fast-path build: materialize R (+ optionally dR/dtheta) --------
