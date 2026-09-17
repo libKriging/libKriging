@@ -72,3 +72,15 @@ test_that("predictIterative rejects a negative max_iter", {
 
   expect_error(predictIterative(k, Xt, max_iter = -1))
 })
+
+test_that("predictIterative with the Nystrom preconditioner matches exact predict", {
+  d <- make_data(60)
+  k <- make_fixed_theta_model(d$y, d$X)
+  Xt <- matrix(runif(2 * 20), ncol = 2)
+
+  p_exact <- predict(k, Xt, return_stdev = TRUE)
+  p_cg <- predictIterative(k, Xt, return_stdev = TRUE, use_nystrom_precond = TRUE, precond_rank = 30)
+
+  expect_lt(max(abs(p_exact$mean - p_cg$mean)), 0.05 * sd(d$y))
+  expect_lt(max(abs(p_exact$stdev - p_cg$stdev)), 0.05 * sd(d$y))
+})
