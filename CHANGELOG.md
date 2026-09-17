@@ -12,6 +12,50 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- CUDA iterative backend: an opt-in mixed-precision matvec for the batched CG
+  solve (`LinearAlgebraCuda::conjugateGradient`), plan item #8 -- set
+  `LK_ITERATIVE_CUDA_MIXED_PRECISION` (any value) to enable; **default
+  behavior is unchanged** (off, full fp64 throughout, same 527/527
+  assertions). Only affects the dense path (a materialized `R`, gated by
+  `LK_ITERATIVE_CUDA_DENSE_MAX_MB` as before): every non-restart matvec
+  runs as a TF32-accelerated `cublasGemmEx` against a lazily-built fp32
+  copy of `R` (cast from the existing double cache, not a second
+  covariance build) instead of `cublasDgemm`, while the periodic
+  exact-residual restart (already run every 50 iterations for round-off
+  correction) stays full fp64 end to end -- the same iterative-refinement
+  argument that already justifies that restart on the plain fp64 path is
+  what lets the fp32/TF32 matvec's accumulated error get corrected away
+  periodically instead of compounding. Not applied to the matrix-free path
+  or the SLQ Lanczos recursion: matrix-free's cost is transcendental
+  evaluation (`exp`/`log1p` per pair), not GEMM FLOPs, so TF32 tensor
+  cores don't help it the same way.
+  Before implementing, considered (and rejected, see the "correction
+  step" note in the entry below) always running the periodic fp64
+  correction on the CPU instead of the GPU, to unify the design with a
+  future Metal backend (no GPU fp64 there at all); measured that a CPU
+  DGEMM is 67-364x slower than even throttled GPU fp64 at these sizes, so
+  the correction step stays GPU-native for CUDA/HIP.
+  Validated (H100 + L40S, realistic `predictIterative`-shaped solve:
+  n=8000, 300 covariance-vector columns): at `tol=1e-4` (this project's
+  typical operating tolerance), every column's TRUE residual still
+  satisfies the tolerance contract on both GPUs, and wall time drops
+  **~5.2x on the L40S** (19.6s → 3.75s, needing more iterations --
+  2270 → 3600 -- but each one is much cheaper) and **~1.1x on the H100**
+  (2.24s → 1.98s, expected: H100's fp64 isn't nearly as throttled
+  relative to TF32 as the L40S's). **Honest limitation found**: at a much
+  tighter `tol=1e-6`, mixed precision degrades far more than plain fp64 --
+  270/300 columns fail to reach that tolerance within the iteration
+  budget (vs. 7/300 for fp64, itself already a pre-existing
+  ill-conditioning limit at this scale/theta, not new here) -- both hit a
+  similar ~2-3e-5 accuracy floor, but fp64 keeps grinding closer to it
+  while TF32's reduced mantissa caps how good a search direction the
+  cheap matvec can produce, independent of how often the residual gets
+  corrected exactly. Kept strictly opt-in (not wired into the objective
+  string or enabled anywhere by default) until this tolerance-dependent
+  behavior is characterized over more `n`/`theta` combinations; recommend
+  it only at the loose-to-moderate tolerances (`~1e-4` and looser) this
+  project actually uses by default (`cg_tol`/`probes_cg_tol`), not for
+  tight-tolerance solves.
 - CUDA iterative backend: the batched CG solve (`LinearAlgebraCuda::conjugateGradient`)
   now compacts already-converged columns out of its working set instead of
   carrying them, frozen, through every remaining matvec (plan item #7).
