@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>libKriging vs GPyTorch — NVIDIA GeForce RTX 2080 Super</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+          max-width: 980px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .25rem; }
+  ul.meta { list-style: none; padding: 0; }
+  ul.meta li { margin: .2rem 0; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; font-size: .92rem; }
+  th, td { border: 1px solid #8884; padding: .3rem .55rem; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { background: #8881; }
+  code { font-size: .9em; }
+</style>
+</head>
+<body>
+<h1>libKriging vs GPyTorch — iterative path, small n</h1>
+<ul class="meta">
+<li><strong>GPU</strong>: NVIDIA GeForce RTX 2080 Super</li>
+<li><strong>CPU</strong>: Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz</li>
+<li><strong>host</strong>: <code>alien</code>  ·  logical CPUs: 20  ·  OMP_NUM_THREADS: <code>(unset)</code></li>
+<li><strong>when</strong>: 2026-09-17 17:34 CEST</li>
+<li><strong>sweep</strong>: <code>sine_sum</code> d=4, matern5_2, shared theta=0.15; n = 250, 500, 1000, 2000, 4000, 8000; test n=300</li>
+<li><strong>shared CG budget</strong>: relative-residual tolerance <code>0.0001</code> applied to <strong>both</strong> libraries (libKriging <code>predictIterative(tol=...)</code> and the objective's 5th <code>LLIterative</code> field; GPyTorch <code>cg_tolerance</code>/<code>eval_cg_tolerance</code>). Budget-matching this is not cosmetic: running libKriging at 1e-8 against GPyTorch at 1e-4 — as an earlier revision of this harness did — compares a solver converged four orders of magnitude tighter against a deliberately truncated one and reads the difference as speed.</li>
+<li><strong>libKriging iterative objective</strong>: <code>LLIterative(30,0,40,6,0.0001,0.01)</code>  ·  <code>predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)</code>  ·  6th field <code>probes_cg_tol=0.01</code> loosens ONLY the gradient's Hutchinson-probe CG solve (not <code>predictIterative</code>'s own tol above) -- see docs/math/Iterative.md</li>
+<li><strong>same model on both sides</strong>: GPyTorch runs a <code>ProductKernel</code> of one-dimensional Matérn-5/2 factors — which is what libKriging's separable <code>matern5_2</code> is, unlike <code>MaternKernel(ard_num_dims=d)</code>, which is radial in <code>||dx/l||_2</code> — with its fixed <code>ConstantMean</code> set to libKriging's <strong>GLS</strong> trend <code>beta</code> rather than <code>mean(y)</code>. Without both alignments the exact <code>GPyTorch-Cholesky</code> rows themselves showed <code>dMean/rms ≈ 4e-02</code>, i.e. that column measured a model mismatch instead of solver convergence; with them they sit at ~4e-08. See <code>_gpt_modules</code> and <code>run_gpytorch</code>.</li>
+<li><strong>GPyTorch</strong>: raised settings so BBMM converges, and <code>max_cholesky_size=0</code> so every n in the sweep actually USES BBMM (GPyTorch's default, 800, silently falls back to exact dense Cholesky at or below it, which would make an n=250/500 “GPyTorch-BBMM” row misnamed) — <code>max_cg_iterations=max(5000,6n), cg_tolerance=0.0001, eval_cg_tolerance=0.0001, max_lanczos_quadrature_iterations=40, num_trace_samples=30, max_preconditioner_size=100, min_preconditioning_size=1</code></li>
+<li><strong>versions</strong>: pylibkriging=<code>1.1.0</code>, cuda_iterative_available=<code>True</code>, torch=<code>2.13.0+cu126</code>, torch.cuda=<code>12.6</code>, torch.cuda.is_available=<code>True</code>, gpytorch=<code>1.15.2</code></li>
+</ul>
+<p><code>fit</code> = solving <code>R(theta)</code> once at the fixed, given theta (no hyperparameter optimization anywhere in this sweep): the <code>Kriging(...)</code> constructor (dense Cholesky for <code>LL</code>; one CG+SLQ commit for the light <code>LLIterative</code> fit) / for GPyTorch, model build <strong>plus one forced no-grad <code>mll(model(x), y)</code> forward</strong> (Cholesky, or one BBMM CG+SLQ solve). That forced forward is needed because <code>gpytorch.models.ExactGP.__init__</code> itself does no linear algebra at all (verified: flat ~1ms regardless of n) -- without it, all of GPyTorch's kernel/solve cost would silently land in <code>logLik</code> (its first forward call) instead, making <code>fit</code> measure object construction rather than a fit. <code>logLik</code> = a further, independent log-likelihood <strong>+ gradient</strong> evaluation at theta -- GPyTorch's train-mode forward has no cache, so this genuinely re-solves <code>R(theta)</code> from scratch, same as libKriging's <code>logLikelihoodFun</code>/<code>logLikelihoodIterativeFun</code> re-solving independently of what <code>fit</code> did. <code>predict</code> = a <em>cold</em> posterior mean on 300 held-out points (GPyTorch's per-fit prediction cache is dropped each rep). Every timing is the <strong>min of up to 5 reps</strong> (1 rep once a single call exceeds 3 s). Backends are named <code>&lt;lib&gt;-&lt;method&gt;-&lt;linalg lib&gt;</code>. <code>libKriging-Cholesky-OpenBLAS</code> is the <strong>reference</strong>: <code>dLogLik/n</code> = <code>|ll − ll_chol|/n</code> and <code>dMean/rms</code> = <code>max|mean − mean_chol| / rms(y_test)</code>, against the <strong>libKriging</strong> Cholesky mean. Both libraries run the same separable Matérn-5/2 product kernel and the same GLS trend, so this is a convergence figure for every row; <code>GPyTorch-Cholesky</code> being exact, its own <code>dMean/rms</code> is the residual cross-library agreement and is the floor the <code>GPyTorch-BBMM</code> rows should reach. <strong><code>logLik (native)</code></strong> is what each library returns as-is — which is why the two sides of that column look nothing alike, and why it is <em>not</em> the one to compare: GPyTorch's <code>ExactMarginalLogLikelihood</code> is <code>log p(y|X) / n</code>, a per-datapoint figure, while libKriging returns the <strong>concentrated</strong> likelihood, having profiled <code>sigma2</code> out analytically. <strong><code>logLik (libK conv.)</code></strong> undoes both conventions — <code>ll_libK = n·mll + q/2 − (n·log(q/n) + n)/2</code>, with <code>q = r' K⁻¹ r</code> taken from GPyTorch's <em>own</em> solve so a BBMM row keeps its own CG error — and is the column <code>dLogLik/n</code> is computed from. The two agree to ~1e-07 relative once converted, so the raw gap between e.g. <code>2183.8</code> and <code>−0.29</code> is entirely convention, not disagreement about the model or the data.</p>
+<h2>Timing trend — time (log scale) vs n</h2>
+<p>Click a metric above the plot to switch; click legend entries to isolate/hide backends.</p>
+<div id="timing-chart" style="width:100%;max-width:960px;height:560px;"></div>
+<script>
+Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.005379510985221714, 0.023485987971071154, 0.1102428919984959, 0.4789077240275219, 2.2768790220143273, 11.026005529041868], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.010757550015114248, 0.015187969955150038, 0.024992659979034215, 0.09459564596181735, 0.3741324690054171, 2.441125279990956], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.02553837699815631, 0.06502471101703122, 0.07815659698098898, 0.29148385097505525, 2.5029670349904336, 43.39593027002411], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.10554403200512752, 0.1238718910026364, 0.18963243102189153, 0.7292366590118036, 4.7637879949761555], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.059123082959558815, 0.07844206801382825, 0.15345494501525536, 0.6987194700050168, 5.158338637033012, 39.66706023697043], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.0056722479639574885, 0.006473077984992415, 0.010957398044411093, 0.029021544964052737, 0.12840797699755058], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.004588967014569789, 0.005568138032685965, 0.02469711401499808, 0.1723659099661745, 0.7667602369911037, 3.5539786440203898], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.005782744032330811, 0.024720776011236012, 0.11216920200968161, 0.4857156060170382, 2.359981718007475, 11.763634636008646], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.011802862980403006, 0.015247742994688451, 0.03084006201243028, 0.1171544129610993, 0.5847506549907848, 6.897631949046627], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.04136132902931422, 0.05115402501542121, 0.127083720988594, 0.6449111470137723, 8.331146338023245, 244.8264281580341], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.10845799400703982, 0.12568597501376644, 0.19210036401636899, 0.7378889980027452, 4.821885621000547], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.05979676800779998, 0.08295984897995368, 0.1724439039826393, 0.7809488479979336, 5.684914504003245, 40.99276675999863], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.006010672019328922, 0.009967122983653098, 0.029396197001915425, 0.14075719902757555, 0.9398323919740506], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.0046326679876074195, 0.010883557028137147, 0.06407143198885024, 0.3858706909813918, 1.9650237369933166, 10.979426885023713], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.013289469992741942, 0.012579376983921975, 0.023687809996772557, 0.052672457008156925, 0.16025968600297347, 0.5464879630017094], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.015995852008927613, 0.019501242029946297, 0.039987635042052716, 0.07766160898609087, 0.2031941440072842, 0.9558485529851168], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.02297294302843511, 0.04324596596416086, 0.08599637600127608, 0.23528181202709675, 1.5395289000007324, 15.633944502973463], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.13982065202435479, 0.1542948679998517, 0.1791603390011005, 0.24600757099688053, 0.5645775509765372], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.07147129997611046, 0.08481522998772562, 0.12110748299164698, 0.5043419430148788, 4.2586499779718, 35.885029792028945], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000], "y": [0.009630331012886018, 0.01341196201974526, 0.02506056596757844, 0.09505251899827272, 0.4833580550039187], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.00830092903925106, 0.011548759008292109, 0.039557795971632004, 0.2531581419752911, 1.2756993610528298, 6.671092972974293], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}], {
+  xaxis: {title: {text: 'n (training size)'}, type: 'log'},
+  yaxis: {title: {text: "Fit time (s)"}, type: 'log'},
+  legend: {orientation: 'h', y: -0.2},
+  margin: {t: 60},
+  updatemenus: [{buttons: [{"label": "Fit time (s)", "method": "update", "args": [{"visible": [true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false]}, {"yaxis.title.text": "Fit time (s)"}]}, {"label": "LogLik+grad time (s)", "method": "update", "args": [{"visible": [false, false, false, false, false, false, false, true, true, true, true, true, true, true, false, false, false, false, false, false, false]}, {"yaxis.title.text": "LogLik+grad time (s)"}]}, {"label": "Predict time (s)", "method": "update", "args": [{"visible": [false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true, true, true, true]}, {"yaxis.title.text": "Predict time (s)"}]}], direction: 'down', x: 0, y: 1.15}],
+  template: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'plotly_dark' : 'plotly_white'
+}, {responsive: true});
+</script>
+<h2>Reference — <code>libKriging-Cholesky-OpenBLAS</code> (exact dense Cholesky)</h2>
+<table><thead>
+<tr><th>n</th><th>fit (s)</th><th>logLik (s)</th><th>predict (s)</th><th>logLik value</th><th>RMSE</th><th>Q²</th></tr>
+</thead><tbody>
+<tr><td>250</td><td>0.005</td><td>0.006</td><td>0.013</td><td>-317.241</td><td>0.4773</td><td>0.8952</td></tr>
+<tr><td>500</td><td>0.023</td><td>0.025</td><td>0.013</td><td>-463.222</td><td>0.3402</td><td>0.9468</td></tr>
+<tr><td>1000</td><td>0.110</td><td>0.112</td><td>0.024</td><td>-512.857</td><td>0.2111</td><td>0.9795</td></tr>
+<tr><td>2000</td><td>0.479</td><td>0.486</td><td>0.053</td><td>-60.627</td><td>0.0955</td><td>0.9958</td></tr>
+<tr><td>4000</td><td>2.277</td><td>2.360</td><td>0.160</td><td>2183.769</td><td>0.0421</td><td>0.9992</td></tr>
+<tr><td>8000</td><td>11.026</td><td>11.764</td><td>0.546</td><td>9751.610</td><td>0.0217</td><td>0.9998</td></tr>
+</tbody></table>
+<h2>Timing — seconds</h2>
+<table><thead>
+<tr><th>backend</th><th>n</th><th>fit</th><th>logLik</th><th>predict</th></tr>
+</thead><tbody>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>250</td><td>0.005</td><td>0.006</td><td>0.013</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>500</td><td>0.023</td><td>0.025</td><td>0.013</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>1000</td><td>0.110</td><td>0.112</td><td>0.024</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>2000</td><td>0.479</td><td>0.486</td><td>0.053</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>4000</td><td>2.277</td><td>2.360</td><td>0.160</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>8000</td><td>11.026</td><td>11.764</td><td>0.546</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>250</td><td>0.011</td><td>0.012</td><td>0.016</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>500</td><td>0.015</td><td>0.015</td><td>0.020</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>1000</td><td>0.025</td><td>0.031</td><td>0.040</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>2000</td><td>0.095</td><td>0.117</td><td>0.078</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>4000</td><td>0.374</td><td>0.585</td><td>0.203</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>8000</td><td>2.441</td><td>6.898</td><td>0.956</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>250</td><td>0.026</td><td>0.041</td><td>0.023</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>500</td><td>0.065</td><td>0.051</td><td>0.043</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>1000</td><td>0.078</td><td>0.127</td><td>0.086</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>2000</td><td>0.291</td><td>0.645</td><td>0.235</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>4000</td><td>2.503</td><td>8.331</td><td>1.540</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>8000</td><td>43.396</td><td>244.826</td><td>15.634</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.106</td><td>0.108</td><td>0.140</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.124</td><td>0.126</td><td>0.154</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.190</td><td>0.192</td><td>0.179</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.729</td><td>0.738</td><td>0.246</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>4.764</td><td>4.822</td><td>0.565</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>—</td><td>—</td><td><em>error: OutOfMemoryError(&#x27;CUDA out of memory. Tried to allocate 490.00 MiB. GPU 0 has a total capacity of 7.59 GiB of which 370.75 MiB is free. Process 255851 has 137.34 MiB memory in use. Including non-PyTorch memory, this process has 6.71 GiB memory in use. Of the allocated memory 5.29 GiB is allocated by PyTorch, and 489.65 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)&#x27;)</em></td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.059</td><td>0.060</td><td>0.071</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.078</td><td>0.083</td><td>0.085</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.153</td><td>0.172</td><td>0.121</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.699</td><td>0.781</td><td>0.504</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>5.158</td><td>5.685</td><td>4.259</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>39.667</td><td>40.993</td><td>35.885</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>250</td><td>0.006</td><td>0.006</td><td>0.010</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>500</td><td>0.006</td><td>0.010</td><td>0.013</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>1000</td><td>0.011</td><td>0.029</td><td>0.025</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>2000</td><td>0.029</td><td>0.141</td><td>0.095</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>4000</td><td>0.128</td><td>0.940</td><td>0.483</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>8000</td><td>—</td><td>—</td><td><em>error: OutOfMemoryError(&#x27;CUDA out of memory. Tried to allocate 490.00 MiB. GPU 0 has a total capacity of 7.59 GiB of which 370.75 MiB is free. Process 255851 has 137.34 MiB memory in use. Including non-PyTorch memory, this process has 6.71 GiB memory in use. Of the allocated memory 5.74 GiB is allocated by PyTorch, and 27.53 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)&#x27;)</em></td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>250</td><td>0.005</td><td>0.005</td><td>0.008</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>500</td><td>0.006</td><td>0.011</td><td>0.012</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>1000</td><td>0.025</td><td>0.064</td><td>0.040</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>2000</td><td>0.172</td><td>0.386</td><td>0.253</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>4000</td><td>0.767</td><td>1.965</td><td>1.276</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>8000</td><td>3.554</td><td>10.979</td><td>6.671</td></tr>
+</tbody></table>
+<h2>Accuracy</h2>
+<table><thead>
+<tr><th>backend</th><th>n</th><th>RMSE</th><th>Q²</th><th>logLik (libK conv.)</th><th>logLik (native)</th><th>dLogLik/n</th><th>dMean/rms</th></tr>
+</thead><tbody>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-317.241</td><td>-317.2409</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-463.222</td><td>-463.2220</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-512.857</td><td>-512.8574</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-60.627</td><td>-60.6268</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2183.769</td><td>2183.7687</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>9751.610</td><td>9751.6102</td><td>0.00e+00</td><td>0.00e+00</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-316.216</td><td>-316.2156</td><td>4.10e-03</td><td>2.19e-04</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-458.727</td><td>-458.7271</td><td>8.99e-03</td><td>2.58e-04</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-510.839</td><td>-510.8388</td><td>2.02e-03</td><td>8.41e-04</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-64.852</td><td>-64.8523</td><td>2.11e-03</td><td>6.93e-04</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2133.247</td><td>2133.2472</td><td>1.26e-02</td><td>4.93e-04</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>9305.778</td><td>9305.7775</td><td>5.57e-02</td><td>5.57e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-316.216</td><td>-316.2156</td><td>4.10e-03</td><td>2.19e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-458.724</td><td>-458.7240</td><td>9.00e-03</td><td>2.67e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-510.844</td><td>-510.8436</td><td>2.01e-03</td><td>9.97e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-64.862</td><td>-64.8622</td><td>2.12e-03</td><td>8.66e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2133.364</td><td>2133.3641</td><td>1.26e-02</td><td>7.11e-04</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>9305.958</td><td>9305.9576</td><td>5.57e-02</td><td>7.33e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-326.263</td><td>-1.3065</td><td>3.61e-02</td><td>3.29e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-496.295</td><td>-1.0580</td><td>6.61e-02</td><td>2.94e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-876.885</td><td>-1.0915</td><td>3.64e-01</td><td>2.18e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-601.848</td><td>-0.7188</td><td>2.71e-01</td><td>5.85e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1564.977</td><td>-0.2754</td><td>1.55e-01</td><td>2.81e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><em>error: OutOfMemoryError(&#x27;CUDA out of memory. Tried to allocate 490.00 MiB. GPU 0 has a total capacity of 7.59 GiB of which 370.75 MiB is free. Process 255851 has 137.34 MiB memory in use. Including non-PyTorch memory, this process has 6.71 GiB memory in use. Of the allocated memory 5.29 GiB is allocated by PyTorch, and 489.65 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)&#x27;)</em></td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-311.939</td><td>-1.2492</td><td>2.12e-02</td><td>3.09e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-486.686</td><td>-1.0388</td><td>4.69e-02</td><td>3.16e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-845.583</td><td>-1.0602</td><td>3.33e-01</td><td>2.87e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-593.683</td><td>-0.7147</td><td>2.67e-01</td><td>6.10e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1540.784</td><td>-0.2814</td><td>1.61e-01</td><td>2.60e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>8877.649</td><td>0.1643</td><td>1.09e-01</td><td>3.83e-04</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-317.241</td><td>-1.2704</td><td>5.25e-09</td><td>1.46e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-463.222</td><td>-0.9918</td><td>9.37e-09</td><td>9.54e-09</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-512.857</td><td>-0.7275</td><td>1.71e-08</td><td>1.57e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-60.627</td><td>-0.4482</td><td>3.60e-08</td><td>2.07e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2183.768</td><td>-0.1207</td><td>8.67e-08</td><td>4.08e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>8000</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><em>error: OutOfMemoryError(&#x27;CUDA out of memory. Tried to allocate 490.00 MiB. GPU 0 has a total capacity of 7.59 GiB of which 370.75 MiB is free. Process 255851 has 137.34 MiB memory in use. Including non-PyTorch memory, this process has 6.71 GiB memory in use. Of the allocated memory 5.74 GiB is allocated by PyTorch, and 27.53 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)&#x27;)</em></td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-317.241</td><td>-1.2704</td><td>5.25e-09</td><td>1.46e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-463.222</td><td>-0.9918</td><td>9.37e-09</td><td>9.54e-09</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-512.857</td><td>-0.7275</td><td>1.71e-08</td><td>1.57e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-60.627</td><td>-0.4482</td><td>3.60e-08</td><td>2.07e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2183.768</td><td>-0.1207</td><td>8.67e-08</td><td>4.08e-08</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>9751.608</td><td>0.2735</td><td>2.48e-07</td><td>5.24e-08</td></tr>
+</tbody></table>
+<h2>Speed-ups (logLik-eval time)</h2>
+<table><thead>
+<tr><th>n</th><th>libKriging-Cholesky-OpenBLAS</th><th>libKriging-Iterative-CUDA</th><th>libKriging-Iterative-OpenMP</th><th><strong>OpenMP / CUDA</strong></th><th><strong>CUDA / Cholesky</strong></th><th>GPyTorch-BBMM-CUDA</th><th>GPyTorch-BBMM-MKL</th></tr>
+</thead><tbody>
+<tr><td>250</td><td>0.006</td><td>0.012</td><td>0.041</td><td>3.5×</td><td>2.0×</td><td>0.108</td><td>0.060</td></tr>
+<tr><td>500</td><td>0.025</td><td>0.015</td><td>0.051</td><td>3.4×</td><td>0.6×</td><td>0.126</td><td>0.083</td></tr>
+<tr><td>1000</td><td>0.112</td><td>0.031</td><td>0.127</td><td>4.1×</td><td>0.3×</td><td>0.192</td><td>0.172</td></tr>
+<tr><td>2000</td><td>0.486</td><td>0.117</td><td>0.645</td><td>5.5×</td><td>0.2×</td><td>0.738</td><td>0.781</td></tr>
+<tr><td>4000</td><td>2.360</td><td>0.585</td><td>8.331</td><td>14.2×</td><td>0.2×</td><td>4.822</td><td>5.685</td></tr>
+<tr><td>8000</td><td>11.764</td><td>6.898</td><td>244.826</td><td>35.5×</td><td>0.6×</td><td>—</td><td>40.993</td></tr>
+</tbody></table>
+<h2>Verdict — did everything converge?</h2>
+<ul>
+<li><strong>libKriging iterative</strong>: logLik within <code>5.6e-02</code> per point of the chol reference, posterior mean within <code>1.0e-03</code> of test RMS — converged.</li>
+<li><strong>GPyTorch</strong>: posterior mean within <code>6.1e-04</code> of test RMS of the chol reference — now that both libraries run the same separable kernel and the same GLS trend, this is BBMM's own solver convergence, directly comparable to the libKriging-iterative figure above — Q² ≥ <code>0.8952</code>. Its log-likelihood is converted into libKriging's convention (see the accuracy table) and compared to within <code>3.6e-01</code> per point.</li>
+<li><strong>log-likelihood accuracy, head to head</strong>: at the same 30 Hutchinson probes and 40 SLQ Lanczos steps per probe, and the same CG tolerance, libKriging's stochastic log-determinant is the more accurate of the two — worst <code>dLogLik/n</code> <code>5.6e-02</code> against GPyTorch BBMM's <code>3.6e-01</code> (<code>7x</code>). Note the two differ in <em>which</em> quantity they are better at: BBMM's posterior mean is slightly closer (see <code>dMean/rms</code>), libKriging's log-likelihood markedly so.</li>
+<li><strong>GPyTorch BBMM vs its own exact Cholesky</strong> (<code>GPyTorch-Cholesky-*</code>, <code>max_cholesky_size</code> forced far above every n here): posterior mean differs by at most <code>6.1e-04</code> of test RMS across n — BBMM has converged to GPyTorch's own exact answer.</li>
+<li><strong><code>libKriging-Iterative-CUDA</code></strong> is already faster than <strong><code>libKriging-Cholesky-OpenBLAS</code></strong> on <code>fit</code> from n=500, <code>logLik</code> from n=500; the dense factor still wins on <code>predict</code> at every n here — the iterative path targets n where the dense factor no longer fits in memory, so a win at these n is a bonus, not the point.</li>
+</ul>
+<h2>Notes</h2>
+<ul>
+<li>Backend names are <code>&lt;lib&gt;-&lt;method&gt;-&lt;linalg lib&gt;</code>. Both <code>libKriging-Iterative-CUDA</code> (<code>LK_ITERATIVE_CUDA_DENSE_MAX_MB</code> budget) and <code>-OpenMP</code> (<code>LK_ITERATIVE_DENSE_MAX_MB</code>) materialize R once per evaluation for a separable kernel within their memory budget and run the matvecs as a single <code>cublasDgemm</code> / BLAS-3 <code>R*V</code> (hence <code>-OpenMP</code>, the BLAS it links), else fall back to a hand-written matvec kernel. <code>libKriging-Cholesky-OpenBLAS</code> and <code>GPyTorch-BBMM-MKL</code> name the actual dense BLAS/LAPACK each links against.</li>
+<li>theta=0.15 is chosen so the SLQ log-determinant's Lanczos quadrature and GPyTorch's BBMM CG both converge with sane iteration budgets; at longer theta (better-fitting but more ill-conditioned R) both need far more iterations / Lanczos steps. The <code>,0,40</code> in the libKriging objective is the third <code>LLIterative</code> argument (SLQ Lanczos steps per probe), added so the iterative log-likelihood <em>value</em> also tracks the exact one here.</li>
+<li><code>libKriging-Iterative-CUDA</code> vs <code>libKriging-Iterative-OpenMP</code> is the same binary with <code>set_cuda_iterative_enabled(...)</code> toggled — identical results, different path for the batched CG / SLQ / gradient matvecs (CUDA kernels vs the CPU dense-<code>R</code> BLAS path).</li>
+<li><code>GPyTorch-BBMM-CUDA</code>/<code>GPyTorch-BBMM-MKL</code> vs <code>GPyTorch-Cholesky-CUDA</code>/<code>GPyTorch-Cholesky-MKL</code> are the SAME model and data, only <code>gpytorch.settings.max_cholesky_size</code> differs (<code>0</code> = always BBMM, forced huge = always exact) — the Cholesky rows are GPyTorch's own reference for whether BBMM has converged, independent of libKriging's Cholesky reference.</li>
+<li>Companion: <code>docs/comparisons/libKriging_vs_GPyTorch.ipynb</code> (summary of these results + the GPyTorch code libKriging mimics).</li>
+</ul>
+</body>
+</html>
