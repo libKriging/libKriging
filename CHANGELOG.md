@@ -89,6 +89,25 @@ JLibKriging.jl.
 ## [1.2.0] - 2026-09-19
 
 ### Added
+- CUDA iterative backend: `build_cov_kernel` (the dense fast-path builder
+  behind `LinearAlgebraCuda`'s `R`/`dR` cache) now computes each covariance
+  pair once instead of twice. `R` and every `∂R/∂θₖ` block are symmetric
+  (`Cov(Xi,Xj,θ) == Cov(Xj,Xi,θ)`), but the kernel launched one thread per
+  `(i,j)` over the FULL n×n grid, each independently paying the
+  transcendental-heavy (`exp`/`log1p`) evaluation for its own cell — i.e.
+  every pair's cost twice for no reason. Now only the upper triangle
+  (`i <= j`) does the evaluation, writing the result to both `R[i,j]` and
+  `R[j,i]` (same for `dR`); lower-triangle threads return immediately.
+  Bit-identical output (cross-checked), 527 assertions green. This was
+  plan item #6, expected to be worth ×3-5 on the SLQ path when originally
+  scoped — but that estimate predates the device-side `R`/`dR` cache (plan
+  item #3, already shipped) that stopped `R` from being rebuilt on every
+  Lanczos/CG step: measured directly (H100, n=8000, isolating the build by
+  forcing a cache miss vs. hit), the one-time build now costs only ~3 ms
+  out of a ~1.3 s evaluation, so halving it is real but currently
+  invisible in aggregate timing — kept because it's a correct, free,
+  zero-downside fix that matters more wherever the build itself dominates
+  (very large `n`, or few-CG-iteration regimes).
 - CUDA iterative backend: `_logLikelihoodIterative`'s gradient path now
   fuses its two separate batched CG solves (`[F|y]`, then the Hutchinson
   probes) into ONE Krylov pass on `[F|y|probes]` (plan item #5, phase A —

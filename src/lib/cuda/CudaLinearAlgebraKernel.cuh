@@ -107,14 +107,19 @@ void lk_cuda_drmul_batched_launch(const double* d_Xt, int n, int dimX, const dou
 // i + j*n; pass nullptr to skip -- dRmulBatched only needs d_dR) with
 // R(Xt,theta)[i,j], for a SEPARABLE kernel -- gauss / exp / matern3_2 /
 // matern5_2, the same four covKind is a code for everywhere else in this
-// file. One thread per (i,j) pair (both halves computed
-// independently, no symmetry exploited -- GPU parallelism is cheap here,
-// unlike the CPU build_separable_cov's thread-count-limited symmetric
-// trick), so the diagonal needs no special case: Xi==Xj makes every
+// file. One thread per (i,j) pair with i <= j (the upper triangle
+// including the diagonal): R is symmetric, so the launch computes each
+// pair's (transcendental-heavy: exp/log1p) covariance value ONCE and
+// writes it to both R[i,j] and R[j,i], instead of every thread in a full
+// n x n grid evaluating its own cell independently and paying that cost
+// twice per pair for no reason (lower-triangle threads simply return).
+// The diagonal needs no special case beyond that: Xi==Xj makes every
 // kernel's u=|dx|/theta term 0, and R(0)=1 falls out of lk_cov_pair on its
-// own. When d_dR is non-null, ALSO fills the dimX contiguous n x n blocks
-// d_dR[k*n*n + i + j*n] = R[i,j] * d(ln Cov)/d(theta_k)[i,j] (same
-// nonnegative log-derivative lk_dlncov_pair computes elsewhere in this
+// own; writing "both" R[i,i] slots is one redundant but harmless store
+// (same address, one owning thread, not a race). When d_dR is non-null,
+// ALSO fills the dimX contiguous n x n blocks (both triangle slots, same
+// reasoning) d_dR[k*n*n + i + j*n] = R[i,j] * d(ln Cov)/d(theta_k)[i,j]
+// (same nonnegative log-derivative lk_dlncov_pair computes elsewhere in this
 // file) -- requires dimX <= 32 (the caller must check, same bound
 // lk_cuda_drmul_batched_launch already enforces). Lets
 // CudaLinearAlgebra.cpp replace the matrix-free rmul_batched_kernel /
