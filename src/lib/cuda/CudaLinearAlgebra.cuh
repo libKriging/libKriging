@@ -62,6 +62,25 @@ LIBKRIGING_EXPORT bool supports(const std::string& covType);
 // from the per-column d_active device array kept for the "any active?"
 // poll, same convergence contract/reporting as
 // LinearAlgebra::conjugateGradientBatched (see cgNonConvergenceWarning).
+//
+// tol is PER-COLUMN (length B.n_cols): each column freezes independently
+// once it reaches ITS OWN tol[c], letting a caller fuse right-hand-side
+// groups that need different tolerances (e.g. Kriging.cpp's mBCG fusion of
+// [F|y|probes] -- F/y want the tighter cg_tol, probes want the looser
+// probes_cg_tol) into ONE Krylov pass instead of a separate call per group.
+LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
+                                              const arma::vec& theta,
+                                              const std::string& covType,
+                                              const arma::mat& B,
+                                              arma::uword max_iter,
+                                              const arma::vec& tol,
+                                              const arma::mat& precU = arma::mat(),
+                                              const arma::vec& precDinv = arma::vec(),
+                                              const arma::mat& precMcholLower = arma::mat(),
+                                              arma::uword* n_unconverged_out = nullptr);
+
+// Scalar-tol convenience overload for the common case (every column shares
+// one tolerance) -- broadcasts into the per-column vector above.
 LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::vec& theta,
                                               const std::string& covType,

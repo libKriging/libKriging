@@ -76,14 +76,22 @@ void lk_cuda_batched_update_p_launch(const double* d_R, const double* d_beta, do
 void lk_cuda_cg_alpha_launch(const double* d_rz_old, const double* d_pAp, int ncols, int* d_active, double* d_alpha,
                              double* d_neg_alpha);
 
-// If active[c]: converged when sqrt(rr_new[c])/bnorm[c] < tol (then active[c]=0, beta[c]=0,
-// rz_old unchanged); else beta[c] = rr_new[c]/rz_old[c] and rz_old[c] = rr_new[c].
-void lk_cuda_cg_beta_launch(const double* d_rr_new, const double* d_bnorm, double tol, int ncols, int* d_active,
-                            double* d_rz_old, double* d_beta);
+// d_tol is a PER-COLUMN device pointer (length ncols) -- lets a batched
+// solve fuse right-hand sides that need different tolerances (e.g.
+// Kriging.cpp's mBCG fusion of [F|y|probes]: F/y want the tighter cg_tol,
+// probes want the looser probes_cg_tol) into ONE Krylov pass instead of a
+// separate call per tolerance group, each column still freezing at its own
+// tol independently (same lockstep-batching contract as everywhere else in
+// this file). If active[c]: converged when sqrt(rr_new[c])/bnorm[c] <
+// tol[c] (then active[c]=0, beta[c]=0, rz_old unchanged); else beta[c] =
+// rr_new[c]/rz_old[c] and rz_old[c] = rr_new[c].
+void lk_cuda_cg_beta_launch(const double* d_rr_new, const double* d_bnorm, const double* d_tol, int ncols,
+                            int* d_active, double* d_rz_old, double* d_beta);
 
-// Restart-iteration variant: if active[c], rz_old[c] = rr[c] and active[c]=0 when converged.
-void lk_cuda_cg_restart_launch(const double* d_rr, const double* d_bnorm, double tol, int ncols, int* d_active,
-                               double* d_rz_old);
+// Restart-iteration variant: if active[c], rz_old[c] = rr[c] and active[c]=0
+// when converged (sqrt(rr[c])/bnorm[c] < tol[c], tol per-column as above).
+void lk_cuda_cg_restart_launch(const double* d_rr, const double* d_bnorm, const double* d_tol, int ncols,
+                               int* d_active, double* d_rz_old);
 
 // d_flag (single int) must be zeroed by the caller first; set to 1 if any active[c] != 0.
 void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
@@ -133,13 +141,15 @@ void lk_cuda_precond_finish_launch(const double* d_Dinv, const double* d_r, cons
                                    double* d_z);
 
 // Preconditioned-CG beta update: beta[c] = rz_new/rz_old, rz_old <- rz_new,
-// convergence tested on the TRUE residual norm rr[c]/bnorm[c].
-void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm, double tol,
-                                    int ncols, int* d_active, double* d_rz_old, double* d_beta);
+// convergence tested on the TRUE residual norm rr[c]/bnorm[c] < d_tol[c]
+// (per-column, see lk_cuda_cg_beta_launch's comment for why).
+void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
+                                    const double* d_tol, int ncols, int* d_active, double* d_rz_old, double* d_beta);
 
-// Restart variant for preconditioned CG: rz_old <- rz[c], converge on rr[c].
-void lk_cuda_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm, double tol,
-                                       int ncols, int* d_active, double* d_rz_old);
+// Restart variant for preconditioned CG: rz_old <- rz[c], converge on rr[c]
+// (per-column d_tol as above).
+void lk_cuda_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
+                                       const double* d_tol, int ncols, int* d_active, double* d_rz_old);
 
 // --- Device-resident batched Lanczos (Stochastic Lanczos Quadrature) ------
 // Lets LinearAlgebraCuda::stochasticLogDetBatched keep every probe's Krylov

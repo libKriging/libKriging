@@ -242,6 +242,22 @@ class LinearAlgebra {
   // that still hadn't reached tol when the loop hit max_iter (0 = every
   // column converged). A [WARNING] is also printed via
   // cgNonConvergenceWarning whenever that count is > 0 (see warn_cg).
+  // tol is PER-COLUMN (length B.n_cols): each column freezes independently
+  // once it reaches ITS OWN tol(c), letting a caller fuse right-hand-side
+  // groups that need different tolerances (e.g. Kriging.cpp's mBCG fusion
+  // of [F|y|probes]) into ONE Krylov pass instead of a separate call per
+  // group. See LinearAlgebraCuda::conjugateGradient's matching overload.
+  LIBKRIGING_EXPORT static arma::mat conjugateGradientBatched(
+      const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+      const arma::mat& B,
+      arma::uword max_iter,
+      const arma::vec& tol,
+      const std::function<arma::mat(const arma::mat&)>& PinvBatched
+      = std::function<arma::mat(const arma::mat&)>(),
+      arma::uword* n_unconverged_out = nullptr);
+
+  // Scalar-tol convenience overload (every column shares one tolerance) --
+  // broadcasts into the per-column vector above.
   LIBKRIGING_EXPORT static arma::mat conjugateGradientBatched(
       const std::function<arma::mat(const arma::mat&)>& AmulBatched,
       const arma::mat& B,
