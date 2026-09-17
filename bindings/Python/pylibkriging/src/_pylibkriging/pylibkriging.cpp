@@ -147,6 +147,15 @@ PYBIND11_MODULE(_pylibkriging, m) {
   const bool default_normalize = false;
   const std::string default_optim = "BFGS";
   const std::string default_objective = "LL";
+  const std::string objective_doc =
+      R"pbdoc(objective: "LL" (default, exact dense log-likelihood), "LMP", "LLVecchia"/
+"LLVecchia(m)", "LLNystrom"/"LLNystrom(k)", or the matrix-free CG/SLQ
+approximated log-likelihood "LLIterative" / "LLIterative(m)" /
+"LLIterative(m,precond_rank)" / "LLIterative(m,precond_rank,lanczos_steps)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)".
+See docs/math/Iterative.md.)pbdoc";
 
   py::class_<Kriging::Parameters>(m, "KrigingParameters")
       .def(py::init<>())
@@ -188,7 +197,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           objective_doc.c_str())
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -200,7 +210,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           objective_doc.c_str())
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),
