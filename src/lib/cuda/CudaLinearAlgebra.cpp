@@ -273,12 +273,16 @@ bool supports(const std::string& covType) {
 // by however many iterations the slowest column still needs) for keeping
 // everything in one batched launch per step -- the right trade given
 // launch/sync overhead, not FLOPs, was the measured bottleneck.
+// Per-column tol: lets a batched solve fuse right-hand-side groups that
+// need different tolerances into ONE Krylov pass (see the .cuh doc
+// comment) -- each column still freezes independently at its own tol[c],
+// same lockstep-batching contract as every other per-column quantity here.
 arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::vec& theta,
                             const std::string& covType,
                             const arma::mat& B,
                             arma::uword max_iter,
-                            double tol,
+                            const arma::vec& tol,
                             const arma::mat& precU,
                             const arma::vec& precDinv,
                             const arma::mat& precMcholLower,
@@ -292,6 +296,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   const int ncols = static_cast<int>(B.n_cols);
   const bool preconditioned = (precU.n_elem > 0);
   const int pk = preconditioned ? static_cast<int>(precU.n_cols) : 0;
+  if (static_cast<int>(tol.n_elem) != ncols)
+    throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: tol has " + std::to_string(tol.n_elem)
+                                + " entries, expected " + std::to_string(ncols) + " (one per column of B)");
 
   // X, theta and R now come from the process-wide dense cache (see
   // DenseCovCache): a whole objective evaluation runs at a fixed theta, so
@@ -319,7 +326,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // "any column still active?" int, every `sync_every` iterations.
   const std::size_t col_bytes = sizeof(double) * static_cast<std::size_t>(ncols);
   const std::size_t col_bytes_i = sizeof(int) * static_cast<std::size_t>(ncols);
-  double *d_scratch, *d_scratch2, *d_alpha, *d_neg_alpha, *d_beta, *d_rz_old, *d_bnorm, *d_neg_ones;
+  double *d_scratch, *d_scratch2, *d_alpha, *d_neg_alpha, *d_beta, *d_rz_old, *d_bnorm, *d_neg_ones, *d_tol;
   int *d_active, *d_flag;
   LK_CUDA_CHECK(cudaMalloc(&d_scratch, col_bytes));   // pAp, then r.r
   LK_CUDA_CHECK(cudaMalloc(&d_scratch2, col_bytes));  // preconditioned: r.z alongside r.r
@@ -329,6 +336,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LK_CUDA_CHECK(cudaMalloc(&d_rz_old, col_bytes));
   LK_CUDA_CHECK(cudaMalloc(&d_bnorm, col_bytes));
   LK_CUDA_CHECK(cudaMalloc(&d_neg_ones, col_bytes));
+  LK_CUDA_CHECK(cudaMalloc(&d_tol, col_bytes));
+  LK_CUDA_CHECK(cudaMemcpy(d_tol, tol.memptr(), col_bytes, cudaMemcpyHostToDevice));
   LK_CUDA_CHECK(cudaMalloc(&d_active, col_bytes_i));
   LK_CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int)));
 
@@ -459,11 +468,11 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         precondApply(d_r, d_z);
         lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, tol, ncols, d_active, d_rz_old);
+        lk_cuda_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old);
         LK_CUDA_CHECK(cudaGetLastError());
         LK_CUDA_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = z
       } else {
-        lk_cuda_cg_restart_launch(d_scratch, d_bnorm, tol, ncols, d_active, d_rz_old);
+        lk_cuda_cg_restart_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old);
         LK_CUDA_CHECK(cudaGetLastError());
         LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = r
       }
@@ -476,12 +485,12 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         precondApply(d_r, d_z);
         lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z == rz_new
         LK_CUDA_CHECK(cudaGetLastError());
-        lk_cuda_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
+        lk_cuda_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
         LK_CUDA_CHECK(cudaGetLastError());
         lk_cuda_batched_update_p_launch(d_z, d_beta, d_p, n, ncols);  // p = z + beta*p
         LK_CUDA_CHECK(cudaGetLastError());
       } else {
-        lk_cuda_cg_beta_launch(d_scratch, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
+        lk_cuda_cg_beta_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
         LK_CUDA_CHECK(cudaGetLastError());
         lk_cuda_batched_update_p_launch(d_r, d_beta, d_p, n, ncols);  // p = r + beta*p
         LK_CUDA_CHECK(cudaGetLastError());
@@ -500,10 +509,21 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // objective is slow is "did CG converge, or did it run to max_iter?".
   // Reaching max_iter means every later quantity (Hutchinson trace, mean,
   // variance) is built on an unconverged solve.
-  if (std::getenv("LK_ITERATIVE_VERBOSE") != nullptr)
-    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%g precond_rank=%d iters=%llu/%llu%s\n", n, ncols, tol, pk,
-                 static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
+  if (std::getenv("LK_ITERATIVE_VERBOSE") != nullptr) {
+    // tol is now per-column (mBCG fusion can mix e.g. cg_tol and
+    // probes_cg_tol in one call) -- print the range rather than a single
+    // value; min==max for every non-fused call site.
+    const double tol_min = tol.min();
+    const double tol_max = tol.max();
+    char tol_str[64];
+    if (tol_min == tol_max)
+      std::snprintf(tol_str, sizeof(tol_str), "%g", tol_min);
+    else
+      std::snprintf(tol_str, sizeof(tol_str), "%g..%g", tol_min, tol_max);
+    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu%s\n", n, ncols, tol_str,
+                 pk, static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
                  iters_done >= max_iter ? "  <-- NOT CONVERGED" : "");
+  }
 
   arma::mat X(n, ncols, arma::fill::none);
   LK_CUDA_CHECK(cudaMemcpy(X.memptr(), d_x, mat_bytes, cudaMemcpyDeviceToHost));
@@ -537,6 +557,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   cudaFree(d_rz_old);
   cudaFree(d_bnorm);
   cudaFree(d_neg_ones);
+  cudaFree(d_tol);
   cudaFree(d_active);
   cudaFree(d_flag);
   if (d_rmul_scratch)
@@ -551,6 +572,22 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   }
 
   return X;
+}
+
+// Scalar-tol convenience overload for the common case (every column shares
+// one tolerance) -- just broadcasts into the per-column vector above.
+arma::mat conjugateGradient(const arma::mat& Xt,
+                            const arma::vec& theta,
+                            const std::string& covType,
+                            const arma::mat& B,
+                            arma::uword max_iter,
+                            double tol,
+                            const arma::mat& precU,
+                            const arma::vec& precDinv,
+                            const arma::mat& precMcholLower,
+                            arma::uword* n_unconverged_out) {
+  return conjugateGradient(Xt, theta, covType, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), precU,
+                           precDinv, precMcholLower, n_unconverged_out);
 }
 
 // R(Xt,theta) * V in one batched device launch (see the header). Same

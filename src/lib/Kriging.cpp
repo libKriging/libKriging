@@ -1924,8 +1924,44 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // columns): p+1 right-hand sides sharing the same matvec, each an
   // independent Krylov solve (no block-CG subspace sharing, but far cheaper
   // than p+1 separate O(n^3) factorizations either way).
-  arma::mat FY = arma::join_rows(m_F, m_y);
-  const arma::mat RinvFY = cgSolve(FY, m_iterative_cg_tol);
+  //
+  // When a gradient is wanted, fuse this solve with the probe solve below
+  // (plan item #5, phase A -- see docs/math/Iterative.md and the n=8000 dig
+  // in bench/gpu's history) instead of running them as two separate CG
+  // calls: [F|y|probes] shares ONE matvec-per-iteration loop, each column
+  // still freezing independently at its OWN tolerance
+  // (m_iterative_cg_tol for F/y, the looser m_iterative_probes_cg_tol for
+  // probes -- LinearAlgebraCuda::conjugateGradient's tol is per-column),
+  // so the result is bit-identical to what two separate calls would have
+  // produced, just without paying kernel-launch/host-sync overhead twice.
+  // CUDA-only for now (mirrors slq_on_cuda's scoping just above): HIP/SYCL/
+  // Metal keep the two-separate-calls path below via the generic cgSolve
+  // lambda, which only has a scalar-tol overload on those backends.
+  arma::mat RinvFY;
+  arma::mat W;  // R^-1 * probes, only set here when the fused path runs
+  bool fused_probes_solved = false;
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+  if (slq_on_cuda && grad_out != nullptr) {
+    const arma::mat FYP = arma::join_rows(m_F, m_y, m_iterative_probes);
+    arma::vec tol_fused(FYP.n_cols);
+    tol_fused.head(m_F.n_cols + 1).fill(m_iterative_cg_tol);
+    tol_fused.tail(nprobe).fill(m_iterative_probes_cg_tol);
+    arma::uword n_unconv = 0;
+    const arma::mat sol = woodbury_pc
+        ? LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, woodbury_pc->U(),
+                                               woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
+        : LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
+                                               arma::vec(), arma::mat(), &n_unconv);
+    gpu_cg_n_unconverged += n_unconv;
+    RinvFY = sol.head_cols(m_F.n_cols + 1);
+    W = sol.tail_cols(nprobe);
+    fused_probes_solved = true;
+  } else
+#endif
+  {
+    const arma::mat FY = arma::join_rows(m_F, m_y);
+    RinvFY = cgSolve(FY, m_iterative_cg_tol);
+  }
   const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
   const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
 
@@ -1995,15 +2031,16 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 
   // W = R^-1 * probes, only needed for the gradient's Hutchinson trace
   // (preconditioned batched CG when a Nystrom preconditioner is enabled).
-  // Uses its OWN tolerance (m_iterative_probes_cg_tol, LLIterative's 6th
-  // field): this solve only feeds a stochastic trace estimate, which has
-  // much more slack than the [F|y] solve above (see the member's doc
-  // comment and the n=8000 dig in bench/gpu's history -- this CG's
-  // iteration count grows far faster with n than [F|y]'s, because the
-  // isotropic Rademacher probes carry energy on R's whole spectrum while
-  // [F|y] is smooth and lives mostly in R's dominant modes).
-  arma::mat W;
-  if (grad_out != nullptr)
+  // Already solved above as part of the fused [F|y|probes] CG call when
+  // fused_probes_solved; otherwise solved here on its own, using its OWN
+  // tolerance (m_iterative_probes_cg_tol, LLIterative's 6th field): this
+  // solve only feeds a stochastic trace estimate, which has much more
+  // slack than the [F|y] solve above (see the member's doc comment and the
+  // n=8000 dig in bench/gpu's history -- this CG's iteration count grows
+  // far faster with n than [F|y]'s, because the isotropic Rademacher
+  // probes carry energy on R's whole spectrum while [F|y] is smooth and
+  // lives mostly in R's dominant modes).
+  if (grad_out != nullptr && !fused_probes_solved)
     W = cgSolve(m_iterative_probes, m_iterative_probes_cg_tol);
 
   if (beta_out != nullptr)
