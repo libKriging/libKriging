@@ -191,6 +191,12 @@ void lk_cuda_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_a
 void lk_cuda_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step, int* d_active,
                                  int* d_m_eff, double* d_beta_out, double* d_inv_bj_out, double* d_neg_beta_prev_out);
 
+// Elementwise double<->float casts (see the .cu file for why: sandwiching a
+// TF32/fp32 cublasGemmEx matvec inside an otherwise-double CG loop, plan
+// item #8). count is the total element count (n*ncols), not a column count.
+void lk_cuda_cast_d2f_launch(const double* d_in, long long count, float* d_out);
+void lk_cuda_cast_f2d_launch(const float* d_in, long long count, double* d_out);
+
 }  // extern "C"
 
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE
