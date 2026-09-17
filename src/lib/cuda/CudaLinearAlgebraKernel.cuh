@@ -96,6 +96,13 @@ void lk_cuda_cg_restart_launch(const double* d_rr, const double* d_bnorm, const 
 // d_flag (single int) must be zeroed by the caller first; set to 1 if any active[c] != 0.
 void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
 
+// d_count (single int) must be zeroed by the caller first; incremented once
+// per active[c] != 0, i.e. ends up holding the number of still-active
+// columns. Same one-int-readback cost as lk_cuda_cg_any_active_launch, but
+// lets the host distinguish "active set unchanged" from "active set
+// shrank" without an unconditional full per-column array readback.
+void lk_cuda_cg_active_count_launch(const int* d_active, int ncols, int* d_count);
+
 // Batched d(R)/d(theta) . V : d_Out[i, k + c*dimX] = sum_{j!=i}
 // d(R_ij)/d(theta_k) * V[j,c], for k in [0,dimX), one launch over all
 // (i, c). d_Out is n x (dimX*ncols) column-major (see the .cu). dimX must
