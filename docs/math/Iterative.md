@@ -54,9 +54,12 @@ Where this sits relative to the other scaling methods:
   batched matvec engine (`LinearAlgebra::conjugateGradientBatched` /
   the GPU backend) used by the CG solves. (An earlier attempt to read
   the quadrature straight off the CG scalars — true "matrix-free BBMM"
-  mBCG, no extra matvecs — was dropped: without full reorthogonalization
-  the reconstructed tridiagonal loses accuracy as `cond(R)` grows, and
-  restoring orthogonality *is* running Lanczos again.)
+  mBCG, no extra matvecs — was dropped, and re-examined and re-dropped
+  under this codebase's current defaults: see
+  [MBCGLogDet.md](MBCGLogDet.md) for the full story, including why the
+  CG-Lanczos duality itself checks out numerically but the codebase's
+  periodic CG restarts break the reconstruction in a way that isn't a
+  quick fix.)
 - **Hutchinson gradient trace term**: the envelope-theorem gradient
   (same principle as `_logLikelihoodVecchia`/`_logLikelihoodNystrom` —
   β̂/σ̂²'s own θ-dependence doesn't contribute at their profiled values)
