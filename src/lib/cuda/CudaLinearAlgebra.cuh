@@ -100,6 +100,38 @@ LIBKRIGING_EXPORT arma::mat dRmulBatched(const arma::mat& Xt,
 // the kernel TU).
 constexpr int kMaxDimX = 32;
 
+// Stochastic Lanczos Quadrature log-determinant estimate for R(Xt,theta),
+// device-resident: unlike calling LinearAlgebra::stochasticLogDetBatched
+// with rmulBatched as its AmulBatched callback (every Lanczos step then
+// uploads that step's probe vectors, computes R*V, and downloads the
+// result so the host can do the next step's reorthogonalization/dot
+// products in Armadillo before uploading again), this keeps EVERY probe's
+// entire Krylov history resident on the device for the whole recurrence --
+// the matvec, the dot products, the full reorthogonalization (as two
+// cublasDgemmStridedBatched calls against that history) and the per-step
+// bookkeeping all run without leaving the GPU. Only nprobe*lanczos_steps
+// scalars (alpha/beta) come back to the host, once, after the last step,
+// for the final small tridiagonal eigendecompositions (still done on host
+// via arma::eig_sym -- O(nprobe*lanczos_steps^2), not worth porting).
+// Same estimator, same fixed-seed probes, same full-reorthogonalization
+// numerics as the CPU/ping-pong version -- this is a performance-only
+// rewrite, not an algorithm change (see tests/KrigingIterativeTest.cpp for
+// the cross-check against the ping-pong path).
+//
+// UNPRECONDITIONED ONLY: does not accept a Woodbury-whitened operator.
+// Kriging.cpp falls back to the CPU-orchestrated
+// LinearAlgebra::stochasticLogDetBatched (with this namespace's rmulBatched
+// as AmulBatched, whitened by WoodburyFactorization::whitenL/whitenLt on
+// the host in between) when a Nystrom preconditioner is active -- which
+// defaults to off (m_iterative_precond_rank = 0), so this covers the
+// common case; porting the preconditioned path is future work if the
+// default ever changes.
+LIBKRIGING_EXPORT double stochasticLogDetBatched(const arma::mat& Xt,
+                                                  const arma::vec& theta,
+                                                  const std::string& covType,
+                                                  arma::uword lanczos_steps,
+                                                  const arma::mat& probes);
+
 }  // namespace LinearAlgebraCuda
 
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE
