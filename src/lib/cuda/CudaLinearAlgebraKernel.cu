@@ -560,6 +560,20 @@ extern "C" void lk_cuda_cg_any_active_launch(const int* d_active, int ncols, int
 // lk_cov_pair/lk_dlncov_pair already give R=1 / dlncov=0 there on their
 // own (same functions the matrix-free kernels above use per-pair, just
 // paid ONCE here instead of once per CG iteration / Lanczos step).
+// One thread per (i,j) pair with i <= j (the upper triangle including the
+// diagonal): R and each dR/dtheta_k block are symmetric
+// (Cov(Xi,Xj,theta) == Cov(Xj,Xi,theta), same for the log-derivative), so
+// evaluating lk_cov_pair/lk_dlncov_pair for BOTH (i,j) and (j,i) -- what
+// every thread in the full n x n grid used to do independently -- pays the
+// transcendental-heavy part (exp/log1p, the actual cost here per the
+// profiling in docs/math/Iterative.md) TWICE for no reason. Computing it
+// once per pair and writing it to both R[i,j]/R[j,i] (and both dR slots)
+// halves that cost; the lower-triangle threads (i>j) simply return; total
+// memory traffic is unchanged (every dense element still gets written
+// exactly once, just by its upper-triangle partner instead of itself).
+// i==j needs no special case: idx_ij and idx_ji are the same address, so
+// writing "both" is one redundant but harmless store, not a race (a single
+// thread owns that diagonal element).
 __global__ void build_cov_kernel(const double* __restrict__ Xt,
                                  int n,
                                  int dimX,
@@ -569,21 +583,27 @@ __global__ void build_cov_kernel(const double* __restrict__ Xt,
                                  double* __restrict__ dR) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i >= n || j >= n)
+  if (i >= n || j >= n || i > j)
     return;
 
   const double* Xi = Xt + static_cast<std::size_t>(i) * dimX;
   const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
   const double c = lk_cov_pair(kind, Xi, Xj, theta, dimX);
-  const std::size_t idx = static_cast<std::size_t>(i) + static_cast<std::size_t>(j) * n;
-  if (R != nullptr)
-    R[idx] = c;
+  const std::size_t idx_ij = static_cast<std::size_t>(i) + static_cast<std::size_t>(j) * n;
+  const std::size_t idx_ji = static_cast<std::size_t>(j) + static_cast<std::size_t>(i) * n;
+  if (R != nullptr) {
+    R[idx_ij] = c;
+    R[idx_ji] = c;
+  }
   if (dR != nullptr) {
     double dln[LK_CUDA_MAX_DIMX];
     lk_dlncov_pair(kind, Xi, Xj, theta, dimX, dln);
     const std::size_t n2 = static_cast<std::size_t>(n) * n;
-    for (int k = 0; k < dimX; ++k)
-      dR[static_cast<std::size_t>(k) * n2 + idx] = c * dln[k];
+    for (int k = 0; k < dimX; ++k) {
+      const double v = c * dln[k];
+      dR[static_cast<std::size_t>(k) * n2 + idx_ij] = v;
+      dR[static_cast<std::size_t>(k) * n2 + idx_ji] = v;
+    }
   }
 }
 
