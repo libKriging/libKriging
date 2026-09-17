@@ -116,6 +116,20 @@ bool denseFitsBudget(double need_mb) {
   return budget_mb > 0 && need_mb <= static_cast<double>(budget_mb);
 }
 
+// Plan item #8: mixed-precision matvec, opt-in while it's being validated
+// (default off -- every existing test/bench keeps running full fp64 unless
+// this is set). Only takes effect on the dense path: the matrix-free
+// kernels' cost is transcendental evaluation (exp/log1p per pair), not
+// GEMM FLOPs, so TF32 tensor cores -- which only accelerate matrix
+// multiply -- don't help there. See CHANGELOG.md / todo_reach_gpytorch.md
+// for the measurement behind restricting the fp64 correction step to the
+// GPU (never the CPU, even on a throttled card) and for why this is scoped
+// to conjugateGradient's own matvec rather than the SLQ Lanczos recursion
+// too (not yet extended there).
+bool mixedPrecisionEnabled() {
+  return std::getenv("LK_ITERATIVE_CUDA_MIXED_PRECISION") != nullptr;
+}
+
 // Device-resident cache of the materialized dense R for the LAST
 // (Xt, theta, covType) seen.
 //
@@ -151,6 +165,11 @@ struct DenseCovCache {
   double* d_Xt = nullptr;
   double* d_theta = nullptr;
   double* d_R = nullptr;
+  // Lazily-built fp32 copy of d_R (plan item #8: mixed-precision matvec),
+  // built once per theta by covCacheRf32() below, on top of the ALREADY
+  // materialized double d_R -- a cast, not a second build, so it never pays
+  // for its own covariance evaluation.
+  float* d_R_f32 = nullptr;
 };
 
 DenseCovCache& covCache() {
@@ -182,7 +201,10 @@ DenseCovCache& covCacheBind(const arma::mat& Xt, const arma::vec& theta, CovKind
     cudaFree(c.d_theta);
   if (c.d_R)
     cudaFree(c.d_R);
+  if (c.d_R_f32)
+    cudaFree(c.d_R_f32);
   c.d_Xt = c.d_theta = c.d_R = nullptr;
+  c.d_R_f32 = nullptr;
 
   const int n = static_cast<int>(Xt.n_cols);
   const int dimX = static_cast<int>(Xt.n_rows);
@@ -213,6 +235,21 @@ double* covCacheR(DenseCovCache& c) {
   lk_cuda_build_cov_launch(c.d_Xt, c.n, c.dimX, c.d_theta, c.kind, c.d_R, nullptr);
   LK_CUDA_CHECK(cudaGetLastError());
   return c.d_R;
+}
+
+// Lazily-built fp32 copy of the (already dense-materialized) R, for the
+// mixed-precision matvec (plan item #8). Requires covCacheR() to already
+// have built the double R -- callers only reach for this on the dense
+// path, same gating as the double cache. A cast, not a rebuild: costs one
+// O(n^2) elementwise kernel, not a second covariance evaluation.
+float* covCacheRf32(DenseCovCache& c) {
+  if (c.d_R_f32)
+    return c.d_R_f32;
+  const std::size_t count = static_cast<std::size_t>(c.n) * c.n;
+  LK_CUDA_CHECK(cudaMalloc(&c.d_R_f32, sizeof(float) * count));
+  lk_cuda_cast_d2f_launch(c.d_R, static_cast<long long>(count), c.d_R_f32);
+  LK_CUDA_CHECK(cudaGetLastError());
+  return c.d_R_f32;
 }
 
 }  // namespace
@@ -310,6 +347,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   double* d_theta = cov.d_theta;
   double* d_Rmat = covCacheR(cov);
   const bool dense = (d_Rmat != nullptr);
+  const bool mixed_precision = dense && mixedPrecisionEnabled();
+  float* d_Rmat_f32 = mixed_precision ? covCacheRf32(cov) : nullptr;
 
   // Current working-set width: starts at ncols, shrinks as columns
   // converge and get compacted out (see compactConverged below). Declared
@@ -327,6 +366,17 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LK_CUDA_CHECK(cudaMalloc(&d_r, mat_bytes));
   LK_CUDA_CHECK(cudaMalloc(&d_p, mat_bytes));
   LK_CUDA_CHECK(cudaMalloc(&d_Ap, mat_bytes));
+
+  // fp32 sandwich buffers for the mixed-precision matvec (plan item #8):
+  // cast the current search direction down once, run the TF32/fp32 GEMM,
+  // cast the result back up. Sized at the ORIGINAL ncols (like every other
+  // buffer here) and used at their leading ncols_cur portion after a
+  // compaction, same convention as d_p/d_Ap.
+  float *d_p_f32 = nullptr, *d_Ap_f32 = nullptr;
+  if (mixed_precision) {
+    LK_CUDA_CHECK(cudaMalloc(&d_p_f32, sizeof(float) * static_cast<std::size_t>(n) * ncols));
+    LK_CUDA_CHECK(cudaMalloc(&d_Ap_f32, sizeof(float) * static_cast<std::size_t>(n) * ncols));
+  }
 
   // Per-column CG scalars, kept ON DEVICE so the loop never round-trips
   // pAp / r.r / alpha / beta through the host (that was ~4 blocking
@@ -417,11 +467,34 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // or the matrix-free rmul_batched_kernel -- the only difference the rest
   // of this CG loop needs to know about. Reads ncols_cur (not ncols): after
   // a compaction this is the current, possibly-shrunk, working-set width.
+  //
+  // `exact` (plan item #8): when mixed_precision is on, most calls run the
+  // TF32/fp32 GEMM instead (d_in cast down, GEMM'd against d_Rmat_f32, cast
+  // back up) -- cheap but with accumulating fp32-level error. The caller
+  // passes exact=true ONLY at the periodic restart's residual recompute,
+  // which stays full fp64 end to end: that's what corrects away the fp32
+  // path's error, the same iterative-refinement argument that already
+  // justifies the restart's round-off correction on the plain fp64 path.
+  // Matrix-free calls always ignore `exact` (no fp32 kernel written for
+  // that path yet -- its cost is transcendental evaluation, not GEMM
+  // FLOPs, so TF32 tensor cores don't help it the same way).
   const double gemm_one = 1.0, gemm_zero = 0.0;
-  auto matvec = [&](const double* d_in, double* d_out) {
+  const float gemm_one_f = 1.0f, gemm_zero_f = 0.0f;
+  auto matvec = [&](const double* d_in, double* d_out, bool exact) {
     if (dense) {
-      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one, d_Rmat, n,
-                                  d_in, n, &gemm_zero, d_out, n));
+      if (mixed_precision && !exact) {
+        const long long count = static_cast<long long>(n) * ncols_cur;
+        lk_cuda_cast_d2f_launch(d_in, count, d_p_f32);
+        LK_CUDA_CHECK(cudaGetLastError());
+        LK_CUBLAS_CHECK(cublasGemmEx(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one_f,
+                                     d_Rmat_f32, CUDA_R_32F, n, d_p_f32, CUDA_R_32F, n, &gemm_zero_f, d_Ap_f32,
+                                     CUDA_R_32F, n, CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        lk_cuda_cast_f2d_launch(d_Ap_f32, count, d_out);
+        LK_CUDA_CHECK(cudaGetLastError());
+      } else {
+        LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one, d_Rmat, n,
+                                    d_in, n, &gemm_zero, d_out, n));
+      }
     } else {
       lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_in, ncols_cur, d_out,
                                   d_rmul_scratch);
@@ -580,7 +653,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   arma::uword iters_done = 0;
   for (arma::uword it = 0; host_flag && it < max_iter; ++it) {
     iters_done = it + 1;
-    matvec(d_p, d_Ap);  // Ap = R*p
+    matvec(d_p, d_Ap, /*exact=*/false);  // Ap = R*p -- the cheap fp32/TF32 path when mixed_precision is on
     lk_cuda_batched_dot_launch(d_p, d_Ap, n, ncols_cur, d_scratch);  // pAp
     LK_CUDA_CHECK(cudaGetLastError());
     lk_cuda_cg_alpha_launch(d_rz_old, d_scratch, ncols_cur, d_active, d_alpha, d_neg_alpha);
@@ -590,8 +663,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
 
     if ((it + 1) % restart_every == 0) {
       // Full restart: recompute r = b - A*x exactly for every still-active
-      // column (same rationale as LinearAlgebra::conjugateGradient's).
-      matvec(d_x, d_Ap);  // Ap = R*x
+      // column (same rationale as LinearAlgebra::conjugateGradient's) --
+      // always full fp64, this is the correction step mixed_precision relies on.
+      matvec(d_x, d_Ap, /*exact=*/true);  // Ap = R*x
       LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, matBytesCur(), cudaMemcpyDeviceToDevice));  // r = b
       lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols_cur);             // r = b - A*x
       LK_CUDA_CHECK(cudaGetLastError());
@@ -666,9 +740,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       std::snprintf(tol_str, sizeof(tol_str), "%g", tol_min);
     else
       std::snprintf(tol_str, sizeof(tol_str), "%g..%g", tol_min, tol_max);
-    std::fprintf(stderr, "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu compacted_to=%d%s\n", n,
-                 ncols, tol_str, pk, static_cast<unsigned long long>(iters_done),
-                 static_cast<unsigned long long>(max_iter), ncols_cur, iters_done >= max_iter ? "  <-- NOT CONVERGED" : "");
+    std::fprintf(stderr,
+                 "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu compacted_to=%d%s%s\n", n, ncols,
+                 tol_str, pk, static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
+                 ncols_cur, iters_done >= max_iter ? "  <-- NOT CONVERGED" : "", mixed_precision ? " mixed_fp32" : "");
   }
 
   // Whatever remains in the (possibly compacted-down) working set is each
@@ -703,7 +778,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
                                         static_cast<arma::uword>(n), max_iter);
 
-  // d_Xt / d_theta / d_Rmat are owned by the dense cache, not by this call.
+  // d_Xt / d_theta / d_Rmat / d_Rmat_f32 are owned by the dense cache, not by this call.
   cudaFree(d_b);
   cudaFree(d_x);
   cudaFree(d_r);
@@ -722,6 +797,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   cudaFree(d_flag);
   if (d_rmul_scratch)
     cudaFree(d_rmul_scratch);
+  if (d_p_f32) {
+    cudaFree(d_p_f32);
+    cudaFree(d_Ap_f32);
+  }
   if (preconditioned) {
     cudaFree(d_precU);
     cudaFree(d_precDinv);

@@ -808,4 +808,40 @@ extern "C" void lk_cuda_build_cov_launch(const double* d_Xt,
   build_cov_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_R, d_dR);
 }
 
+// --- Mixed-precision matvec support (plan item #8) -------------------------
+//
+// Plain elementwise casts, used to sandwich a TF32/fp32 cublasGemmEx call
+// between the CG loop's otherwise-double state: cast the current search
+// direction down to fp32 once, run the (fast, tensor-core) GEMM, cast the
+// result back up. The exact-residual restart (already run periodically for
+// round-off correction, see CudaLinearAlgebra.cpp) stays full fp64 end to
+// end -- that periodic correction is what lets the cheap fp32/TF32 matvec's
+// accumulated error be corrected away, the same iterative-refinement
+// argument as classic mixed-precision CG/GMRES.
+__global__ void cast_d2f_kernel(const double* __restrict__ in, long long count, float* __restrict__ out) {
+  const long long i = blockIdx.x * static_cast<long long>(blockDim.x) + threadIdx.x;
+  if (i >= count)
+    return;
+  out[i] = static_cast<float>(in[i]);
+}
+
+__global__ void cast_f2d_kernel(const float* __restrict__ in, long long count, double* __restrict__ out) {
+  const long long i = blockIdx.x * static_cast<long long>(blockDim.x) + threadIdx.x;
+  if (i >= count)
+    return;
+  out[i] = static_cast<double>(in[i]);
+}
+
+extern "C" void lk_cuda_cast_d2f_launch(const double* d_in, long long count, float* d_out) {
+  const int block = 256;
+  const long long grid = (count + block - 1) / block;
+  cast_d2f_kernel<<<static_cast<unsigned int>(grid), block>>>(d_in, count, d_out);
+}
+
+extern "C" void lk_cuda_cast_f2d_launch(const float* d_in, long long count, double* d_out) {
+  const int block = 256;
+  const long long grid = (count + block - 1) / block;
+  cast_f2d_kernel<<<static_cast<unsigned int>(grid), block>>>(d_in, count, d_out);
+}
+
 #endif  // LIBKRIGING_USE_CUDA_ITERATIVE
