@@ -746,9 +746,12 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     const std::function<arma::mat(const arma::mat&)>& AmulBatched,
     const arma::mat& B,
     arma::uword max_iter,
-    double tol,
+    const arma::vec& tol,
     const std::function<arma::mat(const arma::mat&)>& PinvBatched,
     arma::uword* n_unconverged_out) {
+  if (tol.n_elem != B.n_cols)
+    throw std::invalid_argument("LinearAlgebra::conjugateGradientBatched: tol has " + std::to_string(tol.n_elem)
+                                + " entries, expected " + std::to_string(B.n_cols) + " (one per column of B)");
   // Block conjugate gradient with a SHARED matvec: every right-hand side
   // (column of B) is still an independent Krylov solve -- no block-CG
   // subspace sharing -- but all still-active columns are advanced in lockstep
@@ -820,7 +823,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
         R.col(c) = B.col(c) - AX.col(c);  // fresh exact residual on the updated iterate
       else
         R.col(c) -= alpha_it(c) * AP.col(c);
-      if (arma::norm(R.col(c)) / bnorm(c) < tol)
+      if (arma::norm(R.col(c)) / bnorm(c) < tol(c))
         active[c] = 0;
     }
 
@@ -856,6 +859,19 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
   LinearAlgebra::cgNonConvergenceWarning(n_unconverged, ncols, n, max_iter);
 
   return Xc;
+}
+
+// Scalar-tol convenience overload (every column shares one tolerance) --
+// broadcasts into the per-column vector above.
+LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
+    const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+    const arma::mat& B,
+    arma::uword max_iter,
+    double tol,
+    const std::function<arma::mat(const arma::mat&)>& PinvBatched,
+    arma::uword* n_unconverged_out) {
+  return conjugateGradientBatched(AmulBatched, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), PinvBatched,
+                                  n_unconverged_out);
 }
 
 // Solve X*A=B : X = B / A

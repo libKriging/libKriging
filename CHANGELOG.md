@@ -12,6 +12,35 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- CUDA iterative backend: `_logLikelihoodIterative`'s gradient path now
+  fuses its two separate batched CG solves (`[F|y]`, then the Hutchinson
+  probes) into ONE Krylov pass on `[F|y|probes]` (plan item #5, phase A —
+  see `todo`-style discussion in the PR; the harder phase B, reading the
+  SLQ log-determinant directly off this fused solve's own CG coefficients
+  instead of running a separate dedicated Lanczos, is NOT done here — that
+  was tried once and deliberately reverted, per the comment at
+  `Kriging.cpp`'s SLQ dispatch, because without full reorthogonalization
+  the CG-derived tridiagonal degrades as `cond(R)` grows with `n`). Both
+  `LinearAlgebraCuda::conjugateGradient` and
+  `LinearAlgebra::conjugateGradientBatched` gained a per-column-tolerance
+  overload (`tol` as an `arma::vec` instead of `double`, existing scalar
+  callers unaffected via a thin broadcast overload) so the fused call can
+  still converge `[F|y]` to `cg_tol` and probes to the looser
+  `probes_cg_tol` independently, each column freezing at its own rate —
+  bit-for-bit what two separate calls would produce, just paying one
+  matvec-per-iteration loop's kernel-launch/host-sync overhead instead of
+  two. CUDA-only for now (mirrors the SLQ device-residency work just
+  above): HIP/SYCL/Metal keep the two-separate-calls path, since only
+  `LinearAlgebraCuda::conjugateGradient` has the vector-tol overload.
+  Values cross-checked against the pre-fusion path (differences at the
+  1e-4-1e-5 relative level, consistent with floating-point reassociation
+  from batching order, not a correctness regression — the SLQ term's own
+  ~5% stochastic bias already swamps this). Measured on an H100 (isolated
+  timings, shared-node noise still present): ~10-24% faster on
+  `logLik`+gradient across n=2000-16000, on top of the SLQ device-residency
+  gain above — notably this is the first item in this series to move the
+  needle at n=16000, where the SLQ optimization alone showed nothing
+  because the probe CG solve dominated total time regardless.
 - CUDA iterative backend: the SLQ log-determinant's batched Lanczos
   recurrence (`LLIterative`'s log-det term) is now fully device-resident
   (`LinearAlgebraCuda::stochasticLogDetBatched`) instead of round-tripping
