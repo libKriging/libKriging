@@ -25,6 +25,45 @@ past release, see the corresponding entry on the
 ## [1.2.0] - 2026-09-19
 
 ### Added
+- CUDA iterative backend: the batched CG solve (`LinearAlgebraCuda::conjugateGradient`)
+  now compacts already-converged columns out of its working set instead of
+  carrying them, frozen, through every remaining matvec (plan item #7).
+  Every column of a batched solve is an independent Krylov iteration coupled
+  only through the shared matvec, and that matvec is itself
+  columnwise-independent — so once a column's residual drops below its
+  tolerance, the rest of the solve gains nothing from still including it in
+  the n×ncols block. Compaction piggybacks on the existing periodic
+  exact-residual restart (`restart_every = 50`, already a full host/device
+  sync point): whenever a restart's convergence check finds the active set
+  has shrunk, the remaining columns' `x`/`r`/`p`/`b` (and, when
+  preconditioned, `z`) are gathered to the front of their buffers via one
+  host round trip, and the departing columns' frozen values are scattered
+  into the output at their original positions; a small per-solve `col_map`
+  tracks compacted-slot → original-column index across however many rounds
+  fire. Targets `predictIterative`'s real shape: hundreds of test-point
+  columns whose covariance-vector right-hand sides converge at very
+  different rates (unlike the roughly-uniform `[F|y]`/probe columns), so a
+  handful of stragglers used to drag the whole batch through thousands of
+  full-width iterations.
+  Verified two ways: (1) a direct harness comparing the compacted GPU
+  solve's TRUE per-column residual against tol (all columns satisfy it,
+  confirming compaction preserves the solve's correctness contract) and
+  against a from-scratch CPU reference at the same tol (values differ by a
+  few percent in the ill-conditioned regime this solver already runs in —
+  expected: CG at a loose tolerance on an ill-conditioned matrix has many
+  equally-valid solutions, and this same divergence is present with
+  compaction fully disabled too, i.e. it predates this change and is not
+  something this change introduces); (2) 527 assertions green.
+  Measured (H100, matrix-free path forced via
+  `LK_ITERATIVE_CUDA_DENSE_MAX_MB=0`, n=4000, 300 covariance-vector
+  columns, tol=1e-4 — the realistic `predictIterative` shape): 398s → 54s,
+  ~7.4x, as the active set shrinks 300→298→…→1 across 22 compaction rounds
+  before the last straggler converges alone. This gain is specific to the
+  matrix-free path (large `n`, past `LK_ITERATIVE_CUDA_DENSE_MAX_MB`):
+  on the dense path, the matvec is a single `cublasDgemm` against an
+  already-materialized R, which is memory-bandwidth-bound on streaming R
+  itself rather than on `ncols` — reducing the column count there measured
+  as no change either way.
 - CUDA iterative backend: `build_cov_kernel` (the dense fast-path builder
   behind `LinearAlgebraCuda`'s `R`/`dR` cache) now computes each covariance
   pair once instead of twice. `R` and every `∂R/∂θₖ` block are symmetric
