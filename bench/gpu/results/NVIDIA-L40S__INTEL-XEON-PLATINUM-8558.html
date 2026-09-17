@@ -25,7 +25,7 @@
 <li><strong>GPU</strong>: NVIDIA L40S</li>
 <li><strong>CPU</strong>: INTEL(R) XEON(R) PLATINUM 8558</li>
 <li><strong>host</strong>: <code>farux-gpu04.cluster</code>  ·  logical CPUs: 192  ·  OMP_NUM_THREADS: <code>(unset)</code></li>
-<li><strong>when</strong>: 2026-09-17 11:53 CEST</li>
+<li><strong>when</strong>: 2026-09-17 13:51 CEST</li>
 <li><strong>sweep</strong>: <code>sine_sum</code> d=4, matern5_2, shared theta=0.15; n = 250, 500, 1000, 2000, 4000, 8000; test n=300</li>
 <li><strong>shared CG budget</strong>: relative-residual tolerance <code>0.0001</code> applied to <strong>both</strong> libraries (libKriging <code>predictIterative(tol=...)</code> and the objective's 5th <code>LLIterative</code> field; GPyTorch <code>cg_tolerance</code>/<code>eval_cg_tolerance</code>). Budget-matching this is not cosmetic: running libKriging at 1e-8 against GPyTorch at 1e-4 — as an earlier revision of this harness did — compares a solver converged four orders of magnitude tighter against a deliberately truncated one and reads the difference as speed.</li>
 <li><strong>libKriging iterative objective</strong>: <code>LLIterative(30,0,40,6,0.0001,0.01)</code>  ·  <code>predictIterative(max_iter=8n, Nystrom precond rank ≤ 128)</code>  ·  6th field <code>probes_cg_tol=0.01</code> loosens ONLY the gradient's Hutchinson-probe CG solve (not <code>predictIterative</code>'s own tol above) -- see docs/math/Iterative.md</li>
@@ -38,7 +38,7 @@
 <p>Click a metric above the plot to switch; click legend entries to isolate/hide backends.</p>
 <div id="timing-chart" style="width:100%;max-width:960px;height:560px;"></div>
 <script>
-Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.055124424397945404, 0.10326375253498554, 0.30521954596042633, 0.9058325896039605, 3.3268739040941, 13.799112786538899], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.02290242724120617, 0.02352300751954317, 0.0325371315702796, 0.05095606856048107, 0.37362671736627817, 1.8114771023392677], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.042239684611558914, 0.062044293619692326, 0.09668825007975101, 0.17870531789958477, 0.8667314704507589, 8.667271259240806], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.07467289175838232, 0.07904910668730736, 0.11836860328912735, 0.17771239671856165, 0.8902030671015382, 7.288917526602745], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.03552989196032286, 0.07029129005968571, 0.12483294866979122, 0.37910477351397276, 1.3654509233310819, 6.856932680122554], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.004311860539019108, 0.005006484687328339, 0.006759997457265854, 0.011765693314373493, 0.05180898495018482, 0.2585621951147914], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.005502169951796532, 0.01291259191930294, 0.012668212875723839, 0.024226087145507336, 0.17248246259987354, 0.9713033465668559], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.044824826531112194, 0.12159442063421011, 0.3156462712213397, 0.78373499866575, 2.6755927558988333, 11.903500486165285], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.023367722518742085, 0.028560059145092964, 0.049379708245396614, 0.11767136305570602, 0.6420908235013485, 10.712905587628484], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.04021593276411295, 0.06822951510548592, 0.14227060694247484, 0.43664378207176924, 3.222012653015554, 45.99590818583965], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.07576384302228689, 0.08070241007953882, 0.11989744193851948, 0.18179672490805387, 0.9106110129505396, 7.3439147509634495], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.09037112072110176, 0.0745653286576271, 0.15266080852597952, 0.38711769599467516, 1.5842882227152586, 7.299447091296315], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.004377068020403385, 0.006352147087454796, 0.012991526164114475, 0.04514417052268982, 0.29413422383368015, 2.081318223848939], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.015376866795122623, 0.02219341043382883, 0.051852231845259666, 0.09426548518240452, 0.5717622032389045, 2.238732279278338], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.008387316949665546, 0.03333797678351402, 0.03623312804847956, 0.04900133050978184, 0.11528914980590343, 0.3898151060566306], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.012358635663986206, 0.05137440375983715, 0.08055841457098722, 0.11142308730632067, 0.24236315954476595, 3.025029744952917], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.11468691285699606, 0.2409714236855507, 0.4608257543295622, 0.8662502290681005, 3.753419429063797, 9.645704984664917], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.06666795257478952, 0.07463137526065111, 0.08654965739697218, 0.11663754470646381, 0.326546860858798, 1.7469075210392475], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.08284944389015436, 0.8053843388333917, 1.4908671034500003, 0.6772088762372732, 0.637550899758935, 3.1531750420108438], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.006855090148746967, 0.009276499971747398, 0.015228452160954475, 0.034570145420730114, 0.15672780945897102, 0.9406017735600471], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.03146274387836456, 0.02102141547948122, 0.05452817399054766, 0.08871571999043226, 0.37850042153149843, 1.7934214053675532], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}], {
+Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.06456941924989223, 0.1740304548293352, 0.40671935118734837, 0.7524540340527892, 2.561797552742064, 10.500881901942194], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.022397438995540142, 0.024353942833840847, 0.03123505413532257, 0.05466221086680889, 0.3925062892958522, 1.907496640458703], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.03642034810036421, 0.06082765758037567, 0.09185356833040714, 0.18797775823622942, 0.7947368137538433, 8.14949819073081], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": true, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.07734929025173187, 0.08132374752312899, 0.12065369449555874, 0.17978020664304495, 0.9290647655725479, 7.6079572001472116], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.038980936631560326, 0.06834017112851143, 0.14570461586117744, 0.37560433335602283, 1.3370277946814895, 9.73011158965528], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.004320922307670116, 0.005048414692282677, 0.006978508085012436, 0.011922272853553295, 0.05198310595005751, 0.2623585844412446], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.005764555186033249, 0.010269452817738056, 0.02065522875636816, 0.06014127004891634, 0.15112669207155704, 1.1387346144765615], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": true, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.052557836286723614, 0.17085851076990366, 0.3424504389986396, 0.7703267596662045, 2.1992717385292053, 10.45815268252045], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.0235776761546731, 0.030033078975975513, 0.04942578077316284, 0.12229379266500473, 0.6899121226742864, 11.477255850099027], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.04199653957039118, 0.07577355392277241, 0.16978306137025356, 0.45350739918649197, 3.317664203234017, 47.98999453056604], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.07739619072526693, 0.08172497805207968, 0.12057186011224985, 0.18544153962284327, 0.9461122564971447, 7.669096188619733], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.052190360613167286, 0.07679683621972799, 0.1760638952255249, 0.3912794031202793, 1.4993811212480068, 16.075041751377285], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.004430575296282768, 0.006429165601730347, 0.013744648545980453, 0.04651504475623369, 0.3000227017328143, 2.3457949524745345], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.032096435315907, 0.039325229823589325, 0.07849096693098545, 0.1149674728512764, 0.9724018201231956, 3.621232961304486], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.017334402538836002, 0.030029676854610443, 0.038861216977238655, 0.041445113718509674, 0.11006944067776203, 0.3305415976792574], "name": "libKriging-Cholesky-OpenBLAS", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Cholesky-OpenBLAS<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.019949404522776604, 0.035429866053164005, 0.07976355869323015, 0.1069310549646616, 0.24019102659076452, 3.161138758994639], "name": "libKriging-Iterative-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.10203901305794716, 0.2819605115801096, 0.48797871079295874, 0.9115482037886977, 2.877852004021406, 8.042561859823763], "name": "libKriging-Iterative-OpenMP", "mode": "lines+markers", "visible": false, "hovertemplate": "libKriging-Iterative-OpenMP<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.0693734735250473, 0.0782035794109106, 0.08922149147838354, 0.12170135788619518, 0.33840686455368996, 1.8171670697629452], "name": "GPyTorch-BBMM-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.09907941333949566, 0.9183828411623836, 1.5129076885059476, 0.8729360597208142, 0.625341285020113, 4.898176823742688], "name": "GPyTorch-BBMM-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-BBMM-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.006927552632987499, 0.009407872334122658, 0.015745297074317932, 0.03457864746451378, 0.15772232599556446, 1.0632705446332693], "name": "GPyTorch-Cholesky-CUDA", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-CUDA<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}, {"x": [250, 500, 1000, 2000, 4000, 8000], "y": [0.02986494917422533, 0.03953331056982279, 0.06246106419712305, 0.15733869560062885, 0.5928791295737028, 2.0951258344575763], "name": "GPyTorch-Cholesky-MKL", "mode": "lines+markers", "visible": false, "hovertemplate": "GPyTorch-Cholesky-MKL<br>n=%{x}<br>%{y:.4g} s<extra></extra>"}], {
   xaxis: {title: {text: 'n (training size)'}, type: 'log'},
   yaxis: {title: {text: "Fit time (s)"}, type: 'log'},
   legend: {orientation: 'h', y: -0.2},
@@ -51,59 +51,59 @@ Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [
 <table><thead>
 <tr><th>n</th><th>fit (s)</th><th>logLik (s)</th><th>predict (s)</th><th>logLik value</th><th>RMSE</th><th>Q²</th></tr>
 </thead><tbody>
-<tr><td>250</td><td>0.055</td><td>0.045</td><td>0.008</td><td>-317.241</td><td>0.4773</td><td>0.8952</td></tr>
-<tr><td>500</td><td>0.103</td><td>0.122</td><td>0.033</td><td>-463.222</td><td>0.3402</td><td>0.9468</td></tr>
-<tr><td>1000</td><td>0.305</td><td>0.316</td><td>0.036</td><td>-512.857</td><td>0.2111</td><td>0.9795</td></tr>
-<tr><td>2000</td><td>0.906</td><td>0.784</td><td>0.049</td><td>-60.627</td><td>0.0955</td><td>0.9958</td></tr>
-<tr><td>4000</td><td>3.327</td><td>2.676</td><td>0.115</td><td>2183.769</td><td>0.0421</td><td>0.9992</td></tr>
-<tr><td>8000</td><td>13.799</td><td>11.904</td><td>0.390</td><td>9751.610</td><td>0.0217</td><td>0.9998</td></tr>
+<tr><td>250</td><td>0.065</td><td>0.053</td><td>0.017</td><td>-317.241</td><td>0.4773</td><td>0.8952</td></tr>
+<tr><td>500</td><td>0.174</td><td>0.171</td><td>0.030</td><td>-463.222</td><td>0.3402</td><td>0.9468</td></tr>
+<tr><td>1000</td><td>0.407</td><td>0.342</td><td>0.039</td><td>-512.857</td><td>0.2111</td><td>0.9795</td></tr>
+<tr><td>2000</td><td>0.752</td><td>0.770</td><td>0.041</td><td>-60.627</td><td>0.0955</td><td>0.9958</td></tr>
+<tr><td>4000</td><td>2.562</td><td>2.199</td><td>0.110</td><td>2183.769</td><td>0.0421</td><td>0.9992</td></tr>
+<tr><td>8000</td><td>10.501</td><td>10.458</td><td>0.331</td><td>9751.610</td><td>0.0217</td><td>0.9998</td></tr>
 </tbody></table>
 <h2>Timing — seconds</h2>
 <table><thead>
 <tr><th>backend</th><th>n</th><th>fit</th><th>logLik</th><th>predict</th></tr>
 </thead><tbody>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>250</td><td>0.055</td><td>0.045</td><td>0.008</td></tr>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>500</td><td>0.103</td><td>0.122</td><td>0.033</td></tr>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>1000</td><td>0.305</td><td>0.316</td><td>0.036</td></tr>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>2000</td><td>0.906</td><td>0.784</td><td>0.049</td></tr>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>4000</td><td>3.327</td><td>2.676</td><td>0.115</td></tr>
-<tr><td>libKriging-Cholesky-OpenBLAS</td><td>8000</td><td>13.799</td><td>11.904</td><td>0.390</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>250</td><td>0.023</td><td>0.023</td><td>0.012</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>500</td><td>0.024</td><td>0.029</td><td>0.051</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>1000</td><td>0.033</td><td>0.049</td><td>0.081</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>2000</td><td>0.051</td><td>0.118</td><td>0.111</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>4000</td><td>0.374</td><td>0.642</td><td>0.242</td></tr>
-<tr><td>libKriging-Iterative-CUDA</td><td>8000</td><td>1.811</td><td>10.713</td><td>3.025</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>250</td><td>0.042</td><td>0.040</td><td>0.115</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>500</td><td>0.062</td><td>0.068</td><td>0.241</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>1000</td><td>0.097</td><td>0.142</td><td>0.461</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>2000</td><td>0.179</td><td>0.437</td><td>0.866</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>4000</td><td>0.867</td><td>3.222</td><td>3.753</td></tr>
-<tr><td>libKriging-Iterative-OpenMP</td><td>8000</td><td>8.667</td><td>45.996</td><td>9.646</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.075</td><td>0.076</td><td>0.067</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.079</td><td>0.081</td><td>0.075</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.118</td><td>0.120</td><td>0.087</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.178</td><td>0.182</td><td>0.117</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>0.890</td><td>0.911</td><td>0.327</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>7.289</td><td>7.344</td><td>1.747</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.036</td><td>0.090</td><td>0.083</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.070</td><td>0.075</td><td>0.805</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.125</td><td>0.153</td><td>1.491</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.379</td><td>0.387</td><td>0.677</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>1.365</td><td>1.584</td><td>0.638</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>6.857</td><td>7.299</td><td>3.153</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>250</td><td>0.065</td><td>0.053</td><td>0.017</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>500</td><td>0.174</td><td>0.171</td><td>0.030</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>1000</td><td>0.407</td><td>0.342</td><td>0.039</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>2000</td><td>0.752</td><td>0.770</td><td>0.041</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>4000</td><td>2.562</td><td>2.199</td><td>0.110</td></tr>
+<tr><td>libKriging-Cholesky-OpenBLAS</td><td>8000</td><td>10.501</td><td>10.458</td><td>0.331</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>250</td><td>0.022</td><td>0.024</td><td>0.020</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>500</td><td>0.024</td><td>0.030</td><td>0.035</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>1000</td><td>0.031</td><td>0.049</td><td>0.080</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>2000</td><td>0.055</td><td>0.122</td><td>0.107</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>4000</td><td>0.393</td><td>0.690</td><td>0.240</td></tr>
+<tr><td>libKriging-Iterative-CUDA</td><td>8000</td><td>1.907</td><td>11.477</td><td>3.161</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>250</td><td>0.036</td><td>0.042</td><td>0.102</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>500</td><td>0.061</td><td>0.076</td><td>0.282</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>1000</td><td>0.092</td><td>0.170</td><td>0.488</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>2000</td><td>0.188</td><td>0.454</td><td>0.912</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>4000</td><td>0.795</td><td>3.318</td><td>2.878</td></tr>
+<tr><td>libKriging-Iterative-OpenMP</td><td>8000</td><td>8.149</td><td>47.990</td><td>8.043</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.077</td><td>0.077</td><td>0.069</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.081</td><td>0.082</td><td>0.078</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.121</td><td>0.121</td><td>0.089</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.180</td><td>0.185</td><td>0.122</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>0.929</td><td>0.946</td><td>0.338</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>7.608</td><td>7.669</td><td>1.817</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.039</td><td>0.052</td><td>0.099</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.068</td><td>0.077</td><td>0.918</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.146</td><td>0.176</td><td>1.513</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.376</td><td>0.391</td><td>0.873</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>1.337</td><td>1.499</td><td>0.625</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>9.730</td><td>16.075</td><td>4.898</td></tr>
 <tr><td>GPyTorch-Cholesky-CUDA</td><td>250</td><td>0.004</td><td>0.004</td><td>0.007</td></tr>
 <tr><td>GPyTorch-Cholesky-CUDA</td><td>500</td><td>0.005</td><td>0.006</td><td>0.009</td></tr>
-<tr><td>GPyTorch-Cholesky-CUDA</td><td>1000</td><td>0.007</td><td>0.013</td><td>0.015</td></tr>
-<tr><td>GPyTorch-Cholesky-CUDA</td><td>2000</td><td>0.012</td><td>0.045</td><td>0.035</td></tr>
-<tr><td>GPyTorch-Cholesky-CUDA</td><td>4000</td><td>0.052</td><td>0.294</td><td>0.157</td></tr>
-<tr><td>GPyTorch-Cholesky-CUDA</td><td>8000</td><td>0.259</td><td>2.081</td><td>0.941</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>250</td><td>0.006</td><td>0.015</td><td>0.031</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>500</td><td>0.013</td><td>0.022</td><td>0.021</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>1000</td><td>0.013</td><td>0.052</td><td>0.055</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>2000</td><td>0.024</td><td>0.094</td><td>0.089</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>4000</td><td>0.172</td><td>0.572</td><td>0.379</td></tr>
-<tr><td>GPyTorch-Cholesky-MKL</td><td>8000</td><td>0.971</td><td>2.239</td><td>1.793</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>1000</td><td>0.007</td><td>0.014</td><td>0.016</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>2000</td><td>0.012</td><td>0.047</td><td>0.035</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>4000</td><td>0.052</td><td>0.300</td><td>0.158</td></tr>
+<tr><td>GPyTorch-Cholesky-CUDA</td><td>8000</td><td>0.262</td><td>2.346</td><td>1.063</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>250</td><td>0.006</td><td>0.032</td><td>0.030</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>500</td><td>0.010</td><td>0.039</td><td>0.040</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>1000</td><td>0.021</td><td>0.078</td><td>0.062</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>2000</td><td>0.060</td><td>0.115</td><td>0.157</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>4000</td><td>0.151</td><td>0.972</td><td>0.593</td></tr>
+<tr><td>GPyTorch-Cholesky-MKL</td><td>8000</td><td>1.139</td><td>3.621</td><td>2.095</td></tr>
 </tbody></table>
 <h2>Accuracy</h2>
 <table><thead>
@@ -127,18 +127,18 @@ Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [
 <tr><td>libKriging-Iterative-OpenMP</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-64.852</td><td>-64.8524</td><td>2.11e-03</td><td>5.58e-04</td></tr>
 <tr><td>libKriging-Iterative-OpenMP</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>2133.168</td><td>2133.1681</td><td>1.27e-02</td><td>6.88e-04</td></tr>
 <tr><td>libKriging-Iterative-OpenMP</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>9305.764</td><td>9305.7642</td><td>5.57e-02</td><td>8.19e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-328.872</td><td>-1.3169</td><td>4.65e-02</td><td>2.45e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-473.083</td><td>-1.0116</td><td>1.97e-02</td><td>3.06e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-873.256</td><td>-1.0879</td><td>3.60e-01</td><td>2.84e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-606.463</td><td>-0.7211</td><td>2.73e-01</td><td>5.02e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1567.827</td><td>-0.2746</td><td>1.54e-01</td><td>3.68e-04</td></tr>
-<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>8965.339</td><td>0.1752</td><td>9.83e-02</td><td>4.27e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-308.221</td><td>-1.2343</td><td>3.61e-02</td><td>2.92e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-480.472</td><td>-1.0263</td><td>3.45e-02</td><td>3.14e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-893.533</td><td>-1.1081</td><td>3.81e-01</td><td>1.83e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-600.767</td><td>-0.7182</td><td>2.70e-01</td><td>6.53e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1533.549</td><td>-0.2832</td><td>1.63e-01</td><td>2.44e-04</td></tr>
-<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>8916.230</td><td>0.1691</td><td>1.04e-01</td><td>4.02e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-307.621</td><td>-1.2319</td><td>3.85e-02</td><td>2.45e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-485.559</td><td>-1.0365</td><td>4.47e-02</td><td>3.06e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-873.241</td><td>-1.0879</td><td>3.60e-01</td><td>2.84e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-613.318</td><td>-0.7245</td><td>2.76e-01</td><td>5.02e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1556.332</td><td>-0.2775</td><td>1.57e-01</td><td>3.68e-04</td></tr>
+<tr><td>GPyTorch-BBMM-CUDA</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>8928.760</td><td>0.1707</td><td>1.03e-01</td><td>4.27e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-317.765</td><td>-1.2725</td><td>2.09e-03</td><td>2.92e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-481.631</td><td>-1.0287</td><td>3.68e-02</td><td>3.14e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-880.080</td><td>-1.0947</td><td>3.67e-01</td><td>1.83e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>2000</td><td>0.0955</td><td>0.9958</td><td>-599.230</td><td>-0.7175</td><td>2.69e-01</td><td>6.53e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>4000</td><td>0.0421</td><td>0.9992</td><td>1560.916</td><td>-0.2764</td><td>1.56e-01</td><td>2.44e-04</td></tr>
+<tr><td>GPyTorch-BBMM-MKL</td><td>8000</td><td>0.0217</td><td>0.9998</td><td>8890.324</td><td>0.1659</td><td>1.08e-01</td><td>4.02e-04</td></tr>
 <tr><td>GPyTorch-Cholesky-CUDA</td><td>250</td><td>0.4773</td><td>0.8952</td><td>-317.241</td><td>-1.2704</td><td>5.25e-09</td><td>1.46e-08</td></tr>
 <tr><td>GPyTorch-Cholesky-CUDA</td><td>500</td><td>0.3402</td><td>0.9468</td><td>-463.222</td><td>-0.9918</td><td>9.37e-09</td><td>9.54e-09</td></tr>
 <tr><td>GPyTorch-Cholesky-CUDA</td><td>1000</td><td>0.2111</td><td>0.9795</td><td>-512.857</td><td>-0.7275</td><td>1.71e-08</td><td>1.57e-08</td></tr>
@@ -156,18 +156,18 @@ Plotly.newPlot('timing-chart', [{"x": [250, 500, 1000, 2000, 4000, 8000], "y": [
 <table><thead>
 <tr><th>n</th><th>libKriging-Cholesky-OpenBLAS</th><th>libKriging-Iterative-CUDA</th><th>libKriging-Iterative-OpenMP</th><th><strong>OpenMP / CUDA</strong></th><th><strong>CUDA / Cholesky</strong></th><th>GPyTorch-BBMM-CUDA</th><th>GPyTorch-BBMM-MKL</th></tr>
 </thead><tbody>
-<tr><td>250</td><td>0.045</td><td>0.023</td><td>0.040</td><td>1.7×</td><td>0.5×</td><td>0.076</td><td>0.090</td></tr>
-<tr><td>500</td><td>0.122</td><td>0.029</td><td>0.068</td><td>2.4×</td><td>0.2×</td><td>0.081</td><td>0.075</td></tr>
-<tr><td>1000</td><td>0.316</td><td>0.049</td><td>0.142</td><td>2.9×</td><td>0.2×</td><td>0.120</td><td>0.153</td></tr>
-<tr><td>2000</td><td>0.784</td><td>0.118</td><td>0.437</td><td>3.7×</td><td>0.2×</td><td>0.182</td><td>0.387</td></tr>
-<tr><td>4000</td><td>2.676</td><td>0.642</td><td>3.222</td><td>5.0×</td><td>0.2×</td><td>0.911</td><td>1.584</td></tr>
-<tr><td>8000</td><td>11.904</td><td>10.713</td><td>45.996</td><td>4.3×</td><td>0.9×</td><td>7.344</td><td>7.299</td></tr>
+<tr><td>250</td><td>0.053</td><td>0.024</td><td>0.042</td><td>1.8×</td><td>0.4×</td><td>0.077</td><td>0.052</td></tr>
+<tr><td>500</td><td>0.171</td><td>0.030</td><td>0.076</td><td>2.5×</td><td>0.2×</td><td>0.082</td><td>0.077</td></tr>
+<tr><td>1000</td><td>0.342</td><td>0.049</td><td>0.170</td><td>3.4×</td><td>0.1×</td><td>0.121</td><td>0.176</td></tr>
+<tr><td>2000</td><td>0.770</td><td>0.122</td><td>0.454</td><td>3.7×</td><td>0.2×</td><td>0.185</td><td>0.391</td></tr>
+<tr><td>4000</td><td>2.199</td><td>0.690</td><td>3.318</td><td>4.8×</td><td>0.3×</td><td>0.946</td><td>1.499</td></tr>
+<tr><td>8000</td><td>10.458</td><td>11.477</td><td>47.990</td><td>4.2×</td><td>1.1×</td><td>7.669</td><td>16.075</td></tr>
 </tbody></table>
 <h2>Verdict — did everything converge?</h2>
 <ul>
 <li><strong>libKriging iterative</strong>: logLik within <code>5.6e-02</code> per point of the chol reference, posterior mean within <code>8.8e-04</code> of test RMS — converged.</li>
-<li><strong>GPyTorch</strong>: posterior mean within <code>6.5e-04</code> of test RMS of the chol reference — now that both libraries run the same separable kernel and the same GLS trend, this is BBMM's own solver convergence, directly comparable to the libKriging-iterative figure above — Q² ≥ <code>0.8952</code>. Its log-likelihood is converted into libKriging's convention (see the accuracy table) and compared to within <code>3.8e-01</code> per point.</li>
-<li><strong>log-likelihood accuracy, head to head</strong>: at the same 30 Hutchinson probes and 40 SLQ Lanczos steps per probe, and the same CG tolerance, libKriging's stochastic log-determinant is the more accurate of the two — worst <code>dLogLik/n</code> <code>5.6e-02</code> against GPyTorch BBMM's <code>3.8e-01</code> (<code>7x</code>). Note the two differ in <em>which</em> quantity they are better at: BBMM's posterior mean is slightly closer (see <code>dMean/rms</code>), libKriging's log-likelihood markedly so.</li>
+<li><strong>GPyTorch</strong>: posterior mean within <code>6.5e-04</code> of test RMS of the chol reference — now that both libraries run the same separable kernel and the same GLS trend, this is BBMM's own solver convergence, directly comparable to the libKriging-iterative figure above — Q² ≥ <code>0.8952</code>. Its log-likelihood is converted into libKriging's convention (see the accuracy table) and compared to within <code>3.7e-01</code> per point.</li>
+<li><strong>log-likelihood accuracy, head to head</strong>: at the same 30 Hutchinson probes and 40 SLQ Lanczos steps per probe, and the same CG tolerance, libKriging's stochastic log-determinant is the more accurate of the two — worst <code>dLogLik/n</code> <code>5.6e-02</code> against GPyTorch BBMM's <code>3.7e-01</code> (<code>7x</code>). Note the two differ in <em>which</em> quantity they are better at: BBMM's posterior mean is slightly closer (see <code>dMean/rms</code>), libKriging's log-likelihood markedly so.</li>
 <li><strong>GPyTorch BBMM vs its own exact Cholesky</strong> (<code>GPyTorch-Cholesky-*</code>, <code>max_cholesky_size</code> forced far above every n here): posterior mean differs by at most <code>6.5e-04</code> of test RMS across n — BBMM has converged to GPyTorch's own exact answer.</li>
 <li><strong><code>libKriging-Iterative-CUDA</code></strong> is already faster than <strong><code>libKriging-Cholesky-OpenBLAS</code></strong> on <code>fit</code> from n=250, <code>logLik</code> from n=250; the dense factor still wins on <code>predict</code> at every n here — the iterative path targets n where the dense factor no longer fits in memory, so a win at these n is a bonus, not the point.</li>
 </ul>
