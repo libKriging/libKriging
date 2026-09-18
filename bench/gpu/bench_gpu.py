@@ -365,13 +365,14 @@ def detect_torch_cpu_blas() -> str | None:
 # backend keys used by --backends / dispatch, and how each maps to the
 # "<lib>-<method>-<linalg lib>" display label (the linalg part is filled in
 # at runtime for the CPU/Cholesky rows).
-BACKEND_KEYS = ["chol", "iter-cuda", "iter-omp", "gpt-cuda", "gpt-cpu", "gpt-chol-cuda", "gpt-chol-cpu"]
+BACKEND_KEYS = ["chol", "iter-cuda", "iter-hip", "iter-omp", "gpt-cuda", "gpt-cpu", "gpt-chol-cuda", "gpt-chol-cpu"]
 
 
 def backend_label(key: str, lk_blas: str, torch_blas: str) -> str:
     return {
         "chol": f"libKriging-Cholesky-{lk_blas}",
         "iter-cuda": "libKriging-Iterative-CUDA",   # dense-R cublasDgemm within budget, else hand-written CUDA kernels
+        "iter-hip": "libKriging-Iterative-HIP",     # dense-R hand-written HIP matvec within budget, else matrix-free
         "iter-omp": "libKriging-Iterative-OpenMP",  # dense-R BLAS-3 within budget, else hand-written OpenMP loops
         "gpt-cuda": "GPyTorch-BBMM-CUDA",           # PyTorch CUDA (cuBLAS/cuSOLVER) + BBMM
         "gpt-cpu": f"GPyTorch-BBMM-{torch_blas}",
@@ -685,10 +686,15 @@ def run_libkriging_chol(X, y, Xte, yte, theta):
 
 
 def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_rank: int,
-                        probes_cg_tol: float = None):
+                        probes_cg_tol: float = None, use_hip: bool = False):
     import pylibkriging as lk
 
     lk.set_cuda_iterative_enabled(bool(use_cuda))
+    # set_hip_iterative_enabled only exists on a -DENABLE_HIP_ITERATIVE build
+    # (see pylibkriging.cpp) -- guard so a CUDA-only build (use_hip always
+    # False here) doesn't need it defined.
+    if hasattr(lk, "set_hip_iterative_enabled"):
+        lk.set_hip_iterative_enabled(bool(use_hip))
     n, d = X.shape
     th = np.full(d, theta)
     params = {"theta": np.full((1, d), theta), "sigma2": 1.0}
@@ -743,6 +749,8 @@ def one_point(key, n, theta, Xte, yte, cg_tol, precond_rank, probes_cg_tol=None,
         return run_libkriging_chol(X, y, Xte, yte, theta)
     if key == "iter-cuda":
         return run_libkriging_iter(X, y, Xte, yte, theta, True, cg_tol, precond_rank, probes_cg_tol)
+    if key == "iter-hip":
+        return run_libkriging_iter(X, y, Xte, yte, theta, False, cg_tol, precond_rank, probes_cg_tol, use_hip=True)
     if key == "iter-omp":
         return run_libkriging_iter(X, y, Xte, yte, theta, False, cg_tol, precond_rank, probes_cg_tol)
     if key == "gpt-cuda":
@@ -849,7 +857,7 @@ def _f(x, spec=".4f"):
 def write_csv(path, rows):
     cols = ["backend", "backend_key", "n", "status", "fit_s", "loglik_s", "predict_s", "update_s", "wall_s",
             "ll", "ll_native", "ll_comparable", "rmse", "q2", "dloglik_n", "dmean_rms"]
-    with open(path, "w", newline="") as fh:
+    with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
         for r in rows:
@@ -1059,7 +1067,7 @@ def write_html(path, rows, meta):
 
     ap("<h2>Verdict — did everything converge?</h2>")
     ap("<ul>")
-    iters = [r for r in ok if r.get("backend_key") in ("iter-cuda", "iter-omp")]
+    iters = [r for r in ok if r.get("backend_key") in ("iter-cuda", "iter-hip", "iter-omp")]
     gpts = [r for r in ok if r.get("backend_key") in ("gpt-cuda", "gpt-cpu")]
     if iters:
         m_dll = max((r["dloglik_n"] for r in iters if r.get("dloglik_n") is not None), default=float("nan"))
@@ -1197,7 +1205,7 @@ def write_html(path, rows, meta):
 </body>
 </html>
 """
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write(doc)
 
 
