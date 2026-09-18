@@ -141,6 +141,89 @@ __global__ void drmul_batched_kernel(const double* __restrict__ Xt,
     Oc[static_cast<std::size_t>(k) * n + i] = acc[k];
 }
 
+// One thread per (i,j) pair with i <= j (upper triangle including the
+// diagonal, R is symmetric): fills d_R[i,j]=d_R[j,i]=R(Xt,theta)[i,j] (pass
+// nullptr to skip) and, when d_dR is non-null, the dimX n x n dR/dtheta_k
+// blocks too (both triangle slots) -- see the .hpp doc comment. Mechanical
+// port of CudaLinearAlgebraKernel.cu's build_cov_kernel.
+__global__ void build_cov_kernel(const double* __restrict__ Xt,
+                                 int n,
+                                 int dimX,
+                                 const double* __restrict__ theta,
+                                 CovKind kind,
+                                 double* __restrict__ R,
+                                 double* __restrict__ dR) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i >= n || j >= n || i > j)
+    return;
+
+  const double* Xi = Xt + static_cast<std::size_t>(i) * dimX;
+  const double* Xj = Xt + static_cast<std::size_t>(j) * dimX;
+  const double c = lk_cov_pair(kind, Xi, Xj, theta, dimX);
+  const std::size_t idx_ij = static_cast<std::size_t>(i) + static_cast<std::size_t>(j) * n;
+  const std::size_t idx_ji = static_cast<std::size_t>(j) + static_cast<std::size_t>(i) * n;
+  if (R != nullptr) {
+    R[idx_ij] = c;
+    R[idx_ji] = c;
+  }
+  if (dR != nullptr) {
+    double dln[LK_HIP_MAX_DIMX];
+    lk_dlncov_pair(kind, Xi, Xj, theta, dimX, dln);
+    const std::size_t n2 = static_cast<std::size_t>(n) * n;
+    for (int k = 0; k < dimX; ++k) {
+      const double v = c * dln[k];
+      dR[static_cast<std::size_t>(k) * n2 + idx_ij] = v;
+      dR[static_cast<std::size_t>(k) * n2 + idx_ji] = v;
+    }
+  }
+}
+
+// One thread per (row i, column c): Out[:,c] (at d_Out + c*ldc) = R * V[:,c],
+// R a precomputed n x n column-major matrix (symmetric, as built by
+// build_cov_kernel above, though nothing here assumes that beyond reading
+// R[j,i] rather than R[i,j] -- the same value for our use). No BLAS on this
+// backend (see the .hpp doc comment), so this is what stands in for a
+// cublasDgemm/hipblasDgemm dense matvec: same grid/block shape as
+// rmul_batched_kernel, but reading a cached matrix instead of evaluating
+// covariance transcendentals per pair -- pure FMA, no exp/log1p, which is
+// the entire point of the dense fast path.
+//
+// Deliberately a plain sequential sum over ALL j in [0,n), diagonal
+// included in its natural position -- NOT special-cased the way
+// rmul_batched_kernel special-cases R's diagonal (acc = Pc[i], since
+// R[i,i] == 1 exactly for every covariance kernel here). That
+// diagonal-first shortcut was tried and reverted: this same kernel also
+// serves dRmulBatched's dense path (HipLinearAlgebra.cpp), where `R` is a
+// dR/dtheta_k block whose diagonal is EXACTLY 0 (d(cov(x,x))/dtheta_k =
+// d(1)/dtheta_k = 0, not 1) -- hard-coding "diag == 1" there silently
+// added Vc[i] where it shouldn't have, corrupting the analytic gradient
+// (caught by KrigingIterativeTest's finite-difference cross-check, which
+// went from 105/105 to 98/105 with errors in the tens of thousands). The
+// plain sum here is correct for both R and dR; the resulting tiny
+// floating-point-reassociation difference against rmul_batched_kernel's
+// evaluation order (R's individual entries agree bit-for-bit -- see
+// HipLinearAlgebra.cpp's DenseCovCache doc comment -- only the summation
+// ORDER differs) is the same class of benign difference already documented
+// elsewhere in this codebase (see tests/KrigingIterativeTest.cpp's
+// "dense fast path matches the matrix-free path" comment).
+__global__ void dense_matvec_kernel(const double* __restrict__ R,
+                                    int n,
+                                    const double* __restrict__ V,
+                                    int ncols,
+                                    double* __restrict__ Out,
+                                    int ldc) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int c = blockIdx.y;
+  if (i >= n || c >= ncols)
+    return;
+  const double* Vc = V + static_cast<std::size_t>(c) * n;
+  double acc = 0.0;
+  for (int j = 0; j < n; ++j)
+    acc += R[static_cast<std::size_t>(j) * n + i] * Vc[j];
+  Out[static_cast<std::size_t>(c) * ldc + i] = acc;
+}
+
 // One thread per (row i, column c): R is never materialized (matching the
 // CPU Rmul's O(n) memory invariant) -- each thread recomputes R(i,j) on the
 // fly while walking j = 0..n-1 and accumulates R(i,:) . P[:,c] into
@@ -475,7 +558,7 @@ __global__ void cg_alpha_kernel(const double* __restrict__ rz_old,
 
 __global__ void cg_beta_kernel(const double* __restrict__ rr_new,
                                const double* __restrict__ bnorm,
-                               double tol,
+                               const double* __restrict__ tol,
                                int ncols,
                                int* __restrict__ active,
                                double* __restrict__ rz_old,
@@ -488,7 +571,7 @@ __global__ void cg_beta_kernel(const double* __restrict__ rr_new,
     return;
   }
   const double rn = rr_new[c];
-  if (sqrt(rn) / bnorm[c] < tol) {  // converged: freeze (rz_old left as-is, matches host 'continue')
+  if (sqrt(rn) / bnorm[c] < tol[c]) {  // converged: freeze (rz_old left as-is, matches host 'continue')
     active[c] = 0;
     beta[c] = 0.0;
     return;
@@ -499,7 +582,7 @@ __global__ void cg_beta_kernel(const double* __restrict__ rr_new,
 
 __global__ void cg_restart_kernel(const double* __restrict__ rr,
                                   const double* __restrict__ bnorm,
-                                  double tol,
+                                  const double* __restrict__ tol,
                                   int ncols,
                                   int* __restrict__ active,
                                   double* __restrict__ rz_old) {
@@ -509,7 +592,7 @@ __global__ void cg_restart_kernel(const double* __restrict__ rr,
   if (!active[c])
     return;
   rz_old[c] = rr[c];
-  if (sqrt(rr[c]) / bnorm[c] < tol)
+  if (sqrt(rr[c]) / bnorm[c] < tol[c])
     active[c] = 0;
 }
 
@@ -533,23 +616,23 @@ extern "C" void lk_hip_cg_alpha_launch(const double* d_rz_old,
 
 extern "C" void lk_hip_cg_beta_launch(const double* d_rr_new,
                                        const double* d_bnorm,
-                                       double tol,
+                                       const double* d_tol,
                                        int ncols,
                                        int* d_active,
                                        double* d_rz_old,
                                        double* d_beta) {
   const int block = 128;
-  cg_beta_kernel<<<(ncols + block - 1) / block, block>>>(d_rr_new, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
+  cg_beta_kernel<<<(ncols + block - 1) / block, block>>>(d_rr_new, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
 }
 
 extern "C" void lk_hip_cg_restart_launch(const double* d_rr,
                                           const double* d_bnorm,
-                                          double tol,
+                                          const double* d_tol,
                                           int ncols,
                                           int* d_active,
                                           double* d_rz_old) {
   const int block = 128;
-  cg_restart_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_bnorm, tol, ncols, d_active, d_rz_old);
+  cg_restart_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_bnorm, d_tol, ncols, d_active, d_rz_old);
 }
 
 extern "C" void lk_hip_cg_any_active_launch(const int* d_active, int ncols, int* d_flag) {
@@ -625,7 +708,7 @@ __global__ void precond_combine_kernel(const double* __restrict__ U, int n, int 
 // beta[c] = active ? rz_new[c]/rz_old[c] : 0 ; rz_old[c] = rz_new[c] ;
 // convergence tested on the TRUE residual norm rr[c] (not rz). Matches the
 // preconditioned branch of LinearAlgebra::conjugateGradient.
-__global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz_new, const double* __restrict__ bnorm, double tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old, double* __restrict__ beta) {
+__global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz_new, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old, double* __restrict__ beta) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols)
     return;
@@ -633,7 +716,7 @@ __global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const doub
     beta[c] = 0.0;
     return;
   }
-  if (sqrt(rr[c]) / bnorm[c] < tol) {
+  if (sqrt(rr[c]) / bnorm[c] < tol[c]) {
     active[c] = 0;
     beta[c] = 0.0;
     return;
@@ -654,27 +737,28 @@ extern "C" void lk_hip_precond_apply_launch(const double* d_U, int n, int k, con
 }
 
 extern "C" void lk_hip_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
-                                               double tol, int ncols, int* d_active, double* d_rz_old, double* d_beta) {
+                                               const double* d_tol, int ncols, int* d_active, double* d_rz_old,
+                                               double* d_beta) {
   const int block = 128;
-  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz_new, d_bnorm, tol, ncols, d_active, d_rz_old,
+  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz_new, d_bnorm, d_tol, ncols, d_active, d_rz_old,
                                                                 d_beta);
 }
 
 // Restart-iteration variant for preconditioned CG: rz_old <- rz[c] (the
 // preconditioned inner product), converge on the true residual rr[c].
-__global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz, const double* __restrict__ bnorm, double tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old) {
+__global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols || !active[c])
     return;
   rz_old[c] = rz[c];
-  if (sqrt(rr[c]) / bnorm[c] < tol)
+  if (sqrt(rr[c]) / bnorm[c] < tol[c])
     active[c] = 0;
 }
 
 extern "C" void lk_hip_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
-                                                  double tol, int ncols, int* d_active, double* d_rz_old) {
+                                                  const double* d_tol, int ncols, int* d_active, double* d_rz_old) {
   const int block = 128;
-  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, tol, ncols, d_active, d_rz_old);
+  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, d_tol, ncols, d_active, d_rz_old);
 }
 
 // dimX must be <= LK_HIP_MAX_DIMX (guaranteed by the host caller). d_Out
@@ -690,6 +774,173 @@ extern "C" void lk_hip_drmul_batched_launch(const double* d_Xt,
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   drmul_batched_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_V, ncols, d_Out);
+}
+
+// d_dR (when non-null) must be sized n*n*dimX doubles and dimX <= 32 (same
+// bound as lk_hip_drmul_batched_launch) -- checked by the host caller.
+extern "C" void lk_hip_build_cov_launch(const double* d_Xt,
+                                         int n,
+                                         int dimX,
+                                         const double* d_theta,
+                                         int covKind,
+                                         double* d_R,
+                                         double* d_dR) {
+  const dim3 block(16, 16, 1);
+  const dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, 1);
+  build_cov_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_R, d_dR);
+}
+
+extern "C" void lk_hip_dense_matvec_launch(const double* d_R, int n, const double* d_V, int ncols, double* d_Out,
+                                            int ldc) {
+  const dim3 block(128, 1, 1);
+  const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
+  dense_matvec_kernel<<<grid, block>>>(d_R, n, d_V, ncols, d_Out, ldc);
+}
+
+// --- Device-resident batched Lanczos (Stochastic Lanczos Quadrature) ------
+// See HipLinearAlgebraKernel.hpp's doc comments for the exact per-kernel
+// contract (mechanical port of CudaLinearAlgebraKernel.cu's lanczos_alpha/
+// beta kernels; the reorthogonalization pair below has no CUDA counterpart
+// since CUDA does that with cuBLAS).
+
+__global__ void lanczos_alpha_kernel(const double* __restrict__ dot,
+                                     int ncols,
+                                     const int* __restrict__ active,
+                                     double* __restrict__ alpha,
+                                     double* __restrict__ neg_alpha) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  const double a = active[c] ? dot[c] : 0.0;
+  alpha[c] = a;
+  neg_alpha[c] = -a;
+}
+
+extern "C" void lk_hip_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
+                                             double* d_neg_alpha) {
+  const int block = 128;
+  lanczos_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_dot, ncols, d_active, d_alpha, d_neg_alpha);
+}
+
+// End-of-step Lanczos bookkeeping -- see the .hpp doc comment for the exact
+// semantics (mirrors LinearAlgebra::stochasticLogDetBatched's host loop
+// body). Once active[c] is 0, every output is 0: the caller's V buffer was
+// zero-initialized once up front, and inv_bj_out=0 is what keeps every
+// later normalization write a no-op, so an inactive probe's Krylov vectors
+// stay exactly zero from m_eff[c] on -- matching the CPU version's explicit
+// "Vj.col(p) = 0 for a non-iterating probe" without needing a separate
+// per-step zeroing pass.
+__global__ void lanczos_beta_kernel(const double* __restrict__ dot2,
+                                    int ncols,
+                                    int step_idx,
+                                    int is_last_step,
+                                    int* __restrict__ active,
+                                    int* __restrict__ m_eff,
+                                    double* __restrict__ beta_out,
+                                    double* __restrict__ inv_bj_out,
+                                    double* __restrict__ neg_beta_prev_out) {
+  const int c = blockIdx.x * blockDim.x + threadIdx.x;
+  if (c >= ncols)
+    return;
+  if (!active[c]) {
+    beta_out[c] = 0.0;
+    inv_bj_out[c] = 0.0;
+    neg_beta_prev_out[c] = 0.0;
+    return;
+  }
+  const double bj = sqrt(dot2[c]);
+  const bool invariant = bj < 1e-12;
+  if (invariant) {
+    active[c] = 0;
+    m_eff[c] = step_idx + 1;
+  }
+  const bool no_next = is_last_step || invariant;
+  beta_out[c] = no_next ? 0.0 : bj;
+  inv_bj_out[c] = no_next ? 0.0 : 1.0 / bj;
+  neg_beta_prev_out[c] = no_next ? 0.0 : -bj;
+}
+
+extern "C" void lk_hip_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step,
+                                            int* d_active, int* d_m_eff, double* d_beta_out, double* d_inv_bj_out,
+                                            double* d_neg_beta_prev_out) {
+  const int block = 128;
+  lanczos_beta_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_dot2, ncols, step_idx, is_last_step, d_active, d_m_eff, d_beta_out, d_inv_bj_out, d_neg_beta_prev_out);
+}
+
+// grid = (m, npr): one block per (history step jj, probe p) pair, each a
+// shared-memory tree reduction of dot(V[jj block][:,p], W[:,p]) (same
+// reduction shape as batched_dot_kernel above), writing into probe p's
+// length-ls history slot at t[p*ls + jj] -- see the .hpp doc comment for
+// why (this plus lanczos_reorth_sub_kernel below stand in for CUDA's
+// cublasDgemmStridedBatched pair; no BLAS dependency in this backend).
+// Covering every jj in [0,m) in ONE launch (rather than one launch per jj)
+// keeps this at one kernel launch per Lanczos recurrence step, same as
+// CUDA's single batched cuBLAS call for the same quantity.
+__global__ void lanczos_reorth_dot_kernel(const double* __restrict__ V,
+                                          const double* __restrict__ W,
+                                          int n,
+                                          int npr,
+                                          int ls,
+                                          double* __restrict__ t) {
+  extern __shared__ double sdata[];
+  const int jj = blockIdx.x;
+  const int p = blockIdx.y;
+  const double* Vp = V + (static_cast<std::size_t>(jj) * npr + p) * n;
+  const double* Wp = W + static_cast<std::size_t>(p) * n;
+
+  double sum = 0.0;
+  for (int i = threadIdx.x; i < n; i += blockDim.x)
+    sum += Vp[i] * Wp[i];
+  sdata[threadIdx.x] = sum;
+  __syncthreads();
+
+  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (threadIdx.x < s)
+      sdata[threadIdx.x] += sdata[threadIdx.x + s];
+    __syncthreads();
+  }
+  if (threadIdx.x == 0)
+    t[static_cast<std::size_t>(p) * ls + jj] = sdata[0];
+}
+
+extern "C" void lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int n, int npr, int ls, int m,
+                                                  double* d_t) {
+  const int block = 256;
+  const dim3 grid(static_cast<unsigned int>(m), static_cast<unsigned int>(npr), 1);
+  lanczos_reorth_dot_kernel<<<grid, block, block * sizeof(double)>>>(d_V, d_W, n, npr, ls, d_t);
+}
+
+// One thread per (row i, probe p): W[i,p] -= sum_{k=0}^{m-1} V[step k
+// block][i,p] * t[p*ls+k] -- probe p's whole Krylov history is read
+// straight out of the caller's step-major d_V buffer (step k's n x npr
+// block at d_V + k*npr*n), same layout lanczos_reorth_dot_kernel/the matvec
+// read it in. m is small (<= lanczos_steps, default 40), so a per-thread
+// serial loop over it is cheap next to the O(n) work already in every
+// other kernel in this file.
+__global__ void lanczos_reorth_sub_kernel(const double* __restrict__ V,
+                                          const double* __restrict__ t,
+                                          int n,
+                                          int npr,
+                                          int ls,
+                                          int m,
+                                          double* __restrict__ W) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int p = blockIdx.y;
+  if (i >= n || p >= npr)
+    return;
+  const double* tp = t + static_cast<std::size_t>(p) * ls;
+  double acc = 0.0;
+  for (int k = 0; k < m; ++k)
+    acc += V[(static_cast<std::size_t>(k) * npr + p) * n + i] * tp[k];
+  W[static_cast<std::size_t>(p) * n + i] -= acc;
+}
+
+extern "C" void lk_hip_lanczos_reorth_sub_launch(const double* d_V, const double* d_t, int n, int npr, int ls, int m,
+                                                  double* d_W) {
+  const dim3 block(128, 1, 1);
+  const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(npr), 1);
+  lanczos_reorth_sub_kernel<<<grid, block>>>(d_V, d_t, n, npr, ls, m, d_W);
 }
 
 #endif  // LIBKRIGING_USE_HIP_ITERATIVE

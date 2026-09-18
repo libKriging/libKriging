@@ -36,6 +36,21 @@ if (ENABLE_HIP_ITERATIVE)
     endif ()
     enable_language(HIP)
     find_package(hip REQUIRED)
+    # NOTE: the dense-R fast path (HipLinearAlgebra.cpp's DenseCovCache)
+    # deliberately does NOT use hipBLAS/rocBLAS for its matvec, unlike
+    # CUDA's cuBLAS-based equivalent -- tried first (2026-09-18,
+    # find_package(hipblas) + roc::hipblas), but rocBLAS's Tensile GEMM
+    # kernel database ships prebuilt only for gfx1030/1100/1101/1102/1151/
+    # 906 on this ROCm 6.2 Windows install, NOT gfx1032 (confirmed: no
+    # TensileLibrary.dat, no gfx1032 lazy-load variant either, and
+    # HSA_OVERRIDE_GFX_VERSION=10.3.0 does not help -- rocBLAS's own
+    # Tensile host init fails outright: "Cannot read TensileLibrary.dat ...
+    # for GPU arch: gfx1032"). Since gfx1032 (this project's only verified
+    # HIP target, RX 6600) is itself unofficial/unsupported hardware, tying
+    # the dense fast path to vendor BLAS would silently break it on exactly
+    # the GPU class this backend exists for. Uses a hand-written dense
+    # matvec kernel instead (lk_hip_dense_matvec_launch) -- see
+    # HipLinearAlgebra.cpp's DenseCovCache doc comment.
     set(LIBKRIGING_HIP_SOURCES
             hip/HipLinearAlgebraKernel.hip.cpp hip/HipLinearAlgebraKernel.hpp
             hip/HipLinearAlgebra.cpp hip/HipLinearAlgebra.hpp)

@@ -411,16 +411,39 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   // under-converged solve stops at an iterate, not at a solution, and two
   // iterates sharing a residual norm need not share any digits beyond it.
   //
-  // KNOWN FAILURE (pre-existing on this branch, reproducible at the branch
-  // HEAD without any of the changes around it, and bit-identical at
-  // cg_tol=1e-8 and 1e-10 -- so it is NOT a convergence artefact): on the
-  // CPU backend ll_mf and ll_de differ by ~3e-5 relative and the gradients
-  // by ~2.6e-2 relative, both well past these 1e-6/1e-5 bounds. Note the
-  // test is vacuous when a GPU backend is live, since
-  // LK_ITERATIVE_DENSE_MAX_MB only gates the CPU dense path (the CUDA one
-  // has its own LK_ITERATIVE_CUDA_DENSE_MAX_MB), so both halves then run
-  // the same device code and agree trivially -- which is why this went
-  // unnoticed. Tracked in todo_reach_gpytorch.md.
+  // KNOWN FAILURE, unpreconditioned half only (pre-existing on this branch,
+  // reproducible at the branch HEAD without any of the changes around it).
+  // The preconditioned half below (precond_rank=40) is NOT broken -- CG
+  // genuinely converges there once given enough iterations (verified at
+  // cg_max_iter_mult=200; see below), and ll_mf/ll_de then agree to well
+  // within these bounds, so its assertion is a normal, tight regression
+  // check.
+  //
+  // The unpreconditioned half genuinely does NOT converge to cg_tol=1e-10
+  // even at cg_max_iter_mult=200 (max_iter=32000, 200x n=160): confirmed by
+  // raising cg_max_iter_mult from 2 all the way to 200 here and watching the
+  // ll_mf/ll_de gap merely SHRINK (0.166 -> 0.0103 relative at 20x, still
+  // ~0.01 at 200x) rather than close -- i.e. this IS convergence-related,
+  // contradicting an earlier version of this comment that read "bit-
+  // identical at cg_tol=1e-8 and 1e-10 -- so it is NOT a convergence
+  // artefact": both tol values were in fact hitting the SAME roundoff-
+  // limited residual plateau well above either target, which is exactly
+  // what non-convergence looks like when probed only by varying cg_tol
+  // (raising cg_max_iter_mult is what actually reveals it). On this
+  // specific ill-conditioned, unpreconditioned n=160/theta={0.25,0.3}
+  // system CG's residual appears to stagnate on roundoff long before
+  // 1e-10, so thousands of iterations of tiny BLAS-3-vs-pair-loop
+  // summation-order differences compound into the observed mismatch --
+  // not a code bug in either matvec (see LinearAlgebraTest and the CUDA/HIP
+  // kernel parity checks), just two different non-converged iterates being
+  // compared as if they were both solutions. Not yet fixed: needs either a
+  // well-conditioned (n, theta) pair where plain CG converges within a
+  // modest budget, or an explicitly calibrated (not just "tight") tolerance
+  // for the unpreconditioned comparison specifically. Note the test is
+  // vacuous when a GPU backend is live, since LK_ITERATIVE_DENSE_MAX_MB only
+  // gates the CPU dense path (the CUDA/HIP ones have their own
+  // LK_ITERATIVE_{CUDA,HIP}_DENSE_MAX_MB), so both halves then run the same
+  // device code and agree trivially -- which is why this went unnoticed.
   arma::mat X;
   arma::vec y;
   make_data(160, X, y);
@@ -446,10 +469,10 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   // and the preconditioned path (whitened SLQ + separate probe solve) too
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
   const double llp_mf
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,2,1e-10)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,200,1e-10)").logLikelihoodIterativeFun(theta, false));
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
   const double llp_de
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,2,1e-10)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,200,1e-10)").logLikelihoodIterativeFun(theta, false));
   if (old_env)
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
   else
