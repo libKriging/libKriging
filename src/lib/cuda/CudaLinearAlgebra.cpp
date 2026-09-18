@@ -323,7 +323,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precU,
                             const arma::vec& precDinv,
                             const arma::mat& precMcholLower,
-                            arma::uword* n_unconverged_out) {
+                            arma::uword* n_unconverged_out,
+                            const arma::mat* X0) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: unsupported covType '" + covType + "'");
@@ -336,6 +337,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   if (static_cast<int>(tol.n_elem) != ncols)
     throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: tol has " + std::to_string(tol.n_elem)
                                 + " entries, expected " + std::to_string(ncols) + " (one per column of B)");
+  if (X0 != nullptr && (static_cast<int>(X0->n_rows) != n || static_cast<int>(X0->n_cols) != ncols))
+    throw std::invalid_argument("LinearAlgebraCuda::conjugateGradient: X0 is " + std::to_string(X0->n_rows) + "x"
+                                + std::to_string(X0->n_cols) + ", expected " + std::to_string(n) + "x"
+                                + std::to_string(ncols) + " (same shape as B)");
 
   // X, theta and R now come from the process-wide dense cache (see
   // DenseCovCache): a whole objective evaluation runs at a fixed theta, so
@@ -502,23 +507,33 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     }
   };
 
-  LK_CUDA_CHECK(cudaMemcpy(d_b, B.memptr(), mat_bytes, cudaMemcpyHostToDevice));
-  LK_CUDA_CHECK(cudaMemset(d_x, 0, mat_bytes));
-  LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b - A*0
-
-  std::vector<double> bnorm(ncols), rz0(ncols), neg_ones(ncols, -1.0);
-  std::vector<int> active_h(ncols);
-  bool any_active_h = false;
-  for (int c = 0; c < ncols; ++c) {
-    bnorm[c] = arma::norm(B.col(c));
-    active_h[c] = (bnorm[c] != 0.0) ? 1 : 0;  // x=0 already solves A*x=0 for a zero column
-    rz0[c] = bnorm[c] * bnorm[c];             // r=b initially, so r.r = |b|^2 (unpreconditioned rz_old)
-    any_active_h = any_active_h || (active_h[c] != 0);
-  }
-  LK_CUDA_CHECK(cudaMemcpy(d_bnorm, bnorm.data(), col_bytes, cudaMemcpyHostToDevice));
+  // neg_ones is a constant (doesn't depend on B/X0): upload it before the
+  // X0 branch below, which needs it for the "r = b - A*x0" axpy.
+  std::vector<double> neg_ones(ncols, -1.0);
   LK_CUDA_CHECK(cudaMemcpy(d_neg_ones, neg_ones.data(), col_bytes, cudaMemcpyHostToDevice));
-  LK_CUDA_CHECK(cudaMemcpy(d_active, active_h.data(), col_bytes_i, cudaMemcpyHostToDevice));
 
+  LK_CUDA_CHECK(cudaMemcpy(d_b, B.memptr(), mat_bytes, cudaMemcpyHostToDevice));
+  if (X0 != nullptr) {
+    LK_CUDA_CHECK(cudaMemcpy(d_x, X0->memptr(), mat_bytes, cudaMemcpyHostToDevice));
+    matvec(d_x, d_Ap, /*exact=*/true);                                    // Ap = A*x0, full fp64
+    LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b
+    lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);         // r -= Ap  =>  r = b - A*x0
+    LK_CUDA_CHECK(cudaGetLastError());
+  } else {
+    LK_CUDA_CHECK(cudaMemset(d_x, 0, mat_bytes));
+    LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b - A*0
+  }
+
+  std::vector<double> bnorm(ncols);
+  for (int c = 0; c < ncols; ++c)
+    bnorm[c] = arma::norm(B.col(c));
+  LK_CUDA_CHECK(cudaMemcpy(d_bnorm, bnorm.data(), col_bytes, cudaMemcpyHostToDevice));
+
+  // rz_old is now always computed ON DEVICE from the actual initial residual
+  // (r=b when X0 is null, so <r,r> == |b|^2 exactly -- this reproduces the
+  // old host-computed bnorm^2 shortcut bit-for-bit in that case, just via
+  // one extra one-time kernel launch instead of a host loop; with X0 given,
+  // r != b in general, so the shortcut would have been wrong there).
   if (preconditioned) {
     precondApply(d_r, d_z);                                              // z = Pinv(r)
     LK_CUDA_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z
@@ -526,8 +541,34 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_CUDA_CHECK(cudaGetLastError());
   } else {
     LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z = r
-    LK_CUDA_CHECK(cudaMemcpy(d_rz_old, rz0.data(), col_bytes, cudaMemcpyHostToDevice));
+    lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_rz_old);           // rz_old = <r, r>
+    LK_CUDA_CHECK(cudaGetLastError());
   }
+
+  // active_h: a column is started inactive when b=0 (x=0 trivially solves
+  // it, same as before X0 existed) OR when X0 already meets tol for it (a
+  // good warm start needing zero further iterations) -- the latter can only
+  // happen when X0 != nullptr. Needs the true residual norm r.r, which is
+  // exactly d_rz_old in the unpreconditioned case above but is r.z (not
+  // r.r) once preconditioned, so fetch it separately there.
+  std::vector<double> resid_sq_h(ncols);
+  if (preconditioned) {
+    lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_scratch);
+    LK_CUDA_CHECK(cudaGetLastError());
+    LK_CUDA_CHECK(cudaMemcpy(resid_sq_h.data(), d_scratch, col_bytes, cudaMemcpyDeviceToHost));
+  } else {
+    LK_CUDA_CHECK(cudaMemcpy(resid_sq_h.data(), d_rz_old, col_bytes, cudaMemcpyDeviceToHost));
+  }
+  std::vector<int> active_h(ncols);
+  bool any_active_h = false;
+  for (int c = 0; c < ncols; ++c) {
+    const bool zero_b = (bnorm[c] == 0.0);
+    const bool already_at_tol
+        = (X0 != nullptr) && !zero_b && (std::sqrt(std::max(resid_sq_h[c], 0.0)) < tol(c) * bnorm[c]);
+    active_h[c] = (!zero_b && !already_at_tol) ? 1 : 0;
+    any_active_h = any_active_h || (active_h[c] != 0);
+  }
+  LK_CUDA_CHECK(cudaMemcpy(d_active, active_h.data(), col_bytes_i, cudaMemcpyHostToDevice));
 
   constexpr arma::uword restart_every = 50;  // exact-residual recompute, corrects round-off drift
   constexpr arma::uword sync_every = 10;     // host "any active?" poll cadence
@@ -824,9 +865,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precU,
                             const arma::vec& precDinv,
                             const arma::mat& precMcholLower,
-                            arma::uword* n_unconverged_out) {
+                            arma::uword* n_unconverged_out,
+                            const arma::mat* X0) {
   return conjugateGradient(Xt, theta, covType, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), precU,
-                           precDinv, precMcholLower, n_unconverged_out);
+                           precDinv, precMcholLower, n_unconverged_out, X0);
 }
 
 // R(Xt,theta) * V in one batched device launch (see the header). Same

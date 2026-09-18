@@ -1846,20 +1846,23 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   bool slq_on_cuda = false;
   arma::uword gpu_max_dimx = 0;
   arma::uword gpu_cg_n_unconverged = 0;  // aggregated OR'd into m_iterative_last_cg_unconverged below
-  std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;  // R^-1 * B (preconditioned iff woodbury_pc)
+  // R^-1 * B (preconditioned iff woodbury_pc); x0, when non-null, warm-starts
+  // the solve (see LinearAlgebraCuda::conjugateGradient's X0 -- currently
+  // honored on the CUDA backend only, accepted-and-ignored on HIP/SYCL/Metal).
+  std::function<arma::mat(const arma::mat&, double, const arma::mat*)> gpuCgSolve;
   std::function<arma::mat(const arma::mat&)> rmulBatched;  // R * V
   std::function<arma::mat(const arma::mat&)> dRmulBatched; // [dR/dtheta_k . V]_k, n x (d*ncols)
 #define LK_ITER_GPU_BIND(NS)                                                                                    \
   do {                                                                                                          \
     slq_on_gpu = true;                                                                                          \
     gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                       \
-    gpuCgSolve = [&](const arma::mat& B, double tol) {                                                           \
+    gpuCgSolve = [&](const arma::mat& B, double tol, const arma::mat* x0) {                                     \
       arma::uword n_unconv = 0;                                                                                  \
       arma::mat sol = woodbury_pc                                                                                \
           ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, woodbury_pc->U(),                     \
-                                  woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)                     \
+                                  woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv, x0)                 \
           : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, arma::mat(), arma::vec(),             \
-                                  arma::mat(), &n_unconv);                                                        \
+                                  arma::mat(), &n_unconv, x0);                                                    \
       gpu_cg_n_unconverged += n_unconv;                                                                          \
       return sol;                                                                                                \
     };                                                                                                          \
@@ -1907,7 +1910,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   arma::uword cpu_cg_n_unconverged = 0;
   auto cgSolve = [&](const arma::mat& B, double tol, const arma::mat* x0 = nullptr) -> arma::mat {
     if (gpuCgSolve)
-      return gpuCgSolve(B, tol);  // x0 not supported on the GPU path yet -- warm start silently skipped
+      return gpuCgSolve(B, tol, x0);  // honored on CUDA; accepted-and-ignored on HIP/SYCL/Metal for now
     arma::uword n_unconv = 0;
     arma::mat sol
         = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv, x0);

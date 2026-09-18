@@ -68,6 +68,11 @@ LIBKRIGING_EXPORT bool supports(const std::string& covType);
 // groups that need different tolerances (e.g. Kriging.cpp's mBCG fusion of
 // [F|y|probes] -- F/y want the tighter cg_tol, probes want the looser
 // probes_cg_tol) into ONE Krylov pass instead of a separate call per group.
+//
+// X0, when non-null, seeds every column's initial iterate instead of the
+// default x0=0 (must be n x B.n_cols) -- GPU counterpart of
+// LinearAlgebra::conjugateGradientBatched's X0; see that one's doc comment
+// for the rationale and Kriging::updateIterative for the caller.
 LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::vec& theta,
                                               const std::string& covType,
@@ -77,7 +82,8 @@ LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::mat& precU = arma::mat(),
                                               const arma::vec& precDinv = arma::vec(),
                                               const arma::mat& precMcholLower = arma::mat(),
-                                              arma::uword* n_unconverged_out = nullptr);
+                                              arma::uword* n_unconverged_out = nullptr,
+                                              const arma::mat* X0 = nullptr);
 
 // Scalar-tol convenience overload for the common case (every column shares
 // one tolerance) -- broadcasts into the per-column vector above.
@@ -90,7 +96,8 @@ LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::mat& precU = arma::mat(),
                                               const arma::vec& precDinv = arma::vec(),
                                               const arma::mat& precMcholLower = arma::mat(),
-                                              arma::uword* n_unconverged_out = nullptr);
+                                              arma::uword* n_unconverged_out = nullptr,
+                                              const arma::mat* X0 = nullptr);
 
 // Batched matrix-free matvec: returns R(Xt,theta) * V (V is n x ncols,
 // column-major; result n x ncols) in ONE device launch covering every

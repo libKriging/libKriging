@@ -127,7 +127,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precU,
                             const arma::vec& precDinv,
                             const arma::mat& precMcholLower,
-                            arma::uword* n_unconverged_out) {
+                            arma::uword* n_unconverged_out,
+                            const arma::mat* /*X0*/) {
+  // X0 (warm start) not yet implemented on this backend -- see the header's
+  // doc comment; always solves from x0=0 regardless of what's passed here.
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraSycl::conjugateGradient: unsupported covType '" + covType + "'");
