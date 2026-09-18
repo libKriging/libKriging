@@ -564,10 +564,31 @@ class Kriging : public KrigingImpl {
   /// _logLikelihoodVecchia/_logLikelihoodNystrom) computed via a shared-probe
   /// Hutchinson trace estimator when grad_out is non-null. Optional
   /// out-params expose the profiled beta/sigma2 (used by the commit step).
+  ///
+  /// RinvFY_x0, when non-null, warm-starts the R^-1*[F|y] CG solve (see
+  /// LinearAlgebra::conjugateGradientBatched's X0) instead of the default
+  /// x0=0 -- must be n x (m_F.n_cols+1), n = m_X.n_rows. RinvFY_out, when
+  /// non-null, receives the solved R^-1*[F|y] so a caller can cache it (e.g.
+  /// updateIterative zero-pads it for the newly appended rows and passes it
+  /// back in as RinvFY_x0 on the next call). Both nullptr by default =
+  /// today's behavior (cold start, nothing cached). Only takes effect on the
+  /// CPU path -- ignored when a GPU backend is bound (gpuCgSolve has no x0
+  /// parameter yet).
   double _logLikelihoodIterative(const arma::vec& _theta,
                                  arma::vec* grad_out = nullptr,
                                  arma::vec* beta_out = nullptr,
-                                 double* sigma2_out = nullptr) const;
+                                 double* sigma2_out = nullptr,
+                                 const arma::mat* RinvFY_x0 = nullptr,
+                                 arma::mat* RinvFY_out = nullptr) const;
+  /// Cache of the last committed _logLikelihoodIterative call's R^-1*[F|y]
+  /// solve (n x (m_F.n_cols+1), n = m_X.n_rows AT THAT TIME) -- written at
+  /// every LLIterative fit/updateIterative commit point, read by
+  /// updateIterative as the next call's warm start (zero-padded for the
+  /// newly appended rows). Empty, or a row count that no longer matches
+  /// m_X.n_rows (e.g. after a plain, non-iterative code path touched the
+  /// model), means "no usable cache" -- updateIterative falls back to a cold
+  /// start in that case, same as before this cache existed.
+  arma::mat m_iterative_RinvFY_cache;
   bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
   /// Throw if the model is an Iterative fit (used by simulate/update_simulate/save;
   /// update() has its own updateIterative() incremental path instead)
@@ -579,6 +600,15 @@ class Kriging : public KrigingImpl {
   /// or first does a warm-restart single BFGS from the current theta
   /// (refit=true, same fixed probes/landmarks) before re-profiling. Mirrors
   /// update_nystrom's O((n_old+n_new)*...) incremental strategy.
+  ///
+  /// The final re-profiling CG solve itself is ALSO warm-started, from
+  /// m_iterative_RinvFY_cache (the previous commit's R^-1*[F|y], zero-padded
+  /// for the newly appended rows) -- unlike the exact path's
+  /// update_no_refit_impl, which reuses an incremental Cholesky update, CG
+  /// has no such shortcut; a good x0 is the matrix-free equivalent (see
+  /// LinearAlgebra::conjugateGradientBatched's X0 and m_iterative_RinvFY_cache's
+  /// comment). Falls back to a cold start (today's behavior) when no usable
+  /// cache exists yet, or on a GPU backend (not wired there yet).
   void updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool refit);
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
