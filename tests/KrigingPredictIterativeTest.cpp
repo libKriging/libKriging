@@ -295,6 +295,54 @@ TEST_CASE("predictIterative Nystrom preconditioning converges faster on a tight 
   CHECK(err_pc < err_plain);
 }
 
+// predictIterative_impl's mean solve (right-hand side m_y - m_F*m_beta) and
+// the stdev branch's GLS-correction F-solve (right-hand side m_F) don't
+// depend on X_n at all -- when the model was fit with LLIterative,
+// Kriging::predictIterative now warm-starts both from
+// m_iterative_RinvFY_cache (the [R^-1*F | R^-1*y] left behind by that fit),
+// see docs/math/predictiterative_cg_warmstart.ipynb for the measured
+// iteration savings. This must never change WHAT predictIterative converges
+// to: compare against a model fit with the exact ("LL") objective at the
+// SAME fixed theta, and exercise the cache across two separate calls (with
+// different X_n) on the same LLIterative-fitted model.
+TEST_CASE("predictIterative with an LLIterative fit matches exact predict (cache warm start)",
+          "[predictiterative][kriging][iterative]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(40, X, y);
+
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.1));
+  params.is_theta_estim = false;
+
+  Kriging k_exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
+  Kriging k_iter(
+      y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LLIterative(10,0,20,4,1e-10)", params);
+  REQUIRE(k_iter.is_iterative_light());
+
+  arma::mat Xt1, Xt2;
+  arma::vec yt1, yt2;
+  make_data(10, Xt1, yt1, 456);
+  make_data(8, Xt2, yt2, 789);
+
+  auto [m_ex1, s_ex1, c1, dm1, ds1] = k_exact.predict(Xt1, true, false, false);
+  auto [m_cg1, s_cg1] = k_iter.predictIterative(Xt1, true, /*max_iter=*/0, /*tol=*/1e-10);
+  INFO("call 1: max |mean diff| = " << arma::abs(m_cg1 - m_ex1).max()
+                                    << ", max |stdev diff| = " << arma::abs(s_cg1 - s_ex1).max());
+  CHECK(arma::abs(m_cg1 - m_ex1).max() < 1e-5 * arma::stddev(y));
+  CHECK(arma::abs(s_cg1 - s_ex1).max() < 1e-5 * arma::stddev(y));
+
+  // Second call, different X_n, same model/cache -- the cache is read-only
+  // from predictIterative's point of view (only fit/update write it), so
+  // this must be just as accurate as the first call.
+  auto [m_ex2, s_ex2, c2, dm2, ds2] = k_exact.predict(Xt2, true, false, false);
+  auto [m_cg2, s_cg2] = k_iter.predictIterative(Xt2, true, /*max_iter=*/0, /*tol=*/1e-10);
+  INFO("call 2: max |mean diff| = " << arma::abs(m_cg2 - m_ex2).max()
+                                    << ", max |stdev diff| = " << arma::abs(s_cg2 - s_ex2).max());
+  CHECK(arma::abs(m_cg2 - m_ex2).max() < 1e-5 * arma::stddev(y));
+  CHECK(arma::abs(s_cg2 - s_ex2).max() < 1e-5 * arma::stddev(y));
+}
+
 TEST_CASE("predictIterative benchmark", "[.benchmark]") {
   arma::mat X;
   arma::vec y;
