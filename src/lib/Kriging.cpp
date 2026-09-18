@@ -3370,7 +3370,8 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictIterative(con
     throw std::runtime_error("predictIterative: only available for NoiseModel::None");
   if (m_X.n_rows == 0)
     throw std::runtime_error("predictIterative: model was not fitted");
-  return predictIterative_impl(X_n, return_stdev, max_iter, tol, use_nystrom_precond, precond_rank);
+  return predictIterative_impl(
+      X_n, return_stdev, max_iter, tol, use_nystrom_precond, precond_rank, {}, &m_iterative_RinvFY_cache);
 }
 
 /** Draw sample trajectories of kriging at given points X'

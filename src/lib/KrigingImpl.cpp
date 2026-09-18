@@ -402,7 +402,8 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
                                                                     double tol,
                                                                     bool use_nystrom_precond,
                                                                     arma::uword precond_rank,
-                                                                    const FeatureMap& phi) const {
+                                                                    const FeatureMap& phi,
+                                                                    const arma::mat* RinvFY_cache) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword d = m_X.n_cols;
   if (!phi && X_n.n_cols != d)
@@ -519,12 +520,14 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // LinearAlgebra::conjugateGradientBatched otherwise.
   // GPU dispatch as a backend-agnostic std::function (see the same pattern
   // in Kriging::_logLikelihoodIterative). Empty -> CPU fallback.
-  std::function<arma::mat(const arma::mat&, double)> gpuCgSolve;
+  std::function<arma::mat(const arma::mat&, double, const arma::mat*)> gpuCgSolve;
 #define LK_PRED_GPU_BIND(NS)                                                                                    \
-  gpuCgSolve = [&](const arma::mat& B, double solve_tol) {                                                      \
-    return woodbury_pc ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),  \
-                                               woodbury_pc->Dinv(), woodbury_pc->McholLower())                  \
-                       : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol);                   \
+  gpuCgSolve = [&](const arma::mat& B, double solve_tol, const arma::mat* x0) {                                 \
+    return woodbury_pc                                                                                          \
+        ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),                \
+                                woodbury_pc->Dinv(), woodbury_pc->McholLower(), nullptr, x0)                    \
+        : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, arma::mat(), arma::vec(),        \
+                                arma::mat(), nullptr, x0);                                                       \
   }
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
   if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))
@@ -562,11 +565,30 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
       dense = build_separable_cov(m_covType, Xt, theta, R_dense, nullptr);
   }
 
-  auto cgSolve = [&](const arma::mat& B, double solve_tol) -> arma::mat {
+  auto cgSolve = [&](const arma::mat& B, double solve_tol, const arma::mat* x0 = nullptr) -> arma::mat {
     if (gpuCgSolve)
-      return gpuCgSolve(B, solve_tol);
-    return LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, solve_tol, PinvBatched);
+      return gpuCgSolve(B, solve_tol, x0);
+    return LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, solve_tol, PinvBatched, nullptr, x0);
   };
+
+  // RinvFY_cache = [R^-1*F | R^-1*y] from the last fit/updateIterative
+  // commit (see this function's doc comment). Two of the CG right-hand
+  // sides below don't depend on X_n at all -- reusing the cache as their
+  // warm start turns an always-cold O(n^2 * iters) solve into, typically,
+  // (close to) zero further CG iterations, without changing what either
+  // solve converges to (a bad/stale x0 just costs iterations, never
+  // correctness -- see LinearAlgebra::conjugateGradientBatched's X0).
+  const arma::uword p = m_F.n_cols;
+  const bool have_cache = (RinvFY_cache != nullptr) && (RinvFY_cache->n_rows == n) && (RinvFY_cache->n_cols == p + 1);
+  arma::vec x0_mean;
+  arma::mat RinvFY_cache_F;  // R^-1*F, read straight off the cache -- exact, not approximate
+  if (have_cache) {
+    x0_mean = RinvFY_cache->col(p);  // R^-1*y
+    if (p > 0) {
+      RinvFY_cache_F = RinvFY_cache->cols(0, p - 1);
+      x0_mean -= RinvFY_cache_F * m_beta;  // R^-1*y - (R^-1*F)*beta ~= R^-1*resid
+    }
+  }
 
   // The posterior MEAN solve gets the caller's full `tol`. The posterior
   // VARIANCE only needs quad = sum(R_on % R^-1 R_on) to a few digits (its
@@ -592,7 +614,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
 
   // One CG solve, reused for every prediction point's mean.
   const arma::vec resid = m_y - m_F * m_beta;
-  const arma::mat w = cgSolve(resid, tol);
+  const arma::mat w = have_cache ? cgSolve(resid, tol, &x0_mean) : cgSolve(resid, tol);
 
   arma::mat R_on = arma::mat(n, n_n, arma::fill::none);
   LinearAlgebra::covMat_rect(&R_on, Xt, Xn_n, m_theta, _Cov, 1.0);
@@ -618,7 +640,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
       // simple-kriging formula (correct only when the trend is known
       // rather than estimated, i.e. regmodel == "none") and understates
       // the prediction uncertainty otherwise.
-      const arma::mat W_F = cgSolve(m_F, stdev_tol);
+      const arma::mat W_F = have_cache ? cgSolve(m_F, stdev_tol, &RinvFY_cache_F) : cgSolve(m_F, stdev_tol);
       const arma::mat FtRinvF = m_F.t() * W_F;
       const arma::mat E = F_n - R_on.t() * W_F;
       const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
