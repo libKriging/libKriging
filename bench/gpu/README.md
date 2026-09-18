@@ -147,7 +147,7 @@ over an hour and need tens of GiB of GPU memory, so they're opt-in.
 
 ## Reading the output
 
-Three timings per backend, plus accuracy vs the Cholesky reference:
+Four timings per backend, plus accuracy vs the Cholesky reference:
 
 * **`fit`** — solving `R(theta)` once at the fixed, given theta (no
   hyperparameter optimization anywhere in this sweep): the `Kriging(...)`
@@ -170,7 +170,19 @@ Three timings per backend, plus accuracy vs the Cholesky reference:
   (`predict` / `predictIterative` with a raised `max_iter` + Nyström
   preconditioner / GPyTorch `.eval()` posterior; GPyTorch's per-fit cache is
   dropped each rep).
-* All timings are the **min of up to 5 reps** (1 rep once a call > 3 s).
+* **`update`** — libKriging only (`chol`/`iter-cuda`/`iter-omp`; GPyTorch has
+  no directly comparable, budget-matched API wired into this harness):
+  `update(y_u, X_u, refit=False)` appending a fixed `N_UPDATE=20`-point
+  batch, theta held fixed. `chol` takes the exact incremental-Cholesky
+  shortcut (`update_no_refit_impl`); the iterative rows take the CG warm
+  start from [`docs/math/updateiterative_cg_warmstart.ipynb`](../../docs/math/updateiterative_cg_warmstart.ipynb)
+  (the final CG solve seeded from the fit's own cached `R⁻¹[F|y]`,
+  zero-padded for the new rows, instead of `x0=0`) — a fixed, small batch
+  keeps every `n` in the favorable end of that notebook's
+  gain-vs-`n_u/n_o` curve, matching how `update()` is meant to be used.
+* All timings are the **min of up to 5 reps** (1 rep once a call > 3 s);
+  `update`'s reps each start from a fresh, untimed fit, since `update()`
+  mutates its target and repeating it on the same instance would compound.
 * **`RMSE`/`Q²`** on the test set; **`dLogLik/n`** = `|ll − ll_chol|/n`;
   **`dMean/rms`** = `max|mean − mean_chol| / rms(y_test)`, against the
   **libKriging** Cholesky mean.

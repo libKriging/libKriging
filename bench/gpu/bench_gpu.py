@@ -53,7 +53,7 @@ settings), the cost and accuracy of five backends, each named
   measured model mismatch instead of the ~1e-03 solver convergence it
   exists to show.
 
-Three timings per backend, plus accuracy
+Four timings per backend, plus accuracy
 ----------------------------------------
 * ``fit``     -- model construction: the ``Kriging(...)`` constructor
   (Cholesky for ``LL``; one CG+SLQ commit for the light ``LLIterative`` fit);
@@ -64,6 +64,17 @@ Three timings per backend, plus accuracy
 * ``predict`` -- a *cold* posterior mean on 300 held-out points: ``predict``
   / ``predictIterative`` (CG to ``tol`` with a raised ``max_iter`` +
   Nystrom preconditioner) / GPyTorch ``.eval()`` posterior.
+* ``update``  -- libKriging only (``chol``/``iter-cuda``/``iter-omp``; no
+  GPyTorch row -- no directly equivalent, budget-matched API wired into this
+  harness): appends a FIXED ``N_UPDATE=20``-point batch to the fitted model
+  via ``update(y_u, X_u, refit=False)``, theta held fixed. ``chol`` takes its
+  own real incremental-Cholesky shortcut (``update_no_refit_impl``); the
+  iterative rows take the CG warm start documented in
+  ``docs/math/updateiterative_cg_warmstart.ipynb`` (the final CG solve seeded
+  from the fit's own cached ``R^-1*[F|y]``, zero-padded for the new rows,
+  instead of ``x0=0``). Timed via a fresh, untimed fit each rep (see
+  ``timed_min_update``), since ``update()`` mutates its target and repeating
+  it on the same instance would compound across reps.
 * All timings are the **min of up to 5 reps** (1 rep once a call exceeds 3 s).
 * ``RMSE`` / ``Q2`` on the test set; and, vs the Cholesky reference,
   ``dLogLik/n`` (``|ll - ll_chol| / n``) and ``dMean/rms``
@@ -141,6 +152,15 @@ N_TEST = 300
 TEST_SEED = 999
 TRAIN_SEED = 123
 NOISE_SEED = 0
+# `update` timing: a FIXED small batch appended to the fitted model, across
+# every n in the sweep -- n_u/n_o shrinks as n grows, which is exactly the
+# regime docs/math/updateiterative_cg_warmstart.ipynb measured (CG warm-start
+# gain -> ~76% at n_u/n_o~0, decaying to ~0% once n_u is comparable to n_o -- a fixed,
+# small n_u keeps every row in the favorable end of that curve, matching how
+# update() is meant to be used: a few new points, not doubling the design).
+N_UPDATE = 20
+UPDATE_SEED = 4242
+UPDATE_NOISE_SEED = 1
 # 30 probes, no CG precond, 40 SLQ Lanczos steps, 6n CG budget, and a CG
 # tolerance filled in from --cg-tol.
 #
@@ -392,6 +412,25 @@ def timed_min(fn, reps: int = 5, cap_s: float = 3.0):
     return best, out
 
 
+def timed_min_update(build_fn, update_fn, reps: int = 5, cap_s: float = 3.0):
+    """Like `timed_min`, but for a call that MUTATES its target (`update()`
+    extends the model's own X/y in place, so calling it repeatedly on the
+    SAME instance would compound -- each rep must start from a fresh,
+    untimed base model). Returns (min elapsed, last update_fn() result);
+    `build_fn`'s own cost is never included in the timing."""
+    best = float("inf")
+    out = None
+    for i in range(max(1, reps)):
+        target = build_fn()
+        t0 = time.perf_counter()
+        out = update_fn(target)
+        dt = time.perf_counter() - t0
+        best = min(best, dt)
+        if dt > cap_s:
+            break
+    return best, out
+
+
 def rmse_q2(mean, y_true) -> tuple[float, float]:
     mean = np.asarray(mean, dtype=float).ravel()
     y_true = np.asarray(y_true, dtype=float).ravel()
@@ -628,7 +667,19 @@ def run_libkriging_chol(X, y, Xte, yte, theta):
     loglik_s, ll = timed_min(lambda: float(m.logLikelihoodFun(th, True)[0]))
     predict_s, pm = timed_min(lambda: np.asarray(m.predict(Xte, False, False, False)[0]).ravel())
     rmse, q2 = rmse_q2(pm, yte)
-    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, ll=ll,
+
+    # update(): appends N_UPDATE new points, refit=False (theta held fixed,
+    # same convention as this whole sweep). The exact path's real incremental
+    # shortcut (update_no_refit_impl's Cholesky block update, see Kriging.cpp)
+    # -- the reference this row exists to compare the iterative rows' own
+    # update() cost against.
+    X_u = lhs(N_UPDATE, d, seed=UPDATE_SEED)
+    y_u = sine_sum(X_u) + np.random.default_rng(UPDATE_NOISE_SEED).normal(scale=1e-3, size=N_UPDATE)
+    update_s, _ = timed_min_update(
+        lambda: lk.Kriging(y, X, "matern5_2", objective="LL", optim="none", parameters=params),
+        lambda m_local: m_local.update(y_u, X_u, False))
+
+    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, update_s=update_s, ll=ll,
                 ll_native=ll, ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm,
                 beta=float(np.asarray(m.beta()).ravel()[0]))
 
@@ -660,7 +711,25 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_
                            use_nystrom_precond=prank > 0, precond_rank=prank)[0]
     ).ravel())
     rmse, q2 = rmse_q2(pm, yte)
-    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, ll=ll,
+
+    # update(): appends N_UPDATE new points, refit=False. This is exactly
+    # updateIterative's warm-started path (see
+    # docs/math/updateiterative_cg_warmstart.ipynb): the final CG solve is
+    # seeded from m_iterative_RinvFY_cache (the [R^-1*F | R^-1*y] left by
+    # THIS fit), zero-padded for the N_UPDATE new rows, instead of x0=0.
+    X_u = lhs(N_UPDATE, d, seed=UPDATE_SEED)
+    y_u = sine_sum(X_u) + np.random.default_rng(UPDATE_NOISE_SEED).normal(scale=1e-3, size=N_UPDATE)
+
+    def _build_for_update():
+        lk.set_cuda_iterative_enabled(bool(use_cuda))
+        return lk.Kriging(y, X, "matern5_2",
+                          objective=LK_ITER_OBJECTIVE_FMT.format(
+                              cg_tol=cg_tol, probes_cg_tol=probes_cg_tol if probes_cg_tol is not None else cg_tol),
+                          optim="none", parameters=params)
+
+    update_s, _ = timed_min_update(_build_for_update, lambda m_local: m_local.update(y_u, X_u, False))
+
+    return dict(fit_s=fit_s, loglik_s=loglik_s, predict_s=predict_s, update_s=update_s, ll=ll,
                 ll_native=ll, ll_comparable=True, rmse=rmse, q2=q2, pred_mean=pm)
 
 
@@ -721,7 +790,9 @@ def sweep(keys, sizes, theta, labels, cg_tol, precond_rank, probes_cg_tol=None, 
                     res["dmean_rms"] = float(np.max(np.abs(pm - mean_chol))) / yte_rms
                     res["dloglik_n"] = (abs(res["ll"] - ll_chol) / n) if res["ll_comparable"] else None
                 rows.append(res)
+                update_str = f"{res['update_s']:6.2f}s" if res.get("update_s") is not None else "   —  "
                 print(f" fit={res['fit_s']:6.2f}s logLik={res['loglik_s']:7.2f}s predict={res['predict_s']:7.2f}s"
+                      f" update={update_str}"
                       f"  RMSE={res['rmse']:.4f} Q2={res['q2']:.4f}"
                       f"  dMean/rms={res.get('dmean_rms', float('nan')):.1e}"
                       f" dLogLik/n={res.get('dloglik_n') if res.get('dloglik_n') is not None else float('nan'):.1e}",
@@ -776,7 +847,7 @@ def _f(x, spec=".4f"):
 
 
 def write_csv(path, rows):
-    cols = ["backend", "backend_key", "n", "status", "fit_s", "loglik_s", "predict_s", "wall_s",
+    cols = ["backend", "backend_key", "n", "status", "fit_s", "loglik_s", "predict_s", "update_s", "wall_s",
             "ll", "ll_native", "ll_comparable", "rmse", "q2", "dloglik_n", "dmean_rms"]
     with open(path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
@@ -893,7 +964,8 @@ def write_html(path, rows, meta):
 
     # ---- interactive chart: time (log) vs n, one trace per backend, ----
     # ---- metric switch (fit / logLik / predict) via a dropdown ----
-    metrics = [("fit_s", "Fit time (s)"), ("loglik_s", "LogLik+grad time (s)"), ("predict_s", "Predict time (s)")]
+    metrics = [("fit_s", "Fit time (s)"), ("loglik_s", "LogLik+grad time (s)"), ("predict_s", "Predict time (s)"),
+               ("update_s", f"Update time (s), +{N_UPDATE} pts")]
     backend_order = list(dict.fromkeys(r["backend_key"] for r in rows if r.get("backend_key")))
     traces = []
     for mi, (mkey, _mlabel) in enumerate(metrics):
@@ -928,26 +1000,29 @@ def write_html(path, rows, meta):
 
     ap(f"<h2>Reference — <code>{_html.escape(name('chol'))}</code> (exact dense Cholesky)</h2>")
     ap('<table><thead>')
-    row("n", "fit (s)", "logLik (s)", "predict (s)", "logLik value", "RMSE", "Q²", header=True)
+    row("n", "fit (s)", "logLik (s)", "predict (s)", f"update (s), +{N_UPDATE}", "logLik value", "RMSE", "Q²",
+        header=True)
     ap('</thead><tbody>')
     for n in ns:
         r = chol.get(n)
         if r:
             row(n, _f(r['fit_s'], '.3f'), _f(r['loglik_s'], '.3f'), _f(r['predict_s'], '.3f'),
-                _f(r['ll'], '.3f'), _f(r['rmse']), _f(r['q2']))
+                _f(r.get('update_s'), '.3f'), _f(r['ll'], '.3f'), _f(r['rmse']), _f(r['q2']))
         else:
-            row(n, "—", "—", "—", "—", "—", "—")
+            row(n, "—", "—", "—", "—", "—", "—", "—")
     ap('</tbody></table>')
 
     ap("<h2>Timing — seconds</h2>")
     ap('<table><thead>')
-    row("backend", "n", "fit", "logLik", "predict", header=True)
+    row("backend", "n", "fit", "logLik", "predict", f"update (+{N_UPDATE})", header=True)
     ap('</thead><tbody>')
     for r in rows:
         if r.get("status") != "ok":
-            row(_html.escape(r['backend']), r['n'], "—", "—", f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
+            row(_html.escape(r['backend']), r['n'], "—", "—", "—",
+                f"<em>{_html.escape(str(r.get('status', '?')))}</em>")
             continue
-        row(_html.escape(r['backend']), r['n'], _f(r['fit_s'], '.3f'), _f(r['loglik_s'], '.3f'), _f(r['predict_s'], '.3f'))
+        row(_html.escape(r['backend']), r['n'], _f(r['fit_s'], '.3f'), _f(r['loglik_s'], '.3f'),
+            _f(r['predict_s'], '.3f'), _f(r.get('update_s'), '.3f'))
     ap('</tbody></table>')
 
     ap("<h2>Accuracy</h2>")
@@ -1039,12 +1114,12 @@ def write_html(path, rows, meta):
     # old, un-budget-matched settings (libKriging CG at 1e-8 vs GPyTorch at
     # 1e-4) and silently became false once the CG budgets were matched.
     crossover = {}
-    for op in ("fit_s", "loglik_s", "predict_s"):
+    for op in ("fit_s", "loglik_s", "predict_s", "update_s"):
         wins = [n for n in ns
                 if chol.get(n, {}).get(op) and lkg.get(n, {}).get(op)
                 and lkg[n][op] < chol[n][op]]
         crossover[op] = min(wins) if wins else None
-    lab = {"fit_s": "fit", "loglik_s": "logLik", "predict_s": "predict"}
+    lab = {"fit_s": "fit", "loglik_s": "logLik", "predict_s": "predict", "update_s": "update"}
     beaten = [f"`{lab[op]}` from n={nn}" for op, nn in crossover.items() if nn is not None]
     never = [f"`{lab[op]}`" for op, nn in crossover.items() if nn is None]
     parts = []
