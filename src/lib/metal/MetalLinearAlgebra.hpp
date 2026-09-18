@@ -43,6 +43,14 @@ LIBKRIGING_EXPORT bool supports(const std::string& covType);
 // n_unconverged_out, when non-null, receives how many of B's columns were
 // still active when the loop hit max_iter -- see
 // CudaLinearAlgebra.cuh's matching parameter.
+//
+// X0 exists for signature parity with LinearAlgebraCuda::conjugateGradient
+// (so the shared LK_ITER_GPU_BIND macro in Kriging.cpp compiles against
+// whichever GPU backend is enabled) but is NOT YET honored here -- accepted
+// and ignored, same effective behavior as x0=0 always. No Metal hardware
+// was available to validate a real port of CudaLinearAlgebra.cpp's
+// warm-start preamble when this parameter was added; that CUDA
+// implementation is the reference to port.
 LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::vec& theta,
                                               const std::string& covType,
@@ -52,7 +60,8 @@ LIBKRIGING_EXPORT arma::mat conjugateGradient(const arma::mat& Xt,
                                               const arma::mat& precU = arma::mat(),
                                               const arma::vec& precDinv = arma::vec(),
                                               const arma::mat& precMcholLower = arma::mat(),
-                                              arma::uword* n_unconverged_out = nullptr);
+                                              arma::uword* n_unconverged_out = nullptr,
+                                              const arma::mat* X0 = nullptr);
 
 LIBKRIGING_EXPORT arma::mat rmulBatched(const arma::mat& Xt,
                                         const arma::vec& theta,
