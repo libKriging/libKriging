@@ -247,6 +247,17 @@ class LinearAlgebra {
   // groups that need different tolerances (e.g. Kriging.cpp's mBCG fusion
   // of [F|y|probes]) into ONE Krylov pass instead of a separate call per
   // group. See LinearAlgebraCuda::conjugateGradient's matching overload.
+  //
+  // X0, when non-null, seeds every column's initial iterate instead of the
+  // default x0=0 (must be n x B.n_cols). Mathematically inert -- CG from any
+  // x0 converges to the same solution, warm start only changes the ITERATION
+  // COUNT -- but a good x0 (e.g. the previous solve's answer, zero-padded for
+  // newly appended rows/columns after an incremental update) can cut it
+  // substantially: measured docs/math prototype on a 1D toy update, CG
+  // iterations to the same tol dropped 76% for a single-point append and
+  // ~32% cumulatively over 30 sequential small updates, tapering to ~0 once
+  // the appended block is comparable in size to what was already there. See
+  // Kriging::updateIterative, the one caller that passes X0 today.
   LIBKRIGING_EXPORT static arma::mat conjugateGradientBatched(
       const std::function<arma::mat(const arma::mat&)>& AmulBatched,
       const arma::mat& B,
@@ -254,7 +265,8 @@ class LinearAlgebra {
       const arma::vec& tol,
       const std::function<arma::mat(const arma::mat&)>& PinvBatched
       = std::function<arma::mat(const arma::mat&)>(),
-      arma::uword* n_unconverged_out = nullptr);
+      arma::uword* n_unconverged_out = nullptr,
+      const arma::mat* X0 = nullptr);
 
   // Scalar-tol convenience overload (every column shares one tolerance) --
   // broadcasts into the per-column vector above.
@@ -265,7 +277,8 @@ class LinearAlgebra {
       double tol = 1e-8,
       const std::function<arma::mat(const arma::mat&)>& PinvBatched
       = std::function<arma::mat(const arma::mat&)>(),
-      arma::uword* n_unconverged_out = nullptr);
+      arma::uword* n_unconverged_out = nullptr,
+      const arma::mat* X0 = nullptr);
 
   // Stochastic Lanczos Quadrature (SLQ) estimate of log|A| for an SPD matrix
   // A of size n, given only as a matrix-vector product `Amul` -- A itself is
