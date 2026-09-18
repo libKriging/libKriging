@@ -570,6 +570,46 @@ TEST_CASE("LLIterative update() extends the fit without a full re-fit", "[iterat
   }
 }
 
+// The final CG solve inside updateIterative is warm-started from the
+// PREVIOUS commit's R^-1*[F|y] (see m_iterative_RinvFY_cache), zero-padded
+// for the newly appended rows -- a pure iteration-count optimization
+// (docs/math/updateiterative_cg_warmstart.ipynb measures 76% fewer
+// iterations for a single-point append, ~32% cumulative over 30 sequential
+// updates). It must never change WHAT update() converges to: several
+// updates chained in a row (each one reusing the cache the previous one
+// left behind) should land on the same beta/sigma2 -- to CG tolerance -- as
+// a single fresh fit on the fully combined data.
+TEST_CASE("LLIterative update() warm start does not change the converged answer", "[iterative][kriging]") {
+  arma::mat X0, X1, X2, X3;
+  arma::vec y0, y1, y2, y3;
+  make_data(15, X0, y0, 111);
+  make_data(4, X1, y1, 222);
+  make_data(3, X2, y2, 333);
+  make_data(5, X3, y3, 444);
+
+  Kriging k_seq = make_fixed_theta_iterative(y0, X0, "LLIterative(10,0,20,4,1e-8)");
+  k_seq.update(y1, X1, false);  // 1st update: cache is empty -> cold start
+  k_seq.update(y2, X2, false);  // 2nd update: warm-started from the 1st update's cache
+  k_seq.update(y3, X3, false);  // 3rd update: warm-started from the 2nd update's cache
+
+  const arma::mat X_all = arma::join_cols(arma::join_cols(arma::join_cols(X0, X1), X2), X3);
+  const arma::vec y_all = arma::join_cols(arma::join_cols(arma::join_cols(y0, y1), y2), y3);
+  Kriging k_direct = make_fixed_theta_iterative(y_all, X_all, "LLIterative(10,0,20,4,1e-8)");
+
+  CHECK(k_seq.X().n_rows == k_direct.X().n_rows);
+  CHECK(arma::approx_equal(k_seq.beta(), k_direct.beta(), "absdiff", 1e-4));
+  CHECK(std::abs(k_seq.sigma2() - k_direct.sigma2()) < 1e-4 * k_direct.sigma2());
+
+  // predictIterative from the warm-started sequential model should also
+  // agree with the directly-fitted one at a handful of query points.
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(5, Xt, yt, 555);
+  auto [m_seq, s_seq] = k_seq.predictIterative(Xt, true);
+  auto [m_direct, s_direct] = k_direct.predictIterative(Xt, true);
+  CHECK(arma::approx_equal(m_seq, m_direct, "absdiff", 1e-3));
+}
+
 TEST_CASE("LLIterative(m) at a fixed theta: predictIterative is broadly consistent with the exact MLE",
           "[iterative][kriging]") {
   // Fixed theta, optim="none" (which now also sets the light flag -- see the

@@ -886,3 +886,57 @@ TEST_CASE("LinearAlgebra::conjugateGradientBatched matches the scalar conjugateG
   const arma::mat X_pc = LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, 1e-10, pinv_batched);
   REQUIRE(arma::approx_equal(X_pc, X_dense, "absdiff", 1e-6));
 }
+
+TEST_CASE("LinearAlgebra::conjugateGradientBatched with X0 converges to the same solution, in fewer iterations",
+          "[LinearAlgebra][cg]") {
+  // X0 only changes the STARTING point of each column's Krylov iteration,
+  // never what it converges to -- and a good starting point (here: the exact
+  // answer to a nearby, slightly perturbed system) should let a tight
+  // max_iter budget converge where a cold start (x0=0) cannot.
+  const arma::uword n = 80;
+  arma::arma_rng::set_seed(2024);
+  arma::mat A = arma::randn<arma::mat>(n, n);
+  A = A * A.t();
+  A.diag() += n;  // comfortably SPD
+
+  const arma::mat B = arma::randn<arma::mat>(n, 4);
+  const arma::mat X_dense = arma::solve(A, B);
+  auto amul_batched = [&](const arma::mat& V) -> arma::mat { return A * V; };
+
+  const double tol = 1e-10;
+  const arma::uword tight_max_iter = 5;  // far too little from a cold start on a dense random SPD system
+
+  arma::uword n_unconv_cold = 0;
+  const arma::mat X_cold
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, tight_max_iter, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), &n_unconv_cold);
+  REQUIRE(n_unconv_cold == B.n_cols);  // cold start: none of the 4 columns converge in 5 iterations
+
+  // X0 = the exact solution itself: the best possible warm start, residual
+  // already ~0 -- must converge immediately (0 further iterations needed).
+  arma::uword n_unconv_exact = 0;
+  const arma::mat X_warm_exact
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, tight_max_iter, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), &n_unconv_exact,
+                                                &X_dense);
+  REQUIRE(n_unconv_exact == 0);
+  REQUIRE(arma::approx_equal(X_warm_exact, X_dense, "absdiff", 1e-8));
+
+  // X0 = a genuinely APPROXIMATE warm start (exact solution to a perturbed
+  // system) still converges to the SAME X_dense once given enough iterations
+  // -- warm start changes iteration count, never the answer.
+  arma::mat A_pert = A;
+  A_pert.diag() += 0.01 * n;
+  const arma::mat X0_approx = arma::solve(A_pert, B);
+  const arma::mat X_warm_approx
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), nullptr, &X0_approx);
+  REQUIRE(arma::approx_equal(X_warm_approx, X_dense, "absdiff", 1e-6));
+
+  // X0 with the wrong shape is rejected rather than silently misused.
+  const arma::mat X0_wrong_shape(n + 1, B.n_cols, arma::fill::zeros);
+  REQUIRE_THROWS_AS(LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, tol,
+                                                             std::function<arma::mat(const arma::mat&)>(), nullptr,
+                                                             &X0_wrong_shape),
+                    std::invalid_argument);
+}

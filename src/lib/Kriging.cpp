@@ -1679,7 +1679,9 @@ void Kriging::make_iterative_precond_landmarks() {
 double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
                                         arma::vec* grad_out,
                                         arma::vec* beta_out,
-                                        double* sigma2_out) const {
+                                        double* sigma2_out,
+                                        const arma::mat* RinvFY_x0,
+                                        arma::mat* RinvFY_out) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword nprobe = m_iterative_nprobe;
   const arma::uword max_iter = (m_iterative_cg_max_iter == 0) ? 2 * n : m_iterative_cg_max_iter;
@@ -1911,11 +1913,12 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   }
 
   arma::uword cpu_cg_n_unconverged = 0;
-  auto cgSolve = [&](const arma::mat& B, double tol) -> arma::mat {
+  auto cgSolve = [&](const arma::mat& B, double tol, const arma::mat* x0 = nullptr) -> arma::mat {
     if (gpuCgSolve)
-      return gpuCgSolve(B, tol);
+      return gpuCgSolve(B, tol);  // x0 not supported on the GPU path yet -- warm start silently skipped
     arma::uword n_unconv = 0;
-    arma::mat sol = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv);
+    arma::mat sol
+        = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv, x0);
     cpu_cg_n_unconverged += n_unconv;
     return sol;
   };
@@ -1960,8 +1963,10 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 #endif
   {
     const arma::mat FY = arma::join_rows(m_F, m_y);
-    RinvFY = cgSolve(FY, m_iterative_cg_tol);
+    RinvFY = cgSolve(FY, m_iterative_cg_tol, RinvFY_x0);
   }
+  if (RinvFY_out != nullptr)
+    *RinvFY_out = RinvFY;
   const arma::mat RinvF = RinvFY.head_cols(m_F.n_cols);
   const arma::vec Rinvy = RinvFY.col(RinvFY.n_cols - 1);
 
@@ -2194,6 +2199,23 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
   Xn_u.each_row() /= m_scaleX;
   const arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
 
+  // Warm start for the final CG solve below: the R^-1*[F|y] solve cached at
+  // the LAST commit (a previous updateIterative, or the fit() that produced
+  // this model), zero-padded for the n_u newly appended rows. The old rows'
+  // columns of R^-1*[F|y] are a good starting guess for the new (larger)
+  // system -- the new rows' entries default to 0, same as a cold start would
+  // have used for them. Only valid when its row count matches the PRE-update
+  // n (an empty or size-mismatched cache, e.g. right after loading a model
+  // saved before this cache existed, just means "no warm start", same
+  // behavior as before this existed).
+  const arma::uword n_o = m_X.n_rows;
+  const arma::uword n_u = X_u.n_rows;
+  arma::mat RinvFY_x0;
+  const bool have_warm_start = (m_iterative_RinvFY_cache.n_rows == n_o) && (m_iterative_RinvFY_cache.n_cols > 0);
+  if (have_warm_start)
+    RinvFY_x0 = arma::join_cols(m_iterative_RinvFY_cache,
+                                arma::mat(n_u, m_iterative_RinvFY_cache.n_cols, arma::fill::zeros));
+
   // m_iterative_precond_landmarks (when precond is enabled) holds row-indices
   // into m_X; appending rows here (never reordering/removing) keeps them
   // valid without any adjustment -- same trick as m_nystrom_landmarks.
@@ -2253,7 +2275,10 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
 
   arma::vec beta_v;
   double sigma2_v = -1;
-  _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+  arma::mat RinvFY_new;
+  _logLikelihoodIterative(
+      m_theta, nullptr, &beta_v, &sigma2_v, have_warm_start ? &RinvFY_x0 : nullptr, &RinvFY_new);
+  m_iterative_RinvFY_cache = std::move(RinvFY_new);
   if (m_est_beta)
     m_beta = beta_v;
   if (m_est_sigma2)
@@ -2622,7 +2647,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       // branch applies unconditionally whenever the objective is LLIterative.
       arma::vec beta_v;
       double sigma2_v = -1;
-      _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+      arma::mat RinvFY_v;
+      _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v, nullptr, &RinvFY_v);
+      m_iterative_RinvFY_cache = std::move(RinvFY_v);
       if (m_est_beta)
         m_beta = beta_v;
       if (m_est_sigma2)
@@ -3191,7 +3218,9 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m_est_theta = true;
         arma::vec beta_v;
         double sigma2_v = -1;
-        _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v);
+        arma::mat RinvFY_v;
+        _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v, nullptr, &RinvFY_v);
+        m_iterative_RinvFY_cache = std::move(RinvFY_v);
         if (m_est_beta)
           m_beta = beta_v;
         if (m_est_sigma2)

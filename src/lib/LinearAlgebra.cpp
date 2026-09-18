@@ -748,10 +748,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     arma::uword max_iter,
     const arma::vec& tol,
     const std::function<arma::mat(const arma::mat&)>& PinvBatched,
-    arma::uword* n_unconverged_out) {
+    arma::uword* n_unconverged_out,
+    const arma::mat* X0) {
   if (tol.n_elem != B.n_cols)
     throw std::invalid_argument("LinearAlgebra::conjugateGradientBatched: tol has " + std::to_string(tol.n_elem)
                                 + " entries, expected " + std::to_string(B.n_cols) + " (one per column of B)");
+  if (X0 != nullptr && (X0->n_rows != B.n_rows || X0->n_cols != B.n_cols))
+    throw std::invalid_argument("LinearAlgebra::conjugateGradientBatched: X0 is " + std::to_string(X0->n_rows) + "x"
+                                + std::to_string(X0->n_cols) + ", expected " + std::to_string(B.n_rows) + "x"
+                                + std::to_string(B.n_cols) + " (same shape as B)");
   // Block conjugate gradient with a SHARED matvec: every right-hand side
   // (column of B) is still an independent Krylov solve -- no block-CG
   // subspace sharing -- but all still-active columns are advanced in lockstep
@@ -765,11 +770,15 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
   const bool preconditioned = static_cast<bool>(PinvBatched);
   const arma::uword n = B.n_rows;
   const arma::uword ncols = B.n_cols;
-  arma::mat Xc(n, ncols, arma::fill::zeros);
   if (ncols == 0)
-    return Xc;
+    return arma::mat(n, ncols, arma::fill::zeros);
 
-  arma::mat R = B;                                     // residual b - A*x0, x0 = 0
+  // x0 defaults to 0 (X0 == nullptr): R = B - A*0 = B, same as before this
+  // parameter existed. A caller-supplied X0 only changes the STARTING POINT
+  // of each column's Krylov iteration, never what it converges to -- see the
+  // header comment for why that's still worth having.
+  arma::mat Xc = (X0 != nullptr) ? *X0 : arma::mat(n, ncols, arma::fill::zeros);
+  arma::mat R = (X0 != nullptr) ? arma::mat(B - AmulBatched(Xc)) : B;
   arma::mat Z = preconditioned ? PinvBatched(R) : R;   // z = M^-1 r
   arma::mat P = Z;
   const arma::rowvec bnorm = arma::sqrt(arma::sum(arma::square(B), 0));
@@ -778,9 +787,12 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     rz_old(c) = arma::dot(R.col(c), Z.col(c));
 
   std::vector<char> active(ncols, 1);
-  for (arma::uword c = 0; c < ncols; ++c)
+  for (arma::uword c = 0; c < ncols; ++c) {
     if (bnorm(c) == 0.0)
       active[c] = 0;  // x = 0 already solves A*x = 0
+    else if (arma::norm(R.col(c)) / bnorm(c) < tol(c))
+      active[c] = 0;  // X0 already meets tol for this column (e.g. an unchanged warm-started column)
+  }
 
   constexpr arma::uword restart_every = 50;
   arma::rowvec alpha_it(ncols, arma::fill::zeros);  // this iteration's step lengths, pass 1 -> pass 2
@@ -869,9 +881,10 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     arma::uword max_iter,
     double tol,
     const std::function<arma::mat(const arma::mat&)>& PinvBatched,
-    arma::uword* n_unconverged_out) {
+    arma::uword* n_unconverged_out,
+    const arma::mat* X0) {
   return conjugateGradientBatched(AmulBatched, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), PinvBatched,
-                                  n_unconverged_out);
+                                  n_unconverged_out, X0);
 }
 
 // Solve X*A=B : X = B / A
