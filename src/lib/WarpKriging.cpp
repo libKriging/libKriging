@@ -2079,7 +2079,9 @@ std::pair<double, arma::vec> WarpKriging::concentrated_ll_and_grad_theta() const
   const arma::uword d = m_theta.n_elem;
 
   arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
-  const arma::mat& Rinv = m_Rinv;  // Use cached
+  if ((m_Rinv.memptr() == nullptr) || (arma::size(m_Rinv) != arma::size(m_T)))
+    m_Rinv = LinearAlgebra::inv_sympd(m_T);
+  const arma::mat& Rinv = m_Rinv;  // lazily built above if not already cached
 
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
@@ -2167,7 +2169,9 @@ arma::mat WarpKriging::dK_dPhi(const arma::mat& Phi, const arma::mat& dL_dR) con
 }
 
 arma::vec WarpKriging::warp_gradient() const {
-  const arma::mat& Rinv = m_Rinv;  // Use cached
+  if ((m_Rinv.memptr() == nullptr) || (arma::size(m_Rinv) != arma::size(m_T)))
+    m_Rinv = LinearAlgebra::inv_sympd(m_T);
+  const arma::mat& Rinv = m_Rinv;  // lazily built above if not already cached
   arma::vec alpha = LinearAlgebra::solve_upper(m_T.t(), m_z);
   arma::mat dLL_dR = 0.5 * (alpha * alpha.t() / m_sigma2 - Rinv);
 
