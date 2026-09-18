@@ -4,12 +4,16 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include <carma_bits/cnalloc.h>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
 
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
 #include "cuda/CudaLinearAlgebra.cuh"
+#endif
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+#include "hip/HipLinearAlgebra.hpp"
 #endif
 
 // Should be included Only in Debug build
@@ -125,6 +129,28 @@ PYBIND11_MODULE(_pylibkriging, m) {
         "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
   m.def("set_cuda_iterative_enabled", [](bool) {}, py::arg("value"),
         "No-op: this build was compiled without -DENABLE_CUDA_ITERATIVE.");
+#endif
+
+  // --- HIP-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Same shape as the CUDA block above, exposing src/lib/hip/HipLinearAlgebra's
+  // runtime on/off switch. All three are always defined; on a build without
+  // -DENABLE_HIP_ITERATIVE they report "no HIP" and set_enabled is a no-op.
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+  m.attr("__hip_iterative__") = true;
+  m.def("hip_iterative_available", &LinearAlgebraHip::available,
+        "True iff libKriging was built with -DENABLE_HIP_ITERATIVE and a ROCm/HIP device is visible at runtime.");
+  m.def("hip_iterative_enabled", &LinearAlgebraHip::enabled,
+        "True iff the HIP matrix-free CG backend is currently active (defaults to hip_iterative_available()).");
+  m.def("set_hip_iterative_enabled", &LinearAlgebraHip::set_enabled, py::arg("value"),
+        "Turn the HIP matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__hip_iterative__") = false;
+  m.def("hip_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def("hip_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def("set_hip_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_HIP_ITERATIVE.");
 #endif
 
   m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");
