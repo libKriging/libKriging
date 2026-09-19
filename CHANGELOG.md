@@ -31,6 +31,24 @@ past release, see the corresponding entry on the
   bindings (Python already had it); worked notebooks
   `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
   comparing `LLNystrom`/`LLVecchia` against exact Cholesky (#358).
+- `LLNystrom(k)` objective (fixed-landmark Nystrom low-rank approximation of
+  the covariance, greedy pivoted-Cholesky landmarks held fixed across theta so
+  the objective stays smooth) for large-`n` scalability: `O(n·k²)` fit via the
+  Woodbury identity with an analytic gradient, `predictNystrom`, and a
+  Nystrom-specific `update()` (`refit=false` at fixed theta/landmarks, or
+  `refit=true` warm-restarting theta over the same landmarks); such fits skip
+  the `O(n²)` pairwise-difference cube (#346).
+- `WarpKriging`: binding surface brought to parity with `Kriging` across the
+  Python/R/Octave/Julia bindings — `noise()`, `warp_params()`, `optim()`,
+  `objective()` and `covMat(X1, X2)` accessors, numeric `parameters` seeds
+  (`theta` / `warp_params` / `noise`) with `optim="none"` to rebuild a model
+  with frozen hyper-parameters, `noise=` and `parameters=` no longer mutually
+  exclusive, and `update(..., noise_u=)` / `update_simulate(..., noise_u=)`;
+  the R/Python docs no longer advertise an unimplemented `noise="nugget"`
+  mode (#361).
+- Claude Code plugin packaging: `.claude-plugin/` manifests and
+  `fit`/`predict`/`simulate`/`update`/`build` commands driving the libKriging
+  skill, installable through `/plugin marketplace add libKriging/libKriging`.
 
 ### Changed
 - Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
@@ -68,7 +86,7 @@ past release, see the corresponding entry on the
   checks). `NestedKriging`'s warped submodels, which share one
   `(theta, warp_params)`, now also share one input-range calibration
   (`WarpKriging::recalibrate_warps()`), so the aggregate still interpolates
-  the design.
+  the design (#362).
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a
@@ -82,14 +100,49 @@ past release, see the corresponding entry on the
 - CI: Windows jobs retry the `choco install` step to absorb transient
   community-feed 504s (#326); `rlibkriging`'s `tools/gitmodules-shas` is kept
   in sync with submodule bumps, staged in the right order (#330, #331).
+- `predict(..., return_deriv=true)` returned wrong derivatives
+  (`dyhat/dx`, `dysd2/dx`) whenever the model was fitted with
+  `normalize=true`: the per-dimension division by `scaleX` required by the
+  chain rule was missing, so every derivative was off by a factor of
+  `scaleX` (#345).
+- `WarpKriging`: the analytical warp-parameter gradient was silently wrong
+  for every continuous warp (`knots`, `kumaraswamy`, `boxcox`, `affine`,
+  `neural_mono`, `mlp`), which kept the bi-level optimizer (`BFGS+Adam` and
+  joint `BFGS`) from ever discovering a non-trivial warp — inconsistent
+  `sigma2` scaling, a sign flip from `compute_dX()` not being antisymmetric,
+  and a missing factor 2. `warp_gradient()` now matches finite differences
+  to ~1e-5, with a permanent regression test per warp type (#342).
+- `LLNystrom`: deterministic `optim="none"` fits and a landmark-seeded BFGS
+  warm start, fixing outlier fits in the comparison benchmark (#353).
+- Windows/Python: fixed heap corruption (issue #354) caused by NumPy's and
+  Armadillo's own allocators coexisting in one process — the
+  `ARMA_ALIEN_MEM_*` defines that route Armadillo through `lkalloc` (and so
+  through NumPy's allocator) had been disabled; re-enabled, with `lkalloc`
+  falling back to `_aligned_malloc` / plain `malloc` for every other binding
+  (#357). Debug builds also redirect CRT debug-heap errors to stderr, so a
+  corruption fails in seconds instead of hanging CI on a blocking message
+  box (#356); diagnosis in `docs/dev/WindowsPythonHangDiagnostic354.md`.
+- R: `simulate.WarpKriging` no longer self-qualifies with `:::` (an
+  `R CMD check` NOTE), `WarpKriging` is registered with `setOldClass` (no
+  load-time warning), and the `save`/`load` examples clean up their
+  temporary file (#360).
 
 ### Documentation
 - Added a coding-agent skill covering libKriging usage patterns (#336) and a
   "Known pitfalls" section to `AGENTS.md` (#333).
+- Refreshed the comparison notebooks and the READMEs (#343, #340).
 
 ### CI/Release process
 - Automated `jlibkriging` registration on Julia's General registry (#332).
 - GitHub release notes are now filled in from this changelog (#334).
+- Windows CI: single-threaded OpenMP for the Octave (NestedKriging hang, #349)
+  and Python (#351, #352) jobs; Coverage mode no longer flaky on an undefined
+  `PROCESSOR_COUNT` (#359).
+- Comparison benchmark: data-range-aware length-scale initialisation for
+  GPy / scikit-learn / OpenTURNS, which previously failed on some designs (#341).
+- `jlibkriging`: `[compat]` bounds and package README required by the Julia
+  General registry's AutoMerge, so the next tagged release registers without
+  manual review (#344).
 
 ## [1.1.0] - 2026-07-08
 
@@ -124,7 +177,7 @@ past release, see the corresponding entry on the
 
 | Version | Date | Notes |
 |:--------|:-----|:------|
-| [1.2.0](https://github.com/libKriging/libKriging/releases/tag/v1.2.0) | 2026-09-19 | scikit-learn estimators; `subsetOfData`; NumPy 2 support; WarpKriging input-range fix; lazy `R^-1` (faster `update`). |
+| [1.2.0](https://github.com/libKriging/libKriging/releases/tag/v1.2.0) | 2026-09-19 | `LLNystrom` objective; scikit-learn estimators; `subsetOfData`; NumPy 2; WarpKriging binding parity and gradient/input-range fixes; `predict` derivative fix under `normalize`; Windows/Python heap-corruption fix; lazy `R^-1` (faster `update`). |
 | [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | NestedKriging for large designs; Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
 | [1.0.0](https://github.com/libKriging/libKriging/releases/tag/v1.0.0) | 2026-05-13 | First stable 1.0 release. |
 | [0.9.3](https://github.com/libKriging/libKriging/releases/tag/v0.9.3) | 2026-01-18 | |
