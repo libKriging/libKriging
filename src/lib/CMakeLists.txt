@@ -1,7 +1,92 @@
+# CUDA-accelerated matvec/CG for LLIterative/predictIterative, explicit
+# opt-in only (ENABLE_CUDA_ITERATIVE, see root CMakeLists.txt) -- must be
+# enabled/found before the Kriging target below so its .cu source can be
+# listed directly in add_library().
+set(LIBKRIGING_CUDA_SOURCES "")
+if (ENABLE_CUDA_ITERATIVE)
+    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES native)
+    endif ()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    # CudaLinearAlgebraKernel.cu (nvcc) holds ONLY the __global__ kernel plus a
+    # plain-C, pointer-only launcher; CudaLinearAlgebra.cpp (host compiler,
+    # same as the rest of libKriging) holds the arma::mat/arma::vec-facing
+    # LinearAlgebraCuda:: API and calls that launcher. Keeping arma types out
+    # of the nvcc-compiled TU is deliberate, not stylistic -- nvcc and this
+    # project's host compiler were observed to disagree on arma::Col<double>'s
+    # memory layout (memptr() came back null on the nvcc side despite n_elem
+    # reading correctly), so no Armadillo object may cross that boundary.
+    set(LIBKRIGING_CUDA_SOURCES
+            cuda/CudaLinearAlgebraKernel.cu cuda/CudaLinearAlgebraKernel.cuh
+            cuda/CudaLinearAlgebra.cpp cuda/CudaLinearAlgebra.cuh)
+endif ()
+
+# Same feature, AMD/ROCm backend (ENABLE_HIP_ITERATIVE) -- UNVERIFIED, see
+# src/lib/hip/HipLinearAlgebra.hpp. Mirrors the CUDA wiring above exactly,
+# including the "kernel file stays pointer-only" rule and its reason.
+set(LIBKRIGING_HIP_SOURCES "")
+if (ENABLE_HIP_ITERATIVE)
+    if (${CMAKE_VERSION} VERSION_LESS "3.21")
+        message(FATAL_ERROR "ENABLE_HIP_ITERATIVE requires CMake >= 3.21 for native HIP language support "
+                "(found ${CMAKE_VERSION}).")
+    endif ()
+    if (NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+        set(CMAKE_HIP_ARCHITECTURES native)
+    endif ()
+    enable_language(HIP)
+    find_package(hip REQUIRED)
+    # NOTE: the dense-R fast path (HipLinearAlgebra.cpp's DenseCovCache)
+    # deliberately does NOT use hipBLAS/rocBLAS for its matvec, unlike
+    # CUDA's cuBLAS-based equivalent -- tried first (2026-09-18,
+    # find_package(hipblas) + roc::hipblas), but rocBLAS's Tensile GEMM
+    # kernel database ships prebuilt only for gfx1030/1100/1101/1102/1151/
+    # 906 on this ROCm 6.2 Windows install, NOT gfx1032 (confirmed: no
+    # TensileLibrary.dat, no gfx1032 lazy-load variant either, and
+    # HSA_OVERRIDE_GFX_VERSION=10.3.0 does not help -- rocBLAS's own
+    # Tensile host init fails outright: "Cannot read TensileLibrary.dat ...
+    # for GPU arch: gfx1032"). Since gfx1032 (this project's only verified
+    # HIP target, RX 6600) is itself unofficial/unsupported hardware, tying
+    # the dense fast path to vendor BLAS would silently break it on exactly
+    # the GPU class this backend exists for. Uses a hand-written dense
+    # matvec kernel instead (lk_hip_dense_matvec_launch) -- see
+    # HipLinearAlgebra.cpp's DenseCovCache doc comment.
+    set(LIBKRIGING_HIP_SOURCES
+            hip/HipLinearAlgebraKernel.hip.cpp hip/HipLinearAlgebraKernel.hpp
+            hip/HipLinearAlgebra.cpp hip/HipLinearAlgebra.hpp)
+endif ()
+
+# Intel oneAPI / SYCL backend (ENABLE_SYCL_ITERATIVE) -- UNVERIFIED, see
+# src/lib/sycl/SyclLinearAlgebra.hpp. Single-source: only the *Kernel.cpp
+# gets -fsycl; SyclLinearAlgebra.cpp is host-only (armadillo, no SYCL
+# header) and compiled like the rest of the library, same rule as CUDA/HIP.
+set(LIBKRIGING_SYCL_SOURCES "")
+if (ENABLE_SYCL_ITERATIVE)
+    set(LIBKRIGING_SYCL_SOURCES
+            sycl/SyclLinearAlgebraKernel.cpp sycl/SyclLinearAlgebraKernel.hpp
+            sycl/SyclLinearAlgebra.cpp sycl/SyclLinearAlgebra.hpp)
+endif ()
+
+# Apple Metal backend (ENABLE_METAL_ITERATIVE) -- UNVERIFIED, see
+# src/lib/metal/MetalLinearAlgebra.hpp. MetalLinearAlgebra.cpp is host-only;
+# MetalLinearAlgebraKernel.cpp uses metal-cpp (METAL_CPP_DIR) and embeds the
+# .metal shader source as a string it compiles at runtime.
+set(LIBKRIGING_METAL_SOURCES "")
+if (ENABLE_METAL_ITERATIVE)
+    set(LIBKRIGING_METAL_SOURCES
+            metal/MetalLinearAlgebraKernel.cpp metal/MetalLinearAlgebraKernel.hpp
+            metal/MetalLinearAlgebra.cpp metal/MetalLinearAlgebra.hpp
+            metal/lk_metal_kernels.metal)
+endif ()
+
 # SHARED or STATIC type if defined using BUILD_SHARED_LIBS variable
 # ex: cmake -DBUILD_SHARED_LIBS:BOOL=OFF
 # default value is defined in root CMakeLists.txt
 add_library(Kriging
+        ${LIBKRIGING_CUDA_SOURCES}
+        ${LIBKRIGING_HIP_SOURCES}
+        ${LIBKRIGING_SYCL_SOURCES}
+        ${LIBKRIGING_METAL_SOURCES}
         demo/DemoClass.cpp include/libKriging/demo/DemoClass.hpp
         demo/DemoFunction.cpp include/libKriging/demo/DemoFunction.hpp
         demo/DemoArmadilloClass.cpp include/libKriging/demo/DemoArmadilloClass.hpp
@@ -34,6 +119,47 @@ if (CXX_CLANG_TIDY)
 endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
+
+if (ENABLE_CUDA_ITERATIVE)
+    # The batched CG scalar/vector kernels (CudaLinearAlgebraKernel.cu) stay
+    # hand-written -- they replace what used to be per-column
+    # cublasDdot/Daxpy/Dscal/Dnrm2 calls, which paid ncols separate launches.
+    # cuBLAS IS used for the dense-R fast path's matvec (CudaLinearAlgebra.cpp:
+    # ONE cublasDgemm per call, not one per column, so it doesn't reintroduce
+    # that per-column launch overhead).
+    target_link_libraries(Kriging PUBLIC CUDA::cudart CUDA::cublas)
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_CUDA_ITERATIVE)
+    set_target_properties(Kriging PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif ()
+
+if (ENABLE_HIP_ITERATIVE)
+    target_link_libraries(Kriging PUBLIC hip::host hip::device)
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_HIP_ITERATIVE)
+endif ()
+
+if (ENABLE_SYCL_ITERATIVE)
+    # Only the kernel TU is a SYCL translation unit; SyclLinearAlgebra.cpp
+    # is host-only (see its header). -fsycl must also be a link option.
+    set_source_files_properties(sycl/SyclLinearAlgebraKernel.cpp PROPERTIES COMPILE_OPTIONS "-fsycl")
+    target_link_options(Kriging PUBLIC -fsycl)
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_SYCL_ITERATIVE)
+endif ()
+
+if (ENABLE_METAL_ITERATIVE)
+    if (NOT DEFINED METAL_CPP_DIR)
+        message(FATAL_ERROR "ENABLE_METAL_ITERATIVE requires -DMETAL_CPP_DIR=<path to metal-cpp headers>")
+    endif ()
+    # Embed the .metal shader source as a string, compiled at runtime by
+    # MTL::Device::newLibrary(source:) -- keeps lk_metal_kernels.metal the
+    # single source of truth without a .metallib build step.
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels.metal LK_METAL_MSL_SRC)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels_msl.hpp.in
+            ${CMAKE_CURRENT_BINARY_DIR}/lk_metal_kernels_msl.hpp @ONLY)
+    target_include_directories(Kriging PRIVATE ${METAL_CPP_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(Kriging PUBLIC "-framework Metal" "-framework Foundation" "-framework QuartzCore")
+    target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_METAL_ITERATIVE)
+    set_source_files_properties(metal/lk_metal_kernels.metal PROPERTIES HEADER_FILE_ONLY ON)
+endif ()
 
 # Link OpenMP if found (required for omp_set_num_threads calls in Kriging.cpp, etc.)
 if(OpenMP_CXX_FOUND)

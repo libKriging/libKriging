@@ -358,6 +358,43 @@ Rcpp::List kriging_predict(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
+Rcpp::List kriging_predictIterative(Rcpp::List k,
+                                    arma::mat X_n,
+                                    bool return_stdev = false,
+                                    int max_iter = 0,
+                                    double tol = 1e-8,
+                                    bool use_nystrom_precond = false,
+                                    int precond_rank = 50) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  if (max_iter < 0)
+    Rcpp::stop("max_iter must be >= 0 (0 means the default, 2n)");
+  if (precond_rank < 0)
+    Rcpp::stop("precond_rank must be >= 0");
+  SEXP impl = k.attr("object");
+
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+
+  int d = impl_ptr->X().n_cols;
+  if (d != X_n.n_cols)
+    Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  auto [mean, stdev] = impl_ptr->predictIterative(X_n,
+                                                  return_stdev,
+                                                  static_cast<arma::uword>(max_iter),
+                                                  tol,
+                                                  use_nystrom_precond,
+                                                  static_cast<arma::uword>(precond_rank));
+
+  Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = mean);
+  if (return_stdev) {
+    ret.push_back(stdev, "stdev");
+  }
+
+  return ret;
+}
+
+// [[Rcpp::export]]
 arma::uvec kriging_subsetOfData(arma::mat X, int n_max, std::string method = "kmeans", int seed = 123) {
   if (n_max <= 0)
     Rcpp::stop("n_max must be >= 1");
@@ -631,6 +668,24 @@ int kriging_nystrom_rank(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return static_cast<int>(impl_ptr->nystrom_rank());
+}
+
+// [[Rcpp::export]]
+int kriging_iterative_nprobe(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return static_cast<int>(impl_ptr->iterative_nprobe());
+}
+
+// [[Rcpp::export]]
+bool kriging_is_iterative_light(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->is_iterative_light();
 }
 
 // [[Rcpp::export]]

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
@@ -214,6 +215,64 @@ class KrigingImpl {
                                                                                  double var_scale,
                                                                                  const FeatureMap& phi = {},
                                                                                  const FeatureJacobian& jac = {}) const;
+
+  /// Materialize the dense n x n correlation matrix R (and, when dR !=
+  /// nullptr, the d elementwise theta-derivative blocks dR[k] = dR/dtheta_k)
+  /// for a SEPARABLE kernel Cov(dx,theta) = exp(-sum_k s_k(|dx_k|/theta_k)) --
+  /// gauss / exp / matern3_2 / matern5_2 -- with the per-pair kernel formula
+  /// inlined (no std::function indirection) and the symmetric build
+  /// OpenMP-parallelized. Shared by `Kriging::_logLikelihoodIterative` and
+  /// `predictIterative_impl` so both get a BLAS-3 R*V fast path instead of a
+  /// fresh matrix-free covariance sweep per CG iteration / Lanczos step.
+  /// Returns false (R/dR left untouched) for any other covType or d > 64,
+  /// leaving the caller on its matrix-free fallback. dR[k] = R % H_k with
+  /// H_k the same (nonnegative) d(ln Cov)/d(theta_k) matrix as
+  /// Covariance::DlnCovDtheta_*.
+  static bool build_separable_cov(const std::string& covType,
+                                  const arma::mat& Xt,     // d x n, observations in columns
+                                  const arma::vec& theta,  // d
+                                  arma::mat& R,
+                                  std::vector<arma::mat>* dR = nullptr);
+
+  /// Unified matrix-free conjugate-gradient predict, shared by any variant
+  /// with no per-point noise channel (plain correlation matrix, diag=1) --
+  /// callers are responsible for checking that precondition (nugget/noise
+  /// classes don't call this). Same mean/stdev formulas as `predict_impl`
+  /// (universal-kriging mean, GLS-corrected variance), just solved via
+  /// `LinearAlgebra::conjugateGradient` instead of the stored Cholesky
+  /// factor: needs only m_X/m_y/m_F/m_theta/m_beta/m_sigma2 (O(n) storage),
+  /// at the cost of O(n^2 * iters) compute per solve instead of a single
+  /// O(n^2) triangular solve. See `Kriging::predictIterative` for the parameter
+  /// docs (max_iter/tol/use_nystrom_precond/precond_rank); `phi` is the same
+  /// optional feature map as `predict_impl` (pass {} for identity -- m_X
+  /// must already store Φ(X_normalized) when phi is set).
+  ///
+  /// RinvFY_cache, when non-null, is the n x (m_F.n_cols+1) [R^-1*F | R^-1*y]
+  /// solved once at the last fit/updateIterative commit (Kriging's
+  /// m_iterative_RinvFY_cache -- see its doc comment). TWO of this
+  /// function's CG solves don't actually depend on X_n at all -- the mean
+  /// solve (its right-hand side is `m_y - m_F*m_beta`, fixed by the fit) and
+  /// the GLS stdev correction's F-solve (right-hand side `m_F`, likewise
+  /// fixed) -- yet were being resolved cold on every single call. When the
+  /// cache's row count matches m_X.n_rows (silently ignored otherwise, same
+  /// as no cache at all -- e.g. right after loading a model saved before
+  /// this cache existed, or a WarpKriging/MLPKriging caller that has none),
+  /// R^-1*F is read directly off it (exact, not approximate: it's literally
+  /// the same right-hand side) and R^-1*resid is derived from it as
+  /// R^-1*y - (R^-1*F)*beta -- both used as CG warm starts, so a call whose
+  /// requested tol/preconditioner happens to disagree with the cache's still
+  /// converges to the correct answer, just iterates a little if the warm
+  /// start alone doesn't already clear tol (see docs/math's
+  /// predictiterative_cg_warmstart.ipynb for the measured savings: 89% fewer
+  /// CG iterations over a realistic 200-call sequential prediction loop).
+  std::tuple<arma::vec, arma::vec> predictIterative_impl(const arma::mat& X_n,
+                                                         bool return_stdev,
+                                                         arma::uword max_iter,
+                                                         double tol,
+                                                         bool use_nystrom_precond,
+                                                         arma::uword precond_rank,
+                                                         const FeatureMap& phi = {},
+                                                         const arma::mat* RinvFY_cache = nullptr) const;
 
   /// Unified simulate scaffolding shared by the three variants.  Builds R_nn,
   /// R_on, draws y_n ~ N(yhat_n, σ² · Sigma/Sigma_divisor), and (when

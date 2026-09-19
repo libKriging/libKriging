@@ -103,3 +103,7 @@ Testing/
 
 # Custom params
 AGENTS.md
+# per-host GPU benchmark reports in bench/gpu/ are committed on purpose
+# (one .md/.csv per machine; see bench/gpu/README.md)
+!bench/gpu/results/*.md
+!bench/gpu/results/*.csv
