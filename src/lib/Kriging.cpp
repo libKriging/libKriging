@@ -1846,15 +1846,18 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // dR/dtheta matvec) run on the SAME device queue; `slq_on_gpu` gates the
   // SLQ term and the gradient trace below, `gpuCgSolve` the CG solves.
   bool slq_on_gpu = false;
-  // Set only inside the CUDA/HIP-specific binds below (unlike slq_on_gpu,
-  // which any of CUDA/HIP/SYCL/Metal can set): gate the fully
-  // device-resident SLQ Lanczos path (LinearAlgebraCuda/Hip's
-  // stochasticLogDetBatched) and the mBCG [F|y|probes] CG fusion, which
-  // only CUDA and HIP have ported so far -- SYCL/Metal keep using the
-  // generic rmulBatched-ping-pong SLQ and the two-separate-CG-calls path
-  // below via slq_on_gpu / the generic cgSolve lambda.
+  // Set only inside the CUDA/HIP/Metal-specific binds below (unlike
+  // slq_on_gpu, which any of CUDA/HIP/SYCL/Metal can set): gate the fully
+  // device-resident SLQ Lanczos path (LinearAlgebraCuda/Hip/Metal's
+  // stochasticLogDetBatched). CUDA and HIP additionally fuse the mBCG
+  // [F|y|probes] CG solves (slq_on_cuda/slq_on_hip gate that below too);
+  // Metal has device-resident Lanczos but not that CG fusion yet, so
+  // slq_on_metal only gates the logdetR branch just below, and Metal keeps
+  // using the two-separate-CG-calls path via slq_on_gpu / the generic
+  // cgSolve lambda like SYCL does.
   bool slq_on_cuda = false;
   bool slq_on_hip = false;
+  bool slq_on_metal = false;
   arma::uword gpu_max_dimx = 0;
   arma::uword gpu_cg_n_unconverged = 0;  // aggregated OR'd into m_iterative_last_cg_unconverged below
   // R^-1 * B (preconditioned iff woodbury_pc); x0, when non-null, warm-starts
@@ -1897,8 +1900,10 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     LK_ITER_GPU_BIND(LinearAlgebraSycl);
 #endif
 #ifdef LIBKRIGING_USE_METAL_ITERATIVE
-  if (!slq_on_gpu && LinearAlgebraMetal::enabled() && LinearAlgebraMetal::supports(m_covType))
+  if (!slq_on_gpu && LinearAlgebraMetal::enabled() && LinearAlgebraMetal::supports(m_covType)) {
     LK_ITER_GPU_BIND(LinearAlgebraMetal);
+    slq_on_metal = true;
+  }
 #endif
 #undef LK_ITER_GPU_BIND
 
@@ -1942,13 +1947,13 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // calls: [F|y|probes] shares ONE matvec-per-iteration loop, each column
   // still freezing independently at its OWN tolerance
   // (m_iterative_cg_tol for F/y, the looser m_iterative_probes_cg_tol for
-  // probes -- LinearAlgebraCuda/Hip::conjugateGradient's tol is
+  // probes -- LinearAlgebraCuda/Hip/Metal::conjugateGradient's tol is
   // per-column), so the result is bit-identical to what two separate calls
   // would have produced, just without paying kernel-launch/host-sync
-  // overhead twice. CUDA and HIP only for now (mirrors slq_on_cuda/
-  // slq_on_hip's scoping just above): SYCL/Metal keep the two-separate-
-  // calls path below via the generic cgSolve lambda, which only has a
-  // scalar-tol overload on those backends.
+  // overhead twice. CUDA, HIP and Metal for now (mirrors slq_on_cuda/
+  // slq_on_hip/slq_on_metal's scoping just above): SYCL keeps the
+  // two-separate-calls path below via the generic cgSolve lambda, which
+  // only has a scalar-tol overload on that backend.
   arma::mat RinvFY;
   arma::mat W;  // R^-1 * probes, only set here when the fused path runs
   bool fused_probes_solved = false;
@@ -1982,6 +1987,28 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
                                               woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
         : LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
                                               arma::vec(), arma::mat(), &n_unconv);
+    gpu_cg_n_unconverged += n_unconv;
+    RinvFY = sol.head_cols(m_F.n_cols + 1);
+    W = sol.tail_cols(nprobe);
+    fused_probes_solved = true;
+  } else
+#endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  if (slq_on_metal && grad_out != nullptr) {
+    // Same mBCG [F|y|probes] fusion as the CUDA/HIP branches above, now
+    // that LinearAlgebraMetal::conjugateGradient also takes a per-column
+    // tol vector (see its doc comment) -- one Krylov pass instead of two
+    // separate CG calls (this + the plain-cgSolve probes solve below).
+    const arma::mat FYP = arma::join_rows(m_F, m_y, m_iterative_probes);
+    arma::vec tol_fused(FYP.n_cols);
+    tol_fused.head(m_F.n_cols + 1).fill(m_iterative_cg_tol);
+    tol_fused.tail(nprobe).fill(m_iterative_probes_cg_tol);
+    arma::uword n_unconv = 0;
+    const arma::mat sol = woodbury_pc
+        ? LinearAlgebraMetal::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, woodbury_pc->U(),
+                                                woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
+        : LinearAlgebraMetal::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
+                                                arma::vec(), arma::mat(), &n_unconv);
     gpu_cg_n_unconverged += n_unconv;
     RinvFY = sol.head_cols(m_F.n_cols + 1);
     W = sol.tail_cols(nprobe);
@@ -2041,6 +2068,16 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
                                                          m_iterative_probes);
 #else
     logdetR = 0.0;  // unreachable: slq_on_hip is only ever set true inside a HIP build
+#endif
+  } else if (slq_on_metal && !woodbury_pc) {
+    // Same device-resident Lanczos as the CUDA/HIP branches above, on the
+    // Metal backend (LinearAlgebraMetal::stochasticLogDetBatched) -- see
+    // that function's doc comment.
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+    logdetR = LinearAlgebraMetal::stochasticLogDetBatched(Xt, theta, m_covType, m_iterative_lanczos_steps,
+                                                           m_iterative_probes);
+#else
+    logdetR = 0.0;  // unreachable: slq_on_metal is only ever set true inside a Metal build
 #endif
   } else if (slq_on_gpu && woodbury_pc) {
     // Same Nystrom-whitened SLQ as the CPU preconditioned branch below, just

@@ -469,10 +469,10 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
   // and the preconditioned path (whitened SLQ + separate probe solve) too
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
   const double llp_mf
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,200,1e-10)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
   const double llp_de
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,200,1e-10)").logLikelihoodIterativeFun(theta, false));
+      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
   if (old_env)
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
   else
