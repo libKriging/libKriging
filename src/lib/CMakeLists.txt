@@ -151,7 +151,20 @@ if (ENABLE_METAL_ITERATIVE)
     endif ()
     # Embed the .metal shader source as a string, compiled at runtime by
     # MTL::Device::newLibrary(source:) -- keeps lk_metal_kernels.metal the
-    # single source of truth without a .metallib build step.
+    # single source of truth without a .metallib build step. file(READ...)
+    # below does NOT register lk_metal_kernels.metal as a dependency of
+    # anything (unlike configure_file()'s own input) -- without this,
+    # editing the .metal file alone leaves the embedded/generated
+    # lk_metal_kernels_msl.hpp stale until someone happens to rerun cmake's
+    # configure step by hand (a real footgun: the build silently succeeds
+    # against an old kernel source, only failing loudly at Metal-library
+    # compile time when a NEW kernel name is looked up and not found).
+    # CMAKE_CONFIGURE_DEPENDS is the supported way to add an extra
+    # configure-time dependency: CMake re-runs configure automatically
+    # (hence regenerating the file(READ...) below) whenever this file's
+    # timestamp changes, even via `cmake --build` alone.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+            ${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels.metal)
     file(READ ${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels.metal LK_METAL_MSL_SRC)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/metal/lk_metal_kernels_msl.hpp.in
             ${CMAKE_CURRENT_BINARY_DIR}/lk_metal_kernels_msl.hpp @ONLY)
