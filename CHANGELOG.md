@@ -11,6 +11,8 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-19
+
 ### Added
 - Python: scikit-learn compatible estimators for all four Kriging classes —
   `KrigingRegressor`, `WarpKrigingRegressor`, `MLPKrigingRegressor`,
@@ -38,6 +40,12 @@ past release, see the corresponding entry on the
   NumPy-2.0 fix where `PyArray_CopyInto`'s table offset (which differs
   between NumPy 1.x and 2.x) was hardcoded to the NumPy-2-only value instead
   of being picked at runtime (#339, libKriging/carma#1).
+- Performance: `R^-1` is now computed lazily in `populate_Model`. It is only
+  consumed by an analytic theta gradient, so plain `fit()`, `predict()`,
+  `logLikelihoodFun(theta, grad=false)` and, above all, `update(refit=false)`
+  no longer pay a dense `O(n^3)` `inv_sympd` at the full size on every call;
+  `update(refit=false)`'s incremental Cholesky is `O(n_old^2 * n_u)` again
+  (#363).
 
 ### Fixed
 - `WarpKriging`: every per-variable warping whose parametrisation assumes an
@@ -116,6 +124,7 @@ past release, see the corresponding entry on the
 
 | Version | Date | Notes |
 |:--------|:-----|:------|
+| [1.2.0](https://github.com/libKriging/libKriging/releases/tag/v1.2.0) | 2026-09-19 | scikit-learn estimators; `subsetOfData`; NumPy 2 support; WarpKriging input-range fix; lazy `R^-1` (faster `update`). |
 | [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | NestedKriging for large designs; Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
 | [1.0.0](https://github.com/libKriging/libKriging/releases/tag/v1.0.0) | 2026-05-13 | First stable 1.0 release. |
 | [0.9.3](https://github.com/libKriging/libKriging/releases/tag/v0.9.3) | 2026-01-18 | |
@@ -140,5 +149,6 @@ past release, see the corresponding entry on the
 | [0.4.2](https://github.com/libKriging/libKriging/releases/tag/v0.4.2) | 2021-06-01 | |
 | [0.4.1](https://github.com/libKriging/libKriging/releases/tag/v0.4.1) | 2021-05-31 | First public pre-releases. |
 
-[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.1.0...master
+[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.2.0...master
+[1.2.0]: https://github.com/libKriging/libKriging/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/libKriging/libKriging/compare/v1.0.0...v1.1.0
