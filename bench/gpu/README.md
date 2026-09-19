@@ -1,7 +1,8 @@
 # `bench/gpu/` — manual libKriging vs GPyTorch benchmark
 
 `bench_gpu.py` is a **standalone, run-by-hand** benchmark (not wired into
-CI). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
+CI — see `plot_comparison.py` below for the one piece of this directory
+that IS). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
 `theta=0.15`, n ∈ {250, 500, 1000, 2000, 4000, 8000} by default (`--sizes` to
 change) — and compares seven backends, each named
 `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected from the
@@ -324,3 +325,29 @@ iteration count grows far faster with `n` than the `[F|y]` solve's — see
 own accuracy, unlike loosening the shared `--cg-tol`. See
 [`docs/math/Iterative.md`](../../docs/math/Iterative.md) and
 [`docs/comparisons/libKriging_vs_GPyTorch.ipynb`](../../docs/comparisons/libKriging_vs_GPyTorch.ipynb).
+
+## Cross-machine comparison chart (`plot_comparison.py`, wired into CI)
+
+`results/*.csv` accumulate one file per machine over time (see the "one per
+machine" convention above) — `plot_comparison.py` reads all of them and
+renders a single interactive Plotly page: machine on the x-axis, a timing
+column (fit/logLik/predict, switchable via a dropdown) on a log-scale
+y-axis, one series per training-set size `n` (color + marker shape, since
+`n` is an ordered quantity — see the dataviz skill's `color-formula.md` for
+why that's a one-hue sequential ramp rather than eight arbitrary
+categorical colors). A second dropdown switches which `backend_key`
+(`iter-cuda`, `iter-metal`, `chol`, ...) is shown; legend clicks
+additionally isolate one `n` at a time within the current selection.
+
+Run by hand:
+
+```sh
+pip install plotly
+python bench/gpu/plot_comparison.py   # writes results/comparison.html
+```
+
+`.github/workflows/bench-gpu-report.yml` runs this on every push that
+touches `results/*.csv` (plus manual dispatch) and uploads the HTML as a
+build artifact — the one piece of `bench/gpu/` that IS wired into CI, since
+it only aggregates already-committed results rather than running the
+(hardware-dependent) benchmark itself.
