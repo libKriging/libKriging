@@ -109,7 +109,13 @@ class KrigingImpl {
   arma::mat m_star;
   arma::mat m_circ;
   arma::vec m_z;
-  arma::mat m_Rinv;
+  /// R^-1 = L^-T * L^-1, computed lazily/on demand -- only an analytic theta
+  /// gradient ever needs it (Kriging::_logLikelihood, WarpKriging's
+  /// concentrated_ll_and_grad_theta/warp_gradient), never predict() or a
+  /// refit=false update(); see populate_Model's comment. mutable: those
+  /// gradient functions are const (same rationale as any other cache written
+  /// from inside a const evaluation, e.g. m_iterative_last_cg_unconverged).
+  mutable arma::mat m_Rinv;
   arma::vec m_beta;
   bool m_est_beta{};
   arma::vec m_theta;
@@ -173,7 +179,10 @@ class KrigingImpl {
                       std::map<std::string, double>* bench) const;
 
   /// Preallocate a `KModel` sized from (n=m_X.n_rows, p=m_F.n_cols).
-  /// `Linv` and `Rinv` are left empty (computed on demand / during populate).
+  /// `Linv` and `Rinv` are left empty -- both are computed on demand, lazily,
+  /// only by whichever gradient consumer first needs them (never by
+  /// `populate_Model` itself, and never for a plain predict or a
+  /// `refit=false` update, neither of which touches either one).
   KModel allocate_KModel() const;
 
   /// Unified predict implementation shared by Kriging / NuggetKriging /

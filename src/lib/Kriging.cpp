@@ -333,6 +333,14 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
 
   if (grad_out != nullptr) {
     auto t0 = Bench::tic();
+    // Lazy, on-demand R^-1 (see populate_Model's comment): only the gradient
+    // needs it, so it's built here, the first (and only, across repeated
+    // no-refit calls at the same theta/n) time it's actually asked for --
+    // same size/null-check pattern _leaveOneOut already uses for Linv.
+    if ((m.Rinv.memptr() == nullptr) || (arma::size(m.Rinv) != arma::size(m.L))) {
+      m.Rinv = LinearAlgebra::inv_sympd(m.L);
+      t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+    }
     const arma::mat& Rinv = m.Rinv;
     arma::mat x = LinearAlgebra::solve_upper(m.L.t(), m.Estar);
     t0 = Bench::toc(bench, "x = tL \\ z", t0);
@@ -1987,7 +1995,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         m.R = arma::mat(n_data, n_data, arma::fill::none);
         m.L = arma::mat(n_data, n_data, arma::fill::none);
         m.Linv = arma::mat();  // Empty matrix
-        m.Rinv = arma::mat(n_data, n_data, arma::fill::none);
+        m.Rinv = arma::mat();  // Empty matrix -- computed lazily on demand, like Linv; must NOT be
+                               // preallocated at the right size (fill::none) the way the other KModel
+                               // fields below are, or the lazy size-check in _logLikelihood would
+                               // mistake this uninitialized block for an already-computed R^-1
         m.Fstar = arma::mat(n_data, p_data, arma::fill::none);
         m.ystar = arma::vec(n_data, arma::fill::none);
         m.Rstar = arma::mat(p_data, p_data, arma::fill::none);
@@ -2662,7 +2673,9 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     km.R = arma::mat(n, n, arma::fill::none);
     km.L = arma::mat(n, n, arma::fill::none);
     km.Linv = arma::mat();
-    km.Rinv = arma::mat(n, n, arma::fill::none);
+    km.Rinv = arma::mat();  // computed lazily on demand, like Linv -- must not be preallocated at the
+                            // right size or the lazy size-check in _logLikelihood would mistake this
+                            // uninitialized block for an already-computed R^-1
     km.Fstar = arma::mat(n, p, arma::fill::none);
     km.ystar = arma::vec(n, arma::fill::none);
     km.Rstar = arma::mat(p, p, arma::fill::none);

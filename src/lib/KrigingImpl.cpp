@@ -86,8 +86,9 @@ void KrigingImpl::populate_Model(KModel& m,
   arma::mat dX_local;
   const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
 
-  // Invalidate cached Linv so gradient code recomputes it for the new L
+  // Invalidate cached Linv/Rinv so gradient code recomputes them for the new L
   m.Linv = arma::mat();
+  m.Rinv = arma::mat();
   if (update_eligible) {
     m.L = LinearAlgebra::update_cholCov(&(m.R), dX, theta, _Cov, alpha, diag_norm, m_T, m_R);
   } else {
@@ -95,8 +96,18 @@ void KrigingImpl::populate_Model(KModel& m,
   }
   t0 = Bench::toc(bench, "R = _Cov(dX) & L = Chol(R)", t0);
 
-  m.Rinv = LinearAlgebra::inv_sympd(m.L);
-  t0 = Bench::toc(bench, "R^-1 = L^-T * L^-1", t0);
+  // Rinv (R^-1 = L^-T * L^-1) is NOT computed here anymore: it is only ever
+  // consumed by an analytic THETA GRADIENT (Kriging::_logLikelihood's
+  // grad_out != nullptr branch, WarpKriging::concentrated_ll_and_grad_theta /
+  // warp_gradient) -- never by predict(), and never by a refit=false
+  // update() (which only re-profiles beta/sigma2 at the CURRENT theta, no
+  // gradient). It used to be built unconditionally right here regardless,
+  // an O(n^3) dense triangular solve against the identity that swamped the
+  // (genuinely O(n_old^2*n_u), already-incremental) Cholesky block update
+  // above by ~2 orders of magnitude at n=8000/n_u=20 -- silently undoing
+  // most of update()'s own speedup. Each gradient consumer now computes it
+  // lazily on first actual need (same size/null-check pattern
+  // Kriging::_leaveOneOut already uses for Linv, a few lines below).
 
   // Direct GLS: compute whitened matrices using triangular solves
   m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
@@ -132,7 +143,7 @@ KrigingImpl::KModel KrigingImpl::allocate_KModel() const {
   m.R = arma::mat(n, n, arma::fill::none);
   m.L = arma::mat(n, n, arma::fill::none);
   m.Linv = arma::mat();  // filled on demand in gradient computation
-  m.Rinv = arma::mat();  // computed in populate_Model
+  m.Rinv = arma::mat();  // computed lazily, on demand, by whichever gradient consumer first needs it
   m.Fstar = arma::mat(n, p, arma::fill::none);
   m.ystar = arma::vec(n, arma::fill::none);
   m.Rstar = arma::mat(p, p, arma::fill::none);
