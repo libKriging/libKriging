@@ -15,6 +15,9 @@
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
 #include "hip/HipLinearAlgebra.hpp"
 #endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+#include "metal/MetalLinearAlgebra.hpp"
+#endif
 
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
@@ -151,6 +154,30 @@ PYBIND11_MODULE(_pylibkriging, m) {
         "This build was compiled without -DENABLE_HIP_ITERATIVE.");
   m.def("set_hip_iterative_enabled", [](bool) {}, py::arg("value"),
         "No-op: this build was compiled without -DENABLE_HIP_ITERATIVE.");
+#endif
+
+  // --- Apple-Metal-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Same shape as the CUDA/HIP blocks above, exposing
+  // src/lib/metal/MetalLinearAlgebra's runtime on/off switch. FLOAT32-only
+  // (see MetalLinearAlgebra.hpp); all three are always defined, on a build
+  // without -DENABLE_METAL_ITERATIVE they report "no Metal" and set_enabled
+  // is a no-op.
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  m.attr("__metal_iterative__") = true;
+  m.def("metal_iterative_available", &LinearAlgebraMetal::available,
+        "True iff libKriging was built with -DENABLE_METAL_ITERATIVE and a Metal device is visible at runtime.");
+  m.def("metal_iterative_enabled", &LinearAlgebraMetal::enabled,
+        "True iff the Metal matrix-free CG backend is currently active (defaults to metal_iterative_available()).");
+  m.def("set_metal_iterative_enabled", &LinearAlgebraMetal::set_enabled, py::arg("value"),
+        "Turn the Metal matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__metal_iterative__") = false;
+  m.def("metal_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def("metal_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def("set_metal_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_METAL_ITERATIVE.");
 #endif
 
   m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");
