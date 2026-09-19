@@ -11,6 +11,17 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-09-19
+
+### Fixed
+- Release process: `bindings/Julia/jlibkriging/Project.toml` and
+  `.claude-plugin/plugin.json` had been left at 1.1.0 by the 1.2.0 release
+  preparation, so the Julia release workflow rejected the `v1.2.0` tag and
+  `jlibkriging` was never registered on Julia's General registry for 1.2.0.
+  Both now carry the release version. 1.2.1 is otherwise identical to 1.2.0 for
+  the C++ core, Python, R and Octave/Matlab bindings, and is the first 1.2
+  release available for Julia (#365).
+
 ## [1.2.0] - 2026-09-19
 
 ### Added
@@ -177,6 +188,7 @@ past release, see the corresponding entry on the
 
 | Version | Date | Notes |
 |:--------|:-----|:------|
+| [1.2.1](https://github.com/libKriging/libKriging/releases/tag/v1.2.1) | 2026-09-19 | Julia registration fix (version metadata); otherwise identical to 1.2.0. |
 | [1.2.0](https://github.com/libKriging/libKriging/releases/tag/v1.2.0) | 2026-09-19 | `LLNystrom` objective; scikit-learn estimators; `subsetOfData`; NumPy 2; WarpKriging binding parity and gradient/input-range fixes; `predict` derivative fix under `normalize`; Windows/Python heap-corruption fix; lazy `R^-1` (faster `update`). |
 | [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | NestedKriging for large designs; Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
 | [1.0.0](https://github.com/libKriging/libKriging/releases/tag/v1.0.0) | 2026-05-13 | First stable 1.0 release. |
@@ -202,6 +214,7 @@ past release, see the corresponding entry on the
 | [0.4.2](https://github.com/libKriging/libKriging/releases/tag/v0.4.2) | 2021-06-01 | |
 | [0.4.1](https://github.com/libKriging/libKriging/releases/tag/v0.4.1) | 2021-05-31 | First public pre-releases. |
 
-[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.2.0...master
+[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.2.1...master
+[1.2.1]: https://github.com/libKriging/libKriging/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/libKriging/libKriging/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/libKriging/libKriging/compare/v1.0.0...v1.1.0
