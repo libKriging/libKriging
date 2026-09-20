@@ -330,16 +330,18 @@ own accuracy, unlike loosening the shared `--cg-tol`. See
 
 `results/*.csv` accumulate one file per machine over time (see the "one per
 machine" convention above) — `plot_comparison.py` reads all of them and
-renders a single interactive Plotly page: every (host, `backend_key`)
-combo — e.g. `Apple M4 · libKriging-Iterative-Metal` — as its own x-axis
-category, so host and engine are never split apart into a separate
-dropdown; all host-method-engine combinations are visible together. A
-timing column (fit/logLik/predict, switchable via a dropdown) sits on a
-log-scale y-axis, with one series per training-set size `n` (color +
-marker shape, since `n` is an ordered quantity — see the dataviz skill's
-`color-formula.md` for why that's a one-hue sequential ramp rather than
-eight arbitrary categorical colors). Legend clicks isolate one `n` at a
-time across every combo.
+renders a single interactive Plotly page for the libKriging backends only
+(GPyTorch rows are dropped; that comparison already lives in
+`docs/comparisons/`). Machine is the x-axis, so every backend that ran on
+a machine shares that machine's tick — e.g. `iter-omp` and `chol` on the
+same CPU-only host plot side by side at that host's position. Color
+carries the backend/engine (a categorical identity, fixed hue order) and
+marker shape carries the training-set size `n` (an ordered quantity) — see
+the dataviz skill's `color-formula.md` for why those are different
+encodings. Two legends: a static backend color key, and an `n` shape key
+whose clicks isolate one `n` at a time across every machine and backend. A
+timing column (fit/logLik/predict) is switchable via a dropdown, on a
+log-scale y-axis.
 
 Run by hand:
 
