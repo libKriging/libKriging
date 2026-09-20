@@ -5,14 +5,15 @@ Reads every committed result file (one per machine/backend-build, see
 bench_gpu.sh's "one per machine" convention -- e.g.
 ``NVIDIA-H100-NVL__INTEL-XEON-PLATINUM-8558.csv``,
 ``none__Apple-M4.csv``) and renders a single interactive Plotly HTML page:
-machine on the x-axis, a chosen timing column on the y-axis (log scale --
-these span 3+ orders of magnitude), one trace per training-set size `n`
-(color + marker shape both carry `n`, since it is an ORDERED quantity, not
-an arbitrary category -- see the dataviz skill's color-formula.md). Two
-dropdowns switch the timing column (fit/logLik/predict) and the backend
-key (libKriging-Iterative-CUDA, -Metal, -OpenMP, GPyTorch-BBMM-*, ...) --
-legend clicks (single = toggle, double = isolate) additionally isolate one
-`n` at a time within the current backend/metric selection, which is the
+every (host, backend/engine) combination on the x-axis -- machine and
+backend are NOT split across a dropdown, they are both part of the same
+axis category, so all host-method-engine combos are visible together -- a
+chosen timing column on the y-axis (log scale -- these span 3+ orders of
+magnitude), one trace per training-set size `n` (color + marker shape both
+carry `n`, since it is an ORDERED quantity, not an arbitrary category --
+see the dataviz skill's color-formula.md). A dropdown switches the timing
+column (fit/logLik/predict); legend clicks (single = toggle, double =
+isolate) group/isolate one `n` at a time across every combo, which is the
 "groupable" behavior asked for.
 
 Standalone: no dependency on the rest of libKriging beyond `plotly`. Run by
@@ -61,8 +62,9 @@ BACKEND_LABELS = {
     "gpt-chol-cuda": "GPyTorch-Cholesky-CUDA",
     "gpt-chol-cpu": "GPyTorch-Cholesky-CPU",
 }
-# Shown first in the backend dropdown when present -- the backends this
-# session's work (and most bench/gpu runs) actually cares about comparing.
+# Ordering of the backend/engine part of each x-axis combo -- the backends
+# this session's work (and most bench/gpu runs) actually cares about
+# comparing come first.
 BACKEND_PRIORITY = ["iter-cuda", "iter-hip", "iter-metal", "iter-omp", "chol"]
 
 
@@ -98,46 +100,52 @@ def load_rows(results_dir: str):
 
 
 def build_figure(rows):
-    machines = sorted({r["machine"] for r in rows})
     ns = sorted({r["n"] for r in rows})
-    backend_keys = sorted({r["backend_key"] for r in rows},
-                          key=lambda k: (BACKEND_PRIORITY.index(k) if k in BACKEND_PRIORITY else 99, k))
-    default_backend = backend_keys[0] if backend_keys else None
 
-    # One trace per (backend_key, n): all traces for every backend are
-    # always present in the figure (Plotly can only toggle `visible`, not
-    # add/remove traces, from a dropdown) -- the backend dropdown just
-    # flips which subset is visible. Color/symbol depend only on `n`, so
-    # switching backend never repaints a size's identity (color-formula.md:
-    # "color follows the entity, never its rank").
+    def backend_rank(bk):
+        return (BACKEND_PRIORITY.index(bk) if bk in BACKEND_PRIORITY else 99, bk)
+
+    # One x-axis category per (machine, backend_key) combo -- host and
+    # engine are NOT split across a dropdown, both live on the same axis so
+    # every host-method-engine combination is visible at once. Grouped by
+    # machine first (so a machine's backends sit together), backend priority
+    # second.
+    combos = sorted(
+        {(r["machine"], r["backend_key"]) for r in rows},
+        key=lambda mb: (mb[0], backend_rank(mb[1])),
+    )
+    combo_label = {
+        (m, bk): f"{m} · {BACKEND_LABELS.get(bk, bk)}" for m, bk in combos
+    }
+    xs_all = [combo_label[c] for c in combos]
+
+    # One trace per `n`, spanning every combo on the x-axis. Color/symbol
+    # depend only on `n` (color-formula.md: "color follows the entity, never
+    # its rank"), so there is nothing left to repaint when the metric changes.
     traces = []
-    trace_backend = []  # backend_key each trace belongs to, for the dropdown
-    for bk in backend_keys:
-        for i, n in enumerate(ns):
-            xs, ys_by_metric = [], {key: [] for key, _ in METRICS}
-            for m in machines:
-                match = next((r for r in rows if r["machine"] == m and r["backend_key"] == bk and r["n"] == n), None)
-                if match is None:
-                    continue
-                xs.append(m)
-                for key, _ in METRICS:
-                    ys_by_metric[key].append(match[key])
-            if not xs:
+    for i, n in enumerate(ns):
+        xs, ys_by_metric = [], {key: [] for key, _ in METRICS}
+        for m, bk in combos:
+            match = next((r for r in rows if r["machine"] == m and r["backend_key"] == bk and r["n"] == n), None)
+            if match is None:
                 continue
-            color = SEQUENTIAL_BLUE[i % len(SEQUENTIAL_BLUE)]
-            symbol = MARKER_SYMBOLS[i % len(MARKER_SYMBOLS)]
-            traces.append(go.Scatter(
-                x=xs,
-                y=ys_by_metric[METRICS[0][0]],
-                mode="markers",
-                name=f"n={n}",
-                legendgroup=f"n={n}",
-                marker=dict(color=color, symbol=symbol, size=11, line=dict(width=1, color="#ffffff")),
-                visible=(bk == default_backend),
-                hovertemplate="%{x}<br>n=" + str(n) + "<br>%{y:.3g}s<extra></extra>",
-                meta=dict(backend_key=bk, n=n, ys=ys_by_metric),
-            ))
-            trace_backend.append(bk)
+            xs.append(combo_label[(m, bk)])
+            for key, _ in METRICS:
+                ys_by_metric[key].append(match[key])
+        if not xs:
+            continue
+        color = SEQUENTIAL_BLUE[i % len(SEQUENTIAL_BLUE)]
+        symbol = MARKER_SYMBOLS[i % len(MARKER_SYMBOLS)]
+        traces.append(go.Scatter(
+            x=xs,
+            y=ys_by_metric[METRICS[0][0]],
+            mode="markers",
+            name=f"n={n}",
+            legendgroup=f"n={n}",
+            marker=dict(color=color, symbol=symbol, size=11, line=dict(width=1, color="#ffffff")),
+            hovertemplate="%{x}<br>n=" + str(n) + "<br>%{y:.3g}s<extra></extra>",
+            meta=dict(n=n, ys=ys_by_metric),
+        ))
 
     fig = go.Figure(data=traces)
 
@@ -151,35 +159,23 @@ def build_figure(rows):
                   {"yaxis.title.text": label}],
         ))
 
-    # --- backend dropdown: restyles every trace's `visible` ----------
-    backend_buttons = []
-    for bk in backend_keys:
-        backend_buttons.append(dict(
-            label=BACKEND_LABELS.get(bk, bk),
-            method="restyle",
-            args=[{"visible": [tb == bk for tb in trace_backend]}],
-        ))
-
     fig.update_layout(
         template="plotly_white",
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
         title=dict(text="libKriging iterative backend -- cross-machine comparison", x=0.02, xanchor="left"),
-        xaxis=dict(title="machine", tickangle=-20, gridcolor="#e1e0d9", linecolor="#c3c2b7"),
+        xaxis=dict(title="host · method/engine", categoryorder="array", categoryarray=xs_all,
+                   tickangle=-20, gridcolor="#e1e0d9", linecolor="#c3c2b7"),
         yaxis=dict(title=METRICS[0][1], type="log", gridcolor="#e1e0d9", linecolor="#c3c2b7"),
         legend=dict(title="n (click to isolate)", bgcolor="rgba(0,0,0,0)"),
         plot_bgcolor="#fcfcfb",
         paper_bgcolor="#fcfcfb",
-        margin=dict(t=90, b=120),
+        margin=dict(t=90, b=160),
         updatemenus=[
             dict(buttons=metric_buttons, direction="down", x=0.0, xanchor="left", y=1.15, yanchor="top",
-                showactive=True, pad=dict(r=8, t=4)),
-            dict(buttons=backend_buttons, direction="down", x=0.28, xanchor="left", y=1.15, yanchor="top",
                 showactive=True, pad=dict(r=8, t=4)),
         ],
         annotations=[
             dict(text="metric:", x=0.0, xanchor="left", y=1.20, yanchor="bottom", yref="paper", xref="paper",
-                showarrow=False, font=dict(size=12, color="#52514e")),
-            dict(text="backend:", x=0.28, xanchor="left", y=1.20, yanchor="bottom", yref="paper", xref="paper",
                 showarrow=False, font=dict(size=12, color="#52514e")),
         ],
     )
