@@ -103,6 +103,30 @@ option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
+# Explicit opt-in only -- never auto-detected, even if a CUDA toolkit is
+# present on the machine. Requires a working CUDA toolkit (no longer needs
+# cuBLAS -- see src/lib/cuda/CudaLinearAlgebraKernel.cu). See
+# docs/math/Iterative.md.
+option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative (requires CUDA toolkit)" OFF)
+# Same feature, AMD/ROCm backend. Explicit opt-in only, never auto-detected.
+# Verified 2026-09-13 on an AMD Radeon RX 6600 (gfx1032, Windows, ROCm/HIP SDK
+# 6.2.4 -- gfx1032 itself is NOT on AMD's officially supported list, but the
+# 6.2.4 runtime detects and runs on it fine; see src/lib/hip/HipLinearAlgebra.hpp
+# for the full history) -- builds with CMake's Ninja generator (no VS/MSBuild
+# HIP toolset was available) and passes KrigingIterativeTest/
+# KrigingPredictIterativeTest in full. Requires CMake >= 3.21 (native HIP
+# language support) and a ROCm install providing CMAKE_PREFIX_PATH/hip-config.cmake.
+option(ENABLE_HIP_ITERATIVE "Enable HIP/ROCm-accelerated matvec/CG for LLIterative and predictIterative (requires ROCm; see src/lib/hip/HipLinearAlgebra.hpp)" OFF)
+# Same feature, Intel oneAPI / SYCL backend. Explicit opt-in only, never
+# auto-detected. UNVERIFIED (no oneAPI toolchain or Intel GPU to build/run
+# against -- see src/lib/sycl/SyclLinearAlgebra.hpp). Requires the C++
+# compiler to accept -fsycl (icpx, or an oneAPI clang++).
+option(ENABLE_SYCL_ITERATIVE "Enable SYCL/oneAPI-accelerated matvec/CG for LLIterative and predictIterative (requires an -fsycl compiler; UNVERIFIED, see src/lib/sycl/SyclLinearAlgebra.hpp)" OFF)
+# Same feature, Apple Metal backend. Explicit opt-in only. UNVERIFIED (no
+# macOS / Metal toolchain to build/run against -- see
+# src/lib/metal/MetalLinearAlgebra.hpp). Requires macOS with Metal and the
+# metal-cpp headers (METAL_CPP_DIR).
+option(ENABLE_METAL_ITERATIVE "Enable Apple-Metal-accelerated matvec/CG for LLIterative and predictIterative (macOS only; UNVERIFIED, see src/lib/metal/MetalLinearAlgebra.hpp)" OFF)
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 
