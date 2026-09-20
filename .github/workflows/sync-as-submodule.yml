@@ -39,3 +39,31 @@ jobs:
           fi
           git commit -m "Update submodules" || echo "No changes to commit"
           git push
+
+  update-jlibkriging:
+    # JLibKriging (Julia package) pins libKriging's sources in deps/sources.toml
+    # instead of using a git submodule (a registered Julia package is shipped
+    # without submodules): refresh them on every push to master. Its own CI then
+    # tests the result and registers the package if libKriging's version is new.
+    if: github.ref_name == 'master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: libKriging/JLibKriging
+          token: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
+          ref: master
+
+      - name: Point deps/sources.toml at this libKriging commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
+        run: bash tools/update_sources.sh "${{ github.sha }}"
+
+      - name: Commit
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions - update sources"
+          git add --all
+          git commit -m "Update libKriging sources (${GITHUB_SHA::8})" || echo "No changes to commit"
+          git push
