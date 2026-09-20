@@ -330,14 +330,16 @@ own accuracy, unlike loosening the shared `--cg-tol`. See
 
 `results/*.csv` accumulate one file per machine over time (see the "one per
 machine" convention above) — `plot_comparison.py` reads all of them and
-renders a single interactive Plotly page: machine on the x-axis, a timing
-column (fit/logLik/predict, switchable via a dropdown) on a log-scale
-y-axis, one series per training-set size `n` (color + marker shape, since
-`n` is an ordered quantity — see the dataviz skill's `color-formula.md` for
-why that's a one-hue sequential ramp rather than eight arbitrary
-categorical colors). A second dropdown switches which `backend_key`
-(`iter-cuda`, `iter-metal`, `chol`, ...) is shown; legend clicks
-additionally isolate one `n` at a time within the current selection.
+renders a single interactive Plotly page: every (host, `backend_key`)
+combo — e.g. `Apple M4 · libKriging-Iterative-Metal` — as its own x-axis
+category, so host and engine are never split apart into a separate
+dropdown; all host-method-engine combinations are visible together. A
+timing column (fit/logLik/predict, switchable via a dropdown) sits on a
+log-scale y-axis, with one series per training-set size `n` (color +
+marker shape, since `n` is an ordered quantity — see the dataviz skill's
+`color-formula.md` for why that's a one-hue sequential ramp rather than
+eight arbitrary categorical colors). Legend clicks isolate one `n` at a
+time across every combo.
 
 Run by hand:
 
