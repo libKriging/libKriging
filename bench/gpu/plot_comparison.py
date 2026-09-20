@@ -4,17 +4,20 @@
 Reads every committed result file (one per machine/backend-build, see
 bench_gpu.sh's "one per machine" convention -- e.g.
 ``NVIDIA-H100-NVL__INTEL-XEON-PLATINUM-8558.csv``,
-``none__Apple-M4.csv``) and renders a single interactive Plotly HTML page:
-every (host, backend/engine) combination on the x-axis -- machine and
-backend are NOT split across a dropdown, they are both part of the same
-axis category, so all host-method-engine combos are visible together -- a
-chosen timing column on the y-axis (log scale -- these span 3+ orders of
-magnitude), one trace per training-set size `n` (color + marker shape both
-carry `n`, since it is an ORDERED quantity, not an arbitrary category --
-see the dataviz skill's color-formula.md). A dropdown switches the timing
-column (fit/logLik/predict); legend clicks (single = toggle, double =
-isolate) group/isolate one `n` at a time across every combo, which is the
-"groupable" behavior asked for.
+``none__Apple-M4.csv``) and renders a single interactive Plotly HTML page
+for the libKriging backends only (GPyTorch rows are dropped -- this chart
+is about comparing libKriging's own backends across machines, not
+libKriging vs. GPyTorch, which already has its own comparison in
+`docs/comparisons/`). Machine is the x-axis -- every backend that ran on a
+machine sits at that machine's x position, e.g. `iter-omp` and `chol` on
+the same CPU-only host both plot at that host's tick -- with color
+carrying the backend/engine (a categorical identity: fixed hue order, see
+color-formula.md) and marker shape carrying the training-set size `n` (an
+ORDERED quantity). Two legends show both encodings: a static backend
+color key, and an `n` shape key whose clicks isolate one `n` at a time
+across every machine and backend -- the "groupable" behavior asked for. A
+dropdown switches the timing column (fit/logLik/predict), log-scale
+y-axis (these span 3+ orders of magnitude).
 
 Standalone: no dependency on the rest of libKriging beyond `plotly`. Run by
 hand (`python bench/gpu/plot_comparison.py`) or from CI
@@ -30,16 +33,23 @@ import os
 import plotly.graph_objects as go
 
 # --- dataviz skill's reference palette (references/palette.md) -----------
-# n is an ORDERED quantity (250 < 500 < ... < 32000), not an arbitrary
-# category, so it takes the sequential single-hue ramp (blue, light->dark),
-# not eight categorical hues -- see color-formula.md's categorical-vs-
-# ordinal rule. Steps 250..700 (skipping the too-light 100/150/200 steps,
-# which the ordinal-ramp rule reserves for the near-surface "zero" end of a
-# true sequential/heatmap encoding).
-SEQUENTIAL_BLUE = [
-    "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6",
-    "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b",
+# backend/engine is a CATEGORY (identity, no order), so it gets the fixed
+# 8-hue categorical order -- assigned once per key below, never re-ranked
+# by what happens to be present in a given results/ snapshot (anti-
+# patterns.md: "color follows the entity, never its rank").
+CATEGORICAL = [
+    "#2a78d6",  # 1 blue
+    "#eb6834",  # 2 orange
+    "#1baf7a",  # 3 aqua
+    "#eda100",  # 4 yellow
+    "#e87ba4",  # 5 magenta
+    "#008300",  # 6 green
+    "#4a3aa7",  # 7 violet
+    "#e34948",  # 8 red
 ]
+# n IS an ORDERED quantity (250 < 500 < ... < 32000), so it carries marker
+# SHAPE only here (color is spoken for by backend) -- color-formula.md's
+# categorical-vs-ordinal rule.
 MARKER_SYMBOLS = [
     "circle", "square", "diamond", "triangle-up", "triangle-down",
     "star", "hexagon", "cross", "x", "pentagon",
@@ -57,15 +67,13 @@ BACKEND_LABELS = {
     "iter-hip": "libKriging-Iterative-HIP",
     "iter-metal": "libKriging-Iterative-Metal",
     "iter-omp": "libKriging-Iterative-OpenMP",
-    "gpt-cuda": "GPyTorch-BBMM-CUDA",
-    "gpt-cpu": "GPyTorch-BBMM-CPU",
-    "gpt-chol-cuda": "GPyTorch-Cholesky-CUDA",
-    "gpt-chol-cpu": "GPyTorch-Cholesky-CPU",
 }
-# Ordering of the backend/engine part of each x-axis combo -- the backends
-# this session's work (and most bench/gpu runs) actually cares about
-# comparing come first.
+# Fixed categorical-color assignment, in priority order -- the same
+# backend always gets the same color regardless of which subset of
+# machines/backends a given results/ snapshot happens to contain.
 BACKEND_PRIORITY = ["iter-cuda", "iter-hip", "iter-metal", "iter-omp", "chol"]
+BACKEND_COLOR = {bk: CATEGORICAL[i % len(CATEGORICAL)] for i, bk in enumerate(BACKEND_PRIORITY)}
+GPYTORCH_PREFIX = "gpt"
 
 
 def machine_label(csv_path: str) -> str:
@@ -90,6 +98,8 @@ def load_rows(results_dir: str):
             for row in csv.DictReader(f):
                 if row.get("status") != "ok":
                     continue
+                if row.get("backend_key", "").startswith(GPYTORCH_PREFIX):
+                    continue
                 try:
                     n = int(row["n"])
                     metrics = {key: float(row[key]) for key, _ in METRICS}
@@ -105,71 +115,89 @@ def build_figure(rows):
     def backend_rank(bk):
         return (BACKEND_PRIORITY.index(bk) if bk in BACKEND_PRIORITY else 99, bk)
 
-    # One x-axis category per (machine, backend_key) combo -- host and
-    # engine are NOT split across a dropdown, both live on the same axis so
-    # every host-method-engine combination is visible at once. Grouped by
-    # machine first (so a machine's backends sit together), backend priority
-    # second.
-    combos = sorted(
-        {(r["machine"], r["backend_key"]) for r in rows},
-        key=lambda mb: (mb[0], backend_rank(mb[1])),
-    )
-    combo_label = {
-        (m, bk): f"{m} · {BACKEND_LABELS.get(bk, bk)}" for m, bk in combos
-    }
-    xs_all = [combo_label[c] for c in combos]
+    machines = sorted({r["machine"] for r in rows})
+    backend_keys = sorted({r["backend_key"] for r in rows}, key=backend_rank)
+    symbol_of = {n: MARKER_SYMBOLS[i % len(MARKER_SYMBOLS)] for i, n in enumerate(ns)}
+    color_of = {bk: BACKEND_COLOR.get(bk, "#898781") for bk in backend_keys}
 
-    # One trace per `n`, spanning every combo on the x-axis. Color/symbol
-    # depend only on `n` (color-formula.md: "color follows the entity, never
-    # its rank"), so there is nothing left to repaint when the metric changes.
+    # One data trace per (backend, n), spanning every machine on the
+    # x-axis -- color carries backend (categorical identity), shape carries
+    # n (ordered). Both are real, groupable encodings, but only one trace
+    # per pair can own a legend entry without flooding it (backends x n
+    # could be 40+ entries) -- so these stay out of the legend
+    # (showlegend=False) and share a legendgroup with the *shape* proxy
+    # below, which is what makes "isolate one n" toggle them all at once.
     traces = []
-    for i, n in enumerate(ns):
-        xs, ys_by_metric = [], {key: [] for key, _ in METRICS}
-        for m, bk in combos:
-            match = next((r for r in rows if r["machine"] == m and r["backend_key"] == bk and r["n"] == n), None)
-            if match is None:
+    for bk in backend_keys:
+        for n in ns:
+            xs, ys_by_metric = [], {key: [] for key, _ in METRICS}
+            for m in machines:
+                match = next((r for r in rows if r["machine"] == m and r["backend_key"] == bk and r["n"] == n), None)
+                if match is None:
+                    continue
+                xs.append(m)
+                for key, _ in METRICS:
+                    ys_by_metric[key].append(match[key])
+            if not xs:
                 continue
-            xs.append(combo_label[(m, bk)])
-            for key, _ in METRICS:
-                ys_by_metric[key].append(match[key])
-        if not xs:
-            continue
-        color = SEQUENTIAL_BLUE[i % len(SEQUENTIAL_BLUE)]
-        symbol = MARKER_SYMBOLS[i % len(MARKER_SYMBOLS)]
+            traces.append(go.Scatter(
+                x=xs,
+                y=ys_by_metric[METRICS[0][0]],
+                mode="markers",
+                name=f"{BACKEND_LABELS.get(bk, bk)} / n={n}",
+                legendgroup=f"n={n}",
+                showlegend=False,
+                marker=dict(color=color_of[bk], symbol=symbol_of[n], size=11, line=dict(width=1, color="#ffffff")),
+                hovertemplate="%{x}<br>" + BACKEND_LABELS.get(bk, bk) + "<br>n=" + str(n)
+                              + "<br>%{y:.3g}s<extra></extra>",
+                meta=dict(ys=ys_by_metric),
+            ))
+
+    # --- legend 1: backend color key (a static color identity, not an
+    # interactive filter -- the one groupable/isolatable axis is n, below;
+    # see the module docstring) ------------------------------------------
+    for bk in backend_keys:
         traces.append(go.Scatter(
-            x=xs,
-            y=ys_by_metric[METRICS[0][0]],
-            mode="markers",
-            name=f"n={n}",
+            x=[None], y=[None], mode="markers", name=BACKEND_LABELS.get(bk, bk),
+            marker=dict(color=color_of[bk], symbol="circle", size=11, line=dict(width=1, color="#ffffff")),
+            showlegend=True, hoverinfo="skip",
+        ))
+
+    # --- legend 2: n shape key (click isolates one n, across every
+    # machine and backend) ----------------------------------------------
+    for n in ns:
+        traces.append(go.Scatter(
+            x=[None], y=[None], mode="markers", name=f"n={n}",
             legendgroup=f"n={n}",
-            marker=dict(color=color, symbol=symbol, size=11, line=dict(width=1, color="#ffffff")),
-            hovertemplate="%{x}<br>n=" + str(n) + "<br>%{y:.3g}s<extra></extra>",
-            meta=dict(n=n, ys=ys_by_metric),
+            marker=dict(color="#898781", symbol=symbol_of[n], size=11, line=dict(width=1, color="#ffffff")),
+            showlegend=True, hoverinfo="skip", legend="legend2",
         ))
 
     fig = go.Figure(data=traces)
 
-    # --- metric dropdown: restyles every trace's `y` -----------------
+    # --- metric dropdown: restyles every trace's `y` (proxy legend
+    # entries have no `meta` / real y, so leave them untouched) ----------
     metric_buttons = []
     for key, label in METRICS:
+        ys = [t.meta["ys"][key] if t.meta else t.y for t in fig.data]
         metric_buttons.append(dict(
             label=label,
             method="restyle",
-            args=[{"y": [t.meta["ys"][key] for t in traces]},
-                  {"yaxis.title.text": label}],
+            args=[{"y": ys}, {"yaxis.title.text": label}],
         ))
 
     fig.update_layout(
         template="plotly_white",
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
         title=dict(text="libKriging iterative backend -- cross-machine comparison", x=0.02, xanchor="left"),
-        xaxis=dict(title="host · method/engine", categoryorder="array", categoryarray=xs_all,
+        xaxis=dict(title="machine", categoryorder="array", categoryarray=machines,
                    tickangle=-20, gridcolor="#e1e0d9", linecolor="#c3c2b7"),
         yaxis=dict(title=METRICS[0][1], type="log", gridcolor="#e1e0d9", linecolor="#c3c2b7"),
-        legend=dict(title="n (click to isolate)", bgcolor="rgba(0,0,0,0)"),
+        legend=dict(title="backend (click to toggle)", bgcolor="rgba(0,0,0,0)", x=1.02, y=1.0, yanchor="top"),
+        legend2=dict(title="n (click to isolate)", bgcolor="rgba(0,0,0,0)", x=1.02, y=0.55, yanchor="top"),
         plot_bgcolor="#fcfcfb",
         paper_bgcolor="#fcfcfb",
-        margin=dict(t=90, b=160),
+        margin=dict(t=90, b=120, r=180),
         updatemenus=[
             dict(buttons=metric_buttons, direction="down", x=0.0, xanchor="left", y=1.15, yanchor="top",
                 showactive=True, pad=dict(r=8, t=4)),
