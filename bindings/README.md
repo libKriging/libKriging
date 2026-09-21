@@ -55,6 +55,28 @@ This document lists all methods exposed by each language binding for accessing t
 | `noise_model` | `kriging_noise_model(obj)` | `obj$noise_model()` | `obj.noise_model()` | `noise_model(obj)` | `noise_model(obj)` |
 | `nugget` / `is_nugget_estim` | `kriging_nugget(obj)` / `kriging_is_nugget_estim(obj)` | `obj$nugget()` / `obj$is_nugget_estim()` | `obj.nugget()` / `obj.is_nugget_estim()` | `nugget(obj)` / `is_nugget_estim(obj)` | `nugget(obj)` / `is_nugget_estim(obj)` |
 | `noise` | `kriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
+| `nystrom_rank` | `kriging_nystrom_rank(obj)` | `obj$nystrom_rank()` | `obj.nystrom_rank()` | `nystrom_rank(obj)` | `nystrom_rank(obj)` |
+| **Pre-fit data reduction** | | | | | |
+| `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
+
+`subsetOfData` picks `n_max` representative rows of `X` (`method="kmeans"`, default: k-means centroids snapped to the
+nearest real observation; or `"random"`) to fit on a reduced design; see [docs/math/SubsetOfData.md](../docs/math/SubsetOfData.md).
+It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and Octave/Matlab**; the Python result is an
+`(n_max, 1)` integer array. Keep the matching `y` entries.
+
+### Fit objectives
+
+`Kriging` accepts `objective` = `"LL"` (default), `"LOO"`, `"LMP"`, and the two large-`n` approximations
+`"LLVecchia"` / `"LLVecchia(m)"` (Vecchia, see [docs/math/Vecchia.md](../docs/math/Vecchia.md)) and `"LLNystrom"` /
+`"LLNystrom(k)"` (Nystrom low-rank, see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). `nystrom_rank()` returns the
+rank `k` of a `LLNystrom` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
+longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
+only.
+
+> **C++ only**: the following `Kriging` methods are not exposed by any binding: `predictVecchia`, `predictNystrom`,
+> `simulateNystrom`, `set_vecchia_exact_commit` / `vecchia_exact_commit` (the factorization-free "light" Vecchia mode),
+> `is_vecchia_light`, `vecchia_neighbors`, `is_nystrom_light`, `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun`.
+> From a binding, `predict` is the only prediction entry point.
 
 ---
 
@@ -78,6 +100,10 @@ This document lists all methods exposed by each language binding for accessing t
 | `warping` | `warpKriging_warping(obj)` | `obj$warping()` | `obj.warping()` | `warping(obj)` | `warping(obj)` |
 | `feature_dim` | `warpKriging_featureDim(obj)` | `obj$featureDim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
 | `is_fitted` | `warpKriging_isFitted(obj)` | `obj$isFitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
+| `optim` / `objective` | `warpKriging_optim(obj)` / `warpKriging_objective(obj)` | `obj$optim()` / `obj$objective()` | `obj.optim()` / `obj.objective()` | `optim(obj)` / `objective(obj)` | `optim(obj)` / `objective(obj)` |
+| `noise` | `warpKriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
+| `warp_params` | `warpKriging_warpParams(obj)` | `obj$warp_params()` | `obj.warp_params()` | `warp_params(obj)` | `warp_params(obj)` |
+| Covariance matrix | `warpKriging_covMat(obj,X1,X2)` | `obj$covMat(X1,X2)` | `obj.covMat(X1,X2)` | `covMat(obj,X1,X2)` | `cov_mat(obj,X1,X2)` |
 | `X` / `y` | `warpKriging_X(obj)` / `warpKriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
 | `centerX` / `scaleX` | `warpKriging_centerX(obj)` / `warpKriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |
 | `centerY` / `scaleY` | `warpKriging_centerY(obj)` / `warpKriging_scaleY(obj)` | `obj$centerY()` / `obj$scaleY()` | `obj.centerY()` / `obj.scaleY()` | `centerY(obj)` / `scaleY(obj)` | `centerY(obj)` / `scaleY(obj)` |
@@ -85,6 +111,11 @@ This document lists all methods exposed by each language binding for accessing t
 | `regmodel` | `warpKriging_regmodel(obj)` | `obj$regmodel()` | `obj.regmodel()` | `regmodel(obj)` | `regmodel(obj)` |
 | `F`, `T`, `M`, `z` | `warpKriging_F(obj)`, … | `obj$F()`, … | `obj.F()`, … | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` | `F(obj)`, `T(obj)`, `M(obj)`, `z(obj)` |
 | `beta`, `theta`, `sigma2` | `warpKriging_beta(obj)`, … | `obj$beta()`, … | `obj.beta()`, … | `beta(obj)`, `theta(obj)`, `sigma2(obj)` | `beta(obj)`, `theta(obj)`, `sigma2(obj)` |
+
+> `WarpKriging` constructor / `fit` accept `noise=` as a per-observation variance vector (there is no `"nugget"` mode),
+> and `parameters=` with numeric `theta`, `warp_params` and `noise` seeds; with `optim="none"` they freeze the
+> hyper-parameters. `update` and `update_simulate` accept `noise_u=` (variances of the new points) when the model was
+> fitted with noise. `WarpKriging` always fits with `objective="LL"`.
 
 ---
 
@@ -139,6 +170,23 @@ This document lists all methods exposed by each language binding for accessing t
 | `set_warp_subsample` | — | — | `obj.set_warp_subsample(m)` | — | — |
 
 > No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
+
+---
+
+## Python: scikit-learn estimators
+
+`pylibkriging.sklearn` (`pip install pylibkriging[sklearn]`) wraps each class as a scikit-learn regressor implementing
+`fit` / `predict`, `get_params` / `set_params` and `clone`, so it works in `Pipeline`, `GridSearchCV` and
+`cross_val_score`:
+
+| Estimator | Wraps |
+|---|---|
+| `KrigingRegressor` | `Kriging` |
+| `WarpKrigingRegressor` | `WarpKriging` |
+| `MLPKrigingRegressor` | `MLPKriging` |
+| `NestedKrigingRegressor` | `NestedKriging` |
+
+See [bindings/Python/README.md](Python/README.md#scikit-learn-compatible-estimators) for an example.
 
 ---
 
