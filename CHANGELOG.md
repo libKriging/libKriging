@@ -11,6 +11,12 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-22
+
+Documentation, packaging and release-process consolidation: no change to the
+C++ core and no numerical change. Julia is now installed through
+JLibKriging.jl.
+
 ### Changed
 - Julia: the installable, registered Julia package is now
   [JLibKriging](https://github.com/libKriging/JLibKriging.jl), which builds
@@ -19,12 +25,49 @@ past release, see the corresponding entry on the
   binding itself stays in `bindings/Julia/jlibkriging`. Registration on the
   General registry moves out of `release-julia.yml`, which only tests the
   binding on release tags now (`jlibkriging` had been rejected by the registry's
-  naming and licence guidelines).
+  naming and licence guidelines). The README and the Julia binding pages now
+  document this install path (`Pkg.add(url=...)` until the package is on the
+  General registry).
+- Python: the PyPI project page now shows the package README instead of a
+  one-line description, and the `sklearn` extra that `pylibkriging.sklearn`
+  asks users to install now exists (`pip install pylibkriging[sklearn]`). A
+  `multifidelity` extra, added by mistake with the scikit-learn estimators and
+  pointing at a module that does not exist, is removed.
+- Benchmarks: the C++ benchmark report and executables name the noise model
+  (`Kriging (nugget)`, `Kriging (heterogeneous noise)`) instead of the
+  `NuggetKriging` / `NoiseKriging` classes merged into `Kriging` before 1.0.
 
 ### Documentation
-- The README still advertised `objective="VLL(m)"`, which was renamed
-  `LLVecchia(m)` in 1.2.0 and now raises; it also lists `LLNystrom(k)`. If you
-  are coming from 1.1.x, see the *Breaking* entry of 1.2.0 for the migration.
+- The README advertised `objective="VLL(m)"`, which was renamed
+  `LLVecchia(m)` in 1.2.0 and now raises; it lists `LLVecchia(m)` and
+  `LLNystrom(k)`. If you are coming from 1.1.x, see the *Breaking* entry of
+  1.2.0 for the migration.
+- The method reference (`bindings/README.md`) documents the 1.2 API:
+  `subsetOfData` (whose indices are 0-based in Python and Julia, 1-based in R
+  and Octave/Matlab), `nystrom_rank`, the objectives, the `WarpKriging`
+  accessors and the scikit-learn estimators, and lists the Vecchia / Nystrom
+  methods that are C++-only (`predictVecchia`, `predictNystrom`,
+  `simulateNystrom`, `set_vecchia_exact_commit`), which `docs/math` did not say.
+  All 58 binding notebooks are now linked, and `docs/math` and
+  `docs/comparisons` have index pages.
+- The libkriging skill and its per-language references were wrong for
+  `WarpKriging`: it always fits with `"LL"` (any `objective` is ignored, so the
+  Vecchia / Nystrom objectives apply to `Kriging` only) and has no
+  `noise="nugget"` mode. They now cover `subsetOfData`, `nystrom_rank` and the
+  scikit-learn estimators.
+- README: complete list of input warpings, large-design methods, tested
+  platforms taken from the CI configuration, and install links that were frozen
+  on 0.x releases; same for `CITATION.cff`. The Nystrom, k-means and
+  distributed-GP references and the `USE_JEMALLOC` CMake option were missing
+  from `docs/dev`. The `pylibkriging` README is rewritten.
+
+### CI/Release process
+- `tools/release/check_versions.py` checks that `cmake/version.cmake`,
+  `CITATION.cff`, `.claude-plugin/plugin.json`, `jlibkriging/Project.toml`,
+  `rlibkriging/DESCRIPTION` and the changelog agree on the version and on the
+  release date. It runs on every push and in the six release workflows, which
+  used to compare the tag with `major.minor` of `cmake/version.cmake` only.
+- `RELEASE.md` describes the release procedure.
 
 ## [1.2.1] - 2026-09-19
 
@@ -210,6 +253,7 @@ past release, see the corresponding entry on the
 
 | Version | Date | Notes |
 |:--------|:-----|:------|
+| [1.2.2](https://github.com/libKriging/libKriging/releases/tag/v1.2.2) | 2026-09-22 | Julia installs through JLibKriging.jl; documentation, PyPI page and release-process consolidation (version consistency check, `RELEASE.md`); no API or numerical change. |
 | [1.2.1](https://github.com/libKriging/libKriging/releases/tag/v1.2.1) | 2026-09-19 | Julia registration fix (version metadata); otherwise identical to 1.2.0. |
 | [1.2.0](https://github.com/libKriging/libKriging/releases/tag/v1.2.0) | 2026-09-19 | `LLNystrom` objective; scikit-learn estimators; `subsetOfData`; NumPy 2; WarpKriging binding parity and gradient/input-range fixes; `predict` derivative fix under `normalize`; Windows/Python heap-corruption fix; lazy `R^-1` (faster `update`). |
 | [1.1.0](https://github.com/libKriging/libKriging/releases/tag/v1.1.0) | 2026-07-08 | NestedKriging for large designs; Vecchia VLL objective; fork/threads, Windows CI and TSan fixes; docs & licensing review. |
@@ -236,7 +280,8 @@ past release, see the corresponding entry on the
 | [0.4.2](https://github.com/libKriging/libKriging/releases/tag/v0.4.2) | 2021-06-01 | |
 | [0.4.1](https://github.com/libKriging/libKriging/releases/tag/v0.4.1) | 2021-05-31 | First public pre-releases. |
 
-[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.2.1...master
+[Unreleased]: https://github.com/libKriging/libKriging/compare/v1.2.2...master
+[1.2.2]: https://github.com/libKriging/libKriging/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/libKriging/libKriging/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/libKriging/libKriging/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/libKriging/libKriging/compare/v1.0.0...v1.1.0
