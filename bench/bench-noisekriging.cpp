@@ -200,7 +200,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "NoiseKriging Benchmark (BFGS, LL objective)" << std::endl;
+  std::cout << "Kriging (heterogeneous noise) Benchmark (BFGS, LL objective)" << std::endl;
 
   // Parse command line arguments
   // Usage: bench-noisekriging [iterations] [n] [d]

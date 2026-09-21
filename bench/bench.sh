@@ -20,8 +20,8 @@
 #   ./bench.sh --clean iterations=20              # Clean rebuild, n=100 d=4 iterations=20 kriging
 #   ./bench.sh n=50 d=2                          # n=50 d=2 iterations=10 kriging
 #   ./bench.sh iterations=5 n=1000 d=4 fit       # Only fit operation
-#   ./bench.sh nuggetkriging                      # NuggetKriging benchmark
-#   ./bench.sh noisekriging iterations=15 predict # NoiseKriging predict only
+#   ./bench.sh nuggetkriging                      # Kriging with a nugget (NoiseModel::Nugget)
+#   ./bench.sh noisekriging iterations=15 predict # Kriging with heterogeneous noise, predict only
 #   ./bench.sh warpkriging                        # All WarpKriging warpings
 #   ./bench.sh warpkriging warping=affine         # Only affine warping
 #   ./bench.sh warpkriging n=30 iterations=5      # WarpKriging with custom n

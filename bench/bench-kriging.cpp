@@ -196,7 +196,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "Kriging Benchmark (BFGS, LL objective)" << std::endl;
+  std::cout << "Kriging (no noise) Benchmark (BFGS, LL objective)" << std::endl;
 
   // Parse command line arguments
   // Usage: bench-kriging [iterations] [n] [d]
