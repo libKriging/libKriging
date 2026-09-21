@@ -88,6 +88,23 @@ correct — this is an optimization-landscape issue, not a code bug). `tanh`
 is smooth everywhere and a safer default recommendation unless the user
 specifically wants SELU's less-saturating behavior for deep/wide MLPs.
 
+## Large designs
+
+```python
+# Pre-fit reduction: keep n_max representative rows (k-means centroids snapped
+# to real observations). Returns 0-based row indices, shape (n_max, 1).
+idx = lk.Kriging.subsetOfData(X, n_max=2000, method="kmeans", seed=123).ravel()
+model = lk.Kriging(y[idx], X[idx], "matern5_2")
+
+# Or keep every point and approximate the objective (noise-free Kriging only)
+model = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(30)")   # d <~ 5
+model = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(50)")   # higher d
+model.nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
+```
+`predict` is the only prediction entry point from Python: `predictVecchia`,
+`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+Vecchia mode) exist in C++ only.
+
 ## NestedKriging
 
 ```python
@@ -106,6 +123,19 @@ mean, stdev = model.predict(Xnew, return_stdev=True)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
 `normalize=`, no `save()`/`load()` yet on `NestedKriging`.
+
+## scikit-learn estimators
+
+```python
+# pip install pylibkriging[sklearn]
+from pylibkriging.sklearn import KrigingRegressor   # also WarpKrigingRegressor,
+                                                    # MLPKrigingRegressor, NestedKrigingRegressor
+est = KrigingRegressor(kernel="matern5_2").fit(X, y)   # sklearn order: (X, y)
+mean, std = est.predict(Xnew, return_std=True)         # return_std and return_cov are exclusive
+```
+Constructor parameters mirror the `Kriging` ones (`regmodel`, `normalize`,
+`optim`, `objective`, `noise`, `parameters`), so `get_params` / `set_params` /
+`clone`, `Pipeline` and `GridSearchCV` work as for any scikit-learn regressor.
 
 ## Loading a saved model
 

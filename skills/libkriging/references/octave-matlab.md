@@ -59,6 +59,23 @@ looks unstable — SELU's kink at `z = 0` can make the likelihood surface
 locally jagged for a gradient-based optimizer (the gradient itself is
 correct; this is an optimization-landscape issue, not a bug).
 
+## Large designs
+
+```matlab
+% Pre-fit reduction: keep n_max representative rows (k-means centroids snapped
+% to real observations). Returns 1-based row indices (column vector).
+idx = Kriging.subsetOfData(X, int32(2000), "kmeans", int32(123));
+k = Kriging(y(idx), X(idx, :), "matern5_2");
+
+% Or keep every point and approximate the objective (noise-free Kriging only)
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");   % d <~ 5
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % higher d
+k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
+```
+`predict` is the only prediction entry point from Octave/MATLAB:
+`predictVecchia`, `predictNystrom`, `simulateNystrom` and
+`set_vecchia_exact_commit` (the "light" Vecchia mode) exist in C++ only.
+
 ## NestedKriging
 
 ```matlab

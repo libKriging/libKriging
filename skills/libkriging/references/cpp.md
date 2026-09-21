@@ -59,6 +59,20 @@ auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);
 arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);
 ```
 
+Pre-fit reduction and accessors:
+```cpp
+// n_max representative rows (k-means centroids snapped to real observations);
+// returns sorted 0-based row indices.
+arma::uvec idx = Kriging::subsetOfData(X, /*n_max=*/2000, /*method=*/"kmeans", /*seed=*/123);
+Kriging small(y.elem(idx), X.rows(idx), "matern5_2");
+
+model.nystrom_rank();   // rank k of an LLNystrom fit, 0 otherwise
+model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
+// Factorization-free "light" Vecchia mode: call BEFORE fit(..., "LLVecchia(m)");
+// predict() then routes to predictVecchia (no cov/deriv, simulate, update or save).
+model.set_vecchia_exact_commit(false);
+```
+
 ## WarpKriging
 
 ```cpp

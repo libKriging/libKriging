@@ -4,6 +4,9 @@
 using jlibkriging
 ```
 
+Installed through [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl) (the packaged form of this binding),
+the module is `JLibKriging` with the same API: `using JLibKriging`.
+
 See `SKILL.md` in this directory for *which* class/options to pick; this
 file gives the exact call syntax. `X::Matrix{Float64}` is `n × d` (rows =
 observations), `y::Vector{Float64}` length `n`.
@@ -67,6 +70,23 @@ looks unstable: SELU has a non-smooth kink at `z=0` that can make the
 likelihood surface locally jagged for a gradient-based optimizer (the
 analytic gradient itself is correct — this is an optimization-landscape
 issue, not a bug).
+
+## Large designs
+
+```julia
+# Pre-fit reduction: keep n_max representative rows (k-means centroids snapped
+# to real observations). Returns 0-based row indices (Vector{Int}): add 1.
+idx = subsetOfData(X, 2000; method="kmeans", seed=123) .+ 1
+k = Kriging(y[idx], X[idx, :], "matern5_2")
+
+# Or keep every point and approximate the objective (noise-free Kriging only)
+k = Kriging(y, X, "matern5_2"; objective="LLVecchia(30)")   # d <~ 5
+k = Kriging(y, X, "matern5_2"; objective="LLNystrom(50)")   # higher d
+nystrom_rank(k)   # 50 (0 if the model was not fitted with LLNystrom)
+```
+`predict` is the only prediction entry point from Julia: `predictVecchia`,
+`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+Vecchia mode) exist in C++ only.
 
 ## NestedKriging
 
