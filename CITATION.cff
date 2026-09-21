@@ -3,9 +3,11 @@ message: "If you use this software, please cite it using these metadata."
 title: "libKriging: a C++ library for Kriging / Gaussian process regression"
 abstract: >-
   libKriging provides most standard Kriging / Gaussian process features (fit,
-  prediction, simulation, update) and many input warpings (boxcox, kumaraswamy,
-  knots, mlp, categorical, ordinal), with bindings for Python, R, Octave, Matlab
-  and Julia.
+  prediction, simulation, update) and many input warpings (affine, boxcox,
+  kumaraswamy, neural_mono, knots, mlp, mlp_joint, categorical, ordinal), with
+  scalable variants for large designs (NestedKriging, Vecchia and Nystrom
+  approximations, subset of data) and bindings for Python, R, Octave, Matlab and
+  Julia.
 type: software
 authors:
   - given-names: Yann
