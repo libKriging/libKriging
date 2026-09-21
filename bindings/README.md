@@ -201,3 +201,31 @@ See [bindings/Python/README.md](Python/README.md#scikit-learn-compatible-estimat
 | Load MLPKriging | `mlpkriging_load(file)` / `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `MLPKriging.load(file)` | `load_mlp_kriging(file)` |
 
 ---
+
+---
+
+## Worked notebooks
+
+Each notebook fits the Branin 2D function with one class or option, in each language.
+
+| Example | Python | R | Julia | Octave |
+|---|---|---|---|---|
+| `Kriging` | [Python](Python/kriging_branin2d_py.ipynb) | [R](R/kriging_branin2d_r.ipynb) | [Julia](Julia/kriging_branin2d_julia.ipynb) | [Octave](Octave/kriging_branin2d_octave.ipynb) |
+| `Kriging` with `objective="LLVecchia(m)"` | [Python](Python/kriging_vecchia_branin2d_py.ipynb) | [R](R/kriging_vecchia_branin2d_r.ipynb) | [Julia](Julia/kriging_vecchia_branin2d_julia.ipynb) | [Octave](Octave/kriging_vecchia_branin2d_octave.ipynb) |
+| `NestedKriging` | [Python](Python/nestedkriging_branin2d_py.ipynb) | [R](R/nestedkriging_branin2d_r.ipynb) | [Julia](Julia/nestedkriging_branin2d_julia.ipynb) | [Octave](Octave/nestedkriging_branin2d_octave.ipynb) |
+| `Kriging` with an estimated nugget (`noise="nugget"`) | [Python](Python/nuggetkriging_branin2d_py.ipynb) | [R](R/nuggetkriging_branin2d_r.ipynb) | [Julia](Julia/nuggetkriging_branin2d_julia.ipynb) | — |
+| `Kriging` with known noise variances (`noise=` vector) | [Python](Python/noisekriging_branin2d_py.ipynb) | [R](R/noisekriging_branin2d_r.ipynb) | [Julia](Julia/noisekriging_branin2d_julia.ipynb) | — |
+| `MLPKriging` | [Python](Python/mlpkriging_branin2d_py.ipynb) | [R](R/mlpkriging_branin2d_r.ipynb) | [Julia](Julia/mlpkriging_branin2d_julia.ipynb) | [Octave](Octave/mlpkriging_branin2d_octave.ipynb) |
+| `WarpKriging`, `none` warping | [Python](Python/warpkriging_none_branin2d_py.ipynb) | [R](R/warpkriging_none_branin2d_r.ipynb) | [Julia](Julia/warpkriging_none_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_none_branin2d_octave.ipynb) |
+| `WarpKriging`, `affine` warping | [Python](Python/warpkriging_affine_branin2d_py.ipynb) | [R](R/warpkriging_affine_branin2d_r.ipynb) | [Julia](Julia/warpkriging_affine_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_affine_branin2d_octave.ipynb) |
+| `WarpKriging`, `boxcox` warping | [Python](Python/warpkriging_boxcox_branin2d_py.ipynb) | [R](R/warpkriging_boxcox_branin2d_r.ipynb) | [Julia](Julia/warpkriging_boxcox_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_boxcox_branin2d_octave.ipynb) |
+| `WarpKriging`, `kumaraswamy` warping | [Python](Python/warpkriging_kumaraswamy_branin2d_py.ipynb) | [R](R/warpkriging_kumaraswamy_branin2d_r.ipynb) | [Julia](Julia/warpkriging_kumaraswamy_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_kumaraswamy_branin2d_octave.ipynb) |
+| `WarpKriging`, `neural_mono` warping | [Python](Python/warpkriging_neural_mono_branin2d_py.ipynb) | [R](R/warpkriging_neural_mono_branin2d_r.ipynb) | [Julia](Julia/warpkriging_neural_mono_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_neural_mono_branin2d_octave.ipynb) |
+| `WarpKriging`, `knots` warping | [Python](Python/warpkriging_knots_branin2d_py.ipynb) | [R](R/warpkriging_knots_branin2d_r.ipynb) | [Julia](Julia/warpkriging_knots_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_knots_branin2d_octave.ipynb) |
+| `WarpKriging`, `mlp` warping | [Python](Python/warpkriging_mlp_branin2d_py.ipynb) | [R](R/warpkriging_mlp_branin2d_r.ipynb) | [Julia](Julia/warpkriging_mlp_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_mlp_branin2d_octave.ipynb) |
+| `WarpKriging`, `categorical` warping | [Python](Python/warpkriging_categorical_branin2d_py.ipynb) | [R](R/warpkriging_categorical_branin2d_r.ipynb) | [Julia](Julia/warpkriging_categorical_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_categorical_branin2d_octave.ipynb) |
+| `WarpKriging`, `ordinal` warping | [Python](Python/warpkriging_ordinal_branin2d_py.ipynb) | [R](R/warpkriging_ordinal_branin2d_r.ipynb) | [Julia](Julia/warpkriging_ordinal_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_ordinal_branin2d_octave.ipynb) |
+
+The `nuggetkriging_*` and `noisekriging_*` notebooks keep the names of the classes that were merged into `Kriging`; they
+use `Kriging` with `noise=`. Other notebooks: [docs/math](../docs/math) (large-design methods against exact Cholesky) and
+[docs/comparisons](../docs/comparisons) (other packages).

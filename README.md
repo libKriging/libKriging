@@ -582,8 +582,9 @@ python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 
 ## Documentation
 
-* Per-language API: [bindings/README.md](bindings/README.md).
-* Mathematical background (Vecchia, NestedKriging, update/simulate, each input warping): [docs/math](docs/math).
+* Per-language API and worked notebooks: [bindings/README.md](bindings/README.md).
+* Mathematical background (models, objectives, large-design methods, update/simulate, each input warping): [docs/math](docs/math).
+* Comparisons with other Kriging / Gaussian process packages (scikit-learn, GPy, GPflow, GPyTorch, SMT, OpenTURNS, DiceKriging, RobustGaSP, GaussianProcesses.jl, STK): [docs/comparisons](docs/comparisons).
 * Developer documentation: [docs/dev](docs/dev).
 * The C++ API reference (Doxygen) can be generated locally with `cmake --build . --target doc`.
 
