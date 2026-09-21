@@ -41,7 +41,7 @@ jobs:
           git push
 
   update-jlibkriging:
-    # JLibKriging (Julia package) pins libKriging's sources in deps/sources.toml
+    # JLibKriging.jl (Julia package JLibKriging) pins libKriging's sources in deps/sources.toml
     # instead of using a git submodule (a registered Julia package is shipped
     # without submodules): refresh them on every push to master. Its own CI then
     # tests the result and registers the package if libKriging's version is new.
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: libKriging/JLibKriging
+          repository: libKriging/JLibKriging.jl
           token: ${{ secrets.SYNC_LIBKRIGING_SUBMODULE }}
           ref: master
 
