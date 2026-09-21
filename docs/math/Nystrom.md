@@ -96,7 +96,7 @@ Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, stdev = TRUE)
 ```
 
-## Current limitations (v1)
+## Current limitations
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - Landmarks are not serialized (rebuilt on refit).

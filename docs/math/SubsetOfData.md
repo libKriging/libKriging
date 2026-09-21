@@ -60,7 +60,7 @@ Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, stdev = TRUE)
 ```
 
-## Current limitations (v1)
+## Current limitations
 
 - Discards `n - n_max` points outright — no way to recover their
   information the way Vecchia/Nystrom/NestedKriging do (they all use

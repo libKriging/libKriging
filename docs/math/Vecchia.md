@@ -82,7 +82,7 @@ entirely: θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
 (mean/stdev only — `return_cov`/`return_deriv`, `simulate`, `update`
 and `save` raise a clear error on such a "light" model).
 
-## Current limitations (v1)
+## Current limitations
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - The default exact commit after optimization is still O(n³)
