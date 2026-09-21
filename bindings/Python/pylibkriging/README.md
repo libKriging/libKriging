@@ -37,8 +37,8 @@ sims = model.simulate(nsim=10, seed=123, X=x)  # shape (100, 10)
 
 Other classes: `WarpKriging` (input warpings, categorical / ordinal inputs), `MLPKriging`, `NestedKriging` (large
 designs), and scikit-learn compatible estimators in `pylibkriging.sklearn`. See the
-[method reference](../../README.md) for all bindings and the
-[main README](../../../README.md) for more examples.
+[method reference](https://github.com/libKriging/libKriging/blob/master/bindings/README.md) for all bindings and the
+[main README](https://github.com/libKriging/libKriging#readme) for more examples.
 
 ## Building from source
 
@@ -52,7 +52,7 @@ ENABLE_PYTHON_BINDING=on tools/linux-macos/test.sh
 ```
 
 or `python3 -m pip install .` from the repository root to build and install the wheel directly. See
-[bindings/Python/README.md](../README.md) for the Windows commands and the other options.
+[bindings/Python/README.md](https://github.com/libKriging/libKriging/blob/master/bindings/Python/README.md) for the Windows commands and the other options.
 
 To use a rebuilt module in a running interpreter:
 

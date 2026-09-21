@@ -49,6 +49,13 @@ def main():
         eprint("Dev/debug requirements are not satisfied")
         exit(1)
 
+    # PyPI project page: the package README (absolute links only: PyPI does not resolve relative ones)
+    readme = Path(__file__).absolute().parent / "README.md"
+    try:
+        long_description = readme.read_text(encoding="utf-8")
+    except OSError:
+        long_description = 'Python support for libKriging, the kriging library for performance and wide language support'
+
     setup(
         name='pylibkriging',
         packages=['pylibkriging'],
@@ -57,8 +64,8 @@ def main():
         author_email='hpwxf@haveneer.com',
         url="https://github.com/libKriging/libKriging",
         description='Python binding for LibKriging',
-        long_description='Python support for libKriging, the kriging library for performance and wide language support',
-        # long_description_content_type="text/markdown",
+        long_description=long_description,
+        long_description_content_type="text/markdown",
         ext_modules=[CMakeExtension('pylibkriging', sourcedir=".")],
         cmdclass=dict(build_ext=CMakeBuild),
         script_name='./bindings/Python/pylibkriging/setup.py',
