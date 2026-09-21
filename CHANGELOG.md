@@ -21,6 +21,11 @@ past release, see the corresponding entry on the
   binding on release tags now (`jlibkriging` had been rejected by the registry's
   naming and licence guidelines).
 
+### Documentation
+- The README still advertised `objective="VLL(m)"`, which was renamed
+  `LLVecchia(m)` in 1.2.0 and now raises; it also lists `LLNystrom(k)`. If you
+  are coming from 1.1.x, see the *Breaking* entry of 1.2.0 for the migration.
+
 ## [1.2.1] - 2026-09-19
 
 ### Fixed
@@ -72,6 +77,13 @@ past release, see the corresponding entry on the
   skill, installable through `/plugin marketplace add libKriging/libKriging`.
 
 ### Changed
+- **Breaking**: the Vecchia objective `"VLL"` / `"VLL(m)"` introduced in 1.1.0
+  is renamed `"LLVecchia"` / `"LLVecchia(m)"` (and the Nystrom objective is
+  spelled `"LLNystrom"` / `"LLNystrom(k)"`, never released under its former
+  `"LLNys"` name), in the C++ core, `NestedKriging` and all bindings. No alias
+  was kept: `objective="VLL(m)"` now raises `Unsupported fit objective`.
+  Migration: replace `"VLL"` by `"LLVecchia"` and `"VLL(m)"` by `"LLVecchia(m)"`
+  in your calls; results are unchanged (#346).
 - Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
   Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
   submodules, since both hardcode offsets into NumPy's C-API function table
