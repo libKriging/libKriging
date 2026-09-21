@@ -1,6 +1,6 @@
 {
   "name": "libkriging",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "libKriging usage guidance for Claude Code: which Kriging / Gaussian-process class and options to use, and the exact call syntax for the C++ core and the Python, R, Julia, Octave and MATLAB bindings.",
   "author": {
     "name": "libKriging contributors",
