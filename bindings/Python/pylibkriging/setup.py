@@ -76,6 +76,10 @@ def main():
         data_files=[('lib/site-packages/pylibkriging/shared_libs', extra_libs)],
         python_requires='>=3.7',
         install_requires=get_requirements("requirements.txt"),  # they should be in C++ build environment
+        extras_require={
+            # pylibkriging.sklearn (scikit-learn compatible estimators): `pip install pylibkriging[sklearn]`
+            'sklearn': ['scikit-learn'],
+        },
         zip_safe=False,
     )
 

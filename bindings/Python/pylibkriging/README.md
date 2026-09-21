@@ -36,7 +36,7 @@ sims = model.simulate(nsim=10, seed=123, X=x)  # shape (100, 10)
 ```
 
 Other classes: `WarpKriging` (input warpings, categorical / ordinal inputs), `MLPKriging`, `NestedKriging` (large
-designs), and scikit-learn compatible estimators in `pylibkriging.sklearn`. See the
+designs), and scikit-learn compatible estimators in `pylibkriging.sklearn` (`pip3 install pylibkriging[sklearn]`). See the
 [method reference](https://github.com/libKriging/libKriging/blob/master/bindings/README.md) for all bindings and the
 [main README](https://github.com/libKriging/libKriging#readme) for more examples.
 
