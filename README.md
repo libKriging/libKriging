@@ -290,21 +290,26 @@ Using the previous linked examples (in Python, R, Octave, Matlab or Julia), you 
 
 ## Tested installation
 
-with libKriging 0.9
+Continuous integration (`main.yml`, libKriging 1.2) builds and tests each binding on the following platforms:
 
 <!-- ✔ ⌛️ ✘ -->
 
-|        | Linux Ubuntu:22                             | macOS 14 (x86-64 & ARM)                     | Windows 10                                  |
+|        | Linux (Ubuntu 22.04)                        | macOS (latest runner)                       | Windows (latest runner)                     |
 |:-------|:--------------------------------------------|:--------------------------------------------|:--------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 |
-| R      | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  |
-| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 8.3      |
-| Matlab | <span style="color:green">️✔</span> R2022a   | <span style="color:green">✔</span> R2022*   | <span style="color:green">✔</span> R2022*   |
-| Julia  | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   |
+| Python | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> 3.7, 3.9 |
+| R      | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release |
+| Octave | <span style="color:green">✔</span> distribution package (6.x) | <span style="color:green">✔</span> Homebrew (latest) | <span style="color:green">✔</span> 9.2 |
+| Matlab | <span style="color:orange"><b>?</b></span> CI job disabled | no pre-built package or CI | no pre-built package or CI |
+| Julia  | <span style="color:green">✔</span> 1.x (latest stable) | <span style="color:green">✔</span> 1.x (latest stable) | <span style="color:green">✔</span> 1.x (latest stable) |
 
-* \* : no pre-built package or CI
+* <span style="color:orange"><b>?</b></span> : requires manual verification. The Matlab job needs a MathWorks license
+  token and has been disabled since v0.9.3; Matlab ≥ R2021 is supported by the code but not checked on each change.
 
-* <span style="color:orange"><b>?</b></span> : requires manual verification (not updated since previous release)
+* Pre-built Python wheels of the latest release: Linux x86-64, macOS (universal2) and Windows (x86-64) for
+  Python 3.9 to 3.12, plus Python 3.7 on Windows. Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
+  (MinGW-64). See [the releases page](https://github.com/libKriging/libKriging/releases).
+
+* Julia ≥ 1.10 is required.
 
 # Compilation
 
