@@ -13,7 +13,7 @@ past release, see the corresponding entry on the
 
 ### Changed
 - Julia: the installable, registered Julia package is now
-  [JLibKriging](https://github.com/libKriging/JLibKriging), which builds
+  [JLibKriging](https://github.com/libKriging/JLibKriging.jl), which builds
   libKriging from source at `Pkg.add` time (the way `rlibkriging` does for R)
   and follows libKriging `master` through `sync-as-submodule.yml`; the Julia
   binding itself stays in `bindings/Julia/jlibkriging`. Registration on the

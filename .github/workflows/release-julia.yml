@@ -3,7 +3,7 @@ name: libKriging release workflow (Julia binding)
 # Tests the Julia binding on every release tag.
 #
 # Registration on Julia's General registry no longer happens here: the
-# installable Julia package is JLibKriging (https://github.com/libKriging/JLibKriging),
+# installable Julia package is JLibKriging (https://github.com/libKriging/JLibKriging.jl),
 # which builds libKriging from source at install time and registers itself when
 # its CI passes on a push to its master (see that repository's README).
 
