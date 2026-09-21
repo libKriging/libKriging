@@ -138,7 +138,7 @@ This document lists all methods exposed by each language binding for accessing t
 | `set_predict_chunk` | — | — | `obj.set_predict_chunk(chunk)` | — | — |
 | `set_warp_subsample` | — | — | `obj.set_warp_subsample(m)` | — | — |
 
-> No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` (v1.1) — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
+> No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 
 ---
 

@@ -92,7 +92,7 @@ auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true);
 ```
 `Aggregation` is `PoE, gPoE, BCM, rBCM, NK` — see `SKILL.md` §3. Remember:
 `NK` requires `Trend::RegressionModel::Constant`; no `normalize`, no
-noise/nugget channel, no save/load yet (as of v1.1).
+noise/nugget channel, no save/load yet.
 
 ## Common pitfalls to flag in review
 

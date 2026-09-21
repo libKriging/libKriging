@@ -82,7 +82,7 @@ nk = NestedKriging(y, X, "matern5_2", 20;   # nb_groups
 predict(nk, Xnew; return_stdev=true)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging` (v1.1).
+`normalize=`, no save/load yet on `NestedKriging`.
 
 ## Common pitfalls to flag in review
 

@@ -105,7 +105,7 @@ model = lk.NestedKriging(
 mean, stdev = model.predict(Xnew, return_stdev=True)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
-`normalize=`, no `save()`/`load()` yet on `NestedKriging` (v1.1).
+`normalize=`, no `save()`/`load()` yet on `NestedKriging`.
 
 ## Loading a saved model
 
