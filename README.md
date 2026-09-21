@@ -7,7 +7,7 @@
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
-It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia approximated log-likelihood (`objective="VLL(m)"`, with local prediction and a factorization-free "light" mode).
+It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods.
 It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
 
 
@@ -21,7 +21,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 
 - **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), and `NestedKriging` for large designs.
 - **Covariance kernels**: `gauss`, `exp`, `matern3_2`, `matern5_2`.
-- **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the Vecchia approximated log-likelihood (`VLL(m)`).
+- **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the scalable approximations `LLVecchia(m)` (Vecchia) and `LLNystrom(k)` (Nystrom low-rank).
 - **Input warpings**: boxcox, kumaraswamy, knots, mlp, categorical, ordinal.
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
