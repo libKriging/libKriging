@@ -1,5 +1,21 @@
 # jlibkriging — Julia binding for libKriging
 
+## Install (users)
+
+Use the [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl) package, which builds libKriging from
+source at install time and follows libKriging `master`:
+
+```julia
+import Pkg
+Pkg.add(url="https://github.com/libKriging/JLibKriging.jl")
+# once registered on Julia's General registry: Pkg.add("JLibKriging")
+```
+
+then `using JLibKriging`. It is generated from the binding in this directory (module renamed, library path
+pointed at the build), so the API below is identical.
+
+The rest of this page is for **developing the binding** from a libKriging checkout (module `jlibkriging`).
+
 ## Prerequisites
 
 - Julia ≥ 1.10

@@ -35,7 +35,7 @@ Table of contents
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging  for R](#rlibkriging--for-r)
   - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
-  - [jlibkriging for Julia](#jlibkriging-for-julia)
+  - [JLibKriging for Julia](#jlibkriging-for-julia)
   - [Expected demo results](#expected-demo-results)
   - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
@@ -242,32 +242,27 @@ hold off;
 
 </details>
 
-## jlibkriging for Julia
+## JLibKriging for Julia
 
-The Julia binding requires building libKriging from source with `-DENABLE_JULIA_BINDING=ON`:
+The installable Julia package is [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl). Like
+`rlibkriging` for R, it builds libKriging from source at install time (a few minutes; needs a C++17 compiler and
+BLAS/LAPACK, CMake is provided by `CMake_jll`):
 
-```shell
-git clone --recurse-submodules https://github.com/libKriging/libKriging.git
-cd libKriging
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_JULIA_BINDING=ON .
-cmake --build build
-```
-
-Then install the Julia package (the library is auto-detected from the `build/` directory):
-
-```shell
-julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
+```julia
+import Pkg
+Pkg.add(url="https://github.com/libKriging/JLibKriging.jl")
+# once registered on Julia's General registry: Pkg.add("JLibKriging")
 ```
 
 ```julia
-using jlibkriging
+using JLibKriging
 
 X = reshape([0.0, 0.25, 0.5, 0.75, 1.0], :, 1)
 f(x) = 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7)
 y = f.(X[:, 1])
 
 k = Kriging(y, X, "gauss")
-println(jlibkriging.summary(k))
+println(JLibKriging.summary(k))
 
 x = reshape(collect(0:0.01:1), :, 1)
 p = predict(k, x; stdev=true, cov=false)
@@ -277,6 +272,10 @@ println("Predicted stdev: ", p.stdev[1:5])
 s = simulate(k, 10, 123, x)
 println("Simulation size: ", size(s))
 ```
+
+The Julia binding itself lives in this repository (`bindings/Julia/jlibkriging`, module `jlibkriging`);
+JLibKriging.jl packages it. To work on the binding, build libKriging with `-DENABLE_JULIA_BINDING=ON` and
+`Pkg.develop` it, see [bindings/Julia/README.md](bindings/Julia/README.md).
 
 **Usage example [here](bindings/Julia/jlibkriging/tests/jlibkriging_demo.jl)**
 
