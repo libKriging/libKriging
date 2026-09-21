@@ -44,7 +44,8 @@ k = WarpKriging(y, X, {"kumaraswamy", "categorical(3,2)"}, "matern5_2");
 [p_mean, p_stdev] = k.predict(Xnew, true);
 ```
 `warping` is a cell array with one spec string per column of `X` (see
-`SKILL.md` §4).
+`SKILL.md` §4). `noise` is a variance vector (no `"nugget"` mode) and `objective`
+is always `"LL"` (any other value is ignored).
 
 ## MLPKriging
 

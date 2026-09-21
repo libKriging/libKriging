@@ -69,7 +69,9 @@ model.fit(y, X, {"kumaraswamy", "categorical(5,2)", "none"});
 auto [mean, stdev] = model.predict(Xnew, true, false, false);
 ```
 One spec string per column of `X`, in column order (see `SKILL.md` §4 for
-the spec vocabulary).
+the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
+(always `"LL"`), and its noise is a per-observation variance vector (there is
+no nugget mode).
 
 ## MLPKriging
 

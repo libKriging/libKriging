@@ -44,9 +44,9 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   regmodel = "constant",
                   normalize = FALSE,
                   optim = "BFGS+Adam",   # different default from Kriging: warp params need Adam-style steps
-                  objective = "LL",
+                  objective = "LL",     # only "LL": any other value is ignored
                   parameters = NULL,
-                  noise = NULL)
+                  noise = NULL)        # NULL | numeric variance vector (no "nugget" mode)
 predict(wk, x = Xnew, return_stdev = TRUE)
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string

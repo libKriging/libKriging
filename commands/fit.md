@@ -13,8 +13,8 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
    - categorical / ordinal / non-linearly-scaled inputs, or a wanted input
      transform → `WarpKriging` (one warp spec per column, §4).
    - single deep joint feature map over all inputs → `MLPKriging`.
-   - n ≳ few thousand → keep `Kriging`/`WarpKriging` with
-     `objective="LLVecchia(m)"` (d ≲ 5, local structure) or `"LLNystrom(k)"`
+   - n ≳ few thousand → keep `Kriging` (noise-free; `WarpKriging` only fits
+     with `"LL"`) with `objective="LLVecchia(m)"` (d ≲ 5, local structure) or `"LLNystrom(k)"`
      (higher d); n ~ 10⁴–10⁶ and partitionable → `NestedKriging`.
 
 2. Pick options from §2: `kernel="matern5_2"` and `regmodel="constant"` and

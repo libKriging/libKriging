@@ -46,8 +46,8 @@ wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  regmodel="constant",
                  normalize=false,
                  optim="BFGS+Adam",   # different default from Kriging
-                 objective="LL",
-                 noise=nothing)
+                 objective="LL",     # only "LL": any other value is ignored
+                 noise=nothing)      # nothing | Vector{Float64} of variances (no "nugget" mode)
 predict(wk, Xnew; return_stdev=true)
 ```
 

@@ -54,9 +54,9 @@ model = lk.WarpKriging(
     regmodel="constant",
     normalize=False,
     optim="BFGS",
-    objective="LL",
+    objective="LL",       # only "LL": any other value is ignored
     parameters={},
-    noise=None,   # same semantics as Kriging: None | "nugget" | variance vector
+    noise=None,   # None | per-observation variance vector (no "nugget" mode, unlike Kriging)
 )
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(Xnew, return_stdev=True)
 ```
