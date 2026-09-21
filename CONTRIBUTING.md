@@ -171,3 +171,7 @@ git rebase --onto libKriging/master $NEW_COMMIT_BASE # replay your commits on ma
 git rebase --continue # continue rebase (after conflict resolution) 
 git push -f # update your fork with it (you have to force with -f since you rewrite history)
 ```
+
+# Releasing
+
+Maintainers: the release procedure, and the files that carry the version, are described in [RELEASE.md](RELEASE.md).
