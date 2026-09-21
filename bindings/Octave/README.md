@@ -12,8 +12,10 @@
 Download the archive from [libKriging releases](https://github.com/libKriging/libKriging/releases):
 
 ```shell
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.9.0/mLibKriging_0.9.0_Linux-x86_64.tgz
-tar xzf mLibKriging_0.9.0_Linux-x86_64.tgz
+# see the releases page for the latest version and your platform
+VERSION=1.2.1
+curl -LO https://github.com/libKriging/libKriging/releases/download/v${VERSION}/mLibKriging_${VERSION}_Linux-x86_64.tgz
+tar xzf mLibKriging_${VERSION}_Linux-x86_64.tgz
 octave --path /path/to/mLibKriging
 ```
 

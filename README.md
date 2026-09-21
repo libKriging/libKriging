@@ -69,10 +69,10 @@ use [released binaries](https://github.com/libKriging/libKriging/releases), or R
 pip3 install pylibkriging
 ```
 
-or for pre-release packages (according to your OS and Python version, see https://github.com/libKriging/libKriging/releases)
+or for the wheels attached to a release (pick the one matching your OS and Python version on https://github.com/libKriging/libKriging/releases)
 
 ```shell
-pip3 install https://github.com/libKriging/libKriging/releases/download/v0.9.0/pylibkriging-0.9.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pip3 install https://github.com/libKriging/libKriging/releases/download/v1.2.1/pylibkriging-1.2.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 ```
 
 **Usage example [here](bindings/Python/pylibkriging/tests/pylibkriging_demo.py)**
@@ -141,11 +141,11 @@ From R:
 install.packages('rlibkriging')
 ```
 
-Or using the archive from [libKriging releases](https://github.com/libKriging/rlibkriging/releases)
+Or using the archive from [rlibkriging releases](https://github.com/libKriging/rlibkriging/releases)
 
 ```R
-# in R
-install.packages("https://github.com/libKriging/rlibkriging/releases/download/0.9-0/rlibkriging_0.9-0_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
+# in R (pick the archive matching your OS on the releases page)
+install.packages("https://github.com/libKriging/rlibkriging/releases/download/1.1-1/rlibkriging_1.1-1_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
@@ -187,8 +187,9 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 
 ```shell
-# example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.9.0/mLibKriging_0.9.0_Linux-x86_64.tgz
+# example (see the releases page for the latest version and your platform)
+VERSION=1.2.1
+curl -LO https://github.com/libKriging/libKriging/releases/download/v${VERSION}/mLibKriging_${VERSION}_Linux-x86_64.tgz
 ```
 
 Then
@@ -566,7 +567,7 @@ Successfully installed pylibkriging-0.4.8
 
 </details>
 
-To get a particular version (branch or tag ≥v0.4.9), you can use:
+To get a particular version (any branch or tag, e.g. `v1.2.1`), you can use:
 
 ```shell
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
