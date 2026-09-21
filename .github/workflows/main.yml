@@ -59,6 +59,10 @@ jobs:
         shell: bash
         run: tools/checks/test.sh
 
+      - name: Check version consistency
+        shell: bash
+        run: python3 tools/release/check_versions.py
+
   build:
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
