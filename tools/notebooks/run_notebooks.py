@@ -15,11 +15,13 @@ the kernel (Python: installed; Julia: `--project`; Octave: `OCTAVE_PATH`).
 Usage:
   python3 tools/notebooks/run_notebooks.py --skip-setup bindings/Python/*.ipynb
   python3 tools/notebooks/run_notebooks.py --skip-setup --inplace --kernel python3 nb.ipynb
+  python3 tools/notebooks/run_notebooks.py --skip-cell '^repo_root = ' --prelude 'addpath(...)' nb.ipynb
 
 Requires nbclient, nbformat and ipykernel.
 """
 import argparse
 import copy
+import re
 import sys
 import time
 from pathlib import Path
@@ -53,12 +55,16 @@ def output_errors(nb):
     return found
 
 
-def run(path, kernel, timeout, skip_setup, inplace):
+def run(path, kernel, timeout, skip_setup, inplace, skip_patterns=(), prelude=None):
     nb = nbformat.read(path, as_version=4)
     work = copy.deepcopy(nb)
-    skipped = {i for i, cell in enumerate(nb.cells) if skip_setup and is_setup_cell(cell)}
+    skipped = {i for i, cell in enumerate(nb.cells)
+               if cell.cell_type == "code" and (skip_setup and is_setup_cell(cell)
+                                                or any(re.search(p, cell.source) for p in skip_patterns))}
     kept = [i for i in range(len(nb.cells)) if i not in skipped]
     work.cells = [work.cells[i] for i in kept]  # the skipped cells are not sent to the kernel
+    if prelude:  # runs first, is never stored
+        work.cells.insert(0, nbformat.v4.new_code_cell(prelude))
 
     client = NotebookClient(
         work,
@@ -75,11 +81,11 @@ def run(path, kernel, timeout, skip_setup, inplace):
 
     errors = output_errors(work)
     if errors:
-        return False, "\n".join(sorted(set(errors))[:10]), time.time() - start
+        return False, "\n".join(list(dict.fromkeys(errors))[:10]), time.time() - start
 
     if inplace:
         # Merge the outputs back, leaving the skipped setup cells as they were.
-        for i, done in zip(kept, work.cells):
+        for i, done in zip(kept, work.cells[1 if prelude else 0:]):
             if done.cell_type == "code":
                 nb.cells[i].outputs = done.outputs
                 nb.cells[i].execution_count = done.execution_count
@@ -94,11 +100,15 @@ def main(argv=None):
     parser.add_argument("--timeout", type=int, default=1800, help="per-cell timeout in seconds (default 1800)")
     parser.add_argument("--skip-setup", action="store_true", help="do not run the %%bash installation cells")
     parser.add_argument("--inplace", action="store_true", help="write the outputs back into the notebooks")
+    parser.add_argument("--skip-cell", action="append", default=[], metavar="REGEX",
+                        help="do not run the code cells whose source matches REGEX (repeatable)")
+    parser.add_argument("--prelude", help="code run in the kernel before the first cell, and not stored")
     args = parser.parse_args(argv)
 
     failures = []
     for path in args.notebooks:
-        ok, info, seconds = run(path, args.kernel, args.timeout, args.skip_setup, args.inplace)
+        ok, info, seconds = run(path, args.kernel, args.timeout, args.skip_setup, args.inplace,
+                                args.skip_cell, args.prelude)
         print(f"{'ok  ' if ok else 'FAIL'} {path} ({seconds:.0f}s){': ' + info if info else ''}", flush=True)
         if not ok:
             failures.append(path)
