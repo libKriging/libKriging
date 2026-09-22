@@ -15,7 +15,7 @@ classdef Params < handle
             % destroy the mex backend
             if ~isempty(obj.ref)
                 % fprintf("Delete Params\n")
-                obj.ref = mLibKriging("Params::delete", obj.ref, varargin{:})
+                obj.ref = mLibKriging("Params::delete", obj.ref, varargin{:});
             end
         end
         

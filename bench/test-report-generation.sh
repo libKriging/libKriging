@@ -41,9 +41,9 @@ echo "" >> "$REPORT"
 echo "## Table of Contents" >> "$REPORT"
 echo "" >> "$REPORT"
 echo "- [Summary Tables](#summary-tables)" >> "$REPORT"
-echo "  - [Kriging](#kriging)" >> "$REPORT"
-echo "  - [NuggetKriging](#nuggetkriging)" >> "$REPORT"
-echo "  - [NoiseKriging](#noisekriging)" >> "$REPORT"
+echo "  - [Kriging (no noise)](#kriging-no-noise)" >> "$REPORT"
+echo "  - [Kriging (nugget)](#kriging-nugget)" >> "$REPORT"
+echo "  - [Kriging (heterogeneous noise)](#kriging-heterogeneous-noise)" >> "$REPORT"
 echo "- [Detailed Results](#detailed-results)" >> "$REPORT"
 echo "" >> "$REPORT"
 
@@ -68,7 +68,7 @@ extract_update_mean() {
 }
 
 # Kriging Summary
-echo "### Kriging" >> "$REPORT"
+echo "### Kriging (no noise)" >> "$REPORT"
 echo "" >> "$REPORT"
 echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
 echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
@@ -85,8 +85,8 @@ for n in 100 200 400; do
 done
 echo "" >> "$REPORT"
 
-# NuggetKriging Summary
-echo "### NuggetKriging" >> "$REPORT"
+# Kriging (nugget) Summary
+echo "### Kriging (nugget)" >> "$REPORT"
 echo "" >> "$REPORT"
 echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
 echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
@@ -103,8 +103,8 @@ for n in 100 200 400; do
 done
 echo "" >> "$REPORT"
 
-# NoiseKriging Summary
-echo "### NoiseKriging" >> "$REPORT"
+# Kriging (heterogeneous noise) Summary
+echo "### Kriging (heterogeneous noise)" >> "$REPORT"
 echo "" >> "$REPORT"
 echo "| n   | d | fit (ms) | predict (ms) | update (ms) |" >> "$REPORT"
 echo "|-----|---|----------|--------------|-------------|" >> "$REPORT"
@@ -126,9 +126,9 @@ echo "## Detailed Results" >> "$REPORT"
 echo "" >> "$REPORT"
 
 for bench in kriging nuggetkriging noisekriging; do
-  BENCH_NAME="${bench^}"
-  if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="NuggetKriging"; fi
-  if [ "$bench" = "noisekriging" ]; then BENCH_NAME="NoiseKriging"; fi
+  BENCH_NAME="Kriging (no noise)"
+  if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="Kriging (nugget)"; fi
+  if [ "$bench" = "noisekriging" ]; then BENCH_NAME="Kriging (heterogeneous noise)"; fi
 
   echo "### $BENCH_NAME" >> "$REPORT"
   echo "" >> "$REPORT"

@@ -140,11 +140,11 @@ jobs:
           echo "## Summary Tables" >> "$REPORT"
           echo "" >> "$REPORT"
 
-          # --- Kriging/NuggetKriging/NoiseKriging summaries (n x d) ---
+          # --- Kriging summaries for the three noise models (n x d) ---
           for bench in kriging nuggetkriging noisekriging; do
-            BENCH_NAME="${bench^}"
-            if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="NuggetKriging"; fi
-            if [ "$bench" = "noisekriging" ]; then BENCH_NAME="NoiseKriging"; fi
+            BENCH_NAME="Kriging (no noise)"
+            if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="Kriging (nugget)"; fi
+            if [ "$bench" = "noisekriging" ]; then BENCH_NAME="Kriging (heterogeneous noise)"; fi
 
             echo "### $BENCH_NAME" >> "$REPORT"
             echo "" >> "$REPORT"
@@ -277,9 +277,9 @@ jobs:
           echo "" >> "$REPORT"
 
           for bench in kriging nuggetkriging noisekriging; do
-            BENCH_NAME="${bench^}"
-            if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="NuggetKriging"; fi
-            if [ "$bench" = "noisekriging" ]; then BENCH_NAME="NoiseKriging"; fi
+            BENCH_NAME="Kriging (no noise)"
+            if [ "$bench" = "nuggetkriging" ]; then BENCH_NAME="Kriging (nugget)"; fi
+            if [ "$bench" = "noisekriging" ]; then BENCH_NAME="Kriging (heterogeneous noise)"; fi
 
             echo "### $BENCH_NAME" >> "$REPORT"
             echo "" >> "$REPORT"

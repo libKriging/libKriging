@@ -9,14 +9,14 @@
 ## Table of Contents
 
 - [Summary Tables](#summary-tables)
-  - [Kriging](#kriging)
-  - [NuggetKriging](#nuggetkriging)
-  - [NoiseKriging](#noisekriging)
+  - [Kriging (no noise)](#kriging-no-noise)
+  - [Kriging (nugget)](#kriging-nugget)
+  - [Kriging (heterogeneous noise)](#kriging-heterogeneous-noise)
 - [Detailed Results](#detailed-results)
 
 ## Summary Tables
 
-### Kriging
+### Kriging (no noise)
 
 | n   | d | fit (ms) | predict (ms) | update (ms) |
 |-----|---|----------|--------------|-------------|
@@ -30,7 +30,7 @@
 | 400 | 4 | 1156.789 | 31.234 | 7234.890 |
 | 400 | 8 | 2345.678 | 62.345 | 14567.123 |
 
-### NuggetKriging
+### Kriging (nugget)
 
 | n   | d | fit (ms) | predict (ms) | update (ms) |
 |-----|---|----------|--------------|-------------|
@@ -44,7 +44,7 @@
 | 400 | 4 | 4567.890 | 33.456 | 11234.567 |
 | 400 | 8 | 8234.567 | 65.890 | 22345.678 |
 
-### NoiseKriging
+### Kriging (heterogeneous noise)
 
 | n   | d | fit (ms) | predict (ms) | update (ms) |
 |-----|---|----------|--------------|-------------|
@@ -60,12 +60,12 @@
 
 ## Detailed Results
 
-### Kriging
+### Kriging (no noise)
 
 #### Configuration: n=100, d=2
 
 ```
-Kriging Benchmark (BFGS, LL objective)
+Kriging (no noise) Benchmark (BFGS, LL objective)
 
 n=100 d=2 iterations=10
 Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
@@ -79,7 +79,7 @@ update_simulate           |      0.456 |      0.089 |      0.367 |      0.589 | 
 #### Configuration: n=100, d=4
 
 ```
-Kriging Benchmark (BFGS, LL objective)
+Kriging (no noise) Benchmark (BFGS, LL objective)
 
 n=100 d=4 iterations=10
 Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
@@ -92,12 +92,12 @@ update_simulate           |      0.678 |      0.123 |      0.534 |      0.845 | 
 
 _[Additional configurations omitted for brevity]_
 
-### NuggetKriging
+### Kriging (nugget)
 
 #### Configuration: n=100, d=2
 
 ```
-NuggetKriging Benchmark (BFGS, LL objective)
+Kriging (nugget) Benchmark (BFGS, LL objective)
 
 n=100 d=2 iterations=10
 Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)
@@ -110,12 +110,12 @@ update_simulate           |      0.489 |      0.098 |      0.378 |      0.612 | 
 
 _[Additional configurations omitted for brevity]_
 
-### NoiseKriging
+### Kriging (heterogeneous noise)
 
 #### Configuration: n=100, d=2
 
 ```
-NoiseKriging Benchmark (BFGS, LL objective)
+Kriging (heterogeneous noise) Benchmark (BFGS, LL objective)
 
 n=100 d=2 iterations=10
 Operation                 |  Mean (ms) |   Std (ms) |   Min (ms) |   Max (ms) | Median (ms)

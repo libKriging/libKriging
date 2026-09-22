@@ -76,13 +76,14 @@ pred <- predict(k, Xnew, stdev = TRUE)
 ```
 
 For n large enough that even the final exact commit (O(n³)) is too
-costly, `set_vecchia_exact_commit(FALSE)` before fitting skips it
-entirely: θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
+costly, calling `set_vecchia_exact_commit(false)` before fitting skips it
+entirely (**C++ API only**: no binding exposes this method, nor `predictVecchia`,
+so the light mode cannot be used from Python, R, Julia or Octave/Matlab): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
 `predict` automatically routes through the local Vecchia predictor
 (mean/stdev only — `return_cov`/`return_deriv`, `simulate`, `update`
 and `save` raise a clear error on such a "light" model).
 
-## Current limitations (v1)
+## Current limitations
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - The default exact commit after optimization is still O(n³)

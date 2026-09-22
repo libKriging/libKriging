@@ -26,4 +26,5 @@ They should be used as `-D<option>=<value>` in `cmake` command line.
 | `Matlab_ROOT_DIR`            |        &lt;empty&gt;        | &lt;string&gt;                                      | locate Matlab root directory to help CMake finder |
 | `SANITIZE`                   |            `OFF`            | `OFF`, `THREAD`, `ADDRESS`, `LEAK`                  | Enable sanitize feature (is available)            |
 | `LBFGSB_SHOW_BUILD`          |            `OFF`            | `ON`, `OFF`                                         | Show details of `lbfgsb_cpp` sub-build            |
+| `USE_JEMALLOC`               |            `OFF`            | `ON`, `OFF`                                         | Download and build jemalloc 5.3.0 as the default allocator (ignored on Windows). Off by default: it was disabled while debugging a TLS error in the Python bindings |
 

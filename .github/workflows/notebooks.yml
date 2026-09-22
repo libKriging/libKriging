@@ -1,0 +1,58 @@
+name: Notebooks
+
+# Keeps the worked Python notebooks runnable: builds pylibkriging, then executes
+# bindings/Python/*.ipynb and docs/math/*.ipynb with tools/notebooks/run_notebooks.py.
+# Only the Python notebooks: the others need R, Julia, Octave or third-party packages
+# (the comparison notebooks are covered by bench-comparison.yml).
+
+on:
+  pull_request:
+    paths:
+      - 'bindings/Python/**'
+      - 'docs/math/*.ipynb'
+      - 'tools/notebooks/**'
+      - 'src/lib/**'
+      - '.github/workflows/notebooks.yml'
+  schedule:
+    - cron: '0 4 * * SUN'
+  workflow_dispatch:
+
+env:
+  # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+  # NestedKriging's OpenMP loop can hang on a 2-core runner (the same class of issue
+  # main.yml already works around for the Windows Python/Octave jobs)
+  OMP_NUM_THREADS: 1
+
+jobs:
+  python-notebooks:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y liblapack-dev libopenblas-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r bindings/Python/pylibkriging/requirements.txt \
+            -r bindings/Python/pylibkriging/dev-requirements.txt \
+            cmake matplotlib scipy nbclient nbformat ipykernel
+
+      - name: Build and install pylibkriging
+        run: python -m pip install --no-build-isolation .
+
+      - name: Execute the notebooks
+        # The "Installation" cells of the notebooks (venv, pip, cmake) are not run:
+        # the environment is the one prepared above.
+        run: |
+          python tools/notebooks/run_notebooks.py --skip-setup --kernel python3 \
+            bindings/Python/*.ipynb docs/math/*.ipynb

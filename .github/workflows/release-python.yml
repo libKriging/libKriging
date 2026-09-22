@@ -72,6 +72,9 @@ jobs:
             echo "Ok to build this new version ${GIT_TAG}"
           fi
           
+      - name: Verify version consistency across files
+        run: python3 tools/release/check_versions.py --tag "${GIT_TAG}"
+
       - name: Define a global variables for next jobs
         id: expose-variable
         run: |

@@ -66,7 +66,8 @@ domain.
   `KrigingNystromTest.cpp`).
 - **Prediction**: after fitting, `predict` uses one exact O(n³)
   factorization at the fitted θ* by default (small/medium n).
-  `predictNystrom` instead reuses the committed rank-k factors (U, D)
+  `predictNystrom` (C++ API only, like `simulateNystrom`; bindings only
+  expose `predict`) instead reuses the committed rank-k factors (U, D)
   from the fit via the Woodbury identity — no n×n factorization, usable
   after any `"LLNystrom(k)"` fit. `simulateNystrom` similarly draws
   joint sample trajectories through the same low-rank machinery.
@@ -96,7 +97,7 @@ Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, stdev = TRUE)
 ```
 
-## Current limitations (v1)
+## Current limitations
 
 - `NoiseModel::None` only (no nugget/noise channel).
 - Landmarks are not serialized (rebuilt on refit).

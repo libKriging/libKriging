@@ -44,9 +44,9 @@ wk <- WarpKriging(y, X, warping = c("kumaraswamy", "categorical(5,2)", "none"),
                   regmodel = "constant",
                   normalize = FALSE,
                   optim = "BFGS+Adam",   # different default from Kriging: warp params need Adam-style steps
-                  objective = "LL",
+                  objective = "LL",     # only "LL": any other value is ignored
                   parameters = NULL,
-                  noise = NULL)
+                  noise = NULL)        # NULL | numeric variance vector (no "nugget" mode)
 predict(wk, x = Xnew, return_stdev = TRUE)
 ```
 One spec string per column of `X` (see `SKILL.md` §4). If `X` has string
@@ -71,6 +71,23 @@ an unstable/stuck fit with a single-start optimizer: SELU's kink at `z = 0`
 can make the likelihood surface locally jagged (the gradient itself is
 still correct — this is an optimization-landscape issue, not a bug).
 
+## Large designs
+
+```r
+# Pre-fit reduction: keep n_max representative rows (k-means centroids snapped
+# to real observations). Returns 1-based row indices.
+idx <- subsetOfData(X, n_max = 2000, method = "kmeans", seed = 123)
+k <- Kriging(y[idx], X[idx, , drop = FALSE], "matern5_2")
+
+# Or keep every point and approximate the objective (noise-free Kriging only)
+k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")   # d <~ 5
+k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # higher d
+k$nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
+```
+`predict` is the only prediction entry point from R: `predictVecchia`,
+`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+Vecchia mode) exist in C++ only.
+
 ## NestedKriging
 
 ```r
@@ -86,7 +103,7 @@ nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
 predict(nk, x = Xnew, return_stdev = TRUE)
 ```
 `aggregation = "NK"` requires `regmodel = "constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging` (v1.1).
+`normalize=`, no save/load yet on `NestedKriging`.
 
 ## Common pitfalls to flag in review
 

@@ -6,8 +6,8 @@
 [![CRAN version](https://www.r-pkg.org/badges/version/rlibkriging)](https://cran.r-project.org/package=rlibkriging)
 
 
-'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
-It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia approximated log-likelihood (`objective="VLL(m)"`, with local prediction and a factorization-free "light" mode).
+'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (affine, boxcox, kumaraswamy, neural_mono, knots, mlp, mlp_joint, categorical, ordinal).
+It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods, or by fitting on a k-means reduced design (`subsetOfData`).
 It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
 
 
@@ -21,8 +21,9 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 
 - **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), and `NestedKriging` for large designs.
 - **Covariance kernels**: `gauss`, `exp`, `matern3_2`, `matern5_2`.
-- **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the Vecchia approximated log-likelihood (`VLL(m)`).
-- **Input warpings**: boxcox, kumaraswamy, knots, mlp, categorical, ordinal.
+- **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the scalable approximations `LLVecchia(m)` (Vecchia) and `LLNystrom(k)` (Nystrom low-rank).
+- **Input warpings** (`WarpKriging`, one per input column): affine, boxcox, kumaraswamy, neural_mono, knots, mlp, categorical, ordinal; `mlp_joint` (a joint feature map over all inputs) through `MLPKriging`.
+- **Large designs**: `NestedKriging`, the `LLVecchia(m)` and `LLNystrom(k)` objectives, and `subsetOfData` (k-means pre-fit row selection); see [docs/math/Scalability.md](docs/math/Scalability.md).
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
 - **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
@@ -35,7 +36,7 @@ Table of contents
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging  for R](#rlibkriging--for-r)
   - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
-  - [jlibkriging for Julia](#jlibkriging-for-julia)
+  - [JLibKriging for Julia](#jlibkriging-for-julia)
   - [Expected demo results](#expected-demo-results)
   - [Tested installation](#tested-installation)
 - [Compilation](#compilation)
@@ -69,10 +70,10 @@ use [released binaries](https://github.com/libKriging/libKriging/releases), or R
 pip3 install pylibkriging
 ```
 
-or for pre-release packages (according to your OS and Python version, see https://github.com/libKriging/libKriging/releases)
+or for the wheels attached to a release (pick the one matching your OS and Python version on https://github.com/libKriging/libKriging/releases)
 
 ```shell
-pip3 install https://github.com/libKriging/libKriging/releases/download/v0.9.0/pylibkriging-0.9.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pip3 install https://github.com/libKriging/libKriging/releases/download/v1.2.1/pylibkriging-1.2.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 ```
 
 **Usage example [here](bindings/Python/pylibkriging/tests/pylibkriging_demo.py)**
@@ -141,11 +142,11 @@ From R:
 install.packages('rlibkriging')
 ```
 
-Or using the archive from [libKriging releases](https://github.com/libKriging/rlibkriging/releases)
+Or using the archive from [rlibkriging releases](https://github.com/libKriging/rlibkriging/releases)
 
 ```R
-# in R
-install.packages("https://github.com/libKriging/rlibkriging/releases/download/0.9-0/rlibkriging_0.9-0_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
+# in R (pick the archive matching your OS on the releases page)
+install.packages("https://github.com/libKriging/rlibkriging/releases/download/1.1-1/rlibkriging_1.1-1_R_x86_64-pc-linux-gnu.tar.gz", repos=NULL)
 ```
 
 **Usage example [here](bindings/R/rlibkriging/tests/testthat/test-rlibkriging-demo.R)**
@@ -187,8 +188,9 @@ matplot(x,s,col=rgb(0,0,1,0.2),type='l',lty=1,add=T)
 Download and uncompress the Octave archive from [libKriging releases](https://github.com/libKriging/libKriging/releases)
 
 ```shell
-# example
-curl -LO https://github.com/libKriging/libKriging/releases/download/v0.9.0/mLibKriging_0.9.0_Linux-x86_64.tgz
+# example (see the releases page for the latest version and your platform)
+VERSION=1.2.1
+curl -LO https://github.com/libKriging/libKriging/releases/download/v${VERSION}/mLibKriging_${VERSION}_Linux-x86_64.tgz
 ```
 
 Then
@@ -242,32 +244,27 @@ hold off;
 
 </details>
 
-## jlibkriging for Julia
+## JLibKriging for Julia
 
-The Julia binding requires building libKriging from source with `-DENABLE_JULIA_BINDING=ON`:
+The installable Julia package is [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl). Like
+`rlibkriging` for R, it builds libKriging from source at install time (a few minutes; needs a C++17 compiler and
+BLAS/LAPACK, CMake is provided by `CMake_jll`):
 
-```shell
-git clone --recurse-submodules https://github.com/libKriging/libKriging.git
-cd libKriging
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_JULIA_BINDING=ON .
-cmake --build build
-```
-
-Then install the Julia package (the library is auto-detected from the `build/` directory):
-
-```shell
-julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
+```julia
+import Pkg
+Pkg.add(url="https://github.com/libKriging/JLibKriging.jl")
+# once registered on Julia's General registry: Pkg.add("JLibKriging")
 ```
 
 ```julia
-using jlibkriging
+using JLibKriging
 
 X = reshape([0.0, 0.25, 0.5, 0.75, 1.0], :, 1)
 f(x) = 1 - 1/2 * (sin(12*x) / (1+x) + 2*cos(7*x) * x^5 + 0.7)
 y = f.(X[:, 1])
 
 k = Kriging(y, X, "gauss")
-println(jlibkriging.summary(k))
+println(JLibKriging.summary(k))
 
 x = reshape(collect(0:0.01:1), :, 1)
 p = predict(k, x; stdev=true, cov=false)
@@ -277,6 +274,10 @@ println("Predicted stdev: ", p.stdev[1:5])
 s = simulate(k, 10, 123, x)
 println("Simulation size: ", size(s))
 ```
+
+The Julia binding itself lives in this repository (`bindings/Julia/jlibkriging`, module `jlibkriging`);
+JLibKriging.jl packages it. To work on the binding, build libKriging with `-DENABLE_JULIA_BINDING=ON` and
+`Pkg.develop` it, see [bindings/Julia/README.md](bindings/Julia/README.md).
 
 **Usage example [here](bindings/Julia/jlibkriging/tests/jlibkriging_demo.jl)**
 
@@ -290,21 +291,26 @@ Using the previous linked examples (in Python, R, Octave, Matlab or Julia), you 
 
 ## Tested installation
 
-with libKriging 0.9
+Continuous integration (`main.yml`, libKriging 1.2) builds and tests each binding on the following platforms:
 
 <!-- ✔ ⌛️ ✘ -->
 
-|        | Linux Ubuntu:22                             | macOS 14 (x86-64 & ARM)                     | Windows 10                                  |
+|        | Linux (Ubuntu 22.04)                        | macOS (latest runner)                       | Windows (latest runner)                     |
 |:-------|:--------------------------------------------|:--------------------------------------------|:--------------------------------------------|
-| Python | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 | <span style="color:green">✔</span> 3.7-3.12 |
-| R      | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  | <span style="color:green">✔</span> 4.0-4.4  |
-| Octave | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 7.2      | <span style="color:green">✔</span> 8.3      |
-| Matlab | <span style="color:green">️✔</span> R2022a   | <span style="color:green">✔</span> R2022*   | <span style="color:green">✔</span> R2022*   |
-| Julia  | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   | <span style="color:orange"><b>?</b></span> 1.10+   |
+| Python | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> 3.7, 3.9 |
+| R      | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release |
+| Octave | <span style="color:green">✔</span> distribution package (6.x) | <span style="color:green">✔</span> Homebrew (latest) | <span style="color:green">✔</span> 9.2 |
+| Matlab | <span style="color:orange"><b>?</b></span> CI job disabled | no pre-built package or CI | no pre-built package or CI |
+| Julia  | <span style="color:green">✔</span> 1.x (latest stable) | <span style="color:green">✔</span> 1.x (latest stable) | <span style="color:green">✔</span> 1.x (latest stable) |
 
-* \* : no pre-built package or CI
+* <span style="color:orange"><b>?</b></span> : requires manual verification. The Matlab job needs a MathWorks license
+  token and has been disabled since v0.9.3; Matlab ≥ R2021 is supported by the code but not checked on each change.
 
-* <span style="color:orange"><b>?</b></span> : requires manual verification (not updated since previous release)
+* Pre-built Python wheels of the latest release: Linux x86-64, macOS (universal2) and Windows (x86-64) for
+  Python 3.9 to 3.12, plus Python 3.7 on Windows. Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
+  (MinGW-64). See [the releases page](https://github.com/libKriging/libKriging/releases).
+
+* Julia ≥ 1.10 is required.
 
 # Compilation
 
@@ -567,7 +573,7 @@ Successfully installed pylibkriging-0.4.8
 
 </details>
 
-To get a particular version (branch or tag ≥v0.4.9), you can use:
+To get a particular version (any branch or tag, e.g. `v1.2.1`), you can use:
 
 ```shell
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
@@ -576,8 +582,9 @@ python3 -m pip install "git+https://github.com/libKriging/libKriging.git@tag"
 
 ## Documentation
 
-* Per-language API: [bindings/README.md](bindings/README.md).
-* Mathematical background (Vecchia, NestedKriging, update/simulate, each input warping): [docs/math](docs/math).
+* Per-language API and worked notebooks: [bindings/README.md](bindings/README.md).
+* Mathematical background (models, objectives, large-design methods, update/simulate, each input warping): [docs/math](docs/math).
+* Comparisons with other Kriging / Gaussian process packages (scikit-learn, GPy, GPflow, GPyTorch, SMT, OpenTURNS, DiceKriging, RobustGaSP, GaussianProcesses.jl, STK): [docs/comparisons](docs/comparisons).
 * Developer documentation: [docs/dev](docs/dev).
 * The C++ API reference (Doxygen) can be generated locally with `cmake --build . --target doc`.
 

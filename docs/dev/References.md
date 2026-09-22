@@ -11,7 +11,7 @@ Gaussian process / Kriging modelling:
   Kriging-Based Metamodeling and Optimization. *Journal of Statistical
   Software*, 51(1), 1–55. doi:10.18637/jss.v051.i01
 
-Large-scale approximations (as used by libKriging's Nested and Vecchia paths):
+Large-scale approximations (as used by libKriging's `NestedKriging`, `LLVecchia`, `LLNystrom` and `subsetOfData` paths; see [docs/math/Scalability.md](../math/Scalability.md)):
 
 * Rullière, D., Durrande, N., Bachoc, F. and Chevalier, C. (2018). Nested
   Kriging predictions for datasets with a large number of observations.
@@ -22,6 +22,21 @@ Large-scale approximations (as used by libKriging's Nested and Vecchia paths):
 * Katzfuss, M. and Guinness, J. (2021). A General Framework for Vecchia
   Approximations of Gaussian Processes. *Statistical Science*, 36(1), 124–141.
   doi:10.1214/19-STS755
+* Guinness, J. (2018). Permutation and Grouping Methods for Sharpening Gaussian
+  Process Approximations (Vecchia ordering and neighbor selection).
+  *Technometrics*, 60(4), 415–429.
+* Deisenroth, M. P. and Ng, J. W. (2015). Distributed Gaussian Processes
+  (PoE / BCM / rBCM aggregation used by `NestedKriging`). *Proceedings of the
+  32nd ICML*, PMLR 37, 1481–1490.
+* Williams, C. K. I. and Seeger, M. (2001). Using the Nystrom Method to Speed Up
+  Kernel Machines (`LLNystrom`). *Advances in Neural Information Processing
+  Systems 13*, 682–688.
+* Drineas, P. and Mahoney, M. W. (2005). On the Nystrom Method for Approximating
+  a Gram Matrix for Improved Kernel-Based Learning (`LLNystrom`). *Journal of
+  Machine Learning Research*, 6, 2153–2175.
+* Lloyd, S. P. (1982). Least Squares Quantization in PCM (k-means, used by
+  `subsetOfData`). *IEEE Transactions on Information Theory*, 28(2), 129–137.
+  doi:10.1109/TIT.1982.1056489
 
 Input warpings and non-stationarity (the warpings exposed by libKriging: `affine`, `boxcox`, `kumaraswamy`, `neural_mono`, `knots`, `mlp`, `mlp_joint`/`MLPKriging`, `categorical`, `ordinal` — see [docs/math/Warping-*.md](../math) for the math description, worked example and references of each):
 

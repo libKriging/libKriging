@@ -4,11 +4,14 @@ This directory contains performance benchmarks for the libKriging C++ library.
 
 ## Overview
 
-The benchmark suite tests the performance of three Kriging model types across various data sizes and dimensions:
+The benchmark suite tests the performance of `Kriging` under its three noise models across various data sizes and dimensions:
 
-- **Kriging** - Standard Kriging models (default)
-- **NuggetKriging** - Kriging with nugget effect
-- **NoiseKriging** - Kriging with heteroscedastic noise
+- **kriging** - `Kriging` without noise, `NoiseModel::None` (default)
+- **nuggetkriging** - `Kriging` with an estimated nugget, `NoiseModel::Nugget`
+- **noisekriging** - `Kriging` with known heteroscedastic noise variances, `NoiseModel::Heterogeneous`
+
+(`NuggetKriging` and `NoiseKriging` used to be separate classes; they have been merged into `Kriging`. The benchmark
+names keep the old spelling.)
 
 Each benchmark tests five key operations:
 1. **fit** - Model fitting with BFGS optimization using LL (Log-Likelihood) objective
@@ -63,8 +66,8 @@ The `bench.sh` script provides an easy way to run benchmarks with explicit named
 
 **Benchmark Type Filter:**
 - `kriging` - Standard Kriging (uses LL objective) [default]
-- `nuggetkriging` - NuggetKriging (uses LMP objective)
-- `noisekriging` - NoiseKriging (uses LL objective)
+- `nuggetkriging` - `Kriging` with `NoiseModel::Nugget` (uses LL objective)
+- `noisekriging` - `Kriging` with `NoiseModel::Heterogeneous` (uses LL objective)
 
 **Operation Filter (optional):**
 - `fit` - Show only fit operation
@@ -153,7 +156,7 @@ Benchmarks are integrated with GitHub Actions via `.github/workflows/bench-cpp.y
 - **Test configurations:**
   - n ∈ {100, 200, 400}
   - d ∈ {2, 4, 8}
-  - All three benchmark types (Kriging, NuggetKriging, NoiseKriging)
+  - All three benchmark types (kriging, nuggetkriging, noisekriging)
 - **Total:** 27 configurations per run
 
 **Triggers:**
@@ -195,8 +198,8 @@ This script will:
 ## Files
 
 - **bench-kriging.cpp** - Kriging benchmark implementation
-- **bench-nuggetkriging.cpp** - NuggetKriging benchmark implementation
-- **bench-noisekriging.cpp** - NoiseKriging benchmark implementation
+- **bench-nuggetkriging.cpp** - `Kriging` benchmark with `NoiseModel::Nugget`
+- **bench-noisekriging.cpp** - `Kriging` benchmark with `NoiseModel::Heterogeneous`
 - **bench.sh** - Convenience script to run benchmarks
 - **test-report-generation.sh** - Local test script for CI report generation
 - **CMakeLists.txt** - Build configuration

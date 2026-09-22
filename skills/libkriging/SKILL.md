@@ -40,7 +40,9 @@ Ask, in order:
    a small monotone network, …) instead of hand-picked features?**
    → `WarpKriging`. It fits a per-variable warp jointly with the GP
    hyperparameters by maximum likelihood; the public API mirrors `Kriging`
-   (`fit`, `predict`, `simulate`, `update`, `summary`, `logLikelihood`).
+   (`fit`, `predict`, `simulate`, `update`, `summary`, `logLikelihood`). Its
+   `noise` is a per-observation variance vector only (there is no
+   `"nugget"` mode), and it always fits with the `"LL"` objective.
 
 4. **Do you want a single deep/joint feature map across *all* inputs
    (deep-kernel learning), rather than one warp per variable?**
@@ -52,7 +54,8 @@ Ask, in order:
    more than a few thousand points?** (See
    [Scalability.md](../../docs/math/Scalability.md) for the full method
    inventory and combinability notes.)
-   → Keep `Kriging`/`WarpKriging` but switch the fit objective to one of
+   → Keep `Kriging` (not `WarpKriging`: it always fits with `"LL"` and
+   ignores the `objective` argument) but switch the fit objective to one of
    the two scalable approximations (both O(n·k³)/O(n·k²) instead of O(n³),
    both give an alternative *objective*, not just a cheaper way to
    evaluate the same one — don't expect bit-identical results to `"LL"`):
@@ -90,7 +93,7 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 |---|---|---|
 | `kernel` / `covType` | `"gauss"`, `"exp"`, `"matern3_2"`, `"matern5_2"` (`"whitenoise"` exists but is an internal building block, not a modelling choice) | `"matern5_2"` is the sane general-purpose default (smoother than Matérn 3/2, less rigid than Gaussian, which tends to numerical ill-conditioning). Use `"gauss"` only if the underlying function is known to be very smooth/analytic. See [Kernels.md](../../docs/math/Kernels.md) for formulas. |
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
-| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)), `"LLVecchia"` / `"LLVecchia(m)"` (Vecchia), `"LLNystrom"` / `"LLNystrom(k)"` (Nystrom) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. `"LLVecchia(m)"`/`"LLNystrom(k)"` only for scaling (see §1.5) — each changes the objective, not just its cost, so don't use them on small problems expecting identical results to `"LL"`. |
+| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)), `"LLVecchia"` / `"LLVecchia(m)"` (Vecchia), `"LLNystrom"` / `"LLNystrom(k)"` (Nystrom) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. `"LLVecchia(m)"`/`"LLNystrom(k)"` only for scaling, on noise-free `Kriging` (see §1.5) — each changes the objective, not just its cost, so don't use them on small problems expecting identical results to `"LL"`. |
 | `optim` | `"BFGS"` (default), `"BFGSk"` for k random restarts (e.g. `"BFGS10"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). For a difficult/multimodal likelihood (many inputs, clustered design), multistart (`"BFGS10"`+) is cheap insurance against a bad local optimum — recommend it over blindly trusting a single `"BFGS"` run when the user reports an unstable or suspicious fit. |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. Not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |

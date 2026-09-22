@@ -96,7 +96,8 @@ Full demo: [tests/pylibkriging_demo.py](pylibkriging/tests/pylibkriging_demo.py)
 `pylibkriging.sklearn` exposes `KrigingRegressor`, `WarpKrigingRegressor`,
 `MLPKrigingRegressor` and `NestedKrigingRegressor`, implementing the
 scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
-`clone`), so they drop into `Pipeline` and `GridSearchCV`:
+`clone`), so they drop into `Pipeline` and `GridSearchCV`. They need scikit-learn, an optional dependency:
+`pip3 install pylibkriging[sklearn]`.
 
 ```python
 from sklearn.pipeline import Pipeline
