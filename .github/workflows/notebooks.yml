@@ -20,6 +20,9 @@ on:
 env:
   # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+  # NestedKriging's OpenMP loop can hang on a 2-core runner (the same class of issue
+  # main.yml already works around for the Windows Python/Octave jobs)
+  OMP_NUM_THREADS: 1
 
 jobs:
   python-notebooks:
