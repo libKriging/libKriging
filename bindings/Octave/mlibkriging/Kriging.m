@@ -19,7 +19,7 @@ classdef Kriging < handle
             % destroy the mex backend
             if ~isempty(obj.ref)
                 % fprintf("Delete Kriging\n")
-                obj.ref = mLibKriging("Kriging::delete", obj.ref, varargin{:})
+                obj.ref = mLibKriging("Kriging::delete", obj.ref, varargin{:});
             end
         end
         
