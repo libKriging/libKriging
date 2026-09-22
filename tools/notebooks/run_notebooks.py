@@ -7,9 +7,10 @@ runnable, and to refresh their stored outputs (`--inplace`).
 The binding notebooks start with an "Installation" section of `%%bash` cells that
 create a virtual environment, install requirements and build libKriging. Those
 cells provision an environment and are not what the notebooks demonstrate: with
-`--skip-setup` no `%%bash` cell is run (they keep their stored content, and no
-local path ends up in the outputs), and the notebook is executed against the
-libKriging already installed in the kernel's environment.
+`--skip-setup` no `%%bash` cell (nor the cell that puts a built mlibkriging on the
+Octave path) is run: they keep their stored content, no local path ends up in the
+outputs, and the notebook is executed against the libKriging already available to
+the kernel (Python: installed; Julia: `--project`; Octave: `OCTAVE_PATH`).
 
 Usage:
   python3 tools/notebooks/run_notebooks.py --skip-setup bindings/Python/*.ipynb
@@ -28,20 +29,36 @@ from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError
 
 
+# Python notebooks: the installation cells are `%%bash` cells. Octave notebooks: one cell puts
+# `build/installed` on the path, and errors out when libKriging is not there.
+SETUP_PREFIXES = ("%%bash", "% Add mlibkriging to path")
+
+
 def is_setup_cell(cell):
-    """The installation cells of the binding notebooks are all `%%bash` cells."""
-    return cell.cell_type == "code" and cell.source.lstrip().startswith("%%bash")
+    return cell.cell_type == "code" and cell.source.lstrip().startswith(SETUP_PREFIXES)
+
+
+def output_errors(nb):
+    """Octave's kernel reports a failing statement as plain text ("error: ..."), not as an error output."""
+    if nb.metadata.get("kernelspec", {}).get("language") != "octave":
+        return []
+    found = []
+    for cell in nb.cells:
+        if cell.cell_type != "code":
+            continue
+        for out in cell.get("outputs", []):
+            for line in out.get("text", "").splitlines():
+                if line.startswith("error: "):
+                    found.append(line.strip())
+    return found
 
 
 def run(path, kernel, timeout, skip_setup, inplace):
     nb = nbformat.read(path, as_version=4)
     work = copy.deepcopy(nb)
-    skipped = set()
-    if skip_setup:
-        for i, cell in enumerate(work.cells):
-            if is_setup_cell(cell):
-                skipped.add(i)
-                cell.source = "pass"  # keeps the numbering of the cells
+    skipped = {i for i, cell in enumerate(nb.cells) if skip_setup and is_setup_cell(cell)}
+    kept = [i for i in range(len(nb.cells)) if i not in skipped]
+    work.cells = [work.cells[i] for i in kept]  # the skipped cells are not sent to the kernel
 
     client = NotebookClient(
         work,
@@ -56,12 +73,16 @@ def run(path, kernel, timeout, skip_setup, inplace):
     except CellExecutionError as exc:
         return False, f"{exc}".strip()[-1500:], time.time() - start
 
+    errors = output_errors(work)
+    if errors:
+        return False, "\n".join(sorted(set(errors))[:10]), time.time() - start
+
     if inplace:
         # Merge the outputs back, leaving the skipped setup cells as they were.
-        for i, (orig, done) in enumerate(zip(nb.cells, work.cells)):
-            if orig.cell_type == "code" and i not in skipped:
-                orig.outputs = done.outputs
-                orig.execution_count = done.execution_count
+        for i, done in zip(kept, work.cells):
+            if done.cell_type == "code":
+                nb.cells[i].outputs = done.outputs
+                nb.cells[i].execution_count = done.execution_count
         nbformat.write(nb, path)
     return True, f"{len(skipped)} setup cell(s) skipped" if skipped else "", time.time() - start
 
