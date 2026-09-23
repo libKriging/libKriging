@@ -11,6 +11,12 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Fixed
+- R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
+  `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
+  `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in
+  NAMESPACE").
+
 ## [1.2.2] - 2026-09-22
 
 Documentation, packaging and release-process consolidation: no change to the
