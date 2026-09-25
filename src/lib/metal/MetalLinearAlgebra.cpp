@@ -361,6 +361,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     lk_metal_batched_axpy_launch(dAlpha, dP, dX, n, ncols);
 
     if ((it + 1) % restart_every == 0) {
+      // Periodic TRUE-residual replacement (r = b - A*x): corrects the round-off
+      // drift of the recursive residual but, unlike the former full restart
+      // (p = r or z), KEEPS the search direction via the usual beta update:
+      // resetting p destroyed CG conjugacy (see LinearAlgebra::conjugateGradient).
       matvec(dX, 0, dAp);
       lk_metal_copy_dev(dR, dB, mat * sizeof(float));
       lk_metal_batched_axpy_launch(dNegOnes, dAp, dR, n, ncols);
@@ -368,11 +372,11 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       if (preconditioned) {
         precondApply(dR, *dZ);
         lk_metal_batched_dot_launch(dR, *dZ, n, ncols, dScratch2);
-        lk_metal_cg_restart_precond_launch(dScratch, dScratch2, dBnorm, dTol, ncols, dActive, dRzOld);
-        lk_metal_copy_dev(dP, *dZ, mat * sizeof(float));
+        lk_metal_cg_beta_precond_launch(dScratch, dScratch2, dBnorm, dTol, ncols, dActive, dRzOld, dBeta);
+        lk_metal_batched_update_p_launch(*dZ, dBeta, dP, n, ncols);
       } else {
-        lk_metal_cg_restart_launch(dScratch, dBnorm, dTol, ncols, dActive, dRzOld);
-        lk_metal_copy_dev(dP, dR, mat * sizeof(float));
+        lk_metal_cg_beta_launch(dScratch, dBnorm, dTol, ncols, dActive, dRzOld, dBeta);
+        lk_metal_batched_update_p_launch(dR, dBeta, dP, n, ncols);
       }
     } else {
       lk_metal_batched_axpy_launch(dNegAlpha, dAp, dR, n, ncols);

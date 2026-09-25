@@ -579,7 +579,14 @@ class Kriging : public KrigingImpl {
                                  arma::vec* beta_out = nullptr,
                                  double* sigma2_out = nullptr,
                                  const arma::mat* RinvFY_x0 = nullptr,
-                                 arma::mat* RinvFY_out = nullptr) const;
+                                 arma::mat* RinvFY_out = nullptr,
+                                 const arma::mat* W_x0 = nullptr,
+                                 arma::mat* W_out = nullptr) const;
+  /// W_x0 / W_out: warm start for, and result of, the probe solve R^-1*probes
+  /// (n x nprobe; only used when a gradient is requested). Used by the
+  /// LLIterative optimizer objective to warm-start each evaluation from the
+  /// previous one (probes are fixed across evaluations, so R(theta_k)^-1*probes
+  /// is a good starting point for R(theta_k+1)^-1*probes).
   /// Cache of the last committed _logLikelihoodIterative call's R^-1*[F|y]
   /// solve (n x (m_F.n_cols+1), n = m_X.n_rows AT THAT TIME) -- written at
   /// every LLIterative fit/updateIterative commit point, read by
@@ -589,6 +596,18 @@ class Kriging : public KrigingImpl {
   /// model), means "no usable cache" -- updateIterative falls back to a cold
   /// start in that case, same as before this cache existed.
   arma::mat m_iterative_RinvFY_cache;
+  /// theta at which m_iterative_RinvFY_cache was computed: the cache is only
+  /// used as a warm start when it matches the current m_theta (a later fit
+  /// with another objective, or any other theta change, leaves a stale cache
+  /// of the right size behind -- inert for correctness, but a poor x0).
+  arma::vec m_iterative_RinvFY_cache_theta;
+  /// True when m_iterative_RinvFY_cache holds R(m_theta)^-1*[F|y] for the
+  /// current n rows.
+  bool iterative_cache_valid() const {
+    return m_iterative_RinvFY_cache.n_rows == m_X.n_rows && m_iterative_RinvFY_cache.n_cols == m_F.n_cols + 1
+           && m_iterative_RinvFY_cache_theta.n_elem == m_theta.n_elem
+           && arma::approx_equal(m_iterative_RinvFY_cache_theta, m_theta, "absdiff", 0.0);
+  }
   bool m_iterative_light = false;  ///< true whenever m_iterative_nprobe > 0 (no exact factorization ever exists)
   /// Throw if the model is an Iterative fit (used by simulate/update_simulate/save;
   /// update() has its own updateIterative() incremental path instead)

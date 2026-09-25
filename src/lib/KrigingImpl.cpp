@@ -21,6 +21,7 @@
 #include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
 #include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
 
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -508,18 +509,33 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // empty (== plain CG) when disabled, matching the prior behavior exactly.
   std::unique_ptr<LinearAlgebra::WoodburyFactorization> woodbury_pc;
   std::function<arma::mat(const arma::mat&)> PinvBatched;
-  if (use_nystrom_precond) {
+  // Automatic mode (see LinearAlgebra::cg_auto_precond): when not requested
+  // explicitly, build the factor anyway and keep it only if it captures a
+  // large enough share of trace(R) = n.
+  const arma::uword pc_rank = std::min(precond_rank, n);
+  const bool auto_pc = !use_nystrom_precond && LinearAlgebra::cg_auto_precond && pc_rank > 0 && n >= 2 * pc_rank;
+  if (use_nystrom_precond || auto_pc) {
     arma::vec diag_resid;
-    arma::mat U_pc = LinearAlgebra::nystromFactor(
-        &diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, ones, std::min(precond_rank, n), 1e-12);
-    arma::vec D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
-    // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
-    // for every CG iteration's PinvBatched(V) call (O(n*k + k^2) per column)
-    // -- calling LinearAlgebra::woodbury_solve fresh per apply would redo
-    // that factorization every iteration, making the "cheap" preconditioner
-    // apply as expensive as the O(n^2) matvec it's meant to help avoid.
-    woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
-    PinvBatched = [&woodbury_pc](const arma::mat& V) -> arma::mat { return woodbury_pc->solve(V); };
+    arma::mat U_pc
+        = LinearAlgebra::nystromFactor(&diag_resid, m_X, m_theta, _Cov, /*factor=*/1.0, ones, pc_rank, 1e-12);
+    const double captured = 1.0 - arma::sum(diag_resid) / static_cast<double>(n);
+    const bool keep = use_nystrom_precond || captured >= LinearAlgebra::cg_auto_precond_min_captured;
+    if (std::getenv("LK_DEBUG_CG_ITERS") != nullptr)
+      std::fprintf(stderr,
+                   "[LK_DEBUG_CG_ITERS] nystrom precond rank=%zu captured=%.3f %s\n",
+                   static_cast<size_t>(pc_rank),
+                   captured,
+                   keep ? (auto_pc ? "auto:kept" : "requested") : "auto:dropped");
+    if (keep) {
+      arma::vec D_pc = arma::clamp(diag_resid, LinearAlgebra::num_nugget, arma::datum::inf);
+      // Factor the Woodbury correction ONCE here (O(n*k^2 + k^3)) and reuse it
+      // for every CG iteration's PinvBatched(V) call (O(n*k + k^2) per column)
+      // -- calling LinearAlgebra::woodbury_solve fresh per apply would redo
+      // that factorization every iteration, making the "cheap" preconditioner
+      // apply as expensive as the O(n^2) matvec it's meant to help avoid.
+      woodbury_pc = std::make_unique<LinearAlgebra::WoodburyFactorization>(U_pc, D_pc);
+      PinvBatched = [&woodbury_pc](const arma::mat& V) -> arma::mat { return woodbury_pc->solve(V); };
+    }
   }
 
   // GPU-accelerated CG solve when built with -DENABLE_CUDA_ITERATIVE=ON or

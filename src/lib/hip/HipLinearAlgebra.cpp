@@ -394,6 +394,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_HIP_CHECK(hipGetLastError());
 
     if ((it + 1) % restart_every == 0) {
+      // Periodic TRUE-residual replacement (r = b - A*x): corrects the round-off
+      // drift of the recursive residual but, unlike the former full restart
+      // (p = r or z), KEEPS the search direction via the usual beta update:
+      // resetting p destroyed CG conjugacy (see LinearAlgebra::conjugateGradient).
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's).
       matvec(d_x, d_Ap);  // Ap = A*x
@@ -406,13 +410,13 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         precondApply(d_r, d_z);
         lk_hip_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z
         LK_HIP_CHECK(hipGetLastError());
-        lk_hip_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+        lk_hip_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
         LK_HIP_CHECK(hipGetLastError());
-        LK_HIP_CHECK(hipMemcpy(d_p, d_z, mat_bytes, hipMemcpyDeviceToDevice));  // restart: p = z
+        lk_hip_batched_update_p_launch(d_z, d_beta, d_p, n, ncols);  // p = z + beta*p
       } else {
-        lk_hip_cg_restart_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+        lk_hip_cg_beta_launch(d_scratch, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
         LK_HIP_CHECK(hipGetLastError());
-        LK_HIP_CHECK(hipMemcpy(d_p, d_r, mat_bytes, hipMemcpyDeviceToDevice));  // restart: p = r
+        lk_hip_batched_update_p_launch(d_r, d_beta, d_p, n, ncols);  // p = r + beta*p
       }
     } else {
       lk_hip_batched_axpy_launch(d_neg_alpha, d_Ap, d_r, n, ncols);  // r -= alpha*Ap
