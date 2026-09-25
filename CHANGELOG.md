@@ -11,83 +11,6 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
-### Fixed
-- R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
-  `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
-  `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in
-  NAMESPACE").
-
-## [1.2.2] - 2026-09-22
-
-Documentation, packaging and release-process consolidation: no change to the
-C++ core and no numerical change. Julia is now installed through
-JLibKriging.jl.
-
-### Changed
-- Julia: the installable, registered Julia package is now
-  [JLibKriging](https://github.com/libKriging/JLibKriging.jl), which builds
-  libKriging from source at `Pkg.add` time (the way `rlibkriging` does for R)
-  and follows libKriging `master` through `sync-as-submodule.yml`; the Julia
-  binding itself stays in `bindings/Julia/jlibkriging`. Registration on the
-  General registry moves out of `release-julia.yml`, which only tests the
-  binding on release tags now (`jlibkriging` had been rejected by the registry's
-  naming and licence guidelines). The README and the Julia binding pages now
-  document this install path (`Pkg.add(url=...)` until the package is on the
-  General registry).
-- Python: the PyPI project page now shows the package README instead of a
-  one-line description, and the `sklearn` extra that `pylibkriging.sklearn`
-  asks users to install now exists (`pip install pylibkriging[sklearn]`). A
-  `multifidelity` extra, added by mistake with the scikit-learn estimators and
-  pointing at a module that does not exist, is removed.
-- Benchmarks: the C++ benchmark report and executables name the noise model
-  (`Kriging (nugget)`, `Kriging (heterogeneous noise)`) instead of the
-  `NuggetKriging` / `NoiseKriging` classes merged into `Kriging` before 1.0.
-
-### Documentation
-- The README advertised `objective="VLL(m)"`, which was renamed
-  `LLVecchia(m)` in 1.2.0 and now raises; it lists `LLVecchia(m)` and
-  `LLNystrom(k)`. If you are coming from 1.1.x, see the *Breaking* entry of
-  1.2.0 for the migration.
-- The method reference (`bindings/README.md`) documents the 1.2 API:
-  `subsetOfData` (whose indices are 0-based in Python and Julia, 1-based in R
-  and Octave/Matlab), `nystrom_rank`, the objectives, the `WarpKriging`
-  accessors and the scikit-learn estimators, and lists the Vecchia / Nystrom
-  methods that are C++-only (`predictVecchia`, `predictNystrom`,
-  `simulateNystrom`, `set_vecchia_exact_commit`), which `docs/math` did not say.
-  All 58 binding notebooks are now linked, and `docs/math` and
-  `docs/comparisons` have index pages.
-- The libkriging skill and its per-language references were wrong for
-  `WarpKriging`: it always fits with `"LL"` (any `objective` is ignored, so the
-  Vecchia / Nystrom objectives apply to `Kriging` only) and has no
-  `noise="nugget"` mode. They now cover `subsetOfData`, `nystrom_rank` and the
-  scikit-learn estimators.
-- README: complete list of input warpings, large-design methods, tested
-  platforms taken from the CI configuration, and install links that were frozen
-  on 0.x releases; same for `CITATION.cff`. The Nystrom, k-means and
-  distributed-GP references and the `USE_JEMALLOC` CMake option were missing
-  from `docs/dev`. The `pylibkriging` README is rewritten.
-
-### CI/Release process
-- `tools/release/check_versions.py` checks that `cmake/version.cmake`,
-  `CITATION.cff`, `.claude-plugin/plugin.json`, `jlibkriging/Project.toml`,
-  `rlibkriging/DESCRIPTION` and the changelog agree on the version and on the
-  release date. It runs on every push and in the six release workflows, which
-  used to compare the tag with `major.minor` of `cmake/version.cmake` only.
-- `RELEASE.md` describes the release procedure.
-
-## [1.2.1] - 2026-09-19
-
-### Fixed
-- Release process: `bindings/Julia/jlibkriging/Project.toml` and
-  `.claude-plugin/plugin.json` had been left at 1.1.0 by the 1.2.0 release
-  preparation, so the Julia release workflow rejected the `v1.2.0` tag and
-  `jlibkriging` was never registered on Julia's General registry for 1.2.0.
-  Both now carry the release version. 1.2.1 is otherwise identical to 1.2.0 for
-  the C++ core, Python, R and Octave/Matlab bindings, and is the first 1.2
-  release available for Julia (#365).
-
-## [1.2.0] - 2026-09-19
-
 ### Added
 - CUDA iterative backend: an opt-in mixed-precision matvec for the batched CG
   solve (`LinearAlgebraCuda::conjugateGradient`), plan item #8 -- set
@@ -268,15 +191,6 @@ JLibKriging.jl.
   unpreconditioned CUDA case for now: HIP/SYCL/Metal and the
   Nystrom-preconditioned SLQ path still use the prior CPU-orchestrated
   ping-pong (documented in the new function's doc comment).
-- Python: scikit-learn compatible estimators for all four Kriging classes —
-  `KrigingRegressor`, `WarpKrigingRegressor`, `MLPKrigingRegressor`,
-  `NestedKrigingRegressor` in `pylibkriging.sklearn`, implementing the
-  scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
-  `clone`) so they drop into `Pipeline` and `GridSearchCV` (#338).
-- Cross-package comparison benchmark (`bench/comparison/`): libKriging vs.
-  scikit-learn/GPy/SMT/OpenTURNS (Python) and DiceKriging/RobustGaSP (R) on
-  shared randomized LHS designs (Branin, Hartmann-3/6, Borehole), reporting
-  fit/predict time, RMSE, Q², NLPD; runs on a manual/monthly CI workflow (#335).
 - `predictIterative`: matrix-free conjugate-gradient alternative to `predict()`
   that solves each prediction on the fly instead of keeping a dense Cholesky
   factor resident, with optional Nystrom-preconditioned CG. `LLIterative(m)`:
@@ -288,8 +202,7 @@ JLibKriging.jl.
   step count per probe (default 20) on every binding — raise it when the
   stochastic log-determinant drifts from the exact objective on an
   ill-conditioned covariance; `precond_rank` now also accepts 0 (= no
-  preconditioner). `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting
-  for large designs. Available in the core C++ API and all four bindings
+  preconditioner). Available in the core C++ API and all four bindings
   (Python/R/Julia/Octave-MATLAB); see `docs/math/Iterative.md`,
   `PredictIterative.md`, `SubsetOfData.md`, `Scalability.md` and the
   comparison-vs-GPyTorch notebooks (#347).
@@ -311,37 +224,8 @@ JLibKriging.jl.
   `libKriging-Iterative-CUDA` / `-OpenMP` and `GPyTorch-BBMM-CUDA` / `-<BLAS>`
   on fit / logLik / predict time and accuracy, writing a per-machine
   Markdown/CSV to `bench/gpu/results/`.
-- `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
-  bindings (Python already had it); worked notebooks
-  `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
-  comparing `LLNystrom`/`LLVecchia` against exact Cholesky (#358).
-- `LLNystrom(k)` objective (fixed-landmark Nystrom low-rank approximation of
-  the covariance, greedy pivoted-Cholesky landmarks held fixed across theta so
-  the objective stays smooth) for large-`n` scalability: `O(n·k²)` fit via the
-  Woodbury identity with an analytic gradient, `predictNystrom`, and a
-  Nystrom-specific `update()` (`refit=false` at fixed theta/landmarks, or
-  `refit=true` warm-restarting theta over the same landmarks); such fits skip
-  the `O(n²)` pairwise-difference cube (#346).
-- `WarpKriging`: binding surface brought to parity with `Kriging` across the
-  Python/R/Octave/Julia bindings — `noise()`, `warp_params()`, `optim()`,
-  `objective()` and `covMat(X1, X2)` accessors, numeric `parameters` seeds
-  (`theta` / `warp_params` / `noise`) with `optim="none"` to rebuild a model
-  with frozen hyper-parameters, `noise=` and `parameters=` no longer mutually
-  exclusive, and `update(..., noise_u=)` / `update_simulate(..., noise_u=)`;
-  the R/Python docs no longer advertise an unimplemented `noise="nugget"`
-  mode (#361).
-- Claude Code plugin packaging: `.claude-plugin/` manifests and
-  `fit`/`predict`/`simulate`/`update`/`build` commands driving the libKriging
-  skill, installable through `/plugin marketplace add libKriging/libKriging`.
 
 ### Changed
-- **Breaking**: the Vecchia objective `"VLL"` / `"VLL(m)"` introduced in 1.1.0
-  is renamed `"LLVecchia"` / `"LLVecchia(m)"` (and the Nystrom objective is
-  spelled `"LLNystrom"` / `"LLNystrom(k)"`, never released under its former
-  `"LLNys"` name), in the C++ core, `NestedKriging` and all bindings. No alias
-  was kept: `objective="VLL(m)"` now raises `Unsupported fit objective`.
-  Migration: replace `"VLL"` by `"LLVecchia"` and `"VLL(m)"` by `"LLVecchia(m)"`
-  in your calls; results are unchanged (#346).
 - Iterative path (`LLIterative` / `predictIterative`), CPU as well as GPU:
   an `optim="none"` light fit no longer builds the dense `d x n^2` pairwise
   distance tensor it never reads (was several GB at n=8000); the matrix-free
@@ -427,21 +311,12 @@ JLibKriging.jl.
   back exactly, so a preconditioner also curbs the `log|R|` bias on an
   ill-conditioned R (previously only `lanczos_steps` did). GPU path
   unchanged. See `docs/math/Iterative.md`.
-- Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
-  Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
-  submodules, since both hardcode offsets into NumPy's C-API function table
-  and predated the NumPy 2.0 ABI changes; also fixed a bug in carma's own
-  NumPy-2.0 fix where `PyArray_CopyInto`'s table offset (which differs
-  between NumPy 1.x and 2.x) was hardcoded to the NumPy-2-only value instead
-  of being picked at runtime (#339, libKriging/carma#1).
-- Performance: `R^-1` is now computed lazily in `populate_Model`. It is only
-  consumed by an analytic theta gradient, so plain `fit()`, `predict()`,
-  `logLikelihoodFun(theta, grad=false)` and, above all, `update(refit=false)`
-  no longer pay a dense `O(n^3)` `inv_sympd` at the full size on every call;
-  `update(refit=false)`'s incremental Cholesky is `O(n_old^2 * n_u)` again
-  (#363).
 
 ### Fixed
+- R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
+  `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
+  `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in
+  NAMESPACE").
 - R binding: `Kriging`'s `objective` validator rejected every `LLIterative` form
   with more than three fields *before* the string ever reached C++, so the
   `cg_max_iter_mult` and `cg_tol` fields were unusable from R. The regex now
@@ -574,6 +449,154 @@ JLibKriging.jl.
   measurements instead of hardcoded. The `run_libkriging_iter` warm-up call was
   also silently failing, so the first GPyTorch point absorbed CUDA context
   initialisation.
+- Windows: Python binding processes silently hanging (looking like ~1h CI
+  timeouts) were actually undetected heap corruption from Armadillo's
+  aligned allocator never being routed through libKriging's own allocator
+  indirection (`lkalloc`) despite the Python binding requesting it at module
+  init — re-enabled the wiring (#354, #357). The MSVC Debug CRT's blocking
+  error dialog is now also redirected to stderr so any future corruption
+  fails fast with a diagnosable message instead of hanging CI (#356).
+- Windows: Python binding CI jobs hanging on OpenMP thread-pool churn from
+  repeated parallel regions during BFGS, the same mechanism as an earlier
+  Octave Windows fix — forced `OMP_NUM_THREADS=1` for Windows Python builds
+  (#351, #352).
+- Octave Windows: flaky `predictNystrom` test assertion caused by free-BFGS
+  convergence varying across platforms/compilers — compared against a
+  deterministic fixed-theta fit instead; also fixed `optim="none"` silently
+  ignoring `LLNystrom(k)` and doing an exact fit instead of honoring the
+  requested objective (#353).
+
+## [1.2.2] - 2026-09-22
+
+Documentation, packaging and release-process consolidation: no change to the
+C++ core and no numerical change. Julia is now installed through
+JLibKriging.jl.
+
+### Changed
+- Julia: the installable, registered Julia package is now
+  [JLibKriging](https://github.com/libKriging/JLibKriging.jl), which builds
+  libKriging from source at `Pkg.add` time (the way `rlibkriging` does for R)
+  and follows libKriging `master` through `sync-as-submodule.yml`; the Julia
+  binding itself stays in `bindings/Julia/jlibkriging`. Registration on the
+  General registry moves out of `release-julia.yml`, which only tests the
+  binding on release tags now (`jlibkriging` had been rejected by the registry's
+  naming and licence guidelines). The README and the Julia binding pages now
+  document this install path (`Pkg.add(url=...)` until the package is on the
+  General registry).
+- Python: the PyPI project page now shows the package README instead of a
+  one-line description, and the `sklearn` extra that `pylibkriging.sklearn`
+  asks users to install now exists (`pip install pylibkriging[sklearn]`). A
+  `multifidelity` extra, added by mistake with the scikit-learn estimators and
+  pointing at a module that does not exist, is removed.
+- Benchmarks: the C++ benchmark report and executables name the noise model
+  (`Kriging (nugget)`, `Kriging (heterogeneous noise)`) instead of the
+  `NuggetKriging` / `NoiseKriging` classes merged into `Kriging` before 1.0.
+
+### Documentation
+- The README advertised `objective="VLL(m)"`, which was renamed
+  `LLVecchia(m)` in 1.2.0 and now raises; it lists `LLVecchia(m)` and
+  `LLNystrom(k)`. If you are coming from 1.1.x, see the *Breaking* entry of
+  1.2.0 for the migration.
+- The method reference (`bindings/README.md`) documents the 1.2 API:
+  `subsetOfData` (whose indices are 0-based in Python and Julia, 1-based in R
+  and Octave/Matlab), `nystrom_rank`, the objectives, the `WarpKriging`
+  accessors and the scikit-learn estimators, and lists the Vecchia / Nystrom
+  methods that are C++-only (`predictVecchia`, `predictNystrom`,
+  `simulateNystrom`, `set_vecchia_exact_commit`), which `docs/math` did not say.
+  All 58 binding notebooks are now linked, and `docs/math` and
+  `docs/comparisons` have index pages.
+- The libkriging skill and its per-language references were wrong for
+  `WarpKriging`: it always fits with `"LL"` (any `objective` is ignored, so the
+  Vecchia / Nystrom objectives apply to `Kriging` only) and has no
+  `noise="nugget"` mode. They now cover `subsetOfData`, `nystrom_rank` and the
+  scikit-learn estimators.
+- README: complete list of input warpings, large-design methods, tested
+  platforms taken from the CI configuration, and install links that were frozen
+  on 0.x releases; same for `CITATION.cff`. The Nystrom, k-means and
+  distributed-GP references and the `USE_JEMALLOC` CMake option were missing
+  from `docs/dev`. The `pylibkriging` README is rewritten.
+
+### CI/Release process
+- `tools/release/check_versions.py` checks that `cmake/version.cmake`,
+  `CITATION.cff`, `.claude-plugin/plugin.json`, `jlibkriging/Project.toml`,
+  `rlibkriging/DESCRIPTION` and the changelog agree on the version and on the
+  release date. It runs on every push and in the six release workflows, which
+  used to compare the tag with `major.minor` of `cmake/version.cmake` only.
+- `RELEASE.md` describes the release procedure.
+
+## [1.2.1] - 2026-09-19
+
+### Fixed
+- Release process: `bindings/Julia/jlibkriging/Project.toml` and
+  `.claude-plugin/plugin.json` had been left at 1.1.0 by the 1.2.0 release
+  preparation, so the Julia release workflow rejected the `v1.2.0` tag and
+  `jlibkriging` was never registered on Julia's General registry for 1.2.0.
+  Both now carry the release version. 1.2.1 is otherwise identical to 1.2.0 for
+  the C++ core, Python, R and Octave/Matlab bindings, and is the first 1.2
+  release available for Julia (#365).
+
+## [1.2.0] - 2026-09-19
+
+### Added
+- Python: scikit-learn compatible estimators for all four Kriging classes —
+  `KrigingRegressor`, `WarpKrigingRegressor`, `MLPKrigingRegressor`,
+  `NestedKrigingRegressor` in `pylibkriging.sklearn`, implementing the
+  scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
+  `clone`) so they drop into `Pipeline` and `GridSearchCV` (#338).
+- Cross-package comparison benchmark (`bench/comparison/`): libKriging vs.
+  scikit-learn/GPy/SMT/OpenTURNS (Python) and DiceKriging/RobustGaSP (R) on
+  shared randomized LHS designs (Branin, Hartmann-3/6, Borehole), reporting
+  fit/predict time, RMSE, Q², NLPD; runs on a manual/monthly CI workflow (#335).
+- `Kriging::subsetOfData`: k-means (or random) pre-fit row-subsetting for
+  large designs. Available in the core C++ API and all four bindings
+  (Python/R/Julia/Octave-MATLAB); see `docs/math/SubsetOfData.md` and
+  `Scalability.md` (#358).
+- `nystrom_rank()` accessor exposed in the Julia, Octave/MATLAB and R
+  bindings (Python already had it); worked notebooks
+  `docs/math/llnystrom_vs_cholesky.ipynb` / `llvecchia_vs_cholesky.ipynb`
+  comparing `LLNystrom`/`LLVecchia` against exact Cholesky (#358).
+- `LLNystrom(k)` objective (fixed-landmark Nystrom low-rank approximation of
+  the covariance, greedy pivoted-Cholesky landmarks held fixed across theta so
+  the objective stays smooth) for large-`n` scalability: `O(n·k²)` fit via the
+  Woodbury identity with an analytic gradient, `predictNystrom`, and a
+  Nystrom-specific `update()` (`refit=false` at fixed theta/landmarks, or
+  `refit=true` warm-restarting theta over the same landmarks); such fits skip
+  the `O(n²)` pairwise-difference cube (#346).
+- `WarpKriging`: binding surface brought to parity with `Kriging` across the
+  Python/R/Octave/Julia bindings — `noise()`, `warp_params()`, `optim()`,
+  `objective()` and `covMat(X1, X2)` accessors, numeric `parameters` seeds
+  (`theta` / `warp_params` / `noise`) with `optim="none"` to rebuild a model
+  with frozen hyper-parameters, `noise=` and `parameters=` no longer mutually
+  exclusive, and `update(..., noise_u=)` / `update_simulate(..., noise_u=)`;
+  the R/Python docs no longer advertise an unimplemented `noise="nugget"`
+  mode (#361).
+- Claude Code plugin packaging: `.claude-plugin/` manifests and
+  `fit`/`predict`/`simulate`/`update`/`build` commands driving the libKriging
+  skill, installable through `/plugin marketplace add libKriging/libKriging`.
+
+### Changed
+- **Breaking**: the Vecchia objective `"VLL"` / `"VLL(m)"` introduced in 1.1.0
+  is renamed `"LLVecchia"` / `"LLVecchia(m)"` (and the Nystrom objective is
+  spelled `"LLNystrom"` / `"LLNystrom(k)"`, never released under its former
+  `"LLNys"` name), in the C++ core, `NestedKriging` and all bindings. No alias
+  was kept: `objective="VLL(m)"` now raises `Unsupported fit objective`.
+  Migration: replace `"VLL"` by `"LLVecchia"` and `"VLL(m)"` by `"LLVecchia(m)"`
+  in your calls; results are unchanged (#346).
+- Python: dropped the `numpy<2` pin — `pylibkriging` now supports NumPy 2.x.
+  Required bumping the vendored `pybind11` (2.10.1 → 2.13.6) and `carma`
+  submodules, since both hardcode offsets into NumPy's C-API function table
+  and predated the NumPy 2.0 ABI changes; also fixed a bug in carma's own
+  NumPy-2.0 fix where `PyArray_CopyInto`'s table offset (which differs
+  between NumPy 1.x and 2.x) was hardcoded to the NumPy-2-only value instead
+  of being picked at runtime (#339, libKriging/carma#1).
+- Performance: `R^-1` is now computed lazily in `populate_Model`. It is only
+  consumed by an analytic theta gradient, so plain `fit()`, `predict()`,
+  `logLikelihoodFun(theta, grad=false)` and, above all, `update(refit=false)`
+  no longer pay a dense `O(n^3)` `inv_sympd` at the full size on every call;
+  `update(refit=false)`'s incremental Cholesky is `O(n_old^2 * n_u)` again
+  (#363).
+
+### Fixed
 - `WarpKriging`: every per-variable warping whose parametrisation assumes an
   `O(1)` / `[0, 1]` input — `knots(k)` (Xiong et al. 2007, on `[0, 1]`),
   `kumaraswamy` (a CDF on `[0, 1]`), `boxcox` (needs `x > 0`), `neural_mono`,
@@ -595,22 +618,6 @@ JLibKriging.jl.
   `(theta, warp_params)`, now also share one input-range calibration
   (`WarpKriging::recalibrate_warps()`), so the aggregate still interpolates
   the design (#362).
-- Windows: Python binding processes silently hanging (looking like ~1h CI
-  timeouts) were actually undetected heap corruption from Armadillo's
-  aligned allocator never being routed through libKriging's own allocator
-  indirection (`lkalloc`) despite the Python binding requesting it at module
-  init — re-enabled the wiring (#354, #357). The MSVC Debug CRT's blocking
-  error dialog is now also redirected to stderr so any future corruption
-  fails fast with a diagnosable message instead of hanging CI (#356).
-- Windows: Python binding CI jobs hanging on OpenMP thread-pool churn from
-  repeated parallel regions during BFGS, the same mechanism as an earlier
-  Octave Windows fix — forced `OMP_NUM_THREADS=1` for Windows Python builds
-  (#351, #352).
-- Octave Windows: flaky `predictNystrom` test assertion caused by free-BFGS
-  convergence varying across platforms/compilers — compared against a
-  deterministic fixed-theta fit instead; also fixed `optim="none"` silently
-  ignoring `LLNystrom(k)` and doing an exact fit instead of honoring the
-  requested objective (#353).
 - `optim="none"` silently fell through to a plain exact factorization for
   a light Vecchia fit (`set_vecchia_exact_commit(false)`), ignoring the
   requested `LLVecchia(m)` objective entirely instead of committing a
