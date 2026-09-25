@@ -32,6 +32,8 @@
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -1681,7 +1683,9 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
                                         arma::vec* beta_out,
                                         double* sigma2_out,
                                         const arma::mat* RinvFY_x0,
-                                        arma::mat* RinvFY_out) const {
+                                        arma::mat* RinvFY_out,
+                                        const arma::mat* W_x0,
+                                        arma::mat* W_out) const {
   const arma::uword n = m_X.n_rows;
   const arma::uword nprobe = m_iterative_nprobe;
   const arma::uword max_iter = (m_iterative_cg_max_iter == 0) ? 2 * n : m_iterative_cg_max_iter;
@@ -2017,7 +2021,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
 #endif
   {
     const arma::mat FY = arma::join_rows(m_F, m_y);
-    RinvFY = cgSolve(FY, m_iterative_cg_tol, RinvFY_x0);
+    const bool fy_x0_ok = RinvFY_x0 != nullptr && RinvFY_x0->n_rows == FY.n_rows && RinvFY_x0->n_cols == FY.n_cols;
+    RinvFY = cgSolve(FY, m_iterative_cg_tol, fy_x0_ok ? RinvFY_x0 : nullptr);
   }
   if (RinvFY_out != nullptr)
     *RinvFY_out = RinvFY;
@@ -2119,8 +2124,13 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // far faster with n than [F|y]'s, because the isotropic Rademacher
   // probes carry energy on R's whole spectrum while [F|y] is smooth and
   // lives mostly in R's dominant modes).
-  if (grad_out != nullptr && !fused_probes_solved)
-    W = cgSolve(m_iterative_probes, m_iterative_probes_cg_tol);
+  if (grad_out != nullptr && !fused_probes_solved) {
+    const bool w_x0_ok
+        = W_x0 != nullptr && W_x0->n_rows == m_iterative_probes.n_rows && W_x0->n_cols == m_iterative_probes.n_cols;
+    W = cgSolve(m_iterative_probes, m_iterative_probes_cg_tol, w_x0_ok ? W_x0 : nullptr);
+  }
+  if (W_out != nullptr && grad_out != nullptr)
+    *W_out = W;
 
   if (beta_out != nullptr)
     *beta_out = beta;
@@ -2285,7 +2295,7 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
   const arma::uword n_o = m_X.n_rows;
   const arma::uword n_u = X_u.n_rows;
   arma::mat RinvFY_x0;
-  const bool have_warm_start = (m_iterative_RinvFY_cache.n_rows == n_o) && (m_iterative_RinvFY_cache.n_cols > 0);
+  const bool have_warm_start = iterative_cache_valid();
   if (have_warm_start)
     RinvFY_x0 = arma::join_cols(m_iterative_RinvFY_cache,
                                 arma::mat(n_u, m_iterative_RinvFY_cache.n_cols, arma::fill::zeros));
@@ -2353,6 +2363,7 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
   _logLikelihoodIterative(
       m_theta, nullptr, &beta_v, &sigma2_v, have_warm_start ? &RinvFY_x0 : nullptr, &RinvFY_new);
   m_iterative_RinvFY_cache = std::move(RinvFY_new);
+  m_iterative_RinvFY_cache_theta = m_theta;
   if (m_est_beta)
     m_beta = beta_v;
   if (m_est_sigma2)
@@ -2533,18 +2544,59 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       throw std::invalid_argument("LLIterative objective not supported for Nugget/Heterogeneous noise modes");
     // Like LLNystrom, there is no exact-commit branch here: km_data (the dense
     // O(n^3) KModel) is never populated for this objective, by design.
+    // Warm start across optimizer evaluations: each evaluation's CG solves
+    // (R^-1*[F|y] and R^-1*probes, probes being fixed for the whole fit)
+    // start from the previous evaluation's solutions instead of 0. Kept per
+    // thread, since multistart workers call this objective concurrently from
+    // different starting points. Inert for correctness (CG converges to the
+    // same solution from any x0); LK_CG_WARM_OPTIM=0 disables it.
+    struct WarmState {
+      std::mutex mu;
+      std::map<std::thread::id, std::pair<arma::mat, arma::mat>> x0;  // (RinvFY, W) per thread
+    };
+    const char* warm_env = std::getenv("LK_CG_WARM_OPTIM");
+    const bool warm_on = !(warm_env != nullptr && std::string(warm_env) == "0");
+    auto warm = std::make_shared<WarmState>();
+    auto eval = [this, warm, warm_on](const arma::vec& _theta, arma::vec* grad) -> double {
+      if (!warm_on)
+        return this->_logLikelihoodIterative(_theta, grad);
+      std::pair<arma::mat, arma::mat> prev;
+      {
+        std::lock_guard<std::mutex> lock(warm->mu);
+        auto it = warm->x0.find(std::this_thread::get_id());
+        if (it != warm->x0.end())
+          prev = it->second;
+      }
+      arma::mat fy_out, w_out;
+      const double ll = this->_logLikelihoodIterative(_theta,
+                                                      grad,
+                                                      nullptr,
+                                                      nullptr,
+                                                      prev.first.n_elem > 0 ? &prev.first : nullptr,
+                                                      &fy_out,
+                                                      prev.second.n_elem > 0 ? &prev.second : nullptr,
+                                                      &w_out);
+      if (std::isfinite(ll)) {
+        std::lock_guard<std::mutex> lock(warm->mu);
+        auto& slot = warm->x0[std::this_thread::get_id()];
+        slot.first = std::move(fy_out);
+        if (w_out.n_elem > 0)
+          slot.second = std::move(w_out);
+      }
+      return ll;
+    };
     if (Optim::reparametrize) {
-      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+      return [eval](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
         const arma::vec _theta = Optim::reparam_from(_gamma);
         arma::vec grad;
-        const double ll = this->_logLikelihoodIterative(_theta, grad_out != nullptr ? &grad : nullptr);
+        const double ll = eval(_theta, grad_out != nullptr ? &grad : nullptr);
         if (grad_out != nullptr)
           *grad_out = -Optim::reparam_from_deriv(_theta, grad);
         return -ll;
       };
     } else {
-      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
-        const double ll = this->_logLikelihoodIterative(_gamma, grad_out);
+      return [eval](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
+        const double ll = eval(_gamma, grad_out);
         if (grad_out != nullptr)
           *grad_out = -*grad_out;
         return -ll;
@@ -2724,6 +2776,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       arma::mat RinvFY_v;
       _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v, nullptr, &RinvFY_v);
       m_iterative_RinvFY_cache = std::move(RinvFY_v);
+      m_iterative_RinvFY_cache_theta = m_theta;
       if (m_est_beta)
         m_beta = beta_v;
       if (m_est_sigma2)
@@ -3295,6 +3348,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         arma::mat RinvFY_v;
         _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v, nullptr, &RinvFY_v);
         m_iterative_RinvFY_cache = std::move(RinvFY_v);
+        m_iterative_RinvFY_cache_theta = m_theta;
         if (m_est_beta)
           m_beta = beta_v;
         if (m_est_sigma2)
@@ -3452,8 +3506,14 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictIterative(con
     throw std::runtime_error("predictIterative: only available for NoiseModel::None");
   if (m_X.n_rows == 0)
     throw std::runtime_error("predictIterative: model was not fitted");
-  return predictIterative_impl(
-      X_n, return_stdev, max_iter, tol, use_nystrom_precond, precond_rank, {}, &m_iterative_RinvFY_cache);
+  return predictIterative_impl(X_n,
+                               return_stdev,
+                               max_iter,
+                               tol,
+                               use_nystrom_precond,
+                               precond_rank,
+                               {},
+                               iterative_cache_valid() ? &m_iterative_RinvFY_cache : nullptr);
 }
 
 /** Draw sample trajectories of kriging at given points X'

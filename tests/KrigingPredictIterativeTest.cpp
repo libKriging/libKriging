@@ -110,20 +110,27 @@ TEST_CASE("predictIterative: the dense fast path matches the matrix-free path", 
 
   const char* old_env = std::getenv("LK_ITERATIVE_DENSE_MAX_MB");
 
+  // Both paths must be compared at CONVERGED solves: two non-converged
+  // iterates sharing a residual norm need not share digits beyond it. The
+  // default tol=1e-8 bounds the mean error only to ~cond(R)*1e-8 (cond ~4.5e3
+  // here) and the stdev solves run at sqrt(tol), so the comparison uses a
+  // tol at the round-off floor and a generous iteration budget instead.
+  const double tol_cmp = 1e-14;
+  const arma::uword it_cmp = 10 * X.n_rows;
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);  // force matrix-free
-  auto [m_mf, s_mf] = k.predictIterative(Xt, true);
+  auto [m_mf, s_mf] = k.predictIterative(Xt, true, it_cmp, tol_cmp);
 
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);  // allow dense
-  auto [m_de, s_de] = k.predictIterative(Xt, true);
+  auto [m_de, s_de] = k.predictIterative(Xt, true, it_cmp, tol_cmp);
 
   // and the preconditioned solve too
   auto [m_mf_pc, s_mf_pc] = ([&] {
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
-    return k.predictIterative(Xt, true, 0, 1e-8, true, 20);
+    return k.predictIterative(Xt, true, it_cmp, tol_cmp, true, 20);
   })();
   auto [m_de_pc, s_de_pc] = ([&] {
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
-    return k.predictIterative(Xt, true, 0, 1e-8, true, 20);
+    return k.predictIterative(Xt, true, it_cmp, tol_cmp, true, 20);
   })();
 
   if (old_env)
@@ -134,9 +141,11 @@ TEST_CASE("predictIterative: the dense fast path matches the matrix-free path", 
   INFO("max |mean diff| = " << arma::abs(m_mf - m_de).max());
   INFO("max |stdev diff| = " << arma::abs(s_mf - s_de).max());
   CHECK(arma::abs(m_mf - m_de).max() < 1e-8 * arma::stddev(y));
-  CHECK(arma::abs(s_mf - s_de).max() < 1e-8 * arma::stddev(y));
+  // stdev solves run at sqrt(tol_cmp) = 1e-7 by design (see
+  // predictIterative_impl's stdev_tol), hence a correspondingly looser bound.
+  CHECK(arma::abs(s_mf - s_de).max() < 1e-6 * arma::stddev(y));
   CHECK(arma::abs(m_mf_pc - m_de_pc).max() < 1e-8 * arma::stddev(y));
-  CHECK(arma::abs(s_mf_pc - s_de_pc).max() < 1e-8 * arma::stddev(y));
+  CHECK(arma::abs(s_mf_pc - s_de_pc).max() < 1e-6 * arma::stddev(y));
 }
 
 TEST_CASE("predictIterative defaults to mean only (stdev empty)", "[predictiterative][kriging]") {

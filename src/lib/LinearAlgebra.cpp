@@ -3,6 +3,7 @@
 #define _USE_MATH_DEFINES // required for Visual Studio
 #include <cmath>
 #include <cstdio>
+#include <string>
 #include <cstdlib>
 // clang-format on
 
@@ -53,6 +54,18 @@ LIBKRIGING_EXPORT void LinearAlgebra::set_chol_warning(bool warn) {
 };
 
 LIBKRIGING_EXPORT bool LinearAlgebra::warn_cg = true;
+
+LIBKRIGING_EXPORT bool LinearAlgebra::cg_auto_precond = [] {
+  const char* e = std::getenv("LK_CG_AUTO_PRECOND");
+  return !(e != nullptr && std::string(e) == "0");
+}();
+LIBKRIGING_EXPORT double LinearAlgebra::cg_auto_precond_min_captured = [] {
+  const char* e = std::getenv("LK_CG_AUTO_PRECOND_MIN_CAPTURED");
+  return e != nullptr ? std::atof(e) : 0.5;
+}();
+LIBKRIGING_EXPORT void LinearAlgebra::set_cg_auto_precond(bool on) {
+  LinearAlgebra::cg_auto_precond = on;
+}
 
 LIBKRIGING_EXPORT void LinearAlgebra::set_cg_warning(bool warn) {
   LinearAlgebra::warn_cg = warn;
@@ -466,6 +479,11 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::solve(const arma::mat& A, const arma:
   return arma::solve(A, B, LinearAlgebra::default_solve_opts);
 }
 
+// Round-off floor detection (shared by conjugateGradient / conjugateGradientBatched):
+// a column stops, unconverged, when a true-residual confirmation is not at
+// least 1/cg_stall_factor better than the previous one.
+static constexpr double cg_stall_factor = 0.9;
+
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
                                                              const arma::mat& B,
                                                              arma::uword max_iter,
@@ -489,46 +507,49 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradient(const std::function
     arma::vec p = z;
     double rz_old = arma::dot(r, z);
 
-    // GP covariance matrices are typically ill-conditioned (smooth kernels,
-    // many points): the recursively-updated residual (r -= alpha*Ap) drifts
-    // from the true residual under round-off well before max_iter is
-    // reached, and pushing past that point can make x measurably WORSE, not
-    // better (observed empirically: unstable growth after ~2n iterations on
-    // a matern5_2 fit). Periodically recompute the exact residual from
-    // scratch (one extra matvec every `restart_every` iterations) -- a
-    // standard CG robustness fix -- to correct that drift.
-    constexpr arma::uword restart_every = 50;
+    // No periodic restart: resetting the search direction (p = z) every k
+    // iterations throws away the Krylov conjugacy and turns CG into a
+    // steepest-descent-like method on ill-conditioned GP covariances (measured:
+    // n=60, cond(R)=4.5e3, the restarted variant plateaued at a 5e-5 relative
+    // residual after 2n iterations where plain CG reached 2e-9; n=160,
+    // cond(R)=1.5e8, it stalled at a 0.67 relative error after 5000 iterations
+    // where plain CG reached 3e-10). Round-off drift of the recursive residual
+    // is handled instead by (1) confirming convergence on the TRUE residual
+    // b - A*x before stopping (one extra matvec, only when the recursive one
+    // says "converged") and, if it does not confirm, replacing r by the true
+    // residual while KEEPING the search direction (residual replacement), and
+    // (2) stopping when successive true-residual confirmations stop
+    // improving (round-off floor). No window-based stagnation test on the
+    // recursive residual: on ill-conditioned GP covariances CG routinely
+    // plateaus for hundreds of iterations before converging superlinearly
+    // (measured: n=160, cond(R)~1e8, a 200-iteration window stopped the
+    // solves at ~1000-1500 iterations, 1e-3 away from the converged ll).
+    double last_true_rel = arma::datum::inf;
 
     for (arma::uword it = 0; it < max_iter; ++it) {
       const arma::vec Ap = Amul(p);
       const double pAp = arma::dot(p, Ap);
-      if (pAp <= 0.0)
+      if (!(pAp > 0.0))
         break;  // breakdown guard: shouldn't happen for a genuinely SPD A
       const double alpha = rz_old / pAp;
       x += alpha * p;
-
-      if ((it + 1) % restart_every == 0) {
-        // Full restart: the just-recomputed residual reflects the TRUE
-        // state at x, so the previous rz_old (from the drifted residual) is
-        // no longer a meaningful reference for the Fletcher-Reeves ratio --
-        // blending it into beta (as the non-restart branch does) sends the
-        // search direction off in a bad direction instead of correcting it.
-        // Reset p = z, i.e. restart CG fresh from the current x.
-        r = b - Amul(x);
-        if (arma::norm(r) / bnorm < tol)
-          break;
-        z = preconditioned ? Pinv(r) : r;
-        rz_old = arma::dot(r, z);
-        p = z;
-        continue;
-      }
-
       r -= alpha * Ap;
-      const double rnorm = arma::norm(r);
-      if (rnorm / bnorm < tol)
+      double rel = arma::norm(r) / bnorm;
+      if (rel < tol) {
+        r = b - Amul(x);  // confirm on the true residual
+        rel = arma::norm(r) / bnorm;
+        if (rel < tol)
+          break;
+        if (rel >= cg_stall_factor * last_true_rel)
+          break;              // true residual no longer improving: round-off floor reached
+        last_true_rel = rel;  // residual replacement, search direction kept
+      }
+      if (!std::isfinite(rel))
         break;
       z = preconditioned ? Pinv(r) : r;
       const double rz_new = arma::dot(r, z);
+      if (!(rz_new > 0.0))
+        break;
       p = z + (rz_new / rz_old) * p;
       rz_old = rz_new;
     }
@@ -766,7 +787,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
   // fly) that turns ncols redundant covariance sweeps per iteration into one.
   // Convergence contract matches LinearAlgebra::conjugateGradient: per
   // column, stop once norm(A*x-b)/norm(b) < tol or after max_iter iterations;
-  // same periodic fresh exact-residual restart to correct round-off drift.
+  // same true-residual confirmation and stagnation detection.
   const bool preconditioned = static_cast<bool>(PinvBatched);
   const arma::uword n = B.n_rows;
   const arma::uword ncols = B.n_cols;
@@ -794,14 +815,24 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
       active[c] = 0;  // X0 already meets tol for this column (e.g. an unchanged warm-started column)
   }
 
-  constexpr arma::uword restart_every = 50;
+  // No periodic restart (see LinearAlgebra::conjugateGradient for the
+  // measurements): true-residual confirmation + residual replacement keeping
+  // the search direction; a column stops unconverged when successive
+  // confirmations stop improving (round-off floor).
   arma::rowvec alpha_it(ncols, arma::fill::zeros);  // this iteration's step lengths, pass 1 -> pass 2
+  arma::rowvec last_true_rel(ncols, arma::fill::value(arma::datum::inf));
+  std::vector<char> converged(ncols, 0);
+  for (arma::uword c = 0; c < ncols; ++c) {
+    if (!active[c])
+      converged[c] = 1;  // zero RHS, or X0 already meets tol
+  }
 
   // TEMP DIAGNOSTIC (LK_DEBUG_CG_ITERS=1): report how many of max_iter this
   // call actually used, to check whether CG is converging early or running
   // to the 2n cap as n grows -- see bench/gpu n=4000->8000 scaling dig.
   static const bool debug_cg_iters = std::getenv("LK_DEBUG_CG_ITERS") != nullptr;
   arma::uword it_used = 0;
+  arma::uword n_confirm = 0;
 
   for (arma::uword it = 0; it < max_iter; ++it) {
     bool any_active = false;
@@ -813,29 +844,47 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
 
     const arma::mat AP = AmulBatched(P);  // one shared matvec for all columns
 
+    std::vector<arma::uword> to_confirm;
     for (arma::uword c = 0; c < ncols; ++c) {
       if (!active[c])
         continue;
       const double pAp = arma::dot(P.col(c), AP.col(c));
-      if (pAp <= 0.0) {  // SPD breakdown guard: shouldn't happen for genuinely SPD A
+      if (!(pAp > 0.0)) {  // SPD breakdown guard: shouldn't happen for genuinely SPD A
         active[c] = 0;
         continue;
       }
       alpha_it(c) = rz_old(c) / pAp;
       Xc.col(c) += alpha_it(c) * P.col(c);
+      R.col(c) -= alpha_it(c) * AP.col(c);
+      if (arma::norm(R.col(c)) / bnorm(c) < tol(c))
+        to_confirm.push_back(c);
     }
 
-    const bool do_restart = ((it + 1) % restart_every == 0);
-    const arma::mat AX = do_restart ? AmulBatched(Xc) : arma::mat();
+    // Confirm "converged" columns on the TRUE residual, in one shared matvec.
+    if (!to_confirm.empty()) {
+      ++n_confirm;
+      const arma::uvec idx = arma::conv_to<arma::uvec>::from(to_confirm);
+      const arma::mat AX = AmulBatched(Xc.cols(idx));
+      for (arma::uword q = 0; q < idx.n_elem; ++q) {
+        const arma::uword c = idx(q);
+        R.col(c) = B.col(c) - AX.col(q);
+        const double rel = arma::norm(R.col(c)) / bnorm(c);
+        if (rel < tol(c)) {
+          active[c] = 0;
+          converged[c] = 1;
+        } else if (rel >= cg_stall_factor * last_true_rel(c)) {
+          active[c] = 0;  // round-off floor reached: not converged
+        } else {
+          last_true_rel(c) = rel;  // residual replacement, search direction kept
+        }
+      }
+    }
 
     for (arma::uword c = 0; c < ncols; ++c) {
       if (!active[c])
         continue;
-      if (do_restart)
-        R.col(c) = B.col(c) - AX.col(c);  // fresh exact residual on the updated iterate
-      else
-        R.col(c) -= alpha_it(c) * AP.col(c);
-      if (arma::norm(R.col(c)) / bnorm(c) < tol(c))
+      const double rel = arma::norm(R.col(c)) / bnorm(c);
+      if (!std::isfinite(rel))
         active[c] = 0;
     }
 
@@ -846,26 +895,30 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
         continue;
       const arma::vec z_c = preconditioned ? Z.col(c) : R.col(c);
       const double rz_new = arma::dot(R.col(c), z_c);
-      if (do_restart)
-        P.col(c) = z_c;  // plain restart: p = z, no Fletcher-Reeves blend
-      else
-        P.col(c) = z_c + (rz_new / rz_old(c)) * P.col(c);
+      if (!(rz_new > 0.0)) {
+        active[c] = 0;
+        continue;
+      }
+      P.col(c) = z_c + (rz_new / rz_old(c)) * P.col(c);
       rz_old(c) = rz_new;
     }
   }
   if (debug_cg_iters)
-    std::fprintf(stderr, "[LK_DEBUG_CG_ITERS] n=%zu ncols=%zu max_iter=%zu used=%zu\n",
-                 static_cast<size_t>(n), static_cast<size_t>(ncols),
-                 static_cast<size_t>(max_iter), static_cast<size_t>(it_used));
+    std::fprintf(stderr,
+                 "[LK_DEBUG_CG_ITERS] n=%zu ncols=%zu max_iter=%zu used=%zu confirm=%zu\n",
+                 static_cast<size_t>(n),
+                 static_cast<size_t>(ncols),
+                 static_cast<size_t>(max_iter),
+                 static_cast<size_t>(it_used),
+                 static_cast<size_t>(n_confirm));
 
-  // A column left active when the loop ends (as opposed to converging to
-  // tol, or being deactivated by the SPD breakdown guard above) exhausted
-  // max_iter without meeting tol -- its entry in Xc is whatever CG had
-  // reached at that point, not a converged solve.
+  // A column that never met tol on its TRUE residual (exhausted max_iter,
+  // stagnated on the round-off floor, or broke down) is reported as
+  // unconverged -- its entry in Xc is the last iterate, not a converged solve.
   arma::uword n_unconverged = 0;
   for (arma::uword c = 0; c < ncols; ++c)
-    if (active[c])
-      ++n_unconverged;
+    if (!converged[c])
+      ++n_unconverged;  // hit max_iter, stagnated, or broke down without meeting tol
   if (n_unconverged_out != nullptr)
     *n_unconverged_out = n_unconverged;
   LinearAlgebra::cgNonConvergenceWarning(n_unconverged, ncols, n, max_iter);
