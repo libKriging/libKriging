@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![PyPI version](https://img.shields.io/pypi/v/pylibkriging.svg)](https://pypi.org/project/pylibkriging/)
 [![CRAN version](https://www.r-pkg.org/badges/version/rlibkriging)](https://cran.r-project.org/package=rlibkriging)
+[![bench/gpu comparison](https://github.com/libKriging/libKriging/actions/workflows/bench-gpu-report.yml/badge.svg)](https://github.com/libKriging/libKriging/actions/workflows/bench-gpu-report.yml)
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (boxcox, kumaraswamy, knots, mlp, categorical, ordinal).
@@ -26,6 +27,8 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
 - **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
+
+An interactive cross-machine timing comparison of libKriging's iterative backends (CUDA/HIP/Metal/OpenMP/Cholesky) is generated on every push touching [`bench/gpu/results`](bench/gpu/results) by the [`bench/gpu comparison`](https://github.com/libKriging/libKriging/actions/workflows/bench-gpu-report.yml) workflow — open its latest run and download the `bench-gpu-comparison` artifact for the chart. See [`bench/gpu/README.md`](bench/gpu/README.md) for how the results are produced.
 
 
 Table of contents

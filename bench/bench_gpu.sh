@@ -8,15 +8,21 @@
 #
 # Usage: ./bench/bench_gpu.sh [bench_gpu.py options...]
 #   e.g. ./bench/bench_gpu.sh --sizes 250,500 --backends chol,iter-cuda,iter-omp
+#   e.g. (macOS/Metal) ./bench/bench_gpu.sh --sizes 250,500 --backends chol,iter-metal,gpt-cpu
 #
 # Env overrides:
 #   BUILD_DIR    : build dir to use/create for pylibkriging
 #                  (default: ./build_cuda_iterative if it already has
-#                  ENABLE_CUDA_ITERATIVE=ON, else ./build_dev3)
+#                  ENABLE_CUDA_ITERATIVE=ON; else, on Darwin,
+#                  ./build_metal_iterative; else ./build_dev3)
 #   PYTHON_BIN   : python interpreter to use (default: /home/richet/.local/bin/python3.12
-#                  -- the repo-root venv/.venv here are stale symlinks, see
-#                  memory env-binding-toolchains; the plain `python3` on PATH
-#                  is a stray old interpreter)
+#                  if present -- the repo-root venv/.venv on that host are
+#                  stale symlinks, see memory env-binding-toolchains --
+#                  otherwise the first `python3` on PATH)
+#   METAL_CPP_DIR: path to the metal-cpp headers (macOS only; default:
+#                  <repo>/.deps/metal-cpp if present). Only used when a NEW
+#                  build dir is configured on Darwin, to pass
+#                  -DENABLE_METAL_ITERATIVE=ON -DMETAL_CPP_DIR=...
 #   SKIP_BUILD   : set to 1 to skip the freshness check/rebuild entirely
 #   CUDA_VISIBLE_DEVICES : forwarded as-is (select GPU on a multi-GPU host)
 #
@@ -27,19 +33,43 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-PYTHON_BIN="${PYTHON_BIN:-/home/richet/.local/bin/python3.12}"
+IS_DARWIN=0
+[ "$(uname -s)" = "Darwin" ] && IS_DARWIN=1
+
+if [ -z "${PYTHON_BIN:-}" ]; then
+    if [ -x "/home/richet/.local/bin/python3.12" ]; then
+        PYTHON_BIN="/home/richet/.local/bin/python3.12"
+    else
+        PYTHON_BIN="$(command -v python3 || true)"
+    fi
+fi
 
 if [ -z "${BUILD_DIR:-}" ]; then
     if [ -f "${PROJECT_ROOT}/build_cuda_iterative/CMakeCache.txt" ] \
         && grep -q "^ENABLE_CUDA_ITERATIVE:BOOL=ON" "${PROJECT_ROOT}/build_cuda_iterative/CMakeCache.txt" 2>/dev/null; then
         BUILD_DIR="${PROJECT_ROOT}/build_cuda_iterative"
+    elif [ "$IS_DARWIN" = 1 ]; then
+        BUILD_DIR="${PROJECT_ROOT}/build_metal_iterative"
     else
         BUILD_DIR="${PROJECT_ROOT}/build_dev3"
     fi
 fi
 
-if [ ! -x "$PYTHON_BIN" ]; then
-    echo "Error: PYTHON_BIN not found/executable: $PYTHON_BIN" >&2
+if [ -z "${METAL_CPP_DIR:-}" ] && [ -d "${PROJECT_ROOT}/.deps/metal-cpp" ]; then
+    METAL_CPP_DIR="${PROJECT_ROOT}/.deps/metal-cpp"
+fi
+
+# nproc is Linux-only; macOS has neither it nor coreutils by default.
+if command -v nproc > /dev/null 2>&1; then
+    NPROC="$(nproc)"
+elif [ "$IS_DARWIN" = 1 ]; then
+    NPROC="$(sysctl -n hw.ncpu)"
+else
+    NPROC="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+fi
+
+if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+    echo "Error: PYTHON_BIN not found/executable: ${PYTHON_BIN:-<empty>}" >&2
     exit 1
 fi
 
@@ -49,10 +79,20 @@ PYLIBKRIGING_DIR="${BUILD_DIR}/bindings/Python/pylibkriging"
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
     if [ ! -d "$BUILD_DIR" ]; then
         echo "No build dir at $BUILD_DIR -- configuring a new one..."
+        EXTRA_CMAKE_ARGS=()
+        if [ "$IS_DARWIN" = 1 ]; then
+            if [ -n "${METAL_CPP_DIR:-}" ]; then
+                EXTRA_CMAKE_ARGS+=(-DENABLE_METAL_ITERATIVE=ON -DMETAL_CPP_DIR="$METAL_CPP_DIR")
+            else
+                echo "Note: no METAL_CPP_DIR found -- configuring without -DENABLE_METAL_ITERATIVE" \
+                     "(iter-metal backend won't be available; set METAL_CPP_DIR to enable it)." >&2
+            fi
+        fi
         cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_PYTHON_BINDING=ON \
-            -DPYTHON_EXECUTABLE="$PYTHON_BIN"
+            -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
+            "${EXTRA_CMAKE_ARGS[@]}"
     fi
 
     SO_PATH="$(compgen -G "${PYLIBKRIGING_DIR}/_pylibkriging*.so" || true)"
@@ -76,7 +116,7 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
 
     if [ "$NEEDS_BUILD" = "1" ]; then
         echo "Building _pylibkriging in $BUILD_DIR ..."
-        cmake --build "$BUILD_DIR" --target _pylibkriging -j"$(nproc)"
+        cmake --build "$BUILD_DIR" --target _pylibkriging -j"$NPROC"
     fi
 fi
 
@@ -87,6 +127,10 @@ if ! compgen -G "${PYLIBKRIGING_DIR}/_pylibkriging*.so" > /dev/null; then
 fi
 
 export LD_LIBRARY_PATH="${BUILD_DIR}/src/lib:${BUILD_DIR}/dependencies/armadillo-code:${BUILD_DIR}/dependencies/lbfgsb_cpp${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [ "$IS_DARWIN" = 1 ]; then
+    # macOS's dynamic linker uses DYLD_LIBRARY_PATH, not LD_LIBRARY_PATH.
+    export DYLD_LIBRARY_PATH="${BUILD_DIR}/src/lib:${BUILD_DIR}/dependencies/armadillo-code:${BUILD_DIR}/dependencies/lbfgsb_cpp${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+fi
 export PYTHONPATH="${PYLIBKRIGING_DIR}:${PROJECT_ROOT}/bindings/Python/pylibkriging/src${PYTHONPATH:+:$PYTHONPATH}"
 
 # --- 2. sanity-check the python env -----------------------------------------

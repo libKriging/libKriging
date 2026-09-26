@@ -1,7 +1,8 @@
 # `bench/gpu/` — manual libKriging vs GPyTorch benchmark
 
 `bench_gpu.py` is a **standalone, run-by-hand** benchmark (not wired into
-CI). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
+CI — see `plot_comparison.py` below for the one piece of this directory
+that IS). It runs one fixed sweep — `sine_sum`, d=4, matern5_2, shared
 `theta=0.15`, n ∈ {250, 500, 1000, 2000, 4000, 8000} by default (`--sizes` to
 change) — and compares seven backends, each named
 `<lib>-<method>-<linalg lib>` (the linalg name is auto-detected from the
@@ -324,3 +325,33 @@ iteration count grows far faster with `n` than the `[F|y]` solve's — see
 own accuracy, unlike loosening the shared `--cg-tol`. See
 [`docs/math/Iterative.md`](../../docs/math/Iterative.md) and
 [`docs/comparisons/libKriging_vs_GPyTorch.ipynb`](../../docs/comparisons/libKriging_vs_GPyTorch.ipynb).
+
+## Cross-machine comparison chart (`plot_comparison.py`, wired into CI)
+
+`results/*.csv` accumulate one file per machine over time (see the "one per
+machine" convention above) — `plot_comparison.py` reads all of them and
+renders a single interactive Plotly page for the libKriging backends only
+(GPyTorch rows are dropped; that comparison already lives in
+`docs/comparisons/`). Machine is the x-axis, so every backend that ran on
+a machine shares that machine's tick — e.g. `iter-omp` and `chol` on the
+same CPU-only host plot side by side at that host's position. Color
+carries the backend/engine (a categorical identity, fixed hue order) and
+marker shape carries the training-set size `n` (an ordered quantity) — see
+the dataviz skill's `color-formula.md` for why those are different
+encodings. Two legends: a static backend color key, and an `n` shape key
+whose clicks isolate one `n` at a time across every machine and backend. A
+timing column (fit/logLik/predict) is switchable via a dropdown, on a
+log-scale y-axis.
+
+Run by hand:
+
+```sh
+pip install plotly
+python bench/gpu/plot_comparison.py   # writes results/comparison.html
+```
+
+`.github/workflows/bench-gpu-report.yml` runs this on every push that
+touches `results/*.csv` (plus manual dispatch) and uploads the HTML as a
+build artifact — the one piece of `bench/gpu/` that IS wired into CI, since
+it only aggregates already-committed results rather than running the
+(hardware-dependent) benchmark itself.
