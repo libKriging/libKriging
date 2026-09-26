@@ -818,3 +818,125 @@ TEST_CASE("LinearAlgebra::woodbury_solve/logdet compose end-to-end with nystromF
   double val_wood = LinearAlgebra::woodbury_logdet(U, D);
   REQUIRE(std::abs(val_wood - val_dense) < 1e-6 * std::max(1.0, std::abs(val_dense)));
 }
+
+TEST_CASE("LinearAlgebra::WoodburyFactorization::whitenL/whitenLt give a factor L with L*L.t() == P",
+          "[LinearAlgebra][nystrom][woodbury]") {
+  // whitenL(B) = L^-1 B, whitenLt(B) = L^-T B for a square (non-symmetric)
+  // factor L of P = D + U U' with L L' == P. Two consequences must hold:
+  //   whitenLt(whitenL(B)) == P^-1 B  (== WoodburyFactorization::solve(B))
+  //   Rtilde = L^-1 R L^-T is symmetric with logdet(Rtilde) = logdet(R) - logdet(P)
+  // -- the identity Kriging::_logLikelihoodIterative relies on to run its SLQ
+  // log-determinant on the well-conditioned whitened operator.
+  const arma::uword n = 45;
+  const arma::uword k = 7;
+  arma::arma_rng::set_seed(303);
+  const arma::mat U = arma::randn<arma::mat>(n, k);
+  const arma::vec D = arma::randu<arma::vec>(n) + 0.3;  // strictly positive
+  arma::mat P = U * U.t();
+  P.diag() += D;
+
+  LinearAlgebra::WoodburyFactorization wf(U, D);
+
+  const arma::mat B = arma::randn<arma::mat>(n, 4);
+  REQUIRE(arma::approx_equal(wf.whitenLt(wf.whitenL(B)), arma::solve(P, B), "reldiff", 1e-8));
+
+  // Rtilde on a random SPD R
+  arma::mat A = arma::randn<arma::mat>(n, n);
+  arma::mat R = A * A.t();
+  R.diag() += 1.0;
+  const arma::mat Rtilde = wf.whitenL(R * wf.whitenLt(arma::eye<arma::mat>(n, n)));
+  REQUIRE(arma::approx_equal(Rtilde, Rtilde.t(), "absdiff", 1e-7));  // symmetric
+
+  double lR, lP, lRt, s;
+  arma::log_det(lR, s, R);
+  arma::log_det(lP, s, P);
+  arma::log_det(lRt, s, Rtilde);
+  INFO("logdet(Rtilde)=" << lRt << " vs logdet(R)-logdet(P)=" << (lR - lP));
+  REQUIRE(std::abs(lRt - (lR - lP)) < 1e-6 * std::max(1.0, std::abs(lR - lP)));
+}
+
+TEST_CASE("LinearAlgebra::conjugateGradientBatched matches the scalar conjugateGradient",
+          "[LinearAlgebra][cg]") {
+  // Same solve, different matvec batching: conjugateGradientBatched shares one
+  // AmulBatched call across all columns, conjugateGradient calls a per-vector
+  // Amul. On a well-conditioned SPD system both must converge to the same X.
+  const arma::uword n = 60;
+  arma::arma_rng::set_seed(404);
+  arma::mat A = arma::randn<arma::mat>(n, n);
+  A = A * A.t();
+  A.diag() += n;  // comfortably SPD / well-conditioned
+
+  const arma::mat B = arma::randn<arma::mat>(n, 5);
+  const arma::mat X_dense = arma::solve(A, B);
+
+  auto amul = [&](const arma::vec& v) -> arma::vec { return A * v; };
+  auto amul_batched = [&](const arma::mat& V) -> arma::mat { return A * V; };
+
+  const arma::mat X_scalar = LinearAlgebra::conjugateGradient(amul, B, 2 * n, 1e-10);
+  const arma::mat X_batched = LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, 1e-10);
+
+  REQUIRE(arma::approx_equal(X_scalar, X_dense, "absdiff", 1e-6));
+  REQUIRE(arma::approx_equal(X_batched, X_dense, "absdiff", 1e-6));
+
+  // With an (arbitrary SPD) preconditioner the batched solve still converges
+  // to the same X -- the preconditioner only changes the iteration count.
+  // Here P = diag(A) (Jacobi), applied column-wise.
+  const arma::vec dinv = 1.0 / A.diag();
+  auto pinv_batched = [&](const arma::mat& V) -> arma::mat { return V.each_col() % dinv; };
+  const arma::mat X_pc = LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, 1e-10, pinv_batched);
+  REQUIRE(arma::approx_equal(X_pc, X_dense, "absdiff", 1e-6));
+}
+
+TEST_CASE("LinearAlgebra::conjugateGradientBatched with X0 converges to the same solution, in fewer iterations",
+          "[LinearAlgebra][cg]") {
+  // X0 only changes the STARTING point of each column's Krylov iteration,
+  // never what it converges to -- and a good starting point (here: the exact
+  // answer to a nearby, slightly perturbed system) should let a tight
+  // max_iter budget converge where a cold start (x0=0) cannot.
+  const arma::uword n = 80;
+  arma::arma_rng::set_seed(2024);
+  arma::mat A = arma::randn<arma::mat>(n, n);
+  A = A * A.t();
+  A.diag() += n;  // comfortably SPD
+
+  const arma::mat B = arma::randn<arma::mat>(n, 4);
+  const arma::mat X_dense = arma::solve(A, B);
+  auto amul_batched = [&](const arma::mat& V) -> arma::mat { return A * V; };
+
+  const double tol = 1e-10;
+  const arma::uword tight_max_iter = 5;  // far too little from a cold start on a dense random SPD system
+
+  arma::uword n_unconv_cold = 0;
+  const arma::mat X_cold
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, tight_max_iter, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), &n_unconv_cold);
+  REQUIRE(n_unconv_cold == B.n_cols);  // cold start: none of the 4 columns converge in 5 iterations
+
+  // X0 = the exact solution itself: the best possible warm start, residual
+  // already ~0 -- must converge immediately (0 further iterations needed).
+  arma::uword n_unconv_exact = 0;
+  const arma::mat X_warm_exact
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, tight_max_iter, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), &n_unconv_exact,
+                                                &X_dense);
+  REQUIRE(n_unconv_exact == 0);
+  REQUIRE(arma::approx_equal(X_warm_exact, X_dense, "absdiff", 1e-8));
+
+  // X0 = a genuinely APPROXIMATE warm start (exact solution to a perturbed
+  // system) still converges to the SAME X_dense once given enough iterations
+  // -- warm start changes iteration count, never the answer.
+  arma::mat A_pert = A;
+  A_pert.diag() += 0.01 * n;
+  const arma::mat X0_approx = arma::solve(A_pert, B);
+  const arma::mat X_warm_approx
+      = LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, tol,
+                                                std::function<arma::mat(const arma::mat&)>(), nullptr, &X0_approx);
+  REQUIRE(arma::approx_equal(X_warm_approx, X_dense, "absdiff", 1e-6));
+
+  // X0 with the wrong shape is rejected rather than silently misused.
+  const arma::mat X0_wrong_shape(n + 1, B.n_cols, arma::fill::zeros);
+  REQUIRE_THROWS_AS(LinearAlgebra::conjugateGradientBatched(amul_batched, B, 2 * n, tol,
+                                                             std::function<arma::mat(const arma::mat&)>(), nullptr,
+                                                             &X0_wrong_shape),
+                    std::invalid_argument);
+}

@@ -4,9 +4,20 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include <carma_bits/cnalloc.h>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
+
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+#include "cuda/CudaLinearAlgebra.cuh"
+#endif
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+#include "hip/HipLinearAlgebra.hpp"
+#endif
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+#include "metal/MetalLinearAlgebra.hpp"
+#endif
 
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
@@ -100,6 +111,75 @@ PYBIND11_MODULE(_pylibkriging, m) {
   m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
 
+  // --- CUDA-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Exposes the runtime on/off switch of src/lib/cuda/CudaLinearAlgebra so a
+  // single build can benchmark the CPU vs GPU matrix-free CG path without
+  // recompiling. All three are always defined; on a build without
+  // -DENABLE_CUDA_ITERATIVE they report "no CUDA" and set_enabled is a no-op.
+#ifdef LIBKRIGING_USE_CUDA_ITERATIVE
+  m.attr("__cuda_iterative__") = true;
+  m.def("cuda_iterative_available", &LinearAlgebraCuda::available,
+        "True iff libKriging was built with -DENABLE_CUDA_ITERATIVE and a CUDA device is visible at runtime.");
+  m.def("cuda_iterative_enabled", &LinearAlgebraCuda::enabled,
+        "True iff the CUDA matrix-free CG backend is currently active (defaults to cuda_iterative_available()).");
+  m.def("set_cuda_iterative_enabled", &LinearAlgebraCuda::set_enabled, py::arg("value"),
+        "Turn the CUDA matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__cuda_iterative__") = false;
+  m.def("cuda_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def("cuda_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def("set_cuda_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_CUDA_ITERATIVE.");
+#endif
+
+  // --- HIP-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Same shape as the CUDA block above, exposing src/lib/hip/HipLinearAlgebra's
+  // runtime on/off switch. All three are always defined; on a build without
+  // -DENABLE_HIP_ITERATIVE they report "no HIP" and set_enabled is a no-op.
+#ifdef LIBKRIGING_USE_HIP_ITERATIVE
+  m.attr("__hip_iterative__") = true;
+  m.def("hip_iterative_available", &LinearAlgebraHip::available,
+        "True iff libKriging was built with -DENABLE_HIP_ITERATIVE and a ROCm/HIP device is visible at runtime.");
+  m.def("hip_iterative_enabled", &LinearAlgebraHip::enabled,
+        "True iff the HIP matrix-free CG backend is currently active (defaults to hip_iterative_available()).");
+  m.def("set_hip_iterative_enabled", &LinearAlgebraHip::set_enabled, py::arg("value"),
+        "Turn the HIP matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__hip_iterative__") = false;
+  m.def("hip_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def("hip_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def("set_hip_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_HIP_ITERATIVE.");
+#endif
+
+  // --- Apple-Metal-accelerated iterative (LLIterative / predictIterative) backend ---
+  // Same shape as the CUDA/HIP blocks above, exposing
+  // src/lib/metal/MetalLinearAlgebra's runtime on/off switch. FLOAT32-only
+  // (see MetalLinearAlgebra.hpp); all three are always defined, on a build
+  // without -DENABLE_METAL_ITERATIVE they report "no Metal" and set_enabled
+  // is a no-op.
+#ifdef LIBKRIGING_USE_METAL_ITERATIVE
+  m.attr("__metal_iterative__") = true;
+  m.def("metal_iterative_available", &LinearAlgebraMetal::available,
+        "True iff libKriging was built with -DENABLE_METAL_ITERATIVE and a Metal device is visible at runtime.");
+  m.def("metal_iterative_enabled", &LinearAlgebraMetal::enabled,
+        "True iff the Metal matrix-free CG backend is currently active (defaults to metal_iterative_available()).");
+  m.def("set_metal_iterative_enabled", &LinearAlgebraMetal::set_enabled, py::arg("value"),
+        "Turn the Metal matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
+#else
+  m.attr("__metal_iterative__") = false;
+  m.def("metal_iterative_available", []() { return false; },
+        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def("metal_iterative_enabled", []() { return false; },
+        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def("set_metal_iterative_enabled", [](bool) {}, py::arg("value"),
+        "No-op: this build was compiled without -DENABLE_METAL_ITERATIVE.");
+#endif
+
   m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");
 
   // Basic tools
@@ -120,6 +200,15 @@ PYBIND11_MODULE(_pylibkriging, m) {
   const bool default_normalize = false;
   const std::string default_optim = "BFGS";
   const std::string default_objective = "LL";
+  const std::string objective_doc =
+      R"pbdoc(objective: "LL" (default, exact dense log-likelihood), "LMP", "LLVecchia"/
+"LLVecchia(m)", "LLNystrom"/"LLNystrom(k)", or the matrix-free CG/SLQ
+approximated log-likelihood "LLIterative" / "LLIterative(m)" /
+"LLIterative(m,precond_rank)" / "LLIterative(m,precond_rank,lanczos_steps)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" /
+"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)".
+See docs/math/Iterative.md.)pbdoc";
 
   py::class_<Kriging::Parameters>(m, "KrigingParameters")
       .def(py::init<>())
@@ -161,7 +250,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           objective_doc.c_str())
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -173,13 +263,32 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           objective_doc.c_str())
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false)
+      .def("predictIterative",
+           &PyKriging::predictIterative,
+           py::arg("X"),
+           py::arg("return_stdev") = false,
+           py::arg("max_iter") = 0,
+           py::arg("tol") = 1e-8,
+           py::arg("use_nystrom_precond") = false,
+           py::arg("precond_rank") = 50,
+           R"pbdoc(Predict-only, matrix-free conjugate-gradient alternative to
+predict(): solves each prediction with CG instead of using a stored dense
+factor. return_stdev=True runs one extra CG solve PER prediction point
+(much more expensive than the mean-only path), so it defaults to False.
+use_nystrom_precond=True builds a rank-precond_rank Nystrom factor of R at
+the model's own (already-fitted) theta and uses it as a CG preconditioner
+(fewer CG iterations to reach tol on the typically ill-conditioned R, at a
+one-time setup cost); off by default. Only available for models fitted
+without a nugget/noise channel (NoiseModel.none). See docs/math/PredictIterative.md
+and docs/math/Nystrom.md.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -190,7 +299,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
 centroids snapped to the nearest real point, or a uniform random subsample),
 returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
 for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+LLVecchia/LLNystrom/LLIterative (which still use every point), this
 discards n - n_max points outright.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
@@ -220,6 +329,15 @@ discards n - n_max points outright.)pbdoc")
            py::arg("theta"),
            py::arg("return_grad") = false,
            py::arg("want_hess") = false)
+      .def("logLikelihoodIterativeFun",
+           &PyKriging::logLikelihoodIterativeFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false,
+           R"pbdoc(Matrix-free CG + SLQ log-determinant concentrated log-likelihood
+(the objective="LLIterative(m)" estimate). Unlike logLikelihoodFun, which always
+evaluates the exact O(n^3) dense-Cholesky objective, this is the O(n^2) iterative
+approximation actually optimized by an LLIterative fit. Only valid on a model
+fitted with an LLIterative objective. See docs/math/Iterative.md.)pbdoc")
       .def("logMargPostFun", &PyKriging::logMargPostFun)
       .def("logLikelihood", &PyKriging::logLikelihood)
       .def("logMargPost", &PyKriging::logMargPost)
@@ -231,6 +349,10 @@ discards n - n_max points outright.)pbdoc")
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
       .def("nystrom_rank", &PyKriging::nystrom_rank)
+      .def("iterative_nprobe", &PyKriging::iterative_nprobe)
+      .def("is_iterative_light", &PyKriging::is_iterative_light)
+      .def("iterative_cg_converged", &PyKriging::iterative_cg_converged)
+      .def("iterative_cg_n_unconverged", &PyKriging::iterative_cg_n_unconverged)
       .def("X", &PyKriging::X)
       .def("centerX", &PyKriging::centerX)
       .def("scaleX", &PyKriging::scaleX)
