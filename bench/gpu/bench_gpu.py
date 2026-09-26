@@ -693,14 +693,25 @@ def run_libkriging_iter(X, y, Xte, yte, theta, use_cuda, cg_tol: float, precond_
     import pylibkriging as lk
 
     lk.set_cuda_iterative_enabled(bool(use_cuda))
-    # set_hip_iterative_enabled/set_metal_iterative_enabled only exist on a
-    # -DENABLE_HIP_ITERATIVE / -DENABLE_METAL_ITERATIVE build respectively
-    # (see pylibkriging.cpp) -- guard so a CUDA-only build (both flags False
-    # here) doesn't need either defined.
-    if hasattr(lk, "set_hip_iterative_enabled"):
-        lk.set_hip_iterative_enabled(bool(use_hip))
-    if hasattr(lk, "set_metal_iterative_enabled"):
-        lk.set_metal_iterative_enabled(bool(use_metal))
+    # set_hip_iterative_enabled/set_metal_iterative_enabled exist even on a
+    # build with -DENABLE_HIP_ITERATIVE=OFF / -DENABLE_METAL_ITERATIVE=OFF
+    # (see pylibkriging.cpp) -- they just silently no-op there, which used to
+    # let iter-hip/iter-metal "succeed" by quietly falling back to whatever
+    # backend was already enabled (e.g. OpenMP) and mislabel it as HIP/Metal.
+    # Fail loudly instead so an unsupported request surfaces as an
+    # `error: ...` row rather than a fabricated `ok` one.
+    if use_hip:
+        if not getattr(lk, "hip_iterative_available", lambda: False)():
+            raise RuntimeError("HIP iterative backend requested but not available in this build")
+        lk.set_hip_iterative_enabled(True)
+    elif hasattr(lk, "set_hip_iterative_enabled"):
+        lk.set_hip_iterative_enabled(False)
+    if use_metal:
+        if not getattr(lk, "metal_iterative_available", lambda: False)():
+            raise RuntimeError("Metal iterative backend requested but not available in this build")
+        lk.set_metal_iterative_enabled(True)
+    elif hasattr(lk, "set_metal_iterative_enabled"):
+        lk.set_metal_iterative_enabled(False)
     n, d = X.shape
     th = np.full(d, theta)
     params = {"theta": np.full((1, d), theta), "sigma2": 1.0}
@@ -1280,6 +1291,20 @@ def main(argv=None):
         keys = [k for k in keys if not k.endswith("-cuda")]
         if dropped:
             print(f"note: no CUDA -> dropping {dropped}", flush=True)
+
+    try:
+        import pylibkriging as _lk_avail
+
+        hip_ok = bool(getattr(_lk_avail, "hip_iterative_available", lambda: False)())
+        metal_ok = bool(getattr(_lk_avail, "metal_iterative_available", lambda: False)())
+    except Exception:
+        hip_ok = metal_ok = False
+    if "iter-hip" in keys and not hip_ok:
+        keys.remove("iter-hip")
+        print("note: hip_iterative_available() is False -> dropping iter-hip", flush=True)
+    if "iter-metal" in keys and not metal_ok:
+        keys.remove("iter-metal")
+        print("note: metal_iterative_available() is False -> dropping iter-metal", flush=True)
 
     lk_blas = detect_libkriging_blas() or "BLAS"
     torch_blas = detect_torch_cpu_blas() or "CPU"
