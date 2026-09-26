@@ -29,6 +29,18 @@ class LinearAlgebra {
   LIBKRIGING_EXPORT static bool warn_cg;
   LIBKRIGING_EXPORT static void set_cg_warning(bool warn);
 
+  // Automatic Nystrom preconditioning of predictIterative's CG solves when the
+  // caller did not request it explicitly (use_nystrom_precond=false). The
+  // rank-k Nystrom factor is built (O(n*k^2), cheaper than a handful of
+  // O(n^2) matvecs) and KEPT only if it captures at least
+  // cg_auto_precond_min_captured of trace(R) = n -- i.e. only when R's spectrum
+  // decays fast (the ill-conditioned regime where it pays off); otherwise it
+  // is discarded and plain CG runs. Default on; LK_CG_AUTO_PRECOND=0 (or
+  // set_cg_auto_precond(false)) restores the former opt-in-only behavior.
+  LIBKRIGING_EXPORT static bool cg_auto_precond;
+  LIBKRIGING_EXPORT static double cg_auto_precond_min_captured;
+  LIBKRIGING_EXPORT static void set_cg_auto_precond(bool on);
+
   // Shared by every conjugateGradient(Batched) implementation -- CPU and
   // every GPU backend (CUDA/HIP/SYCL/Metal) -- so the same message/format
   // is used everywhere a CG solve can silently under-converge. Prints
@@ -224,7 +236,7 @@ class LinearAlgebra {
   // Left empty (default), this reduces to plain CG. Standard
   // preconditioned-CG recurrence (z = Pinv(r) replaces r in the
   // Fletcher-Reeves ratio and search direction); the same periodic
-  // exact-residual restart as plain CG applies here too.
+  // true-residual confirmation / stagnation rules as plain CG apply here too.
   LIBKRIGING_EXPORT static arma::mat conjugateGradient(const std::function<arma::vec(const arma::vec&)>& Amul,
                                                        const arma::mat& B,
                                                        arma::uword max_iter,

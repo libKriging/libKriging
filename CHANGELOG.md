@@ -226,6 +226,17 @@ past release, see the corresponding entry on the
   Markdown/CSV to `bench/gpu/results/`.
 
 ### Changed
+- `predictIterative`: automatic Nystrom preconditioning when not requested
+  explicitly -- the rank-`precond_rank` factor is built and kept only if it
+  captures >= 50% of trace(R) (`LinearAlgebra::cg_auto_precond`,
+  `LK_CG_AUTO_PRECOND=0` to disable, `LK_CG_AUTO_PRECOND_MIN_CAPTURED` to
+  tune). Measured n=1000: mean error / 10-20, time -30..-40% at theta 0.15-0.3.
+- LLIterative optimizer: CG warm start across objective evaluations (per
+  thread) for both R^-1[F|y] and R^-1*probes (`LK_CG_WARM_OPTIM=0` to
+  disable). Measured n=300 bounded fit: same theta, CG iterations -59%,
+  time / 2.1.
+- The R^-1[F|y] warm-start cache is now stamped with its theta and ignored
+  when theta changed since it was computed.
 - Iterative path (`LLIterative` / `predictIterative`), CPU as well as GPU:
   an `optim="none"` light fit no longer builds the dense `d x n^2` pairwise
   distance tensor it never reads (was several GB at n=8000); the matrix-free
@@ -313,6 +324,19 @@ past release, see the corresponding entry on the
   unchanged. See `docs/math/Iterative.md`.
 
 ### Fixed
+- Iterative CG (CPU `LinearAlgebra::conjugateGradient(Batched)`): removed the
+  periodic full restart (`p = r` every 50 iterations), which destroyed CG
+  conjugacy and made ill-conditioned solves plateau (n=60, cond(R)=4.5e3:
+  5e-5 relative residual after 2n iterations instead of 2e-9). Convergence is
+  now confirmed on the true residual `b - A*x` (residual replacement keeping
+  the search direction when it does not confirm), and a column stops as
+  unconverged when successive confirmations stop improving. GPU backends
+  (CUDA/HIP/SYCL/Metal) keep their periodic true-residual recompute but no
+  longer reset the search direction (untested on hardware in this change).
+- Tests `predictIterative/LLIterative: the dense fast path matches the
+  matrix-free path` now compare converged solves (they failed because both
+  paths were stuck on the restart plateau). See
+  `docs/dev/iterative-convergence/REPORT.md`.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

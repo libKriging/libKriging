@@ -251,6 +251,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_SYCL_CHECK(cudaGetLastError());
 
     if ((it + 1) % restart_every == 0) {
+      // Periodic TRUE-residual replacement (r = b - A*x): corrects the round-off
+      // drift of the recursive residual but, unlike the former full restart
+      // (p = r or z), KEEPS the search direction via the usual beta update:
+      // resetting p destroyed CG conjugacy (see LinearAlgebra::conjugateGradient).
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's).
       lk_sycl_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_x, ncols, d_Ap,
@@ -265,13 +269,13 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         precondApply(d_r, d_z);
         lk_sycl_batched_dot_launch(d_r, d_z, n, ncols, d_scratch2);  // r.z
         LK_SYCL_CHECK(cudaGetLastError());
-        lk_sycl_cg_restart_precond_launch(d_scratch, d_scratch2, d_bnorm, tol, ncols, d_active, d_rz_old);
+        lk_sycl_cg_beta_precond_launch(d_scratch, d_scratch2, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
         LK_SYCL_CHECK(cudaGetLastError());
-        LK_SYCL_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = z
+        lk_sycl_batched_update_p_launch(d_z, d_beta, d_p, n, ncols);  // p = z + beta*p
       } else {
-        lk_sycl_cg_restart_launch(d_scratch, d_bnorm, tol, ncols, d_active, d_rz_old);
+        lk_sycl_cg_beta_launch(d_scratch, d_bnorm, tol, ncols, d_active, d_rz_old, d_beta);
         LK_SYCL_CHECK(cudaGetLastError());
-        LK_SYCL_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // restart: p = r
+        lk_sycl_batched_update_p_launch(d_r, d_beta, d_p, n, ncols);  // p = r + beta*p
       }
     } else {
       lk_sycl_batched_axpy_launch(d_neg_alpha, d_Ap, d_r, n, ncols);  // r -= alpha*Ap
