@@ -661,11 +661,13 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   if (return_stdev) {
     // One CG solve PER prediction point (R_on's columns don't share a
     // Krylov subspace): O(n^2 * iters * n_n) total, hence opt-in. Solved to
-    // the looser stdev_tol (see above).
-    const arma::mat V = cgSolve(R_on, stdev_tol);
-    const arma::vec quad = arma::sum(R_on % V, 0).t();
+    // the looser stdev_tol (see above); re-solved at the tighter `tol` below
+    // for any column the cancellation guard flags as unreliable.
+    arma::mat V = cgSolve(R_on, stdev_tol);
+    arma::vec quad = arma::sum(R_on % V, 0).t();
 
     arma::vec gls_correction(n_n, arma::fill::zeros);
+    arma::mat W_F;
     if (m_F.n_cols > 0) {
       // GLS correction for the trend coefficients' own estimation
       // uncertainty -- same u^T(F^T R^-1 F)^-1 u term predict_impl computes
@@ -674,15 +676,45 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
       // algebra (p = m_F.n_cols). Without it, stdev reduces to the
       // simple-kriging formula (correct only when the trend is known
       // rather than estimated, i.e. regmodel == "none") and understates
-      // the prediction uncertainty otherwise.
-      const arma::mat W_F = have_cache ? cgSolve(m_F, stdev_tol, &RinvFY_cache_F) : cgSolve(m_F, stdev_tol);
+      // the prediction uncertainty otherwise. Solved at the full `tol`, not
+      // stdev_tol: only m_F.n_cols right-hand sides (typically 1-2), so
+      // tightening it is essentially free, and its error feeds straight
+      // into the 1-quad+correction cancellation below.
+      W_F = have_cache ? cgSolve(m_F, tol, &RinvFY_cache_F) : cgSolve(m_F, tol);
       const arma::mat FtRinvF = m_F.t() * W_F;
       const arma::mat E = F_n - R_on.t() * W_F;
       const arma::mat correction_rhs = arma::solve(FtRinvF, E.t());
       gls_correction = arma::sum(E.t() % correction_rhs, 0).t();
     }
 
-    stdev = arma::sqrt(arma::clamp(m_sigma2 * (1.0 - quad + gls_correction), 0.0, arma::datum::inf));
+    arma::vec var_raw = 1.0 - quad + gls_correction;
+
+    // Catastrophic-cancellation guard: `1 - quad` subtracts two O(1)
+    // quantities, so the stdev_tol solve's absolute error in quad (~
+    // stdev_tol times a column's norm) can dominate var_raw wherever it's
+    // small -- which happens whenever a prediction point coincides with, or
+    // sits extremely close to, a training point, where the true posterior
+    // variance is tiny (down to the nugget floor). Left alone this silently
+    // returns a wildly-inflated stdev there, or even a hard 0 once var_raw
+    // goes slightly negative and gets clamped below. Re-solve just the
+    // flagged columns (rare in practice: normal predictions land away from
+    // the training set) at the caller's full `tol` instead.
+    const double cancel_guard = 16.0 * stdev_tol;
+    const arma::uvec bad = arma::find(var_raw < cancel_guard);
+    if (!bad.is_empty()) {
+      const arma::mat R_on_bad = R_on.cols(bad);
+      const arma::mat V_bad = cgSolve(R_on_bad, tol);
+      quad(bad) = arma::sum(R_on_bad % V_bad, 0).t();
+      if (m_F.n_cols > 0) {
+        const arma::mat FtRinvF = m_F.t() * W_F;
+        const arma::mat E_bad = F_n.rows(bad) - R_on_bad.t() * W_F;
+        const arma::mat correction_rhs_bad = arma::solve(FtRinvF, E_bad.t());
+        gls_correction(bad) = arma::sum(E_bad.t() % correction_rhs_bad, 0).t();
+      }
+      var_raw = 1.0 - quad + gls_correction;
+    }
+
+    stdev = arma::sqrt(arma::clamp(m_sigma2 * var_raw, 0.0, arma::datum::inf));
     stdev *= m_scaleY;
   }
   return {mean, stdev};
