@@ -74,10 +74,10 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
   // no-grad evaluation happen, no CG-heavy optimization)
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative"));
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8)"));
-  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5)"));    // opt-in Nystrom CG precond
-  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0)"));    // 0 = preconditioning off (== "LLIterative(8)")
-  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5,30)"));  // + explicit SLQ Lanczos steps
-  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40)"));  // Lanczos steps without a preconditioner
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5)"));  // opt-in Nystrom CG precond
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0)"));  // 0 = preconditioning off (== "LLIterative(8)")
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5,30)"));    // + explicit SLQ Lanczos steps
+  CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40)"));    // Lanczos steps without a preconditioner
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,5,30,4)"));  // + explicit CG max_iter multiplier
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,1)"));  // multiplier without a preconditioner
   CHECK_NOTHROW(make_fixed_theta_iterative(y, X, "LLIterative(8,0,40,2,1e-6)"));  // + explicit CG tolerance
@@ -96,17 +96,17 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
                                 "LLIterative(8x)",
                                 "LLIterative(8,-2)",
                                 "LLIterative(8,x)",
-                                "LLIterative(8,5,1)",       // lanczos_steps must be >= 2
+                                "LLIterative(8,5,1)",  // lanczos_steps must be >= 2
                                 "LLIterative(8,5,x)",
                                 "LLIterative(8,5,-4)",
-                                "LLIterative(8,5,30,0)",    // cg_max_iter_mult must be >= 1
+                                "LLIterative(8,5,30,0)",  // cg_max_iter_mult must be >= 1
                                 "LLIterative(8,5,30,-2)",
                                 "LLIterative(8,5,30,x)",
-                                "LLIterative(8,5,30,4,1)",       // cg_tol must be in (0,1)
+                                "LLIterative(8,5,30,4,1)",  // cg_tol must be in (0,1)
                                 "LLIterative(8,5,30,4,0)",
                                 "LLIterative(8,5,30,4,-1e-4)",
                                 "LLIterative(8,5,30,4,x)",
-                                "LLIterative(8,5,30,4,1e-4,1)",     // probes_cg_tol must be in (0,1)
+                                "LLIterative(8,5,30,4,1e-4,1)",  // probes_cg_tol must be in (0,1)
                                 "LLIterative(8,5,30,4,1e-4,0)",
                                 "LLIterative(8,5,30,4,1e-4,-1e-2)",
                                 "LLIterative(8,5,30,4,1e-4,x)",
@@ -120,7 +120,8 @@ TEST_CASE("LLIterative objective spec parsing and validation", "[iterative][krig
                   std::invalid_argument);
 }
 
-TEST_CASE("LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol): looser CG costs no accuracy", "[iterative][kriging]") {
+TEST_CASE("LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol): looser CG costs no accuracy",
+          "[iterative][kriging]") {
   // The default CG tolerance is 1e-4, not 1e-8, because the log-determinant
   // it is paired with is a stochastic SLQ estimate whose bias dominates: the
   // linear solves are NOT the accuracy-limiting step, so tightening them
@@ -132,8 +133,8 @@ TEST_CASE("LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol): lo
   make_data(120, X, y);
   const arma::vec theta{0.3, 0.3};
 
-  const double ll_tight
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-10)").logLikelihoodIterativeFun(theta, false));
+  const double ll_tight = std::get<0>(
+      make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-10)").logLikelihoodIterativeFun(theta, false));
   const double ll_default
       = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(24,0,60)").logLikelihoodIterativeFun(theta, false));
 
@@ -162,7 +163,8 @@ TEST_CASE("LLIterative(...,cg_tol,probes_cg_tol): probes_cg_tol defaults to cg_t
   const auto [ll_explicit_same, g_explicit_same]
       = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-6)").logLikelihoodIterativeFun(theta, true);
 
-  INFO("ll(5-field, cg_tol=1e-6) = " << ll_omitted << ", ll(6-field, probes_cg_tol=cg_tol=1e-6) = " << ll_explicit_same);
+  INFO("ll(5-field, cg_tol=1e-6) = " << ll_omitted
+                                     << ", ll(6-field, probes_cg_tol=cg_tol=1e-6) = " << ll_explicit_same);
   CHECK(ll_omitted == ll_explicit_same);  // same probe seed, same tol -> bit-identical CG trajectory
   CHECK(arma::approx_equal(g_omitted, g_explicit_same, "absdiff", 0.0));
 
@@ -171,10 +173,10 @@ TEST_CASE("LLIterative(...,cg_tol,probes_cg_tol): probes_cg_tol defaults to cg_t
   // all (beta/sigma2/SSE/logdetR all come from the [F|y] solve and the SLQ
   // matvec, never from W). Guard that invariant, then check the gradient
   // itself degrades negligibly when only probes_cg_tol is loosened.
-  const auto [ll_tight_probes, g_tight_probes] = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-6)")
-                                                     .logLikelihoodIterativeFun(theta, true);
-  const auto [ll_loose_probes, g_loose_probes] = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-2)")
-                                                     .logLikelihoodIterativeFun(theta, true);
+  const auto [ll_tight_probes, g_tight_probes]
+      = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-6)").logLikelihoodIterativeFun(theta, true);
+  const auto [ll_loose_probes, g_loose_probes]
+      = make_fixed_theta_iterative(y, X, "LLIterative(24,0,60,2,1e-6,1e-2)").logLikelihoodIterativeFun(theta, true);
 
   INFO("ll(probes_cg_tol=1e-6) = " << ll_tight_probes << ", ll(probes_cg_tol=1e-2) = " << ll_loose_probes);
   CHECK(ll_tight_probes == ll_loose_probes);  // value is independent of probes_cg_tol by construction
@@ -444,11 +446,11 @@ TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[ite
 
   // and the preconditioned path (whitened SLQ + separate probe solve) too
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "0", 1);
-  const double llp_mf
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
+  const double llp_mf = std::get<0>(
+      make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
   setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", "4096", 1);
-  const double llp_de
-      = std::get<0>(make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
+  const double llp_de = std::get<0>(
+      make_fixed_theta_iterative(y, X, "LLIterative(30,40,24,50,1e-10)").logLikelihoodIterativeFun(theta, false));
   if (old_env)
     setenv_portable("LK_ITERATIVE_DENSE_MAX_MB", old_env, 1);
   else

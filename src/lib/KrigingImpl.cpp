@@ -16,10 +16,10 @@
 #include "libKriging/utils/jsonutils.hpp"
 #include "libKriging/utils/nlohmann/json.hpp"
 
-#include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
-#include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
-#include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
-#include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
+#include "cuda/CudaLinearAlgebra.cuh"    // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+#include "hip/HipLinearAlgebra.hpp"      // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
+#include "metal/MetalLinearAlgebra.hpp"  // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
+#include "sycl/SyclLinearAlgebra.hpp"    // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
 
 #include <cstdio>
 #include <cstdlib>
@@ -457,8 +457,7 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
     // OpenMP runtime's (implementation-defined) nested-parallel behavior.
     if (n >= 32 && !omp_in_parallel()) {
       const int optimal_threads = get_optimal_threads(omp_get_max_threads());
-      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
-                                        arma::mat(n, k, arma::fill::zeros));
+      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads), arma::mat(n, k, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
       {
         arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
@@ -548,13 +547,22 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
   // GPU dispatch as a backend-agnostic std::function (see the same pattern
   // in Kriging::_logLikelihoodIterative). Empty -> CPU fallback.
   std::function<arma::mat(const arma::mat&, double, const arma::mat*)> gpuCgSolve;
-#define LK_PRED_GPU_BIND(NS)                                                                                    \
-  gpuCgSolve = [&](const arma::mat& B, double solve_tol, const arma::mat* x0) {                                 \
-    return woodbury_pc                                                                                          \
-        ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, woodbury_pc->U(),                \
-                                woodbury_pc->Dinv(), woodbury_pc->McholLower(), nullptr, x0)                    \
-        : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, solve_tol, arma::mat(), arma::vec(),        \
-                                arma::mat(), nullptr, x0);                                                       \
+#define LK_PRED_GPU_BIND(NS)                                                                                          \
+  gpuCgSolve = [&](const arma::mat& B, double solve_tol, const arma::mat* x0) {                                       \
+    return woodbury_pc                                                                                                \
+               ? NS::conjugateGradient(Xt,                                                                            \
+                                       theta,                                                                         \
+                                       m_covType,                                                                     \
+                                       B,                                                                             \
+                                       max_iter,                                                                      \
+                                       solve_tol,                                                                     \
+                                       woodbury_pc->U(),                                                              \
+                                       woodbury_pc->Dinv(),                                                           \
+                                       woodbury_pc->McholLower(),                                                     \
+                                       nullptr,                                                                       \
+                                       x0)                                                                            \
+               : NS::conjugateGradient(                                                                               \
+                   Xt, theta, m_covType, B, max_iter, solve_tol, arma::mat(), arma::vec(), arma::mat(), nullptr, x0); \
   }
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
   if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType))

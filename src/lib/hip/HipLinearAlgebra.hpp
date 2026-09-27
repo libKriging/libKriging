@@ -202,10 +202,10 @@ constexpr int kMaxDimX = 32;
 // common case; porting the preconditioned path is future work if the
 // default ever changes.
 LIBKRIGING_EXPORT double stochasticLogDetBatched(const arma::mat& Xt,
-                                                  const arma::vec& theta,
-                                                  const std::string& covType,
-                                                  arma::uword lanczos_steps,
-                                                  const arma::mat& probes);
+                                                 const arma::vec& theta,
+                                                 const std::string& covType,
+                                                 arma::uword lanczos_steps,
+                                                 const arma::mat& probes);
 
 }  // namespace LinearAlgebraHip
 

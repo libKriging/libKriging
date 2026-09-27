@@ -145,8 +145,15 @@ extern "C" int lk_sycl_rmul_batched_scratch_elems(int, int) {
   return 0;
 }
 
-extern "C" void lk_sycl_rmul_batched_launch(const double* Xt, int n, int dimX, const double* theta, int covKind,
-                                            const double* P, int ncols, double* Ap, double*) {
+extern "C" void lk_sycl_rmul_batched_launch(const double* Xt,
+                                            int n,
+                                            int dimX,
+                                            const double* theta,
+                                            int covKind,
+                                            const double* P,
+                                            int ncols,
+                                            double* Ap,
+                                            double*) {
   q().parallel_for(sycl::range<2>(static_cast<std::size_t>(n), static_cast<std::size_t>(ncols)),
                    [=](sycl::id<2> id) {
                      const int i = static_cast<int>(id[0]);
@@ -164,8 +171,14 @@ extern "C" void lk_sycl_rmul_batched_launch(const double* Xt, int n, int dimX, c
       .wait();
 }
 
-extern "C" void lk_sycl_drmul_batched_launch(const double* Xt, int n, int dimX, const double* theta, int covKind,
-                                             const double* V, int ncols, double* Out) {
+extern "C" void lk_sycl_drmul_batched_launch(const double* Xt,
+                                             int n,
+                                             int dimX,
+                                             const double* theta,
+                                             int covKind,
+                                             const double* V,
+                                             int ncols,
+                                             double* Out) {
   q().parallel_for(sycl::range<2>(static_cast<std::size_t>(n), static_cast<std::size_t>(ncols)),
                    [=](sycl::id<2> id) {
                      const int i = static_cast<int>(id[0]);
@@ -194,15 +207,17 @@ extern "C" void lk_sycl_drmul_batched_launch(const double* Xt, int n, int dimX, 
 }
 
 extern "C" void lk_sycl_batched_dot_launch(const double* A, const double* B, int n, int ncols, double* out) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     const double* Ac = A + static_cast<std::size_t>(c) * n;
-     const double* Bc = B + static_cast<std::size_t>(c) * n;
-     double s = 0.0;
-     for (int i = 0; i < n; ++i)
-       s += Ac[i] * Bc[i];
-     out[c] = s;
-   }).wait();
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     const double* Ac = A + static_cast<std::size_t>(c) * n;
+                     const double* Bc = B + static_cast<std::size_t>(c) * n;
+                     double s = 0.0;
+                     for (int i = 0; i < n; ++i)
+                       s += Ac[i] * Bc[i];
+                     out[c] = s;
+                   })
+      .wait();
 }
 
 extern "C" void lk_sycl_batched_axpy_launch(const double* alpha, const double* X, double* Y, int n, int ncols) {
@@ -223,100 +238,143 @@ extern "C" void lk_sycl_batched_update_p_launch(const double* R, const double* b
       .wait();
 }
 
-extern "C" void lk_sycl_cg_alpha_launch(const double* rz_old, const double* pAp, int ncols, int* active, double* alpha,
+extern "C" void lk_sycl_cg_alpha_launch(const double* rz_old,
+                                        const double* pAp,
+                                        int ncols,
+                                        int* active,
+                                        double* alpha,
                                         double* neg_alpha) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     if (!active[c]) {
-       alpha[c] = 0.0;
-       neg_alpha[c] = 0.0;
-       return;
-     }
-     const double p = pAp[c];
-     if (!(p > 0.0)) {
-       active[c] = 0;
-       alpha[c] = 0.0;
-       neg_alpha[c] = 0.0;
-       return;
-     }
-     const double a = rz_old[c] / p;
-     alpha[c] = a;
-     neg_alpha[c] = -a;
-   }).wait();
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     if (!active[c]) {
+                       alpha[c] = 0.0;
+                       neg_alpha[c] = 0.0;
+                       return;
+                     }
+                     const double p = pAp[c];
+                     if (!(p > 0.0)) {
+                       active[c] = 0;
+                       alpha[c] = 0.0;
+                       neg_alpha[c] = 0.0;
+                       return;
+                     }
+                     const double a = rz_old[c] / p;
+                     alpha[c] = a;
+                     neg_alpha[c] = -a;
+                   })
+      .wait();
 }
 
-extern "C" void lk_sycl_cg_beta_launch(const double* rr_new, const double* bnorm, double tol, int ncols, int* active,
-                                       double* rz_old, double* beta) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     if (!active[c]) {
-       beta[c] = 0.0;
-       return;
-     }
-     const double rn = rr_new[c];
-     if (sycl::sqrt(rn) / bnorm[c] < tol) {
-       active[c] = 0;
-       beta[c] = 0.0;
-       return;
-     }
-     beta[c] = rn / rz_old[c];
-     rz_old[c] = rn;
-   }).wait();
+extern "C" void lk_sycl_cg_beta_launch(const double* rr_new,
+                                       const double* bnorm,
+                                       double tol,
+                                       int ncols,
+                                       int* active,
+                                       double* rz_old,
+                                       double* beta) {
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     if (!active[c]) {
+                       beta[c] = 0.0;
+                       return;
+                     }
+                     const double rn = rr_new[c];
+                     if (sycl::sqrt(rn) / bnorm[c] < tol) {
+                       active[c] = 0;
+                       beta[c] = 0.0;
+                       return;
+                     }
+                     beta[c] = rn / rz_old[c];
+                     rz_old[c] = rn;
+                   })
+      .wait();
 }
 
-extern "C" void lk_sycl_cg_restart_launch(const double* rr, const double* bnorm, double tol, int ncols, int* active,
+extern "C" void lk_sycl_cg_restart_launch(const double* rr,
+                                          const double* bnorm,
+                                          double tol,
+                                          int ncols,
+                                          int* active,
                                           double* rz_old) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     if (!active[c])
-       return;
-     rz_old[c] = rr[c];
-     if (sycl::sqrt(rr[c]) / bnorm[c] < tol)
-       active[c] = 0;
-   }).wait();
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     if (!active[c])
+                       return;
+                     rz_old[c] = rr[c];
+                     if (sycl::sqrt(rr[c]) / bnorm[c] < tol)
+                       active[c] = 0;
+                   })
+      .wait();
 }
 
-extern "C" void lk_sycl_cg_restart_precond_launch(const double* rr, const double* rz, const double* bnorm, double tol,
-                                                  int ncols, int* active, double* rz_old) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     if (!active[c])
-       return;
-     rz_old[c] = rz[c];
-     if (sycl::sqrt(rr[c]) / bnorm[c] < tol)
-       active[c] = 0;
-   }).wait();
+extern "C" void lk_sycl_cg_restart_precond_launch(const double* rr,
+                                                  const double* rz,
+                                                  const double* bnorm,
+                                                  double tol,
+                                                  int ncols,
+                                                  int* active,
+                                                  double* rz_old) {
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     if (!active[c])
+                       return;
+                     rz_old[c] = rz[c];
+                     if (sycl::sqrt(rr[c]) / bnorm[c] < tol)
+                       active[c] = 0;
+                   })
+      .wait();
 }
 
-extern "C" void lk_sycl_cg_beta_precond_launch(const double* rr, const double* rz_new, const double* bnorm, double tol,
-                                               int ncols, int* active, double* rz_old, double* beta) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     const int c = static_cast<int>(id[0]);
-     if (!active[c]) {
-       beta[c] = 0.0;
-       return;
-     }
-     if (sycl::sqrt(rr[c]) / bnorm[c] < tol) {
-       active[c] = 0;
-       beta[c] = 0.0;
-       return;
-     }
-     beta[c] = rz_new[c] / rz_old[c];
-     rz_old[c] = rz_new[c];
-   }).wait();
+extern "C" void lk_sycl_cg_beta_precond_launch(const double* rr,
+                                               const double* rz_new,
+                                               const double* bnorm,
+                                               double tol,
+                                               int ncols,
+                                               int* active,
+                                               double* rz_old,
+                                               double* beta) {
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     const int c = static_cast<int>(id[0]);
+                     if (!active[c]) {
+                       beta[c] = 0.0;
+                       return;
+                     }
+                     if (sycl::sqrt(rr[c]) / bnorm[c] < tol) {
+                       active[c] = 0;
+                       beta[c] = 0.0;
+                       return;
+                     }
+                     beta[c] = rz_new[c] / rz_old[c];
+                     rz_old[c] = rz_new[c];
+                   })
+      .wait();
 }
 
 extern "C" void lk_sycl_cg_any_active_launch(const int* active, int ncols, int* flag) {
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     if (active[id[0]]) {
-       sycl::atomic_ref<int, sycl::memory_order::relaxed, sycl::memory_scope::device> a(*flag);
-       a.fetch_or(1);
-     }
-   }).wait();
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     if (active[id[0]]) {
+                       sycl::atomic_ref<int, sycl::memory_order::relaxed, sycl::memory_scope::device> a(*flag);
+                       a.fetch_or(1);
+                     }
+                   })
+      .wait();
 }
 
-extern "C" void lk_sycl_precond_apply_launch(const double* U, int n, int k, const double* Dinv, const double* Mchol,
-                                             const double* r, int ncols, double* z, double* scratch_nc,
+extern "C" void lk_sycl_precond_apply_launch(const double* U,
+                                             int n,
+                                             int k,
+                                             const double* Dinv,
+                                             const double* Mchol,
+                                             const double* r,
+                                             int ncols,
+                                             double* z,
+                                             double* scratch_nc,
                                              double* scratch_kc) {
   // scratch_nc = Dinv .* r
   q().parallel_for(sycl::range<2>(static_cast<std::size_t>(n), static_cast<std::size_t>(ncols)),
@@ -339,21 +397,23 @@ extern "C" void lk_sycl_precond_apply_launch(const double* U, int n, int k, cons
                    })
       .wait();
   // solve (L L^T) s = t in place, one column per work-item
-  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)), [=](sycl::id<1> id) {
-     double* tc = scratch_kc + id[0] * k;
-     for (int i = 0; i < k; ++i) {
-       double s = tc[i];
-       for (int j = 0; j < i; ++j)
-         s -= Mchol[static_cast<std::size_t>(j) * k + i] * tc[j];
-       tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
-     }
-     for (int i = k - 1; i >= 0; --i) {
-       double s = tc[i];
-       for (int j = i + 1; j < k; ++j)
-         s -= Mchol[static_cast<std::size_t>(i) * k + j] * tc[j];
-       tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
-     }
-   }).wait();
+  q().parallel_for(sycl::range<1>(static_cast<std::size_t>(ncols)),
+                   [=](sycl::id<1> id) {
+                     double* tc = scratch_kc + id[0] * k;
+                     for (int i = 0; i < k; ++i) {
+                       double s = tc[i];
+                       for (int j = 0; j < i; ++j)
+                         s -= Mchol[static_cast<std::size_t>(j) * k + i] * tc[j];
+                       tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
+                     }
+                     for (int i = k - 1; i >= 0; --i) {
+                       double s = tc[i];
+                       for (int j = i + 1; j < k; ++j)
+                         s -= Mchol[static_cast<std::size_t>(i) * k + j] * tc[j];
+                       tc[i] = s / Mchol[static_cast<std::size_t>(i) * k + i];
+                     }
+                   })
+      .wait();
   // z[i,c] = Dinv[i] * (r[i,c] - sum_kk U[i,kk] * s[kk,c])
   q().parallel_for(sycl::range<2>(static_cast<std::size_t>(n), static_cast<std::size_t>(ncols)),
                    [=](sycl::id<2> id) {

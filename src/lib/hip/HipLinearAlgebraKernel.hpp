@@ -52,8 +52,15 @@ int lk_hip_rmul_batched_scratch_elems(int n, int ncols);
 // null otherwise). All pointers are device pointers. Launches
 // asynchronously; the caller is responsible for checking
 // hipGetLastError()/hipDeviceSynchronize() afterward.
-void lk_hip_rmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                 const double* d_P, int ncols, double* d_Ap, double* d_scratch);
+void lk_hip_rmul_batched_launch(const double* d_Xt,
+                                int n,
+                                int dimX,
+                                const double* d_theta,
+                                int covKind,
+                                const double* d_P,
+                                int ncols,
+                                double* d_Ap,
+                                double* d_scratch);
 
 // out[c] = sum_i A[i,c]*B[i,c] for every column c (A, B are n x ncols,
 // column-major); pass the same pointer for A and B to get a per-column
@@ -78,8 +85,12 @@ void lk_hip_batched_update_p_launch(const double* d_R, const double* d_beta, dou
 
 // alpha[c] = active[c] && pAp[c] > 0 ? rz_old[c]/pAp[c] : 0 ; neg_alpha[c] = -alpha[c].
 // Marks active[c]=0 on the pAp[c] <= 0 breakdown.
-void lk_hip_cg_alpha_launch(const double* d_rz_old, const double* d_pAp, int ncols, int* d_active, double* d_alpha,
-                             double* d_neg_alpha);
+void lk_hip_cg_alpha_launch(const double* d_rz_old,
+                            const double* d_pAp,
+                            int ncols,
+                            int* d_active,
+                            double* d_alpha,
+                            double* d_neg_alpha);
 
 // d_tol is a PER-COLUMN device pointer (length ncols) -- lets a batched
 // solve fuse right-hand sides that need different tolerances (e.g.
@@ -90,13 +101,22 @@ void lk_hip_cg_alpha_launch(const double* d_rz_old, const double* d_pAp, int nco
 // this file). If active[c]: converged when sqrt(rr_new[c])/bnorm[c] <
 // tol[c] (then active[c]=0, beta[c]=0, rz_old unchanged); else beta[c] =
 // rr_new[c]/rz_old[c] and rz_old[c] = rr_new[c].
-void lk_hip_cg_beta_launch(const double* d_rr_new, const double* d_bnorm, const double* d_tol, int ncols,
-                            int* d_active, double* d_rz_old, double* d_beta);
+void lk_hip_cg_beta_launch(const double* d_rr_new,
+                           const double* d_bnorm,
+                           const double* d_tol,
+                           int ncols,
+                           int* d_active,
+                           double* d_rz_old,
+                           double* d_beta);
 
 // Restart-iteration variant: if active[c], rz_old[c] = rr[c] and active[c]=0
 // when converged (sqrt(rr[c])/bnorm[c] < tol[c], tol per-column as above).
-void lk_hip_cg_restart_launch(const double* d_rr, const double* d_bnorm, const double* d_tol, int ncols,
-                               int* d_active, double* d_rz_old);
+void lk_hip_cg_restart_launch(const double* d_rr,
+                              const double* d_bnorm,
+                              const double* d_tol,
+                              int ncols,
+                              int* d_active,
+                              double* d_rz_old);
 
 // d_flag (single int) must be zeroed by the caller first; set to 1 if any active[c] != 0.
 void lk_hip_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
@@ -105,8 +125,14 @@ void lk_hip_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
 // d(R_ij)/d(theta_k) * V[j,c], for k in [0,dimX), one launch over all
 // (i, c). d_Out is n x (dimX*ncols) column-major (see the .cu). dimX must
 // be <= 32. Matches Kriging::_logLikelihoodIterative's CPU dRmul_all.
-void lk_hip_drmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                  const double* d_V, int ncols, double* d_Out);
+void lk_hip_drmul_batched_launch(const double* d_Xt,
+                                 int n,
+                                 int dimX,
+                                 const double* d_theta,
+                                 int covKind,
+                                 const double* d_V,
+                                 int ncols,
+                                 double* d_Out);
 
 // Dense fast-path build: fills d_R (n x n, column-major, element (i,j) at
 // i + j*n; pass nullptr to skip -- dRmulBatched only needs d_dR) with
@@ -125,7 +151,12 @@ void lk_hip_drmul_batched_launch(const double* d_Xt, int n, int dimX, const doub
 // + a lk_hip_dense_matvec_launch call per matvec, instead of recomputing
 // every covariance entry's transcendentals on every iteration. Mechanical
 // port of CudaLinearAlgebraKernel.cu's build_cov_kernel.
-void lk_hip_build_cov_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind, double* d_R,
+void lk_hip_build_cov_launch(const double* d_Xt,
+                             int n,
+                             int dimX,
+                             const double* d_theta,
+                             int covKind,
+                             double* d_R,
                              double* d_dR);
 
 // Out[i, c*ldc_stride/n-th-column...] : Out[:, c] (at d_Out + c*ldc, a
@@ -149,19 +180,38 @@ void lk_hip_dense_matvec_launch(const double* d_R, int n, const double* d_V, int
 // M = d_Mchol d_Mchol^T (k x k lower). d_U is n x k col-major, d_Dinv is n,
 // d_r/d_z are n x ncols. d_scratch_nc must be >= n*ncols doubles,
 // d_scratch_kc >= k*ncols. Matches LinearAlgebra::WoodburyFactorization::solve.
-void lk_hip_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
-                                  const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc);
+void lk_hip_precond_apply_launch(const double* d_U,
+                                 int n,
+                                 int k,
+                                 const double* d_Dinv,
+                                 const double* d_Mchol,
+                                 const double* d_r,
+                                 int ncols,
+                                 double* d_z,
+                                 double* d_scratch_nc,
+                                 double* d_scratch_kc);
 
 // Preconditioned-CG beta update: beta[c] = rz_new/rz_old, rz_old <- rz_new,
 // convergence tested on the TRUE residual norm rr[c]/bnorm[c] < d_tol[c]
 // (per-column, see lk_hip_cg_beta_launch's comment for why).
-void lk_hip_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
-                                    const double* d_tol, int ncols, int* d_active, double* d_rz_old, double* d_beta);
+void lk_hip_cg_beta_precond_launch(const double* d_rr,
+                                   const double* d_rz_new,
+                                   const double* d_bnorm,
+                                   const double* d_tol,
+                                   int ncols,
+                                   int* d_active,
+                                   double* d_rz_old,
+                                   double* d_beta);
 
 // Restart variant for preconditioned CG: rz_old <- rz[c], converge on rr[c]
 // (per-column d_tol as above).
-void lk_hip_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
-                                       const double* d_tol, int ncols, int* d_active, double* d_rz_old);
+void lk_hip_cg_restart_precond_launch(const double* d_rr,
+                                      const double* d_rz,
+                                      const double* d_bnorm,
+                                      const double* d_tol,
+                                      int ncols,
+                                      int* d_active,
+                                      double* d_rz_old);
 
 // --- Device-resident batched Lanczos (Stochastic Lanczos Quadrature) ------
 // Lets LinearAlgebraHip::stochasticLogDetBatched keep every probe's Krylov
@@ -178,7 +228,10 @@ void lk_hip_cg_restart_precond_launch(const double* d_rr, const double* d_rz, co
 // plain kernels instead.
 
 // alpha[c] = active[c] ? dot[c] : 0 ; neg_alpha[c] = -alpha[c].
-void lk_hip_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
+void lk_hip_lanczos_alpha_launch(const double* d_dot,
+                                 int ncols,
+                                 const int* d_active,
+                                 double* d_alpha,
                                  double* d_neg_alpha);
 
 // Per-probe end-of-step bookkeeping, mirroring
@@ -194,8 +247,14 @@ void lk_hip_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_ac
 //     once and every later write to it is gated by inv_bj_out being 0 here).
 // active/m_eff are both read-modify-write (int, length ncols); m_eff must be
 // pre-filled with lanczos_steps (the "never went inactive" default) by the caller.
-void lk_hip_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step, int* d_active,
-                                int* d_m_eff, double* d_beta_out, double* d_inv_bj_out,
+void lk_hip_lanczos_beta_launch(const double* d_dot2,
+                                int ncols,
+                                int step_idx,
+                                int is_last_step,
+                                int* d_active,
+                                int* d_m_eff,
+                                double* d_beta_out,
+                                double* d_inv_bj_out,
                                 double* d_neg_beta_prev_out);
 
 // d_t[p*ls + jj] = dot(d_V[step jj block][:,p], d_W[:,p]) for every probe p
@@ -208,8 +267,7 @@ void lk_hip_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, i
 // contiguous length-`ls` blocks (one per probe); only slots [0,m) of each
 // block are written. HIP-only: replaces CUDA's cuBLAS half of the
 // reorthogonalization (this backend has no BLAS dependency).
-void lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int n, int npr, int ls, int m,
-                                      double* d_t);
+void lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int n, int npr, int ls, int m, double* d_t);
 
 // d_W[:,p] -= sum_{k=0}^{m-1} d_V[step k's n x npr block][:,p] * d_t[p*ls + k],
 // for every probe p -- subtracts w's projection onto the WHOLE Krylov
@@ -218,8 +276,7 @@ void lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int 
 // lk_hip_lanczos_reorth_dot_launch read from (step k's block at
 // d_V + k*npr*n). HIP-only: replaces CUDA's cublasDgemmStridedBatched
 // (CUBLAS_OP_N, ...) half of the reorthogonalization.
-void lk_hip_lanczos_reorth_sub_launch(const double* d_V, const double* d_t, int n, int npr, int ls, int m,
-                                      double* d_W);
+void lk_hip_lanczos_reorth_sub_launch(const double* d_V, const double* d_t, int n, int npr, int ls, int m, double* d_W);
 
 }  // extern "C"
 

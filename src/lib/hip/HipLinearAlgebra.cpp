@@ -31,15 +31,14 @@
 
 namespace {
 
-#define LK_HIP_CHECK(expr)                                                    \
-  do {                                                                         \
-    hipError_t lk_hip_status__ = (expr);                                     \
-    if (lk_hip_status__ != hipSuccess) {                                     \
-      std::ostringstream lk_hip_oss__;                                        \
-      lk_hip_oss__ << "HIP error at " << __FILE__ << ":" << __LINE__ << ": " \
-                    << hipGetErrorString(lk_hip_status__);                   \
-      throw std::runtime_error(lk_hip_oss__.str());                           \
-    }                                                                          \
+#define LK_HIP_CHECK(expr)                                                                                          \
+  do {                                                                                                              \
+    hipError_t lk_hip_status__ = (expr);                                                                            \
+    if (lk_hip_status__ != hipSuccess) {                                                                            \
+      std::ostringstream lk_hip_oss__;                                                                              \
+      lk_hip_oss__ << "HIP error at " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(lk_hip_status__); \
+      throw std::runtime_error(lk_hip_oss__.str());                                                                 \
+    }                                                                                                               \
   } while (0)
 
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
@@ -132,7 +131,8 @@ bool covCacheMatches(const DenseCovCache& c, const arma::mat& Xt, const arma::ve
     return false;
   if (c.xt.size() != Xt.n_elem || c.theta.size() != theta.n_elem)
     return false;
-  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr()) && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
+  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr())
+         && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
 }
 
 // Binds the cache to (Xt, theta, kind), uploading Xt/theta if the key
@@ -319,12 +319,14 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_HIP_CHECK(hipMalloc(&d_z, mat_bytes));
     LK_HIP_CHECK(hipMalloc(&d_prec_nc, mat_bytes));
     LK_HIP_CHECK(hipMalloc(&d_prec_kc, sizeof(double) * static_cast<std::size_t>(pk) * ncols));
-    LK_HIP_CHECK(hipMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk,
-                             hipMemcpyHostToDevice));
+    LK_HIP_CHECK(
+        hipMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk, hipMemcpyHostToDevice));
     LK_HIP_CHECK(
         hipMemcpy(d_precDinv, precDinv.memptr(), sizeof(double) * static_cast<std::size_t>(n), hipMemcpyHostToDevice));
-    LK_HIP_CHECK(hipMemcpy(d_precMchol, precMcholLower.memptr(), sizeof(double) * static_cast<std::size_t>(pk) * pk,
-                             hipMemcpyHostToDevice));
+    LK_HIP_CHECK(hipMemcpy(d_precMchol,
+                           precMcholLower.memptr(),
+                           sizeof(double) * static_cast<std::size_t>(pk) * pk,
+                           hipMemcpyHostToDevice));
   }
   auto precondApply = [&](const double* d_in, double* d_out) {
     lk_hip_precond_apply_launch(d_precU, n, pk, d_precDinv, d_precMchol, d_in, ncols, d_out, d_prec_nc, d_prec_kc);
@@ -371,9 +373,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LK_HIP_CHECK(hipMemcpy(d_active, active_h.data(), col_bytes_i, hipMemcpyHostToDevice));
 
   if (preconditioned) {
-    precondApply(d_r, d_z);                                              // z = Pinv(r)
+    precondApply(d_r, d_z);                                                 // z = Pinv(r)
     LK_HIP_CHECK(hipMemcpy(d_p, d_z, mat_bytes, hipMemcpyDeviceToDevice));  // p = z
-    lk_hip_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);           // rz_old = <r, z>
+    lk_hip_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);                // rz_old = <r, z>
     LK_HIP_CHECK(hipGetLastError());
   } else {
     LK_HIP_CHECK(hipMemcpy(d_p, d_r, mat_bytes, hipMemcpyDeviceToDevice));  // p = z = r
@@ -400,9 +402,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       // resetting p destroyed CG conjugacy (see LinearAlgebra::conjugateGradient).
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's).
-      matvec(d_x, d_Ap);  // Ap = A*x
+      matvec(d_x, d_Ap);                                                      // Ap = A*x
       LK_HIP_CHECK(hipMemcpy(d_r, d_b, mat_bytes, hipMemcpyDeviceToDevice));  // r = b
-      lk_hip_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);             // r = b - A*x
+      lk_hip_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);            // r = b - A*x
       LK_HIP_CHECK(hipGetLastError());
       lk_hip_batched_dot_launch(d_r, d_r, n, ncols, d_scratch);  // r.r (true residual)
       LK_HIP_CHECK(hipGetLastError());
@@ -461,8 +463,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       ++n_unconverged;
   if (n_unconverged_out != nullptr)
     *n_unconverged_out = n_unconverged;
-  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
-                                        static_cast<arma::uword>(n), max_iter);
+  LinearAlgebra::cgNonConvergenceWarning(
+      n_unconverged, static_cast<arma::uword>(ncols), static_cast<arma::uword>(n), max_iter);
 
   hipFree(d_b);
   hipFree(d_x);
@@ -509,8 +511,17 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precMcholLower,
                             arma::uword* n_unconverged_out,
                             const arma::mat* X0) {
-  return conjugateGradient(Xt, theta, covType, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), precU,
-                           precDinv, precMcholLower, n_unconverged_out, X0);
+  return conjugateGradient(Xt,
+                           theta,
+                           covType,
+                           B,
+                           max_iter,
+                           arma::vec(B.n_cols, arma::fill::value(tol)),
+                           precU,
+                           precDinv,
+                           precMcholLower,
+                           n_unconverged_out,
+                           X0);
 }
 
 // R(Xt,theta) * V in one batched device launch (see the header). Same
@@ -577,8 +588,8 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
     throw std::invalid_argument("LinearAlgebraHip::dRmulBatched: dimX " + std::to_string(dimX) + " > "
                                 + std::to_string(kMaxDimX));
   if (static_cast<int>(V.n_rows) != n)
-    throw std::invalid_argument("LinearAlgebraHip::dRmulBatched: V has " + std::to_string(V.n_rows)
-                                + " rows, expected " + std::to_string(n));
+    throw std::invalid_argument("LinearAlgebraHip::dRmulBatched: V has " + std::to_string(V.n_rows) + " rows, expected "
+                                + std::to_string(n));
 
   // Xt/theta are shared with the dense cache (the gradient pass runs at the
   // same theta as the CG/SLQ passes that precede it, so they are already
@@ -592,8 +603,7 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
   LK_HIP_CHECK(hipMalloc(&d_V, sizeof(double) * static_cast<std::size_t>(n) * ncols));
   const std::size_t out_bytes = sizeof(double) * static_cast<std::size_t>(n) * dimX * ncols;
   LK_HIP_CHECK(hipMalloc(&d_Out, out_bytes));
-  LK_HIP_CHECK(hipMemcpy(
-      d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, hipMemcpyHostToDevice));
+  LK_HIP_CHECK(hipMemcpy(d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, hipMemcpyHostToDevice));
 
   // Dense fast path: materialize the dimX dR/dtheta_k blocks once, then one
   // lk_hip_dense_matvec_launch per dimension writes straight into its
@@ -644,8 +654,11 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
 // d_V + j*npr*n -- same layout CUDA's version uses, and for the same
 // reason (step j's block is already exactly what the matvec/reorth kernels
 // want as input, no gather pass needed).
-double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, const std::string& covType,
-                               arma::uword lanczos_steps_in, const arma::mat& probes) {
+double stochasticLogDetBatched(const arma::mat& Xt,
+                               const arma::vec& theta,
+                               const std::string& covType,
+                               arma::uword lanczos_steps_in,
+                               const arma::mat& probes) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraHip::stochasticLogDetBatched: unsupported covType '" + covType + "'");
@@ -665,7 +678,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
   for (int p = 0; p < npr; ++p) {
     znorm[static_cast<std::size_t>(p)] = arma::norm(probes.col(static_cast<arma::uword>(p)));
     if (znorm[static_cast<std::size_t>(p)] != 0.0) {
-      V0.col(static_cast<arma::uword>(p)) = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
+      V0.col(static_cast<arma::uword>(p))
+          = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
       active_h[static_cast<std::size_t>(p)] = 1;
     } else {
       active_h[static_cast<std::size_t>(p)] = 0;
@@ -684,8 +698,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
       lk_hip_dense_matvec_launch(d_Rmat, n, d_in, npr, d_out, n);
       LK_HIP_CHECK(hipGetLastError());
     } else {
-      lk_hip_rmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_in, npr, d_out,
-                                 d_rmul_scratch);
+      lk_hip_rmul_batched_launch(
+          cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_in, npr, d_out, d_rmul_scratch);
       LK_HIP_CHECK(hipGetLastError());
     }
   };
@@ -729,8 +743,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     LK_HIP_CHECK(hipGetLastError());
     lk_hip_lanczos_alpha_launch(d_dot, npr, d_active, d_alpha_step, d_neg_alpha);
     LK_HIP_CHECK(hipGetLastError());
-    LK_HIP_CHECK(hipMemcpy(d_alpha_all + static_cast<std::size_t>(j) * npr, d_alpha_step, col_bytes,
-                             hipMemcpyDeviceToDevice));
+    LK_HIP_CHECK(
+        hipMemcpy(d_alpha_all + static_cast<std::size_t>(j) * npr, d_alpha_step, col_bytes, hipMemcpyDeviceToDevice));
     lk_hip_batched_axpy_launch(d_neg_alpha, Vj, d_W, n, npr);  // w -= alpha_j * Vj
     LK_HIP_CHECK(hipGetLastError());
 
@@ -748,8 +762,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     const int is_last = (j + 1 == ls) ? 1 : 0;
     lk_hip_lanczos_beta_launch(d_dot2, npr, j, is_last, d_active, d_m_eff, d_beta_step, d_inv_bj, d_neg_beta_prev);
     LK_HIP_CHECK(hipGetLastError());
-    LK_HIP_CHECK(hipMemcpy(d_beta_all + static_cast<std::size_t>(j) * npr, d_beta_step, col_bytes,
-                             hipMemcpyDeviceToDevice));
+    LK_HIP_CHECK(
+        hipMemcpy(d_beta_all + static_cast<std::size_t>(j) * npr, d_beta_step, col_bytes, hipMemcpyDeviceToDevice));
 
     if (j + 1 < ls) {
       double* Vnext = d_V + static_cast<std::size_t>(j + 1) * npr * n;

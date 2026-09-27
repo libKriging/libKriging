@@ -634,7 +634,10 @@ __global__ void build_cov_kernel(const double* __restrict__ Xt,
 // instead of falling back to the CPU path.
 
 // DinvR[i,c] = Dinv[i] * R[i,c]  (n x ncols)
-__global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double* __restrict__ R, int n, double* __restrict__ Out) {
+__global__ void scale_rows_kernel(const double* __restrict__ Dinv,
+                                  const double* __restrict__ R,
+                                  int n,
+                                  double* __restrict__ Out) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n)
@@ -644,7 +647,11 @@ __global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double*
 }
 
 // z[i,c] = Dinv[i] * (r[i,c] - Us[i,c])  (all n x ncols)
-__global__ void precond_finish_kernel(const double* __restrict__ Dinv, const double* __restrict__ r, const double* __restrict__ Us, int n, double* __restrict__ z) {
+__global__ void precond_finish_kernel(const double* __restrict__ Dinv,
+                                      const double* __restrict__ r,
+                                      const double* __restrict__ Us,
+                                      int n,
+                                      double* __restrict__ z) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n)
@@ -656,7 +663,14 @@ __global__ void precond_finish_kernel(const double* __restrict__ Dinv, const dou
 // beta[c] = active ? rz_new[c]/rz_old[c] : 0 ; rz_old[c] = rz_new[c] ;
 // convergence tested on the TRUE residual norm rr[c] (not rz). Matches the
 // preconditioned branch of LinearAlgebra::conjugateGradient.
-__global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz_new, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old, double* __restrict__ beta) {
+__global__ void cg_beta_precond_kernel(const double* __restrict__ rr,
+                                       const double* __restrict__ rz_new,
+                                       const double* __restrict__ bnorm,
+                                       const double* __restrict__ tol,
+                                       int ncols,
+                                       int* __restrict__ active,
+                                       double* __restrict__ rz_old,
+                                       double* __restrict__ beta) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols)
     return;
@@ -679,23 +693,39 @@ extern "C" void lk_cuda_scale_rows_launch(const double* d_Dinv, const double* d_
   scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_R, n, d_Out);
 }
 
-extern "C" void lk_cuda_precond_finish_launch(const double* d_Dinv, const double* d_r, const double* d_Us, int n,
-                                              int ncols, double* d_z) {
+extern "C" void lk_cuda_precond_finish_launch(const double* d_Dinv,
+                                              const double* d_r,
+                                              const double* d_Us,
+                                              int n,
+                                              int ncols,
+                                              double* d_z) {
   const dim3 blk(128, 1, 1);
   const dim3 grid_n((n + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
   precond_finish_kernel<<<grid_n, blk>>>(d_Dinv, d_r, d_Us, n, d_z);
 }
 
-extern "C" void lk_cuda_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
-                                               const double* d_tol, int ncols, int* d_active, double* d_rz_old, double* d_beta) {
+extern "C" void lk_cuda_cg_beta_precond_launch(const double* d_rr,
+                                               const double* d_rz_new,
+                                               const double* d_bnorm,
+                                               const double* d_tol,
+                                               int ncols,
+                                               int* d_active,
+                                               double* d_rz_old,
+                                               double* d_beta) {
   const int block = 128;
-  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz_new, d_bnorm, d_tol, ncols, d_active, d_rz_old,
-                                                                d_beta);
+  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_rr, d_rz_new, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
 }
 
 // Restart-iteration variant for preconditioned CG: rz_old <- rz[c] (the
 // preconditioned inner product), converge on the true residual rr[c].
-__global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old) {
+__global__ void cg_restart_precond_kernel(const double* __restrict__ rr,
+                                          const double* __restrict__ rz,
+                                          const double* __restrict__ bnorm,
+                                          const double* __restrict__ tol,
+                                          int ncols,
+                                          int* __restrict__ active,
+                                          double* __restrict__ rz_old) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols || !active[c])
     return;
@@ -704,10 +734,16 @@ __global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const d
     active[c] = 0;
 }
 
-extern "C" void lk_cuda_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
-                                                  const double* d_tol, int ncols, int* d_active, double* d_rz_old) {
+extern "C" void lk_cuda_cg_restart_precond_launch(const double* d_rr,
+                                                  const double* d_rz,
+                                                  const double* d_bnorm,
+                                                  const double* d_tol,
+                                                  int ncols,
+                                                  int* d_active,
+                                                  double* d_rz_old) {
   const int block = 128;
-  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_rr, d_rz, d_bnorm, d_tol, ncols, d_active, d_rz_old);
 }
 
 // alpha[c] = active[c] ? dot[c] : 0 ; neg_alpha[c] = -alpha[c]. See
@@ -727,7 +763,10 @@ __global__ void lanczos_alpha_kernel(const double* __restrict__ dot,
   neg_alpha[c] = -a;
 }
 
-extern "C" void lk_cuda_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
+extern "C" void lk_cuda_lanczos_alpha_launch(const double* d_dot,
+                                             int ncols,
+                                             const int* d_active,
+                                             double* d_alpha,
                                              double* d_neg_alpha) {
   const int block = 128;
   lanczos_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_dot, ncols, d_active, d_alpha, d_neg_alpha);
@@ -771,8 +810,14 @@ __global__ void lanczos_beta_kernel(const double* __restrict__ dot2,
   neg_beta_prev_out[c] = no_next ? 0.0 : -bj;
 }
 
-extern "C" void lk_cuda_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step,
-                                            int* d_active, int* d_m_eff, double* d_beta_out, double* d_inv_bj_out,
+extern "C" void lk_cuda_lanczos_beta_launch(const double* d_dot2,
+                                            int ncols,
+                                            int step_idx,
+                                            int is_last_step,
+                                            int* d_active,
+                                            int* d_m_eff,
+                                            double* d_beta_out,
+                                            double* d_inv_bj_out,
                                             double* d_neg_beta_prev_out) {
   const int block = 128;
   lanczos_beta_kernel<<<(ncols + block - 1) / block, block>>>(

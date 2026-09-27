@@ -189,11 +189,13 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_SYCL_CHECK(cudaMalloc(&d_z, mat_bytes));
     LK_SYCL_CHECK(cudaMalloc(&d_prec_nc, mat_bytes));
     LK_SYCL_CHECK(cudaMalloc(&d_prec_kc, sizeof(double) * static_cast<std::size_t>(pk) * ncols));
-    LK_SYCL_CHECK(cudaMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk,
-                             cudaMemcpyHostToDevice));
     LK_SYCL_CHECK(
-        cudaMemcpy(d_precDinv, precDinv.memptr(), sizeof(double) * static_cast<std::size_t>(n), cudaMemcpyHostToDevice));
-    LK_SYCL_CHECK(cudaMemcpy(d_precMchol, precMcholLower.memptr(), sizeof(double) * static_cast<std::size_t>(pk) * pk,
+        cudaMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk, cudaMemcpyHostToDevice));
+    LK_SYCL_CHECK(cudaMemcpy(
+        d_precDinv, precDinv.memptr(), sizeof(double) * static_cast<std::size_t>(n), cudaMemcpyHostToDevice));
+    LK_SYCL_CHECK(cudaMemcpy(d_precMchol,
+                             precMcholLower.memptr(),
+                             sizeof(double) * static_cast<std::size_t>(pk) * pk,
                              cudaMemcpyHostToDevice));
   }
   auto precondApply = [&](const double* d_in, double* d_out) {
@@ -227,9 +229,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LK_SYCL_CHECK(cudaMemcpy(d_active, active_h.data(), col_bytes_i, cudaMemcpyHostToDevice));
 
   if (preconditioned) {
-    precondApply(d_r, d_z);                                              // z = Pinv(r)
+    precondApply(d_r, d_z);                                                    // z = Pinv(r)
     LK_SYCL_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z
-    lk_sycl_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);           // rz_old = <r, z>
+    lk_sycl_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);                  // rz_old = <r, z>
     LK_SYCL_CHECK(cudaGetLastError());
   } else {
     LK_SYCL_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z = r
@@ -257,11 +259,18 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       // resetting p destroyed CG conjugacy (see LinearAlgebra::conjugateGradient).
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's).
-      lk_sycl_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_x, ncols, d_Ap,
+      lk_sycl_rmul_batched_launch(d_Xt,
+                                  n,
+                                  dimX,
+                                  d_theta,
+                                  static_cast<int>(kind),
+                                  d_x,
+                                  ncols,
+                                  d_Ap,
                                   d_rmul_scratch);  // Ap = A*x
       LK_SYCL_CHECK(cudaGetLastError());
       LK_SYCL_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b
-      lk_sycl_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);             // r = b - A*x
+      lk_sycl_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);              // r = b - A*x
       LK_SYCL_CHECK(cudaGetLastError());
       lk_sycl_batched_dot_launch(d_r, d_r, n, ncols, d_scratch);  // r.r (true residual)
       LK_SYCL_CHECK(cudaGetLastError());
@@ -320,8 +329,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       ++n_unconverged;
   if (n_unconverged_out != nullptr)
     *n_unconverged_out = n_unconverged;
-  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
-                                        static_cast<arma::uword>(n), max_iter);
+  LinearAlgebra::cgNonConvergenceWarning(
+      n_unconverged, static_cast<arma::uword>(ncols), static_cast<arma::uword>(n), max_iter);
 
   cudaFree(d_Xt);
   cudaFree(d_theta);
@@ -427,8 +436,8 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
   LK_SYCL_CHECK(
       cudaMemcpy(d_Xt, Xt.memptr(), sizeof(double) * static_cast<std::size_t>(n) * dimX, cudaMemcpyHostToDevice));
   LK_SYCL_CHECK(cudaMemcpy(d_theta, theta.memptr(), sizeof(double) * dimX, cudaMemcpyHostToDevice));
-  LK_SYCL_CHECK(cudaMemcpy(
-      d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, cudaMemcpyHostToDevice));
+  LK_SYCL_CHECK(
+      cudaMemcpy(d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, cudaMemcpyHostToDevice));
 
   lk_sycl_drmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_V, ncols, d_Out);
   LK_SYCL_CHECK(cudaGetLastError());

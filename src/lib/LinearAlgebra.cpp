@@ -127,7 +127,8 @@ arma::mat LinearAlgebra::safe_chol_lower_retry(arma::mat X, int inc_cond) {
     // t0 = Bench::toc(nullptr, "        inc_cond" ,t0);
   } else {
     if (warn_chol && (inc_cond > 0)) {
-      arma::cout << "[WARNING] Added " << LinearAlgebra::num_nugget << " * 10^" << inc_cond << " numerical nugget to force Cholesky decomposition" << arma::endl;
+      arma::cout << "[WARNING] Added " << LinearAlgebra::num_nugget << " * 10^" << inc_cond
+                 << " numerical nugget to force Cholesky decomposition" << arma::endl;
     }
     return L;
   }
@@ -435,13 +436,13 @@ void LinearAlgebra::WoodburyFactorization::ensure_whiten_factors() const {
   //   log det Rtilde = log det R - log det P.
   if (!m_whiten_Q.is_empty())
     return;
-  const arma::vec Dinvhalf = arma::sqrt(m_Dinv);       // D^{-1/2}
-  const arma::mat W = m_U.each_col() % Dinvhalf;        // D^{-1/2} U
+  const arma::vec Dinvhalf = arma::sqrt(m_Dinv);  // D^{-1/2}
+  const arma::mat W = m_U.each_col() % Dinvhalf;  // D^{-1/2} U
   arma::mat Q, S;
   arma::qr_econ(Q, S, W);
   arma::vec Lam;
   arma::mat G;
-  arma::eig_sym(Lam, G, S * S.t());                     // eigenvalues of S S' (>= 0)
+  arma::eig_sym(Lam, G, S * S.t());  // eigenvalues of S S' (>= 0)
   Lam = arma::clamp(Lam, 0.0, arma::datum::inf);
   m_whiten_Dinvhalf = Dinvhalf;
   m_whiten_Q = Q;
@@ -451,16 +452,16 @@ void LinearAlgebra::WoodburyFactorization::ensure_whiten_factors() const {
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenL(const arma::mat& B) const {
   ensure_whiten_factors();
-  arma::mat t = B.each_col() % m_whiten_Dinvhalf;             // D^{-1/2} B
-  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} (...)
+  arma::mat t = B.each_col() % m_whiten_Dinvhalf;            // D^{-1/2} B
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));  // K^{-1/2} (...)
   return t;
 }
 
 LIBKRIGING_EXPORT arma::mat LinearAlgebra::WoodburyFactorization::whitenLt(const arma::mat& B) const {
   ensure_whiten_factors();
   arma::mat t = B;
-  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));   // K^{-1/2} B
-  t.each_col() %= m_whiten_Dinvhalf;                          // D^{-1/2} (...)
+  t += m_whiten_Q * (m_whiten_core * (m_whiten_Q.t() * t));  // K^{-1/2} B
+  t.each_col() %= m_whiten_Dinvhalf;                         // D^{-1/2} (...)
   return t;
 }
 
@@ -800,7 +801,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
   // header comment for why that's still worth having.
   arma::mat Xc = (X0 != nullptr) ? *X0 : arma::mat(n, ncols, arma::fill::zeros);
   arma::mat R = (X0 != nullptr) ? arma::mat(B - AmulBatched(Xc)) : B;
-  arma::mat Z = preconditioned ? PinvBatched(R) : R;   // z = M^-1 r
+  arma::mat Z = preconditioned ? PinvBatched(R) : R;  // z = M^-1 r
   arma::mat P = Z;
   const arma::rowvec bnorm = arma::sqrt(arma::sum(arma::square(B), 0));
   arma::rowvec rz_old(ncols, arma::fill::zeros);
@@ -936,8 +937,8 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::conjugateGradientBatched(
     const std::function<arma::mat(const arma::mat&)>& PinvBatched,
     arma::uword* n_unconverged_out,
     const arma::mat* X0) {
-  return conjugateGradientBatched(AmulBatched, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), PinvBatched,
-                                  n_unconverged_out, X0);
+  return conjugateGradientBatched(
+      AmulBatched, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), PinvBatched, n_unconverged_out, X0);
 }
 
 // Solve X*A=B : X = B / A
@@ -999,10 +1000,10 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
   const double* X_mem = X.memptr();
   double* dX_mem = dX.memptr();
 
-  #ifdef _OPENMP
+#ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if (n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = i + 1; j < static_cast<arma::sword>(n); j++) {
         arma::uword ij = i * n + j;
@@ -1017,7 +1018,7 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
       }
     }
   } else {
-  #endif
+#endif
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = i + 1; j < n; j++) {
         arma::uword ij = i * n + j;
@@ -1031,28 +1032,28 @@ LIBKRIGING_EXPORT arma::mat LinearAlgebra::compute_dX(const arma::mat& X) {
         }
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
 
   return dX;
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
-                                                     const arma::mat& dX,
-                                                     const arma::vec& theta,
-                                                     std::function<double(const arma::vec&, const arma::vec&)> Cov,
-                                                     double factor,
-                                                     const arma::vec& diag) {
+                                                    const arma::mat& dX,
+                                                    const arma::vec& theta,
+                                                    std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                                    double factor,
+                                                    const arma::vec& diag) {
   arma::uword n = (*R).n_rows;
 
-  // First compute off-diagonal elements with OpenMP parallelization
-  // Use dynamic scheduling for load balancing (lower triangle has uneven work)
-  #ifdef _OPENMP
+// First compute off-diagonal elements with OpenMP parallelization
+// Use dynamic scheduling for load balancing (lower triangle has uneven work)
+#ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(optimal_threads) if (n >= 200)
     for (arma::sword i = 0; i < static_cast<arma::sword>(n); i++) {
       for (arma::sword j = 0; j < i; j++) {
         double cov_val = Cov(dX.col(i * n + j), theta) * factor;
@@ -1060,7 +1061,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
       }
     }
   } else {
-  #endif
+#endif
     // Serial version for small matrices or when OpenMP is disabled
     for (arma::uword i = 0; i < n; i++) {
       for (arma::uword j = 0; j < i; j++) {
@@ -1068,9 +1069,9 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
 
   // Then set diagonal
   if (diag.n_elem == 0) {
@@ -1083,11 +1084,11 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_dX(arma::mat* R,
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
-                                                    const arma::mat& X,
-                                                    const arma::vec& theta,
-                                                    std::function<double(const arma::vec&, const arma::vec&)> Cov,
-                                                    double factor,
-                                                    const arma::vec& diag) {
+                                                   const arma::mat& X,
+                                                   const arma::vec& theta,
+                                                   std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                                   double factor,
+                                                   const arma::vec& diag) {
   arma::uword n = (*R).n_rows;
   arma::uword d = X.n_rows;
 
@@ -1097,13 +1098,13 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
   // Block size for cache optimization (64 elements fit well in L1 cache)
   const arma::uword BLOCK_SIZE = 64;
 
-  // First compute off-diagonal elements with block-based OpenMP parallelization
-  // Use dynamic scheduling because lower triangle has uneven work distribution
-  #ifdef _OPENMP
+// First compute off-diagonal elements with block-based OpenMP parallelization
+// Use dynamic scheduling because lower triangle has uneven work distribution
+#ifdef _OPENMP
   if (n >= 200) {  // Only use OpenMP for large enough matrices (avoid overhead for small n)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if(n >= 200)
+#pragma omp parallel for schedule(dynamic, 4) num_threads(optimal_threads) if (n >= 200)
     for (arma::sword bi = 0; bi < static_cast<arma::sword>(n); bi += BLOCK_SIZE) {
       arma::uword block_end_i = (bi + BLOCK_SIZE < n) ? bi + BLOCK_SIZE : n;
 
@@ -1122,7 +1123,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
       }
     }
   } else {
-  #endif
+#endif
     // Serial version for small matrices or when OpenMP is disabled
     // Pre-allocate diff vector to avoid repeated allocations
     arma::vec diff(d);
@@ -1137,9 +1138,9 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
         (*R).at(i, j) = (*R).at(j, i) = cov_val;
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
 
   // Then set diagonal
   if (diag.n_elem == 0) {
@@ -1152,11 +1153,11 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_sym_X(arma::mat* R,
 }
 
 LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
-                                                   const arma::mat& X1,
-                                                   const arma::mat& X2,
-                                                   const arma::vec& theta,
-                                                   std::function<double(const arma::vec&, const arma::vec&)> Cov,
-                                                   double factor) {
+                                                  const arma::mat& X1,
+                                                  const arma::mat& X2,
+                                                  const arma::vec& theta,
+                                                  std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                                  double factor) {
   arma::uword n1 = X1.n_cols;
   arma::uword n2 = X2.n_cols;
   arma::uword d = X1.n_rows;
@@ -1168,20 +1169,20 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
   // Block size for cache optimization
   const arma::uword BLOCK_SIZE = 64;
 
-  // Block-based parallelization for better cache locality
-  // Rectangular matrices have uniform work distribution, use static scheduling
-  #ifdef _OPENMP
+// Block-based parallelization for better cache locality
+// Rectangular matrices have uniform work distribution, use static scheduling
+#ifdef _OPENMP
   arma::uword total_work = n1 * n2;
   if (total_work >= 40000) {  // Only use OpenMP for sufficient work (avoid overhead for small matrices)
     // Limit threads to avoid overhead - optimal is 4-8 threads based on benchmarks
     int optimal_threads = get_optimal_threads(2);
-    #pragma omp parallel num_threads(optimal_threads) if(total_work >= 40000)
+#pragma omp parallel num_threads(optimal_threads) if (total_work >= 40000)
     {
       // Pre-allocate diff vector once per thread (thread-local)
       arma::vec diff(d);
       double* diff_mem = diff.memptr();
 
-      #pragma omp for schedule(static) collapse(2)
+#pragma omp for schedule(static) collapse(2)
       for (arma::sword bi = 0; bi < static_cast<arma::sword>(n1); bi += BLOCK_SIZE) {
         for (arma::sword bj = 0; bj < static_cast<arma::sword>(n2); bj += BLOCK_SIZE) {
           arma::uword block_end_i = (bi + BLOCK_SIZE < static_cast<arma::sword>(n1)) ? bi + BLOCK_SIZE : n1;
@@ -1200,7 +1201,7 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
       }
     }
   } else {
-  #endif
+#endif
     // Serial version for small matrices or when OpenMP is disabled
     // Pre-allocate diff vector to avoid repeated allocations
     arma::vec diff(d);
@@ -1214,9 +1215,9 @@ LIBKRIGING_EXPORT void LinearAlgebra::covMat_rect(arma::mat* R,
         (*R).at(i, j) = Cov(diff, theta) * factor;
       }
     }
-  #ifdef _OPENMP
+#ifdef _OPENMP
   }
-  #endif
+#endif
 }
 
 // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)

@@ -3,8 +3,8 @@
 
 #include "libKriging/utils/lk_armadillo.hpp"
 
-#include <carma>
 #include <carma_bits/cnalloc.h>
+#include <carma>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
@@ -118,20 +118,27 @@ PYBIND11_MODULE(_pylibkriging, m) {
   // -DENABLE_CUDA_ITERATIVE they report "no CUDA" and set_enabled is a no-op.
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
   m.attr("__cuda_iterative__") = true;
-  m.def("cuda_iterative_available", &LinearAlgebraCuda::available,
+  m.def("cuda_iterative_available",
+        &LinearAlgebraCuda::available,
         "True iff libKriging was built with -DENABLE_CUDA_ITERATIVE and a CUDA device is visible at runtime.");
-  m.def("cuda_iterative_enabled", &LinearAlgebraCuda::enabled,
+  m.def("cuda_iterative_enabled",
+        &LinearAlgebraCuda::enabled,
         "True iff the CUDA matrix-free CG backend is currently active (defaults to cuda_iterative_available()).");
-  m.def("set_cuda_iterative_enabled", &LinearAlgebraCuda::set_enabled, py::arg("value"),
+  m.def("set_cuda_iterative_enabled",
+        &LinearAlgebraCuda::set_enabled,
+        py::arg("value"),
         "Turn the CUDA matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
 #else
   m.attr("__cuda_iterative__") = false;
-  m.def("cuda_iterative_available", []() { return false; },
-        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
-  m.def("cuda_iterative_enabled", []() { return false; },
-        "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
-  m.def("set_cuda_iterative_enabled", [](bool) {}, py::arg("value"),
-        "No-op: this build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def(
+      "cuda_iterative_available", []() { return false; }, "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def(
+      "cuda_iterative_enabled", []() { return false; }, "This build was compiled without -DENABLE_CUDA_ITERATIVE.");
+  m.def(
+      "set_cuda_iterative_enabled",
+      [](bool) {},
+      py::arg("value"),
+      "No-op: this build was compiled without -DENABLE_CUDA_ITERATIVE.");
 #endif
 
   // --- HIP-accelerated iterative (LLIterative / predictIterative) backend ---
@@ -140,20 +147,27 @@ PYBIND11_MODULE(_pylibkriging, m) {
   // -DENABLE_HIP_ITERATIVE they report "no HIP" and set_enabled is a no-op.
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
   m.attr("__hip_iterative__") = true;
-  m.def("hip_iterative_available", &LinearAlgebraHip::available,
+  m.def("hip_iterative_available",
+        &LinearAlgebraHip::available,
         "True iff libKriging was built with -DENABLE_HIP_ITERATIVE and a ROCm/HIP device is visible at runtime.");
-  m.def("hip_iterative_enabled", &LinearAlgebraHip::enabled,
+  m.def("hip_iterative_enabled",
+        &LinearAlgebraHip::enabled,
         "True iff the HIP matrix-free CG backend is currently active (defaults to hip_iterative_available()).");
-  m.def("set_hip_iterative_enabled", &LinearAlgebraHip::set_enabled, py::arg("value"),
+  m.def("set_hip_iterative_enabled",
+        &LinearAlgebraHip::set_enabled,
+        py::arg("value"),
         "Turn the HIP matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
 #else
   m.attr("__hip_iterative__") = false;
-  m.def("hip_iterative_available", []() { return false; },
-        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
-  m.def("hip_iterative_enabled", []() { return false; },
-        "This build was compiled without -DENABLE_HIP_ITERATIVE.");
-  m.def("set_hip_iterative_enabled", [](bool) {}, py::arg("value"),
-        "No-op: this build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def(
+      "hip_iterative_available", []() { return false; }, "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def(
+      "hip_iterative_enabled", []() { return false; }, "This build was compiled without -DENABLE_HIP_ITERATIVE.");
+  m.def(
+      "set_hip_iterative_enabled",
+      [](bool) {},
+      py::arg("value"),
+      "No-op: this build was compiled without -DENABLE_HIP_ITERATIVE.");
 #endif
 
   // --- Apple-Metal-accelerated iterative (LLIterative / predictIterative) backend ---
@@ -164,20 +178,27 @@ PYBIND11_MODULE(_pylibkriging, m) {
   // is a no-op.
 #ifdef LIBKRIGING_USE_METAL_ITERATIVE
   m.attr("__metal_iterative__") = true;
-  m.def("metal_iterative_available", &LinearAlgebraMetal::available,
+  m.def("metal_iterative_available",
+        &LinearAlgebraMetal::available,
         "True iff libKriging was built with -DENABLE_METAL_ITERATIVE and a Metal device is visible at runtime.");
-  m.def("metal_iterative_enabled", &LinearAlgebraMetal::enabled,
+  m.def("metal_iterative_enabled",
+        &LinearAlgebraMetal::enabled,
         "True iff the Metal matrix-free CG backend is currently active (defaults to metal_iterative_available()).");
-  m.def("set_metal_iterative_enabled", &LinearAlgebraMetal::set_enabled, py::arg("value"),
+  m.def("set_metal_iterative_enabled",
+        &LinearAlgebraMetal::set_enabled,
+        py::arg("value"),
         "Turn the Metal matrix-free CG backend on/off at runtime (LLIterative fit solves and predictIterative).");
 #else
   m.attr("__metal_iterative__") = false;
-  m.def("metal_iterative_available", []() { return false; },
-        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
-  m.def("metal_iterative_enabled", []() { return false; },
-        "This build was compiled without -DENABLE_METAL_ITERATIVE.");
-  m.def("set_metal_iterative_enabled", [](bool) {}, py::arg("value"),
-        "No-op: this build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def(
+      "metal_iterative_available", []() { return false; }, "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def(
+      "metal_iterative_enabled", []() { return false; }, "This build was compiled without -DENABLE_METAL_ITERATIVE.");
+  m.def(
+      "set_metal_iterative_enabled",
+      [](bool) {},
+      py::arg("value"),
+      "No-op: this build was compiled without -DENABLE_METAL_ITERATIVE.");
 #endif
 
   m.def("load", &load_any, py::arg("filename"), "Load any Kriging model from file, auto-detecting its class.");

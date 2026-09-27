@@ -23,10 +23,10 @@
 #include "libKriging/utils/nlohmann/json.hpp"
 #include "libKriging/utils/utils.hpp"
 
-#include "cuda/CudaLinearAlgebra.cuh"  // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
-#include "hip/HipLinearAlgebra.hpp"    // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
-#include "sycl/SyclLinearAlgebra.hpp"  // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
-#include "metal/MetalLinearAlgebra.hpp" // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
+#include "cuda/CudaLinearAlgebra.cuh"    // no-op unless built with -DENABLE_CUDA_ITERATIVE=ON
+#include "hip/HipLinearAlgebra.hpp"      // no-op unless built with -DENABLE_HIP_ITERATIVE=ON
+#include "metal/MetalLinearAlgebra.hpp"  // no-op unless built with -DENABLE_METAL_ITERATIVE=ON
+#include "sycl/SyclLinearAlgebra.hpp"    // no-op unless built with -DENABLE_SYCL_ITERATIVE=ON
 
 #include <cassert>
 #include <lbfgsb_cpp/lbfgsb.hpp>
@@ -1510,11 +1510,11 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
 // share it too -- see its doc comment there.
 
 arma::uword Kriging::parse_iterative_m(const std::string& objective,
-                                      arma::uword* precond_rank_out,
-                                      arma::uword* lanczos_steps_out,
-                                      arma::uword* cg_max_iter_mult_out,
-                                      double* cg_tol_out,
-                                      double* probes_cg_tol_out) {
+                                       arma::uword* precond_rank_out,
+                                       arma::uword* lanczos_steps_out,
+                                       arma::uword* cg_max_iter_mult_out,
+                                       double* cg_tol_out,
+                                       double* probes_cg_tol_out) {
   // "LLIterative"                              -> m=30, no precond, default SLQ Lanczos steps
   // "LLIterative(m)"                           -> m Hutchinson/SLQ probes
   // "LLIterative(m,precond_rank)"              -> + opt-in Nystrom-preconditioned CG
@@ -1744,8 +1744,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
       // Let OMP_NUM_THREADS govern this matvec directly -- it IS the whole
       // cost of a matrix-free LLIterative evaluation.
       const int optimal_threads = get_optimal_threads(omp_get_max_threads());
-      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads),
-                                        arma::mat(n, k, arma::fill::zeros));
+      std::vector<arma::mat> thread_out(static_cast<std::size_t>(optimal_threads), arma::mat(n, k, arma::fill::zeros));
 #pragma omp parallel num_threads(optimal_threads)
       {
         arma::mat& local = thread_out[static_cast<std::size_t>(omp_get_thread_num())];
@@ -1868,24 +1867,34 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   // the solve (see LinearAlgebraCuda::conjugateGradient's X0 -- currently
   // honored on the CUDA backend only, accepted-and-ignored on HIP/SYCL/Metal).
   std::function<arma::mat(const arma::mat&, double, const arma::mat*)> gpuCgSolve;
-  std::function<arma::mat(const arma::mat&)> rmulBatched;  // R * V
-  std::function<arma::mat(const arma::mat&)> dRmulBatched; // [dR/dtheta_k . V]_k, n x (d*ncols)
-#define LK_ITER_GPU_BIND(NS)                                                                                    \
-  do {                                                                                                          \
-    slq_on_gpu = true;                                                                                          \
-    gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                       \
-    gpuCgSolve = [&](const arma::mat& B, double tol, const arma::mat* x0) {                                     \
-      arma::uword n_unconv = 0;                                                                                  \
-      arma::mat sol = woodbury_pc                                                                                \
-          ? NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, woodbury_pc->U(),                     \
-                                  woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv, x0)                 \
-          : NS::conjugateGradient(Xt, theta, m_covType, B, max_iter, tol, arma::mat(), arma::vec(),             \
-                                  arma::mat(), &n_unconv, x0);                                                    \
-      gpu_cg_n_unconverged += n_unconv;                                                                          \
-      return sol;                                                                                                \
-    };                                                                                                          \
-    rmulBatched = [&](const arma::mat& V) { return NS::rmulBatched(Xt, theta, m_covType, V); };                 \
-    dRmulBatched = [&](const arma::mat& V) { return NS::dRmulBatched(Xt, theta, m_covType, V); };               \
+  std::function<arma::mat(const arma::mat&)> rmulBatched;   // R * V
+  std::function<arma::mat(const arma::mat&)> dRmulBatched;  // [dR/dtheta_k . V]_k, n x (d*ncols)
+#define LK_ITER_GPU_BIND(NS)                                                                                       \
+  do {                                                                                                             \
+    slq_on_gpu = true;                                                                                             \
+    gpu_max_dimx = static_cast<arma::uword>(NS::kMaxDimX);                                                         \
+    gpuCgSolve = [&](const arma::mat& B, double tol, const arma::mat* x0) {                                        \
+      arma::uword n_unconv = 0;                                                                                    \
+      arma::mat sol                                                                                                \
+          = woodbury_pc                                                                                            \
+                ? NS::conjugateGradient(Xt,                                                                        \
+                                        theta,                                                                     \
+                                        m_covType,                                                                 \
+                                        B,                                                                         \
+                                        max_iter,                                                                  \
+                                        tol,                                                                       \
+                                        woodbury_pc->U(),                                                          \
+                                        woodbury_pc->Dinv(),                                                       \
+                                        woodbury_pc->McholLower(),                                                 \
+                                        &n_unconv,                                                                 \
+                                        x0)                                                                        \
+                : NS::conjugateGradient(                                                                           \
+                    Xt, theta, m_covType, B, max_iter, tol, arma::mat(), arma::vec(), arma::mat(), &n_unconv, x0); \
+      gpu_cg_n_unconverged += n_unconv;                                                                            \
+      return sol;                                                                                                  \
+    };                                                                                                             \
+    rmulBatched = [&](const arma::mat& V) { return NS::rmulBatched(Xt, theta, m_covType, V); };                    \
+    dRmulBatched = [&](const arma::mat& V) { return NS::dRmulBatched(Xt, theta, m_covType, V); };                  \
   } while (0)
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
   if (LinearAlgebraCuda::enabled() && LinearAlgebraCuda::supports(m_covType)) {
@@ -1934,8 +1943,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     if (gpuCgSolve)
       return gpuCgSolve(B, tol, x0);  // honored on CUDA; accepted-and-ignored on HIP/SYCL/Metal for now
     arma::uword n_unconv = 0;
-    arma::mat sol
-        = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv, x0);
+    arma::mat sol = LinearAlgebra::conjugateGradientBatched(RmulBatched, B, max_iter, tol, PinvBatched, &n_unconv, x0);
     cpu_cg_n_unconverged += n_unconv;
     return sol;
   };
@@ -1968,11 +1976,20 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     tol_fused.head(m_F.n_cols + 1).fill(m_iterative_cg_tol);
     tol_fused.tail(nprobe).fill(m_iterative_probes_cg_tol);
     arma::uword n_unconv = 0;
-    const arma::mat sol = woodbury_pc
-        ? LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, woodbury_pc->U(),
-                                               woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
-        : LinearAlgebraCuda::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
-                                               arma::vec(), arma::mat(), &n_unconv);
+    const arma::mat sol
+        = woodbury_pc
+              ? LinearAlgebraCuda::conjugateGradient(Xt,
+                                                     theta,
+                                                     m_covType,
+                                                     FYP,
+                                                     max_iter,
+                                                     tol_fused,
+                                                     woodbury_pc->U(),
+                                                     woodbury_pc->Dinv(),
+                                                     woodbury_pc->McholLower(),
+                                                     &n_unconv)
+              : LinearAlgebraCuda::conjugateGradient(
+                  Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(), arma::vec(), arma::mat(), &n_unconv);
     gpu_cg_n_unconverged += n_unconv;
     RinvFY = sol.head_cols(m_F.n_cols + 1);
     W = sol.tail_cols(nprobe);
@@ -1980,17 +1997,26 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   } else
 #endif
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-  if (slq_on_hip && grad_out != nullptr) {
+      if (slq_on_hip && grad_out != nullptr) {
     const arma::mat FYP = arma::join_rows(m_F, m_y, m_iterative_probes);
     arma::vec tol_fused(FYP.n_cols);
     tol_fused.head(m_F.n_cols + 1).fill(m_iterative_cg_tol);
     tol_fused.tail(nprobe).fill(m_iterative_probes_cg_tol);
     arma::uword n_unconv = 0;
-    const arma::mat sol = woodbury_pc
-        ? LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, woodbury_pc->U(),
-                                              woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
-        : LinearAlgebraHip::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
-                                              arma::vec(), arma::mat(), &n_unconv);
+    const arma::mat sol
+        = woodbury_pc
+              ? LinearAlgebraHip::conjugateGradient(Xt,
+                                                    theta,
+                                                    m_covType,
+                                                    FYP,
+                                                    max_iter,
+                                                    tol_fused,
+                                                    woodbury_pc->U(),
+                                                    woodbury_pc->Dinv(),
+                                                    woodbury_pc->McholLower(),
+                                                    &n_unconv)
+              : LinearAlgebraHip::conjugateGradient(
+                  Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(), arma::vec(), arma::mat(), &n_unconv);
     gpu_cg_n_unconverged += n_unconv;
     RinvFY = sol.head_cols(m_F.n_cols + 1);
     W = sol.tail_cols(nprobe);
@@ -1998,7 +2024,7 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
   } else
 #endif
 #ifdef LIBKRIGING_USE_METAL_ITERATIVE
-  if (slq_on_metal && grad_out != nullptr) {
+      if (slq_on_metal && grad_out != nullptr) {
     // Same mBCG [F|y|probes] fusion as the CUDA/HIP branches above, now
     // that LinearAlgebraMetal::conjugateGradient also takes a per-column
     // tol vector (see its doc comment) -- one Krylov pass instead of two
@@ -2008,11 +2034,20 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     tol_fused.head(m_F.n_cols + 1).fill(m_iterative_cg_tol);
     tol_fused.tail(nprobe).fill(m_iterative_probes_cg_tol);
     arma::uword n_unconv = 0;
-    const arma::mat sol = woodbury_pc
-        ? LinearAlgebraMetal::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, woodbury_pc->U(),
-                                                woodbury_pc->Dinv(), woodbury_pc->McholLower(), &n_unconv)
-        : LinearAlgebraMetal::conjugateGradient(Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(),
-                                                arma::vec(), arma::mat(), &n_unconv);
+    const arma::mat sol
+        = woodbury_pc
+              ? LinearAlgebraMetal::conjugateGradient(Xt,
+                                                      theta,
+                                                      m_covType,
+                                                      FYP,
+                                                      max_iter,
+                                                      tol_fused,
+                                                      woodbury_pc->U(),
+                                                      woodbury_pc->Dinv(),
+                                                      woodbury_pc->McholLower(),
+                                                      &n_unconv)
+              : LinearAlgebraMetal::conjugateGradient(
+                  Xt, theta, m_covType, FYP, max_iter, tol_fused, arma::mat(), arma::vec(), arma::mat(), &n_unconv);
     gpu_cg_n_unconverged += n_unconv;
     RinvFY = sol.head_cols(m_F.n_cols + 1);
     W = sol.tail_cols(nprobe);
@@ -2059,8 +2094,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // host<->device ping-pong -- scoped to the unpreconditioned case for
     // now (see that function's doc comment for why).
 #ifdef LIBKRIGING_USE_CUDA_ITERATIVE
-    logdetR = LinearAlgebraCuda::stochasticLogDetBatched(Xt, theta, m_covType, m_iterative_lanczos_steps,
-                                                          m_iterative_probes);
+    logdetR = LinearAlgebraCuda::stochasticLogDetBatched(
+        Xt, theta, m_covType, m_iterative_lanczos_steps, m_iterative_probes);
 #else
     logdetR = 0.0;  // unreachable: slq_on_cuda is only ever set true inside a CUDA build
 #endif
@@ -2069,8 +2104,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // backend (LinearAlgebraHip::stochasticLogDetBatched) -- see that
     // function's doc comment.
 #ifdef LIBKRIGING_USE_HIP_ITERATIVE
-    logdetR = LinearAlgebraHip::stochasticLogDetBatched(Xt, theta, m_covType, m_iterative_lanczos_steps,
-                                                         m_iterative_probes);
+    logdetR = LinearAlgebraHip::stochasticLogDetBatched(
+        Xt, theta, m_covType, m_iterative_lanczos_steps, m_iterative_probes);
 #else
     logdetR = 0.0;  // unreachable: slq_on_hip is only ever set true inside a HIP build
 #endif
@@ -2079,8 +2114,8 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // Metal backend (LinearAlgebraMetal::stochasticLogDetBatched) -- see
     // that function's doc comment.
 #ifdef LIBKRIGING_USE_METAL_ITERATIVE
-    logdetR = LinearAlgebraMetal::stochasticLogDetBatched(Xt, theta, m_covType, m_iterative_lanczos_steps,
-                                                           m_iterative_probes);
+    logdetR = LinearAlgebraMetal::stochasticLogDetBatched(
+        Xt, theta, m_covType, m_iterative_lanczos_steps, m_iterative_probes);
 #else
     logdetR = 0.0;  // unreachable: slq_on_metal is only ever set true inside a Metal build
 #endif
@@ -2092,25 +2127,23 @@ double Kriging::_logLikelihoodIterative(const arma::vec& _theta,
     // next to the matvec it wraps). Closes the gap where GPU dispatch used
     // to silently run the SLQ term unpreconditioned even when a Nystrom
     // preconditioner was requested and the CG solves above WERE using it.
-    auto RtildeMulBatchedGpu = [&](const arma::mat& V) -> arma::mat {
-      return woodbury_pc->whitenL(rmulBatched(woodbury_pc->whitenLt(V)));
-    };
+    auto RtildeMulBatchedGpu
+        = [&](const arma::mat& V) -> arma::mat { return woodbury_pc->whitenL(rmulBatched(woodbury_pc->whitenLt(V))); };
     logdetR = logdetP_pc
-              + LinearAlgebra::stochasticLogDetBatched(RtildeMulBatchedGpu, n, nprobe, m_iterative_lanczos_steps,
-                                                       m_iterative_probes);
+              + LinearAlgebra::stochasticLogDetBatched(
+                  RtildeMulBatchedGpu, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
   } else if (slq_on_gpu) {
-    logdetR = LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps,
-                                                     m_iterative_probes);
+    logdetR
+        = LinearAlgebra::stochasticLogDetBatched(rmulBatched, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
   } else if (woodbury_pc) {
-    auto RtildeMulBatched = [&](const arma::mat& V) -> arma::mat {
-      return woodbury_pc->whitenL(RmulBatched(woodbury_pc->whitenLt(V)));
-    };
+    auto RtildeMulBatched
+        = [&](const arma::mat& V) -> arma::mat { return woodbury_pc->whitenL(RmulBatched(woodbury_pc->whitenLt(V))); };
     logdetR = logdetP_pc
-              + LinearAlgebra::stochasticLogDetBatched(RtildeMulBatched, n, nprobe, m_iterative_lanczos_steps,
-                                                       m_iterative_probes);
+              + LinearAlgebra::stochasticLogDetBatched(
+                  RtildeMulBatched, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
   } else {
-    logdetR = LinearAlgebra::stochasticLogDetBatched(RmulBatched, n, nprobe, m_iterative_lanczos_steps,
-                                                     m_iterative_probes);
+    logdetR
+        = LinearAlgebra::stochasticLogDetBatched(RmulBatched, n, nprobe, m_iterative_lanczos_steps, m_iterative_probes);
   }
 
   // W = R^-1 * probes, only needed for the gradient's Hutchinson trace
@@ -2297,8 +2330,8 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
   arma::mat RinvFY_x0;
   const bool have_warm_start = iterative_cache_valid();
   if (have_warm_start)
-    RinvFY_x0 = arma::join_cols(m_iterative_RinvFY_cache,
-                                arma::mat(n_u, m_iterative_RinvFY_cache.n_cols, arma::fill::zeros));
+    RinvFY_x0
+        = arma::join_cols(m_iterative_RinvFY_cache, arma::mat(n_u, m_iterative_RinvFY_cache.n_cols, arma::fill::zeros));
 
   // m_iterative_precond_landmarks (when precond is enabled) holds row-indices
   // into m_X; appending rows here (never reordering/removing) keeps them
@@ -2360,8 +2393,7 @@ void Kriging::updateIterative(const arma::vec& y_u, const arma::mat& X_u, bool r
   arma::vec beta_v;
   double sigma2_v = -1;
   arma::mat RinvFY_new;
-  _logLikelihoodIterative(
-      m_theta, nullptr, &beta_v, &sigma2_v, have_warm_start ? &RinvFY_x0 : nullptr, &RinvFY_new);
+  _logLikelihoodIterative(m_theta, nullptr, &beta_v, &sigma2_v, have_warm_start ? &RinvFY_x0 : nullptr, &RinvFY_new);
   m_iterative_RinvFY_cache = std::move(RinvFY_new);
   m_iterative_RinvFY_cache_theta = m_theta;
   if (m_est_beta)
@@ -2644,9 +2676,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   // them -- earlier code forced it whenever optim=="none", which is what
   // made an optim="none" LLIterative fit allocate (and fill, and reduce
   // over) up to several GB it never reads.
-  const bool objective_is_light
-      = (objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLIterative", 0) == 0)
-        || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit);
+  const bool objective_is_light = (objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLIterative", 0) == 0)
+                                  || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit);
   const bool build_dX = !objective_is_light;
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);

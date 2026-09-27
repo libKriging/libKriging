@@ -36,29 +36,74 @@ void lk_sycl_sync(void);
 // unused (this port does not tile the reduction) and lk_sycl_..._scratch_elems
 // always returns 0.
 int lk_sycl_rmul_batched_scratch_elems(int n, int ncols);
-void lk_sycl_rmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                 const double* d_P, int ncols, double* d_Ap, double* d_scratch);
+void lk_sycl_rmul_batched_launch(const double* d_Xt,
+                                 int n,
+                                 int dimX,
+                                 const double* d_theta,
+                                 int covKind,
+                                 const double* d_P,
+                                 int ncols,
+                                 double* d_Ap,
+                                 double* d_scratch);
 void lk_sycl_batched_dot_launch(const double* d_A, const double* d_B, int n, int ncols, double* d_out);
 void lk_sycl_batched_axpy_launch(const double* d_alpha, const double* d_X, double* d_Y, int n, int ncols);
 void lk_sycl_batched_update_p_launch(const double* d_R, const double* d_beta, double* d_P, int n, int ncols);
 
-void lk_sycl_cg_alpha_launch(const double* d_rz_old, const double* d_pAp, int ncols, int* d_active, double* d_alpha,
+void lk_sycl_cg_alpha_launch(const double* d_rz_old,
+                             const double* d_pAp,
+                             int ncols,
+                             int* d_active,
+                             double* d_alpha,
                              double* d_neg_alpha);
-void lk_sycl_cg_beta_launch(const double* d_rr_new, const double* d_bnorm, double tol, int ncols, int* d_active,
-                            double* d_rz_old, double* d_beta);
-void lk_sycl_cg_restart_launch(const double* d_rr, const double* d_bnorm, double tol, int ncols, int* d_active,
+void lk_sycl_cg_beta_launch(const double* d_rr_new,
+                            const double* d_bnorm,
+                            double tol,
+                            int ncols,
+                            int* d_active,
+                            double* d_rz_old,
+                            double* d_beta);
+void lk_sycl_cg_restart_launch(const double* d_rr,
+                               const double* d_bnorm,
+                               double tol,
+                               int ncols,
+                               int* d_active,
                                double* d_rz_old);
 void lk_sycl_cg_any_active_launch(const int* d_active, int ncols, int* d_flag);
 
-void lk_sycl_drmul_batched_launch(const double* d_Xt, int n, int dimX, const double* d_theta, int covKind,
-                                  const double* d_V, int ncols, double* d_Out);
+void lk_sycl_drmul_batched_launch(const double* d_Xt,
+                                  int n,
+                                  int dimX,
+                                  const double* d_theta,
+                                  int covKind,
+                                  const double* d_V,
+                                  int ncols,
+                                  double* d_Out);
 
-void lk_sycl_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
-                                  const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc);
-void lk_sycl_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm, double tol,
-                                    int ncols, int* d_active, double* d_rz_old, double* d_beta);
-void lk_sycl_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm, double tol,
-                                       int ncols, int* d_active, double* d_rz_old);
+void lk_sycl_precond_apply_launch(const double* d_U,
+                                  int n,
+                                  int k,
+                                  const double* d_Dinv,
+                                  const double* d_Mchol,
+                                  const double* d_r,
+                                  int ncols,
+                                  double* d_z,
+                                  double* d_scratch_nc,
+                                  double* d_scratch_kc);
+void lk_sycl_cg_beta_precond_launch(const double* d_rr,
+                                    const double* d_rz_new,
+                                    const double* d_bnorm,
+                                    double tol,
+                                    int ncols,
+                                    int* d_active,
+                                    double* d_rz_old,
+                                    double* d_beta);
+void lk_sycl_cg_restart_precond_launch(const double* d_rr,
+                                       const double* d_rz,
+                                       const double* d_bnorm,
+                                       double tol,
+                                       int ncols,
+                                       int* d_active,
+                                       double* d_rz_old);
 
 }  // extern "C"
 

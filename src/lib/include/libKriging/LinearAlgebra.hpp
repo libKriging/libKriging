@@ -155,7 +155,7 @@ class LinearAlgebra {
    private:
     void ensure_whiten_factors() const;  // lazily builds the whitenL/whitenLt factors
 
-    arma::mat m_U;   // the n x k Nystrom factor, kept for U()/GPU apply
+    arma::mat m_U;  // the n x k Nystrom factor, kept for U()/GPU apply
     arma::vec m_Dinv;
     arma::mat m_Ut;  // U.t(), kept separately from m_DinvU: solve()'s rhs needs U.t()*DinvB, not DinvU.t()*DinvB
     arma::mat m_DinvU;
@@ -189,31 +189,31 @@ class LinearAlgebra {
   // R[i,j] = R[j,i] = factor * Cov(dX.col(i*n+j), theta) for i < j
   // diag is set after factor multiplication
   LIBKRIGING_EXPORT static void covMat_sym_dX(arma::mat* R,
-                                               const arma::mat& dX,
-                                               const arma::vec& theta,
-                                               std::function<double(const arma::vec&, const arma::vec&)> Cov,
-                                               double factor = 1.0,
-                                               const arma::vec& diag = arma::vec());
-
-  // Compute symmetric covariance matrix R directly from X
-  // R[i,j] = R[j,i] = factor * Cov(X.col(i) - X.col(j), theta) for i < j
-  // X is assumed to be (d x n) with observations in columns
-  LIBKRIGING_EXPORT static void covMat_sym_X(arma::mat* R,
-                                              const arma::mat& X,
+                                              const arma::mat& dX,
                                               const arma::vec& theta,
                                               std::function<double(const arma::vec&, const arma::vec&)> Cov,
                                               double factor = 1.0,
                                               const arma::vec& diag = arma::vec());
 
+  // Compute symmetric covariance matrix R directly from X
+  // R[i,j] = R[j,i] = factor * Cov(X.col(i) - X.col(j), theta) for i < j
+  // X is assumed to be (d x n) with observations in columns
+  LIBKRIGING_EXPORT static void covMat_sym_X(arma::mat* R,
+                                             const arma::mat& X,
+                                             const arma::vec& theta,
+                                             std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                             double factor = 1.0,
+                                             const arma::vec& diag = arma::vec());
+
   // Compute rectangular covariance matrix R between X1 and X2
   // R[i,j] = factor * Cov(X1.col(i) - X2.col(j), theta)
   // X1 is (d x n1), X2 is (d x n2) with observations in columns
   LIBKRIGING_EXPORT static void covMat_rect(arma::mat* R,
-                                             const arma::mat& X1,
-                                             const arma::mat& X2,
-                                             const arma::vec& theta,
-                                             std::function<double(const arma::vec&, const arma::vec&)> Cov,
-                                             double factor = 1.0);
+                                            const arma::mat& X1,
+                                            const arma::mat& X2,
+                                            const arma::vec& theta,
+                                            std::function<double(const arma::vec&, const arma::vec&)> Cov,
+                                            double factor = 1.0);
 
   // Efficient computation of trace(A * B) = sum_i sum_j A(i,j) * B(j,i)
   // Avoids explicit matrix multiplication
@@ -275,8 +275,7 @@ class LinearAlgebra {
       const arma::mat& B,
       arma::uword max_iter,
       const arma::vec& tol,
-      const std::function<arma::mat(const arma::mat&)>& PinvBatched
-      = std::function<arma::mat(const arma::mat&)>(),
+      const std::function<arma::mat(const arma::mat&)>& PinvBatched = std::function<arma::mat(const arma::mat&)>(),
       arma::uword* n_unconverged_out = nullptr,
       const arma::mat* X0 = nullptr);
 
@@ -287,8 +286,7 @@ class LinearAlgebra {
       const arma::mat& B,
       arma::uword max_iter,
       double tol = 1e-8,
-      const std::function<arma::mat(const arma::mat&)>& PinvBatched
-      = std::function<arma::mat(const arma::mat&)>(),
+      const std::function<arma::mat(const arma::mat&)>& PinvBatched = std::function<arma::mat(const arma::mat&)>(),
       arma::uword* n_unconverged_out = nullptr,
       const arma::mat* X0 = nullptr);
 
@@ -318,12 +316,11 @@ class LinearAlgebra {
   // n x nprobe block instead of nprobe times on single vectors -- lets the
   // matvec (and hence the SLQ log-determinant) run batched on the GPU. See
   // LinearAlgebra.cpp and docs/math/Iterative.md.
-  LIBKRIGING_EXPORT static double stochasticLogDetBatched(
-      const std::function<arma::mat(const arma::mat&)>& AmulBatched,
-      arma::uword n,
-      arma::uword nprobe,
-      arma::uword lanczos_steps,
-      const arma::mat& probes);
+  LIBKRIGING_EXPORT static double stochasticLogDetBatched(const std::function<arma::mat(const arma::mat&)>& AmulBatched,
+                                                          arma::uword n,
+                                                          arma::uword nprobe,
+                                                          arma::uword lanczos_steps,
+                                                          const arma::mat& probes);
 
   // Generates `nprobe` Rademacher (+-1 entries) probe vectors of length n,
   // as columns of an n x nprobe matrix -- meant to be generated ONCE (fixed

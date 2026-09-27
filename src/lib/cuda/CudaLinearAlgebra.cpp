@@ -40,15 +40,15 @@ namespace {
     }                                                                          \
   } while (0)
 
-#define LK_CUBLAS_CHECK(expr)                                                     \
-  do {                                                                            \
-    cublasStatus_t lk_cublas_status__ = (expr);                                   \
-    if (lk_cublas_status__ != CUBLAS_STATUS_SUCCESS) {                            \
-      std::ostringstream lk_cublas_oss__;                                         \
+#define LK_CUBLAS_CHECK(expr)                                                      \
+  do {                                                                             \
+    cublasStatus_t lk_cublas_status__ = (expr);                                    \
+    if (lk_cublas_status__ != CUBLAS_STATUS_SUCCESS) {                             \
+      std::ostringstream lk_cublas_oss__;                                          \
       lk_cublas_oss__ << "cuBLAS error at " << __FILE__ << ":" << __LINE__ << ": " \
-                      << static_cast<int>(lk_cublas_status__);                    \
-      throw std::runtime_error(lk_cublas_oss__.str());                           \
-    }                                                                            \
+                      << static_cast<int>(lk_cublas_status__);                     \
+      throw std::runtime_error(lk_cublas_oss__.str());                             \
+    }                                                                              \
   } while (0)
 
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
@@ -183,7 +183,8 @@ bool covCacheMatches(const DenseCovCache& c, const arma::mat& Xt, const arma::ve
     return false;
   if (c.xt.size() != Xt.n_elem || c.theta.size() != theta.n_elem)
     return false;
-  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr()) && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
+  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr())
+         && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
 }
 
 // Binds the cache to (Xt, theta, kind), uploading Xt/theta if the key
@@ -360,9 +361,7 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // this early because matvec/precondApply (defined further down) capture
   // it by reference and must see it already in scope.
   int ncols_cur = ncols;
-  auto matBytesCur = [&] {
-    return sizeof(double) * static_cast<std::size_t>(n) * static_cast<std::size_t>(ncols_cur);
-  };
+  auto matBytesCur = [&] { return sizeof(double) * static_cast<std::size_t>(n) * static_cast<std::size_t>(ncols_cur); };
 
   const std::size_t mat_bytes = sizeof(double) * static_cast<std::size_t>(n) * ncols;
   double *d_b, *d_x, *d_r, *d_p, *d_Ap;
@@ -416,11 +415,13 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_CUDA_CHECK(cudaMalloc(&d_z, mat_bytes));
     LK_CUDA_CHECK(cudaMalloc(&d_prec_nc, mat_bytes));
     LK_CUDA_CHECK(cudaMalloc(&d_prec_kc, sizeof(double) * static_cast<std::size_t>(pk) * ncols));
-    LK_CUDA_CHECK(cudaMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk,
-                             cudaMemcpyHostToDevice));
     LK_CUDA_CHECK(
-        cudaMemcpy(d_precDinv, precDinv.memptr(), sizeof(double) * static_cast<std::size_t>(n), cudaMemcpyHostToDevice));
-    LK_CUDA_CHECK(cudaMemcpy(d_precMchol, precMcholLower.memptr(), sizeof(double) * static_cast<std::size_t>(pk) * pk,
+        cudaMemcpy(d_precU, precU.memptr(), sizeof(double) * static_cast<std::size_t>(n) * pk, cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(
+        d_precDinv, precDinv.memptr(), sizeof(double) * static_cast<std::size_t>(n), cudaMemcpyHostToDevice));
+    LK_CUDA_CHECK(cudaMemcpy(d_precMchol,
+                             precMcholLower.memptr(),
+                             sizeof(double) * static_cast<std::size_t>(pk) * pk,
                              cudaMemcpyHostToDevice));
   }
   // z = P^-1 r with P = D + U U^T, applied by the Woodbury identity:
@@ -439,17 +440,61 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     lk_cuda_scale_rows_launch(d_precDinv, d_in, n, ncols_cur, d_prec_nc);  // d_prec_nc = Dinv .* r
     LK_CUDA_CHECK(cudaGetLastError());
     // t = U^T (Dinv .* r)   (k x ncols_cur)
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_T, CUBLAS_OP_N, pk, ncols_cur, n, &prec_one, d_precU, n,
-                                d_prec_nc, n, &prec_zero, d_prec_kc, pk));
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
+                                CUBLAS_OP_T,
+                                CUBLAS_OP_N,
+                                pk,
+                                ncols_cur,
+                                n,
+                                &prec_one,
+                                d_precU,
+                                n,
+                                d_prec_nc,
+                                n,
+                                &prec_zero,
+                                d_prec_kc,
+                                pk));
     // s = (L L^T)^-1 t, in place: L y = t then L^T s = y
-    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_N,
-                                CUBLAS_DIAG_NON_UNIT, pk, ncols_cur, &prec_one, d_precMchol, pk, d_prec_kc, pk));
-    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(), CUBLAS_SIDE_LEFT, CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_T,
-                                CUBLAS_DIAG_NON_UNIT, pk, ncols_cur, &prec_one, d_precMchol, pk, d_prec_kc, pk));
+    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(),
+                                CUBLAS_SIDE_LEFT,
+                                CUBLAS_FILL_MODE_LOWER,
+                                CUBLAS_OP_N,
+                                CUBLAS_DIAG_NON_UNIT,
+                                pk,
+                                ncols_cur,
+                                &prec_one,
+                                d_precMchol,
+                                pk,
+                                d_prec_kc,
+                                pk));
+    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(),
+                                CUBLAS_SIDE_LEFT,
+                                CUBLAS_FILL_MODE_LOWER,
+                                CUBLAS_OP_T,
+                                CUBLAS_DIAG_NON_UNIT,
+                                pk,
+                                ncols_cur,
+                                &prec_one,
+                                d_precMchol,
+                                pk,
+                                d_prec_kc,
+                                pk));
     // d_prec_nc is free again (its Dinv .* r content was consumed by the
     // first DGEMM): reuse it for U s (n x ncols_cur) instead of a 7th buffer.
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, pk, &prec_one, d_precU, n,
-                                d_prec_kc, pk, &prec_zero, d_prec_nc, n));
+    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
+                                CUBLAS_OP_N,
+                                CUBLAS_OP_N,
+                                n,
+                                ncols_cur,
+                                pk,
+                                &prec_one,
+                                d_precU,
+                                n,
+                                d_prec_kc,
+                                pk,
+                                &prec_zero,
+                                d_prec_nc,
+                                n));
     lk_cuda_precond_finish_launch(d_precDinv, d_in, d_prec_nc, n, ncols_cur, d_out);
     LK_CUDA_CHECK(cudaGetLastError());
   };
@@ -491,18 +536,46 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         const long long count = static_cast<long long>(n) * ncols_cur;
         lk_cuda_cast_d2f_launch(d_in, count, d_p_f32);
         LK_CUDA_CHECK(cudaGetLastError());
-        LK_CUBLAS_CHECK(cublasGemmEx(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one_f,
-                                     d_Rmat_f32, CUDA_R_32F, n, d_p_f32, CUDA_R_32F, n, &gemm_zero_f, d_Ap_f32,
-                                     CUDA_R_32F, n, CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        LK_CUBLAS_CHECK(cublasGemmEx(cublasHandle(),
+                                     CUBLAS_OP_N,
+                                     CUBLAS_OP_N,
+                                     n,
+                                     ncols_cur,
+                                     n,
+                                     &gemm_one_f,
+                                     d_Rmat_f32,
+                                     CUDA_R_32F,
+                                     n,
+                                     d_p_f32,
+                                     CUDA_R_32F,
+                                     n,
+                                     &gemm_zero_f,
+                                     d_Ap_f32,
+                                     CUDA_R_32F,
+                                     n,
+                                     CUBLAS_COMPUTE_32F_FAST_TF32,
+                                     CUBLAS_GEMM_DEFAULT_TENSOR_OP));
         lk_cuda_cast_f2d_launch(d_Ap_f32, count, d_out);
         LK_CUDA_CHECK(cudaGetLastError());
       } else {
-        LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols_cur, n, &gemm_one, d_Rmat, n,
-                                    d_in, n, &gemm_zero, d_out, n));
+        LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
+                                    CUBLAS_OP_N,
+                                    CUBLAS_OP_N,
+                                    n,
+                                    ncols_cur,
+                                    n,
+                                    &gemm_one,
+                                    d_Rmat,
+                                    n,
+                                    d_in,
+                                    n,
+                                    &gemm_zero,
+                                    d_out,
+                                    n));
       }
     } else {
-      lk_cuda_rmul_batched_launch(d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_in, ncols_cur, d_out,
-                                  d_rmul_scratch);
+      lk_cuda_rmul_batched_launch(
+          d_Xt, n, dimX, d_theta, static_cast<int>(kind), d_in, ncols_cur, d_out, d_rmul_scratch);
       LK_CUDA_CHECK(cudaGetLastError());
     }
   };
@@ -515,9 +588,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   LK_CUDA_CHECK(cudaMemcpy(d_b, B.memptr(), mat_bytes, cudaMemcpyHostToDevice));
   if (X0 != nullptr) {
     LK_CUDA_CHECK(cudaMemcpy(d_x, X0->memptr(), mat_bytes, cudaMemcpyHostToDevice));
-    matvec(d_x, d_Ap, /*exact=*/true);                                    // Ap = A*x0, full fp64
+    matvec(d_x, d_Ap, /*exact=*/true);                                         // Ap = A*x0, full fp64
     LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, mat_bytes, cudaMemcpyDeviceToDevice));  // r = b
-    lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);         // r -= Ap  =>  r = b - A*x0
+    lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols);              // r -= Ap  =>  r = b - A*x0
     LK_CUDA_CHECK(cudaGetLastError());
   } else {
     LK_CUDA_CHECK(cudaMemset(d_x, 0, mat_bytes));
@@ -535,13 +608,13 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // one extra one-time kernel launch instead of a host loop; with X0 given,
   // r != b in general, so the shortcut would have been wrong there).
   if (preconditioned) {
-    precondApply(d_r, d_z);                                              // z = Pinv(r)
+    precondApply(d_r, d_z);                                                    // z = Pinv(r)
     LK_CUDA_CHECK(cudaMemcpy(d_p, d_z, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z
-    lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);           // rz_old = <r, z>
+    lk_cuda_batched_dot_launch(d_r, d_z, n, ncols, d_rz_old);                  // rz_old = <r, z>
     LK_CUDA_CHECK(cudaGetLastError());
   } else {
     LK_CUDA_CHECK(cudaMemcpy(d_p, d_r, mat_bytes, cudaMemcpyDeviceToDevice));  // p = z = r
-    lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_rz_old);           // rz_old = <r, r>
+    lk_cuda_batched_dot_launch(d_r, d_r, n, ncols, d_rz_old);                  // rz_old = <r, r>
     LK_CUDA_CHECK(cudaGetLastError());
   }
 
@@ -598,8 +671,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // shrank -- i.e. at most once per restart_every=50 iterations.
   auto compactConverged = [&]() {
     std::vector<int> active_h_cur(static_cast<std::size_t>(ncols_cur));
-    LK_CUDA_CHECK(cudaMemcpy(active_h_cur.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur),
-                             cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(
+        active_h_cur.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur), cudaMemcpyDeviceToHost));
     int n_still_active = 0;
     for (int c = 0; c < ncols_cur; ++c)
       n_still_active += active_h_cur[static_cast<std::size_t>(c)];
@@ -668,9 +741,10 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     LK_CUDA_CHECK(cudaMemcpy(d_rz_old, rz_old2.data(), new_col_bytes, cudaMemcpyHostToDevice));
     LK_CUDA_CHECK(cudaMemcpy(d_bnorm, bnorm2.data(), new_col_bytes, cudaMemcpyHostToDevice));
     LK_CUDA_CHECK(cudaMemcpy(d_tol, tol2.data(), new_col_bytes, cudaMemcpyHostToDevice));
-    const std::vector<int> ones(static_cast<std::size_t>(ncols_cur), 1);  // every kept column is, by construction, active
-    LK_CUDA_CHECK(cudaMemcpy(d_active, ones.data(), sizeof(int) * static_cast<std::size_t>(ncols_cur),
-                             cudaMemcpyHostToDevice));
+    const std::vector<int> ones(static_cast<std::size_t>(ncols_cur),
+                                1);  // every kept column is, by construction, active
+    LK_CUDA_CHECK(
+        cudaMemcpy(d_active, ones.data(), sizeof(int) * static_cast<std::size_t>(ncols_cur), cudaMemcpyHostToDevice));
     col_map = std::move(new_col_map);
 
     // The matrix-free matvec's tiling scratch requirement depends on
@@ -710,9 +784,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       // Full restart: recompute r = b - A*x exactly for every still-active
       // column (same rationale as LinearAlgebra::conjugateGradient's) --
       // always full fp64, this is the correction step mixed_precision relies on.
-      matvec(d_x, d_Ap, /*exact=*/true);  // Ap = R*x
+      matvec(d_x, d_Ap, /*exact=*/true);                                             // Ap = R*x
       LK_CUDA_CHECK(cudaMemcpy(d_r, d_b, matBytesCur(), cudaMemcpyDeviceToDevice));  // r = b
-      lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols_cur);             // r = b - A*x
+      lk_cuda_batched_axpy_launch(d_neg_ones, d_Ap, d_r, n, ncols_cur);              // r = b - A*x
       LK_CUDA_CHECK(cudaGetLastError());
       lk_cuda_batched_dot_launch(d_r, d_r, n, ncols_cur, d_scratch);  // r.r (true residual)
       LK_CUDA_CHECK(cudaGetLastError());
@@ -786,9 +860,16 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     else
       std::snprintf(tol_str, sizeof(tol_str), "%g..%g", tol_min, tol_max);
     std::fprintf(stderr,
-                 "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu compacted_to=%d%s%s\n", n, ncols,
-                 tol_str, pk, static_cast<unsigned long long>(iters_done), static_cast<unsigned long long>(max_iter),
-                 ncols_cur, iters_done >= max_iter ? "  <-- NOT CONVERGED" : "", mixed_precision ? " mixed_fp32" : "");
+                 "[lk-cuda] CG n=%d ncols=%d tol=%s precond_rank=%d iters=%llu/%llu compacted_to=%d%s%s\n",
+                 n,
+                 ncols,
+                 tol_str,
+                 pk,
+                 static_cast<unsigned long long>(iters_done),
+                 static_cast<unsigned long long>(max_iter),
+                 ncols_cur,
+                 iters_done >= max_iter ? "  <-- NOT CONVERGED" : "",
+                 mixed_precision ? " mixed_fp32" : "");
   }
 
   // Whatever remains in the (possibly compacted-down) working set is each
@@ -812,16 +893,16 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // LinearAlgebra::conjugateGradientBatched.
   std::vector<int> active_final(static_cast<std::size_t>(ncols_cur));
   if (ncols_cur > 0)
-    LK_CUDA_CHECK(cudaMemcpy(active_final.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur),
-                             cudaMemcpyDeviceToHost));
+    LK_CUDA_CHECK(cudaMemcpy(
+        active_final.data(), d_active, sizeof(int) * static_cast<std::size_t>(ncols_cur), cudaMemcpyDeviceToHost));
   arma::uword n_unconverged = 0;
   for (int c = 0; c < ncols_cur; ++c)
     if (active_final[static_cast<std::size_t>(c)])
       ++n_unconverged;
   if (n_unconverged_out != nullptr)
     *n_unconverged_out = n_unconverged;
-  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
-                                        static_cast<arma::uword>(n), max_iter);
+  LinearAlgebra::cgNonConvergenceWarning(
+      n_unconverged, static_cast<arma::uword>(ncols), static_cast<arma::uword>(n), max_iter);
 
   // d_Xt / d_theta / d_Rmat / d_Rmat_f32 are owned by the dense cache, not by this call.
   cudaFree(d_b);
@@ -871,8 +952,17 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precMcholLower,
                             arma::uword* n_unconverged_out,
                             const arma::mat* X0) {
-  return conjugateGradient(Xt, theta, covType, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), precU,
-                           precDinv, precMcholLower, n_unconverged_out, X0);
+  return conjugateGradient(Xt,
+                           theta,
+                           covType,
+                           B,
+                           max_iter,
+                           arma::vec(B.n_cols, arma::fill::value(tol)),
+                           precU,
+                           precDinv,
+                           precMcholLower,
+                           n_unconverged_out,
+                           X0);
 }
 
 // R(Xt,theta) * V in one batched device launch (see the header). Same
@@ -907,8 +997,8 @@ arma::mat rmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::st
   double* d_scratch = nullptr;
   if (dense) {
     const double one = 1.0, zero = 0.0;
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_Rmat, n, d_V, n, &zero,
-                                d_Av, n));
+    LK_CUBLAS_CHECK(
+        cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_Rmat, n, d_V, n, &zero, d_Av, n));
   } else {
     const int scratch_elems = lk_cuda_rmul_batched_scratch_elems(n, ncols);
     if (scratch_elems > 0)
@@ -952,8 +1042,8 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
   LK_CUDA_CHECK(cudaMalloc(&d_V, sizeof(double) * static_cast<std::size_t>(n) * ncols));
   const std::size_t out_bytes = sizeof(double) * static_cast<std::size_t>(n) * dimX * ncols;
   LK_CUDA_CHECK(cudaMalloc(&d_Out, out_bytes));
-  LK_CUDA_CHECK(cudaMemcpy(
-      d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, cudaMemcpyHostToDevice));
+  LK_CUDA_CHECK(
+      cudaMemcpy(d_V, V.memptr(), sizeof(double) * static_cast<std::size_t>(n) * ncols, cudaMemcpyHostToDevice));
 
   // Dense fast path: materialize the dimX dR/dtheta_k blocks once, then one
   // cublasDgemm per dimension writes straight into its interleaved slot of
@@ -971,8 +1061,20 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
     const double one = 1.0, zero = 0.0;
     const std::size_t n2 = static_cast<std::size_t>(n) * n;
     for (int k = 0; k < dimX; ++k) {
-      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_dR + n2 * k, n, d_V,
-                                  n, &zero, d_Out + static_cast<std::size_t>(k) * n, dimX * n));
+      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
+                                  CUBLAS_OP_N,
+                                  CUBLAS_OP_N,
+                                  n,
+                                  ncols,
+                                  n,
+                                  &one,
+                                  d_dR + n2 * k,
+                                  n,
+                                  d_V,
+                                  n,
+                                  &zero,
+                                  d_Out + static_cast<std::size_t>(k) * n,
+                                  dimX * n));
     }
     cudaFree(d_dR);
   } else {
@@ -1003,8 +1105,11 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
 //     pointer d_V+p*n, batch stride n. No transposition/copy needed there
 //     either; both matvec and reorthogonalization read straight out of one
 //     buffer, in the layout each of them wants natively.
-double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, const std::string& covType,
-                               arma::uword lanczos_steps_in, const arma::mat& probes) {
+double stochasticLogDetBatched(const arma::mat& Xt,
+                               const arma::vec& theta,
+                               const std::string& covType,
+                               arma::uword lanczos_steps_in,
+                               const arma::mat& probes) {
   CovKind kind;
   if (!covKindFromString(covType, &kind))
     throw std::invalid_argument("LinearAlgebraCuda::stochasticLogDetBatched: unsupported covType '" + covType + "'");
@@ -1024,7 +1129,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
   for (int p = 0; p < npr; ++p) {
     znorm[static_cast<std::size_t>(p)] = arma::norm(probes.col(static_cast<arma::uword>(p)));
     if (znorm[static_cast<std::size_t>(p)] != 0.0) {
-      V0.col(static_cast<arma::uword>(p)) = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
+      V0.col(static_cast<arma::uword>(p))
+          = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
       active_h[static_cast<std::size_t>(p)] = 1;
     } else {
       active_h[static_cast<std::size_t>(p)] = 0;
@@ -1041,11 +1147,11 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
   const double gemm_one = 1.0, gemm_zero = 0.0;
   auto matvec = [&](const double* d_in, double* d_out) {
     if (dense) {
-      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, npr, n, &gemm_one, d_Rmat, n, d_in, n,
-                                  &gemm_zero, d_out, n));
+      LK_CUBLAS_CHECK(cublasDgemm(
+          cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, npr, n, &gemm_one, d_Rmat, n, d_in, n, &gemm_zero, d_out, n));
     } else {
-      lk_cuda_rmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_in, npr, d_out,
-                                  d_rmul_scratch);
+      lk_cuda_rmul_batched_launch(
+          cov.d_Xt, n, dimX, cov.d_theta, static_cast<int>(kind), d_in, npr, d_out, d_rmul_scratch);
       LK_CUDA_CHECK(cudaGetLastError());
     }
   };
@@ -1078,9 +1184,9 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
   LK_CUDA_CHECK(cudaMemcpy(d_m_eff, m_eff_init.data(), col_bytes_i, cudaMemcpyHostToDevice));
 
   const double gemm_neg_one = -1.0;
-  const long long stride_probe = n;              // consecutive probes' base pointers in d_V / d_W, in elements
-  const long long stride_t = ls;                 // consecutive probes' slots in d_t
-  const int lda_hist = npr * n;                  // leading dim of a probe's n x (<=ls) history view into d_V
+  const long long stride_probe = n;  // consecutive probes' base pointers in d_V / d_W, in elements
+  const long long stride_t = ls;     // consecutive probes' slots in d_t
+  const int lda_hist = npr * n;      // leading dim of a probe's n x (<=ls) history view into d_V
 
   for (int j = 0; j < ls; ++j) {
     double* Vj = d_V + static_cast<std::size_t>(j) * npr * n;
@@ -1094,8 +1200,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     LK_CUDA_CHECK(cudaGetLastError());
     lk_cuda_lanczos_alpha_launch(d_dot, npr, d_active, d_alpha_step, d_neg_alpha);
     LK_CUDA_CHECK(cudaGetLastError());
-    LK_CUDA_CHECK(cudaMemcpy(d_alpha_all + static_cast<std::size_t>(j) * npr, d_alpha_step, col_bytes,
-                             cudaMemcpyDeviceToDevice));
+    LK_CUDA_CHECK(
+        cudaMemcpy(d_alpha_all + static_cast<std::size_t>(j) * npr, d_alpha_step, col_bytes, cudaMemcpyDeviceToDevice));
     lk_cuda_batched_axpy_launch(d_neg_alpha, Vj, d_W, n, npr);  // w -= alpha_j * Vj
     LK_CUDA_CHECK(cudaGetLastError());
 
@@ -1105,20 +1211,50 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     // pairs -- see the function doc comment for why V_hist_p is already in
     // exactly the shape/stride cuBLAS wants without a gather pass.
     const int m = j + 1;
-    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(), CUBLAS_OP_T, CUBLAS_OP_N, m, 1, n, &gemm_one, d_V,
-                                              lda_hist, stride_probe, d_W, n, stride_probe, &gemm_zero, d_t, ls,
-                                              stride_t, npr));
-    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, 1, m, &gemm_neg_one, d_V,
-                                              lda_hist, stride_probe, d_t, ls, stride_t, &gemm_one, d_W, n,
-                                              stride_probe, npr));
+    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(),
+                                              CUBLAS_OP_T,
+                                              CUBLAS_OP_N,
+                                              m,
+                                              1,
+                                              n,
+                                              &gemm_one,
+                                              d_V,
+                                              lda_hist,
+                                              stride_probe,
+                                              d_W,
+                                              n,
+                                              stride_probe,
+                                              &gemm_zero,
+                                              d_t,
+                                              ls,
+                                              stride_t,
+                                              npr));
+    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(),
+                                              CUBLAS_OP_N,
+                                              CUBLAS_OP_N,
+                                              n,
+                                              1,
+                                              m,
+                                              &gemm_neg_one,
+                                              d_V,
+                                              lda_hist,
+                                              stride_probe,
+                                              d_t,
+                                              ls,
+                                              stride_t,
+                                              &gemm_one,
+                                              d_W,
+                                              n,
+                                              stride_probe,
+                                              npr));
 
     lk_cuda_batched_dot_launch(d_W, d_W, n, npr, d_dot2);  // bj^2
     LK_CUDA_CHECK(cudaGetLastError());
     const int is_last = (j + 1 == ls) ? 1 : 0;
     lk_cuda_lanczos_beta_launch(d_dot2, npr, j, is_last, d_active, d_m_eff, d_beta_step, d_inv_bj, d_neg_beta_prev);
     LK_CUDA_CHECK(cudaGetLastError());
-    LK_CUDA_CHECK(cudaMemcpy(d_beta_all + static_cast<std::size_t>(j) * npr, d_beta_step, col_bytes,
-                             cudaMemcpyDeviceToDevice));
+    LK_CUDA_CHECK(
+        cudaMemcpy(d_beta_all + static_cast<std::size_t>(j) * npr, d_beta_step, col_bytes, cudaMemcpyDeviceToDevice));
 
     if (j + 1 < ls) {
       double* Vnext = d_V + static_cast<std::size_t>(j + 1) * npr * n;

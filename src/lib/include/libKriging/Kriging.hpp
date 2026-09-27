@@ -465,7 +465,7 @@ class Kriging : public KrigingImpl {
   /// probes at every evaluation would make the objective noisy/non-smooth
   /// between BFGS iterations.
   arma::mat m_iterative_probes;
-  arma::uword m_iterative_cg_max_iter = 0;     ///< CG budget per solve (0 = 2n, like predictIterative)
+  arma::uword m_iterative_cg_max_iter = 0;  ///< CG budget per solve (0 = 2n, like predictIterative)
   /// CG relative-residual tolerance for the iterative objective's linear
   /// solves. Settable through LLIterative's 5th objective field.
   ///

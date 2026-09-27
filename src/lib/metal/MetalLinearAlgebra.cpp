@@ -29,10 +29,22 @@ namespace {
 enum : int { GAUSS = 0, EXP = 1, MATERN32 = 2, MATERN52 = 3 };
 
 bool covKind(const std::string& covType, int* out) {
-  if (covType == "gauss") { *out = GAUSS; return true; }
-  if (covType == "exp") { *out = EXP; return true; }
-  if (covType == "matern3_2") { *out = MATERN32; return true; }
-  if (covType == "matern5_2") { *out = MATERN52; return true; }
+  if (covType == "gauss") {
+    *out = GAUSS;
+    return true;
+  }
+  if (covType == "exp") {
+    *out = EXP;
+    return true;
+  }
+  if (covType == "matern3_2") {
+    *out = MATERN32;
+    return true;
+  }
+  if (covType == "matern5_2") {
+    *out = MATERN52;
+    return true;
+  }
   return false;
 }
 
@@ -92,7 +104,8 @@ bool covCacheMatches(const DenseCovCache& c, const arma::mat& Xt, const arma::ve
     return false;
   if (c.xt.size() != Xt.n_elem || c.theta.size() != theta.n_elem)
     return false;
-  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr()) && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
+  return std::equal(c.xt.begin(), c.xt.end(), Xt.memptr())
+         && std::equal(c.theta.begin(), c.theta.end(), theta.memptr());
 }
 
 // Binds the cache to (Xt, theta, kind), uploading Xt/theta if the key
@@ -261,8 +274,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     if (dRmat)
       lk_metal_dense_matvec_launch(dRmat, n, in, ncols, out, n, static_cast<long>(in_byte_offset));
     else
-      lk_metal_rmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, kind, in, ncols, out, nullptr,
-                                   static_cast<long>(in_byte_offset));
+      lk_metal_rmul_batched_launch(
+          cov.d_Xt, n, dimX, cov.d_theta, kind, in, ncols, out, nullptr, static_cast<long>(in_byte_offset));
   };
 
   FBuf dB(mat, B.memptr()), dX(mat), dR(mat), dP(mat), dAp(mat);
@@ -280,9 +293,9 @@ arma::mat conjugateGradient(const arma::mat& Xt,
   // branch below needs it for the "r = b - A*x0" axpy.
   if (X0 != nullptr) {
     lk_metal_upload_f64_as_f32(dX, X0->memptr(), mat);
-    matvec(dX, 0, dAp);  // Ap = A*x0
-    lk_metal_copy_dev(dR, dB, mat * sizeof(float));                                    // r = b
-    lk_metal_batched_axpy_launch(dNegOnes, dAp, dR, n, ncols);                         // r -= Ap
+    matvec(dX, 0, dAp);                                         // Ap = A*x0
+    lk_metal_copy_dev(dR, dB, mat * sizeof(float));             // r = b
+    lk_metal_batched_axpy_launch(dNegOnes, dAp, dR, n, ncols);  // r -= Ap
   } else {
     lk_metal_memset_dev(dX, 0, mat * sizeof(float));
     lk_metal_copy_dev(dR, dB, mat * sizeof(float));  // r = b - A*0
@@ -413,8 +426,8 @@ arma::mat conjugateGradient(const arma::mat& Xt,
       ++n_unconverged;
   if (n_unconverged_out != nullptr)
     *n_unconverged_out = n_unconverged;
-  LinearAlgebra::cgNonConvergenceWarning(n_unconverged, static_cast<arma::uword>(ncols),
-                                        static_cast<arma::uword>(n), max_iter);
+  LinearAlgebra::cgNonConvergenceWarning(
+      n_unconverged, static_cast<arma::uword>(ncols), static_cast<arma::uword>(n), max_iter);
 
   return X;
 }
@@ -433,8 +446,17 @@ arma::mat conjugateGradient(const arma::mat& Xt,
                             const arma::mat& precMcholLower,
                             arma::uword* n_unconverged_out,
                             const arma::mat* X0) {
-  return conjugateGradient(Xt, theta, covType, B, max_iter, arma::vec(B.n_cols, arma::fill::value(tol)), precU,
-                           precDinv, precMcholLower, n_unconverged_out, X0);
+  return conjugateGradient(Xt,
+                           theta,
+                           covType,
+                           B,
+                           max_iter,
+                           arma::vec(B.n_cols, arma::fill::value(tol)),
+                           precU,
+                           precDinv,
+                           precMcholLower,
+                           n_unconverged_out,
+                           X0);
 }
 
 // Device-resident batched Lanczos -- see MetalLinearAlgebra.hpp's doc
@@ -444,8 +466,11 @@ arma::mat conjugateGradient(const arma::mat& Xt,
 // buffer (bound via lk_metal_rmul_batched_launch/lk_metal_batched_axpy_
 // launch's byte-offset parameters) -- lanczos_reorth_dot/sub read that
 // same layout directly (device-side offset math, see the .metal file).
-double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, const std::string& covType,
-                               arma::uword lanczos_steps_in, const arma::mat& probes) {
+double stochasticLogDetBatched(const arma::mat& Xt,
+                               const arma::vec& theta,
+                               const std::string& covType,
+                               arma::uword lanczos_steps_in,
+                               const arma::mat& probes) {
   int kind;
   if (!covKind(covType, &kind))
     throw std::invalid_argument("LinearAlgebraMetal::stochasticLogDetBatched: unsupported covType '" + covType + "'");
@@ -463,7 +488,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
   for (int p = 0; p < npr; ++p) {
     znorm[static_cast<std::size_t>(p)] = arma::norm(probes.col(static_cast<arma::uword>(p)));
     if (znorm[static_cast<std::size_t>(p)] != 0.0) {
-      V0.col(static_cast<arma::uword>(p)) = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
+      V0.col(static_cast<arma::uword>(p))
+          = probes.col(static_cast<arma::uword>(p)) / znorm[static_cast<std::size_t>(p)];
       active_h[static_cast<std::size_t>(p)] = 1;
     } else {
       active_h[static_cast<std::size_t>(p)] = 0;
@@ -482,8 +508,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     if (dRmat)
       lk_metal_dense_matvec_launch(dRmat, n, in, npr, out, n, static_cast<long>(in_byte_offset));
     else
-      lk_metal_rmul_batched_launch(cov.d_Xt, n, dimX, cov.d_theta, kind, in, npr, out, nullptr,
-                                   static_cast<long>(in_byte_offset));
+      lk_metal_rmul_batched_launch(
+          cov.d_Xt, n, dimX, cov.d_theta, kind, in, npr, out, nullptr, static_cast<long>(in_byte_offset));
   };
 
   const std::size_t step_elems = static_cast<std::size_t>(n) * npr;
@@ -505,7 +531,8 @@ double stochasticLogDetBatched(const arma::mat& Xt, const arma::vec& theta, cons
     matvec(dV, vj_off, dW);
     if (j > 0) {
       const std::size_t vprev_off = step_bytes * static_cast<std::size_t>(j - 1);
-      lk_metal_batched_axpy_launch(dNegBetaPrev, dV, dW, n, npr, static_cast<long>(vprev_off), 0);  // w -= beta_prev*v_prev
+      lk_metal_batched_axpy_launch(
+          dNegBetaPrev, dV, dW, n, npr, static_cast<long>(vprev_off), 0);  // w -= beta_prev*v_prev
     }
     lk_metal_batched_dot_launch(dW, dV, n, npr, dDot, 0, static_cast<long>(vj_off));  // alpha_j = <w, Vj>
     lk_metal_lanczos_alpha_launch(dDot, npr, j, dActive, dAlphaAll, dNegAlpha);

@@ -471,14 +471,14 @@ extern "C" int lk_hip_rmul_batched_scratch_elems(int n, int ncols) {
 // lk_hip_rmul_batched_scratch_elems(n, ncols) whenever that is > 0;
 // ignored (may be null) otherwise.
 extern "C" void lk_hip_rmul_batched_launch(const double* d_Xt,
-                                            int n,
-                                            int dimX,
-                                            const double* d_theta,
-                                            int covKind,
-                                            const double* d_P,
-                                            int ncols,
-                                            double* d_Ap,
-                                            double* d_scratch) {
+                                           int n,
+                                           int dimX,
+                                           const double* d_theta,
+                                           int covKind,
+                                           const double* d_P,
+                                           int ncols,
+                                           double* d_Ap,
+                                           double* d_scratch) {
   const dim3 block(128, 1, 1);
   const int row_blocks = (n + static_cast<int>(block.x) - 1) / static_cast<int>(block.x);
   const int j_blocks = chooseJBlocks(n, row_blocks, ncols);
@@ -509,11 +509,7 @@ extern "C" void lk_hip_batched_axpy_launch(const double* d_alpha, const double* 
   batched_axpy_kernel<<<grid, block>>>(d_alpha, d_X, d_Y, n);
 }
 
-extern "C" void lk_hip_batched_update_p_launch(const double* d_R,
-                                                const double* d_beta,
-                                                double* d_P,
-                                                int n,
-                                                int ncols) {
+extern "C" void lk_hip_batched_update_p_launch(const double* d_R, const double* d_beta, double* d_P, int n, int ncols) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   batched_update_p_kernel<<<grid, block>>>(d_R, d_beta, d_P, n);
@@ -605,32 +601,32 @@ __global__ void cg_any_active_kernel(const int* __restrict__ active, int ncols, 
 }
 
 extern "C" void lk_hip_cg_alpha_launch(const double* d_rz_old,
-                                        const double* d_pAp,
-                                        int ncols,
-                                        int* d_active,
-                                        double* d_alpha,
-                                        double* d_neg_alpha) {
+                                       const double* d_pAp,
+                                       int ncols,
+                                       int* d_active,
+                                       double* d_alpha,
+                                       double* d_neg_alpha) {
   const int block = 128;
   cg_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_rz_old, d_pAp, ncols, d_active, d_alpha, d_neg_alpha);
 }
 
 extern "C" void lk_hip_cg_beta_launch(const double* d_rr_new,
-                                       const double* d_bnorm,
-                                       const double* d_tol,
-                                       int ncols,
-                                       int* d_active,
-                                       double* d_rz_old,
-                                       double* d_beta) {
+                                      const double* d_bnorm,
+                                      const double* d_tol,
+                                      int ncols,
+                                      int* d_active,
+                                      double* d_rz_old,
+                                      double* d_beta) {
   const int block = 128;
   cg_beta_kernel<<<(ncols + block - 1) / block, block>>>(d_rr_new, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
 }
 
 extern "C" void lk_hip_cg_restart_launch(const double* d_rr,
-                                          const double* d_bnorm,
-                                          const double* d_tol,
-                                          int ncols,
-                                          int* d_active,
-                                          double* d_rz_old) {
+                                         const double* d_bnorm,
+                                         const double* d_tol,
+                                         int ncols,
+                                         int* d_active,
+                                         double* d_rz_old) {
   const int block = 128;
   cg_restart_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_bnorm, d_tol, ncols, d_active, d_rz_old);
 }
@@ -648,7 +644,10 @@ extern "C" void lk_hip_cg_any_active_launch(const int* d_active, int ncols, int*
 // instead of falling back to the CPU path.
 
 // DinvR[i,c] = Dinv[i] * R[i,c]  (n x ncols)
-__global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double* __restrict__ R, int n, double* __restrict__ Out) {
+__global__ void scale_rows_kernel(const double* __restrict__ Dinv,
+                                  const double* __restrict__ R,
+                                  int n,
+                                  double* __restrict__ Out) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n)
@@ -658,7 +657,12 @@ __global__ void scale_rows_kernel(const double* __restrict__ Dinv, const double*
 }
 
 // t[kk,c] = sum_i U[i,kk] * Z[i,c]   (U n x k col-major; t k x ncols col-major)
-__global__ void gemm_Ut_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Z, int ncols, double* __restrict__ t) {
+__global__ void gemm_Ut_kernel(const double* __restrict__ U,
+                               int n,
+                               int k,
+                               const double* __restrict__ Z,
+                               int ncols,
+                               double* __restrict__ t) {
   const int kk = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (kk >= k || c >= ncols)
@@ -692,7 +696,14 @@ __global__ void trisolve_MMt_kernel(const double* __restrict__ Mchol, int k, int
 }
 
 // z[i,c] = Dinv[i] * (r[i,c] - sum_kk U[i,kk] * s[kk,c])
-__global__ void precond_combine_kernel(const double* __restrict__ U, int n, int k, const double* __restrict__ Dinv, const double* __restrict__ r, int ncols, const double* __restrict__ s, double* __restrict__ z) {
+__global__ void precond_combine_kernel(const double* __restrict__ U,
+                                       int n,
+                                       int k,
+                                       const double* __restrict__ Dinv,
+                                       const double* __restrict__ r,
+                                       int ncols,
+                                       const double* __restrict__ s,
+                                       double* __restrict__ z) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   const int c = blockIdx.y;
   if (i >= n || c >= ncols)
@@ -708,7 +719,14 @@ __global__ void precond_combine_kernel(const double* __restrict__ U, int n, int 
 // beta[c] = active ? rz_new[c]/rz_old[c] : 0 ; rz_old[c] = rz_new[c] ;
 // convergence tested on the TRUE residual norm rr[c] (not rz). Matches the
 // preconditioned branch of LinearAlgebra::conjugateGradient.
-__global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz_new, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old, double* __restrict__ beta) {
+__global__ void cg_beta_precond_kernel(const double* __restrict__ rr,
+                                       const double* __restrict__ rz_new,
+                                       const double* __restrict__ bnorm,
+                                       const double* __restrict__ tol,
+                                       int ncols,
+                                       int* __restrict__ active,
+                                       double* __restrict__ rz_old,
+                                       double* __restrict__ beta) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols)
     return;
@@ -725,28 +743,47 @@ __global__ void cg_beta_precond_kernel(const double* __restrict__ rr, const doub
   rz_old[c] = rz_new[c];
 }
 
-extern "C" void lk_hip_precond_apply_launch(const double* d_U, int n, int k, const double* d_Dinv, const double* d_Mchol,
-                                             const double* d_r, int ncols, double* d_z, double* d_scratch_nc, double* d_scratch_kc) {
+extern "C" void lk_hip_precond_apply_launch(const double* d_U,
+                                            int n,
+                                            int k,
+                                            const double* d_Dinv,
+                                            const double* d_Mchol,
+                                            const double* d_r,
+                                            int ncols,
+                                            double* d_z,
+                                            double* d_scratch_nc,
+                                            double* d_scratch_kc) {
   const dim3 blk(128, 1, 1);
   const dim3 grid_n((n + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
   const dim3 grid_k((k + blk.x - 1) / blk.x, static_cast<unsigned int>(ncols), 1);
-  scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_r, n, d_scratch_nc);       // d_scratch_nc = Dinv .* r
+  scale_rows_kernel<<<grid_n, blk>>>(d_Dinv, d_r, n, d_scratch_nc);               // d_scratch_nc = Dinv .* r
   gemm_Ut_kernel<<<grid_k, blk>>>(d_U, n, k, d_scratch_nc, ncols, d_scratch_kc);  // d_scratch_kc = U^T (Dinv .* r)
   trisolve_MMt_kernel<<<(ncols + blk.x - 1) / blk.x, blk>>>(d_Mchol, k, ncols, d_scratch_kc);  // <- s in place
   precond_combine_kernel<<<grid_n, blk>>>(d_U, n, k, d_Dinv, d_r, ncols, d_scratch_kc, d_z);   // d_z
 }
 
-extern "C" void lk_hip_cg_beta_precond_launch(const double* d_rr, const double* d_rz_new, const double* d_bnorm,
-                                               const double* d_tol, int ncols, int* d_active, double* d_rz_old,
-                                               double* d_beta) {
+extern "C" void lk_hip_cg_beta_precond_launch(const double* d_rr,
+                                              const double* d_rz_new,
+                                              const double* d_bnorm,
+                                              const double* d_tol,
+                                              int ncols,
+                                              int* d_active,
+                                              double* d_rz_old,
+                                              double* d_beta) {
   const int block = 128;
-  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz_new, d_bnorm, d_tol, ncols, d_active, d_rz_old,
-                                                                d_beta);
+  cg_beta_precond_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_rr, d_rz_new, d_bnorm, d_tol, ncols, d_active, d_rz_old, d_beta);
 }
 
 // Restart-iteration variant for preconditioned CG: rz_old <- rz[c] (the
 // preconditioned inner product), converge on the true residual rr[c].
-__global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const double* __restrict__ rz, const double* __restrict__ bnorm, const double* __restrict__ tol, int ncols, int* __restrict__ active, double* __restrict__ rz_old) {
+__global__ void cg_restart_precond_kernel(const double* __restrict__ rr,
+                                          const double* __restrict__ rz,
+                                          const double* __restrict__ bnorm,
+                                          const double* __restrict__ tol,
+                                          int ncols,
+                                          int* __restrict__ active,
+                                          double* __restrict__ rz_old) {
   const int c = blockIdx.x * blockDim.x + threadIdx.x;
   if (c >= ncols || !active[c])
     return;
@@ -755,22 +792,28 @@ __global__ void cg_restart_precond_kernel(const double* __restrict__ rr, const d
     active[c] = 0;
 }
 
-extern "C" void lk_hip_cg_restart_precond_launch(const double* d_rr, const double* d_rz, const double* d_bnorm,
-                                                  const double* d_tol, int ncols, int* d_active, double* d_rz_old) {
+extern "C" void lk_hip_cg_restart_precond_launch(const double* d_rr,
+                                                 const double* d_rz,
+                                                 const double* d_bnorm,
+                                                 const double* d_tol,
+                                                 int ncols,
+                                                 int* d_active,
+                                                 double* d_rz_old) {
   const int block = 128;
-  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(d_rr, d_rz, d_bnorm, d_tol, ncols, d_active, d_rz_old);
+  cg_restart_precond_kernel<<<(ncols + block - 1) / block, block>>>(
+      d_rr, d_rz, d_bnorm, d_tol, ncols, d_active, d_rz_old);
 }
 
 // dimX must be <= LK_HIP_MAX_DIMX (guaranteed by the host caller). d_Out
 // must be sized n * dimX * ncols doubles.
 extern "C" void lk_hip_drmul_batched_launch(const double* d_Xt,
-                                             int n,
-                                             int dimX,
-                                             const double* d_theta,
-                                             int covKind,
-                                             const double* d_V,
-                                             int ncols,
-                                             double* d_Out) {
+                                            int n,
+                                            int dimX,
+                                            const double* d_theta,
+                                            int covKind,
+                                            const double* d_V,
+                                            int ncols,
+                                            double* d_Out) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   drmul_batched_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_V, ncols, d_Out);
@@ -779,19 +822,23 @@ extern "C" void lk_hip_drmul_batched_launch(const double* d_Xt,
 // d_dR (when non-null) must be sized n*n*dimX doubles and dimX <= 32 (same
 // bound as lk_hip_drmul_batched_launch) -- checked by the host caller.
 extern "C" void lk_hip_build_cov_launch(const double* d_Xt,
-                                         int n,
-                                         int dimX,
-                                         const double* d_theta,
-                                         int covKind,
-                                         double* d_R,
-                                         double* d_dR) {
+                                        int n,
+                                        int dimX,
+                                        const double* d_theta,
+                                        int covKind,
+                                        double* d_R,
+                                        double* d_dR) {
   const dim3 block(16, 16, 1);
   const dim3 grid((n + block.x - 1) / block.x, (n + block.y - 1) / block.y, 1);
   build_cov_kernel<<<grid, block>>>(d_Xt, n, dimX, d_theta, static_cast<CovKind>(covKind), d_R, d_dR);
 }
 
-extern "C" void lk_hip_dense_matvec_launch(const double* d_R, int n, const double* d_V, int ncols, double* d_Out,
-                                            int ldc) {
+extern "C" void lk_hip_dense_matvec_launch(const double* d_R,
+                                           int n,
+                                           const double* d_V,
+                                           int ncols,
+                                           double* d_Out,
+                                           int ldc) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(ncols), 1);
   dense_matvec_kernel<<<grid, block>>>(d_R, n, d_V, ncols, d_Out, ldc);
@@ -816,8 +863,11 @@ __global__ void lanczos_alpha_kernel(const double* __restrict__ dot,
   neg_alpha[c] = -a;
 }
 
-extern "C" void lk_hip_lanczos_alpha_launch(const double* d_dot, int ncols, const int* d_active, double* d_alpha,
-                                             double* d_neg_alpha) {
+extern "C" void lk_hip_lanczos_alpha_launch(const double* d_dot,
+                                            int ncols,
+                                            const int* d_active,
+                                            double* d_alpha,
+                                            double* d_neg_alpha) {
   const int block = 128;
   lanczos_alpha_kernel<<<(ncols + block - 1) / block, block>>>(d_dot, ncols, d_active, d_alpha, d_neg_alpha);
 }
@@ -860,9 +910,15 @@ __global__ void lanczos_beta_kernel(const double* __restrict__ dot2,
   neg_beta_prev_out[c] = no_next ? 0.0 : -bj;
 }
 
-extern "C" void lk_hip_lanczos_beta_launch(const double* d_dot2, int ncols, int step_idx, int is_last_step,
-                                            int* d_active, int* d_m_eff, double* d_beta_out, double* d_inv_bj_out,
-                                            double* d_neg_beta_prev_out) {
+extern "C" void lk_hip_lanczos_beta_launch(const double* d_dot2,
+                                           int ncols,
+                                           int step_idx,
+                                           int is_last_step,
+                                           int* d_active,
+                                           int* d_m_eff,
+                                           double* d_beta_out,
+                                           double* d_inv_bj_out,
+                                           double* d_neg_beta_prev_out) {
   const int block = 128;
   lanczos_beta_kernel<<<(ncols + block - 1) / block, block>>>(
       d_dot2, ncols, step_idx, is_last_step, d_active, d_m_eff, d_beta_out, d_inv_bj_out, d_neg_beta_prev_out);
@@ -904,8 +960,8 @@ __global__ void lanczos_reorth_dot_kernel(const double* __restrict__ V,
     t[static_cast<std::size_t>(p) * ls + jj] = sdata[0];
 }
 
-extern "C" void lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int n, int npr, int ls, int m,
-                                                  double* d_t) {
+extern "C" void
+lk_hip_lanczos_reorth_dot_launch(const double* d_V, const double* d_W, int n, int npr, int ls, int m, double* d_t) {
   const int block = 256;
   const dim3 grid(static_cast<unsigned int>(m), static_cast<unsigned int>(npr), 1);
   lanczos_reorth_dot_kernel<<<grid, block, block * sizeof(double)>>>(d_V, d_W, n, npr, ls, d_t);
@@ -936,8 +992,8 @@ __global__ void lanczos_reorth_sub_kernel(const double* __restrict__ V,
   W[static_cast<std::size_t>(p) * n + i] -= acc;
 }
 
-extern "C" void lk_hip_lanczos_reorth_sub_launch(const double* d_V, const double* d_t, int n, int npr, int ls, int m,
-                                                  double* d_W) {
+extern "C" void
+lk_hip_lanczos_reorth_sub_launch(const double* d_V, const double* d_t, int n, int npr, int ls, int m, double* d_W) {
   const dim3 block(128, 1, 1);
   const dim3 grid((n + block.x - 1) / block.x, static_cast<unsigned int>(npr), 1);
   lanczos_reorth_sub_kernel<<<grid, block>>>(d_V, d_t, n, npr, ls, m, d_W);
