@@ -698,20 +698,38 @@ std::tuple<arma::vec, arma::vec> KrigingImpl::predictIterative_impl(const arma::
     // returns a wildly-inflated stdev there, or even a hard 0 once var_raw
     // goes slightly negative and gets clamped below. Re-solve just the
     // flagged columns (rare in practice: normal predictions land away from
-    // the training set) at the caller's full `tol` instead.
+    // the training set) at the caller's full `tol` instead -- but ONLY when
+    // the original solve actually reached stdev_tol: a column CG couldn't
+    // converge (large n, no preconditioner, ill-conditioned R) already hit
+    // its max_iter budget, so re-solving at a tighter tol with that same
+    // budget repeats the identical failure, silently doubling this
+    // function's cost for no accuracy gain (found via a genuine slowdown in
+    // docs/math/predictiterative_vs_cholesky.ipynb's large-n sweep). Checked
+    // directly against RmulBatched (backend-agnostic: the same CPU matvec
+    // regardless of which cgSolve dispatched to) rather than trusted from
+    // the solver's own bookkeeping, so this works whether cgSolve ran on
+    // CPU or GPU.
     const double cancel_guard = 16.0 * stdev_tol;
-    const arma::uvec bad = arma::find(var_raw < cancel_guard);
-    if (!bad.is_empty()) {
-      const arma::mat R_on_bad = R_on.cols(bad);
-      const arma::mat V_bad = cgSolve(R_on_bad, tol);
-      quad(bad) = arma::sum(R_on_bad % V_bad, 0).t();
-      if (m_F.n_cols > 0) {
-        const arma::mat FtRinvF = m_F.t() * W_F;
-        const arma::mat E_bad = F_n.rows(bad) - R_on_bad.t() * W_F;
-        const arma::mat correction_rhs_bad = arma::solve(FtRinvF, E_bad.t());
-        gls_correction(bad) = arma::sum(E_bad.t() % correction_rhs_bad, 0).t();
+    const arma::uvec candidates = arma::find(var_raw < cancel_guard);
+    if (!candidates.is_empty()) {
+      const arma::mat R_on_cand = R_on.cols(candidates);
+      const arma::mat resid_cand = R_on_cand - RmulBatched(V.cols(candidates));
+      const arma::vec cand_norm
+          = arma::clamp(arma::sqrt(arma::sum(arma::square(R_on_cand), 0)).t(), 1e-300, arma::datum::inf);
+      const arma::vec relres = arma::sqrt(arma::sum(arma::square(resid_cand), 0)).t() / cand_norm;
+      const arma::uvec bad = candidates.elem(arma::find(relres <= 2.0 * stdev_tol));
+      if (!bad.is_empty()) {
+        const arma::mat R_on_bad = R_on.cols(bad);
+        const arma::mat V_bad = cgSolve(R_on_bad, tol);
+        quad(bad) = arma::sum(R_on_bad % V_bad, 0).t();
+        if (m_F.n_cols > 0) {
+          const arma::mat FtRinvF = m_F.t() * W_F;
+          const arma::mat E_bad = F_n.rows(bad) - R_on_bad.t() * W_F;
+          const arma::mat correction_rhs_bad = arma::solve(FtRinvF, E_bad.t());
+          gls_correction(bad) = arma::sum(E_bad.t() % correction_rhs_bad, 0).t();
+        }
+        var_raw = 1.0 - quad + gls_correction;
       }
-      var_raw = 1.0 - quad + gls_correction;
     }
 
     stdev = arma::sqrt(arma::clamp(m_sigma2 * var_raw, 0.0, arma::datum::inf));
