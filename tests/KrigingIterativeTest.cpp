@@ -399,7 +399,7 @@ TEST_CASE("LLIterative(m,precond_rank): the Nystrom preconditioner is applied to
   CHECK(err_pc <= err_plain + 0.02 * std::abs(ll_exact) + 1.0);  // never materially worse
 }
 
-TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[iterative][kriging]") {
+TEST_CASE("LLIterative: the dense fast path matches the matrix-free path", "[iterative][kriging][intensive]") {
   // For a separable kernel and small enough n, _logLikelihoodIterative
   // materializes R (and the dR/dtheta_k blocks) once and runs every matvec
   // as a BLAS-3 R*V. LK_ITERATIVE_DENSE_MAX_MB=0 forces the strictly
