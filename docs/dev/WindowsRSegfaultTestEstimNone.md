@@ -324,14 +324,37 @@ changes are themselves safe to keep permanently if useful — only the
 
 ### C.1 Using this
 
+**Update after first use**: the `R_TEST_REPEAT`/`CTEST_REPEAT` in-job
+repeat knobs (8 each) ran clean **16/16 times total across two separate
+full job-runs** (8 R + 8 Julia-suite repeats, twice) — zero crashes,
+right after the organic failures in §A/§B's "First/Second occurrence"
+entries. That's a meaningfully large sample to come back clean if the
+per-attempt crash probability were anywhere near the ~40% the raw
+job-level pass/fail count suggested (P(16/16 clean) ≈ 2.8% at p=0.2,
+≈0.0028% at p=0.4) — **the leading interpretation is that repeating
+*within* one job (same runner VM, same boot) doesn't resample whatever
+actually varies between occurrences.** If the trigger depends on
+something tied to the VM instance itself (heap layout/ASLR seed fixed
+per boot, or some other per-VM state established once at boot and then
+constant for every process launched in that job), many in-job repeats
+would systematically undersample it while two independent *job*
+launches (fresh VM each) already caught it twice. **Prefer many
+separate job/run launches over high in-job repeat counts** going
+forward — e.g. `gh run rerun <run-id>` (whole run, fresh VMs) in a loop
+across several distinct runs, rather than cranking `R_TEST_REPEAT`/
+`CTEST_REPEAT` higher on a single run. The repeat knobs aren't useless
+(still cheap insurance, and would help if the true mechanism turns out
+to be process-level after all) — just don't rely on them alone.
+
 1. Push to this branch (or `gh workflow run` / re-push an empty commit)
    to trigger the trimmed matrix. Given ~3 passes for every ~2 failures
-   observed so far, budget a handful of pushes/reruns, not just one —
-   `gh run rerun <run-id> --failed` after a clean run is the cheap way to
-   retry without a new commit (see the session transcript for the exact
-   commands; `--job <id>` alone sometimes errors "cannot be rerun" when
-   another attempt is already in flight — use `--failed` on the whole run
-   instead once nothing is in progress).
+   observed at the *job* level so far (§C.1's update above), budget
+   several separate pushes/reruns, not just one — `gh run rerun <run-id>`
+   (whole run) is the cheap way to retry without a new commit
+   (`--job <id>` alone sometimes errors "cannot be rerun" when another
+   attempt is already in flight; `--failed` only works once nothing in
+   the run is still in progress — plain `gh run rerun <run-id>` re-runs
+   the whole thing unconditionally and sidesteps both issues).
 2. Once a run fails with a genuine segfault (not a build error — check
    the log first), download the `artifacts-Windows` artifact
    (`gh run download <run-id>`) and look for `crash_dumps/*.dmp`.
