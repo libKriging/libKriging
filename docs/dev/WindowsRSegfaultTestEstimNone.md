@@ -1,16 +1,28 @@
-# Intermittent Windows R segfault in `test-estimnone.R` — investigation prep
+# Intermittent Windows native crashes — investigation prep
 
-**Status: OPEN, not yet reproduced natively or root-caused.** This document
-was written from a Linux sandbox (no Windows access) after a single
-observed CI failure, to hand off to a session with real Windows access. It
-records everything confirmed so far, everything already ruled out, and a
-concrete plan for continuing. See
-[`WindowsPythonHangDiagnostic354.md`](WindowsPythonHangDiagnostic354.md) for
-the writing style this aims to follow once evidence exists, and
-[`win_debug.md`](win_debug.md) for the general Windows debugging
-environment/tooling setup (VS Build Tools, WinDbg/`cdb.exe`, Application
-Verifier, py-spy-equivalent native inspection) — this doc assumes that
-environment and doesn't repeat its setup instructions.
+**Status: OPEN, not yet reproduced natively or root-caused.** Two distinct
+symptom clusters, both Windows-only, both intermittent, found on the same
+branch within a few days of each other — plausibly the same underlying
+memory-corruption class of bug (cf. the historical
+[`WindowsPythonHangDiagnostic354.md`](WindowsPythonHangDiagnostic354.md)
+case, also Windows-only heap corruption, also initially looking scattered
+before its real mechanism was found), but **not confirmed to share a root
+cause** — treat as two open questions until evidence says otherwise:
+
+1. [§A — R Windows: `test-estimnone.R`](#a-r-windows-test-estimnoner-heterogeneous-noise-kriging) —
+   segfault in the R binding's test suite, always at the same test.
+2. [§B — Julia Windows: core `ctest` segfault cluster](#b-julia-windows--core-ctest-segfault-cluster) —
+   14 different C++ Catch2 tests, spanning Nystrom/Vecchia/NestedKriging/
+   LinearAlgebra, segfaulting in the same CI run.
+
+This document was written from a Linux sandbox (no Windows access) after
+observed CI failures, to hand off to a session with real Windows access.
+It records everything confirmed so far, everything already ruled out, a
+CI-assisted plan to collect real crash dumps *before* anyone needs to sit
+in front of a Windows VM (§C), and the native-debugging fallback plan
+(§D) adapted from `WindowsPythonHangDiagnostic354.md`/
+[`win_debug.md`](win_debug.md) if the CI dumps aren't enough — this doc
+assumes that environment and doesn't repeat its setup instructions.
 
 - No GitHub issue opened yet — open one and link it here once this is
   picked back up (or ask the user first; not done automatically per
@@ -19,14 +31,21 @@ environment and doesn't repeat its setup instructions.
   current `feature/cg-predict` work — see `feature/cg-predict`/
   `feature/iterative-convergence` for now-superseded history if this
   branch has since moved).
-- Failing run: https://github.com/libKriging/libKriging/actions/runs/36435180775/job/108971136040
-  (commit `31b1671e`).
-- Immediate rerun of the *same* job, *same* commit, no code change:
-  **passed** (`run_attempt: 2`, conclusion `success`). This is the single
-  strongest piece of evidence so far: the bug is intermittent, not a
-  deterministic logic error.
 
-## Symptom
+## A. R Windows: `test-estimnone.R` heterogeneous-noise Kriging
+
+- First failing run: https://github.com/libKriging/libKriging/actions/runs/36435180775/job/108971136040
+  (commit `31b1671e`). Immediate rerun, same commit, no code change:
+  **passed**.
+- Second occurrence, different commit, unrelated changes (bench refresh +
+  a CI timeout tweak): https://github.com/libKriging/libKriging/actions/runs/36691416263/job/109809264142
+  (commit `e4f076a6`). Rerun: **passed** again.
+- **Three passes, two failures, same exact crash point both times** — see
+  "Precise localization" below. This is the strongest evidence so far:
+  intermittent, not a deterministic logic error, and recurring across
+  unrelated commits (so not tied to one specific change).
+
+### A.1 Symptom
 
 CI job "Build and tests / build (R Windows, windows-latest, Release, on)"
 fails after ~20 minutes with:
@@ -44,7 +63,7 @@ catch or report it, so there's no R traceback, no `testthat` summary, no
 "False lead already ruled out" below) — the actual crash only shows up as
 this `Segmentation fault` line from `make` itself.
 
-## Precise localization
+### A.2 Precise localization
 
 The R script is `Rscript testthat.R` → `testthat::test_check('rlibkriging')`,
 which runs every file under `bindings/R/rlibkriging/tests/testthat/` in
@@ -77,7 +96,7 @@ given how trivial those are) at R's garbage collection of `rno_noestim` or
 one of the two earlier model objects, or when `testthat` moves on to the
 next test file.
 
-## What's already been checked (from a Linux sandbox — no native repro yet)
+### A.3 What's already been checked (from a Linux sandbox — no native repro yet)
 
 These were checked by static inspection and log analysis only; none of
 this required Windows, so a Windows session can skip straight past them:
@@ -144,7 +163,7 @@ own `CMAKE_CXX_STANDARD` were ever bumped past 17 without updating
 compiling the R side at 17, which *would* be a real (if different) bug
 worth a lint/CI check some day. Not implicated in this crash.
 
-## Hypotheses not yet tested (start here)
+### A.4 Hypotheses not yet tested (start here)
 
 In rough priority order, informed by this repo's prior Windows
 investigations (`WindowsPythonHangDiagnostic354.md`, and the OpenMP
@@ -190,13 +209,169 @@ thread-pool-churn fixes for Octave/Python Windows referenced there):
    other hypotheses were disproven with hard evidence, so "looks fine by
    inspection" is weak evidence on its own for this class of bug.
 
-## Suggested reproduction plan
+### A.5 Suggested reproduction plan
+
+Start with §C (CI-assisted dump collection) — cheap and requires no
+Windows access. If that doesn't yield enough, §D below has the full
+native-VM reproduction plan for both §A and §B.
+
+## B. Julia Windows — core `ctest` segfault cluster
+
+### B.1 Symptom
+
+CI job "Build and tests / build (Julia Windows, windows-latest, Release,
+on)" — despite the name, this job runs the **entire core C++ `ctest`
+suite** (`tools/windows/test.sh`: `ctest -C "${MODE}" ...`, no test
+filter), Julia binding enabled alongside; it isn't Julia-specific. One
+run failed with **14 different Catch2 tests** all marked `(SEGFAULT)` by
+ctest's own reporting, spanning several unrelated features:
+
+```
+	 53 - LLIterative(m,precond_rank): the Nystrom preconditioner is applied to the SLQ log-determinant (SEGFAULT)
+	101 - LinearAlgebra - rapid fire varying sizes (SEGFAULT)
+	134 - NestedKriging is close to full Kriging on moderate n (SEGFAULT)
+	147 - LLVecchia(20) estimation is consistent with the exact MLE (SEGFAULT)
+	150 - predictVecchia matches exact predict (SEGFAULT)
+	152 - light Vecchia fit skips the exact factorization (SEGFAULT)
+	158 - LLNystrom analytic gradient matches finite differences (SEGFAULT)
+	159 - LLNystrom fit is a permanent light fit: predict routes to predictNystrom (SEGFAULT)
+	161 - LLNystrom(k) estimation is consistent with the exact MLE (SEGFAULT)
+	162 - predictNystrom matches exact predict after an LLNystrom fit close to full rank (SEGFAULT)
+	163 - LLNystrom update(refit=false) extends data at fixed theta/landmarks (SEGFAULT)
+	164 - LLNystrom update(refit=true) warm-restarts theta over the same landmarks (SEGFAULT)
+	166 - simulateNystrom mean/marginal-variance are consistent with predictNystrom (SEGFAULT)
+	169 - LLNystrom honors optim=none identically to optim=BFGS (SEGFAULT)
+```
+
+Tests *between* these (e.g. #175/#176, MLPKriging-related) printed and
+passed normally in the same run — so this is not "everything after some
+point in the run crashes" (which would suggest one corruption cascading
+through the rest of the process); each failure looks self-contained.
+
+- Run: https://github.com/libKriging/libKriging/actions/runs/36691416263/job/109809263774
+  (commit `e4f076a6`). Two rerun attempts afterward (`run_attempt: 2` and
+  `3`) both **passed**, running the identical full suite with no code
+  change in between.
+- Neither commit in `e4f076a6` (a GPU-bench result refresh, and a CI-only
+  change tagging one unrelated test `[intensive]` + raising Coverage
+  mode's timeout) touches anything in `src/lib/`, `LinearAlgebra.cpp`, or
+  any of Nystrom/Vecchia/NestedKriging — nothing in that diff plausibly
+  causes this. Checked all commits on this branch going back through this
+  session's own `predictIterative`/CG-solver work: **every one of them
+  passed this same job before `e4f076a6`** — so if this is related to
+  that work rather than a pre-existing latent bug, it was already present
+  and just hadn't been hit yet, not introduced by `e4f076a6` itself.
+
+### B.2 What's already been checked
+
+- `#354`'s fix is still active: `CMakeLists.txt` still has the three
+  `ARMA_ALIEN_MEM_*`/`CARMA_DO_NOT_EXPORT_ALIEN_MEM_FUNCTIONS` defines
+  (lines ~327-329) — not a regression of that specific fix.
+- Not obviously tied to any single recent source change (see run
+  history above) — this needs a bisection or a repeatable native repro
+  to make progress, which is exactly what §C is for.
+
+### B.3 Hypotheses not yet tested
+
+The breadth (Nystrom + Vecchia + NestedKriging + a generic
+"LinearAlgebra rapid fire varying sizes" stress test, i.e. not one
+feature) suggests either (a) a shared low-level mechanism many features
+happen to call into (Cholesky/`rcond`/CG solves in `LinearAlgebra.cpp`,
+matching the *mechanism* — though not necessarily the same exact bug —
+behind #354), or (b) a test-process-level issue unrelated to any single
+feature's logic (stack size exhaustion under deep/recursive calls,
+OpenMP thread-pool churn again, or a shared test fixture/RNG state
+corrupting something that only some tests are sensitive to). Both are
+worth checking; §C's repeated-run + crash-dump approach should surface a
+consistent (or inconsistent) faulting stack across occurrences, which
+would discriminate between them immediately.
+
+## C. CI-assisted dump collection (do this first)
+
+Before reaching for a live Windows VM (§D, adapted from
+`WindowsPythonHangDiagnostic354.md`), this branch's CI has been
+**temporarily** set up to collect real crash dumps automatically, for
+free, without anyone needing to sit in front of Windows:
+
+- `.github/workflows/main.yml`: the `build` job's matrix is trimmed to
+  just `R Windows` and `Julia Windows` (every other config commented out
+  of scope for this investigation, not deleted — `git log` for the
+  commit that did this trim to see/restore the full matrix).
+- A new step, Windows-only, right before `test`, enables **Windows Error
+  Reporting LocalDumps** (`HKCU:\...\Windows Error
+  Reporting\LocalDumps`, `DumpType=2` = full memory dump) pointed at
+  `<workspace>/crash_dumps/`. This is passive and process-name-agnostic —
+  *any* process that crashes while the job runs gets a `.dmp` written,
+  without needing to predict in advance whether it's `Rscript.exe`, a
+  forked sub-`Rscript.exe`, or one of the `ctest`-launched Catch2 test
+  `.exe`s.
+- `tools/r-windows/test.sh` reruns `make test` up to `R_TEST_REPEAT`
+  times (set to 8 for the `R Windows` matrix entry), stopping at the
+  first failure.
+- `tools/windows/test.sh` passes `--repeat until-fail:${CTEST_REPEAT}`
+  (set to 8) and `${CTEST_EXTRA_ARGS}` (set to `-R
+  Nystrom|Vecchia|NestedKriging|LinearAlgebra`, i.e. just the 14
+  previously-crashing tests' features) to `ctest`, so each of the ~14
+  selected tests gets up to 8 fresh-process attempts within the job's
+  time budget instead of one.
+- The existing "upload artifacts on test failure" step now also picks up
+  `**/*.dmp`.
+
+Both env-var knobs (`R_TEST_REPEAT`, `CTEST_REPEAT`/`CTEST_EXTRA_ARGS`)
+default to a no-op (repeat once, no filter) when unset, so these script
+changes are themselves safe to keep permanently if useful — only the
+*matrix trim* in `main.yml` is meant to be temporary.
+
+### C.1 Using this
+
+1. Push to this branch (or `gh workflow run` / re-push an empty commit)
+   to trigger the trimmed matrix. Given ~3 passes for every ~2 failures
+   observed so far, budget a handful of pushes/reruns, not just one —
+   `gh run rerun <run-id> --failed` after a clean run is the cheap way to
+   retry without a new commit (see the session transcript for the exact
+   commands; `--job <id>` alone sometimes errors "cannot be rerun" when
+   another attempt is already in flight — use `--failed` on the whole run
+   instead once nothing is in progress).
+2. Once a run fails with a genuine segfault (not a build error — check
+   the log first), download the `artifacts-Windows` artifact
+   (`gh run download <run-id>`) and look for `crash_dumps/*.dmp`.
+3. If a `.dmp` was captured: open it with WinDbg (`File > Open Dump
+   File`) or `cdb.exe -z path\to\file.dmp`, then `!analyze -v` for an
+   automated first pass (faulting instruction, module, basic stack), and
+   `kv`/`.ecxr; kv` for the full stack with arguments. This needs the
+   matching PDBs — if the CI build doesn't already produce/upload them,
+   the fastest path is usually rebuilding the exact same commit locally
+   in a Windows VM (§D's "Build" section) so local PDBs line up, rather
+   than trying to get symbol servers to resolve a CI-only build.
+4. If no `.dmp` appears despite a failed job: LocalDumps may need `HKLM`
+   instead of `HKCU` on GH-hosted runners (untested — flip it if `HKCU`
+   turns out not to trigger; GH-hosted Windows runners run elevated by
+   default, so `HKLM` should also be writable), or the crash may be a
+   `SIGABRT`/CRT-detected error Windows doesn't route through WER the
+   same way as a hard access violation — check the job log for which
+   flavor it actually was before assuming the dump mechanism itself
+   failed.
+5. Once a dump's stack is in hand, update §A or §B above with it, and
+   follow the elimination-trail style of `WindowsPythonHangDiagnostic354.md`
+   for whatever hypothesis it points to.
+
+### C.2 Reverting the temporary CI changes
+
+Once this investigation concludes (root cause found, or deliberately
+parked), restore the full matrix: `git revert` the commit that
+introduced the trim (identify it via `git log --oneline -- .github/workflows/main.yml`,
+the one whose message starts with the matrix-trim description — based on
+`e4f076a6` at the time this was written). The `tools/r-windows/test.sh`/
+`tools/windows/test.sh` repeat-knob changes are safe to keep (no-op by
+default) or revert together with the matrix trim — either is fine.
+
+## D. Native Windows VM debugging (fallback, if §C's dumps aren't enough)
 
 Adapting `WindowsPythonHangDiagnostic354.md`'s approach (see that doc and
 `win_debug.md` for full environment setup — VS Build Tools, CMake ≥ 4.2,
 Rtools, WinDbg, Application Verifier):
 
-### Build (mirrors `tools/r-windows/build.sh` / CI's `BUILD_NAME=r-windows`)
+### D.1 Build (mirrors `tools/r-windows/build.sh` / CI's `BUILD_NAME=r-windows`)
 
 ```bash
 cd /path/to/libKriging
@@ -210,7 +385,11 @@ export BUILD_DIR=build_win_r
 tools/r-windows/build.sh
 ```
 
-### Isolate just the crashing block
+For §B (Julia Windows / core ctest), swap `ENABLE_R_BINDING=off`,
+`ENABLE_JULIA_BINDING=on`, and build via `tools/windows/build.sh`
+instead — same pattern, see that script for the exact flags.
+
+### D.2 Isolate just the crashing block (§A)
 
 Create a scratch copy of the relevant lines (don't edit the real test file
 in place while debugging — copy it, e.g. to
@@ -267,11 +446,33 @@ one run to hit.
 **Remember to disable Page Heap when done** (systemwide per-image-name
 setting — see `win_debug.md`).
 
+### D.3 Isolate just the crashing tests (§B)
+
+Build per D.1's Julia/core variant, then loop the 14 known-crashing tests
+directly instead of the whole suite:
+
+```bash
+cd build_win_r  # or wherever BUILD_DIR pointed
+for i in $(seq 1 100); do
+  echo "=== attempt $i ==="
+  ctest -C Release -R "Nystrom|Vecchia|NestedKriging|LinearAlgebra" --output-on-failure || break
+done
+```
+
+Same `cdb.exe -c 'sxe av; g; .exr -1; kv; q'` / Application Verifier Page
+Heap approach as D.2 applies here too, attached to whichever Catch2 test
+`.exe` ctest launches for the specific test that ends up crashing (check
+`ctest -N` or the build directory's `tests/` output for the exact `.exe`
+name per test).
+
 ## Cleanup notes
 
-Nothing has been committed or changed in the working tree for this
-investigation — this document is the only artifact. If a future session
-adds scratch repro files (`bindings/R/repro_estimnone_noise.R`, any dumped
-crash matrices, throwaway builds), list them here and remove before
-merging anything, matching the cleanup discipline in
+Nothing has been committed to a scratch/throwaway state for this
+investigation beyond the **intentional, documented-as-temporary** CI
+changes in §C (matrix trim in `main.yml`, repeat-knob support in
+`tools/r-windows/test.sh`/`tools/windows/test.sh`) — see §C.2 for how to
+revert those once done. If a future session adds scratch repro files
+(`bindings/R/repro_estimnone_noise.R`, dumped crash matrices/dumps,
+throwaway Windows VM builds), list them here and remove before merging
+anything, matching the cleanup discipline in
 `WindowsPythonHangDiagnostic354.md`.

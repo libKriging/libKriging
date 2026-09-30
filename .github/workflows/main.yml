@@ -68,86 +68,25 @@ jobs:
     timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
       fail-fast: false
+      # TEMPORARY — matrix trimmed to just the two configs with an open,
+      # intermittent Windows native-crash investigation (R Windows:
+      # docs/dev/WindowsRSegfaultTestEstimNone.md; Julia Windows: same doc's
+      # "Julia Windows / core ctest segfault cluster" section). Restore the
+      # full matrix with `git revert` of the commit that introduced this
+      # trim (based on e4f076a6) once the investigation concludes.
       matrix:
         include:
-          - name: "Linux Debug"
-            os: ubuntu-22.04
-            mode: Debug
-            enable_python: on
-          - name: "Linux Debug without OpenMP"
-            os: ubuntu-22.04
-            mode: Debug
-            enable_python: on
-            disable_openmp: on
-          - name: "macOS Debug"
-            os: macOS-latest
-            mode: Debug
-            enable_python: on
-          - name: "Python (3.7) Windows Debug"
-            os: windows-latest
-            mode: Debug
-            enable_python: on
-            python-version: 3.7
-          - name: "Python (3.9) Windows Debug"
-            os: windows-latest
-            mode: Debug
-            enable_python: on
-            python-version: 3.9
-          - name: "Octave Linux"
-            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
-            mode: Release
-            enable_python: off
-            enable_octave: on
-            force_update: on
-          - name: "Octave macOS"
-            os: macOS-latest
-            mode: Release
-            enable_python: off
-            enable_octave: on
-          - name: "Octave Windows"
-            os: windows-latest
-            mode: Release
-            # using python and octave in windows leads to the following error:
-            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
-            #   491 | # define snprintf _snprintf
-            enable_python: off
-            enable_octave: on
-            timeout_minutes: 90
-          - name: "Matlab Linux"
-            # Disabled: requires MATHWORKS_API_TOKEN secret (license failure since v0.9.3)
-            # Using matlab-actions/setup-matlab@v2, only available on Linux
-            os: ubuntu-22.04
-            mode: Release
-            enable_matlab: off
-          - name: "R Linux"
-            os: ubuntu-22.04
-            mode: Release
-            enable_R: on
-          - name: "R Linux without OpenMP"
-            os: ubuntu-22.04
-            mode: Release
-            enable_R: on
-            disable_openmp: on
-          - name: "R macOS"
-            os: macOS-latest
-            mode: Release
-            enable_R: on
           - name: "R Windows"
             os: windows-latest
             mode: Release
             enable_R: on
-          - name: "Julia Linux"
-            os: ubuntu-22.04
-            mode: Release
-            enable_julia: on
-          - name: "Julia macOS"
-            os: macOS-latest
-            mode: Release
-            enable_julia: on
+            r_test_repeat: 8 # TEMPORARY: see note above
           - name: "Julia Windows"
             os: windows-latest
             mode: Release
             enable_julia: on
+            ctest_repeat: 8 # TEMPORARY: see note above
+            ctest_extra_args: "-R Nystrom|Vecchia|NestedKriging|LinearAlgebra" # TEMPORARY: see note above
 
     steps:
       - uses: actions/checkout@v4
@@ -186,6 +125,12 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
+          # TEMPORARY (segfault investigation, see matrix comment above):
+          # empty when unset, which tools/*/test.sh's ${VAR:-default} falls
+          # back on -- no-op outside the two trimmed-matrix entries.
+          echo "R_TEST_REPEAT=${{matrix.r_test_repeat}}"         >> $GITHUB_ENV
+          echo "CTEST_REPEAT=${{matrix.ctest_repeat}}"           >> $GITHUB_ENV
+          echo "CTEST_EXTRA_ARGS=${{matrix.ctest_extra_args}}"   >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash
@@ -270,6 +215,23 @@ jobs:
         shell: bash
         run: tools/${BUILD_NAME}/build.sh
 
+      - name: Enable Windows crash dumps (TEMPORARY — segfault investigation)
+        # WER LocalDumps: writes a full-memory .dmp for ANY process that
+        # crashes while this key is set, without needing to know in advance
+        # which .exe will segfault. HKCU (not HKLM) so it needs no elevation.
+        # See docs/dev/WindowsRSegfaultTestEstimNone.md.
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dumpDir = Join-Path $env:GITHUB_WORKSPACE "crash_dumps"
+          New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
+          $key = "HKCU:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps"
+          New-Item -Path $key -Force | Out-Null
+          Set-ItemProperty -Path $key -Name DumpFolder -Value $dumpDir -Type ExpandString
+          Set-ItemProperty -Path $key -Name DumpType -Value 2 -Type DWord
+          Set-ItemProperty -Path $key -Name DumpCount -Value 20 -Type DWord
+          Write-Host "Crash dumps (if any) will be written to $dumpDir"
+
       - name: test
         shell: bash
         run: tools/${BUILD_NAME}/test.sh
@@ -289,6 +251,7 @@ jobs:
             **/*.zip
             **/*.tgz
             **/*.tar.gz
+            **/*.dmp
       
       - if: steps.test.outcome != 'success'
         run: exit 1

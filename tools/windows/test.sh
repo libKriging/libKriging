@@ -31,4 +31,11 @@ cd ${BUILD_DIR:-build}
 # Cleanup compiled libs to check right path finding
 rm -fr src bindings
 
-ctest -C "${MODE}" ${CTEST_FLAGS}
+# CTEST_REPEAT/CTEST_EXTRA_ARGS: TEMPORARY, for the intermittent Windows
+# segfault investigation (docs/dev/WindowsRSegfaultTestEstimNone.md).
+# `--repeat until-fail:N` is ctest's own feature: each selected test is
+# rerun (fresh process) up to N times, stopping as soon as it fails once.
+# CTEST_EXTRA_ARGS narrows the selection (e.g. `-R <regex>`) so more
+# repeats fit in the job's time budget. Both no-op (repeat:1, no filter)
+# when unset/empty, i.e. every other job's behavior is unchanged.
+ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}
