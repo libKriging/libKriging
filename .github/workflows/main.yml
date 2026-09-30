@@ -211,15 +211,16 @@ jobs:
         shell: bash
         run: tools/common/before_script.sh
 
-      - name: script
-        shell: bash
-        run: tools/${BUILD_NAME}/build.sh
-
       - name: Enable Windows crash dumps (TEMPORARY — segfault investigation)
         # WER LocalDumps: writes a full-memory .dmp for ANY process that
         # crashes while this key is set, without needing to know in advance
         # which .exe will segfault. HKCU (not HKLM) so it needs no elevation.
-        # See docs/dev/WindowsRSegfaultTestEstimNone.md.
+        # Placed BEFORE "script": build.sh runs its own embedded `ctest`
+        # (tools/windows/build.sh, right after the build, before `install`)
+        # and that's where the Julia-Windows segfault cluster was actually
+        # first caught with this infra in place -- putting this step after
+        # "script" would be too late. See
+        # docs/dev/WindowsRSegfaultTestEstimNone.md.
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -232,13 +233,20 @@ jobs:
           Set-ItemProperty -Path $key -Name DumpCount -Value 20 -Type DWord
           Write-Host "Crash dumps (if any) will be written to $dumpDir"
 
+      - name: script
+        shell: bash
+        run: tools/${BUILD_NAME}/build.sh
+        id: script
+        continue-on-error: true
+
       - name: test
         shell: bash
         run: tools/${BUILD_NAME}/test.sh
         id: test
+        if: steps.script.outcome == 'success'
         continue-on-error: true
 
-      - if: steps.test.outcome != 'success'
+      - if: steps.script.outcome != 'success' || steps.test.outcome != 'success'
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ runner.os }}

@@ -67,7 +67,13 @@ if [[ "$BUILD_TEST" == "true" ]]; then
     fi
 
     # Test on fresh build lib (before installation)
-    ctest -C "${MODE}" ${CTEST_FLAGS}
+    # CTEST_REPEAT/CTEST_EXTRA_ARGS: TEMPORARY, for the intermittent
+    # Windows segfault investigation (docs/dev/WindowsRSegfaultTestEstimNone.md)
+    # -- this is the ctest invocation that actually caught the Julia
+    # Windows segfault cluster once crash-dump capture was wired up, not
+    # the later one in tools/windows/test.sh. No-op (repeat:1, no filter)
+    # when unset/empty.
+    ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}
 
     cmake --build . --target install --config "${MODE}"
 else
