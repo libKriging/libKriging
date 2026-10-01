@@ -72,8 +72,17 @@ Evidence, from the first instrumented run (run 36841355421, Julia job
    `l2 == 1024` condition (#6021).
 3. Lift the pin once a fixed OpenBLAS reaches conda-forge.
 
+Fix verified to install and load (run 36906481554): conda resolves
+`libopenblas-0.3.33`, OpenBLAS reports `OpenBLAS 0.3.33 ... Zen`,
+`OPENBLAS_L2_SIZE=2048` is exported, and both jobs pass. Both VMs were
+EPYC 9V74, but .NET's `Avx512F.IsSupported` (which includes OS/XCR0
+enablement) said `False` there. OpenBLAS's override reads the *raw*
+CPUID bit, so that run can't tell whether those VMs would have crashed
+under 0.3.34. The setup step now logs the raw `CPUID.7:EBX[16]`.
+
 Still open:
-- Confirm on a VM that reports `AVX512F supported: True` and now passes.
+- Confirm a pass on a VM with raw `CPUID.7:EBX[16] = True` (and ideally
+  record that the bad VM of run 36841355421 had it).
 - Why the R crash only appeared from 2026-09 (0/63 R jobs crashed before),
   while 0.3.34 was there since July. It's either the AVX-512 exposure
   share in the pool or the R path (n=1000 `dpotrf`/`dsyrk`) needing a
