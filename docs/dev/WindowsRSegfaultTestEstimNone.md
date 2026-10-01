@@ -386,14 +386,44 @@ to be process-level after all) — just don't rely on them alone.
    raw process crash, never routed through Catch2, so WER should already
    work there unmodified -- not yet confirmed either, since R Windows
    hasn't crashed again since the pipeline-ordering fix.)
-5. If no `.dmp` appears despite a failed job and §4's Catch2-SEH fix is
-   already in place: LocalDumps may need `HKLM` instead of `HKCU` on
-   GH-hosted runners (untested — flip it if `HKCU` turns out not to
-   trigger; GH-hosted Windows runners run elevated by default, so `HKLM`
-   should also be writable), or check the job log for whether the crash
-   is genuinely a hard access violation vs. some other
-   `SIGABRT`/CRT-detected error WER doesn't route the same way.
-6. Once a dump's stack is in hand, update §A or §B above with it, and
+5. **§A also confirmed not to produce a dump, ruling out "Catch2-only"**:
+   two reruns after the Catch2-SEH fix (§C.1 item 4), the R crash
+   reproduced again — first attempt, `make test` attempt 1/8, identical
+   `Segmentation fault` signature as always. `upload-artifact` ran and
+   uploaded 487 files (6.5 MB) — **still zero `.dmp`**. §A's crash was
+   never routed through Catch2, so this isn't the same cause as §B;
+   R(script).exe on Windows most likely has its **own** internal
+   crash-handling (R has historically shipped SEH-based "fatal error"
+   reporting on Windows, in the same spirit as Catch2's) that similarly
+   intercepts the access violation before it reaches the OS as
+   genuinely unhandled. **Net effect across the whole investigation so
+   far: WER LocalDumps has not produced a single `.dmp`, despite 3
+   confirmed crash reproductions (§B ×2, §A ×1) with the capture
+   mechanism active.** The pattern -- every crash in this codebase gets
+   "nicely" intercepted by *something* (Catch2's SEH handler, and now
+   apparently R's own) before WER ever sees it -- is itself a possibly
+   useful observation if a unifying root cause is ever found.
+6. Given item 5, **WER LocalDumps as implemented is not succeeding**;
+   don't keep spending CI runs on bare reruns expecting a different
+   result -- the mechanism itself needs to change first. Two untried
+   options, roughly in order of effort:
+   - **`HKLM` instead of `HKCU`** for the registry key (quick, 1-line
+     change, untested) -- unlikely to help per se (both should apply to
+     the same process), but cheap enough to rule out.
+   - **`procdump` instead of WER** (Sysinternals, `choco install
+     procdump`): attach as a debugger with `-e 1` (dump on *first-chance*
+     exception, not just unhandled) wrapping the specific command, e.g.
+     `procdump -accepteula -e 1 -ma -x <dumpdir> Rscript.exe
+     testthat.R` for §A, or similarly wrapping the specific crashing
+     Catch2 `.exe` for §B. Because it hooks via the debugging API at a
+     lower level than WER, this can catch the exception *before*
+     Catch2's/R's own handler gets to run, which would sidestep this
+     investigation's core obstacle entirely -- more promising than
+     fiddling with the WER registry key, but needs care: procdump
+     launching via `-x` monitors the process it directly launches, not
+     necessarily grandchild processes `ctest` spawns for each Catch2
+     test, so §B's integration needs more thought than §A's.
+7. Once a dump's stack is in hand, update §A or §B above with it, and
    follow the elimination-trail style of `WindowsPythonHangDiagnostic354.md`
    for whatever hypothesis it points to.
 
