@@ -80,14 +80,15 @@ jobs:
             os: windows-latest
             mode: Release
             enable_R: on
-            r_test_repeat: 8 # TEMPORARY: see note above
+            # in-job repeats proved useless (the crash is per-VM
+            # deterministic): run once, re-launch whole runs instead
+            r_test_repeat: 1 # TEMPORARY: see note above
           - name: "Julia Windows"
             os: windows-latest
             mode: Release
             enable_julia: on
-            ctest_repeat: 8 # TEMPORARY: see note above
+            ctest_repeat: 1 # TEMPORARY: see note above
             ctest_extra_args: "-R Nystrom|Vecchia|NestedKriging|LinearAlgebra" # TEMPORARY: see note above
-            disable_catch_windows_seh: on # TEMPORARY: see note above -- lets WER capture a .dmp
 
     steps:
       - uses: actions/checkout@v4
@@ -213,27 +214,31 @@ jobs:
         shell: bash
         run: tools/common/before_script.sh
 
-      - name: Enable Windows crash dumps (TEMPORARY — segfault investigation)
-        # WER LocalDumps: writes a full-memory .dmp for ANY process that
-        # crashes while this key is set, without needing to know in advance
-        # which .exe will segfault. HKCU (not HKLM) so it needs no elevation.
-        # Placed BEFORE "script": build.sh runs its own embedded `ctest`
-        # (tools/windows/build.sh, right after the build, before `install`)
-        # and that's where the Julia-Windows segfault cluster was actually
-        # first caught with this infra in place -- putting this step after
-        # "script" would be too late. See
-        # docs/dev/WindowsRSegfaultTestEstimNone.md.
+      - name: Windows segfault investigation setup (TEMPORARY)
+        # Logs, on EVERY Windows VM (crashing or not), the two per-VM
+        # variables suspected to drive the crash: CPU model/topology and the
+        # kernel OpenBLAS's DYNAMIC_ARCH selects for it. Also logs the WER
+        # policy (a disabled WER would explain why LocalDumps never produced
+        # a single .dmp). Crash stacks now come from
+        # tools/windows/segfault-probe.sh (cdb, first-chance AV) instead.
+        # See docs/dev/WindowsRSegfaultTestEstimNone.md section E.
         if: runner.os == 'Windows'
         shell: pwsh
+        continue-on-error: true
         run: |
-          $dumpDir = Join-Path $env:GITHUB_WORKSPACE "crash_dumps"
-          New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
-          $key = "HKCU:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps"
-          New-Item -Path $key -Force | Out-Null
-          Set-ItemProperty -Path $key -Name DumpFolder -Value $dumpDir -Type ExpandString
-          Set-ItemProperty -Path $key -Name DumpType -Value 2 -Type DWord
-          Set-ItemProperty -Path $key -Name DumpCount -Value 20 -Type DWord
-          Write-Host "Crash dumps (if any) will be written to $dumpDir"
+          Get-CimInstance Win32_Processor | Format-List Name,Manufacturer,Description,NumberOfCores,NumberOfLogicalProcessors,L2CacheSize,L3CacheSize,MaxClockSpeed
+          Write-Host "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          $dll = Get-ChildItem "$HOME\Miniconda3\Library\bin" -Filter "*openblas*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($dll) {
+            $code = "import ctypes; l = ctypes.CDLL(r'$($dll.FullName)'); l.openblas_get_corename.restype = ctypes.c_char_p; l.openblas_get_config.restype = ctypes.c_char_p; print('PROBE OpenBLAS core:', l.openblas_get_corename().decode(), '| config:', l.openblas_get_config().decode(), '| threads:', l.openblas_get_num_threads())"
+            & "$HOME\Miniconda3\python.exe" -c $code
+          } else { Write-Host "openblas dll not found under Miniconda3\Library\bin" }
+          foreach ($k in "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "HKCU:\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting") {
+            Write-Host "== $k"; Get-ItemProperty -Path $k -ErrorAction SilentlyContinue | Format-List
+          }
+          Get-Service WerSvc -ErrorAction SilentlyContinue | Format-List Name,Status,StartType
+          $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
+          Write-Host "cdb present: $(Test-Path $cdb) ($cdb)"
 
       - name: script
         shell: bash

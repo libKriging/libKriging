@@ -6,6 +6,9 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
+# Absolute, since the ctest call below runs from inside the build dir
+PROBE_SCRIPT=$(cd "$(dirname "$0")" && pwd -P)/segfault-probe.sh
+
 # Default configuration when used out of CI
 MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
@@ -77,7 +80,12 @@ if [[ "$BUILD_TEST" == "true" ]]; then
     # Windows segfault cluster once crash-dump capture was wired up, not
     # the later one in tools/windows/test.sh. No-op (repeat:1, no filter)
     # when unset/empty.
-    ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}
+    # On failure, re-probe the crash on this same VM before bailing out
+    # (TEMPORARY, see tools/windows/segfault-probe.sh).
+    if ! ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}; then
+      "${PROBE_SCRIPT}" core "$PWD"
+      exit 1
+    fi
 
     cmake --build . --target install --config "${MODE}"
 else

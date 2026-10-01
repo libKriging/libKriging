@@ -25,6 +25,8 @@ for i in $(seq 1 "$N"); do
   fi
   if ! make test; then
     echo "make test failed on attempt $i/$N"
+    # TEMPORARY: re-probe the crash on this same VM (see segfault-probe.sh)
+    R_LIBS="$PWD/Rlibs" "${BASEDIR}"/../windows/segfault-probe.sh r "$PWD/rlibkriging/tests"
     exit 1
   fi
 done

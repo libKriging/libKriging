@@ -38,4 +38,8 @@ rm -fr src bindings
 # CTEST_EXTRA_ARGS narrows the selection (e.g. `-R <regex>`) so more
 # repeats fit in the job's time budget. Both no-op (repeat:1, no filter)
 # when unset/empty, i.e. every other job's behavior is unchanged.
-ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}
+if ! ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}; then
+  # TEMPORARY: re-probe the crash on this same VM (see segfault-probe.sh)
+  "${BASEDIR}"/segfault-probe.sh core "$PWD"
+  exit 1
+fi
