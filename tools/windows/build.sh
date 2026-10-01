@@ -29,6 +29,10 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 STATIC_LIB=on
 MAKE_SHARED_LIBS=off
 EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DSTATIC_LIB=${STATIC_LIB}"
+# TEMPORARY -- Windows segfault investigation (docs/dev/WindowsRSegfaultTestEstimNone.md).
+if [[ "$DISABLE_CATCH_WINDOWS_SEH" == "on" ]]; then
+  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DDISABLE_CATCH_WINDOWS_SEH=ON"
+fi
 
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}

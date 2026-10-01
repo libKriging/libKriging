@@ -366,15 +366,34 @@ to be process-level after all) — just don't rely on them alone.
    the fastest path is usually rebuilding the exact same commit locally
    in a Windows VM (§D's "Build" section) so local PDBs line up, rather
    than trying to get symbol servers to resolve a CI-only build.
-4. If no `.dmp` appears despite a failed job: LocalDumps may need `HKLM`
-   instead of `HKCU` on GH-hosted runners (untested — flip it if `HKCU`
-   turns out not to trigger; GH-hosted Windows runners run elevated by
-   default, so `HKLM` should also be writable), or the crash may be a
-   `SIGABRT`/CRT-detected error Windows doesn't route through WER the
-   same way as a hard access violation — check the job log for which
-   flavor it actually was before assuming the dump mechanism itself
-   failed.
-5. Once a dump's stack is in hand, update §A or §B above with it, and
+4. **Confirmed root cause of a missing dump, §B specifically**: the 4th
+   rerun of the trimmed matrix reproduced the 14-test Julia Windows
+   segfault cluster again (`script` step failed — build.sh's embedded
+   `ctest`, matching §B.1), and the artifact *was* uploaded this time
+   (pipeline fix from the commit right before this one worked) -- but it
+   contained **no `.dmp`**, only logs. Cause: **Catch2 itself installs a
+   Windows SEH handler** (`CATCH_CONFIG_WINDOWS_SEH`, on by default) that
+   intercepts the access violation, reports it cleanly as `(SEGFAULT)` in
+   ctest's output, and apparently never lets the exception reach the OS
+   as genuinely *unhandled* -- which is specifically what WER's
+   LocalDumps triggers on. **Fixed**: `tests/CMakeLists.txt` gained a
+   `DISABLE_CATCH_WINDOWS_SEH` CMake option (off by default) that adds
+   `-DCATCH_CONFIG_NO_WINDOWS_SEH`; wired through
+   `tools/windows/build.sh`'s `DISABLE_CATCH_WINDOWS_SEH` env var, set to
+   `on` for the Julia Windows matrix entry. Not yet verified this
+   actually produces a `.dmp` on the next real occurrence -- that's the
+   next thing to confirm. (This doesn't apply to §A: the R crash is a
+   raw process crash, never routed through Catch2, so WER should already
+   work there unmodified -- not yet confirmed either, since R Windows
+   hasn't crashed again since the pipeline-ordering fix.)
+5. If no `.dmp` appears despite a failed job and §4's Catch2-SEH fix is
+   already in place: LocalDumps may need `HKLM` instead of `HKCU` on
+   GH-hosted runners (untested — flip it if `HKCU` turns out not to
+   trigger; GH-hosted Windows runners run elevated by default, so `HKLM`
+   should also be writable), or check the job log for whether the crash
+   is genuinely a hard access violation vs. some other
+   `SIGABRT`/CRT-detected error WER doesn't route the same way.
+6. Once a dump's stack is in hand, update §A or §B above with it, and
    follow the elimination-trail style of `WindowsPythonHangDiagnostic354.md`
    for whatever hypothesis it points to.
 

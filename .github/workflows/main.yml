@@ -87,6 +87,7 @@ jobs:
             enable_julia: on
             ctest_repeat: 8 # TEMPORARY: see note above
             ctest_extra_args: "-R Nystrom|Vecchia|NestedKriging|LinearAlgebra" # TEMPORARY: see note above
+            disable_catch_windows_seh: on # TEMPORARY: see note above -- lets WER capture a .dmp
 
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +132,7 @@ jobs:
           echo "R_TEST_REPEAT=${{matrix.r_test_repeat}}"         >> $GITHUB_ENV
           echo "CTEST_REPEAT=${{matrix.ctest_repeat}}"           >> $GITHUB_ENV
           echo "CTEST_EXTRA_ARGS=${{matrix.ctest_extra_args}}"   >> $GITHUB_ENV
+          echo "DISABLE_CATCH_WINDOWS_SEH=${{matrix.disable_catch_windows_seh}}" >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash

@@ -1,6 +1,23 @@
 include(CTest)
 include(Catch)
 
+# TEMPORARY -- Windows segfault investigation
+# (docs/dev/WindowsRSegfaultTestEstimNone.md): Catch2's own SEH handler
+# intercepts a crashing test's access violation and reports it cleanly
+# ("(SEGFAULT)" in ctest's output), which means Windows Error Reporting
+# never sees an unhandled exception and its LocalDumps mechanism never
+# fires. Disabling it lets the crash reach the OS's default unhandled-
+# exception path instead, so WER can actually capture a .dmp. Opt-in via
+# -DDISABLE_CATCH_WINDOWS_SEH=ON (set only for the temporarily-trimmed
+# Julia Windows CI matrix entry, see tools/windows/build.sh); no effect
+# anywhere else, and the option itself is harmless to leave in place.
+option(DISABLE_CATCH_WINDOWS_SEH
+       "TEMPORARY: disable Catch2's Windows SEH handler so WER can capture a crash dump" OFF)
+if (DISABLE_CATCH_WINDOWS_SEH)
+    message(STATUS "DISABLE_CATCH_WINDOWS_SEH is ON -- crashing tests will propagate to Windows Error Reporting instead of being caught internally by Catch2")
+    add_compile_definitions(CATCH_CONFIG_NO_WINDOWS_SEH)
+endif ()
+
 # target_link_libraries links the executable to the library.
 # Since the library has public include directories we will use those link directories when building
 
