@@ -80,9 +80,18 @@ enablement) said `False` there. OpenBLAS's override reads the *raw*
 CPUID bit, so that run can't tell whether those VMs would have crashed
 under 0.3.34. The setup step now logs the raw `CPUID.7:EBX[16]`.
 
+**Fix confirmed** (run 36909982870, 8 attempts = 16 Windows jobs, all
+green):
+- Attempt 6's Julia job landed on an **AMD EPYC 9V45 (Zen 5, Family 26)**:
+  raw `CPUID.7:EBX[16] = True`, L2 1024 KB/core, L3 32 MB, so every
+  condition of the 0.3.34 override is met. It passed **72/72** of the
+  previously crashing selection with 0.3.33 + `OPENBLAS_L2_SIZE=2048`.
+  (OpenBLAS 0.3.33 doesn't know Family 26 and falls back to `Haswell`,
+  one of the two kernels #6013 shows overflowing.)
+- The other VMs: 14× EPYC 7763 (Zen 3, no AVX-512) and 1× Xeon Platinum
+  8573C (AVX-512, Intel, unaffected class). All passed.
+
 Still open:
-- Confirm a pass on a VM with raw `CPUID.7:EBX[16] = True` (and ideally
-  record that the bad VM of run 36841355421 had it).
 - Why the R crash only appeared from 2026-09 (0/63 R jobs crashed before),
   while 0.3.34 was there since July. It's either the AVX-512 exposure
   share in the pool or the R path (n=1000 `dpotrf`/`dsyrk`) needing a
