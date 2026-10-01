@@ -39,7 +39,15 @@ fi
 # Clean conda trash and lock files before install to avoid PermissionError with locked DLLs.
 find "$HOME/Miniconda3" -name "*.conda_trash" -delete 2>/dev/null || true
 $HOME/Miniconda3/Scripts/conda.exe clean --all -y 2>/dev/null || true
-$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config # hdf5
+# openblas/libopenblas pinned to 0.3.33: 0.3.34 (clang-cl, DYNAMIC_ARCH,
+# NO_AVX512 build, i.e. conda-forge's) overflows the stack in
+# dgemm_kernel_ZEN/HASWELL on AMD Zen 4/5 hosts exposing AVX-512 -- e.g. the
+# AMD EPYC 9V74 GitHub windows-latest runners, where it segfaulted ~1 VM in 4
+# since 2026-07-18. Since this DLL also ships in the Python wheel and the R
+# release, the pin protects users too. Upstream: OpenMathLib/OpenBLAS#6013,
+# #6021. Lift once a fixed release reaches conda-forge. See
+# docs/dev/WindowsRSegfaultTestEstimNone.md.
+$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge "openblas=0.3.33" "libopenblas=0.3.33" liblapack pkg-config # hdf5
 
 # https://chocolatey.org/docs/commands-install
 # required to compile fortran part

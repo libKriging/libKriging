@@ -1,11 +1,84 @@
 # Windows native crashes (R binding + core ctest cluster) — investigation
 
-**Status: OPEN, not root-caused.** Rewritten on 2026-10-01 after a full
-re-analysis of every Windows CI log since July 2026 (~400 jobs scanned).
-Several conclusions of the first version of this doc were **wrong** and
-are corrected in [§2](#2-corrections-to-the-first-version-of-this-doc).
-The current lead and the experiment designed to confirm or kill it are in
-[§3](#3-hypotheses-ranked) and [§4](#4-the-discriminating-experiment-currently-wired-in-ci).
+**Status: ROOT-CAUSED (2026-10-01), fix applied, awaiting confirmation
+on an AVX-512 Zen 4 VM.** It's an **OpenBLAS 0.3.34 regression**, not a
+libKriging bug: see [§0](#0-root-cause). Sections §1-§4 keep the
+investigation trail that led there. Where they disagree with §0, §0 wins
+(in particular, §1.1's "OpenBLAS did not change" was wrong).
+
+## 0. Root cause
+
+**OpenBLAS 0.3.34 overflows the stack inside `dgemm_kernel_ZEN` /
+`dgemm_kernel_HASWELL` on AMD Zen 4/5 hosts that expose AVX-512**, in
+`DYNAMIC_ARCH` + `NO_AVX512` clang-cl Windows builds, which is exactly
+conda-forge's `libopenblas`. Upstream:
+[OpenMathLib/OpenBLAS#6013](https://github.com/OpenMathLib/OpenBLAS/issues/6013)
+(0.3.33 fine) and
+[#6021](https://github.com/OpenMathLib/OpenBLAS/issues/6021). The cause
+is a Zen 4 GEMM P/Q blocking override in `kernel/setparam-ref.c`
+`init_parameter()`. It fires when the CPU is AuthenticAMD, L2 = 1024 KB,
+L3 % 32 MB == 0 and AVX512F is in CPUID, and it also applies to forced
+coretypes.
+
+Evidence, from the first instrumented run (run 36841355421, Julia job
+110300961652, a bad VM on the first try):
+
+- CPU **AMD EPYC 9V74 (Zen 4, Family 25 Model 17)**, L2 1024 KB/core
+  (WMI reports 2048 for 2 cores), L3 32 MB. OpenBLAS core `Zen`.
+  `OPENBLAS_CORETYPE=SkylakeX` falls back to `Haswell`, consistent with a
+  `NO_AVX512` build.
+- `cdb`: first-chance access violation at the **`ret` of
+  `openblas!dgemm_kernel_ZEN+0x6ea6`**, return address non-canonical, the
+  whole visible stack overwritten with doubles 0.97-0.999 (covariance
+  values). A stack smash inside OpenBLAS; no libKriging frame involved.
+- Probe matrix on that VM:
+
+  | Variant | T1 LLNystrom gradient (n=150) | T2 rapid fire (50 threads) |
+  |---|---|---|
+  | baseline (Zen) | **crash** | **crash** |
+  | `OPENBLAS_NUM_THREADS=1` | **crash** | pass |
+  | `OMP_NUM_THREADS=1` | **crash** | pass |
+  | `OPENBLAS_CORETYPE=Haswell` | **crash** | **crash** |
+  | `OPENBLAS_CORETYPE=SkylakeX` (→Haswell) | **crash** | **crash** |
+  | `OPENBLAS_CORETYPE=Prescott` | pass | pass |
+
+  The override doesn't apply to Prescott kernels, and a CORETYPE pin
+  doesn't escape it (#6021). That also explains §1.6's
+  threaded/unthreaded split.
+- **Timing**: CI logs show `openblas-0.3.33` until 2026-07-11 and
+  `openblas-0.3.34` from 2026-07-18, the day of the very first crash.
+  §1.1's statement that the version was constant was wrong: the earlier
+  scan only covered August onward.
+- Good VMs seen: AMD EPYC 7763 (Zen 3), unaffected per #6013. Also one
+  **EPYC 9V74 whose R job passed**. #6013 says Zen 4 VMs that do *not*
+  expose AVX-512 are spared. That VM's AVX-512 exposure wasn't logged
+  then; it is now (`PROBE AVX512F supported`).
+- The ~60 s delay on one crashing test per bad run (§1.7) comes from WER:
+  `HKLM\...\Windows Error Reporting\ServiceTimeout = 60000`, with `WerSvc`
+  stopped and manual-start. That's also why LocalDumps never produced a
+  `.dmp`.
+
+**Fix (commit after this doc revision):**
+
+1. `tools/windows/install.sh` and `tools/octave-windows/install.sh` pin
+   `openblas=0.3.33 libopenblas=0.3.33`. `tools/r-windows/install.sh`
+   reuses the first. This DLL **ships with the Python wheel**
+   (`bindings/Python/pylibkriging/setup.py`) and **the R release**
+   (`tools/release/r-release.sh`), so Windows binaries built between
+   2026-07-18 and this fix embed 0.3.34 and can crash for users on
+   AVX-512 Zen 4/5 machines. Consider rebuilding them.
+2. `OPENBLAS_L2_SIZE=2048` exported in the three Windows `loadenv.sh` as
+   a belt-and-braces runtime guard: it disables the override's
+   `l2 == 1024` condition (#6021).
+3. Lift the pin once a fixed OpenBLAS reaches conda-forge.
+
+Still open:
+- Confirm on a VM that reports `AVX512F supported: True` and now passes.
+- Why the R crash only appeared from 2026-09 (0/63 R jobs crashed before),
+  while 0.3.34 was there since July. It's either the AVX-512 exposure
+  share in the pool or the R path (n=1000 `dpotrf`/`dsyrk`) needing a
+  specific condition; probe R1/R2 never ran on a bad VM.
+- Then revert the TEMPORARY CI changes (§6).
 
 ## 1. Facts established from the CI history
 
@@ -23,9 +96,10 @@ ctest's `Exception: SegFault` and make's `test] Segmentation fault`.
 | R Windows | Rtools gcc package linking the MSVC-built core | `make test` dies with `Segmentation fault` at the exact same log position, 6/6 times | master, **2026-09-19** |
 
 All three link the **same conda-forge OpenBLAS 0.3.34 (pthreads,
-DYNAMIC_ARCH)**, installed unpinned by `tools/windows/install.sh`. That
-version did not change over the whole period (0.3.34 since at least
-2026-08-01), so an OpenBLAS *update* is not the trigger.
+DYNAMIC_ARCH)**, installed unpinned by `tools/windows/install.sh`. ~~That
+version did not change over the whole period, so an OpenBLAS *update* is
+not the trigger.~~ **Wrong, see §0:** 0.3.33 until 2026-07-11, 0.3.34
+from 2026-07-18, the day of the first crash.
 
 ### 1.2 Deterministic per VM, not intermittent per process
 

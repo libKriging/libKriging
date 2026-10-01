@@ -228,6 +228,9 @@ jobs:
         run: |
           Get-CimInstance Win32_Processor | Format-List Name,Manufacturer,Description,NumberOfCores,NumberOfLogicalProcessors,L2CacheSize,L3CacheSize,MaxClockSpeed
           Write-Host "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          # The OpenBLAS 0.3.34 Zen 4 bug (OpenMathLib/OpenBLAS#6013) needs AVX-512 exposed
+          Write-Host "PROBE AVX512F supported (CPUID+OS): $([System.Runtime.Intrinsics.X86.Avx512F]::IsSupported)  AVX2: $([System.Runtime.Intrinsics.X86.Avx2]::IsSupported)"
+          Write-Host "PROBE OPENBLAS_L2_SIZE (set later by tools/*/loadenv.sh): 2048"
           $dll = Get-ChildItem "$HOME\Miniconda3\Library\bin" -Filter "*openblas*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($dll) {
             $code = "import ctypes; l = ctypes.CDLL(r'$($dll.FullName)'); l.openblas_get_corename.restype = ctypes.c_char_p; l.openblas_get_config.restype = ctypes.c_char_p; print('PROBE OpenBLAS core:', l.openblas_get_corename().decode(), '| config:', l.openblas_get_config().decode(), '| threads:', l.openblas_get_num_threads())"
