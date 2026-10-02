@@ -6,9 +6,6 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-# Absolute, since the ctest call below runs from inside the build dir
-PROBE_SCRIPT=$(cd "$(dirname "$0")" && pwd -P)/segfault-probe.sh
-
 # Default configuration when used out of CI
 MODE=${MODE:-Debug}
 EXTRA_CMAKE_OPTIONS=${EXTRA_CMAKE_OPTIONS:-}
@@ -32,10 +29,6 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 STATIC_LIB=on
 MAKE_SHARED_LIBS=off
 EXTRA_CMAKE_OPTIONS="-DBUILD_SHARED_LIBS=${MAKE_SHARED_LIBS} -DSTATIC_LIB=${STATIC_LIB}"
-# TEMPORARY -- Windows segfault investigation (docs/dev/WindowsRSegfaultTestEstimNone.md).
-if [[ "$DISABLE_CATCH_WINDOWS_SEH" == "on" ]]; then
-  EXTRA_CMAKE_OPTIONS="${EXTRA_CMAKE_OPTIONS} -DDISABLE_CATCH_WINDOWS_SEH=ON"
-fi
 
 mkdir -p ${BUILD_DIR:-build}
 cd ${BUILD_DIR:-build}
@@ -74,18 +67,7 @@ if [[ "$BUILD_TEST" == "true" ]]; then
     fi
 
     # Test on fresh build lib (before installation)
-    # CTEST_REPEAT/CTEST_EXTRA_ARGS: TEMPORARY, for the intermittent
-    # Windows segfault investigation (docs/dev/WindowsRSegfaultTestEstimNone.md)
-    # -- this is the ctest invocation that actually caught the Julia
-    # Windows segfault cluster once crash-dump capture was wired up, not
-    # the later one in tools/windows/test.sh. No-op (repeat:1, no filter)
-    # when unset/empty.
-    # On failure, re-probe the crash on this same VM before bailing out
-    # (TEMPORARY, see tools/windows/segfault-probe.sh).
-    if ! ctest -C "${MODE}" ${CTEST_FLAGS} --repeat until-fail:${CTEST_REPEAT:-1} ${CTEST_EXTRA_ARGS:-}; then
-      "${PROBE_SCRIPT}" core "$PWD"
-      exit 1
-    fi
+    ctest -C "${MODE}" ${CTEST_FLAGS}
 
     cmake --build . --target install --config "${MODE}"
 else

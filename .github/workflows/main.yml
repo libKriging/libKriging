@@ -68,27 +68,86 @@ jobs:
     timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
       fail-fast: false
-      # TEMPORARY — matrix trimmed to just the two configs with an open,
-      # intermittent Windows native-crash investigation (R Windows:
-      # docs/dev/WindowsRSegfaultTestEstimNone.md; Julia Windows: same doc's
-      # "Julia Windows / core ctest segfault cluster" section). Restore the
-      # full matrix with `git revert` of the commit that introduced this
-      # trim (based on e4f076a6) once the investigation concludes.
       matrix:
         include:
+          - name: "Linux Debug"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: on
+          - name: "Linux Debug without OpenMP"
+            os: ubuntu-22.04
+            mode: Debug
+            enable_python: on
+            disable_openmp: on
+          - name: "macOS Debug"
+            os: macOS-latest
+            mode: Debug
+            enable_python: on
+          - name: "Python (3.7) Windows Debug"
+            os: windows-latest
+            mode: Debug
+            enable_python: on
+            python-version: 3.7
+          - name: "Python (3.9) Windows Debug"
+            os: windows-latest
+            mode: Debug
+            enable_python: on
+            python-version: 3.9
+          - name: "Octave Linux"
+            os: ubuntu-22.04 # required to ease the support of octave ≥ 6
+            mode: Release
+            enable_python: off
+            enable_octave: on
+            force_update: on
+          - name: "Octave macOS"
+            os: macOS-latest
+            mode: Release
+            enable_python: off
+            enable_octave: on
+          - name: "Octave Windows"
+            os: windows-latest
+            mode: Release
+            # using python and octave in windows leads to the following error:
+            # C:/hostedtoolcache/windows/Python/3.7.9/x64/include/pyerrors.h:491:19: error: '_snprintf' is not a member of 'std'; did you mean 'isprint'?
+            #   491 | # define snprintf _snprintf
+            enable_python: off
+            enable_octave: on
+            timeout_minutes: 90
+          - name: "Matlab Linux"
+            # Disabled: requires MATHWORKS_API_TOKEN secret (license failure since v0.9.3)
+            # Using matlab-actions/setup-matlab@v2, only available on Linux
+            os: ubuntu-22.04
+            mode: Release
+            enable_matlab: off
+          - name: "R Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+          - name: "R Linux without OpenMP"
+            os: ubuntu-22.04
+            mode: Release
+            enable_R: on
+            disable_openmp: on
+          - name: "R macOS"
+            os: macOS-latest
+            mode: Release
+            enable_R: on
           - name: "R Windows"
             os: windows-latest
             mode: Release
             enable_R: on
-            # in-job repeats proved useless (the crash is per-VM
-            # deterministic): run once, re-launch whole runs instead
-            r_test_repeat: 1 # TEMPORARY: see note above
+          - name: "Julia Linux"
+            os: ubuntu-22.04
+            mode: Release
+            enable_julia: on
+          - name: "Julia macOS"
+            os: macOS-latest
+            mode: Release
+            enable_julia: on
           - name: "Julia Windows"
             os: windows-latest
             mode: Release
             enable_julia: on
-            ctest_repeat: 1 # TEMPORARY: see note above
-            ctest_extra_args: "-R Nystrom|Vecchia|NestedKriging|LinearAlgebra" # TEMPORARY: see note above
 
     steps:
       - uses: actions/checkout@v4
@@ -127,13 +186,6 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
-          # TEMPORARY (segfault investigation, see matrix comment above):
-          # empty when unset, which tools/*/test.sh's ${VAR:-default} falls
-          # back on -- no-op outside the two trimmed-matrix entries.
-          echo "R_TEST_REPEAT=${{matrix.r_test_repeat}}"         >> $GITHUB_ENV
-          echo "CTEST_REPEAT=${{matrix.ctest_repeat}}"           >> $GITHUB_ENV
-          echo "CTEST_EXTRA_ARGS=${{matrix.ctest_extra_args}}"   >> $GITHUB_ENV
-          echo "DISABLE_CATCH_WINDOWS_SEH=${{matrix.disable_catch_windows_seh}}" >> $GITHUB_ENV
 
       - name: Define local variables Unix Like
         shell: bash
@@ -214,51 +266,17 @@ jobs:
         shell: bash
         run: tools/common/before_script.sh
 
-      - name: Windows segfault investigation setup (TEMPORARY)
-        # Logs, on EVERY Windows VM (crashing or not), the two per-VM
-        # variables suspected to drive the crash: CPU model/topology and the
-        # kernel OpenBLAS's DYNAMIC_ARCH selects for it. Also logs the WER
-        # policy (a disabled WER would explain why LocalDumps never produced
-        # a single .dmp). Crash stacks now come from
-        # tools/windows/segfault-probe.sh (cdb, first-chance AV) instead.
-        # See docs/dev/WindowsRSegfaultTestEstimNone.md section E.
-        if: runner.os == 'Windows'
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          Get-CimInstance Win32_Processor | Format-List Name,Manufacturer,Description,NumberOfCores,NumberOfLogicalProcessors,L2CacheSize,L3CacheSize,MaxClockSpeed
-          Write-Host "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
-          # The OpenBLAS 0.3.34 Zen 4 bug (OpenMathLib/OpenBLAS#6013) needs AVX-512 exposed
-          # OpenBLAS's override reads the RAW CPUID.7:EBX bit 16 (not OS/XCR0 enablement), so log both
-          $c7 = [System.Runtime.Intrinsics.X86.X86Base]::CpuId(7, 0)
-          Write-Host "PROBE AVX512F raw CPUID.7:EBX[16]: $((($c7.Item2 -shr 16) -band 1) -eq 1)  usable (CPUID+OS): $([System.Runtime.Intrinsics.X86.Avx512F]::IsSupported)  AVX2: $([System.Runtime.Intrinsics.X86.Avx2]::IsSupported)"
-          Write-Host "PROBE OPENBLAS_L2_SIZE (set later by tools/*/loadenv.sh): 2048"
-          $dll = Get-ChildItem "$HOME\Miniconda3\Library\bin" -Filter "*openblas*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($dll) {
-            $code = "import ctypes; l = ctypes.CDLL(r'$($dll.FullName)'); l.openblas_get_corename.restype = ctypes.c_char_p; l.openblas_get_config.restype = ctypes.c_char_p; print('PROBE OpenBLAS core:', l.openblas_get_corename().decode(), '| config:', l.openblas_get_config().decode(), '| threads:', l.openblas_get_num_threads())"
-            & "$HOME\Miniconda3\python.exe" -c $code
-          } else { Write-Host "openblas dll not found under Miniconda3\Library\bin" }
-          foreach ($k in "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "HKCU:\SOFTWARE\Microsoft\Windows\Windows Error Reporting", "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting") {
-            Write-Host "== $k"; Get-ItemProperty -Path $k -ErrorAction SilentlyContinue | Format-List
-          }
-          Get-Service WerSvc -ErrorAction SilentlyContinue | Format-List Name,Status,StartType
-          $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
-          Write-Host "cdb present: $(Test-Path $cdb) ($cdb)"
-
       - name: script
         shell: bash
         run: tools/${BUILD_NAME}/build.sh
-        id: script
-        continue-on-error: true
 
       - name: test
         shell: bash
         run: tools/${BUILD_NAME}/test.sh
         id: test
-        if: steps.script.outcome == 'success'
         continue-on-error: true
 
-      - if: steps.script.outcome != 'success' || steps.test.outcome != 'success'
+      - if: steps.test.outcome != 'success'
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ runner.os }}
@@ -271,7 +289,6 @@ jobs:
             **/*.zip
             **/*.tgz
             **/*.tar.gz
-            **/*.dmp
       
       - if: steps.test.outcome != 'success'
         run: exit 1

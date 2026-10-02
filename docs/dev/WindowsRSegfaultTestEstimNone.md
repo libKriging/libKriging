@@ -1,10 +1,13 @@
 # Windows native crashes (R binding + core ctest cluster) — investigation
 
-**Status: ROOT-CAUSED (2026-10-01), fix applied, awaiting confirmation
-on an AVX-512 Zen 4 VM.** It's an **OpenBLAS 0.3.34 regression**, not a
-libKriging bug: see [§0](#0-root-cause). Sections §1-§4 keep the
-investigation trail that led there. Where they disagree with §0, §0 wins
-(in particular, §1.1's "OpenBLAS did not change" was wrong).
+**Status: FIXED (2026-10-02).** It was an **OpenBLAS 0.3.34 regression**,
+not a libKriging bug: see [§0](#0-root-cause). The fix is to pin
+`libopenblas=0.3.33` and set `OPENBLAS_L2_SIZE=2048`. It was confirmed on
+an AVX-512 Zen 5 runner, and the temporary CI instrumentation has been
+removed (§6). Sections §1-§5 keep the investigation trail. Where they
+disagree with §0, §0 wins (in particular, §1.1's "OpenBLAS did not
+change" was wrong). §4 describes instrumentation that **no longer
+exists** in the tree; get it from commit `0ea2e398` if needed again.
 
 ## 0. Root cause
 
@@ -257,7 +260,7 @@ Dropped: R GC/finalizer timing (wrong localization, §2.1); #354-style
 two-allocator heap mismatch (doesn't fit per-VM determinism); in-process
 randomness, ASLR or GC timing (bad VMs fail 100%).
 
-## 4. The discriminating experiment (currently wired in CI)
+## 4. The discriminating experiment (removed, see §6)
 
 TEMPORARY, on branch `rebase/cg-predict-on-v1.2.2` (trimmed matrix: R
 Windows + Julia Windows only, see §6 to revert):
@@ -318,19 +321,25 @@ reproduces if **its CPU matches a bad runner's**. Get the CPU model from
   VM's core>` forces the same kernel on any CPU that supports its ISA
   (if the CPU lacks it, the result is an illegal instruction, not an AV).
 
-## 6. Temporary CI changes to revert
+## 6. Temporary CI changes: reverted
 
-All on this branch, all marked `TEMPORARY`:
+All the TEMPORARY changes are gone: the matrix trim, the repeat knobs,
+`DISABLE_CATCH_WINDOWS_SEH`, the WER/setup step, `continue-on-error`,
+the `*.dmp` artifact glob, and `tools/windows/segfault-probe.sh` with its
+call sites. `.github/workflows/main.yml`, `tests/CMakeLists.txt`,
+`tools/windows/{build,test}.sh` and `tools/r-windows/test.sh` were
+restored to their state before `16cf4da2`. What remains is the fix only:
+`tools/{windows,octave-windows}/install.sh` (0.3.33 pin) and
+`tools/{windows,r-windows,octave-windows}/loadenv.sh`
+(`OPENBLAS_L2_SIZE=2048`).
 
-- `.github/workflows/main.yml`: matrix trimmed to R/Julia Windows (commit
-  `16cf4da2`), `R_TEST_REPEAT`/`CTEST_REPEAT`/`CTEST_EXTRA_ARGS`/
-  `DISABLE_CATCH_WINDOWS_SEH` env plumbing, the setup step,
-  `continue-on-error` on `script`/`test`, `**/*.dmp` in the artifact glob.
-- `tools/windows/segfault-probe.sh` and the 3 call sites
-  (`tools/windows/build.sh`, `tools/windows/test.sh`,
-  `tools/r-windows/test.sh`).
-- `tests/CMakeLists.txt` `DISABLE_CATCH_WINDOWS_SEH` option (harmless, off
-  by default).
+To bring the instrumentation back (CPU/AVX-512/OpenBLAS-core logging on
+every Windows VM, plus the on-VM probe with `cdb`):
+`git checkout 0ea2e398 -- .github/workflows/main.yml tools/windows/segfault-probe.sh tools/windows/build.sh tools/windows/test.sh tools/r-windows/test.sh`,
+then trim the matrix as needed.
 
-`git log --oneline -- .github/workflows/main.yml tools/windows tools/r-windows tests/CMakeLists.txt`
-lists the commits. Revert them all before merging this branch.
+Follow-ups:
+- Lift the 0.3.33 pin once a fixed OpenBLAS reaches conda-forge, and
+  check it on an AVX-512 Zen 4/5 runner.
+- Windows wheels and R packages built between 2026-07-18 and this fix
+  embed 0.3.34. Decide whether to rebuild them.
