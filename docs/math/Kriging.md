@@ -88,7 +88,10 @@ the same trend uncertainty term as the concentrated likelihood. See
 [Update.md](Update.md) for the exact formulas shared
 by `predict`, `simulate`, `update` and `update_simulate`, all
 implemented via the same cached Cholesky/QR factorization rather than
-independent from-scratch computations.
+independent from-scratch computations. `predictIterative` is a predict-only,
+matrix-free alternative (conjugate gradient instead of the stored
+factor) for models where that factor isn't resident — see
+[PredictIterative.md](PredictIterative.md).
 
 ## Simple example
 

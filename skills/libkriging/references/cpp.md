@@ -73,6 +73,14 @@ model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
 model.set_vecchia_exact_commit(false);
 ```
 
+Matrix-free CG prediction (predict-only, any exact `"LL"`/`"LOO"`/`"LMP"`
+fit -- doesn't change how the model is fitted, only how `predict` computes
+its answer): see [PredictIterative.md](../../docs/math/PredictIterative.md).
+```cpp
+auto [mean, stdev_empty] = model.predictIterative(Xnew);                 // mean only, cheap
+auto [mean2, stdev] = model.predictIterative(Xnew, /*return_stdev=*/true); // + 1 CG solve per point
+```
+
 ## WarpKriging
 
 ```cpp

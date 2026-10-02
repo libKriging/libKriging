@@ -1,0 +1,6 @@
+/home/richet/.local/lib/python3.12/site-packages/linear_operator/utils/linear_cg.py:339: NumericalWarning: CG terminated in 3000 iterations with average residual norm 0.04211681695321985 which is larger than the tolerance of 0.01 specified by linear_operator.settings.cg_tolerance. If performance is affected, consider raising the maximum number of CG iterations by running code in a linear_operator.settings.max_cg_iterations(value) context.
+  warnings.warn(
+sine_sum,4,2000,0,matern5_2,0.3,gpytorch-cpu,CPU,3.8299536429694854,2.1794226369820535,0.0023725859937258065,4.7075910499552265,0.028272653693403163,0.9996016068413026,0.3870340735563066,1.0,0,0.06030400254392928,0.998187529270691,ok
+sine_sum,4,2000,0,matern5_2,0.3,libkriging-gpu,CUDA,77.53279457701137,41.1400356280501,229.11647312296554,264.1461307660211,0.016542789654120087,0.9998636057004033,-2.7456359982316867,0.95,1,0.01417079115721585,0.9998999154778361,ok
+sine_sum,4,2000,0,matern5_2,0.3,libkriging-cpu,?,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,timeout
+[run_gpu] wrote results/gpu.csv

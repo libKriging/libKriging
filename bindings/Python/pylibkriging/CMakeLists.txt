@@ -37,6 +37,22 @@ list(APPEND pylibkriging_SRCS
 
 pybind11_add_module(_pylibkriging ${pylibkriging_SRCS})
 target_link_libraries(_pylibkriging PRIVATE Kriging carma)
+# carma's cnalloc.h precompiled header (see dependencies/carma/CMakeLists.txt,
+# target_precompile_headers(carma INTERFACE ...)) is inherited here via the
+# link above. On a -DENABLE_HIP_ITERATIVE=ON build every source in a
+# Kriging-linked target is ALSO compiled once for the HIP device target
+# ("-x hip --offload-arch=..."), and reusing one host-target PCH for that
+# device pass fails hard ("PCH file was compiled for the target
+# 'x86_64-...' but the current translation unit is being compiled for
+# target 'amdgcn-amd-amdhsa'"). None of pylibkriging's own sources need
+# cnalloc.h precompiled (this binding is a thin wrapper, not carma's own
+# heavy template code), so just turn PCH off for this target rather than
+# fight the HIP double-compile.
+set_target_properties(_pylibkriging PROPERTIES DISABLE_PRECOMPILE_HEADERS ON)
+# For the optional #include "cuda/CudaLinearAlgebra.cuh" in pylibkriging.cpp
+# (guarded by LIBKRIGING_USE_CUDA_ITERATIVE, which propagates from the
+# Kriging target when built with -DENABLE_CUDA_ITERATIVE=ON).
+target_include_directories(_pylibkriging PRIVATE ${LIBKRIGING_SOURCE_DIR}/src/lib)
 
 # Fix "cannot allocate memory in static TLS block" error
 # This occurs because OpenMP (libgomp) uses static TLS which has limited space when loaded via dlopen()

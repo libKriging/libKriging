@@ -16,6 +16,9 @@ target_link_libraries(bench-vecchia LINK_PUBLIC Kriging)
 add_executable(bench-nystrom bench-nystrom.cpp)
 target_link_libraries(bench-nystrom LINK_PUBLIC Kriging)
 
+add_executable(bench-predictiterative bench-predictiterative.cpp)
+target_link_libraries(bench-predictiterative LINK_PUBLIC Kriging)
+
 add_executable(bench-nuggetkriging bench-nuggetkriging.cpp)
 target_link_libraries(bench-nuggetkriging LINK_PUBLIC Kriging)
 
@@ -37,13 +40,29 @@ target_link_libraries(bench-warpkriging LINK_PUBLIC Kriging)
 add_executable(bench-mlpkriging bench-mlpkriging.cpp)
 target_link_libraries(bench-mlpkriging LINK_PUBLIC Kriging)
 
+add_executable(debug-woodbury debug-woodbury.cpp)
+target_link_libraries(debug-woodbury LINK_PUBLIC Kriging)
+
+if (ENABLE_CUDA_ITERATIVE)
+    add_executable(bench-iterative-cuda bench-iterative-cuda.cpp)
+    target_link_libraries(bench-iterative-cuda LINK_PUBLIC Kriging)
+    # LinearAlgebraCuda:: is declared in src/lib/cuda/CudaLinearAlgebra.cuh,
+    # an internal header (not under src/lib/include), hence not on Kriging's
+    # public include path.
+    target_include_directories(bench-iterative-cuda PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
+
+    add_executable(debug-cuda-matvec debug-cuda-matvec.cpp)
+    target_link_libraries(debug-cuda-matvec LINK_PUBLIC Kriging)
+    target_include_directories(debug-cuda-matvec PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
+endif ()
+
 # Optionally install benchmarks
-install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom
+install(TARGETS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-predictiterative
         RUNTIME DESTINATION bin/bench)
 
 # Add custom target to build all benchmarks
 add_custom_target(all_benchmarks
-    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom
+    DEPENDS bench-kriging bench-nuggetkriging bench-noisekriging bench-linearalgebra bench-fit-profile bench-adambfgs bench-warpkriging bench-mlpkriging bench-nestedkriging bench-vecchia bench-nystrom bench-predictiterative
     COMMENT "Building all benchmark executables")
 
 # Add CTest entries for benchmarks (optional - can be run manually or via CI)

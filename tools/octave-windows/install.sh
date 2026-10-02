@@ -26,7 +26,15 @@ fi
 # NB: no `conda update -n base` here: updating the runner-image Miniconda in
 # place crashes (PermissionError on in-use libcrypto DLL + conda rollback bug);
 # a plain install is sufficient and is what tools/windows/install.sh does.
-$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge openblas liblapack pkg-config
+# openblas/libopenblas pinned to 0.3.33: 0.3.34 (clang-cl, DYNAMIC_ARCH,
+# NO_AVX512 build, i.e. conda-forge's) overflows the stack in
+# dgemm_kernel_ZEN/HASWELL on AMD Zen 4/5 hosts exposing AVX-512 -- e.g. the
+# AMD EPYC 9V74 GitHub windows-latest runners, where it segfaulted ~1 VM in 4
+# since 2026-07-18. Since this DLL also ships in the Python wheel and the R
+# release, the pin protects users too. Upstream: OpenMathLib/OpenBLAS#6013,
+# #6021. Lift once a fixed release reaches conda-forge. See
+# docs/dev/WindowsRSegfaultTestEstimNone.md.
+$HOME/Miniconda3/Scripts/conda.exe install -y --quiet -n base -c conda-forge "openblas=0.3.33" "libopenblas=0.3.33" liblapack pkg-config
 
 # https://chocolatey.org/docs/commands-install
 # https://chocolatey.org/packages/make

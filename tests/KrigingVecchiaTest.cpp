@@ -282,7 +282,9 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
 
 // Regression test for a real bug: optim="none" used to silently fall through
 // to a plain exact factorization for LLVecchia's light mode
-// (set_vecchia_exact_commit(false)), ignoring the requested objective. The
+// (set_vecchia_exact_commit(false)), ignoring the requested objective (fixed
+// alongside the identical LLIterative bug -- see "LLIterative honors
+// optim=none identically to optim=BFGS" in KrigingIterativeTest.cpp). The
 // contract under test: whatever objective is given at fit time is what
 // predict()/etc actually use afterwards, for EVERY supported value of optim.
 TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kriging]") {
