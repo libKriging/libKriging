@@ -40,8 +40,9 @@ log-determinant comes out of the CG solve you were already running for
 `R⁻¹·probes` — no extra matvecs, no extra kernel launches, nothing. This is
 exactly GPyTorch's mBCG: **the log-determinant is "free"** because CG and
 SLQ share one Krylov subspace instead of exploring two independent ones
-(`LLIterative` currently uses `nprobe` probes for a *dedicated* 40-step (by
-default) Lanczos recurrence, entirely separate from the CG solve on those
+(`LLIterative` currently uses `nprobe` probes for a *dedicated* fixed-step
+Lanczos recurrence — 20 steps by default, `m_iterative_lanczos_steps`,
+overridable via `"LLIterative(m,precond_rank,lanczos_steps)"` — entirely separate from the CG solve on those
 same probes needed for the gradient's Hutchinson trace — see
 `Kriging.cpp:_logLikelihoodIterative`).
 
@@ -105,18 +106,22 @@ d=4, θ=0.15, `sine_sum`-style random design, 30 probes, `tol=1e-4`
 
 This flatly contradicts the old finding — 0.5% at n=2000, not 40%, and
 *shrinking* as n grows, not growing. Pushing further, at n=4000/8000
-against the dedicated fixed-40-step Lanczos production actually uses today:
+against a dedicated fixed-40-step Lanczos — i.e. *twice* the production
+default of 20 steps, so the last column is, if anything, an optimistic
+bound on what `LLIterative` ships by default:
 
 | n | exact | mBCG (no reorthog) | mBCG error | fixed-40-step Lanczos error |
 |--:|--:|--:|--:|--:|
 | 4000 | -6846.06 | -6884.52 | **5.6e-3** | 4.9e-3 |
 | 8000 | -19432.93 | -19408.40 | **1.3e-3** | **4.4e-2** |
 
-At n=8000 the naive mBCG estimate is **~35× more accurate** than what
-`LLIterative` ships today. The reason is intuitive once you see the CG
+At n=8000 the naive mBCG estimate is **~35× more accurate** than the
+40-step dedicated Lanczos (and expectedly more so against the 20-step
+default `LLIterative` ships today). The reason is intuitive once you see the CG
 iteration counts: mBCG's implicit Lanczos runs for however many iterations
 CG actually needs (hundreds to low thousands here), while the dedicated
-Lanczos is capped at a *fixed* 40 steps regardless of `n` — the fixed
+Lanczos is capped at a *fixed* step count regardless of `n` (20 by
+default, 40 in the table above) — the fixed
 budget under-resolves `R`'s spectrum as `n` grows exactly the way
 [Iterative.md](Iterative.md)'s own "SLQ bias vs. budget, not method"
 discussion describes; mBCG's automatically-scaling step count sidesteps

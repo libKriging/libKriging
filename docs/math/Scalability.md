@@ -20,6 +20,7 @@ method has its own page with the full derivation.
 | `predictIterative` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictIterative.md](PredictIterative.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
+| GPU backend (CUDA / HIP; SYCL, Metal unverified) | `LLIterative` fit + `predictIterative` only | same asymptotic cost, device-batched matvec/CG/SLQ | *nothing* — same iterative computation on the device | none | [Iterative.md](Iterative.md) (build-time opt-in: `ENABLE_CUDA_ITERATIVE` / `ENABLE_HIP_ITERATIVE` / `ENABLE_SYCL_ITERATIVE` / `ENABLE_METAL_ITERATIVE`, never auto-detected) |
 
 All of these (Vecchia, Nystrom, Iterative, NestedKriging, predictIterative,
 subsetOfData) are usable independently and, where noted below,
@@ -123,16 +124,21 @@ target* it converges to as group size grows.
 ## Not implemented (deferred)
 
 Evaluated and explicitly out of scope for now (see the project's own
-scalability roadmap analysis): GPU acceleration (a Bandicoot port would
-be the lowest-effort path, since it mirrors Armadillo's API, but
-untested on this project's target platforms), and structured/inducing-
+scalability roadmap analysis): GPU acceleration *beyond the iterative
+path* — the opt-in CUDA/HIP (and unverified SYCL/Metal) backends only
+accelerate `LLIterative`/`predictIterative`'s matvec/CG/SLQ; the exact
+Cholesky fit, `LLVecchia`, `LLNystrom` and `NestedKriging` stay CPU-only
+(a Bandicoot port would be the lowest-effort path for those, since it
+mirrors Armadillo's API, but untested on this project's target
+platforms) — and structured/inducing-
 point variational methods (KISS-GP/SKI, SVGP) — these would need a
 substantially different inference engine (approximate ELBO, automatic
 differentiation through arbitrary kernel compositions) rather than an
 incremental addition to the current exact-linear-algebra core. See
 [libKriging_vs_GPyTorch.ipynb](../comparisons/libKriging_vs_GPyTorch.ipynb)
 for a direct comparison against a library that does implement these
-(GPyTorch's BBMM/CG + GPU + variational stack).
+(GPyTorch's BBMM/CG + GPU + variational stack), including a GPU-vs-GPU
+sweep of `LLIterative` against BBMM.
 
 ## References
 
