@@ -58,6 +58,19 @@ if has octave && has matlab; then
   exit 1
 fi
 
+# The Python binding is built for the python3 found in PATH (CMake would
+# otherwise pick any interpreter it finds), whose modules (pytest included)
+# the CMake configuration checks.
+if has python; then
+  PYTHON_EXE=$(command -v python3) || { echo "python3 not found in PATH" >&2; exit 1; }
+  REQ_DIR="${ROOT_DIR}/bindings/Python/pylibkriging"
+  if ! "${PYTHON_EXE}" "${REQ_DIR}/check_requirements.py" requirements.txt dev-requirements.txt; then
+    echo "Missing Python modules for the python binding: run" >&2
+    echo "  ${PYTHON_EXE} -m pip install -r ${REQ_DIR}/requirements.txt -r ${REQ_DIR}/dev-requirements.txt" >&2
+    exit 1
+  fi
+fi
+
 CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_INSTALL_PREFIX="${PREFIX}"
@@ -68,6 +81,7 @@ CMAKE_ARGS=(
   -DENABLE_MATLAB_BINDING="$(onoff matlab)"
   -DENABLE_JULIA_BINDING="$(onoff julia)"
 )
+has python && CMAKE_ARGS+=(-DPYTHON_EXECUTABLE="${PYTHON_EXE}")
 # The Octave/MATLAB mex and the R package (Linux) link a static libKriging,
 # as their release builds do (see tools/r-linux-macos/build.sh).
 if has octave || has matlab || { has r && [ "$(uname -s)" == "Linux" ]; }; then
@@ -86,8 +100,12 @@ fi
 CMAKE_ARGS+=(${LIBKRIGING_CMAKE_ARGS})
 
 echo "== Configuring libKriging (GPU auto-detection) in ${BUILD_DIR}"
-cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]}" | tee "${BUILD_DIR}.configure.log" \
-  | grep -E "iterative backend|binding (enabled|available)" || true
+if ! cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]}" > "${BUILD_DIR}.configure.log" 2>&1; then
+  tail -n 30 "${BUILD_DIR}.configure.log" >&2
+  echo "CMake configuration failed (full log: ${BUILD_DIR}.configure.log)" >&2
+  exit 1
+fi
+grep -E "iterative backend|binding (enabled|available)" "${BUILD_DIR}.configure.log" || true
 echo "== Building and installing into ${PREFIX}"
 cmake --build "${BUILD_DIR}" --target install --parallel "${JOBS}"
 
