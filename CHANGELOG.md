@@ -12,6 +12,26 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- GPU build is now automatic: `ENABLE_CUDA_ITERATIVE` accepts `AUTO`
+  (new default) and enables the CUDA backend whenever a CUDA compiler and
+  toolkit are found at configure time (CMake ≥ 3.23), with portable
+  `CMAKE_CUDA_ARCHITECTURES=all-major` unless set; `ON`/`OFF` keep their
+  meaning. A CUDA-enabled libKriging no longer has a load-time dependency
+  on the CUDA toolkit: the CUDA runtime is linked statically and cuBLAS is
+  loaded on first use (`LK_CUBLAS_LIBRARY` to override), so the same build
+  runs through the CPU path on machines without GPU/driver/cuBLAS. Static
+  `libKriging.a` builds resolve their device code themselves and record
+  their GPU link libraries in `share/libKriging/libKriging_gpu_link_libs.txt`,
+  which the R package's `Makevars` now picks up (R builds with CUDA link).
+  The tool scripts and `setup.py` forward `ENABLE_CUDA_ITERATIVE` (and
+  `setup.py` also `LIBKRIGING_CMAKE_ARGS`); release workflows pin it to
+  `OFF`, so published packages stay CPU-only.
+- Backend-agnostic GPU switch `libKriging/Gpu.hpp`
+  (`libKriging::gpu::available/active_backend/enabled/set_enabled/compiled_backends`),
+  exposed identically in every binding: `gpu_available()`, `gpu_backend()`,
+  `gpu_enabled()`, `set_gpu_enabled()`, `gpu_compiled_backends()` in
+  Python, R and Julia; `Gpu.available()` etc. in Octave/MATLAB. Every
+  backend now also honors `LK_ITERATIVE_GPU=0` to start disabled.
 - CUDA iterative backend: an opt-in mixed-precision matvec for the batched CG
   solve (`LinearAlgebraCuda::conjugateGradient`), plan item #8 -- set
   `LK_ITERATIVE_CUDA_MIXED_PRECISION` (any value) to enable; **default

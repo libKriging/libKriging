@@ -6,6 +6,7 @@
 #include <carma_bits/cnalloc.h>
 #include <carma>
 #include <iostream>
+#include <libKriging/Gpu.hpp>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
 
@@ -110,6 +111,26 @@ PYBIND11_MODULE(_pylibkriging, m) {
 
   m.attr("__version__") = KRIGING_VERSION_INFO;
   m.attr("__build_type__") = BUILD_TYPE;
+
+  // --- Backend-agnostic GPU switch (libKriging/Gpu.hpp) ---
+  // Same five calls in every binding (R, Julia, Octave/MATLAB too); the
+  // per-backend cuda_/hip_/metal_ functions below remain for benchmarks that
+  // need to address one backend specifically.
+  m.def("gpu_compiled_backends",
+        &libKriging::gpu::compiled_backends,
+        "Comma-separated GPU backends compiled into this build ('cuda', 'hip', 'sycl', 'metal'), or '' if none.");
+  m.def("gpu_available",
+        &libKriging::gpu::available,
+        "True iff a compiled-in GPU backend found a usable device at runtime.");
+  m.def("gpu_backend",
+        &libKriging::gpu::active_backend,
+        "GPU backend the iterative path (LLIterative, predictIterative) currently uses, or 'none' (CPU).");
+  m.def("gpu_enabled", &libKriging::gpu::enabled, "True iff gpu_backend() != 'none'.");
+  m.def("set_gpu_enabled",
+        &libKriging::gpu::set_enabled,
+        py::arg("value"),
+        "Turn GPU acceleration of LLIterative/predictIterative on or off (ignored when no GPU is available). "
+        "The initial state is gpu_available(), unless the LK_ITERATIVE_GPU environment variable is 0/off.");
 
   // --- CUDA-accelerated iterative (LLIterative / predictIterative) backend ---
   // Exposes the runtime on/off switch of src/lib/cuda/CudaLinearAlgebra so a

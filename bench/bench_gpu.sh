@@ -46,7 +46,7 @@ fi
 
 if [ -z "${BUILD_DIR:-}" ]; then
     if [ -f "${PROJECT_ROOT}/build_cuda_iterative/CMakeCache.txt" ] \
-        && grep -q "^ENABLE_CUDA_ITERATIVE:BOOL=ON" "${PROJECT_ROOT}/build_cuda_iterative/CMakeCache.txt" 2>/dev/null; then
+        && grep -q "^LIBKRIGING_CUDA_ITERATIVE:INTERNAL=ON" "${PROJECT_ROOT}/build_cuda_iterative/CMakeCache.txt" 2>/dev/null; then
         BUILD_DIR="${PROJECT_ROOT}/build_cuda_iterative"
     elif [ "$IS_DARWIN" = 1 ]; then
         BUILD_DIR="${PROJECT_ROOT}/build_metal_iterative"

@@ -59,6 +59,51 @@ function _check_ptr(ptr::Ptr{Nothing})
     return ptr
 end
 
+# ─── GPU ──────────────────────────────────────────────────────────
+
+"""
+    gpu_compiled_backends() -> String
+
+Comma-separated GPU backends compiled into this libKriging build (`"cuda"`,
+`"hip"`, `"sycl"`, `"metal"`), or `""` if none.
+"""
+gpu_compiled_backends() = unsafe_string(ccall(dlsym(_lk(), :lk_gpu_compiled_backends), Cstring, ()))
+
+"""
+    gpu_available() -> Bool
+
+`true` iff a compiled-in GPU backend found a usable device at runtime.
+"""
+gpu_available() = ccall(dlsym(_lk(), :lk_gpu_available), Cint, ()) != 0
+
+"""
+    gpu_backend() -> String
+
+GPU backend used by `LLIterative` fits and `predictIterative`, or `"none"`
+(CPU path).
+"""
+gpu_backend() = unsafe_string(ccall(dlsym(_lk(), :lk_gpu_backend), Cstring, ()))
+
+"""
+    gpu_enabled() -> Bool
+
+`true` iff `gpu_backend() != "none"`.
+"""
+gpu_enabled() = ccall(dlsym(_lk(), :lk_gpu_enabled), Cint, ()) != 0
+
+"""
+    set_gpu_enabled(value::Bool)
+
+Turn GPU acceleration of `LLIterative`/`predictIterative` on or off (turning
+it on is ignored when no GPU is available). The initial state is
+`gpu_available()`, unless the environment variable `LK_ITERATIVE_GPU` is set
+to `0` before the first GPU query or iterative call.
+"""
+function set_gpu_enabled(value::Bool)
+    ccall(dlsym(_lk(), :lk_set_gpu_enabled), Nothing, (Cint,), value ? 1 : 0)
+    return gpu_enabled()
+end
+
 # ─── Kriging ──────────────────────────────────────────────────────
 
 mutable struct Kriging
@@ -1505,6 +1550,7 @@ export is_beta_estim, is_theta_estim, is_sigma2_estim
 export nugget, is_nugget_estim, noise
 export is_fitted, feature_dim, warping
 export activation, hidden_dims
+export gpu_compiled_backends, gpu_available, gpu_backend, gpu_enabled, set_gpu_enabled
 # Deprecated: get_X, get_y, get_theta, get_sigma2, get_beta, get_nugget, get_noise,
 #             get_centerX, get_scaleX, get_centerY, get_scaleY, get_F, get_T, get_M, get_z,
 #             get_warping, get_hidden_dims, is_normalize

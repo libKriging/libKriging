@@ -51,7 +51,8 @@ target_link_libraries(_pylibkriging PRIVATE Kriging carma)
 set_target_properties(_pylibkriging PROPERTIES DISABLE_PRECOMPILE_HEADERS ON)
 # For the optional #include "cuda/CudaLinearAlgebra.cuh" in pylibkriging.cpp
 # (guarded by LIBKRIGING_USE_CUDA_ITERATIVE, which propagates from the
-# Kriging target when built with -DENABLE_CUDA_ITERATIVE=ON).
+# Kriging target when built with -DENABLE_CUDA_ITERATIVE=ON, or AUTO with a
+# CUDA toolkit found).
 target_include_directories(_pylibkriging PRIVATE ${LIBKRIGING_SOURCE_DIR}/src/lib)
 
 # Fix "cannot allocate memory in static TLS block" error

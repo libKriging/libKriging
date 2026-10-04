@@ -1,5 +1,6 @@
 #include "libkriging_c.h"
 
+#include <libKriging/Gpu.hpp>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
@@ -42,6 +43,34 @@ static thread_local std::string g_last_error;
 
 const char* lk_get_last_error(void) {
   return g_last_error.c_str();
+}
+
+/* ========================================================================== */
+/*  GPU                                                                       */
+/* ========================================================================== */
+
+const char* lk_gpu_compiled_backends(void) {
+  static thread_local std::string s;
+  s = libKriging::gpu::compiled_backends();
+  return s.c_str();
+}
+
+int lk_gpu_available(void) {
+  return libKriging::gpu::available() ? 1 : 0;
+}
+
+const char* lk_gpu_backend(void) {
+  static thread_local std::string s;
+  s = libKriging::gpu::active_backend();
+  return s.c_str();
+}
+
+int lk_gpu_enabled(void) {
+  return libKriging::gpu::enabled() ? 1 : 0;
+}
+
+void lk_set_gpu_enabled(int value) {
+  libKriging::gpu::set_enabled(value != 0);
 }
 
 /* ========================================================================== */

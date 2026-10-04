@@ -17,6 +17,11 @@ export EXTRA_SYSTEM_LIBRARY_PATH=${HOME}/Miniconda3/Library/lib
 MAKE_SHARED_LIBS=off
 STATIC_LIB=on
 
+# R on Windows builds with MinGW (Rtools), which nvcc does not support as a
+# host compiler, and Makevars.win does not link GPU runtime libraries: keep
+# the CUDA backend off unless explicitly requested.
+export ENABLE_CUDA_ITERATIVE="${ENABLE_CUDA_ITERATIVE:-OFF}"
+
 BUILD_TEST=true \
     CC=$(R CMD config CC) \
     CXX=$(R CMD config CXX) \

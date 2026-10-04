@@ -17,6 +17,7 @@
 
 #include "HipLinearAlgebraKernel.hpp"
 
+#include "libKriging/Gpu.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 
 #include <hip/hip_runtime.h>
@@ -205,7 +206,7 @@ std::mutex g_enabled_mutex;
 bool enabled() {
   std::lock_guard<std::mutex> lock(g_enabled_mutex);
   if (!g_enabled_initialized) {
-    g_enabled = available();
+    g_enabled = libKriging::gpu::default_enabled(available());
     g_enabled_initialized = true;
   }
   return g_enabled;

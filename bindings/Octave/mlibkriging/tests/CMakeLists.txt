@@ -10,4 +10,5 @@ add_mex_test(NAME KrigingPredictIterative FILENAME KrigingPredictIterative_test.
 add_mex_test(NAME Params-Demo FILENAME Params_demo.m)
 add_mex_test(NAME WarpKriging FILENAME WarpKriging_test.m)
 add_mex_test(NAME MLPKriging FILENAME MLPKriging_test.m)
+add_mex_test(NAME Gpu FILENAME Gpu_test.m)
 add_mex_test(NAME LoadKriging FILENAME load_kriging_test.m)

@@ -1,3 +1,4 @@
+#include "Gpu_binding.hpp"
 #include "Kriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
 #include "NestedKriging_binding.hpp"
@@ -391,6 +392,17 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return OptimBinding::get_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Optim::set_thread_pool_size"_hash:
       return OptimBinding::set_thread_pool_size(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "Gpu::compiled_backends"_hash:
+      return GpuBinding::compiled_backends(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::available"_hash:
+      return GpuBinding::available(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::backend"_hash:
+      return GpuBinding::backend(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::enabled"_hash:
+      return GpuBinding::enabled(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Gpu::set_enabled"_hash:
+      return GpuBinding::set_enabled(nlhs, plhs, nrhs - 1, prhs + 1);
 
     default:
       throw MxException(LOCATION(), "mLibKriging:noRoute", "No route to such command [", command, "]");

@@ -11,6 +11,11 @@ if [ -e "$loadenv_sh" ]; then
   . "$loadenv_sh"
 fi
 
+# Published wheels are CPU-only (reproducible, no CUDA runtime dependency),
+# whatever toolkit the packaging machine happens to have; override only for
+# a deliberate GPU build.
+export ENABLE_CUDA_ITERATIVE="${ENABLE_CUDA_ITERATIVE:-OFF}"
+
 ARCH=$(uname -s)
 echo "Ready to release from $ARCH"
 
@@ -25,6 +30,7 @@ case $ARCH in
     docker run --rm \
       -e ROOT_DIR=/data \
       -e DEBUG_CI="${DEBUG_CI}" \
+      -e ENABLE_CUDA_ITERATIVE="${ENABLE_CUDA_ITERATIVE}" \
       -w /data \
       -v `pwd`:/data \
       quay.io/pypa/manylinux2014_x86_64 /data/bindings/Python/pylibkriging/tools/build_wheels.sh

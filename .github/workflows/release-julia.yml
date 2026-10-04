@@ -18,6 +18,10 @@ on:
         required: false
         default: ''
 
+env:
+  # Published packages are CPU-only, whatever CUDA toolkit a runner may have
+  ENABLE_CUDA_ITERATIVE: "OFF"
+
 jobs:
   check-release-consistency:
     name: Check Release Consistency

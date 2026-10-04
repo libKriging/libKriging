@@ -103,11 +103,20 @@ option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
-# Explicit opt-in only -- never auto-detected, even if a CUDA toolkit is
-# present on the machine. Requires a working CUDA toolkit (no longer needs
-# cuBLAS -- see src/lib/cuda/CudaLinearAlgebraKernel.cu). See
-# docs/math/Iterative.md.
-option(ENABLE_CUDA_ITERATIVE "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative (requires CUDA toolkit)" OFF)
+# CUDA-accelerated matvec/CG for LLIterative and predictIterative.
+#   AUTO (default): enabled iff a working CUDA compiler + toolkit is found at
+#                   configure time (and CMake >= 3.23); otherwise silently OFF.
+#   ON:             required -- configuring fails if CUDA is not usable.
+#   OFF:            never (what the release/packaging builds pass explicitly,
+#                   so published binaries stay CPU-only and reproducible).
+# The runtime does not need a GPU: the CUDA runtime is linked statically and
+# cuBLAS is loaded on first use (src/lib/cuda/CudaLinearAlgebra.cpp), so a
+# CUDA-enabled build still loads and runs through the CPU path on a machine
+# without a GPU / driver / toolkit. Resolved below into the internal
+# LIBKRIGING_CUDA_ITERATIVE (ON/OFF) that the rest of the build reads. See
+# docs/math/Iterative.md and docs/dev/AllCMakeOptions.md.
+set(ENABLE_CUDA_ITERATIVE "AUTO" CACHE STRING
+        "Enable CUDA-accelerated matvec/CG for LLIterative and predictIterative; choose between ON, OFF and AUTO (if a CUDA toolkit is found)")
 # Same feature, AMD/ROCm backend. Explicit opt-in only, never auto-detected.
 # Verified 2026-09-13 on an AMD Radeon RX 6600 (gfx1032, Windows, ROCm/HIP SDK
 # 6.2.4 -- gfx1032 itself is NOT on AMD's officially supported list, but the
@@ -144,6 +153,42 @@ else ()
         logFatalError("Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
     endif ()
 endif ()
+
+# ENABLE_CUDA_ITERATIVE default is AUTO
+string(TOUPPER "${ENABLE_CUDA_ITERATIVE}" ENABLE_CUDA_ITERATIVE_UPPER)
+if (ENABLE_CUDA_ITERATIVE_UPPER STREQUAL "AUTO")
+    set(LIBKRIGING_CUDA_ITERATIVE OFF)
+    if (${CMAKE_VERSION} VERSION_LESS "3.23")
+        message(STATUS "CUDA iterative backend: AUTO -> OFF (needs CMake >= 3.23, found ${CMAKE_VERSION})")
+    else ()
+        include(CheckLanguage)
+        check_language(CUDA)
+        if (CMAKE_CUDA_COMPILER)
+            find_package(CUDAToolkit QUIET)
+            if (TARGET CUDA::cudart_static)
+                set(LIBKRIGING_CUDA_ITERATIVE ON)
+                if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+                    # Portable default: every major real architecture the
+                    # toolkit supports plus PTX for the newest one (JIT on
+                    # future GPUs). Unlike "native", needs no GPU at build time.
+                    set(CMAKE_CUDA_ARCHITECTURES all-major)
+                endif ()
+                message(STATUS "CUDA iterative backend: AUTO -> ON (CUDA ${CUDAToolkit_VERSION}, architectures: ${CMAKE_CUDA_ARCHITECTURES})")
+            else ()
+                message(STATUS "CUDA iterative backend: AUTO -> OFF (CUDA compiler found but no usable CUDA toolkit)")
+            endif ()
+        else ()
+            message(STATUS "CUDA iterative backend: AUTO -> OFF (no working CUDA compiler; set CMAKE_CUDA_COMPILER / CMAKE_CUDA_HOST_COMPILER to use one)")
+        endif ()
+    endif ()
+elseif (ENABLE_CUDA_ITERATIVE)
+    set(LIBKRIGING_CUDA_ITERATIVE ON)
+    message(STATUS "CUDA iterative backend: ON")
+else ()
+    set(LIBKRIGING_CUDA_ITERATIVE OFF)
+    message(STATUS "CUDA iterative backend: OFF")
+endif ()
+set(LIBKRIGING_CUDA_ITERATIVE ${LIBKRIGING_CUDA_ITERATIVE} CACHE INTERNAL "Resolved ENABLE_CUDA_ITERATIVE (ON/OFF)" FORCE)
 
 # ENABLE_STATIC_ANALYSIS default is OFF
 string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)

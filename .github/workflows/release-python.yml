@@ -12,6 +12,8 @@ on:
         default: ''
 
 env:
+  # Published packages are CPU-only, whatever CUDA toolkit a runner may have
+  ENABLE_CUDA_ITERATIVE: "OFF"
   DEBUG_CI: true
   # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"

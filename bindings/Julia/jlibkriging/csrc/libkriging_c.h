@@ -9,6 +9,15 @@ extern "C" {
    Use lk_get_last_error() to retrieve the error message. */
 const char* lk_get_last_error(void);
 
+/* --- GPU acceleration of LLIterative / predictIterative (libKriging/Gpu.hpp) ---
+   Strings are owned by the library and valid until the next call of the same
+   function on the same thread. */
+const char* lk_gpu_compiled_backends(void);
+int lk_gpu_available(void);
+const char* lk_gpu_backend(void);
+int lk_gpu_enabled(void);
+void lk_set_gpu_enabled(int value);
+
 /* --- Kriging ---
    noise_model: "none" (default/NULL), "nugget", or "heterogeneous"
    noise:       per-observation noise vector (heterogeneous mode only, NULL otherwise)

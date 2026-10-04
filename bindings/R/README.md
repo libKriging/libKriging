@@ -55,6 +55,22 @@ tools/r-windows/build.sh
 tools/r-windows/test.sh
 ```
 
+## GPU acceleration
+
+The CRAN package is CPU-only. For GPU support, build from source as above on
+a machine with a CUDA toolkit. CUDA is built in automatically when a CUDA toolkit is found at build time
+(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; set it to `OFF` to opt out). Only
+`objective = "LLIterative(...)"` fits and `predictIterative` use the GPU. A
+CUDA-enabled build still loads and runs on the CPU on a machine without a
+GPU. The backend is on by default when a device is found; `LK_ITERATIVE_GPU=0`
+in the environment, or the call below, forces the CPU path. See
+[docs/dev/AllCMakeOptions.md](../../docs/dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative).
+
+```r
+gpu_backend()            # "cuda", or "none" (CPU)
+set_gpu_enabled(FALSE)   # force the CPU path
+```
+
 ## Test
 
 ```shell

@@ -15,6 +15,7 @@
 
 #include "MetalLinearAlgebraKernel.hpp"
 
+#include "libKriging/Gpu.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 
 #include <algorithm>
@@ -178,7 +179,7 @@ std::mutex g_mtx;
 bool enabled() {
   std::lock_guard<std::mutex> lock(g_mtx);
   if (!g_init) {
-    g_enabled = available();
+    g_enabled = libKriging::gpu::default_enabled(available());
     g_init = true;
   }
   return g_enabled;

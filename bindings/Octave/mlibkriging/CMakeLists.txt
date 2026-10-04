@@ -31,6 +31,7 @@ add_mex_function(NAME mLibKriging
         WarpKriging_binding.cpp WarpKriging_binding.hpp
         MLPKriging_binding.cpp MLPKriging_binding.hpp
         Optim_binding.cpp Optim_binding.hpp
+        Gpu_binding.cpp Gpu_binding.hpp
         Params_binding.cpp Params_binding.hpp
         Params.cpp Params.hpp
         LINK_LIBRARIES Kriging OctaveShared)
@@ -44,6 +45,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/WarpKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/MLPKriging.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Optim.m
+        ${CMAKE_CURRENT_SOURCE_DIR}/Gpu.m
         ${CMAKE_CURRENT_SOURCE_DIR}/Params.m
         ${CMAKE_CURRENT_SOURCE_DIR}/class_saved.m
         ${CMAKE_CURRENT_SOURCE_DIR}/load_kriging.m

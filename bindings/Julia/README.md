@@ -73,6 +73,22 @@ julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
 
 The shared library `libkriging_c` is auto-detected from the `build/` directory.
 
+## GPU acceleration
+
+Pre-built archives are CPU-only. For GPU support, build from source as above
+on a machine with a CUDA toolkit. CUDA is built in automatically when a CUDA toolkit is found at build time
+(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; set it to `OFF` to opt out). Only
+`objective = "LLIterative(...)"` fits and `predictIterative` use the GPU. A
+CUDA-enabled build still loads and runs on the CPU on a machine without a
+GPU. The backend is on by default when a device is found; `LK_ITERATIVE_GPU=0`
+in the environment, or the call below, forces the CPU path. See
+[docs/dev/AllCMakeOptions.md](../../docs/dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative).
+
+```julia
+gpu_backend()            # "cuda", or "none" (CPU)
+set_gpu_enabled(false)   # force the CPU path
+```
+
 ## Test
 
 Via CMake/CTest (runs all tests including Julia):

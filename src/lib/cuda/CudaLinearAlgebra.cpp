@@ -12,10 +12,26 @@
 
 #include "CudaLinearAlgebraKernel.cuh"
 
+#include "libKriging/Gpu.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 
+// cuBLAS types/enums only: the library itself is loaded at runtime (see
+// cublasApi() below), never linked, so a CUDA-enabled libKriging still loads
+// on a machine without the CUDA toolkit and falls back to the CPU path.
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX  // keep std::min/std::max usable below
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -51,6 +67,98 @@ namespace {
     }                                                                              \
   } while (0)
 
+// Runtime-loaded cuBLAS entry points. libKriging links the CUDA runtime
+// statically (CUDA::cudart_static) and loads cuBLAS with dlopen/LoadLibrary
+// on first use instead of linking it: a binary built with CUDA support then
+// has no load-time dependency on any CUDA toolkit library (only the NVIDIA
+// driver is needed, and only once a GPU is actually used), so the same build
+// runs on GPU-less machines through the CPU path. LK_CUBLAS_LIBRARY may name
+// the library to load explicitly (full path or file name); otherwise the
+// cuBLAS major version this file was compiled against is tried first, then
+// the unversioned name. The exported symbol names below are the ones the
+// cublas_v2.h macros (cublasCreate -> cublasCreate_v2, ...) resolve to.
+struct CublasApi {
+  decltype(&::cublasCreate_v2) Create = nullptr;
+  decltype(&::cublasDgemm_v2) Dgemm = nullptr;
+  decltype(&::cublasDgemmStridedBatched) DgemmStridedBatched = nullptr;
+  decltype(&::cublasDtrsm_v2) Dtrsm = nullptr;
+  // cublasGemmEx is overloaded in C++ (an inline legacy cudaDataType
+  // computeType wrapper); the exported C symbol is the cublasComputeType_t one.
+  cublasStatus_t(CUBLASWINAPI* GemmEx)(cublasHandle_t,
+                                       cublasOperation_t,
+                                       cublasOperation_t,
+                                       int,
+                                       int,
+                                       int,
+                                       const void*,
+                                       const void*,
+                                       cudaDataType,
+                                       int,
+                                       const void*,
+                                       cudaDataType,
+                                       int,
+                                       const void*,
+                                       void*,
+                                       cudaDataType,
+                                       int,
+                                       cublasComputeType_t,
+                                       cublasGemmAlgo_t)
+      = nullptr;
+  bool ok = false;
+  std::string error;
+};
+
+const CublasApi& cublasApi() {
+  static const CublasApi api = [] {
+    CublasApi a;
+    std::vector<std::string> candidates;
+    if (const char* e = std::getenv("LK_CUBLAS_LIBRARY"))
+      candidates.emplace_back(e);
+#ifdef _WIN32
+    candidates.push_back("cublas64_" + std::to_string(CUBLAS_VER_MAJOR) + ".dll");
+#else
+    candidates.push_back("libcublas.so." + std::to_string(CUBLAS_VER_MAJOR));
+    candidates.emplace_back("libcublas.so");
+#endif
+    void* handle = nullptr;
+    for (const auto& name : candidates) {
+#ifdef _WIN32
+      handle = reinterpret_cast<void*>(LoadLibraryA(name.c_str()));
+#else
+      handle = dlopen(name.c_str(), RTLD_NOW | RTLD_LOCAL);
+#endif
+      if (handle != nullptr)
+        break;
+    }
+    if (handle == nullptr) {
+      a.error = "cannot load cuBLAS (tried";
+      for (const auto& name : candidates)
+        a.error += " " + name;
+      a.error += ")";
+      return a;
+    }
+    auto sym = [handle](const char* name) -> void* {
+#ifdef _WIN32
+      return reinterpret_cast<void*>(GetProcAddress(reinterpret_cast<HMODULE>(handle), name));
+#else
+      return dlsym(handle, name);
+#endif
+    };
+    a.Create = reinterpret_cast<decltype(a.Create)>(sym("cublasCreate_v2"));
+    a.Dgemm = reinterpret_cast<decltype(a.Dgemm)>(sym("cublasDgemm_v2"));
+    a.DgemmStridedBatched = reinterpret_cast<decltype(a.DgemmStridedBatched)>(sym("cublasDgemmStridedBatched"));
+    a.Dtrsm = reinterpret_cast<decltype(a.Dtrsm)>(sym("cublasDtrsm_v2"));
+    a.GemmEx = reinterpret_cast<decltype(a.GemmEx)>(sym("cublasGemmEx"));
+    a.ok = a.Create && a.Dgemm && a.DgemmStridedBatched && a.Dtrsm && a.GemmEx;
+    if (!a.ok)
+      a.error = "cuBLAS loaded but a required symbol is missing";
+    // The handle is intentionally never closed: cuBLAS stays loaded for the
+    // lifetime of the process, like a linked library would.
+    return a;
+  }();
+  return api;
+}
+
 enum class CovKind : int { Gauss = 0, Exp = 1, Matern32 = 2, Matern52 = 3 };
 
 bool covKindFromString(const std::string& covType, CovKind* out) {
@@ -84,7 +192,7 @@ bool covKindFromString(const std::string& covType, CovKind* out) {
 cublasHandle_t cublasHandle() {
   static cublasHandle_t handle = [] {
     cublasHandle_t h;
-    const cublasStatus_t st = cublasCreate(&h);
+    const cublasStatus_t st = cublasApi().Create(&h);
     if (st != CUBLAS_STATUS_SUCCESS)
       throw std::runtime_error("LinearAlgebraCuda: cublasCreate failed");
     return h;
@@ -261,7 +369,19 @@ bool available() {
   static const bool cached = [] {
     int count = 0;
     cudaError_t status = cudaGetDeviceCount(&count);
-    return status == cudaSuccess && count > 0;
+    if (status != cudaSuccess || count <= 0)
+      return false;
+    // A device without a loadable cuBLAS cannot run this backend: say so
+    // once rather than silently running the CPU path on a GPU machine.
+    if (!cublasApi().ok) {
+      std::fprintf(stderr,
+                   "[libKriging] CUDA device found but GPU backend disabled: %s. "
+                   "Install the CUDA %d cuBLAS runtime or set LK_CUBLAS_LIBRARY.\n",
+                   cublasApi().error.c_str(),
+                   CUBLAS_VER_MAJOR);
+      return false;
+    }
+    return true;
   }();
   return cached;
 }
@@ -275,7 +395,7 @@ std::mutex g_enabled_mutex;
 bool enabled() {
   std::lock_guard<std::mutex> lock(g_enabled_mutex);
   if (!g_enabled_initialized) {
-    g_enabled = available();
+    g_enabled = libKriging::gpu::default_enabled(available());
     g_enabled_initialized = true;
   }
   return g_enabled;
@@ -440,61 +560,61 @@ arma::mat conjugateGradient(const arma::mat& Xt,
     lk_cuda_scale_rows_launch(d_precDinv, d_in, n, ncols_cur, d_prec_nc);  // d_prec_nc = Dinv .* r
     LK_CUDA_CHECK(cudaGetLastError());
     // t = U^T (Dinv .* r)   (k x ncols_cur)
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
-                                CUBLAS_OP_T,
-                                CUBLAS_OP_N,
-                                pk,
-                                ncols_cur,
-                                n,
-                                &prec_one,
-                                d_precU,
-                                n,
-                                d_prec_nc,
-                                n,
-                                &prec_zero,
-                                d_prec_kc,
-                                pk));
+    LK_CUBLAS_CHECK(cublasApi().Dgemm(cublasHandle(),
+                                      CUBLAS_OP_T,
+                                      CUBLAS_OP_N,
+                                      pk,
+                                      ncols_cur,
+                                      n,
+                                      &prec_one,
+                                      d_precU,
+                                      n,
+                                      d_prec_nc,
+                                      n,
+                                      &prec_zero,
+                                      d_prec_kc,
+                                      pk));
     // s = (L L^T)^-1 t, in place: L y = t then L^T s = y
-    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(),
-                                CUBLAS_SIDE_LEFT,
-                                CUBLAS_FILL_MODE_LOWER,
-                                CUBLAS_OP_N,
-                                CUBLAS_DIAG_NON_UNIT,
-                                pk,
-                                ncols_cur,
-                                &prec_one,
-                                d_precMchol,
-                                pk,
-                                d_prec_kc,
-                                pk));
-    LK_CUBLAS_CHECK(cublasDtrsm(cublasHandle(),
-                                CUBLAS_SIDE_LEFT,
-                                CUBLAS_FILL_MODE_LOWER,
-                                CUBLAS_OP_T,
-                                CUBLAS_DIAG_NON_UNIT,
-                                pk,
-                                ncols_cur,
-                                &prec_one,
-                                d_precMchol,
-                                pk,
-                                d_prec_kc,
-                                pk));
+    LK_CUBLAS_CHECK(cublasApi().Dtrsm(cublasHandle(),
+                                      CUBLAS_SIDE_LEFT,
+                                      CUBLAS_FILL_MODE_LOWER,
+                                      CUBLAS_OP_N,
+                                      CUBLAS_DIAG_NON_UNIT,
+                                      pk,
+                                      ncols_cur,
+                                      &prec_one,
+                                      d_precMchol,
+                                      pk,
+                                      d_prec_kc,
+                                      pk));
+    LK_CUBLAS_CHECK(cublasApi().Dtrsm(cublasHandle(),
+                                      CUBLAS_SIDE_LEFT,
+                                      CUBLAS_FILL_MODE_LOWER,
+                                      CUBLAS_OP_T,
+                                      CUBLAS_DIAG_NON_UNIT,
+                                      pk,
+                                      ncols_cur,
+                                      &prec_one,
+                                      d_precMchol,
+                                      pk,
+                                      d_prec_kc,
+                                      pk));
     // d_prec_nc is free again (its Dinv .* r content was consumed by the
     // first DGEMM): reuse it for U s (n x ncols_cur) instead of a 7th buffer.
-    LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
-                                CUBLAS_OP_N,
-                                CUBLAS_OP_N,
-                                n,
-                                ncols_cur,
-                                pk,
-                                &prec_one,
-                                d_precU,
-                                n,
-                                d_prec_kc,
-                                pk,
-                                &prec_zero,
-                                d_prec_nc,
-                                n));
+    LK_CUBLAS_CHECK(cublasApi().Dgemm(cublasHandle(),
+                                      CUBLAS_OP_N,
+                                      CUBLAS_OP_N,
+                                      n,
+                                      ncols_cur,
+                                      pk,
+                                      &prec_one,
+                                      d_precU,
+                                      n,
+                                      d_prec_kc,
+                                      pk,
+                                      &prec_zero,
+                                      d_prec_nc,
+                                      n));
     lk_cuda_precond_finish_launch(d_precDinv, d_in, d_prec_nc, n, ncols_cur, d_out);
     LK_CUDA_CHECK(cudaGetLastError());
   };
@@ -536,42 +656,42 @@ arma::mat conjugateGradient(const arma::mat& Xt,
         const long long count = static_cast<long long>(n) * ncols_cur;
         lk_cuda_cast_d2f_launch(d_in, count, d_p_f32);
         LK_CUDA_CHECK(cudaGetLastError());
-        LK_CUBLAS_CHECK(cublasGemmEx(cublasHandle(),
-                                     CUBLAS_OP_N,
-                                     CUBLAS_OP_N,
-                                     n,
-                                     ncols_cur,
-                                     n,
-                                     &gemm_one_f,
-                                     d_Rmat_f32,
-                                     CUDA_R_32F,
-                                     n,
-                                     d_p_f32,
-                                     CUDA_R_32F,
-                                     n,
-                                     &gemm_zero_f,
-                                     d_Ap_f32,
-                                     CUDA_R_32F,
-                                     n,
-                                     CUBLAS_COMPUTE_32F_FAST_TF32,
-                                     CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+        LK_CUBLAS_CHECK(cublasApi().GemmEx(cublasHandle(),
+                                           CUBLAS_OP_N,
+                                           CUBLAS_OP_N,
+                                           n,
+                                           ncols_cur,
+                                           n,
+                                           &gemm_one_f,
+                                           d_Rmat_f32,
+                                           CUDA_R_32F,
+                                           n,
+                                           d_p_f32,
+                                           CUDA_R_32F,
+                                           n,
+                                           &gemm_zero_f,
+                                           d_Ap_f32,
+                                           CUDA_R_32F,
+                                           n,
+                                           CUBLAS_COMPUTE_32F_FAST_TF32,
+                                           CUBLAS_GEMM_DEFAULT_TENSOR_OP));
         lk_cuda_cast_f2d_launch(d_Ap_f32, count, d_out);
         LK_CUDA_CHECK(cudaGetLastError());
       } else {
-        LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    n,
-                                    ncols_cur,
-                                    n,
-                                    &gemm_one,
-                                    d_Rmat,
-                                    n,
-                                    d_in,
-                                    n,
-                                    &gemm_zero,
-                                    d_out,
-                                    n));
+        LK_CUBLAS_CHECK(cublasApi().Dgemm(cublasHandle(),
+                                          CUBLAS_OP_N,
+                                          CUBLAS_OP_N,
+                                          n,
+                                          ncols_cur,
+                                          n,
+                                          &gemm_one,
+                                          d_Rmat,
+                                          n,
+                                          d_in,
+                                          n,
+                                          &gemm_zero,
+                                          d_out,
+                                          n));
       }
     } else {
       lk_cuda_rmul_batched_launch(
@@ -997,8 +1117,8 @@ arma::mat rmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::st
   double* d_scratch = nullptr;
   if (dense) {
     const double one = 1.0, zero = 0.0;
-    LK_CUBLAS_CHECK(
-        cublasDgemm(cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_Rmat, n, d_V, n, &zero, d_Av, n));
+    LK_CUBLAS_CHECK(cublasApi().Dgemm(
+        cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, ncols, n, &one, d_Rmat, n, d_V, n, &zero, d_Av, n));
   } else {
     const int scratch_elems = lk_cuda_rmul_batched_scratch_elems(n, ncols);
     if (scratch_elems > 0)
@@ -1061,20 +1181,20 @@ arma::mat dRmulBatched(const arma::mat& Xt, const arma::vec& theta, const std::s
     const double one = 1.0, zero = 0.0;
     const std::size_t n2 = static_cast<std::size_t>(n) * n;
     for (int k = 0; k < dimX; ++k) {
-      LK_CUBLAS_CHECK(cublasDgemm(cublasHandle(),
-                                  CUBLAS_OP_N,
-                                  CUBLAS_OP_N,
-                                  n,
-                                  ncols,
-                                  n,
-                                  &one,
-                                  d_dR + n2 * k,
-                                  n,
-                                  d_V,
-                                  n,
-                                  &zero,
-                                  d_Out + static_cast<std::size_t>(k) * n,
-                                  dimX * n));
+      LK_CUBLAS_CHECK(cublasApi().Dgemm(cublasHandle(),
+                                        CUBLAS_OP_N,
+                                        CUBLAS_OP_N,
+                                        n,
+                                        ncols,
+                                        n,
+                                        &one,
+                                        d_dR + n2 * k,
+                                        n,
+                                        d_V,
+                                        n,
+                                        &zero,
+                                        d_Out + static_cast<std::size_t>(k) * n,
+                                        dimX * n));
     }
     cudaFree(d_dR);
   } else {
@@ -1147,7 +1267,7 @@ double stochasticLogDetBatched(const arma::mat& Xt,
   const double gemm_one = 1.0, gemm_zero = 0.0;
   auto matvec = [&](const double* d_in, double* d_out) {
     if (dense) {
-      LK_CUBLAS_CHECK(cublasDgemm(
+      LK_CUBLAS_CHECK(cublasApi().Dgemm(
           cublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, n, npr, n, &gemm_one, d_Rmat, n, d_in, n, &gemm_zero, d_out, n));
     } else {
       lk_cuda_rmul_batched_launch(
@@ -1211,42 +1331,42 @@ double stochasticLogDetBatched(const arma::mat& Xt,
     // pairs -- see the function doc comment for why V_hist_p is already in
     // exactly the shape/stride cuBLAS wants without a gather pass.
     const int m = j + 1;
-    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(),
-                                              CUBLAS_OP_T,
-                                              CUBLAS_OP_N,
-                                              m,
-                                              1,
-                                              n,
-                                              &gemm_one,
-                                              d_V,
-                                              lda_hist,
-                                              stride_probe,
-                                              d_W,
-                                              n,
-                                              stride_probe,
-                                              &gemm_zero,
-                                              d_t,
-                                              ls,
-                                              stride_t,
-                                              npr));
-    LK_CUBLAS_CHECK(cublasDgemmStridedBatched(cublasHandle(),
-                                              CUBLAS_OP_N,
-                                              CUBLAS_OP_N,
-                                              n,
-                                              1,
-                                              m,
-                                              &gemm_neg_one,
-                                              d_V,
-                                              lda_hist,
-                                              stride_probe,
-                                              d_t,
-                                              ls,
-                                              stride_t,
-                                              &gemm_one,
-                                              d_W,
-                                              n,
-                                              stride_probe,
-                                              npr));
+    LK_CUBLAS_CHECK(cublasApi().DgemmStridedBatched(cublasHandle(),
+                                                    CUBLAS_OP_T,
+                                                    CUBLAS_OP_N,
+                                                    m,
+                                                    1,
+                                                    n,
+                                                    &gemm_one,
+                                                    d_V,
+                                                    lda_hist,
+                                                    stride_probe,
+                                                    d_W,
+                                                    n,
+                                                    stride_probe,
+                                                    &gemm_zero,
+                                                    d_t,
+                                                    ls,
+                                                    stride_t,
+                                                    npr));
+    LK_CUBLAS_CHECK(cublasApi().DgemmStridedBatched(cublasHandle(),
+                                                    CUBLAS_OP_N,
+                                                    CUBLAS_OP_N,
+                                                    n,
+                                                    1,
+                                                    m,
+                                                    &gemm_neg_one,
+                                                    d_V,
+                                                    lda_hist,
+                                                    stride_probe,
+                                                    d_t,
+                                                    ls,
+                                                    stride_t,
+                                                    &gemm_one,
+                                                    d_W,
+                                                    n,
+                                                    stride_probe,
+                                                    npr));
 
     lk_cuda_batched_dot_launch(d_W, d_W, n, npr, d_dot2);  // bj^2
     LK_CUDA_CHECK(cudaGetLastError());

@@ -313,6 +313,24 @@ Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, stdev = TRUE)   # routes to predictIterative (light fit)
 ```
 
+### GPU
+
+The CG solves, SLQ Lanczos steps and trace-gradient matvecs of this
+objective (and of `predictIterative`) run on the GPU when libKriging was
+built with a GPU backend and a device is found at runtime. CUDA is built
+automatically whenever a CUDA toolkit is present at build time
+(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; packages published on
+PyPI/CRAN are CPU-only); such a build still loads and runs on the CPU on a
+machine without a GPU. Same switch in every binding:
+
+```r
+gpu_backend()          # "cuda", or "none" (CPU)
+set_gpu_enabled(FALSE) # force the CPU path; or LK_ITERATIVE_GPU=0 in the environment
+```
+
+See [AllCMakeOptions.md](../dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative)
+for the build options and the per-binding API.
+
 ## Current limitations (v1)
 
 - `NoiseModel::None` only (no nugget/noise channel).

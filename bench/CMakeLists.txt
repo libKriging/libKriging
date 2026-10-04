@@ -43,7 +43,7 @@ target_link_libraries(bench-mlpkriging LINK_PUBLIC Kriging)
 add_executable(debug-woodbury debug-woodbury.cpp)
 target_link_libraries(debug-woodbury LINK_PUBLIC Kriging)
 
-if (ENABLE_CUDA_ITERATIVE)
+if (LIBKRIGING_CUDA_ITERATIVE)
     add_executable(bench-iterative-cuda bench-iterative-cuda.cpp)
     target_link_libraries(bench-iterative-cuda LINK_PUBLIC Kriging)
     # LinearAlgebraCuda:: is declared in src/lib/cuda/CudaLinearAlgebra.cuh,
@@ -52,7 +52,8 @@ if (ENABLE_CUDA_ITERATIVE)
     target_include_directories(bench-iterative-cuda PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
 
     add_executable(debug-cuda-matvec debug-cuda-matvec.cpp)
-    target_link_libraries(debug-cuda-matvec LINK_PUBLIC Kriging)
+    # calls the CUDA runtime directly (libKriging links it privately)
+    target_link_libraries(debug-cuda-matvec LINK_PUBLIC Kriging CUDA::cudart_static)
     target_include_directories(debug-cuda-matvec PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
 endif ()
 

@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import sys
 import platform
 import subprocess
@@ -137,6 +138,12 @@ class CMakeBuild(build_ext):
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'
                       ]
+        # GPU backend: AUTO (default) enables CUDA iff a CUDA toolkit is found
+        # at build time; the release scripts export ENABLE_CUDA_ITERATIVE=OFF
+        # so published wheels stay CPU-only.
+        cmake_args += ['-DENABLE_CUDA_ITERATIVE=' + os.environ.get('ENABLE_CUDA_ITERATIVE', 'AUTO')]
+        # Any further CMake options, e.g. LIBKRIGING_CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=90"
+        cmake_args += shlex.split(os.environ.get('LIBKRIGING_CMAKE_ARGS', ''))
 
         cfg = 'Debug' if args.debug else 'Release'
         print('build mode:', cfg)

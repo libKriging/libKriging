@@ -1,9 +1,10 @@
-# CUDA-accelerated matvec/CG for LLIterative/predictIterative, explicit
-# opt-in only (ENABLE_CUDA_ITERATIVE, see root CMakeLists.txt) -- must be
+# CUDA-accelerated matvec/CG for LLIterative/predictIterative
+# (ENABLE_CUDA_ITERATIVE=ON/OFF/AUTO, resolved into LIBKRIGING_CUDA_ITERATIVE
+# by the root CMakeLists.txt) -- must be
 # enabled/found before the Kriging target below so its .cu source can be
 # listed directly in add_library().
 set(LIBKRIGING_CUDA_SOURCES "")
-if (ENABLE_CUDA_ITERATIVE)
+if (LIBKRIGING_CUDA_ITERATIVE)
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
         set(CMAKE_CUDA_ARCHITECTURES native)
     endif ()
@@ -104,6 +105,7 @@ add_library(Kriging
         include/libKriging/KrigingException.hpp
         lkalloc.cpp include/libKriging/utils/lkalloc.hpp
         Bench.cpp include/libKriging/Bench.hpp
+        Gpu.cpp include/libKriging/Gpu.hpp
         include/libKriging/utils/LinearHashStorage.hpp
         include/libKriging/utils/data_from_arma_vec.hpp
         include/libKriging/utils/ExplicitCopySpecifier.hpp
@@ -120,16 +122,43 @@ endif ()
 
 target_link_libraries(Kriging PUBLIC armadillo lbfgsb_cpp::lbfgsb_cpp) # maybe PRIVATE
 
-if (ENABLE_CUDA_ITERATIVE)
+if (LIBKRIGING_CUDA_ITERATIVE)
     # The batched CG scalar/vector kernels (CudaLinearAlgebraKernel.cu) stay
     # hand-written -- they replace what used to be per-column
     # cublasDdot/Daxpy/Dscal/Dnrm2 calls, which paid ncols separate launches.
-    # cuBLAS IS used for the dense-R fast path's matvec (CudaLinearAlgebra.cpp:
-    # ONE cublasDgemm per call, not one per column, so it doesn't reintroduce
-    # that per-column launch overhead).
-    target_link_libraries(Kriging PUBLIC CUDA::cudart CUDA::cublas)
+    # cuBLAS IS used (dense-R matvec, preconditioner GEMM/TRSM, mixed
+    # precision GEMM) but is NOT linked: CudaLinearAlgebra.cpp loads it at
+    # runtime, and the CUDA runtime is linked statically, so the library has
+    # no load-time dependency on the CUDA toolkit and falls back to the CPU
+    # path on machines without a GPU. Only the cuBLAS headers are needed.
+    # PRIVATE: a shared libKriging already contains the static runtime, so
+    # its consumers need nothing CUDA-related; a static libKriging.a still
+    # exports it as a link-only dependency for CMake consumers.
+    target_link_libraries(Kriging PRIVATE CUDA::cudart_static ${CMAKE_DL_LIBS})
+    target_include_directories(Kriging PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_CUDA_ITERATIVE)
-    set_target_properties(Kriging PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    # CUDA_RESOLVE_DEVICE_SYMBOLS: perform the device link inside libKriging
+    # itself, so a static libKriging.a is self-contained and can be linked by
+    # a non-CMake toolchain (the R package's Makevars) without an extra
+    # nvcc device-link step.
+    set_target_properties(Kriging PROPERTIES
+            CUDA_SEPARABLE_COMPILATION ON
+            CUDA_RESOLVE_DEVICE_SYMBOLS ON
+            CUDA_RUNTIME_LIBRARY Static)
+    # Non-CMake consumers of a static libKriging.a (the R package's
+    # Makevars, via bindings/R/tools/CMakeLists.txt) must add the static
+    # CUDA runtime themselves: record exactly what to link, one item per
+    # line (absolute paths or -l flags), installed below.
+    set(LIBKRIGING_GPU_LINK_LIBS "${CUDA_cudart_static_LIBRARY}")
+    if (UNIX)
+        list(APPEND LIBKRIGING_GPU_LINK_LIBS "-ldl" "-lrt" "-lpthread")
+    endif ()
+    string(REPLACE ";" "\n" LIBKRIGING_GPU_LINK_LIBS_TXT "${LIBKRIGING_GPU_LINK_LIBS}")
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/libKriging_gpu_link_libs.txt "${LIBKRIGING_GPU_LINK_LIBS_TXT}\n")
+else ()
+    # Always installed (empty without a GPU backend) so a stale file from a
+    # previous CUDA build in the same prefix can't leak into a CPU-only one.
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/libKriging_gpu_link_libs.txt "")
 endif ()
 
 if (ENABLE_HIP_ITERATIVE)
@@ -259,4 +288,7 @@ install(EXPORT libKriging-export
 )
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
+)
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libKriging_gpu_link_libs.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/libKriging
 )
