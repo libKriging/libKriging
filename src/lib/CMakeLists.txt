@@ -286,6 +286,43 @@ install(EXPORT libKriging-export
         NAMESPACE libKriging::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
 )
+# The Armadillo configuration set for the whole build by add_definitions()
+# in the top CMakeLists.txt changes the layout of arma objects (word size)
+# and their allocator: consumers of the installed library must use the same.
+target_compile_definitions(Kriging INTERFACE
+        "$<INSTALL_INTERFACE:ARMA_32BIT_WORD;ARMA_ALIEN_MEM_ALLOC_FUNCTION=lkalloc::malloc;ARMA_ALIEN_MEM_FREE_FUNCTION=lkalloc::free>")
+
+# An installed shared libKriging finds the libarmadillo installed next to it
+# (DT_RUNPATH is not transitive: its consumers' own RUNPATH does not apply).
+if (UNIX AND NOT APPLE)
+    set_target_properties(Kriging PROPERTIES INSTALL_RPATH "$ORIGIN")
+endif ()
+
+# find_package(libKriging CONFIG): resolves the dependencies of libKriging.cmake
+include(CMakePackageConfigHelpers)
+set(LIBKRIGING_ARMADILLO_CMAKE_DIR ${CMAKE_INSTALL_DATADIR}/Armadillo/CMake) # armadillo's own install rule
+set(LIBKRIGING_CONFIG_NEEDS_OPENMP ${OpenMP_CXX_FOUND})
+set(LIBKRIGING_CONFIG_NEEDS_CUDATOOLKIT OFF)
+if (LIBKRIGING_CUDA_ITERATIVE AND NOT BUILD_SHARED_LIBS)
+    set(LIBKRIGING_CONFIG_NEEDS_CUDATOOLKIT ON) # CUDA::cudart_static is a link-only dependency of libKriging.a
+endif ()
+set(LIBKRIGING_CONFIG_NEEDS_HIP OFF)
+if (LIBKRIGING_HIP_ITERATIVE)
+    set(LIBKRIGING_CONFIG_NEEDS_HIP ON)
+endif ()
+configure_package_config_file(libKrigingConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libKriging
+        PATH_VARS LIBKRIGING_ARMADILLO_CMAKE_DIR)
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfigVersion.cmake
+        VERSION ${KRIGING_VERSION}
+        COMPATIBILITY SameMinorVersion)
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/libKrigingConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libKriging
+)
+
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libKriging/libKriging_exports.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libKriging
 )

@@ -360,6 +360,17 @@ past release, see the corresponding entry on the
   unchanged. See `docs/math/Iterative.md`.
 
 ### Fixed
+- Installed C++ library usable from CMake: new `find_package(libKriging CONFIG)`
+  package (`lib/cmake/libKriging/libKrigingConfig.cmake`) that resolves the
+  dependencies `lib/cmake/libKriging.cmake` references but did not define
+  (`armadillo`, `lbfgsb_cpp`, OpenMP, the CUDA/HIP runtime of a static GPU
+  build); `libKriging::Kriging` now carries `ARMA_32BIT_WORD` and the
+  `lkalloc` allocator defines, without which a consumer's `arma::mat` had a
+  different layout (a 300x2 `X` seen as 300x0); an installed shared
+  `libKriging.so` finds its `libarmadillo.so` (RUNPATH `$ORIGIN`, Linux).
+- `tools/install-gpu.sh`: stops on a failed CMake configuration, builds the
+  Python binding for the `python3` in PATH (CMake could pick another
+  interpreter) and checks its build requirements up front.
 - Iterative CG (CPU `LinearAlgebra::conjugateGradient(Batched)`): removed the
   periodic full restart (`p = r` every 50 iterations), which destroyed CG
   conjugacy and made ill-conditioned solves plateau (n=60, cond(R)=4.5e3:

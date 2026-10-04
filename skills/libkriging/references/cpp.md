@@ -7,6 +7,18 @@ Headers: `libKriging/Kriging.hpp`, `WarpKriging.hpp`, `MLPKriging.hpp`,
 See `SKILL.md` in this directory for *which* class/options to pick; this
 file gives the exact call syntax.
 
+## Linking an installed libKriging (CMake)
+
+```cmake
+find_package(libKriging CONFIG REQUIRED)   # -DCMAKE_PREFIX_PATH=<install prefix>
+target_link_libraries(app PRIVATE libKriging::Kriging)
+```
+
+The target carries the Armadillo configuration libKriging was built with
+(`ARMA_32BIT_WORD`, `lkalloc` allocator): don't link it without it (e.g. by
+hand-written `-lKriging -larmadillo`), the `arma::mat` layout would differ.
+Include the libKriging headers before `<armadillo>`.
+
 ## Kriging (noise-free or noisy)
 
 ```cpp

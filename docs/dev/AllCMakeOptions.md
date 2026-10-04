@@ -85,9 +85,10 @@ which compiles libKriging itself: it gets the GPU variant by passing
 - Not covered: the R package on Windows (Rtools/MinGW is not a supported
   `nvcc` host compiler; `tools/r-windows/build.sh` defaults to `OFF`), and
   the R package with HIP/SYCL/Metal (its `Makevars` only adds the CUDA
-  runtime). CMake consumers of an installed *static* CUDA-enabled
-  `libKriging` must `find_package(CUDAToolkit)` before including
-  `lib/cmake/libKriging.cmake` (it references `CUDA::cudart_static`).
+  runtime). CMake consumers of an installed libKriging use
+  `find_package(libKriging CONFIG)`, which also finds the CUDA toolkit
+  that a *static* CUDA-enabled `libKriging.a` references
+  (`CUDA::cudart_static`).
 - Existing build directories keep their cached value: an old
   `ENABLE_CUDA_ITERATIVE:BOOL=OFF` stays `OFF` until reconfigured.
 

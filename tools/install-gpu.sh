@@ -123,7 +123,7 @@ echo "== Done. GPU backends:"
 grep -E "iterative backend" "${BUILD_DIR}.configure.log" | sed 's/^-- /   /'
 echo
 echo "Use it:"
-echo "  C++:    headers/libs in ${PREFIX} (CMAKE_PREFIX_PATH=${PREFIX})"
+echo "  C++:    find_package(libKriging CONFIG) with CMAKE_PREFIX_PATH=${PREFIX}; link libKriging::Kriging"
 has python && echo "  Python: export PYTHONPATH=${PREFIX}/bindings/Python LD_LIBRARY_PATH=${PREFIX}/lib:\$LD_LIBRARY_PATH; python -c 'import pylibkriging as lk; print(lk.gpu_backend())'"
 has r      && echo "  R:      library(rlibkriging); gpu_backend()"
 has octave && echo "  Octave: addpath('${PREFIX}/bindings/Octave'); Gpu.backend()"
