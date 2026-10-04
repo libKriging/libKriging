@@ -27,7 +27,10 @@ env:
 jobs:
   python-notebooks:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    # docs/math/subsetofdata_vs_cholesky.ipynb's full-data exact fit (n=6000,
+    # single-threaded under OMP_NUM_THREADS=1) alone takes ~20 min on a 4-core
+    # machine and up to ~30 min on a slower runner: room for it plus the rest.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,5 +57,5 @@ jobs:
         # The "Installation" cells of the notebooks (venv, pip, cmake) are not run:
         # the environment is the one prepared above.
         run: |
-          python tools/notebooks/run_notebooks.py --skip-setup --kernel python3 \
+          python tools/notebooks/run_notebooks.py --skip-setup --kernel python3 --timeout 3600 \
             bindings/Python/*.ipynb docs/math/*.ipynb
