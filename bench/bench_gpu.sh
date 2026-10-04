@@ -134,7 +134,10 @@ fi
 export PYTHONPATH="${PYLIBKRIGING_DIR}:${PROJECT_ROOT}/bindings/Python/pylibkriging/src${PYTHONPATH:+:$PYTHONPATH}"
 
 # --- 2. sanity-check the python env -----------------------------------------
-ENV_CHECK="$("$PYTHON_BIN" - <<'PYEOF' 2>&1
+# Run from bench/gpu, like bench_gpu.py below: `python -` puts the current
+# directory first on sys.path, where a stray _pylibkriging*.so (e.g. one left
+# in the repository root) would shadow the build under test.
+ENV_CHECK="$(cd "${SCRIPT_DIR}/gpu" && "$PYTHON_BIN" - <<'PYEOF' 2>&1
 import sys
 missing = []
 for mod in ("numpy", "torch", "gpytorch"):
@@ -144,8 +147,8 @@ for mod in ("numpy", "torch", "gpytorch"):
         missing.append(mod)
 try:
     import pylibkriging  # noqa: F401
-except ImportError as e:
-    print(f"PYLIBKRIGING_IMPORT_ERROR: {e}")
+except Exception as e:  # not only ImportError: a stale extension raises e.g. NameError
+    print(f"PYLIBKRIGING_IMPORT_ERROR: {type(e).__name__}: {e}")
     sys.exit(2)
 if missing:
     print("MISSING: " + ",".join(missing))
