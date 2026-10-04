@@ -63,6 +63,8 @@ cmake-build*/
 build*/
 /dist
 /pylibkriging.egg-info
+/pylibkriging_gpu.egg-info
+/bindings/Python/pylibkriging/VARIANT
 CMakeCache.txt
 CMakeFiles
 
@@ -107,3 +109,6 @@ AGENTS.md
 # (one .md/.csv per machine; see bench/gpu/README.md)
 !bench/gpu/results/*.md
 !bench/gpu/results/*.csv
+/gpu-package
+/build-gpu
+/build-gpu.configure.log

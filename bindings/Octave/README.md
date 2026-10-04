@@ -62,19 +62,17 @@ ENABLE_MATLAB_BINDING=on tools/linux-macos/test.sh
 
 ## GPU acceleration
 
-Pre-built packages are CPU-only. For GPU support, build from source as above
-on a machine with a CUDA toolkit. CUDA is built in automatically when a CUDA toolkit is found at build time
-(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; set it to `OFF` to opt out). Only
-`objective = "LLIterative(...)"` fits and `predictIterative` use the GPU. A
-CUDA-enabled build still loads and runs on the CPU on a machine without a
-GPU. The backend is on by default when a device is found; `LK_ITERATIVE_GPU=0`
-in the environment, or the call below, forces the CPU path. See
-[docs/dev/AllCMakeOptions.md](../../docs/dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative).
+Pre-built packages are **CPU only**. The GPU variant is compiled on your
+machine: from `libKriging-gpu_<version>_src.tar.gz` (release asset) or a
+clone with submodules, run `tools/install-gpu.sh octave` (or `matlab`); it
+detects CUDA, HIP/ROCm, SYCL and Metal, and builds for CPU if none is found.
 
 ```matlab
-Gpu.backend()            % 'cuda', or 'none' (CPU)
-Gpu.set_enabled(false)   % force the CPU path
+Gpu.backend()            % 'cuda', 'hip', ..., or 'none' (CPU)
+Gpu.set_enabled(false)   % force the CPU path (or LK_ITERATIVE_GPU=0)
 ```
+
+See [GPU backends](../../docs/dev/AllCMakeOptions.md#gpu-backends).
 
 ## Test
 

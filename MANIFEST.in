@@ -1,0 +1,21 @@
+# Source distribution of pylibkriging built from the repository root
+# (`python setup.py sdist`, see tools/release/python-sdist-gpu.sh): the whole
+# C++ tree is needed, since the extension is compiled at install time.
+include setup.py pyproject.toml MANIFEST.in CMakeLists.txt README.md LICENSE NOTICE
+recursive-include cmake *
+recursive-include src *
+recursive-include tests *
+recursive-include bench *.cpp *.hpp *.h CMakeLists.txt
+recursive-include bindings/Python/pylibkriging *
+# header-only helpers shared with the Python binding
+include bindings/Octave/mlibkriging/tools/formatString.hpp bindings/Octave/mlibkriging/tools/string_hash.hpp
+recursive-include dependencies *
+prune dependencies/armadillo-code/docs
+prune dependencies/armadillo-code/tests1
+prune dependencies/armadillo-code/tests2
+prune dependencies/Catch2/docs
+prune dependencies/pybind11/docs
+prune dependencies/pybind11/tests
+global-exclude .git .gitignore *.pyc *.so *.dylib *.dll *.ipynb
+prune bindings/Python/pylibkriging/build
+prune **/__pycache__

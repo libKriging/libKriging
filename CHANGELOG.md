@@ -12,6 +12,22 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Added
+- Two published variants per binding. The binary packages (PyPI wheels
+  `pylibkriging`, CRAN `rlibkriging`, release archives for C++, R, Octave and
+  MATLAB) are CPU-only: every release workflow exports
+  `ENABLE_GPU_ITERATIVE=OFF`. The `-gpu` variants are compiled on the user's
+  machine with every GPU backend found there: `pip install pylibkriging-gpu`
+  (new source distribution, `tools/release/python-sdist-gpu.sh`), and for the
+  other bindings the new `libKriging-gpu_<version>_src.tar.gz` release asset
+  (repository + submodules, `tools/release/gpu-source-archive.sh`) with the
+  new `tools/install-gpu.sh [python] [r] [octave|matlab] [julia]`.
+- `ENABLE_GPU_ITERATIVE` (`AUTO` / `OFF` / empty) overrides the four GPU
+  backend options at once, and `ENABLE_HIP_ITERATIVE`, `ENABLE_SYCL_ITERATIVE`
+  and `ENABLE_METAL_ITERATIVE` now accept `AUTO` (defaults unchanged: OFF).
+  HIP is auto-enabled only when ROCm and an AMD GPU are found (compiled for
+  the detected architectures), SYCL when the compiler builds a `-fsycl`
+  program, Metal on macOS with the metal-cpp headers (SYCL and Metal remain
+  unverified). Resolution lives in the new `cmake/gpu.cmake`.
 - GPU build is now automatic: `ENABLE_CUDA_ITERATIVE` accepts `AUTO`
   (new default) and enables the CUDA backend whenever a CUDA compiler and
   toolkit are found at configure time (CMake ≥ 3.23), with portable

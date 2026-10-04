@@ -64,21 +64,23 @@ importlib.reload(lk)
 
 ## GPU acceleration
 
-Wheels published on PyPI are CPU-only. For GPU support, build from source on
-a machine with a CUDA toolkit (`pip install .` from the repository root, or
-the CMake build above). CUDA is built in automatically when a CUDA toolkit is found at build time
-(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; set it to `OFF` to opt out). Only
-`objective = "LLIterative(...)"` fits and `predictIterative` use the GPU. A
-CUDA-enabled build still loads and runs on the CPU on a machine without a
-GPU. The backend is on by default when a device is found; `LK_ITERATIVE_GPU=0`
-in the environment, or the call below, forces the CPU path. See
-[docs/dev/AllCMakeOptions.md](../../../docs/dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative).
+Two variants install the same `pylibkriging` module (install one, not both):
+
+- `pip install pylibkriging`: binary wheels, **CPU only** (default).
+- `pip install pylibkriging-gpu`: source distribution compiled on your
+  machine with every GPU backend found there (CUDA, HIP/ROCm, SYCL, Metal);
+  needs a C++17 compiler, BLAS/LAPACK and the GPU toolkit, and falls back to
+  a CPU build when no GPU toolchain is found.
+
+Only `objective="LLIterative(...)"` fits and `predictIterative` use the GPU.
 
 ```python
 import pylibkriging as lk
-lk.gpu_backend()            # "cuda", or "none" (CPU)
-lk.set_gpu_enabled(False)   # force the CPU path
+lk.gpu_backend()            # "cuda", "hip", ..., or "none" (CPU)
+lk.set_gpu_enabled(False)   # force the CPU path (or LK_ITERATIVE_GPU=0)
 ```
+
+See [GPU backends](https://github.com/libKriging/libKriging/blob/master/docs/dev/AllCMakeOptions.md#gpu-backends).
 
 ## Releasing
 

@@ -6,10 +6,10 @@ if [[ "$DEBUG_CI" == "true" ]]; then
   set -x
 fi
 
-# Published wheels are CPU-only (reproducible, no CUDA runtime dependency),
-# whatever toolkit the packaging machine happens to have; override only for
-# a deliberate GPU build.
-export ENABLE_CUDA_ITERATIVE="${ENABLE_CUDA_ITERATIVE:-OFF}"
+# Published wheels are CPU-only (reproducible, no GPU runtime dependency),
+# whatever toolkit the packaging machine happens to have; the GPU variant is
+# the pylibkriging-gpu sdist (tools/release/python-sdist-gpu.sh).
+export ENABLE_GPU_ITERATIVE="${ENABLE_GPU_ITERATIVE:-OFF}"
 
 ARCH=$(uname -s)
 echo "Ready to release from $ARCH"
@@ -29,7 +29,7 @@ case $ARCH in
     docker run --rm \
       -e ROOT_DIR=/data \
       -e DEBUG_CI="${DEBUG_CI}" \
-      -e ENABLE_CUDA_ITERATIVE="${ENABLE_CUDA_ITERATIVE}" \
+      -e ENABLE_GPU_ITERATIVE="${ENABLE_GPU_ITERATIVE}" \
       -w /data \
       -v `pwd`:/data \
       quay.io/pypa/manylinux_2_28_x86_64 \

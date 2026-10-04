@@ -27,7 +27,7 @@ endif ()
 # src/lib/hip/HipLinearAlgebra.hpp. Mirrors the CUDA wiring above exactly,
 # including the "kernel file stays pointer-only" rule and its reason.
 set(LIBKRIGING_HIP_SOURCES "")
-if (ENABLE_HIP_ITERATIVE)
+if (LIBKRIGING_HIP_ITERATIVE)
     if (${CMAKE_VERSION} VERSION_LESS "3.21")
         message(FATAL_ERROR "ENABLE_HIP_ITERATIVE requires CMake >= 3.21 for native HIP language support "
                 "(found ${CMAKE_VERSION}).")
@@ -62,7 +62,7 @@ endif ()
 # gets -fsycl; SyclLinearAlgebra.cpp is host-only (armadillo, no SYCL
 # header) and compiled like the rest of the library, same rule as CUDA/HIP.
 set(LIBKRIGING_SYCL_SOURCES "")
-if (ENABLE_SYCL_ITERATIVE)
+if (LIBKRIGING_SYCL_ITERATIVE)
     set(LIBKRIGING_SYCL_SOURCES
             sycl/SyclLinearAlgebraKernel.cpp sycl/SyclLinearAlgebraKernel.hpp
             sycl/SyclLinearAlgebra.cpp sycl/SyclLinearAlgebra.hpp)
@@ -73,7 +73,7 @@ endif ()
 # MetalLinearAlgebraKernel.cpp uses metal-cpp (METAL_CPP_DIR) and embeds the
 # .metal shader source as a string it compiles at runtime.
 set(LIBKRIGING_METAL_SOURCES "")
-if (ENABLE_METAL_ITERATIVE)
+if (LIBKRIGING_METAL_ITERATIVE)
     set(LIBKRIGING_METAL_SOURCES
             metal/MetalLinearAlgebraKernel.cpp metal/MetalLinearAlgebraKernel.hpp
             metal/MetalLinearAlgebra.cpp metal/MetalLinearAlgebra.hpp
@@ -161,12 +161,12 @@ else ()
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/libKriging_gpu_link_libs.txt "")
 endif ()
 
-if (ENABLE_HIP_ITERATIVE)
+if (LIBKRIGING_HIP_ITERATIVE)
     target_link_libraries(Kriging PUBLIC hip::host hip::device)
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_HIP_ITERATIVE)
 endif ()
 
-if (ENABLE_SYCL_ITERATIVE)
+if (LIBKRIGING_SYCL_ITERATIVE)
     # Only the kernel TU is a SYCL translation unit; SyclLinearAlgebra.cpp
     # is host-only (see its header). -fsycl must also be a link option.
     set_source_files_properties(sycl/SyclLinearAlgebraKernel.cpp PROPERTIES COMPILE_OPTIONS "-fsycl")
@@ -174,7 +174,7 @@ if (ENABLE_SYCL_ITERATIVE)
     target_compile_definitions(Kriging PUBLIC LIBKRIGING_USE_SYCL_ITERATIVE)
 endif ()
 
-if (ENABLE_METAL_ITERATIVE)
+if (LIBKRIGING_METAL_ITERATIVE)
     if (NOT DEFINED METAL_CPP_DIR)
         message(FATAL_ERROR "ENABLE_METAL_ITERATIVE requires -DMETAL_CPP_DIR=<path to metal-cpp headers>")
     endif ()

@@ -75,19 +75,19 @@ The shared library `libkriging_c` is auto-detected from the `build/` directory.
 
 ## GPU acceleration
 
-Pre-built archives are CPU-only. For GPU support, build from source as above
-on a machine with a CUDA toolkit. CUDA is built in automatically when a CUDA toolkit is found at build time
-(`ENABLE_CUDA_ITERATIVE=AUTO`, the default; set it to `OFF` to opt out). Only
-`objective = "LLIterative(...)"` fits and `predictIterative` use the GPU. A
-CUDA-enabled build still loads and runs on the CPU on a machine without a
-GPU. The backend is on by default when a device is found; `LK_ITERATIVE_GPU=0`
-in the environment, or the call below, forces the CPU path. See
-[docs/dev/AllCMakeOptions.md](../../docs/dev/AllCMakeOptions.md#gpu-backend-enable_cuda_iterative).
+Release archives are **CPU only**. The GPU variant is compiled on your
+machine: from `libKriging-gpu_<version>_src.tar.gz` (release asset) or a
+clone with submodules, run `tools/install-gpu.sh julia` (detects CUDA,
+HIP/ROCm, SYCL, Metal; CPU build if none) and point `JLIBKRIGING_LIB_PATH`
+to the `libkriging_c` library it prints. For JLibKriging.jl, pass
+`-DENABLE_GPU_ITERATIVE=AUTO` to its libKriging build.
 
 ```julia
-gpu_backend()            # "cuda", or "none" (CPU)
-set_gpu_enabled(false)   # force the CPU path
+gpu_backend()            # "cuda", "hip", ..., or "none" (CPU)
+set_gpu_enabled(false)   # force the CPU path (or LK_ITERATIVE_GPU=0)
 ```
+
+See [GPU backends](../../docs/dev/AllCMakeOptions.md#gpu-backends).
 
 ## Test
 

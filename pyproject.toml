@@ -1,0 +1,14 @@
+# Build requirements for installing pylibkriging from a source distribution
+# (`pip install pylibkriging-gpu`, or `pip install .` from the repository
+# root): the C++ library is compiled at install time with CMake.
+# numpy and pytest are checked by CMake's Python requirement probe.
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "packaging",
+    "cmake>=3.23",
+    "numpy>=1.18",
+    "pytest",
+]
+build-backend = "setuptools.build_meta:__legacy__"
