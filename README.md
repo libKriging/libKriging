@@ -25,6 +25,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 - **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the scalable approximations `LLVecchia(m)` (Vecchia) and `LLNystrom(k)` (Nystrom low-rank).
 - **Input warpings** (`WarpKriging`, one per input column): affine, boxcox, kumaraswamy, neural_mono, knots, mlp, categorical, ordinal; `mlp_joint` (a joint feature map over all inputs) through `MLPKriging`.
 - **Large designs**: `NestedKriging`, the `LLVecchia(m)` and `LLNystrom(k)` objectives, and `subsetOfData` (k-means pre-fit row selection); see [docs/math/Scalability.md](docs/math/Scalability.md).
+- **Matrix-free fit and prediction**: the `LLIterative` objective and `predictIterative` (conjugate gradient), on the CPU (OpenMP) or on a GPU (CUDA, HIP/ROCm; SYCL and Metal unverified) when libKriging is compiled with one — see [CPU or GPU](#cpu-or-gpu).
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
 - **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
@@ -36,6 +37,7 @@ Table of contents
 
 - [Features](#features)
 - [Installation from pre-built packages](#installation-from-pre-built-packages)
+  - [CPU or GPU](#cpu-or-gpu)
   - [pylibkriging for Python](#pylibkriging-for-python)
   - [rlibkriging  for R](#rlibkriging--for-r)
   - [mlibkriging for Octave and MATLAB](#mlibkriging-for-octave-and-matlab)
@@ -66,6 +68,31 @@ If you want to contribute read [Contribution guide](CONTRIBUTING.md).
 
 For the most common target {Python, R, Octave, Matlab, Julia} x {Linux, macOS, Windows} x { x86-64, ARM }, you can
 use [released binaries](https://github.com/libKriging/libKriging/releases), or R CRAN or Python PyPI.
+
+## CPU or GPU
+
+The binary packages below (PyPI wheels, CRAN binaries, release archives) are **CPU only**. GPU support is a separate
+"`-gpu`" variant, compiled on your machine with every GPU backend found there (CUDA; HIP/ROCm; SYCL and Metal,
+unverified) and falling back to a plain CPU build when there is none:
+
+| Binding | CPU (default packages) | GPU (compiled on your machine) |
+|:--|:--|:--|
+| Python | `pip install pylibkriging` | `pip install pylibkriging-gpu` |
+| R | `install.packages('rlibkriging')` | `tools/install-gpu.sh r` |
+| Octave / MATLAB | release archive `mLibKriging_<version>_<platform>` | `tools/install-gpu.sh octave` (or `matlab`) |
+| Julia | [JLibKriging.jl](https://github.com/libKriging/JLibKriging.jl) (compiles libKriging itself) | `tools/install-gpu.sh julia`, see [bindings/Julia](bindings/Julia/README.md#gpu-acceleration) |
+| C++ | release archive | `tools/install-gpu.sh` (then `find_package(libKriging CONFIG)`) |
+
+`tools/install-gpu.sh` runs from the `libKriging-gpu_<version>_src.tar.gz` asset of each
+[release](https://github.com/libKriging/libKriging/releases) (the sources with their submodules) or from a clone with
+submodules; it takes several bindings at once (e.g. `tools/install-gpu.sh python r octave`, `--help` for options).
+Both GPU routes need a C++17 compiler, CMake, BLAS/LAPACK and the GPU toolkit (e.g. the CUDA toolkit with `nvcc`); the
+Python variants install the same `pylibkriging` module, so install one or the other. A CUDA build has no load-time
+dependency on the CUDA toolkit and runs through the CPU path on a machine without a GPU.
+
+Only `objective="LLIterative(...)"` fits and `predictIterative` use the GPU. Every binding reports and switches it
+at runtime (`gpu_backend()` in Python, R and Julia, `Gpu.backend()` in Octave/MATLAB; `set_gpu_enabled(false)` or
+the environment variable `LK_ITERATIVE_GPU=0` forces the CPU path). Details: [GPU backends](docs/dev/AllCMakeOptions.md#gpu-backends).
 
 ## [pylibkriging](https://pypi.org/project/pylibkriging/) for Python
 
@@ -502,6 +529,13 @@ first `cmake` configuration command.
 
 If `CMAKE_INSTALL_PREFIX` variable is not set with CMake, default installation directory is `${BUILD}/installed`.
 
+A CMake project then uses the installed library with `find_package(libKriging CONFIG REQUIRED)` (with
+`CMAKE_PREFIX_PATH=${INSTALL_PREFIX}`) and `target_link_libraries(<target> PRIVATE libKriging::Kriging)`.
+
+GPU backends are selected at configuration: by default CUDA is enabled when a CUDA toolkit is found;
+`-DENABLE_GPU_ITERATIVE=AUTO` also detects HIP/ROCm, SYCL and Metal, `-DENABLE_GPU_ITERATIVE=OFF` builds CPU only
+(see [GPU backends](docs/dev/AllCMakeOptions.md#gpu-backends)).
+
 ### For Linux and macOS
 
 <details>
@@ -553,7 +587,9 @@ the [Compilation requirements](#requirements-more-details).
 python3 -m pip install "git+https://github.com/libKriging/libKriging.git"
 ```
 
-will download, compile and install pylibkriging from *master* branch.
+will download, compile and install pylibkriging from *master* branch. Like any build from source, it includes the CUDA
+backend when a CUDA toolkit is found (`ENABLE_GPU_ITERATIVE=OFF python3 -m pip install ...` to build CPU only, see
+[CPU or GPU](#cpu-or-gpu)).
 
 <details>
 <summary>Example of build process output (~2mn)</summary>
