@@ -16,7 +16,9 @@
 #include "libKriging/utils/utils.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -25,6 +27,7 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 
 namespace libKriging {
 
@@ -2572,16 +2575,58 @@ void WarpKriging::optimise_joint(const std::string& method) {
       }
     };
 
-    // Starts run sequentially in the calling thread, as in Kriging::fit. They
-    // must not run concurrently: every start calls L-BFGS-B (lbfgsb_cpp,
-    // directly or through AdamBFGS), whose f2c-translated BLAS/LINPACK
-    // helpers (Lbfgsb.3.0/blas.c, linpack.c) keep their loop counters and
-    // accumulators in `static` locals. Concurrent optimizers race on them
-    // (ThreadSanitizer: dcopy_/daxpy_), which showed up as non-symmetric R,
-    // wrong optima and heap corruption ("malloc(): corrupted top size") in
-    // WarpKrigingTest's parallel multistart test.
-    for (int task_id = 0; task_id < multistart; ++task_id)
-      worker(task_id);
+    // Starts run concurrently in a thread pool. This requires a reentrant
+    // L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS/LINPACK helpers
+    // (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static` locals that
+    // concurrent optimizers would race on.
+    if (multistart == 1) {
+      worker(0);
+    } else {
+      // Determine thread pool size
+      unsigned int n_cpu = std::thread::hardware_concurrency();
+      int pool_size = Optim::thread_pool_size;
+      if (pool_size <= 0)
+        pool_size = std::max(1u, n_cpu);
+      pool_size = std::min(pool_size, multistart);
+
+      if (Optim::log_level > Optim::log_none) {
+        arma::cout << "WarpKriging thread pool: " << pool_size << " workers (ncpu=" << n_cpu
+                   << ", multistart=" << multistart << ")" << arma::endl;
+      }
+
+      // Thread pool with atomic task counter
+      std::atomic<int> next_task(0);
+      std::vector<std::thread> threads;
+      threads.reserve(pool_size);
+
+      // RAII guard to ensure threads are always joined (also when spawning
+      // a later thread throws)
+      struct ThreadJoiner {
+        std::vector<std::thread>& threads_ref;
+        explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
+        ~ThreadJoiner() {
+          for (auto& t : threads_ref)
+            if (t.joinable())
+              t.join();
+        }
+      } joiner(threads);
+
+      for (int worker_id = 0; worker_id < pool_size; worker_id++) {
+        threads.emplace_back([&]() {
+          while (true) {
+            int task_id = next_task.fetch_add(1);
+            if (task_id >= multistart)
+              break;
+
+            // Staggered startup delay
+            int delay_ms = task_id * Optim::thread_start_delay_ms;
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+
+            worker(task_id);
+          }
+        });
+      }
+    }
 
     // Find best result
     int best_idx = -1;
