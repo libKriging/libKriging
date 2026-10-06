@@ -103,6 +103,35 @@ option(ENABLE_COVERAGE "Enable coverage target" OFF)
 option(ENABLE_MEMCHECK "Enable memcheck on tests" OFF)
 option(SANITIZE "Enable sanitize feature" OFF) # could be THREAD, ADDRESS or LEAK
 option(LBFGSB_SHOW_BUILD OFF)
+# GPU-accelerated matvec/CG for LLIterative and predictIterative, one option
+# per backend, each ON / OFF / AUTO (enabled iff its toolchain -- and, for
+# HIP, an AMD GPU -- is found at configure time). ENABLE_GPU_ITERATIVE, when
+# set, overrides all four at once: AUTO = detect every backend (what the
+# "-gpu" source packages use), OFF = CPU only (what every published binary
+# package uses). Resolved by cmake/gpu.cmake into the internal
+# LIBKRIGING_<BACKEND>_ITERATIVE (ON/OFF) the rest of the build reads. See
+# docs/dev/AllCMakeOptions.md.
+#
+# CUDA (default AUTO): a CUDA-enabled build has no load-time dependency on
+# the toolkit (static CUDA runtime, cuBLAS loaded on first use), so it runs
+# through the CPU path on machines without a GPU.
+# HIP (default OFF): verified 2026-09-13 on an AMD Radeon RX 6600 (gfx1032,
+# Windows, ROCm/HIP SDK 6.2.4 -- see src/lib/hip/HipLinearAlgebra.hpp);
+# needs CMake >= 3.21 and a ROCm install providing hip-config.cmake.
+# SYCL (default OFF): UNVERIFIED (see src/lib/sycl/SyclLinearAlgebra.hpp);
+# needs a C++ compiler accepting -fsycl (icpx, oneAPI clang++).
+# Metal (default OFF): UNVERIFIED (see src/lib/metal/MetalLinearAlgebra.hpp);
+# macOS only, needs the metal-cpp headers (METAL_CPP_DIR).
+set(ENABLE_GPU_ITERATIVE "" CACHE STRING
+        "Override every GPU backend option: AUTO (detect all), OFF (CPU only), or empty (use ENABLE_<BACKEND>_ITERATIVE)")
+set(ENABLE_CUDA_ITERATIVE "AUTO" CACHE STRING
+        "CUDA backend for LLIterative/predictIterative: ON, OFF or AUTO (if a CUDA toolkit is found)")
+set(ENABLE_HIP_ITERATIVE "OFF" CACHE STRING
+        "HIP/ROCm backend for LLIterative/predictIterative: ON, OFF or AUTO (if ROCm and an AMD GPU are found)")
+set(ENABLE_SYCL_ITERATIVE "OFF" CACHE STRING
+        "SYCL/oneAPI backend for LLIterative/predictIterative (UNVERIFIED): ON, OFF or AUTO (if the compiler accepts -fsycl)")
+set(ENABLE_METAL_ITERATIVE "OFF" CACHE STRING
+        "Apple Metal backend for LLIterative/predictIterative (UNVERIFIED): ON, OFF or AUTO (macOS with metal-cpp headers)")
 
 set(PYBIND11_PYTHON_VERSION 3.7)
 
@@ -120,6 +149,8 @@ else ()
         logFatalError("Invalid CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
     endif ()
 endif ()
+
+include(cmake/gpu.cmake)
 
 # ENABLE_STATIC_ANALYSIS default is OFF
 string(TOUPPER "${ENABLE_STATIC_ANALYSIS}" ENABLE_STATIC_ANALYSIS)

@@ -1,0 +1,42 @@
+name: bench/gpu comparison report
+
+# bench/gpu/results/*.csv are committed by hand after a real run on real
+# GPU/CPU hardware (bench_gpu.sh is explicitly NOT run in CI -- see
+# bench/gpu/README.md). This workflow only aggregates whatever has already
+# been committed into one cross-machine Plotly chart, so it triggers on
+# pushes that touch those CSVs (plus manual dispatch) rather than on every
+# push.
+on:
+  push:
+    paths:
+      - 'bench/gpu/results/*.csv'
+      - 'bench/gpu/plot_comparison.py'
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: Build comparison chart
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install plotly
+      - name: Build cross-machine comparison chart
+        run: python bench/gpu/plot_comparison.py
+      - name: Summarize
+        run: |
+          {
+            echo "### bench/gpu cross-machine comparison"
+            echo
+            echo "$(ls bench/gpu/results/*.csv | wc -l) result file(s):"
+            echo
+            for f in bench/gpu/results/*.csv; do echo "- \`$(basename "$f")\`"; done
+            echo
+            echo "Full interactive chart: see the \`bench-gpu-comparison\` artifact on this run."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-gpu-comparison
+          path: bench/gpu/results/comparison.html

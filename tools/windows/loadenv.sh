@@ -24,3 +24,9 @@ export PATH=${HOME}/Miniconda3/Library/bin:$PATH
 # (not loaded by default from PATH since Python ≥3.8)
 # An alternative could be to reuse PATH either in LIBKRIGING_DLL_PATH or __init__.py.
 export LIBKRIGING_DLL_PATH=${HOME}/Miniconda3/Library/bin
+
+# Belt and braces for OpenBLAS 0.3.34 (OpenMathLib/OpenBLAS#6013/#6021, see
+# the 0.3.33 pin in tools/windows/install.sh): its Zen 4 GEMM blocking
+# override only fires when L2 reads as 1024 KB, and overflows the stack of
+# dgemm_kernel_ZEN/HASWELL on AVX-512 Zen 4/5 hosts. Claiming 2 MB disables it.
+export OPENBLAS_L2_SIZE=2048

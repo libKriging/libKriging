@@ -60,6 +60,20 @@ ENABLE_MATLAB_BINDING=on ENABLE_PYTHON_BINDING=off tools/linux-macos/build.sh
 ENABLE_MATLAB_BINDING=on tools/linux-macos/test.sh
 ```
 
+## GPU acceleration
+
+Pre-built packages are **CPU only**. The GPU variant is compiled on your
+machine: from `libKriging-gpu_<version>_src.tar.gz` (release asset) or a
+clone with submodules, run `tools/install-gpu.sh octave` (or `matlab`); it
+detects CUDA, HIP/ROCm, SYCL and Metal, and builds for CPU if none is found.
+
+```matlab
+Gpu.backend()            % 'cuda', 'hip', ..., or 'none' (CPU)
+Gpu.set_enabled(false)   % force the CPU path (or LK_ITERATIVE_GPU=0)
+```
+
+See [GPU backends](../../docs/dev/AllCMakeOptions.md#gpu-backends).
+
 ## Test
 
 ```shell

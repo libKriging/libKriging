@@ -156,6 +156,32 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.setOptional(4, stderr_deriv_m, "predicted stdev deriv matrix");
 }
 
+void predictIterative(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Range{2, 7}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 2}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
+  const int max_iter = input.getOptional<int>(3, "max_iter").value_or(0);
+  const double tol = input.getOptional<double>(4, "tol").value_or(1e-8);
+  const bool use_nystrom_precond = input.getOptional<bool>(5, "use_nystrom_precond").value_or(false);
+  const int precond_rank = input.getOptional<int>(6, "precond_rank").value_or(50);
+  if (max_iter < 0)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "max_iter must be >= 0 (0 means the default, 2n)");
+  if (precond_rank < 0)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "precond_rank must be >= 0");
+  auto [mean_v, stdev_v] = km->predictIterative(input.get<arma::mat>(1, "matrix"),
+                                                return_stdev,
+                                                static_cast<arma::uword>(max_iter),
+                                                tol,
+                                                use_nystrom_precond,
+                                                static_cast<arma::uword>(precond_rank));
+  output.set(0, mean_v, "predicted response");
+  output.setOptional(1, stdev_v, "stdev vector");
+}
+
 void subsetOfData(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
@@ -472,6 +498,26 @@ void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   output.set(0, static_cast<int>(km->nystrom_rank()), "nystrom_rank");
+}
+
+void iterative_nprobe(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, static_cast<int>(km->iterative_nprobe()), "iterative_nprobe");
+}
+
+void is_iterative_light(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->is_iterative_light(), "is_iterative_light");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

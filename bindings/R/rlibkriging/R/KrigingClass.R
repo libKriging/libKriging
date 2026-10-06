@@ -4,15 +4,43 @@
 ## ****************************************************************************
 
 # Validate the `objective` argument. Unlike match.arg(), this accepts the
-# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)" and the
+# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)", the
 # Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
-# in addition to the classic "LL" / "LOO" / "LMP" (kept consistent with the
-# Python/Julia bindings, which pass `objective` as a free string).
+# and the matrix-free CG/SLQ approximated log-likelihood "LLIterative" /
+# "LLIterative(m)" / "LLIterative(m,precond_rank)" /
+# "LLIterative(m,precond_rank,lanczos_steps)" /
+# "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)" /
+# "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)" /
+# "LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"
+# (2nd form opts into a Nystrom-preconditioned CG for the fit's own solves;
+# 3rd form also sets the number of SLQ Lanczos steps per probe, default 20 --
+# raise it if the stochastic log-determinant drifts on an ill-conditioned R;
+# 4th raises the CG iteration budget to cg_max_iter_mult*n, default 2; 5th
+# sets the [F|y] solve's CG relative-residual tolerance, default 1e-4; 6th
+# sets a SEPARATE tolerance for the gradient's Hutchinson-probe CG solve,
+# which needs far more iterations than [F|y] at the same tolerance as n
+# grows -- defaults to the 5th field's value when omitted), in addition to
+# the classic "LL" / "LOO" / "LMP" (kept consistent with the Python/Julia
+# bindings, which pass `objective` as a free string).
+#
+# This regex must stay in sync with Kriging::parse_iterative_m: it runs BEFORE
+# the C++ parser, so anything it rejects never reaches C++ at all, and a
+# newly-added objective field silently becomes unusable from R until it is
+# added here too. Note the 5th and 6th fields are REALs (e.g. "1e-6", "0.01"),
+# not integers like the first four.
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
-    if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
+    if (!grepl(paste0("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?",
+                      "|LLIterative(\\([0-9]+(,[0-9]+(,[0-9]+(,[0-9]+",
+                      "(,[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?",
+                      "(,[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)?)?)?)?)?\\))?)$"),
+               objective))
         stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
-             "\"LLNystrom\" or \"LLNystrom(k)\" (got \"",
+             "\"LLNystrom\", \"LLNystrom(k)\", \"LLIterative\", \"LLIterative(m)\", ",
+             "\"LLIterative(m,precond_rank)\", \"LLIterative(m,precond_rank,lanczos_steps)\", ",
+             "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)\", ",
+             "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)\" or ",
+             "\"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -26,13 +54,13 @@ classKriging <- function(nk) {
     for (f in c('as.list','copy','fit','save',
     'covMat','leaveOneOut','leaveOneOutFun','leaveOneOutVec',
     'logLikelihood','logLikelihoodFun','logMargPost','logMargPostFun',
-    'predict','print','show','simulate','update', 'update_simulate')) {
+    'predict','predictIterative','print','show','simulate','update', 'update_simulate')) {
         eval(parse(text=paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','iterative_nprobe','is_iterative_light')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -71,10 +99,33 @@ classKriging <- function(nk) {
 #'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
 #'     log-likelihood with \code{m} conditioning neighbors (default 30):
 #'     each evaluation costs O(n m^3) instead of O(n^3), recommended for
-#'     large designs in low dimension; and \code{"LLNystrom"} or
+#'     large designs in low dimension; \code{"LLNystrom"} or
 #'     \code{"LLNystrom(k)"} for the Nystrom (global low-rank) approximated
 #'     log-likelihood with rank \code{k} (default 50): each evaluation costs
-#'     O(n k^2) instead of O(n^3), also recommended for large designs.
+#'     O(n k^2) instead of O(n^3), also recommended for large designs; and
+#'     \code{"LLIterative"} / \code{"LLIterative(m)"} /
+#'     \code{"LLIterative(m,precond_rank)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"}
+#'     for the matrix-free conjugate-gradient log-likelihood with \code{m}
+#'     stochastic-trace probes (default 30), an optional
+#'     rank-\code{precond_rank} Nystrom CG preconditioner (0 = off),
+#'     \code{lanczos_steps} Lanczos steps per probe in the stochastic
+#'     log-determinant estimate (default 20; raise it if the estimate drifts
+#'     on an ill-conditioned covariance), a CG iteration budget of
+#'     \code{cg_max_iter_mult * n} (default 2), a CG relative-residual
+#'     tolerance \code{cg_tol} for the \code{[F|y]} solve (default 1e-4 --
+#'     deliberately loose, since the stochastic log-determinant sitting next
+#'     to the solves has a far larger error of its own; tighten it only when
+#'     the solve outputs \code{beta}/\code{sigma2}/gradient are what needs
+#'     the precision) and a SEPARATE tolerance \code{probes_cg_tol} for the
+#'     gradient's Hutchinson-probe solve (default: tracks \code{cg_tol} --
+#'     that solve needs far more CG iterations than \code{[F|y]} to reach
+#'     the same tolerance as \code{n} grows, so it is the one worth loosening
+#'     independently):
+#'     keeps R exact and never factorizes it.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -254,9 +305,15 @@ print.Kriging <- function(x, ...) {
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
 #'     squares, \code{"LMP"} for the Log-Marginal Posterior,
 #'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
-#'     log-likelihood (see \code{\link{Kriging}}), and \code{"LLNystrom"} or
+#'     log-likelihood (see \code{\link{Kriging}}), \code{"LLNystrom"} or
 #'     \code{"LLNystrom(k)"} for the Nystrom approximated log-likelihood
-#'     (see \code{\link{Kriging}}).
+#'     (see \code{\link{Kriging}}), and \code{"LLIterative"} /
+#'     \code{"LLIterative(m)"} / \code{"LLIterative(m,precond_rank)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol)"} /
+#'     \code{"LLIterative(m,precond_rank,lanczos_steps,cg_max_iter_mult,cg_tol,probes_cg_tol)"}
+#'     for the matrix-free CG log-likelihood (see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -368,12 +425,64 @@ predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, 
 }
 
 
+#' Predict-only, matrix-free conjugate-gradient alternative to
+#' \code{predict} for a \code{Kriging} object.
+#'
+#' Solves each prediction with conjugate gradient instead of using a
+#' stored dense factor: O(n) memory instead of O(n^2), at the cost of
+#' O(n^2 * iters) compute per solve. Useful when a model's dense factor
+#' either was never computed or isn't worth keeping resident just for
+#' prediction. \code{return_stdev = TRUE} runs one extra CG solve PER
+#' prediction point, so it defaults to \code{FALSE}. Only available for
+#' models fitted without a nugget/noise channel. See
+#' \code{docs/math/PredictIterative.md} for the full derivation.
+#'
+#' @author Yann Richet \email{yann.richet@asnr.fr}
+#'
+#' @param object S3 Kriging object.
+#' @param x Input points where the prediction must be computed.
+#' @param return_stdev \code{Logical}. If \code{TRUE} the standard deviation
+#'     is returned (one extra CG solve per prediction point).
+#' @param max_iter CG iteration budget per solve (\code{0} = default, \code{2n}).
+#' @param tol Relative residual tolerance for early stopping.
+#' @param use_nystrom_precond \code{Logical}. If \code{TRUE}, build a rank-\code{precond_rank}
+#'     Nystrom factor of R at the model's own (already-fitted) theta and use it
+#'     as a CG preconditioner: fewer CG iterations to reach \code{tol} on the
+#'     typically ill-conditioned R, at a one-time setup cost. Off by default.
+#' @param precond_rank Rank of that Nystrom preconditioner, if enabled.
+#' @param ... Ignored.
+#'
+#' @return A list containing the element \code{mean} and, if
+#'     \code{return_stdev=TRUE}, \code{stdev}.
+#'
+#' @method predictIterative Kriging
+#' @export
+#'
+#' @examples
+#' f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
+#' set.seed(123)
+#' X <- as.matrix(runif(10))
+#' y <- f(X)
+#'
+#' k <- Kriging(y, X, "matern3_2")
+#'
+#' x <- seq(from = 0, to = 1, length.out = 101)
+#' p <- predictIterative(k, x)
+predictIterative.Kriging <- function(object, x, return_stdev = FALSE, max_iter = 0L, tol = 1e-8,
+                              use_nystrom_precond = FALSE, precond_rank = 50L, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (is.data.frame(x)) x = data.matrix(x)
+    if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
+    return(kriging_predictIterative(object, x, return_stdev, as.integer(max_iter), tol,
+                             use_nystrom_precond, as.integer(precond_rank)))
+}
+
 #' Subset-of-data pre-fit reduction.
 #'
 #' Selects a subset of \code{n_max} rows from a design \code{X}, meant to be
 #' used as a cheap pre-fit reduction for large designs: fit on
 #' \code{X[idx, ]}/\code{y[idx]} instead of the full data. Unlike
-#' Vecchia/Nystrom (which still use every point), this discards
+#' Vecchia/Nystrom/Iterative (which still use every point), this discards
 #' \code{n - n_max} points outright, in exchange for an ordinary exact fit
 #' on the reduced design.
 #'

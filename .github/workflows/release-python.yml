@@ -12,6 +12,10 @@ on:
         default: ''
 
 env:
+  # Published binary packages are CPU-only, whatever GPU toolkit a runner may
+  # have; the GPU variants are source packages (pylibkriging-gpu sdist,
+  # libKriging-gpu_<version>_src archive) compiled on the user's machine.
+  ENABLE_GPU_ITERATIVE: "OFF"
   DEBUG_CI: true
   # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
@@ -184,11 +188,39 @@ jobs:
           path: |
             dist 
             
+  build-sdist-gpu:
+    name: pylibkriging-gpu source distribution
+    needs: check-release-consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist
+        shell: bash
+        run: |
+          pip3 install setuptools wheel packaging numpy
+          tools/release/python-sdist-gpu.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-artifact-sdist-gpu
+          path: |
+            dist/pylibkriging_gpu-*.tar.gz
+
   all-package-build-checkpoint:
     name: Build package checkpoint
     needs:
       - check-release-consistency
       - build-wheel-python
+      - build-sdist-gpu
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -265,6 +297,21 @@ jobs:
                   --repository-url https://upload.pypi.org/legacy/ \
                   ./dist/*.whl
         if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}  
+
+      # pylibkriging-gpu is a separate PyPI project (source distribution only,
+      # compiled with GPU auto-detection on the installing machine): its own
+      # step, so a token not yet authorized for that project cannot block the
+      # CPU wheels above.
+      - name: upload pylibkriging-gpu sdist
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD_GPU || secrets.TWINE_PASSWORD }}
+        run: |
+          pip3 install twine
+          python3 -m twine upload \
+                  --repository-url https://upload.pypi.org/legacy/ \
+                  ./dist/pylibkriging_gpu-*.tar.gz
+        if: ${{ needs.check-release-consistency.outputs.draft-release == 'false' }}
 
   release-artifacts:
     name: Upload Release Assets

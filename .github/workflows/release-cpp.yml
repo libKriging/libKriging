@@ -12,6 +12,10 @@ on:
         default: ''
 
 env:
+  # Published binary packages are CPU-only, whatever GPU toolkit a runner may
+  # have; the GPU variants are source packages (pylibkriging-gpu sdist,
+  # libKriging-gpu_<version>_src archive) compiled on the user's machine.
+  ENABLE_GPU_ITERATIVE: "OFF"
   DEBUG_CI: true
   # cmake >= 4 rejects deps declaring cmake_minimum_required < 3.5 (pinned pybind11)
   CMAKE_POLICY_VERSION_MINIMUM: "3.5"
@@ -171,11 +175,33 @@ jobs:
           path: |
             cpp-package
 
+  build-gpu-source-archive:
+    name: "-gpu source archive"
+    needs: check-release-consistency
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Build libKriging-gpu source archive
+        shell: bash
+        run: |
+          GIT_TAG=${{ needs.check-release-consistency.outputs.git-tag }} tools/release/gpu-source-archive.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-artifact-gpu-src
+          path: |
+            gpu-package
+
   create-release-if-needed:
     name: Create Release
     needs:
       - check-release-consistency
       - build-cpp-library
+      - build-gpu-source-archive
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

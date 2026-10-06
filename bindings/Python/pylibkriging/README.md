@@ -62,6 +62,26 @@ import pylibkriging as lk
 importlib.reload(lk)
 ```
 
+## GPU acceleration
+
+Two variants install the same `pylibkriging` module (install one, not both):
+
+- `pip install pylibkriging`: binary wheels, **CPU only** (default).
+- `pip install pylibkriging-gpu`: source distribution compiled on your
+  machine with every GPU backend found there (CUDA, HIP/ROCm, SYCL, Metal);
+  needs a C++17 compiler, BLAS/LAPACK and the GPU toolkit, and falls back to
+  a CPU build when no GPU toolchain is found.
+
+Only `objective="LLIterative(...)"` fits and `predictIterative` use the GPU.
+
+```python
+import pylibkriging as lk
+lk.gpu_backend()            # "cuda", "hip", ..., or "none" (CPU)
+lk.set_gpu_enabled(False)   # force the CPU path (or LK_ITERATIVE_GPU=0)
+```
+
+See [GPU backends](https://github.com/libKriging/libKriging/blob/master/docs/dev/AllCMakeOptions.md#gpu-backends).
+
 ## Releasing
 
 Wheels are built and uploaded to PyPI by the `release-python` GitHub workflow

@@ -73,6 +73,22 @@ julia -e 'using Pkg; Pkg.develop(path="bindings/Julia/jlibkriging")'
 
 The shared library `libkriging_c` is auto-detected from the `build/` directory.
 
+## GPU acceleration
+
+Release archives are **CPU only**. The GPU variant is compiled on your
+machine: from `libKriging-gpu_<version>_src.tar.gz` (release asset) or a
+clone with submodules, run `tools/install-gpu.sh julia` (detects CUDA,
+HIP/ROCm, SYCL, Metal; CPU build if none) and point `JLIBKRIGING_LIB_PATH`
+to the `libkriging_c` library it prints. For JLibKriging.jl, pass
+`-DENABLE_GPU_ITERATIVE=AUTO` to its libKriging build.
+
+```julia
+gpu_backend()            # "cuda", "hip", ..., or "none" (CPU)
+set_gpu_enabled(false)   # force the CPU path (or LK_ITERATIVE_GPU=0)
+```
+
+See [GPU backends](../../docs/dev/AllCMakeOptions.md#gpu-backends).
+
 ## Test
 
 Via CMake/CTest (runs all tests including Julia):

@@ -1,5 +1,6 @@
 #include "libkriging_c.h"
 
+#include <libKriging/Gpu.hpp>
 #include <libKriging/Kriging.hpp>
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
@@ -42,6 +43,34 @@ static thread_local std::string g_last_error;
 
 const char* lk_get_last_error(void) {
   return g_last_error.c_str();
+}
+
+/* ========================================================================== */
+/*  GPU                                                                       */
+/* ========================================================================== */
+
+const char* lk_gpu_compiled_backends(void) {
+  static thread_local std::string s;
+  s = libKriging::gpu::compiled_backends();
+  return s.c_str();
+}
+
+int lk_gpu_available(void) {
+  return libKriging::gpu::available() ? 1 : 0;
+}
+
+const char* lk_gpu_backend(void) {
+  static thread_local std::string s;
+  s = libKriging::gpu::active_backend();
+  return s.c_str();
+}
+
+int lk_gpu_enabled(void) {
+  return libKriging::gpu::enabled() ? 1 : 0;
+}
+
+void lk_set_gpu_enabled(int value) {
+  libKriging::gpu::set_enabled(value != 0);
 }
 
 /* ========================================================================== */
@@ -221,6 +250,39 @@ int lk_kriging_predict(void* ptr,
       std::memcpy(mean_deriv_out, mean_deriv_m.memptr(), mean_deriv_m.n_elem * sizeof(double));
     if (stdev_deriv_out && return_deriv)
       std::memcpy(stdev_deriv_out, stdev_deriv_m.memptr(), stdev_deriv_m.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_predictIterative(void* ptr,
+                                const double* X_n,
+                                int m,
+                                int d,
+                                int return_stdev,
+                                int max_iter,
+                                double tol,
+                                int use_nystrom_precond,
+                                int precond_rank,
+                                double* mean_out,
+                                double* stdev_out) {
+  try {
+    if (max_iter < 0)
+      throw std::invalid_argument("lk_kriging_predictIterative: max_iter must be >= 0 (0 means the default, 2n)");
+    if (precond_rank < 0)
+      throw std::invalid_argument("lk_kriging_predictIterative: precond_rank must be >= 0");
+    auto* k = static_cast<Kriging*>(ptr);
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    auto [mean_v, stdev_v] = k->predictIterative(X_m,
+                                                 return_stdev != 0,
+                                                 static_cast<arma::uword>(max_iter),
+                                                 tol,
+                                                 use_nystrom_precond != 0,
+                                                 static_cast<arma::uword>(precond_rank));
+    if (mean_out)
+      std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
+    if (stdev_out && return_stdev)
+      std::memcpy(stdev_out, stdev_v.memptr(), stdev_v.n_elem * sizeof(double));
     return 0;
   }
   CATCH_RETURN
@@ -486,6 +548,20 @@ const char* lk_kriging_objective(void* ptr) {
 int lk_kriging_nystrom_rank(void* ptr) {
   try {
     return static_cast<int>(static_cast<Kriging*>(ptr)->nystrom_rank());
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_iterative_nprobe(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->iterative_nprobe());
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_is_iterative_light(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->is_iterative_light() ? 1 : 0;
   }
   CATCH_RETURN
 }

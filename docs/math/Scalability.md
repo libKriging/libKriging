@@ -15,13 +15,16 @@ method has its own page with the full derivation.
 |---|---|---|---|---|---|
 | `LLVecchia(m)` | fit objective | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
 | `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
+| `LLIterative(m[,r[,s]])` | fit objective | O(n²·iters) per CG solve, batched over all m+1 right-hand sides (one covariance sweep per iteration); SLQ log-det is `s` (default 20) Lanczos steps/probe, run through the same batched matvec | *nothing* structural — R stays exact; only `log\|R\|` is a stochastic (SLQ) estimate. Raise `s`, or set a Nystrom preconditioner rank `r` (which also whitens the SLQ operator), if it drifts on ill-conditioned R | none (doesn't touch the covariance structure) | [Iterative.md](Iterative.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
+| `predictIterative` | predict only | O(n²·iters) mean, +O(n²·iters·q) for stdev | *nothing* — same exact objective, iterative linear algebra instead of a dense factor | none (doesn't touch the covariance structure) | [PredictIterative.md](PredictIterative.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
+| GPU backend (CUDA / HIP; SYCL, Metal unverified) | `LLIterative` fit + `predictIterative` only | same asymptotic cost, device-batched matvec/CG/SLQ | *nothing* — same iterative computation on the device | none | [Iterative.md](Iterative.md); published binary packages are CPU-only; the `-gpu` source variants compile with every backend found on the user's machine — see [AllCMakeOptions.md](../dev/AllCMakeOptions.md#gpu-backends) |
 
-All of these (Vecchia, Nystrom, NestedKriging, subsetOfData) are usable
-independently and, where noted below, combinable — none of them require
-opting out of the others.
+All of these (Vecchia, Nystrom, Iterative, NestedKriging, predictIterative,
+subsetOfData) are usable independently and, where noted below,
+combinable — none of them require opting out of the others.
 
 ## Which one, when
 
@@ -42,6 +45,20 @@ opting out of the others.
      submodels per group, aggregates predictions (`NK` by default —
      converges to the exact/PoE-family predictor as group size grows;
      see [Nested.md](Nested.md) §3 for the aggregation choice).
+   - **You want to keep R itself exact — no structural approximation
+     at all, not even locally/low-rank — and only accept a stochastic
+     estimate of the one term CG can't give directly (`log|R|`)**
+     → `objective="LLIterative(m)"`. Every other term (β, σ², the
+     gradient's quadratic form) is exact up to CG's tolerance; costs
+     O(n²) per matvec like the exact objective's O(n³) factorization
+     would eventually need, but never materializes R and never
+     factorizes it. Optionally add a Nystrom preconditioner
+     (`"LLIterative(m,precond_rank)"`) — it cuts the CG iteration count on
+     ill-conditioned fits *and* whitens the SLQ log-determinant operator
+     (`R̃ = L⁻¹RL⁻ᵀ`, `log|R| = log|P| + log|P⁻¹R|`), so it also curbs the
+     `log|R|` bias — and/or raise the SLQ Lanczos step count
+     (`"LLIterative(m,precond_rank,lanczos_steps)"`, default 20) when the
+     stochastic `log|R|` drifts from the exact objective.
    - **Willing to lose information rather than approximate it**:
      `subsetOfData(X, n_max)` picks `n_max` representative rows
      (k-means, snapped to real points) and hands them to an ordinary
@@ -50,7 +67,18 @@ opting out of the others.
      discarding `n - n_max` observations outright rather than using all
      of them more cheaply the way every other method here does.
 
-2. **Regardless of which of the above you use**: OpenMP parallelizes
+2. **Is the fit fine (ordinary `"LL"`/`"LOO"`/`"LMP"`, one-time O(n³) is
+   acceptable) but you don't want an O(n²) dense factor resident just
+   for `predict` — or it was never computed at all?**
+   → `predictIterative`. Doesn't change the objective or its accuracy at all;
+   just solves each prediction with matrix-free conjugate gradient
+   instead of reusing a stored factor. `return_stdev=true` is
+   opt-in-expensive (one CG solve *per prediction point*) — cheap only
+   for the mean, or for a handful of stdev queries. On an
+   ill-conditioned fit, `use_nystrom_precond=true` cuts the iteration
+   count needed to reach a given tolerance (see [PredictIterative.md](PredictIterative.md)).
+
+3. **Regardless of which of the above you use**: OpenMP parallelizes
    independent work (multi-start `optim`, multi-trajectory `simulate`,
    multi-point `predict`) transparently when built with it — no API
    change, always worth having on for large designs.
@@ -67,31 +95,54 @@ target* it converges to as group size grows.
   (`objective="LLVecchia(m)"`) instead of a full O(n³) reference fit —
   see [Nested.md](Nested.md)'s "Common prior" section. `LLNystrom` is
   **not** currently wired into `NestedKriging`'s common-prior path.
+- **`predictIterative` after a light Vecchia fit**: a light Vecchia fit
+  (`set_vecchia_exact_commit(false)`) never has a resident dense
+  factor, so `predict` on it always routes to the *local* Vecchia
+  predictor. `predictIterative` is a legitimate alternative there too — same
+  fitted θ/β, but a *global* (not m-neighbor-local) prediction, at
+  O(n²·iters) instead of Vecchia's O(n³) exact-commit cost. Neither
+  path is automatic; call the one you want explicitly.
+- **`predictIterative` after a Nystrom fit**: works (predictIterative only needs
+  m_X/m_y/m_F/θ/β, which a Nystrom fit still populates in full), but is
+  usually pointless — `predictNystrom` reuses the fit's own committed
+  low-rank factors and is cheaper than a fresh CG solve over the full n.
+- **`LLIterative` fits are also permanent light fits**: like Nystrom and
+  a light-mode Vecchia, an `LLIterative` fit's `predict()` always routes
+  to `predictIterative` — see [Iterative.md](Iterative.md).
+  `predictIterative`'s own `use_nystrom_precond` is independent of whether the
+  fit itself used `LLIterative(m,precond_rank)`'s preconditioner; each
+  must be enabled explicitly where it's used.
 - **`subsetOfData` before any of the above**: since it's a plain
   pre-fit row selection, not a fit objective, it composes with every
   other method here — reduce `(X, y)` first, then fit with
-  `LLVecchia`/`LLNystrom`/`NestedKriging`/exact `"LL"` on the reduced
-  design if it's still large enough to warrant one of them.
-- **Vecchia/Nystrom + `NoiseModel`**: neither supports a nugget/noise
-  channel yet (`NoiseModel::None` only) — see each method's own
-  "Current limitations" section.
+  `LLVecchia`/`LLNystrom`/`LLIterative`/`NestedKriging`/exact `"LL"` on
+  the reduced design if it's still large enough to warrant one of them.
+- **Vecchia/Nystrom/Iterative + `NoiseModel`**: none of the three
+  support a nugget/noise channel yet (`NoiseModel::None` only) — see
+  each method's own "Current limitations" section.
 
 ## Not implemented (deferred)
 
 Evaluated and explicitly out of scope for now (see the project's own
-scalability roadmap analysis): GPU acceleration (a Bandicoot port would
-be the lowest-effort path, since it mirrors Armadillo's API, but
-untested on this project's target platforms), and structured/inducing-
+scalability roadmap analysis): GPU acceleration *beyond the iterative
+path* — the opt-in CUDA/HIP (and unverified SYCL/Metal) backends only
+accelerate `LLIterative`/`predictIterative`'s matvec/CG/SLQ; the exact
+Cholesky fit, `LLVecchia`, `LLNystrom` and `NestedKriging` stay CPU-only
+(a Bandicoot port would be the lowest-effort path for those, since it
+mirrors Armadillo's API, but untested on this project's target
+platforms) — and structured/inducing-
 point variational methods (KISS-GP/SKI, SVGP) — these would need a
 substantially different inference engine (approximate ELBO, automatic
 differentiation through arbitrary kernel compositions) rather than an
 incremental addition to the current exact-linear-algebra core. See
 [libKriging_vs_GPyTorch.ipynb](../comparisons/libKriging_vs_GPyTorch.ipynb)
 for a direct comparison against a library that does implement these
-(GPyTorch's BBMM/CG + GPU + variational stack).
+(GPyTorch's BBMM/CG + GPU + variational stack), including a GPU-vs-GPU
+sweep of `LLIterative` against BBMM.
 
 ## References
 
 See each method's own page ([Vecchia.md](Vecchia.md),
-[Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
+[Nystrom.md](Nystrom.md), [Iterative.md](Iterative.md),
+[Nested.md](Nested.md), [PredictIterative.md](PredictIterative.md),
 [SubsetOfData.md](SubsetOfData.md)) for its specific references.

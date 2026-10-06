@@ -9,6 +9,10 @@ on:
         default: ''
 
 env:
+  # Published binary packages are CPU-only, whatever GPU toolkit a runner may
+  # have; the GPU variants are source packages (pylibkriging-gpu sdist,
+  # libKriging-gpu_<version>_src archive) compiled on the user's machine.
+  ENABLE_GPU_ITERATIVE: "OFF"
   DEBUG_CI: true
 
 jobs:

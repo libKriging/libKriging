@@ -55,6 +55,26 @@ tools/r-windows/build.sh
 tools/r-windows/test.sh
 ```
 
+## GPU acceleration
+
+The CRAN package and the release archives are **CPU only**. The GPU variant
+is compiled on your machine: download `libKriging-gpu_<version>_src.tar.gz`
+from the [releases](https://github.com/libKriging/libKriging/releases)
+(or use a clone with submodules), then
+
+```shell
+tools/install-gpu.sh r      # detects CUDA, HIP/ROCm, SYCL, Metal; CPU build if none
+```
+
+Only `objective = "LLIterative(...)"` fits and `predictIterative` use the GPU.
+
+```r
+gpu_backend()            # "cuda", "hip", ..., or "none" (CPU)
+set_gpu_enabled(FALSE)   # force the CPU path (or LK_ITERATIVE_GPU=0)
+```
+
+See [GPU backends](../../docs/dev/AllCMakeOptions.md#gpu-backends). Not available for R on Windows.
+
 ## Test
 
 ```shell

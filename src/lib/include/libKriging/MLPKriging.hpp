@@ -98,6 +98,18 @@ class MLPKriging {
                                                                                               bool return_deriv
                                                                                               = false) const;
 
+  /** Predict-only alternative to `predict`, using matrix-free conjugate
+   * gradient instead of the stored O(n^2) Cholesky factor -- see
+   * `Kriging::predictIterative`'s doc for the general idea and parameters; same
+   * signature and defaults, only available when there is no per-point noise
+   * channel. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictIterative(const arma::mat& X_n,
+                                                                      bool return_stdev = false,
+                                                                      arma::uword max_iter = 0,
+                                                                      double tol = 1e-8,
+                                                                      bool use_nystrom_precond = false,
+                                                                      arma::uword precond_rank = 50) const;
+
   LIBKRIGING_EXPORT arma::mat simulate(int nsim, int seed, const arma::mat& X_n, bool will_update = false);
 
   LIBKRIGING_EXPORT arma::mat update_simulate(const arma::vec& y_u, const arma::mat& X_u);

@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import sys
 import platform
 import subprocess
@@ -32,6 +33,25 @@ def main():
     libKriging_path = Path(__file__).absolute().parents[3]
     print(f"LibKriging root directory is {libKriging_path}")
     os.chdir(libKriging_path)
+
+    # Distribution variant. "" (default): the `pylibkriging` package, whose
+    # published wheels are CPU-only. "gpu": the `pylibkriging-gpu` source
+    # distribution, compiled at install time with every GPU backend found on
+    # the installing machine (ENABLE_GPU_ITERATIVE=AUTO). Selected by
+    # LIBKRIGING_PY_VARIANT, or by a VARIANT file next to this setup.py:
+    # tools/release/python-sdist-gpu.sh writes that file only for the time of
+    # `setup.py sdist`, so it ships inside the pylibkriging-gpu sdist (which
+    # then builds the gpu variant with no environment variable) and never
+    # lingers in a checkout used to build the CPU wheels.
+    global variant
+    variant_file = Path(__file__).absolute().parent / "VARIANT"
+    variant = os.environ.get("LIBKRIGING_PY_VARIANT")
+    if variant is None and variant_file.exists():
+        variant = variant_file.read_text().strip()
+    variant = (variant or "").strip().lower()
+    if variant not in ("", "gpu"):
+        eprint(f"Unknown LIBKRIGING_PY_VARIANT '{variant}' (expected '' or 'gpu')")
+        exit(1)
     with open("cmake/version.cmake", "r") as file:
         data = file.read()
 
@@ -57,7 +77,7 @@ def main():
         long_description = 'Python support for libKriging, the kriging library for performance and wide language support'
 
     setup(
-        name='pylibkriging',
+        name='pylibkriging-gpu' if variant == 'gpu' else 'pylibkriging',
         packages=['pylibkriging'],
         version=kriging_version,
         author='Pascal Havé',
@@ -133,14 +153,37 @@ class CMakeBuild(build_ext):
                       '-DENABLE_PYTHON_BINDING=on',
                       '-DENABLE_OCTAVE_BINDING=off',
                       '-DENABLE_MATLAB_BINDING=off',
+                      '-DENABLE_JULIA_BINDING=off',
                       '-DBUILD_SHARED_LIBS=off',
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       f'-DKRIGING_VERSION={self.distribution.get_version()}'
                       ]
+        # GPU backends: ENABLE_GPU_ITERATIVE=AUTO detects every backend
+        # (CUDA, HIP, SYCL, Metal) on the building machine -- the default of
+        # the "gpu" variant; OFF forces a CPU-only build -- what the release
+        # scripts export for the published wheels. Without either, CMake's
+        # per-backend defaults apply (ENABLE_CUDA_ITERATIVE=AUTO, others OFF).
+        gpu_mode = os.environ.get('ENABLE_GPU_ITERATIVE', 'AUTO' if variant == 'gpu' else '')
+        if variant == 'gpu':
+            # No auditwheel step bundles shared dependencies into a source
+            # install: link armadillo/lbfgsb statically into the extension.
+            cmake_args += ['-DSTATIC_LIB=on']
+        if gpu_mode:
+            cmake_args += ['-DENABLE_GPU_ITERATIVE=' + gpu_mode]
+        for backend in ('CUDA', 'HIP', 'SYCL', 'METAL'):
+            value = os.environ.get(f'ENABLE_{backend}_ITERATIVE')
+            if value:
+                cmake_args += [f'-DENABLE_{backend}_ITERATIVE={value}']
+        # Any further CMake options, e.g. LIBKRIGING_CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=90"
+        cmake_args += shlex.split(os.environ.get('LIBKRIGING_CMAKE_ARGS', ''))
 
         cfg = 'Debug' if args.debug else 'Release'
         print('build mode:', cfg)
         build_args = ['--config', cfg]
+        if variant == 'gpu':
+            # End-user install from source: only the extension (and the
+            # libraries it needs), not the C++ tests and benchmarks.
+            build_args += ['--target', '_pylibkriging']
 
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
@@ -155,6 +198,9 @@ class CMakeBuild(build_ext):
 
         env = os.environ.copy()
         env['CXXFLAGS'] = env.get('CXXFLAGS', '')
+        # CMake >= 4 (what `pip install` may fetch as a build dependency)
+        # rejects the pinned dependencies' cmake_minimum_required < 3.5.
+        env.setdefault('CMAKE_POLICY_VERSION_MINIMUM', '3.5')
 
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
