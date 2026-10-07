@@ -360,6 +360,11 @@ endif()
 catch_discover_tests(NestedKrigingTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
+add_executable(MultiOutputKrigingTest MultiOutputKrigingTest.cpp)
+target_link_libraries(MultiOutputKrigingTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries MultiOutputKrigingTest)
+catch_discover_tests(MultiOutputKrigingTest)
+
 add_executable(KrigingVecchiaTest KrigingVecchiaTest.cpp)
 target_link_libraries(KrigingVecchiaTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingVecchiaTest)
