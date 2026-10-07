@@ -405,6 +405,10 @@ discards n - n_max points outright.)pbdoc")
            &PyMultiOutputKriging::logLikelihoodFun,
            py::arg("theta"),
            py::arg("return_grad") = false)
+      .def("leaveOneOutFun",
+           &PyMultiOutputKriging::leaveOneOutFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false)
       .def("__repr__", [](const PyMultiOutputKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")

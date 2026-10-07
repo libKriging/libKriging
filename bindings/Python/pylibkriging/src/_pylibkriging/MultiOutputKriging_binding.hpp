@@ -78,6 +78,7 @@ class PyMultiOutputKriging {
   [[nodiscard]] py::array_t<double> beta() const;
   double logLikelihood();
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, bool return_grad);
+  std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, bool return_grad);
   /// Copy of the k-th latent Kriging (independent of this model afterwards)
   [[nodiscard]] PyKriging component(unsigned long k) const;
 

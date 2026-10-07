@@ -40,6 +40,12 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
   /// an intercept, has σ_j² = 0 and is left out (it would make LL infinite)
   arma::uvec active;
 
+  // state of the last simulate(..., will_update = true): raw points (m × d),
+  // normalized draws (m × q × nsim), seed
+  arma::mat sim_X;
+  arma::cube sim_Yn;
+  int sim_seed = 0;
+
   [[nodiscard]] bool fitted() const { return !m_is_empty; }
   [[nodiscard]] const arma::vec& theta_() const { return m_theta; }
 
@@ -105,6 +111,55 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     return ll;
   }
 
+  // Leave-one-out mean squared error (Dubrule 1983), summed over outputs on
+  // the internal (normalized) scale: Σ_j Σ_i e_ij² / n. Gradient in θ as in
+  // Kriging::_leaveOneOut, column by column.
+  double leaveOneOutObj(const arma::vec& theta, arma::vec* grad_out, KModel* model) const {
+    const arma::uword n = m_X.n_rows;
+    const arma::uword d = m_X.n_cols;
+    KModel m_local;
+    if (model != nullptr)
+      populate_Model(*model, theta, 1.0, KrigingImpl::ones, false, nullptr, &Y);
+    else
+      m_local = make_model(theta);
+    KModel& m = (model != nullptr) ? *model : m_local;
+
+    if ((m.Linv.memptr() == nullptr) || (arma::size(m.Linv) != arma::size(m.L)))
+      m.Linv = LinearAlgebra::solve_lower(m.L, arma::mat(n, n, arma::fill::eye));
+    const arma::mat By = m.Linv.t() * m.Estar;  // n × q
+    arma::mat Qstar, Rtmp;
+    LinearAlgebra::qr_econ(Qstar, Rtmp, m.Fstar);
+    const arma::mat A = Qstar.t() * m.Linv;
+    const arma::mat H = LinearAlgebra::crossprod(m.Linv) - LinearAlgebra::crossprod(A);
+    const arma::vec s2loo = 1.0 / H.diag();
+    arma::mat err = By;
+    err.each_col() %= s2loo;
+    const double loo = arma::accu(err % err) / n;
+
+    if (grad_out != nullptr) {
+      grad_out->set_size(d);
+      arma::mat gradR_k(n, n);
+      for (arma::uword k = 0; k < d; ++k) {
+        gradR_k.zeros();
+        for (arma::uword i = 0; i < n; ++i)
+          for (arma::uword j = 0; j < i; ++j) {
+            const double g = m.R.at(i, j) * _DlnCovDtheta(m_dX.col(i * n + j), theta).at(k);
+            gradR_k.at(i, j) = g;
+            gradR_k.at(j, i) = g;
+          }
+        const arma::vec diagdH = -LinearAlgebra::diagABA(H, gradR_k);
+        const arma::vec ds2loo = -s2loo % s2loo % diagdH;
+        arma::mat derr = By;
+        derr.each_col() %= ds2loo;
+        arma::mat t2 = H * (gradR_k * By);
+        t2.each_col() %= s2loo;
+        derr -= t2;
+        (*grad_out)(k) = 2 * arma::accu(err % derr) / n;
+      }
+    }
+    return loo;
+  }
+
   void commit(KModel& m) {
     const double n = static_cast<double>(m_X.n_rows);
     m_R = std::move(m.R);
@@ -126,14 +181,16 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
            const std::string& optim,
            const std::string& objective,
            const Parameters& parameters) {
-    if (objective != "LL")
+    if (objective != "LL" && objective != "LOO")
       throw std::invalid_argument("MultiOutputKriging: objective '" + objective
-                                  + "' is not supported by the \"shared\" output model (only \"LL\")");
+                                  + "' is not supported by the \"shared\" output model (LL or LOO)");
+    const bool loo = objective == "LOO";
     const arma::uword n = X.n_rows;
     const arma::uword d = X.n_cols;
     m_optim = optim;
     m_objective = objective;
     m_is_empty = true;
+    clear_sim();
 
     normalize_outputs(Yraw, normalize);
     arma::mat theta0 = fit_setup_X_impl(X, regmodel, normalize, parameters.theta);
@@ -178,14 +235,15 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
 
     auto to_gamma = [](const arma::vec& t) { return Optim::reparametrize ? Optim::reparam_to(t) : t; };
     auto from_gamma = [](const arma::vec& g) { return Optim::reparametrize ? Optim::reparam_from(g) : g; };
-    // minimized: −LL in γ
+    // minimized in γ: −LL, or the LOO mean squared error
     auto ofn = [&](const arma::vec& gamma, arma::vec* grad_out, KModel* m) -> double {
       const arma::vec theta = from_gamma(gamma);
-      double ll = logLikelihood(theta, grad_out, m);
+      const double sign = loo ? 1.0 : -1.0;
+      double f = loo ? leaveOneOutObj(theta, grad_out, m) : logLikelihood(theta, grad_out, m);
       if (grad_out != nullptr)
-        *grad_out = Optim::reparametrize ? arma::vec(-Optim::reparam_from_deriv(theta, *grad_out))
-                                         : arma::vec(-*grad_out);
-      return -ll;
+        *grad_out = sign
+                    * (Optim::reparametrize ? arma::vec(Optim::reparam_from_deriv(theta, *grad_out)) : *grad_out);
+      return sign * f;
     };
 
     const arma::vec gamma_lower = to_gamma(theta_lower);
@@ -205,8 +263,10 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
         lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
         optimizer.iprint = -1;
         optimizer.max_iter = Optim::max_iteration;
-        optimizer.pgtol = Optim::gradient_tolerance;
-        optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+        // tolerances scaled by n² for LOO, as in Kriging
+        const double tol_scale = loo ? static_cast<double>(n * n) : 1.0;
+        optimizer.pgtol = Optim::gradient_tolerance / tol_scale;
+        optimizer.factr = Optim::objective_rel_tolerance / 1E-13 / tol_scale;
         arma::ivec bounds_type{d, arma::fill::value(2)};
 
         // same restart policy as Kriging
@@ -317,29 +377,107 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     return std::make_tuple(std::move(mean), std::move(stdev), std::move(cov), std::move(deriv));
   }
 
-  arma::cube simulate(int nsim, int seed, const arma::mat& X_n) const {
-    const arma::uword m = X_n.n_rows;
-    const arma::uword q = Y.n_cols;
-    auto [Xn, F_n] = normalize_X(X_n);
+  void clear_sim() {
+    sim_X.reset();
+    sim_Yn.reset();
+  }
+
+  // Joint conditional distribution at raw points X_p (P × d), normalized
+  // scale and unit variance: mean (P × q) and correlation Σ (P × P); output j
+  // has covariance σ_j² Σ.
+  std::pair<arma::mat, arma::mat> conditional(const arma::mat& X_p) const {
+    const arma::uword P = X_p.n_rows;
+    auto [Xn, F_n] = normalize_X(X_p);
     const arma::mat R_on = cross_corr(arma::trans(m_X), Xn, 1.0, false);
     const arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
-    const arma::mat yhat = F_n * B + Rstar_on.t() * Z;
+    arma::mat yhat = F_n * B + Rstar_on.t() * Z;
     const arma::mat Ecirc_n = LinearAlgebra::rsolve_upper(m_circ, F_n - Rstar_on.t() * m_M);
-    arma::mat R_nn(m, m, arma::fill::none);
+    arma::mat R_nn(P, P, arma::fill::none);
     LinearAlgebra::covMat_sym_X(&R_nn, Xn, m_theta, _Cov, 1.0, KrigingImpl::ones);
-    const arma::mat L = LinearAlgebra::safe_chol_lower(R_nn - Rstar_on.t() * Rstar_on + Ecirc_n * Ecirc_n.t());
+    arma::mat Sigma = R_nn - Rstar_on.t() * Rstar_on + Ecirc_n * Ecirc_n.t();
+    return {std::move(yhat), std::move(Sigma)};
+  }
+
+  arma::cube simulate(int nsim, int seed, const arma::mat& X_n, bool will_update) {
+    const arma::uword m = X_n.n_rows;
+    const arma::uword q = Y.n_cols;
+    auto [yhat, Sigma] = conditional(X_n);
+    const arma::mat L = LinearAlgebra::safe_chol_lower(Sigma);
 
     // outputs drawn in turn from one seeded stream (q = 1 matches Kriging)
-    arma::cube out(m, q, nsim);
+    arma::cube yn(m, q, nsim);
     Random::reset_seed(seed);
     for (arma::uword j = 0; j < q; ++j) {
       arma::mat y_n = L * Random::randn_mat(m, nsim) * std::sqrt(s2(j));
       y_n.each_col() += yhat.col(j);
-      y_n = centerY(j) + scaleY(j) * y_n;
       for (int s = 0; s < nsim; ++s)
-        out.slice(s).col(j) = y_n.col(s);
+        yn.slice(s).col(j) = y_n.col(s);
     }
-    return out;
+    if (will_update) {
+      sim_X = X_n;
+      sim_Yn = yn;
+      sim_seed = seed;
+    } else {
+      clear_sim();
+    }
+    return to_raw(std::move(yn));
+  }
+
+  arma::cube to_raw(arma::cube yn) const {
+    for (arma::uword s = 0; s < yn.n_slices; ++s) {
+      yn.slice(s).each_row() %= scaleY;
+      yn.slice(s).each_row() += centerY;
+    }
+    return yn;
+  }
+
+  /** Condition the last simulate() draws on new data (X_u, Y_u), model kept:
+   * with Σ the joint conditional correlation of (Y(X_n), Y(X_u)) given the
+   * data, for each draw y_n
+   *   1. draw y_u ~ N(μ_u + Σ_un Σ_nn⁻¹ (y_n − μ_n), σ² (Σ_uu − Σ_un Σ_nn⁻¹ Σ_nu)),
+   *      so (y_n, y_u) is a joint draw;
+   *   2. y_n ← y_n + Σ_nu Σ_uu⁻¹ (Y_u − y_u)   (conditioning by kriging).
+   * Exact for fixed θ, β integrated out as in universal kriging. */
+  arma::cube update_simulate(const arma::mat& Y_u, const arma::mat& X_u) const {
+    if (sim_Yn.n_elem == 0)
+      throw std::runtime_error("MultiOutputKriging::update_simulate: call simulate(..., will_update=true) first");
+    const arma::uword m = sim_X.n_rows;
+    const arma::uword u = X_u.n_rows;
+    const arma::uword q = Y.n_cols;
+    const arma::uword nsim = sim_Yn.n_slices;
+
+    auto [mu, S] = conditional(arma::join_cols(sim_X, X_u));
+    const arma::mat S_nn = S.submat(0, 0, m - 1, m - 1);
+    const arma::mat S_nu = S.submat(0, m, m - 1, m + u - 1);
+    const arma::mat S_uu = S.submat(m, m, m + u - 1, m + u - 1);
+
+    const arma::mat L_nn = LinearAlgebra::safe_chol_lower(S_nn);
+    const arma::mat A = LinearAlgebra::solve_lower(L_nn, S_nu);              // m × u
+    const arma::mat W = LinearAlgebra::solve_upper(L_nn.t(), A);             // Σ_nn⁻¹ Σ_nu
+    const arma::mat L_u = LinearAlgebra::safe_chol_lower(S_uu - A.t() * A);  // Σ_u|n
+    const arma::mat L_uu = LinearAlgebra::safe_chol_lower(S_uu);
+    const arma::mat Lambda
+        = arma::trans(LinearAlgebra::solve_upper(L_uu.t(), LinearAlgebra::solve_lower(L_uu, S_nu.t())));  // m × u
+
+    arma::mat Yn_u = Y_u.each_row() - centerY;
+    Yn_u.each_row() /= scaleY;
+
+    arma::cube out(m, q, nsim);
+    Random::reset_seed(sim_seed + 1);
+    for (arma::uword j = 0; j < q; ++j) {
+      arma::mat yn(m, nsim);
+      for (arma::uword s = 0; s < nsim; ++s)
+        yn.col(s) = sim_Yn.slice(s).col(j);
+      arma::mat dev = yn.each_col() - mu.col(j).head(m);
+      arma::mat yu = W.t() * dev + L_u * Random::randn_mat(u, nsim) * std::sqrt(s2(j));
+      yu.each_col() += mu.col(j).tail(u);
+      arma::mat resid = -yu;  // Y_u − y_u, per draw
+      resid.each_col() += Yn_u.col(j);
+      const arma::mat upd = yn + Lambda * resid;
+      for (arma::uword s = 0; s < nsim; ++s)
+        out.slice(s).col(j) = upd.col(s);
+    }
+    return to_raw(std::move(out));
   }
 
   // Append data, keep θ, re-estimate β_j and σ_j²
@@ -356,6 +494,7 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
     KModel m = make_model(m_theta);
     commit(m);
+    clear_sim();
   }
 
   // Closed-form LOO (Dubrule 1983), shared R: (mean, stdev) n × q
@@ -509,6 +648,16 @@ const arma::mat& MultiOutputKriging::beta() const {
 double MultiOutputKriging::logLikelihood() {
   const SharedModel& sm = shared("logLikelihood");
   return sm.logLikelihood(sm.theta_(), nullptr, nullptr);
+}
+
+std::tuple<double, arma::vec> MultiOutputKriging::leaveOneOutFun(const arma::vec& theta, bool grad) {
+  const SharedModel& sm = shared("leaveOneOutFun");
+  if (theta.n_elem != m_X.n_cols)
+    throw std::invalid_argument("MultiOutputKriging::leaveOneOutFun: theta must have " + std::to_string(m_X.n_cols)
+                                + " elements");
+  arma::vec g;
+  const double loo = sm.leaveOneOutObj(theta, grad ? &g : nullptr, nullptr);
+  return std::make_tuple(loo, std::move(g));
 }
 
 std::tuple<double, arma::vec> MultiOutputKriging::logLikelihoodFun(const arma::vec& theta, bool grad) {
@@ -766,12 +915,8 @@ arma::cube MultiOutputKriging::simulate(int nsim, int seed, const arma::mat& X_n
   if (nsim < 1)
     throw std::invalid_argument("MultiOutputKriging::simulate: nsim must be >= 1");
 
-  if (m_shared) {
-    if (will_update)
-      throw std::runtime_error(
-          "MultiOutputKriging::simulate: will_update (update_simulate) is not implemented yet for \"shared\"");
-    return m_shared->simulate(nsim, seed, X_n);
-  }
+  if (m_shared)
+    return m_shared->simulate(nsim, seed, X_n, will_update);
 
   const arma::uword m = X_n.n_rows;
   const arma::uword K = m_components.size();
@@ -799,10 +944,12 @@ arma::cube MultiOutputKriging::simulate(int nsim, int seed, const arma::mat& X_n
 
 arma::cube MultiOutputKriging::update_simulate(const arma::mat& Y_u, const arma::mat& X_u) {
   check_fitted("update_simulate");
-  if (m_lastsim_residual.n_elem == 0)
-    throw std::runtime_error("MultiOutputKriging::update_simulate: call simulate(..., will_update=true) first");
   if (Y_u.n_cols != m_Y.n_cols || Y_u.n_rows != X_u.n_rows || X_u.n_cols != m_X.n_cols)
     throw std::invalid_argument("MultiOutputKriging::update_simulate: Y_u must be n_u × q and X_u n_u × d");
+  if (m_shared)
+    return m_shared->update_simulate(Y_u, X_u);
+  if (m_lastsim_residual.n_elem == 0)
+    throw std::runtime_error("MultiOutputKriging::update_simulate: call simulate(..., will_update=true) first");
 
   const arma::uword K = m_components.size();
   const arma::mat A_u = project(Y_u);

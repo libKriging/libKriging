@@ -44,8 +44,10 @@ struct MultiOutputKrigingParameters {
  *       one θ for all outputs (maximum of the summed concentrated
  *       likelihoods, one Cholesky per evaluation), β_j and σ_j² per output.
  *       Same normalization, scales and optimizer as Kriging: with q = 1 it
- *       gives the same model as Kriging(y, X, …). Objective "LL" only;
- *       update_simulate not implemented yet.
+ *       gives the same model as Kriging(y, X, …). Objectives "LL" (summed
+ *       log-likelihoods) and "LOO" (LOO squared errors summed over outputs,
+ *       on the normalized scale). update_simulate conditions the stored draws
+ *       exactly (fixed θ, universal kriging).
  *
  *   "separable", "separable(<kernel>)"
  *       Separable (ICM / R_t ⊗ R_x) models: parsed but not implemented yet
@@ -122,8 +124,9 @@ class MultiOutputKriging {
   LIBKRIGING_EXPORT arma::cube simulate(int nsim, int seed, const arma::mat& X_n, bool will_update = false);
 
   /** Re-draw the last simulate() trajectories conditionally on new data
-   * (X_u, Y_u), without changing the model. The PCA basis is kept: Y_u is
+   * (X_u, Y_u), without changing the model. "pca": the basis is kept, Y_u is
    * projected on it and each latent Kriging is updated with its scores.
+   * "shared": exact conditioning of the stored draws (θ, σ_j² kept).
    * @return m × q × nsim cube */
   LIBKRIGING_EXPORT arma::cube update_simulate(const arma::mat& Y_u, const arma::mat& X_u);
 
@@ -168,6 +171,9 @@ class MultiOutputKriging {
   /// Summed concentrated log-likelihood at θ (normalized scale), with its
   /// gradient in θ when grad is true
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad = false);
+  /// LOO mean squared error summed over outputs (normalized scale) at θ,
+  /// with its gradient in θ when grad is true
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> leaveOneOutFun(const arma::vec& theta, bool grad = false);
 
   // PCA mode
   [[nodiscard]] arma::uword nb_components() const { return m_components.size(); }

@@ -18,8 +18,12 @@ libKriging, avec un focus sur les sorties temporelles / fonctionnelles.
 
 1. `ANALYSIS.md` §6 : Q2, Q3, Q5, Q6 tranchées ; Q1, Q4, Q7 ouvertes.
 2. `ANALYSIS.md` §5.4 : fait `"pca"`, généralisation de la factorisation de
-   `KrigingImpl`, `"shared"` ; reste `"separable"` → `"separable(<kernel>)"`,
-   puis LOO/`update_simulate` en `"shared"` et bindings R / Octave / Julia.
+   `KrigingImpl`, `"shared"` (objectifs `LL`/`LOO`, `update_simulate`) ;
+   reste `"separable"` → `"separable(<kernel>)"`, puis bindings R / Octave / Julia.
+
+Validation de `"shared"` contre `RobustGaSP::ppgasp(method = "mle", nugget.est = FALSE)`
+(n = 40, q = 30, matern 5/2, 2026-10-08) : θ identiques à 7 chiffres, LL égales
+à 4e-13 près, moyennes à 1e-6 × sd(Y), écarts-types à 0,4 % près.
 
 Voisins : GEK (travail local non publié), multi-fidélité (branche
 `feature/multi-fidelity-cokriging`).

@@ -161,8 +161,35 @@ def test_shared_predict_simulate(shared, data):
     act = stdev > 1e-3 * stdev.max()
     np.testing.assert_allclose(sims.mean(axis=2)[act], mean[act], atol=0.1 * stdev.max())
     np.testing.assert_allclose(sims.std(axis=2)[act], stdev[act], rtol=0.1)
-    with pytest.raises(RuntimeError, match="not implemented"):
-        shared.simulate(nsim=10, seed=3, X=Xnew, will_update=True)
+
+
+def test_shared_update_simulate(data):
+    X, Y, Xnew, _ = data
+    rng = np.random.default_rng(4)
+    X_u = rng.uniform(size=(3, 2))
+    Y_u = np.array([code(x) for x in X_u])
+    m = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
+    m.simulate(nsim=3000, seed=9, X=Xnew, will_update=True)
+    up = m.update_simulate(Y_u, X_u)
+    assert up.shape == (5, 200, 3000)
+    ref = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
+    ref.update(Y_u, X_u, refit=False)
+    mean, sd, _, _ = ref.predict(Xnew)
+    s2, s2_ref = m.sigma2(), ref.sigma2()
+    sd = sd * np.sqrt(np.divide(s2, s2_ref, out=np.ones_like(s2), where=s2_ref > 0))  # update_simulate keeps sigma2
+    act = sd > 1e-3 * sd.max()
+    np.testing.assert_allclose(up.mean(axis=2)[act], mean[act], atol=0.1 * sd.max())
+    np.testing.assert_allclose(up.std(axis=2)[act], sd[act], rtol=0.1)
+
+
+def test_shared_loo_objective(data):
+    X, Y, _, _ = data
+    loo = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared", objective="LOO")
+    ll = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
+    assert loo.objective() == "LOO"
+    f, g = loo.leaveOneOutFun(loo.theta(), return_grad=True)
+    assert g.shape == (2,)
+    assert f <= loo.leaveOneOutFun(ll.theta())[0] * (1 + 1e-6)
 
 
 def test_shared_single_output_matches_kriging(data):

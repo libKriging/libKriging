@@ -404,14 +404,105 @@ TEST_CASE("MultiOutputKriging shared restrictions", "[multioutput][shared]") {
   const arma::mat X(15, 2, arma::fill::randu);
   const arma::mat Y(15, 3, arma::fill::randu);
   MultiOutputKriging mo("gauss", "shared");
-  CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO"), std::invalid_argument);
+  CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LMP"), std::invalid_argument);
   CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "none"), std::invalid_argument);
   mo.fit(Y, X);
   CHECK(mo.sigma2().n_elem == 3);
   CHECK(mo.beta().n_cols == 3);
-  CHECK_THROWS_AS(mo.simulate(5, 1, X, true), std::runtime_error);
+  CHECK_THROWS_AS(mo.update_simulate(Y, X), std::runtime_error);  // no simulate(..., true) yet
   CHECK(mo.nb_components() == 0);
 
   MultiOutputKriging pc(Y, X, "gauss", "pca");
   CHECK_THROWS_AS(pc.theta(), std::runtime_error);
+}
+
+TEST_CASE("MultiOutputKriging shared LOO objective", "[multioutput][shared]") {
+  arma::arma_rng::set_seed(21);
+  const arma::mat X(30, 2, arma::fill::randu);
+
+  SECTION("q = 1 reduces to Kriging") {
+    const arma::vec y = arma::sin(9 * X.col(0)) + arma::cos(11 * X.col(1)) + 3 * X.col(0);
+    MultiOutputKriging mo(arma::mat(y), X, "matern5_2", "shared", Trend::RegressionModel::Constant, false, "BFGS",
+                          "LOO");
+    Kriging kr(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO");
+    CHECK(mo.objective() == "LOO");
+    const arma::vec th = {0.3, 0.2};
+    auto [l1, g1] = mo.leaveOneOutFun(th, true);
+    auto [l2, g2] = kr.leaveOneOutFun(th, true, false);
+    CHECK(std::abs(l1 - l2) < 1e-10 * l2);
+    CHECK(arma::abs(g1 - g2).max() < 1e-8 * arma::abs(g2).max());
+    CHECK(arma::abs(mo.theta() - kr.theta()).max() < 1e-4 * arma::abs(kr.theta()).max());
+    CHECK(std::abs(mo.sigma2()(0) - kr.sigma2()) < 1e-3 * kr.sigma2());
+  }
+
+  SECTION("gradient and optimum on curves") {
+    const arma::vec t = arma::linspace(0, 10, 15);
+    const arma::mat Y = curves(X, t);
+    MultiOutputKriging mo(Y, X, "matern5_2", "shared", Trend::RegressionModel::Constant, false, "BFGS", "LOO");
+    const arma::vec th = {0.3, 0.7};
+    auto [loo, g] = mo.leaveOneOutFun(th, true);
+    for (arma::uword k = 0; k < 2; ++k) {
+      const double h = 1e-6;
+      arma::vec tp = th, tm = th;
+      tp(k) += h;
+      tm(k) -= h;
+      const double fd = (std::get<0>(mo.leaveOneOutFun(tp)) - std::get<0>(mo.leaveOneOutFun(tm))) / (2 * h);
+      CHECK(std::abs(g(k) - fd) < 1e-4 * std::max(std::abs(fd), 1e-3 * loo));
+    }
+    const double loo_hat = std::get<0>(mo.leaveOneOutFun(mo.theta()));
+    for (arma::uword k = 0; k < 2; ++k)
+      for (double f : {0.9, 1.1}) {
+        arma::vec tk = mo.theta();
+        tk(k) *= f;
+        CHECK(std::get<0>(mo.leaveOneOutFun(tk)) >= loo_hat * (1 - 1e-6));
+      }
+    // the LOO fit has (summed) LOO error no worse than the LL fit
+    MultiOutputKriging ml(Y, X, "matern5_2", "shared");
+    CHECK(loo_hat <= std::get<0>(mo.leaveOneOutFun(ml.theta())) * (1 + 1e-6));
+  }
+}
+
+TEST_CASE("MultiOutputKriging shared update_simulate", "[multioutput][shared]") {
+  arma::arma_rng::set_seed(8);
+  const arma::mat X(20, 2, arma::fill::randu);
+  const arma::vec t = arma::linspace(0.5, 10, 6);
+  const arma::mat Y = curves(X, t);
+  const arma::mat Xt(8, 2, arma::fill::randu);
+  const arma::mat X_u(3, 2, arma::fill::randu);
+  const arma::mat Y_u = curves(X_u, t);
+
+  MultiOutputKriging mo(Y, X, "matern5_2", "shared");
+  const int nsim = 4000;
+  const arma::cube sim = mo.simulate(nsim, 17, Xt, true);
+  const arma::cube up = mo.update_simulate(Y_u, X_u);
+  REQUIRE(up.n_rows == 8);
+  REQUIRE(up.n_cols == 6);
+  REQUIRE(up.n_slices == nsim);
+  // the stored draws are not modified
+  CHECK(arma::approx_equal(mo.simulate(nsim, 17, Xt, true), sim, "absdiff", 0));
+
+  // reference: same theta, data appended; sigma2 is kept by update_simulate
+  MultiOutputKriging ref(Y, X, "matern5_2", "shared");
+  ref.update(Y_u, X_u, false);
+  auto [m_ref, s_ref, c_ref, d_ref] = ref.predict(Xt);
+  arma::mat s_exp = s_ref;
+  s_exp.each_row() %= arma::trans(arma::sqrt(mo.sigma2() / ref.sigma2()));
+
+  const arma::mat m_mc = arma::mean(up, 2);
+  arma::mat s_mc(8, 6);
+  for (arma::uword j = 0; j < 6; ++j) {
+    arma::mat yj(8, nsim);
+    for (int s = 0; s < nsim; ++s)
+      yj.col(s) = up.slice(s).col(j);
+    s_mc.col(j) = arma::stddev(yj, 0, 1);
+  }
+  const arma::uvec act = arma::find(s_exp > 1e-3 * s_exp.max());
+  REQUIRE(act.n_elem > 0);
+  CHECK(arma::abs(m_mc - m_ref).max() < 0.1 * s_exp.max());
+  CHECK(arma::abs(s_mc.elem(act) / s_exp.elem(act) - 1).max() < 0.1);
+
+  // conditioning on data at already simulated points pins the draws there
+  const arma::cube pin = mo.update_simulate(curves(Xt.rows(0, 1), t), Xt.rows(0, 1));
+  for (int s = 0; s < 10; ++s)
+    CHECK(arma::abs(pin.slice(s).rows(0, 1) - curves(Xt.rows(0, 1), t)).max() < 1e-4);
 }
