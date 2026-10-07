@@ -49,9 +49,19 @@ struct MultiOutputKrigingParameters {
  *       on the normalized scale). update_simulate conditions the stored draws
  *       exactly (fixed θ, universal kriging).
  *
- *   "separable", "separable(<kernel>)"
- *       Separable (ICM / R_t ⊗ R_x) models: parsed but not implemented yet
- *       (fit throws).
+ *   "separable"
+ *       Intrinsic coregionalization model, isotopic (Conti & O'Hagan 2010):
+ *         Cov(vec Y) = Σ ⊗ r_θ,  Σ free q × q,
+ *       Σ̂ = E*ᵀ E* / n in closed form, θ maximizes the profiled likelihood
+ *       −2ℓ = nq log 2π + n log|Σ̂| + q log|R| + nq. Same θ-profile of β and
+ *       same predictive mean as "shared" (autokrigeability), but coherent
+ *       joint covariance and joint simulations across outputs. Requires
+ *       n − p ≥ q and a non-singular Σ̂ (otherwise use "pca" or
+ *       "separable(<kernel>)").
+ *
+ *   "separable(<kernel>)"
+ *       Σ = σ² R_t(φ) from output coordinates: parsed but not implemented
+ *       yet (fit throws).
  *
  * Covariance ordering: joint covariances are over vec(Y_n), i.e. the m
  * prediction points of output 1, then output 2, … (column-major).
@@ -161,11 +171,17 @@ class MultiOutputKriging {
   [[nodiscard]] const arma::rowvec& centerY() const { return m_centerY; }
   [[nodiscard]] const arma::rowvec& scaleY() const { return m_scaleY; }
 
-  // Shared mode (same scales as the Kriging accessors: normalized when
-  // normalize = true)
+  // Shared / separable modes (same scales as the Kriging accessors:
+  // normalized when normalize = true)
   [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& theta() const;   ///< θ, d
   [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& sigma2() const;  ///< σ_j², q
   [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& beta() const;    ///< β_j, p × q
+  /// Σ (q × q): diag(σ_j²) in "shared", free in "separable"
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& output_cov() const;
+  /** Kronecker factors of the predictive covariance at X_n (m × d):
+   * (C_x [m × m] correlation, Σ_raw [q × q] on the original scale) with
+   * Cov(vec Y_n) = kron(Σ_raw, C_x), without forming the dense mq × mq. */
+  LIBKRIGING_EXPORT std::tuple<arma::mat, arma::mat> predictCovFactors(const arma::mat& X_n);
   /// Summed log-likelihood at the fitted θ
   LIBKRIGING_EXPORT double logLikelihood();
   /// Summed concentrated log-likelihood at θ (normalized scale), with its

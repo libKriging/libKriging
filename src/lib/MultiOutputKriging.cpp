@@ -17,15 +17,21 @@
 #include <stdexcept>
 
 // =============================================================================
-// "shared" output model: one θ for all outputs, β_j and σ_j² per output
+// "shared" and "separable" output models: one θ for all outputs, β_j per
+// output; Cov(vec Y) = Σ ⊗ R_θ with Σ diagonal (shared, PP-GaSP) or free
+// q × q (separable, ICM). Both give the same θ-profile of the trend and the
+// same predictive mean (autokrigeability, isotopic design).
 // =============================================================================
 
 class MultiOutputKriging::SharedModel : public KrigingImpl {
  public:
-  explicit SharedModel(const std::string& covType) {
+  SharedModel(const std::string& covType, bool full_cov) : full(full_cov) {
     m_covType = covType;
     make_Cov(covType);
   }
+
+  /// false: Σ diagonal ("shared"); true: Σ free q × q ("separable")
+  bool full = false;
 
   // normalized outputs (n × q), whitened residuals (n × q), trend (p × q),
   // variances (q), output centering / scaling (1 × q)
@@ -39,6 +45,10 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
   /// (e.g. a curve's initial condition) is reproduced exactly by a trend with
   /// an intercept, has σ_j² = 0 and is left out (it would make LL infinite)
   arma::uvec active;
+  /// Σ (q × q, normalized scale; zero rows/columns for constant outputs) and
+  /// its lower Cholesky factor; diag(Σ) = s2
+  arma::mat Sig;
+  arma::mat Lsig;
 
   // state of the last simulate(..., will_update = true): raw points (m × d),
   // normalized draws (m × q × nsim), seed
@@ -94,15 +104,28 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     KModel& m = (model != nullptr) ? *model : m_local;
 
     const arma::mat E = (active.n_elem == Y.n_cols) ? m.Estar : arma::mat(m.Estar.cols(active));
-    const arma::rowvec s2_j = arma::sum(arma::square(E), 0) / n;
     const double logdetL = arma::sum(arma::log(m.L.diag()));
-    const double ll = -0.5 * arma::accu(n * arma::log(2 * M_PI * s2_j) + 2 * logdetL + n);
+    double ll;
+    arma::rowvec s2_j;
+    arma::mat Ls;
+    if (!full) {
+      s2_j = arma::sum(arma::square(E), 0) / n;
+      ll = -0.5 * arma::accu(n * arma::log(2 * M_PI * s2_j) + 2 * logdetL + n);
+    } else {
+      // −2ℓ = nq log 2π + n log|Σ̂| + q log|R| + nq,  Σ̂ = E*ᵀ E* / n
+      Ls = sigma_chol(E.t() * E / n);
+      ll = -0.5 * (n * q * std::log(2 * M_PI) + 2 * n * arma::sum(arma::log(Ls.diag())) + 2 * q * logdetL + n * q);
+    }
 
     if (grad_out != nullptr) {
       if ((m.Rinv.memptr() == nullptr) || (arma::size(m.Rinv) != arma::size(m.L)))
         m.Rinv = LinearAlgebra::inv_sympd(m.L);
       arma::mat x = LinearAlgebra::solve_upper(m.L.t(), E);
-      x.each_row() /= arma::sqrt(s2_j);
+      // whiten across outputs: x Σ̂^{-1/2}, so that Σ_ij dR_ij x_i·x_j = tr(Σ̂⁻¹ xᵀ dR x)
+      if (!full)
+        x.each_row() /= arma::sqrt(s2_j);
+      else
+        x = arma::trans(LinearAlgebra::solve_lower(Ls, x.t()));
       arma::vec term1(d, arma::fill::zeros);
       arma::vec term2(d, arma::fill::zeros);
       compute_ll_grad_theta_vecs(m.R, m.Rinv, x, theta, term1, term2);
@@ -160,6 +183,18 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     return loo;
   }
 
+  // Lower Cholesky factor of the estimated output covariance; refuses a
+  // (numerically) singular estimate
+  static arma::mat sigma_chol(const arma::mat& S) {
+    arma::mat Ls;
+    const bool ok = arma::chol(Ls, S, "lower");
+    if (!ok || Ls.diag().min() < 1e-8 * Ls.diag().max())
+      throw std::runtime_error(
+          "MultiOutputKriging: the estimated output covariance of \"separable\" is singular (outputs nearly "
+          "linearly dependent, e.g. smooth curves); use \"pca\" or \"separable(<kernel>)\"");
+    return Ls;
+  }
+
   void commit(KModel& m) {
     const double n = static_cast<double>(m_X.n_rows);
     m_R = std::move(m.R);
@@ -169,8 +204,21 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     m_circ = std::move(m.Rstar);
     B = std::move(m.betahat);
     Z = std::move(m.Estar);
-    s2 = arma::vec(Y.n_cols, arma::fill::zeros);
-    s2.elem(active) = arma::trans(arma::sum(arma::square(Z.cols(active)), 0)) / n;
+    const arma::uword q = Y.n_cols;
+    s2 = arma::vec(q, arma::fill::zeros);
+    Sig = arma::mat(q, q, arma::fill::zeros);
+    Lsig = arma::mat(q, q, arma::fill::zeros);
+    if (full) {
+      const arma::mat Za = Z.cols(active);
+      const arma::mat S = Za.t() * Za / n;
+      Sig.submat(active, active) = S;
+      Lsig.submat(active, active) = sigma_chol(S);
+      s2 = Sig.diag();
+    } else {
+      s2.elem(active) = arma::trans(arma::sum(arma::square(Z.cols(active)), 0)) / n;
+      Sig.diag() = s2;
+      Lsig.diag() = arma::sqrt(s2);
+    }
     m_is_empty = false;
   }
 
@@ -195,6 +243,11 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     normalize_outputs(Yraw, normalize);
     arma::mat theta0 = fit_setup_X_impl(X, regmodel, normalize, parameters.theta);
     set_active(Yraw);
+    if (full && active.n_elem > n - m_F.n_cols)
+      throw std::invalid_argument("MultiOutputKriging: \"separable\" estimates a free " + std::to_string(active.n_elem)
+                                  + " x " + std::to_string(active.n_elem) + " output covariance, which needs n - p >= q"
+                                  + " (here n - p = " + std::to_string(n - m_F.n_cols)
+                                  + "); use \"pca\" or \"separable(<kernel>)\"");
     m_est_beta = true;
     m_est_sigma2 = true;
 
@@ -314,6 +367,26 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     commit(m);
   }
 
+  /// S Σ S: output covariance on the original scale
+  arma::mat output_cov_raw() const {
+    arma::mat C = Sig;
+    C.each_row() %= scaleY;
+    C.each_col() %= scaleY.t();
+    return C;
+  }
+
+  /// Draws Σ^{1/2}-mixed across outputs: E[j] are independent (rows × nsim)
+  /// unit draws; returns output j's noise. "shared": σ_j E[j].
+  arma::mat mix(const std::vector<arma::mat>& E, arma::uword j) const {
+    if (!full)
+      return E[j] * std::sqrt(s2(j));
+    arma::mat out = E[j] * Lsig(j, j);
+    for (arma::uword k = 0; k < j; ++k)
+      if (Lsig(j, k) != 0)
+        out += E[k] * Lsig(j, k);
+    return out;
+  }
+
   // Normalized new points (d × m) and trend (m × p)
   std::pair<arma::mat, arma::mat> normalize_X(const arma::mat& X_n) const {
     arma::mat Xn = X_n;
@@ -357,7 +430,7 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       arma::mat R_nn(m, m, arma::fill::none);
       LinearAlgebra::covMat_sym_X(&R_nn, Xn, m_theta, _Cov, 1.0, KrigingImpl::ones);
       const arma::mat Sigma = R_nn - Rstar_on.t() * Rstar_on + Ecirc_n * Ecirc_n.t();
-      cov = arma::kron(arma::diagmat(vscale), Sigma);  // block-diagonal over vec(Y_n)
+      cov = arma::kron(output_cov_raw(), Sigma);  // over vec(Y_n); block-diagonal for "shared"
     }
 
     arma::cube deriv;
@@ -407,8 +480,11 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     // outputs drawn in turn from one seeded stream (q = 1 matches Kriging)
     arma::cube yn(m, q, nsim);
     Random::reset_seed(seed);
+    std::vector<arma::mat> E(q);
+    for (arma::uword j = 0; j < q; ++j)
+      E[j] = L * Random::randn_mat(m, nsim);
     for (arma::uword j = 0; j < q; ++j) {
-      arma::mat y_n = L * Random::randn_mat(m, nsim) * std::sqrt(s2(j));
+      arma::mat y_n = mix(E, j);
       y_n.each_col() += yhat.col(j);
       for (int s = 0; s < nsim; ++s)
         yn.slice(s).col(j) = y_n.col(s);
@@ -464,12 +540,15 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
 
     arma::cube out(m, q, nsim);
     Random::reset_seed(sim_seed + 1);
+    std::vector<arma::mat> Eu(q);
+    for (arma::uword j = 0; j < q; ++j)
+      Eu[j] = L_u * Random::randn_mat(u, nsim);
     for (arma::uword j = 0; j < q; ++j) {
       arma::mat yn(m, nsim);
       for (arma::uword s = 0; s < nsim; ++s)
         yn.col(s) = sim_Yn.slice(s).col(j);
       arma::mat dev = yn.each_col() - mu.col(j).head(m);
-      arma::mat yu = W.t() * dev + L_u * Random::randn_mat(u, nsim) * std::sqrt(s2(j));
+      arma::mat yu = W.t() * dev + mix(Eu, j);
       yu.each_col() += mu.col(j).tail(u);
       arma::mat resid = -yu;  // Y_u − y_u, per draw
       resid.each_col() += Yn_u.col(j);
@@ -520,6 +599,14 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     std::ostringstream os;
     os << "  * theta: " << arma::trans(m_theta);
     os << "  * sigma2: " << arma::trans(s2);
+    if (full) {
+      const arma::vec sd = arma::sqrt(s2);
+      arma::mat C = Sig;
+      for (arma::uword i = 0; i < C.n_rows; ++i)
+        for (arma::uword j = 0; j < C.n_cols; ++j)
+          C(i, j) = (sd(i) > 0 && sd(j) > 0) ? C(i, j) / (sd(i) * sd(j)) : 0.0;
+      os << "  * output correlation:\n" << C;
+    }
     return os.str();
   }
 };
@@ -622,8 +709,9 @@ void MultiOutputKriging::check_fitted(const std::string& where) const {
 }
 
 const MultiOutputKriging::SharedModel& MultiOutputKriging::shared(const std::string& where) const {
-  if (m_output_model != OutputModel::Shared)
-    throw std::runtime_error("MultiOutputKriging::" + where + ": only available with the \"shared\" output model"
+  if (m_output_model != OutputModel::Shared && m_output_model != OutputModel::Separable)
+    throw std::runtime_error("MultiOutputKriging::" + where
+                             + ": only available with the \"shared\" and \"separable\" output models"
                              + (m_output_model == OutputModel::PCA ? " (use component(k) in \"pca\")" : ""));
   check_fitted(where);
   return *m_shared;
@@ -643,6 +731,19 @@ const arma::vec& MultiOutputKriging::sigma2() const {
 
 const arma::mat& MultiOutputKriging::beta() const {
   return shared("beta").B;
+}
+
+const arma::mat& MultiOutputKriging::output_cov() const {
+  return shared("output_cov").Sig;
+}
+
+std::tuple<arma::mat, arma::mat> MultiOutputKriging::predictCovFactors(const arma::mat& X_n) {
+  const SharedModel& sm = shared("predictCovFactors");
+  if (X_n.n_cols != m_X.n_cols)
+    throw std::invalid_argument("MultiOutputKriging::predictCovFactors: X_n has " + std::to_string(X_n.n_cols)
+                                + " columns, expected " + std::to_string(m_X.n_cols));
+  arma::mat C = sm.conditional(X_n).second;
+  return std::make_tuple(std::move(C), sm.output_cov_raw());
 }
 
 double MultiOutputKriging::logLikelihood() {
@@ -711,9 +812,9 @@ void MultiOutputKriging::fit(const arma::mat& Y,
                              const std::string& optim,
                              const std::string& objective,
                              const Parameters& parameters) {
-  if (m_output_model != OutputModel::PCA && m_output_model != OutputModel::Shared)
+  if (m_output_model == OutputModel::SeparableKernel)
     throw std::runtime_error("MultiOutputKriging: output model '" + output_model_string()
-                             + "' is not implemented yet (only \"pca\" and \"shared\")");
+                             + "' is not implemented yet (pca, shared and separable are)");
 
   const arma::uword n = Y.n_rows;
   const arma::uword q = Y.n_cols;
@@ -740,8 +841,8 @@ void MultiOutputKriging::fit(const arma::mat& Y,
   m_components.clear();
   m_shared.reset();
 
-  if (m_output_model == OutputModel::Shared) {
-    m_shared = std::make_unique<SharedModel>(m_covType);
+  if (m_output_model == OutputModel::Shared || m_output_model == OutputModel::Separable) {
+    m_shared = std::make_unique<SharedModel>(m_covType, m_output_model == OutputModel::Separable);
     m_shared->fit(Y, X, regmodel, normalize, optim, objective, parameters);
     m_centerY = m_shared->centerY;
     m_scaleY = m_shared->scaleY;

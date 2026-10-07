@@ -221,3 +221,14 @@ std::tuple<double, py::array_t<double>> PyMultiOutputKriging::leaveOneOutFun(con
   auto [loo, g] = m_internal->leaveOneOutFun(th, return_grad);
   return std::make_tuple(loo, vec_to_arr(g));
 }
+
+py::array_t<double> PyMultiOutputKriging::output_cov() const {
+  arma::mat S = m_internal->output_cov();
+  return carma::mat_to_arr(S, true);
+}
+
+std::tuple<py::array_t<double>, py::array_t<double>> PyMultiOutputKriging::predictCovFactors(
+    const py::array_t<double>& X_n) {
+  auto [Cx, S] = m_internal->predictCovFactors(to_mat(X_n));
+  return std::make_tuple(carma::mat_to_arr(Cx, true), carma::mat_to_arr(S, true));
+}

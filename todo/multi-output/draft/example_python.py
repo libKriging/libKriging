@@ -1,6 +1,7 @@
-# API attendue de MultiOutputKriging côté Python. Les modes "pca" et "shared" sont
-# implémentés (testés par bindings/Python/pylibkriging/tests/MultiOutputKriging_test.py) ;
-# la section "separable" reste prospective. Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
+# API attendue de MultiOutputKriging côté Python. Les modes "pca", "shared" et
+# "separable" sont implémentés (testés par bindings/Python/pylibkriging/tests/MultiOutputKriging_test.py) ;
+# la section "separable(<kernel>)" reste prospective. "separable" (Σ libre) n'est pas
+# utilisable ici : q = 200 > n − p = 39 (et des courbes lisses rendent Σ̂ singulier). Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
 import numpy as np
 import pylibkriging as lk
 

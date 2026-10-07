@@ -1,4 +1,4 @@
-"""MultiOutputKriging ("pca" and "shared") — mirrors todo/multi-output/draft/example_python.py."""
+"""MultiOutputKriging ("pca", "shared" and "separable") — mirrors todo/multi-output/draft/example_python.py."""
 import numpy as np
 import pytest
 
@@ -215,3 +215,46 @@ def test_shared_update(data):
     m.update(Y_u, X_u, refit=False)
     np.testing.assert_array_equal(m.theta(), theta)
     np.testing.assert_allclose(m.predict(X_u)[0], Y_u, atol=1e-6)
+
+
+# ----------------------------------------------------------------------------- separable
+
+
+def few_outputs(X):
+    return np.column_stack([np.sin(6 * X[:, 0]) + X[:, 1],
+                            np.sin(6 * X[:, 0]) - 2 * np.cos(5 * X[:, 1]),
+                            X[:, 0] * X[:, 1] + 0.5 * np.cos(7 * X[:, 1]),
+                            3 + np.cos(4 * X[:, 0] + 2 * X[:, 1])])
+
+
+def test_separable():
+    rng = np.random.default_rng(7)
+    X = rng.uniform(size=(30, 2))
+    Y = few_outputs(X)
+    Xnew = rng.uniform(size=(6, 2))
+    sep = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable")
+    sh = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
+    S = sep.output_cov()
+    assert S.shape == (4, 4)
+    np.testing.assert_allclose(S, S.T)
+    np.testing.assert_allclose(np.diag(S), sep.sigma2())
+    assert sep.logLikelihoodFun(sh.theta())[0] >= sh.logLikelihood()
+
+    mean, sd, cov, _ = sep.predict(Xnew, return_stdev=True, return_cov=True)
+    Cx, Sraw = sep.predictCovFactors(Xnew)
+    assert Cx.shape == (6, 6) and Sraw.shape == (4, 4)
+    np.testing.assert_allclose(cov, np.kron(Sraw, Cx), atol=1e-10)
+    np.testing.assert_allclose(np.sqrt(np.diag(cov)), sd.ravel(order="F"), rtol=1e-8)
+    # same mean as "shared" at the same theta (autokrigeability)
+    sh_same = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared", optim="none",
+                                    parameters={"theta": sep.theta()[None, :]})
+    np.testing.assert_allclose(mean, sh_same.predict(Xnew)[0], atol=1e-10)
+
+    sims = sep.simulate(nsim=20000, seed=1, X=Xnew[:1])
+    np.testing.assert_allclose(np.cov(sims[0]), Sraw * Cx[0, 0], atol=0.05 * np.diag(Sraw * Cx[0, 0]).max())
+
+
+def test_separable_restrictions(data):
+    X, Y, _, _ = data
+    with pytest.raises(ValueError, match="n - p >= q"):
+        lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable")  # q = 200 > n - p = 39

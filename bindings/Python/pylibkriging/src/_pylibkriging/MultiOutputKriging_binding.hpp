@@ -76,6 +76,8 @@ class PyMultiOutputKriging {
   [[nodiscard]] py::array_t<double> theta() const;
   [[nodiscard]] py::array_t<double> sigma2() const;
   [[nodiscard]] py::array_t<double> beta() const;
+  [[nodiscard]] py::array_t<double> output_cov() const;
+  std::tuple<py::array_t<double>, py::array_t<double>> predictCovFactors(const py::array_t<double>& X_n);
   double logLikelihood();
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, bool return_grad);
   std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, bool return_grad);

@@ -400,6 +400,8 @@ discards n - n_max points outright.)pbdoc")
       .def("theta", &PyMultiOutputKriging::theta)
       .def("sigma2", &PyMultiOutputKriging::sigma2)
       .def("beta", &PyMultiOutputKriging::beta)
+      .def("output_cov", &PyMultiOutputKriging::output_cov)
+      .def("predictCovFactors", &PyMultiOutputKriging::predictCovFactors, py::arg("X"))
       .def("logLikelihood", &PyMultiOutputKriging::logLikelihood)
       .def("logLikelihoodFun",
            &PyMultiOutputKriging::logLikelihoodFun,
