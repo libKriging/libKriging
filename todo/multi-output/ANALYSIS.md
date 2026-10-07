@@ -428,18 +428,32 @@ un `MultiOutputKriging` ; garder l'appel explicite ailleurs.
 
 ## 6. Questions ouvertes
 
+Tranchées le 2026-10-07 :
+
+- **Q2 — tendance** : même `regmodel` pour toutes les sorties, `β_j` propre
+  à chaque sortie.
+- **Q3 — nugget/bruit** : refusé dans un premier temps (aucun nugget, aucun
+  bruit) ; un éventuel nugget relatif commun viendra plus tard.
+- **Q5 — `"separable"` avec `n − p < q`** : refusé, avec un message qui
+  oriente vers `"pca"` ou `"separable(<kernel>)"`.
+- **Q6 — cov de `predict` en `"shared"`** : matrice dense bloc-diagonale
+  `mq × mq` ; `predictCovFactors` réservé aux modèles de Kronecker.
+
+Mise en œuvre de l'étape 2 (§5.4) : plutôt que de changer le type des membres
+`m_y`, `m_beta`, `m_sigma2` (ce qui casserait l'API publique de `Kriging`),
+seule la couche de factorisation est généralisée — `KModel::ystar/Estar/betahat`
+deviennent des `mat`, `populate_Model` accepte un second membre `n × q`,
+`compute_ll_grad_theta_vecs` accepte `x` à `q` colonnes, `cross_corr` et
+`fit_setup_X_impl` sont extraits. L'état multi-sorties (`Y`, `Z`, `B`, `σ_j²`)
+vit dans la classe dérivée qui implémente `"shared"`.
+
+Restent ouvertes (numérotation d'origine) :
+
 1. Cas d'usage cible : sorties fonctionnelles (`q` grand, isotopique) ou
    quelques sorties hétérogènes (`q` petit, hétérotopique) ? Cela décide
    entre l'étape 1 et l'étape 2 en priorité.
-2. Tendance : même `regmodel` pour toutes les sorties (naturel en B/C) ?
-3. Nugget/bruit par sortie dans B (casse le partage de `R` ⇒ retour à `q`
-   Cholesky) : refuser, ou n'autoriser qu'un nugget relatif commun ?
 4. Format de sortie de `predict` dans les bindings (matrice vs liste par
    sortie), cohérence avec `MarkovCoKriging` (branche `feature/multi-fidelity-cokriging`).
-5. (D?) `"separable"` avec `n − p < q` : `Σ̂` singulier — régulariser
-   (Ledoit-Wolf, rang faible) ou refuser et orienter vers
-   `"separable(<kernel>)"` / `"pca"` ?
-6. (D?) `predict(..., return_cov=true)` en `"shared"` : renvoyer la cov dense
-   bloc-diagonale (mq × mq) ou seulement via `predictCovFactors` ?
-7. (D?) Calendrier `LMP` / `LLVecchia` / `LLNystrom` et save/load pour
+   Choix provisoire du binding Python : matrices `m × q`.
+7. Calendrier `LMP` / `LLVecchia` / `LLNystrom` et save/load pour
    `MultiOutputKriging`.

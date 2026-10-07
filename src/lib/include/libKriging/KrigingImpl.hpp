@@ -23,18 +23,23 @@ class KrigingImpl {
   /// of the covariance matrix (plain correlation / nugget / per-point noise)
   /// is handled by the owning class in its populate_Model override; what this
   /// struct carries is identical across the three variants.
+  ///
+  /// `ystar`, `Estar` and `betahat` have one column per output: a single
+  /// column for Kriging / WarpKriging / MLPKriging, q columns when
+  /// `populate_Model` is given an n × q right-hand side (MultiOutputKriging,
+  /// "shared" output model). `SSEstar` is then the total over all columns.
   struct KModel {
     arma::mat R;      ///< normalized covariance (correlation + optional diag)
     arma::mat L;      ///< Cholesky lower of R
     arma::mat Linv;   ///< L⁻¹
     arma::mat Rinv;   ///< R⁻¹ = L⁻ᵀ L⁻¹
     arma::mat Fstar;  ///< L \ F (whitened trend)
-    arma::vec ystar;  ///< L \ y (whitened observations)
+    arma::mat ystar;  ///< L \ y (whitened observations)
     arma::mat Rstar;  ///< chol_upper(F' R⁻¹ F)
     arma::mat Qstar;  ///< Q factor from QR of Fstar (LOO path)
-    arma::vec Estar;  ///< L \ (y - F β̂) (whitened residual)
-    double SSEstar;   ///< Estar' Estar
-    arma::vec betahat;
+    arma::mat Estar;  ///< L \ (y - F β̂) (whitened residual)
+    double SSEstar;   ///< Estar' Estar (summed over columns)
+    arma::mat betahat;
   };
 
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
@@ -162,12 +167,17 @@ class KrigingImpl {
   /// On return, `m.betahat` holds the GLS estimate regardless of
   /// `m_est_beta`; derived wrappers are responsible for zeroing it (and
   /// optionally recomputing SSE) when `m_est_beta` is false.
+  ///
+  /// `Y` (n × q, normalized) replaces `m_y` as right-hand side when given:
+  /// the factorization is shared and every KModel field depending on y gets
+  /// q columns.
   void populate_Model(KModel& m,
                       const arma::vec& theta,
                       double alpha,
                       const arma::vec& diag_norm,
                       bool update_eligible,
-                      std::map<std::string, double>* bench) const;
+                      std::map<std::string, double>* bench,
+                      const arma::mat* Y = nullptr) const;
 
   /// Preallocate a `KModel` sized from (n=m_X.n_rows, p=m_F.n_cols).
   /// `Linv` and `Rinv` are left empty -- both are computed on demand, lazily,
@@ -175,6 +185,12 @@ class KrigingImpl {
   /// `populate_Model` itself, and never for a plain predict or a
   /// `refit=false` update, neither of which touches either one).
   KModel allocate_KModel() const;
+
+  /// Correlation block R_on (n_o × n_n) between observation and new points,
+  /// both given column-wise in kernel space (d × n_o, d × n_n). Entries are
+  /// `_Cov(dij, m_theta) * factor`; when `coincident_to_one`, coincident
+  /// points get exactly 1.
+  arma::mat cross_corr(const arma::mat& Xn_o, const arma::mat& Xn_n, double factor, bool coincident_to_one) const;
 
   /// Unified predict implementation shared by Kriging / NuggetKriging /
   /// NoiseKriging.  The three variants only differ in:
@@ -288,6 +304,16 @@ class KrigingImpl {
                            const std::optional<arma::mat>& theta,
                            bool build_dX = true);
 
+  /// The X part of `fit_setup_impl` (everything but y and beta): sets
+  /// `m_normalize`, `m_centerX/m_scaleX`, `m_X`, `m_dX/m_maxdX`,
+  /// `m_regmodel/m_F`, and returns the normalized `theta0`. Used directly by
+  /// models that normalize several outputs themselves.
+  arma::mat fit_setup_X_impl(const arma::mat& X,
+                             const Trend::RegressionModel& regmodel,
+                             bool normalize,
+                             const std::optional<arma::mat>& theta,
+                             bool build_dX = true);
+
   /// Dump the inherited GP state to a JSON object using the
   /// Kriging/NuggetKriging/NoiseKriging schema. Used by `save()` in those
   /// three classes; WarpKriging/MLPKriging use a different schema and roll
@@ -366,7 +392,9 @@ class KrigingImpl {
   /// Shared inner loop for ∂LL/∂θ_k.  Accumulates term1_vec[k] and
   /// term2_vec[k] (k=0..d-1) over upper-triangle (i,j) pairs using m_dX and
   /// _DlnCovDtheta.  Caller is responsible for pre-sizing both output vectors
-  /// to d and zeroing them.
+  /// to d and zeroing them.  `x` is R⁻¹(y − Fβ) (n × 1); with q > 1 columns
+  /// (each pre-divided by its √σ_j²), term1 accumulates Σ_j x_j' ∂R x_j, and
+  /// term2 is unchanged (the caller multiplies it by q).
   void compute_ll_grad_theta_vecs(const arma::mat& R,
                                   const arma::mat& Rinv,
                                   const arma::mat& x,
