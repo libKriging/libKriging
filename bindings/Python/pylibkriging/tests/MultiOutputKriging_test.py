@@ -1,0 +1,124 @@
+"""MultiOutputKriging (output_model="pca") — mirrors todo/multi-output/draft/example_python.py."""
+import numpy as np
+import pytest
+
+import pylibkriging as lk
+
+t = np.linspace(0.0, 10.0, 200)
+
+
+def code(x):
+    f, a = 0.5 + 1.5 * x[0], 0.1 + 0.5 * x[1]
+    return np.exp(-a * t) * np.cos(2 * np.pi * f * t / 5)
+
+
+@pytest.fixture(scope="module")
+def data():
+    rng = np.random.default_rng(0)
+    X = rng.uniform(size=(40, 2))
+    Y = np.array([code(x) for x in X])
+    Xnew = rng.uniform(size=(5, 2))
+    Ynew = np.array([code(x) for x in Xnew])
+    return X, Y, Xnew, Ynew
+
+
+@pytest.fixture(scope="module")
+def pca(data):
+    X, Y, _, _ = data
+    return lk.MultiOutputKriging(Y, X, "matern5_2", output_model="pca(0.99)", regmodel="constant", normalize=True)
+
+
+def test_pca_basis(pca, data):
+    X, Y, _, _ = data
+    K = pca.nb_components()
+    assert 2 <= K < 40
+    assert pca.output_model() == "pca(0.99)"
+    assert pca.nb_outputs() == 200
+    assert pca.pca_basis().shape == (200, K)
+    assert pca.pca_explained().shape == (K,)
+    assert pca.pca_explained()[-1] >= 0.99
+    assert pca.pca_residual().shape == Y.shape
+    np.testing.assert_allclose(pca.Y(), Y)
+    np.testing.assert_allclose(pca.X(), X)
+    assert pca.component(0).theta().size == 2
+    assert "MultiOutputKriging" in repr(pca)
+
+
+def test_predict_shapes_and_accuracy(pca, data):
+    _, _, Xnew, Ynew = data
+    mean, stdev, cov, deriv = pca.predict(Xnew, return_stdev=True, return_cov=True, return_deriv=True)
+    assert mean.shape == (5, 200)
+    assert stdev.shape == (5, 200)
+    assert cov.shape == (1000, 1000)
+    assert deriv.shape == (5, 2, 200)
+    # vec(Y_n) ordering: output-major, column-major
+    np.testing.assert_allclose(np.sqrt(np.diag(cov)), stdev.ravel(order="F"), rtol=1e-8, atol=1e-12)
+    assert np.sqrt(np.mean((mean - Ynew) ** 2)) < 0.1 * Ynew.std()
+    mean2, stdev2, cov2, deriv2 = pca.predict(Xnew)
+    np.testing.assert_allclose(mean2, mean)
+    assert cov2.size == 0 and deriv2.size == 0
+
+
+def test_simulate(pca, data):
+    _, _, Xnew, _ = data
+    sims = pca.simulate(nsim=1000, seed=123, X=Xnew)
+    assert sims.shape == (5, 200, 1000)
+    np.testing.assert_array_equal(sims, pca.simulate(nsim=1000, seed=123, X=Xnew))
+    mean, stdev, _, _ = pca.predict(Xnew)
+    assert np.abs(sims.mean(axis=2) - mean).max() < 5 * stdev.max() / np.sqrt(1000)
+    trough = sims.min(axis=1)  # functional of the trajectory
+    q = np.quantile(trough, [0.05, 0.5, 0.95], axis=1)
+    assert q.shape == (3, 5) and np.all(q[0] <= q[2])
+
+
+def test_loo_and_model_choice(data):
+    X, Y, _, _ = data
+    loos = {spec: lk.MultiOutputKriging(Y, X, "matern5_2", output_model=spec).leaveOneOut()
+            for spec in ("pca(3)", "pca(0.999)")}
+    assert loos["pca(0.999)"] < loos["pca(3)"]
+    m = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="pca(3)")
+    loo_mean, loo_sd = m.leaveOneOutMat()
+    assert loo_mean.shape == Y.shape and loo_sd.shape == Y.shape
+
+
+def test_update(data):
+    X, Y, Xnew, _ = data
+    rng = np.random.default_rng(1)
+    X_u = rng.uniform(size=(3, 2))
+    Y_u = np.array([code(x) for x in X_u])
+
+    m = lk.MultiOutputKriging(Y, X, "matern3_2", output_model="pca(0.999)")
+    m.simulate(nsim=200, seed=5, X=Xnew, will_update=True)
+    assert m.update_simulate(Y_u, X_u).shape == (5, 200, 200)
+
+    basis = m.pca_basis()
+    m.update(Y_u, X_u, refit=False)
+    assert m.X().shape == (43, 2)
+    np.testing.assert_array_equal(m.pca_basis(), basis)
+
+    m.update(Y_u, X_u, refit=True)
+    assert m.Y().shape == (46, 200)
+
+
+def test_single_output_matches_kriging(data):
+    X, Y, Xnew, _ = data
+    y1 = Y[:, 50]
+    a = lk.MultiOutputKriging(y1, X, "matern5_2", output_model="pca")  # 1-D Y = one output
+    b = lk.Kriging(y1, X, "matern5_2")
+    np.testing.assert_allclose(a.component(0).theta(), b.theta(), rtol=1e-6)
+    m1, s1, _, _ = a.predict(Xnew)
+    m2, s2, *_ = b.predict(Xnew, True, False, False)
+    np.testing.assert_allclose(m1.ravel(), m2.ravel(), atol=1e-6)
+    np.testing.assert_allclose(s1.ravel(), s2.ravel(), atol=1e-6)
+
+
+def test_errors(data):
+    X, Y, _, _ = data
+    with pytest.raises(ValueError):
+        lk.MultiOutputKriging("gauss", "pca(1.5)")
+    with pytest.raises(RuntimeError, match="not implemented"):
+        lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable(matern5_2)", output_coordinates=t)
+    with pytest.raises(ValueError, match="output_coordinates"):
+        lk.MultiOutputKriging(Y, X, "matern5_2", output_coordinates=t[:10])
+    with pytest.raises(ValueError, match="unsupported parameter"):
+        lk.MultiOutputKriging(Y, X, "matern5_2", parameters={"sigma2": 1.0})

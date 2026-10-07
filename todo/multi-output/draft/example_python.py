@@ -1,5 +1,6 @@
-# ESQUISSE — API attendue de MultiOutputKriging côté Python (non exécutable :
-# la classe n'existe pas encore). Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
+# API attendue de MultiOutputKriging côté Python. Seul le mode "pca" est implémenté
+# (testé par bindings/Python/pylibkriging/tests/MultiOutputKriging_test.py) ;
+# les sections "separable" / "shared" restent prospectives. Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
 import numpy as np
 import pylibkriging as lk
 
@@ -49,8 +50,9 @@ Cx, Sigma = sep.predictCovFactors(Xnew)               # (m × m), (q × q)
 
 # Trajectoires conjointes → incertitude sur une fonctionnelle de la courbe
 sims = sep.simulate(nsim=1000, seed=123, X=Xnew)      # m × q × nsim
-peak = sims.max(axis=1)                               # m × nsim : pic de chaque trajectoire
-print(np.quantile(peak, [0.05, 0.5, 0.95], axis=1))   # IC à 90 % du pic, par point
+trough = sims.min(axis=1)                             # m × nsim : creux de chaque trajectoire
+print(np.quantile(trough, [0.05, 0.5, 0.95], axis=1)) # IC à 90 % du creux, par point
+# (pas le pic : toutes les courbes valent 1 en t = 0, c'est leur maximum)
 
 # --- 3. θ partagés (PP-GaSP) : rapide, bandes ponctuelles seulement ----------
 shared = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")

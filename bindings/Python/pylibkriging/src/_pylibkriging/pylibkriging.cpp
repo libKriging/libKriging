@@ -15,6 +15,7 @@
 #include "Kriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
 #include "NestedKriging_binding.hpp"
+#include "MultiOutputKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
 
@@ -318,6 +319,85 @@ discards n - n_max points outright.)pbdoc")
       .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
       .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
       .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
+
+  /* --- MultiOutputKriging --- */
+  py::class_<PyMultiOutputKriging>(m,
+                                   "WrappedPyMultiOutputKriging",
+                                   R"pbdoc(
+        Multi-output Kriging for isotopic designs (exposed as pylibkriging.MultiOutputKriging).
+
+        Y is n x q (rows = observations, like X). output_model="pca(K)" / "pca(v)" / "pca":
+        Karhunen-Loeve reduction of Y, one Kriging per principal score, truncation residual
+        added to the prediction variance. "shared" / "separable" / "separable(<kernel>)" are
+        not implemented yet. predict returns (mean m x q, stdev m x q, cov mq x mq over
+        vec(Y_n), mean derivative m x d x q); simulate returns an m x q x nsim array.
+    )pbdoc")
+      .def(py::init<const std::string&, const std::string&>(), py::arg("kernel"), py::arg("output_model") = "pca")
+      .def(py::init<const py::array_t<double>&,
+                    const py::array_t<double>&,
+                    const std::string&,
+                    const std::string&,
+                    const std::string&,
+                    bool,
+                    const std::string&,
+                    const std::string&,
+                    const py::dict&,
+                    const py::object&>(),
+           py::arg("Y"),
+           py::arg("X"),
+           py::arg("kernel"),
+           py::arg("output_model") = "pca",
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{},
+           py::arg("output_coordinates") = py::none())
+      .def("fit",
+           &PyMultiOutputKriging::fit,
+           py::arg("Y"),
+           py::arg("X"),
+           py::arg("regmodel") = default_regmodel,
+           py::arg("normalize") = default_normalize,
+           py::arg("optim") = default_optim,
+           py::arg("objective") = default_objective,
+           py::arg("parameters") = py::dict{})
+      .def("set_output_coordinates", &PyMultiOutputKriging::set_output_coordinates, py::arg("t"))
+      .def("predict",
+           &PyMultiOutputKriging::predict,
+           py::arg("X"),
+           py::arg("return_stdev") = true,
+           py::arg("return_cov") = false,
+           py::arg("return_deriv") = false)
+      .def("simulate",
+           &PyMultiOutputKriging::simulate,
+           py::arg("nsim"),
+           py::arg("seed"),
+           py::arg("X"),
+           py::arg("will_update") = false)
+      .def("update_simulate", &PyMultiOutputKriging::update_simulate, py::arg("Y_u"), py::arg("X_u"))
+      .def("update", &PyMultiOutputKriging::update, py::arg("Y_u"), py::arg("X_u"), py::arg("refit") = true)
+      .def("leaveOneOut", &PyMultiOutputKriging::leaveOneOut)
+      .def("leaveOneOutMat", &PyMultiOutputKriging::leaveOneOutMat)
+      .def("summary", &PyMultiOutputKriging::summary)
+      .def("kernel", &PyMultiOutputKriging::kernel)
+      .def("output_model", &PyMultiOutputKriging::output_model)
+      .def("nb_outputs", &PyMultiOutputKriging::nb_outputs)
+      .def("X", &PyMultiOutputKriging::X)
+      .def("Y", &PyMultiOutputKriging::Y)
+      .def("output_coordinates", &PyMultiOutputKriging::output_coordinates)
+      .def("regmodel", &PyMultiOutputKriging::regmodel)
+      .def("normalize", &PyMultiOutputKriging::normalize)
+      .def("optim", &PyMultiOutputKriging::optim)
+      .def("objective", &PyMultiOutputKriging::objective)
+      .def("centerY", &PyMultiOutputKriging::centerY)
+      .def("scaleY", &PyMultiOutputKriging::scaleY)
+      .def("nb_components", &PyMultiOutputKriging::nb_components)
+      .def("pca_basis", &PyMultiOutputKriging::pca_basis)
+      .def("pca_explained", &PyMultiOutputKriging::pca_explained)
+      .def("pca_residual", &PyMultiOutputKriging::pca_residual)
+      .def("component", &PyMultiOutputKriging::component, py::arg("k"))
+      .def("__repr__", [](const PyMultiOutputKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")
       .def(py::init<const std::vector<std::string>&, const std::string&>(),

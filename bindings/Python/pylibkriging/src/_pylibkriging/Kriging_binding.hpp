@@ -15,6 +15,7 @@ namespace py = pybind11;
 class PyKriging {
  private:
   PyKriging(std::unique_ptr<Kriging>&& internal) : m_internal(std::move(internal)) {}
+  friend class PyMultiOutputKriging;  // wraps copies of its latent Kriging components
 
  public:
   // Kernel-only constructor (no data)

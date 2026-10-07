@@ -86,6 +86,12 @@ std::string MultiOutputKriging::output_model_string() const {
   return "?";
 }
 
+void MultiOutputKriging::set_output_coordinates(const arma::mat& t) {
+  if (!t.is_finite())
+    throw std::invalid_argument("MultiOutputKriging::set_output_coordinates: coordinates must be finite");
+  m_t = t;
+}
+
 void MultiOutputKriging::check_fitted(const std::string& where) const {
   if (m_components.empty())
     throw std::runtime_error("MultiOutputKriging::" + where + ": model is not fitted");
@@ -145,6 +151,10 @@ void MultiOutputKriging::fit(const arma::mat& Y,
     throw std::invalid_argument("MultiOutputKriging::fit: need at least 2 observations and 1 output");
   if (!Y.is_finite() || !X.is_finite())
     throw std::invalid_argument("MultiOutputKriging::fit: Y and X must be finite (isotopic design, no missing value)");
+
+  if (m_t.n_elem > 0 && m_t.n_rows != q)
+    throw std::invalid_argument("MultiOutputKriging::fit: output_coordinates has " + std::to_string(m_t.n_rows)
+                                + " rows but Y has " + std::to_string(q) + " columns (outputs)");
 
   m_X = X;
   m_Y = Y;

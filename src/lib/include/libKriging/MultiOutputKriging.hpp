@@ -75,6 +75,11 @@ class MultiOutputKriging {
                                        const std::string& objective = "LL",
                                        const Parameters& parameters = {});
 
+  /** Output coordinates (e.g. time steps), q × d_t. Used by
+   * "separable(<kernel>)" (not implemented yet); stored and checked against q
+   * at fit time otherwise. A vector is taken as a single column. */
+  LIBKRIGING_EXPORT void set_output_coordinates(const arma::mat& t);
+
   /** Fit on (X, Y).
    * @param Y n × q outputs
    * @param X n × d inputs
@@ -131,6 +136,7 @@ class MultiOutputKriging {
   [[nodiscard]] arma::uword nb_outputs() const { return m_Y.n_cols; }
   [[nodiscard]] const arma::mat& X() const { return m_X; }
   [[nodiscard]] const arma::mat& Y() const { return m_Y; }
+  [[nodiscard]] const arma::mat& output_coordinates() const { return m_t; }  ///< q × d_t (empty if unset)
   [[nodiscard]] const Trend::RegressionModel& regmodel() const { return m_regmodel; }
   [[nodiscard]] bool normalize() const { return m_normalize; }
   [[nodiscard]] const std::string& optim() const { return m_optim; }
@@ -162,6 +168,7 @@ class MultiOutputKriging {
   // data
   arma::mat m_X;  ///< n × d
   arma::mat m_Y;  ///< n × q
+  arma::mat m_t;  ///< q × d_t output coordinates
   arma::rowvec m_centerY;
   arma::rowvec m_scaleY;
 
