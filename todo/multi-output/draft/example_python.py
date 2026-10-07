@@ -1,6 +1,6 @@
-# API attendue de MultiOutputKriging côté Python. Seul le mode "pca" est implémenté
-# (testé par bindings/Python/pylibkriging/tests/MultiOutputKriging_test.py) ;
-# les sections "separable" / "shared" restent prospectives. Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
+# API attendue de MultiOutputKriging côté Python. Les modes "pca" et "shared" sont
+# implémentés (testés par bindings/Python/pylibkriging/tests/MultiOutputKriging_test.py) ;
+# la section "separable" reste prospective. Cf. todo/multi-output/ANALYSIS.md §5, draft/MultiOutputKriging.hpp.
 import numpy as np
 import pylibkriging as lk
 
@@ -56,7 +56,8 @@ print(np.quantile(trough, [0.05, 0.5, 0.95], axis=1)) # IC à 90 % du creux, par
 
 # --- 3. θ partagés (PP-GaSP) : rapide, bandes ponctuelles seulement ----------
 shared = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
-print(shared.sigma2().shape, shared.beta().shape)     # (q,), (p, q)
+print(shared.theta(), shared.logLikelihood())         # un seul θ (d) pour les q sorties
+print(shared.sigma2().shape, shared.beta().shape)     # (q,), (p, q) ; σ² = 0 pour une sortie constante (t = 0)
 
 # --- Choix du modèle par validation croisée ----------------------------------
 for m in (pca, sep, shared):
@@ -71,4 +72,4 @@ sep.update(Y_u, X_u, refit=True)
 y1 = Y[:, 50]
 a = lk.MultiOutputKriging(y1[:, None], X, "matern5_2", output_model="shared")
 b = lk.Kriging(y1, X, "matern5_2")
-assert np.allclose(a.theta(), b.theta())
+assert np.allclose(a.theta(), b.theta().ravel(), rtol=1e-5)

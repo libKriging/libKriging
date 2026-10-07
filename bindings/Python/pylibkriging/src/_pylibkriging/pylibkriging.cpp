@@ -397,6 +397,14 @@ discards n - n_max points outright.)pbdoc")
       .def("pca_explained", &PyMultiOutputKriging::pca_explained)
       .def("pca_residual", &PyMultiOutputKriging::pca_residual)
       .def("component", &PyMultiOutputKriging::component, py::arg("k"))
+      .def("theta", &PyMultiOutputKriging::theta)
+      .def("sigma2", &PyMultiOutputKriging::sigma2)
+      .def("beta", &PyMultiOutputKriging::beta)
+      .def("logLikelihood", &PyMultiOutputKriging::logLikelihood)
+      .def("logLikelihoodFun",
+           &PyMultiOutputKriging::logLikelihoodFun,
+           py::arg("theta"),
+           py::arg("return_grad") = false)
       .def("__repr__", [](const PyMultiOutputKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")

@@ -3,21 +3,23 @@
 Dossier de travail pour le support de sorties multiples (`Y` n × q) dans
 libKriging, avec un focus sur les sorties temporelles / fonctionnelles.
 
-**État : analyse / conception. Aucun code produit dans l'arbre source.**
+**État :** `MultiOutputKriging` implémenté en C++ et Python pour les modèles
+`"pca"` et `"shared"` (`src/lib/MultiOutputKriging.cpp`) ; `"separable"` à venir.
 
 ## Contenu
 
 | Fichier | Rôle |
 |---|---|
 | `ANALYSIS.md` | Revue biblio (§1), logiciels (§2), feuille de route (§3), sorties temporelles (§4), API (§5), questions ouvertes (§6) |
-| `draft/MultiOutputKriging.hpp` | Esquisse d'API C++ — vérifiée par `g++ -fsyntax-only`, non branchée au build |
-| `draft/example_python.py` | Exemple d'usage Python de l'API attendue (non exécutable) |
+| `draft/MultiOutputKriging.hpp` | Esquisse d'API C++ initiale (la version réelle est `src/lib/include/libKriging/MultiOutputKriging.hpp`) |
+| `draft/example_python.py` | Exemple d'usage Python ; sections `pca` et `shared` exécutables |
 
 ## Reprise rapide
 
-1. Trancher `ANALYSIS.md` §6 (cas d'usage cible, `Σ̂` singulier, format de cov).
-2. Suivre `ANALYSIS.md` §5.4 : `"pca"` par composition → généralisation
-   `KrigingImpl` à `m_Y` → `"shared"` → `"separable"` → `"separable(<kernel>)"`.
+1. `ANALYSIS.md` §6 : Q2, Q3, Q5, Q6 tranchées ; Q1, Q4, Q7 ouvertes.
+2. `ANALYSIS.md` §5.4 : fait `"pca"`, généralisation de la factorisation de
+   `KrigingImpl`, `"shared"` ; reste `"separable"` → `"separable(<kernel>)"`,
+   puis LOO/`update_simulate` en `"shared"` et bindings R / Octave / Julia.
 
 Voisins : GEK (travail local non publié), multi-fidélité (branche
 `feature/multi-fidelity-cokriging`).

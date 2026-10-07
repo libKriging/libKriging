@@ -38,9 +38,18 @@ struct MultiOutputKrigingParameters {
  *       in simulate (via Ρᵀw, w ~ N(0, I_n), so it stays coherent across
  *       outputs without forming the q × q matrix).
  *
- *   "shared", "separable", "separable(<kernel>)"
- *       Shared-correlation (PP-GaSP) and separable (ICM / R_t ⊗ R_x) models:
- *       parsed but not implemented yet (fit throws).
+ *   "shared"
+ *       Shared correlation, parallel partial GP (Gu & Berger, AoAS 2016):
+ *         Y_j ~ GP(F β_j, σ_j² r_θ),  outputs independent given θ,
+ *       one θ for all outputs (maximum of the summed concentrated
+ *       likelihoods, one Cholesky per evaluation), β_j and σ_j² per output.
+ *       Same normalization, scales and optimizer as Kriging: with q = 1 it
+ *       gives the same model as Kriging(y, X, …). Objective "LL" only;
+ *       update_simulate not implemented yet.
+ *
+ *   "separable", "separable(<kernel>)"
+ *       Separable (ICM / R_t ⊗ R_x) models: parsed but not implemented yet
+ *       (fit throws).
  *
  * Covariance ordering: joint covariances are over vec(Y_n), i.e. the m
  * prediction points of output 1, then output 2, … (column-major).
@@ -60,6 +69,9 @@ class MultiOutputKriging {
   };
 
   MultiOutputKriging() = delete;
+  LIBKRIGING_EXPORT ~MultiOutputKriging();
+  LIBKRIGING_EXPORT MultiOutputKriging(MultiOutputKriging&&) noexcept;
+  LIBKRIGING_EXPORT MultiOutputKriging& operator=(MultiOutputKriging&&) noexcept;
 
   /// @param covType kernel on x (same names as Kriging)
   /// @param outputModel see class documentation
@@ -141,8 +153,21 @@ class MultiOutputKriging {
   [[nodiscard]] bool normalize() const { return m_normalize; }
   [[nodiscard]] const std::string& optim() const { return m_optim; }
   [[nodiscard]] const std::string& objective() const { return m_objective; }
-  [[nodiscard]] const arma::rowvec& centerY() const { return m_centerY; }  ///< ȳ, 1 × q
-  [[nodiscard]] const arma::rowvec& scaleY() const { return m_scaleY; }    ///< s, 1 × q
+  /// Output centering / scaling, 1 × q: column means and sd (if normalize)
+  /// in "pca", column min and range (if normalize, as Kriging) in "shared".
+  [[nodiscard]] const arma::rowvec& centerY() const { return m_centerY; }
+  [[nodiscard]] const arma::rowvec& scaleY() const { return m_scaleY; }
+
+  // Shared mode (same scales as the Kriging accessors: normalized when
+  // normalize = true)
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& theta() const;   ///< θ, d
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& sigma2() const;  ///< σ_j², q
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& beta() const;    ///< β_j, p × q
+  /// Summed log-likelihood at the fitted θ
+  LIBKRIGING_EXPORT double logLikelihood();
+  /// Summed concentrated log-likelihood at θ (normalized scale), with its
+  /// gradient in θ when grad is true
+  LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad = false);
 
   // PCA mode
   [[nodiscard]] arma::uword nb_components() const { return m_components.size(); }
@@ -181,8 +206,14 @@ class MultiOutputKriging {
   // simulate / update_simulate state
   arma::cube m_lastsim_residual;  ///< m × q × nsim truncation draws of the last simulate
 
+  // Shared state (KrigingImpl-derived, defined in MultiOutputKriging.cpp)
+  class SharedModel;
+  std::unique_ptr<SharedModel> m_shared;
+
   void parse_output_model(const std::string& s);
   void check_fitted(const std::string& where) const;
+  const SharedModel& shared(const std::string& where) const;
+  SharedModel& shared(const std::string& where);
   /// Scores of Y (n × q, original scale) on the current basis: n × K
   arma::mat project(const arma::mat& Y) const;
   /// Map latent values (m × K) back to outputs (m × q), original scale

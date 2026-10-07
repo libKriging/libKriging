@@ -72,6 +72,12 @@ class PyMultiOutputKriging {
   [[nodiscard]] py::array_t<double> pca_basis() const;
   [[nodiscard]] py::array_t<double> pca_explained() const;
   [[nodiscard]] py::array_t<double> pca_residual() const;
+  // "shared" output model
+  [[nodiscard]] py::array_t<double> theta() const;
+  [[nodiscard]] py::array_t<double> sigma2() const;
+  [[nodiscard]] py::array_t<double> beta() const;
+  double logLikelihood();
+  std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, bool return_grad);
   /// Copy of the k-th latent Kriging (independent of this model afterwards)
   [[nodiscard]] PyKriging component(unsigned long k) const;
 

@@ -1,4 +1,4 @@
-"""MultiOutputKriging (output_model="pca") — mirrors todo/multi-output/draft/example_python.py."""
+"""MultiOutputKriging ("pca" and "shared") — mirrors todo/multi-output/draft/example_python.py."""
 import numpy as np
 import pytest
 
@@ -74,8 +74,9 @@ def test_simulate(pca, data):
 def test_loo_and_model_choice(data):
     X, Y, _, _ = data
     loos = {spec: lk.MultiOutputKriging(Y, X, "matern5_2", output_model=spec).leaveOneOut()
-            for spec in ("pca(3)", "pca(0.999)")}
+            for spec in ("pca(3)", "pca(0.999)", "shared")}
     assert loos["pca(0.999)"] < loos["pca(3)"]
+    assert loos["shared"] < loos["pca(3)"]
     m = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="pca(3)")
     loo_mean, loo_sd = m.leaveOneOutMat()
     assert loo_mean.shape == Y.shape and loo_sd.shape == Y.shape
@@ -122,3 +123,68 @@ def test_errors(data):
         lk.MultiOutputKriging(Y, X, "matern5_2", output_coordinates=t[:10])
     with pytest.raises(ValueError, match="unsupported parameter"):
         lk.MultiOutputKriging(Y, X, "matern5_2", parameters={"sigma2": 1.0})
+
+
+# ----------------------------------------------------------------------------- shared
+
+
+@pytest.fixture(scope="module")
+def shared(data):
+    X, Y, _, _ = data
+    return lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared", normalize=True)
+
+
+def test_shared_parameters(shared, data):
+    X, Y, Xnew, Ynew = data
+    assert shared.output_model() == "shared"
+    assert shared.theta().shape == (2,)
+    assert shared.sigma2().shape == (200,)
+    assert shared.beta().shape == (1, 200)
+    assert shared.sigma2()[0] == 0  # t = 0: every curve equals 1, constant output
+    assert shared.nb_components() == 0
+    ll, grad = shared.logLikelihoodFun(shared.theta(), return_grad=True)
+    assert ll == pytest.approx(shared.logLikelihood())
+    assert np.abs(grad).max() < 1e-2 * abs(ll)
+
+
+def test_shared_predict_simulate(shared, data):
+    _, _, Xnew, Ynew = data
+    mean, stdev, cov, deriv = shared.predict(Xnew, return_stdev=True, return_cov=True, return_deriv=True)
+    assert mean.shape == (5, 200) and stdev.shape == (5, 200)
+    assert cov.shape == (1000, 1000) and deriv.shape == (5, 2, 200)
+    np.testing.assert_allclose(np.sqrt(np.diag(cov)), stdev.ravel(order="F"), rtol=1e-8, atol=1e-12)
+    assert np.abs(cov[:5, 5:10]).max() == 0  # outputs independent given theta
+    assert np.sqrt(np.mean((mean - Ynew) ** 2)) < 0.15 * Ynew.std()
+
+    sims = shared.simulate(nsim=2000, seed=3, X=Xnew)
+    assert sims.shape == (5, 200, 2000)
+    act = stdev > 1e-3 * stdev.max()
+    np.testing.assert_allclose(sims.mean(axis=2)[act], mean[act], atol=0.1 * stdev.max())
+    np.testing.assert_allclose(sims.std(axis=2)[act], stdev[act], rtol=0.1)
+    with pytest.raises(RuntimeError, match="not implemented"):
+        shared.simulate(nsim=10, seed=3, X=Xnew, will_update=True)
+
+
+def test_shared_single_output_matches_kriging(data):
+    X, Y, Xnew, _ = data
+    y1 = Y[:, 50]
+    a = lk.MultiOutputKriging(y1, X, "matern5_2", output_model="shared")
+    b = lk.Kriging(y1, X, "matern5_2")
+    np.testing.assert_allclose(a.theta(), b.theta().ravel(), rtol=1e-5)
+    np.testing.assert_allclose(a.sigma2()[0], b.sigma2(), rtol=1e-5)
+    m1, s1, _, _ = a.predict(Xnew)
+    m2, s2, *_ = b.predict(Xnew, True, False, False)
+    np.testing.assert_allclose(m1.ravel(), m2.ravel(), atol=1e-6)
+    np.testing.assert_allclose(s1.ravel(), s2.ravel(), atol=1e-6)
+
+
+def test_shared_update(data):
+    X, Y, _, _ = data
+    rng = np.random.default_rng(2)
+    X_u = rng.uniform(size=(3, 2))
+    Y_u = np.array([code(x) for x in X_u])
+    m = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="shared")
+    theta = m.theta()
+    m.update(Y_u, X_u, refit=False)
+    np.testing.assert_array_equal(m.theta(), theta)
+    np.testing.assert_allclose(m.predict(X_u)[0], Y_u, atol=1e-6)

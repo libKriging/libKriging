@@ -187,6 +187,30 @@ py::array_t<double> PyMultiOutputKriging::pca_residual() const {
   return carma::mat_to_arr(R, true);
 }
 
+py::array_t<double> PyMultiOutputKriging::theta() const {
+  return vec_to_arr(m_internal->theta());
+}
+
+py::array_t<double> PyMultiOutputKriging::sigma2() const {
+  return vec_to_arr(m_internal->sigma2());
+}
+
+py::array_t<double> PyMultiOutputKriging::beta() const {
+  arma::mat B = m_internal->beta();
+  return carma::mat_to_arr(B, true);
+}
+
+double PyMultiOutputKriging::logLikelihood() {
+  return m_internal->logLikelihood();
+}
+
+std::tuple<double, py::array_t<double>> PyMultiOutputKriging::logLikelihoodFun(const py::array_t<double>& theta,
+                                                                              bool return_grad) {
+  const arma::vec th = arma::vectorise(to_mat(theta));
+  auto [ll, g] = m_internal->logLikelihoodFun(th, return_grad);
+  return std::make_tuple(ll, vec_to_arr(g));
+}
+
 PyKriging PyMultiOutputKriging::component(unsigned long k) const {
   return PyKriging(std::make_unique<Kriging>(m_internal->component(k), ExplicitCopySpecifier{}));
 }
