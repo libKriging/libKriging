@@ -2865,7 +2865,6 @@ arma::mat WarpKriging::simulate(int nsim,
                                 /*R_nn_factor=*/1.0,
                                 /*R_nn_diag=*/{},
                                 /*Sigma_divisor=*/1.0,
-                                /*use_qr_for_circ=*/true,
                                 phi_fn);
 
   if (will_update) {

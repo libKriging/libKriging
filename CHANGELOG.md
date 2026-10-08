@@ -16,6 +16,14 @@ past release, see the corresponding entry on the
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in
   NAMESPACE").
+- `update_simulate` (Kriging, with nugget or noise, and WarpKriging): the
+  conditioned paths mixed the raw and normalized output scales, giving a wrong
+  mean and stdev with `normalize=true`; extending the paths to `X_u` inverted
+  the near-singular joint correlation of the simulation design, which left an
+  absolute stdev floor and mean shifts for smooth kernels. Both are fixed (the
+  extension is now a block-Cholesky extension driven by the normals of
+  `simulate()`), and `noise_u` is normalized by `scaleY^2` in
+  `Kriging::update_simulate(y, noise, X)`.
 
 ## [1.2.2] - 2026-09-22
 

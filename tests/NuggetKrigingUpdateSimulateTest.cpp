@@ -92,7 +92,7 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
       }
     }
     INFO("KS test failures: " << ks_failures << " / " << n_sim_points << failure_details.str());
-    // CHECK(ks_failures == 0);
+    CHECK(ks_failures == 0);
   }
 
   SECTION("Multiple points update_simulate") {
@@ -147,7 +147,7 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
       }
     }
     INFO("KS test failures: " << ks_failures << " / " << n_sim_points << failure_details.str());
-    // CHECK(ks_failures == 0);
+    CHECK(ks_failures == 0);
   }
 
   SECTION("Different kernels") {
@@ -203,7 +203,7 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
         }
       }
       INFO("KS test failures: " << ks_failures << " / " << 5 << failure_details.str());
-      // CHECK(ks_failures == 0);
+      CHECK(ks_failures == 0);
     }
   }
 
@@ -268,7 +268,7 @@ TEST_CASE("NuggetKrigingUpdateSimulateTest - Update simulate equals updated mode
         }
       }
       INFO("KS test failures: " << ks_failures << " / " << 5 << failure_details.str());
-      // CHECK(ks_failures == 0);
+      CHECK(ks_failures == 0);
     }
   }
 }
