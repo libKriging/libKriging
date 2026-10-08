@@ -208,9 +208,7 @@ TEST_CASE("MultiOutputKriging pca update and update_simulate", "[multioutput]") 
   }
 
   SECTION("update_simulate conditions the last trajectories") {
-    // matern3_2: Kriging::update_simulate has a ~1e-3 absolute stdev floor that
-    // dominates the tiny posterior stdev of smoother kernels (pre-existing)
-    MultiOutputKriging mo(Y, X, "matern3_2", "pca(0.999)");
+    MultiOutputKriging mo(Y, X, "matern5_2", "pca(0.999)");
     CHECK_THROWS_AS(mo.update_simulate(Yu, Xu), std::runtime_error);
     const int nsim = 2000;
     const arma::cube S0 = mo.simulate(nsim, 5, Xt, true);
@@ -219,10 +217,10 @@ TEST_CASE("MultiOutputKriging pca update and update_simulate", "[multioutput]") 
     REQUIRE(S1.n_cols == 40);
     REQUIRE(S1.n_slices == static_cast<arma::uword>(nsim));
 
-    // reference: model actually updated (no refit), then predicted
-    MultiOutputKriging ref(Y, X, "matern3_2", "pca(0.999)");
-    ref.update(Yu, Xu, false);
-    auto [m, s, c, d] = ref.predict(Xt, true);
+    // reference: the same model actually updated (no refit), then predicted
+    // (a second fit may land on another local optimum for some component)
+    mo.update(Yu, Xu, false);
+    auto [m, s, c, d] = mo.predict(Xt, true);
     const arma::mat emean = arma::mean(S1, 2);
     CHECK(arma::abs(emean - m).max() < 5 * s.max() / std::sqrt(nsim) + 1e-8);
   }
