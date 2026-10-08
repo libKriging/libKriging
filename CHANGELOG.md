@@ -16,6 +16,19 @@ past release, see the corresponding entry on the
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in
   NAMESPACE").
+- WarpKriging: intermittent heap corruption (`malloc(): corrupted top size`)
+  and degraded optimum in the parallel multistart of `fit()`
+  (`BFGS<k>`, `BFGS<k>+Adam`). Concurrent L-BFGS-B runs raced on the `static`
+  locals of the f2c BLAS/LINPACK helpers of `lbfgsb_cpp`; the submodule is
+  bumped to `b6eff96`, which makes them reentrant. The multistart thread
+  joiner is also constructed before the threads are spawned, so they are
+  joined even if a later spawn throws.
+- Windows: OpenBLAS is pinned to 0.3.33 (conda-forge) and
+  `OPENBLAS_L2_SIZE=2048` is exported in the Windows build environments.
+  OpenBLAS 0.3.34 overflows the stack of `dgemm_kernel_ZEN`/`HASWELL` on AMD
+  Zen 4/5 hosts exposing AVX-512 (OpenMathLib/OpenBLAS#6013, #6021), which
+  crashed the R, Python and Julia Windows builds; the bundled DLL ships with
+  the Python wheel and the R release.
 - `update_simulate` (Kriging, with nugget or noise, and WarpKriging): the
   conditioned paths mixed the raw and normalized output scales, giving a wrong
   mean and stdev with `normalize=true`; extending the paths to `X_u` inverted
