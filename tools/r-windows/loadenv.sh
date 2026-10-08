@@ -30,3 +30,9 @@ fi
 
 # In all cases, we need an access to libomp.dll, flang.dll, flangrti.dll, openblas.dll
 export PATH=${HOME}/Miniconda3/Library/bin:$PATH
+
+# Belt and braces for OpenBLAS 0.3.34 (OpenMathLib/OpenBLAS#6013/#6021, see
+# the 0.3.33 pin in tools/windows/install.sh): its Zen 4 GEMM blocking
+# override only fires when L2 reads as 1024 KB, and overflows the stack of
+# dgemm_kernel_ZEN/HASWELL on AVX-512 Zen 4/5 hosts. Claiming 2 MB disables it.
+export OPENBLAS_L2_SIZE=2048
