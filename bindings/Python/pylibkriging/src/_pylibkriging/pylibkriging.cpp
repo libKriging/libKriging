@@ -14,8 +14,8 @@
 
 #include "Kriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
-#include "NestedKriging_binding.hpp"
 #include "MultiOutputKriging_binding.hpp"
+#include "NestedKriging_binding.hpp"
 #include "RandomGenerator.hpp"
 #include "WarpKriging_binding.hpp"
 
@@ -403,14 +403,9 @@ discards n - n_max points outright.)pbdoc")
       .def("output_cov", &PyMultiOutputKriging::output_cov)
       .def("predictCovFactors", &PyMultiOutputKriging::predictCovFactors, py::arg("X"))
       .def("logLikelihood", &PyMultiOutputKriging::logLikelihood)
-      .def("logLikelihoodFun",
-           &PyMultiOutputKriging::logLikelihoodFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false)
-      .def("leaveOneOutFun",
-           &PyMultiOutputKriging::leaveOneOutFun,
-           py::arg("theta"),
-           py::arg("return_grad") = false)
+      .def(
+          "logLikelihoodFun", &PyMultiOutputKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
+      .def("leaveOneOutFun", &PyMultiOutputKriging::leaveOneOutFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("__repr__", [](const PyMultiOutputKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")

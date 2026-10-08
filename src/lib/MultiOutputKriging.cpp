@@ -110,11 +110,13 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     arma::mat Ls;
     if (!full) {
       s2_j = arma::sum(arma::square(E), 0) / n;
-      ll = -0.5 * arma::accu(n * arma::log(2 * M_PI * s2_j) + 2 * logdetL + n);
+      ll = -0.5 * arma::accu(n * arma::log(2 * arma::datum::pi * s2_j) + 2 * logdetL + n);
     } else {
       // −2ℓ = nq log 2π + n log|Σ̂| + q log|R| + nq,  Σ̂ = E*ᵀ E* / n
       Ls = sigma_chol(E.t() * E / n);
-      ll = -0.5 * (n * q * std::log(2 * M_PI) + 2 * n * arma::sum(arma::log(Ls.diag())) + 2 * q * logdetL + n * q);
+      ll = -0.5
+           * (n * q * std::log(2 * arma::datum::pi) + 2 * n * arma::sum(arma::log(Ls.diag())) + 2 * q * logdetL
+              + n * q);
     }
 
     if (grad_out != nullptr) {
@@ -294,8 +296,7 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       const double sign = loo ? 1.0 : -1.0;
       double f = loo ? leaveOneOutObj(theta, grad_out, m) : logLikelihood(theta, grad_out, m);
       if (grad_out != nullptr)
-        *grad_out = sign
-                    * (Optim::reparametrize ? arma::vec(Optim::reparam_from_deriv(theta, *grad_out)) : *grad_out);
+        *grad_out = sign * (Optim::reparametrize ? arma::vec(Optim::reparam_from_deriv(theta, *grad_out)) : *grad_out);
       return sign * f;
     };
 
@@ -326,12 +327,12 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
         double start_best = std::numeric_limits<double>::infinity();
         arma::vec start_best_gamma = gamma;
         for (int retry = 0; retry <= Optim::max_restart; ++retry) {
-          auto res = optimizer.minimize(
-              [&](const arma::vec& g, arma::vec& grad) -> double { return ofn(g, &grad, &m); },
-              gamma,
-              lower.memptr(),
-              upper.memptr(),
-              bounds_type.memptr());
+          auto res
+              = optimizer.minimize([&](const arma::vec& g, arma::vec& grad) -> double { return ofn(g, &grad, &m); },
+                                   gamma,
+                                   lower.memptr(),
+                                   upper.memptr(),
+                                   bounds_type.memptr());
           if (res.f_opt < start_best) {
             start_best = res.f_opt;
             start_best_gamma = gamma;
@@ -358,8 +359,8 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       }
     }
     if (best_theta.is_empty())
-      throw std::runtime_error("MultiOutputKriging: all " + std::to_string(multistart)
-                               + " optimization starts failed (" + last_error + ")");
+      throw std::runtime_error("MultiOutputKriging: all " + std::to_string(multistart) + " optimization starts failed ("
+                               + last_error + ")");
 
     m_theta = best_theta;
     m_est_theta = true;
@@ -610,7 +611,6 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     return os.str();
   }
 };
-
 
 // =============================================================================
 // construction / configuration

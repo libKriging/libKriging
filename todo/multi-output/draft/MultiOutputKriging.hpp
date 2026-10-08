@@ -159,9 +159,9 @@ class MultiOutputKriging {
    * predictCovFactors. D? cov « croisée » seulement (bloc diagonal par sortie
    * si outputModel = "shared", puisque Σ est diagonale). */
   LIBKRIGING_EXPORT std::tuple<arma::mat, arma::mat, arma::mat, arma::cube> predict(const arma::mat& X_n,
-                                                                                     bool return_stdev = true,
-                                                                                     bool return_cov = false,
-                                                                                     bool return_deriv = false);
+                                                                                    bool return_stdev = true,
+                                                                                    bool return_cov = false,
+                                                                                    bool return_deriv = false);
 
   /** Kronecker factors of the predictive covariance, Cov(vec Y_n) = Σ ⊗ C_x.
    * Only for "shared" (Σ diagonal), "separable" and "separable(<kernel>)";
@@ -217,8 +217,8 @@ class MultiOutputKriging {
 
   // PCA mode only (throw otherwise)
   [[nodiscard]] LIBKRIGING_EXPORT arma::uword nb_components() const;
-  [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& pca_basis() const;     ///< Φ, q × K
-  [[nodiscard]] LIBKRIGING_EXPORT const arma::rowvec& pca_mean() const;   ///< ȳ, 1 × q
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& pca_basis() const;      ///< Φ, q × K
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::rowvec& pca_mean() const;    ///< ȳ, 1 × q
   [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& pca_explained() const;  ///< cumulative fraction, K
   [[nodiscard]] LIBKRIGING_EXPORT const Kriging& component(arma::uword k) const;
 
@@ -230,8 +230,8 @@ class MultiOutputKriging {
   // configuration
   std::string m_covType;
   OutputModel m_output_model = OutputModel::Shared;
-  std::string m_output_covType;      ///< kernel on t for SeparableKernel
-  double m_pca_spec = 0.99;          ///< K (≥ 1, integer) or explained-variance fraction (< 1)
+  std::string m_output_covType;  ///< kernel on t for SeparableKernel
+  double m_pca_spec = 0.99;      ///< K (≥ 1, integer) or explained-variance fraction (< 1)
   Trend::RegressionModel m_regmodel = Trend::RegressionModel::Constant;
   bool m_normalize = false;
   std::string m_optim;
@@ -251,11 +251,11 @@ class MultiOutputKriging {
   arma::mat m_Sigma;         ///< q × q (Separable)
   arma::vec m_output_theta;  ///< φ (SeparableKernel)
   std::optional<double> m_nugget_ratio;
-  arma::mat m_F;  ///< n × p, shared by all outputs
-  arma::mat m_T;  ///< chol(R), shared
-  arma::mat m_M;  ///< T \ F, shared
-  arma::mat m_Z;  ///< T \ (Y − F β̂), n × q
-  arma::mat m_Ut;     ///< eigenvectors of R_t (SeparableKernel)
+  arma::mat m_F;        ///< n × p, shared by all outputs
+  arma::mat m_T;        ///< chol(R), shared
+  arma::mat m_M;        ///< T \ F, shared
+  arma::mat m_Z;        ///< T \ (Y − F β̂), n × q
+  arma::mat m_Ut;       ///< eigenvectors of R_t (SeparableKernel)
   arma::vec m_lambdat;  ///< eigenvalues of R_t (SeparableKernel)
 
   // PCA state

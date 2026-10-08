@@ -205,7 +205,7 @@ double PyMultiOutputKriging::logLikelihood() {
 }
 
 std::tuple<double, py::array_t<double>> PyMultiOutputKriging::logLikelihoodFun(const py::array_t<double>& theta,
-                                                                              bool return_grad) {
+                                                                               bool return_grad) {
   const arma::vec th = arma::vectorise(to_mat(theta));
   auto [ll, g] = m_internal->logLikelihoodFun(th, return_grad);
   return std::make_tuple(ll, vec_to_arr(g));
@@ -216,7 +216,7 @@ PyKriging PyMultiOutputKriging::component(unsigned long k) const {
 }
 
 std::tuple<double, py::array_t<double>> PyMultiOutputKriging::leaveOneOutFun(const py::array_t<double>& theta,
-                                                                            bool return_grad) {
+                                                                             bool return_grad) {
   const arma::vec th = arma::vectorise(to_mat(theta));
   auto [loo, g] = m_internal->leaveOneOutFun(th, return_grad);
   return std::make_tuple(loo, vec_to_arr(g));

@@ -422,8 +422,8 @@ TEST_CASE("MultiOutputKriging shared LOO objective", "[multioutput][shared]") {
 
   SECTION("q = 1 reduces to Kriging") {
     const arma::vec y = arma::sin(9 * X.col(0)) + arma::cos(11 * X.col(1)) + 3 * X.col(0);
-    MultiOutputKriging mo(arma::mat(y), X, "matern5_2", "shared", Trend::RegressionModel::Constant, false, "BFGS",
-                          "LOO");
+    MultiOutputKriging mo(
+        arma::mat(y), X, "matern5_2", "shared", Trend::RegressionModel::Constant, false, "BFGS", "LOO");
     Kriging kr(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO");
     CHECK(mo.objective() == "LOO");
     const arma::vec th = {0.3, 0.2};
