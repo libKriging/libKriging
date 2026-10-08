@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -2570,6 +2571,10 @@ void WarpKriging::optimise_joint(const std::string& method) {
       }
     };
 
+    // Starts run concurrently in a thread pool. This requires a reentrant
+    // L-BFGS-B: lbfgsb_cpp >= b6eff96, whose f2c BLAS/LINPACK helpers
+    // (Lbfgsb.3.0/blas.c, linpack.c) no longer keep `static` locals that
+    // concurrent optimizers would race on.
     if (multistart == 1) {
       worker(0);
     } else {
@@ -2590,7 +2595,8 @@ void WarpKriging::optimise_joint(const std::string& method) {
       std::vector<std::thread> threads;
       threads.reserve(pool_size);
 
-      // RAII guard to ensure threads are always joined
+      // RAII guard to ensure threads are always joined (also when spawning
+      // a later thread throws)
       struct ThreadJoiner {
         std::vector<std::thread>& threads_ref;
         explicit ThreadJoiner(std::vector<std::thread>& t) : threads_ref(t) {}
@@ -2599,7 +2605,7 @@ void WarpKriging::optimise_joint(const std::string& method) {
             if (t.joinable())
               t.join();
         }
-      };
+      } joiner(threads);
 
       for (int worker_id = 0; worker_id < pool_size; worker_id++) {
         threads.emplace_back([&]() {
@@ -2616,8 +2622,6 @@ void WarpKriging::optimise_joint(const std::string& method) {
           }
         });
       }
-
-      ThreadJoiner joiner(threads);
     }
 
     // Find best result
