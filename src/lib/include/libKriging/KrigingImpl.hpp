@@ -129,18 +129,9 @@ class KrigingImpl {
   arma::mat lastsim_y_n;
   int lastsim_nsim{};
   int lastsim_seed{};
-  arma::mat lastsim_F_n;
-  arma::mat lastsim_R_nn;
   arma::mat lastsim_L_oCn;
-  arma::mat lastsim_L_nCn;
-  arma::mat lastsim_L_on;
-  arma::mat lastsim_Rinv_on;
-  arma::mat lastsim_F_on;
-  arma::mat lastsim_Fstar_on;
-  arma::mat lastsim_circ_on;
-  arma::mat lastsim_Fcirc_on;
-  arma::mat lastsim_Fhat_nKo;
   arma::mat lastsim_Ecirc_nKo;
+  arma::mat lastsim_LSigma_nKo;
 
   // Updated simulation stored data
   arma::mat lastsimup_Xn_u;
@@ -228,9 +219,6 @@ class KrigingImpl {
   ///   * `R_nn_factor` / `R_nn_diag`: passed through to `covMat_sym_X`.
   ///   * `Sigma_divisor`: Sigma_nKo is divided by this before the Cholesky
   ///     used to sample (Nug: α; K/Noise: 1).
-  ///   * `use_qr_for_circ`: when true, build `lastsim_circ_on` via QR of the
-  ///     augmented `Fstar_on` (K/Nug); when false, via `chol_upper` of the
-  ///     Gram matrix (Noise).  Preserves the existing bit-level divergence.
   arma::mat simulate_impl(int nsim,
                           int seed,
                           const arma::mat& X_n,
@@ -240,7 +228,6 @@ class KrigingImpl {
                           double R_nn_factor,
                           const arma::vec& R_nn_diag,
                           double Sigma_divisor,
-                          bool use_qr_for_circ,
                           const FeatureMap& phi = {});
 
   /// Unified update_simulate shared by the three variants. The wrapper is
@@ -255,7 +242,7 @@ class KrigingImpl {
   ///   * `R_un_factor`: multiplies off-diagonal R_un entries (Nug: α).
   ///   * `R_un_coincident_to_one`: when true, force R_un[i,j]=1 whenever
   ///     Xn_u[:,i] == lastsim_Xn_n[:,j] (Nug update_simulate with nugget).
-  ///   * `Sigma_divisor`: divides the Sigma_uKno Cholesky argument (Nug: α).
+  ///   * `Sigma_divisor`: as in `simulate_impl` (Nug: α).
   arma::mat update_simulate_impl(const arma::vec& y_u,
                                  const arma::mat& X_u,
                                  bool allow_cache,

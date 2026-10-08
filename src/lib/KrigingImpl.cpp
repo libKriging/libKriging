@@ -319,7 +319,6 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
                                      double R_nn_factor,
                                      const arma::vec& R_nn_diag,
                                      double Sigma_divisor,
-                                     bool use_qr_for_circ,
                                      const FeatureMap& phi) {
   arma::uword n_n = X_n.n_rows;
   arma::uword n_o = m_X.n_rows;
@@ -409,37 +408,9 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
     lastsim_seed = seed;
     lastsim_nsim = nsim;
 
-    lastsim_R_nn = R_nn;
-    lastsim_F_n = F_n;
-
     lastsim_L_oCn = Rstar_on;
-    lastsim_L_nCn = LinearAlgebra::safe_chol_lower(SigmaNoTrend_nKo);
-    t0 = Bench::toc(nullptr, "L_nCn     ", t0);
-
-    lastsim_L_on = arma::join_rows(arma::join_cols(m_T, lastsim_L_oCn.t()),
-                                   arma::join_cols(arma::zeros(n_o, n_n), lastsim_L_nCn));
-
-    lastsim_Rinv_on = LinearAlgebra::inv_sympd(lastsim_L_on);
-    t0 = Bench::toc(nullptr, "Rinv_on     ", t0);
-
-    lastsim_F_on = arma::join_cols(m_F, lastsim_F_n);
-    lastsim_Fstar_on = LinearAlgebra::solve_lower(lastsim_L_on, lastsim_F_on);
-    t0 = Bench::toc(nullptr, "Fstar_on     ", t0);
-
-    if (use_qr_for_circ) {
-      arma::mat Q_Fstar_on;
-      LinearAlgebra::qr_econ(Q_Fstar_on, lastsim_circ_on, lastsim_Fstar_on);
-    } else {
-      arma::mat FtRinvF_on = lastsim_Fstar_on.t() * lastsim_Fstar_on;
-      lastsim_circ_on = LinearAlgebra::chol_upper(FtRinvF_on);
-    }
-    lastsim_Fcirc_on = LinearAlgebra::rsolve_upper(lastsim_circ_on, lastsim_F_on);
-    t0 = Bench::toc(nullptr, "Fcirc_on     ", t0);
-
-    lastsim_Fhat_nKo = lastsim_L_oCn.t() * m_M;
-    t0 = Bench::toc(nullptr, "Fhat_nKo     ", t0);
-    lastsim_Ecirc_nKo = LinearAlgebra::rsolve_upper(m_circ, F_n - lastsim_Fhat_nKo);
-    t0 = Bench::toc(nullptr, "Ecirc_nKo     ", t0);
+    lastsim_Ecirc_nKo = Ecirc_n;
+    lastsim_LSigma_nKo = LSigma_nKo;
   }
 
   return y_n;
@@ -469,6 +440,8 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
 
   const arma::uword n_n = lastsim_Xn_n.n_cols;
   const arma::uword n_o = m_X.n_rows;
+  // y_u is raw; the conditioning below works on the normalized output scale (as m_y, m_sigma2)
+  const arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
   const arma::mat Xn_o = trans(m_X);    // already in kernel-input space
   const arma::mat Xn_n = lastsim_Xn_n;  // already in kernel-input space (phi-space when phi was used)
 
@@ -521,67 +494,44 @@ arma::mat KrigingImpl::update_simulate_impl(const arma::vec& y_u,
     t0 = Bench::toc(nullptr, "R_un          ", t0);
   }
 
-  // ======================================================================
-  // FOXY step #1 Extend the simulation to the design 'X_u' IF NECESSARY.
-  // ======================================================================
-
   if (!use_lastsimup) {
-    arma::mat R_onCu = arma::join_rows(lastsimup_R_uo, lastsimup_R_un).t();
-    arma::mat Rstar_onCu = LinearAlgebra::solve_lower(lastsim_L_on, R_onCu);
-    t0 = Bench::toc(nullptr, "Rstar_onCu          ", t0);
-
-    arma::mat Ecirc_uKon = LinearAlgebra::rsolve_upper(lastsim_circ_on, F_u - Rstar_onCu.t() * lastsim_Fstar_on);
-    t0 = Bench::toc(nullptr, "Ecirc_uKon          ", t0);
-
-    arma::mat Sigma_uKon = lastsimup_R_uu - Rstar_onCu.t() * Rstar_onCu + Ecirc_uKon * Ecirc_uKon.t();
-    Sigma_uKon = arma::symmatu(Sigma_uKon);
-    arma::vec Sigma_uKon_eigval;
-    arma::eig_sym(Sigma_uKon_eigval, Sigma_uKon);
-    const double Sigma_uKon_scale = std::max(1.0, arma::abs(Sigma_uKon.diag()).max());
-    const double Sigma_uKon_tol = std::sqrt(arma::datum::eps) * Sigma_uKon_scale;
-    if (Sigma_uKon_eigval.min() < Sigma_uKon_tol) {
-      Sigma_uKon.diag() += (Sigma_uKon_tol - Sigma_uKon_eigval.min());
-      Sigma_uKon = arma::symmatu(Sigma_uKon);
-    }
-    t0 = Bench::toc(nullptr, "Sigma_uKon          ", t0);
-
-    arma::mat LSigma_uKon = LinearAlgebra::safe_chol_lower(Sigma_uKon / Sigma_divisor);
-    t0 = Bench::toc(nullptr, "LSigma_uKon          ", t0);
-
-    arma::mat W_uCon = (R_onCu.t() + Ecirc_uKon * lastsim_Fcirc_on.t()) * lastsim_Rinv_on;
-    t0 = Bench::toc(nullptr, "W_uCon          ", t0);
-
-    arma::mat m_u = W_uCon.head_cols(n_o) * m_y;
-    arma::mat M_u = arma::repmat(m_u, 1, lastsim_nsim) + W_uCon.tail_cols(n_n) * lastsim_y_n;
-
-    Random::reset_seed(lastsim_seed);
-    lastsimup_y_u = M_u + LSigma_uKon * Random::randn_mat(n_u, lastsim_nsim) * std::sqrt(m_sigma2);
-    t0 = Bench::toc(nullptr, "y_u          ", t0);
-  }
-
-  // ======================================================================
-  // FOXY step #2   Update the simulated paths on 'X_n'
-  // ======================================================================
-
-  if (!use_lastsimup) {
+    // Covariances given the observations (universal kriging, trend included)
     arma::mat Rstar_ou = LinearAlgebra::solve_lower(m_T, lastsimup_R_uo.t());
-    t0 = Bench::toc(nullptr, "Rstar_ou          ", t0);
+    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Rstar_ou.t() * m_M);
+    arma::mat Sigma_uKo = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
+    arma::mat Sigma_unKo = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
+    t0 = Bench::toc(nullptr, "Sigma_uKo          ", t0);
 
-    arma::mat Fhat_uKo = Rstar_ou.t() * m_M;
-    arma::mat Ecirc_uKo = LinearAlgebra::rsolve_upper(m_circ, F_u - Fhat_uKo);
-    t0 = Bench::toc(nullptr, "Ecirc_uKo          ", t0);
+    // ====================================================================
+    // FOXY step #1  Extend the simulation to 'X_u', jointly with the paths
+    // on 'X_n': block-Cholesky extension of the covariance given the
+    // observations, driven by the same normals as simulate().  Unlike
+    // conditioning y_u on the simulated y_n, this never inverts a matrix
+    // built on the (dense, possibly near-singular) simulation design.
+    // ====================================================================
+    const arma::mat A = LinearAlgebra::solve_lower(lastsim_LSigma_nKo, Sigma_unKo.t() / Sigma_divisor);
+    arma::vec S_eigval;
+    arma::mat S_eigvec;
+    arma::eig_sym(S_eigval, S_eigvec, arma::symmatu(Sigma_uKo / Sigma_divisor - A.t() * A));
+    const arma::mat LS_u = S_eigvec * arma::diagmat(arma::sqrt(arma::clamp(S_eigval, 0.0, arma::datum::inf)));
 
-    arma::mat Rtild_uCu = lastsimup_R_uu - Rstar_ou.t() * Rstar_ou + Ecirc_uKo * Ecirc_uKo.t();
-    t0 = Bench::toc(nullptr, "Rtild_uCu          ", t0);
+    arma::vec yhat_u = F_u * m_beta + Rstar_ou.t() * m_z;
+    Random::reset_seed(lastsim_seed);
+    const arma::mat Z_n = Random::randn_mat(n_n, lastsim_nsim);  // the normals behind lastsim_y_n
+    const arma::mat Z_u = Random::randn_mat(n_u, lastsim_nsim);  // fresh ones, independent of Z_n
+    lastsimup_y_u = A.t() * Z_n + LS_u * Z_u;
+    lastsimup_y_u *= std::sqrt(m_sigma2);
+    lastsimup_y_u.each_col() += yhat_u;
+    t0 = Bench::toc(nullptr, "y_u          ", t0);
 
-    arma::mat Rtild_nCu = lastsimup_R_un - Rstar_ou.t() * lastsim_L_oCn + Ecirc_uKo * lastsim_Ecirc_nKo.t();
-    t0 = Bench::toc(nullptr, "Rtild_nCu          ", t0);
-
-    lastsimup_Wtild_nKu = LinearAlgebra::solve(Rtild_uCu, Rtild_nCu).t();
+    // ====================================================================
+    // FOXY step #2  Kriging weights of the residuals at 'X_u' onto 'X_n'
+    // ====================================================================
+    lastsimup_Wtild_nKu = LinearAlgebra::solve(Sigma_uKo, Sigma_unKo).t();
     t0 = Bench::toc(nullptr, "Wtild_nKu          ", t0);
   }
 
-  return lastsim_y_n + lastsimup_Wtild_nKu * (arma::repmat(y_u, 1, lastsim_nsim) - lastsimup_y_u);
+  return lastsim_y_n + m_scaleY * lastsimup_Wtild_nKu * (arma::repmat(yn_u, 1, lastsim_nsim) - lastsimup_y_u);
 }
 
 void KrigingImpl::update_no_refit_impl(const arma::vec& y_u,

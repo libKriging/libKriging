@@ -2448,8 +2448,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                        /*R_on_coincident_to_one=*/false,
                        /*R_nn_factor=*/1.0,
                        /*R_nn_diag=*/arma::vec(),
-                       /*Sigma_divisor=*/1.0,
-                       /*use_qr_for_circ=*/true);
+                       /*Sigma_divisor=*/1.0);
 }
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
@@ -2467,8 +2466,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_on_coincident_to_one=*/with_nugget,
                                 /*R_nn_factor=*/alpha,
                                 /*R_nn_diag=*/diag_nn,
-                                /*Sigma_divisor=*/alpha,
-                                /*use_qr_for_circ=*/true);
+                                /*Sigma_divisor=*/alpha);
   if (will_update)
     m_lastsim_with_nugget = with_nugget;
   return y_n;
@@ -2490,8 +2488,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                 /*R_on_coincident_to_one=*/false,
                                 /*R_nn_factor=*/1.0,
                                 /*R_nn_diag=*/arma::vec(),
-                                /*Sigma_divisor=*/1.0,
-                                /*use_qr_for_circ=*/false);
+                                /*Sigma_divisor=*/1.0);
   if (will_update)
     m_lastsim_with_noise = with_noise;
   arma::mat eps(n_n, nsim, arma::fill::none);
@@ -2539,7 +2536,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
     throw std::runtime_error("Dimension mismatch: X_u cols vs X cols");
   if (noise_u.n_elem != X_u.n_rows)
     throw std::runtime_error("Noise vector length must match X_u rows");
-  const arma::vec diag_uu = 1.0 + noise_u / m_sigma2;
+  const arma::vec diag_uu = 1.0 + noise_u / (m_scaleY * m_scaleY * m_sigma2);
   const arma::uword n_n = lastsim_Xn_n.n_cols;
   arma::mat y_up = update_simulate_impl(y_u,
                                         X_u,

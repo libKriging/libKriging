@@ -10,11 +10,8 @@
 // clang-format on
 
 // NOTE: These tests verify that update_simulate() gives statistically similar results to update() + simulate().
-// Ideally, with the same random seed, results should be identical, but current implementations show small
-// numerical differences. Tolerances are set to detect significant deviations while accepting minor variations.
-// 
-// KNOWN ISSUE: With Linear and Quadratic trend models, larger differences are observed (~0.12 for Linear).
-// This suggests a bug in how the trend (F matrix) is handled in update_simulate for non-constant trends.
+// The two draws use different random streams, so they are compared in distribution (KS test, and moments
+// against the updated model's predict()).
 
 TEST_CASE("KrigingUpdateSimulateTest - Update simulate equals updated model simulate", "[update_simulate][kriging]") {
   arma::arma_rng::set_seed(123);
@@ -90,7 +87,7 @@ TEST_CASE("KrigingUpdateSimulateTest - Update simulate equals updated model simu
       }
     }
     INFO("KS test failures: " << ks_failures << " / " << n_sim_points << failure_details.str());
-    // CHECK(ks_failures == 0);
+    CHECK(ks_failures == 0);
   }
 
   SECTION("Multiple points update_simulate") {
@@ -136,7 +133,7 @@ TEST_CASE("KrigingUpdateSimulateTest - Update simulate equals updated model simu
       }
     }
     INFO("KS test failures: " << ks_failures << " / " << n_sim_points << failure_details.str());
-    // CHECK(ks_failures == 0);
+    CHECK(ks_failures == 0);
   }
 
   SECTION("Different kernels") {
@@ -183,7 +180,10 @@ TEST_CASE("KrigingUpdateSimulateTest - Update simulate equals updated model simu
         }
       }
       INFO("KS test failures: " << ks_failures << " / " << 5 << failure_details.str());
-      // CHECK(ks_failures == 0);
+      // gauss: simulate() itself carries a numerical-nugget stdev floor on a dense
+      // design, which dominates the tiny posterior stdev near the data
+      if (kernel != "gauss")
+        CHECK(ks_failures == 0);
     }
   }
 
@@ -242,7 +242,54 @@ TEST_CASE("KrigingUpdateSimulateTest - Update simulate equals updated model simu
         }
       }
       INFO("KS test failures: " << ks_failures << " / " << 5 << failure_details.str());
-      // CHECK(ks_failures == 0);
+      CHECK(ks_failures == 0);
     }
+  }
+}
+
+TEST_CASE("KrigingUpdateSimulateTest - moments match the updated model", "[update_simulate][kriging]") {
+  arma::arma_rng::set_seed(42);
+  const arma::mat X(8, 1, arma::fill::randu);
+  auto f = [](const arma::mat& x) { return arma::vec(arma::sin(6 * x.col(0)) + arma::square(x.col(0))); };
+  const arma::vec y = f(X);
+  const arma::mat X_u = arma::mat({0.33, 0.71}).t();
+  const arma::vec y_u = f(X_u);
+  const arma::mat X_n = arma::linspace(0, 1, 41);
+  const int nsim = 5000;
+
+  SECTION("mean and stdev, with and without normalization") {
+    for (std::string kernel : {"exp", "matern3_2", "matern5_2"}) {
+      for (bool normalize : {false, true}) {
+        CAPTURE(kernel, normalize);
+        Kriging fitted(y, X, kernel, Trend::RegressionModel::Constant, normalize);
+        Kriging::Parameters p{fitted.sigma2(), false, arma::mat(fitted.theta()), false, std::nullopt, true};
+
+        Kriging kr(kernel);
+        kr.fit(y, X, Trend::RegressionModel::Constant, normalize, "none", "LL", p);
+        kr.simulate(nsim, 123, X_n, true);
+        const arma::mat sims = kr.update_simulate(y_u, X_u);
+
+        Kriging ref(kernel);
+        ref.fit(y, X, Trend::RegressionModel::Constant, normalize, "none", "LL", p);
+        ref.update(y_u, X_u, false);
+        auto [m, s, c, dm, ds] = ref.predict(X_n, true, false, false);
+
+        const arma::uvec active = arma::find(s > 1e-3 * s.max());
+        REQUIRE(active.n_elem > X_n.n_rows / 2);
+        const arma::vec emean = arma::mean(sims, 1);
+        const arma::vec esd = arma::stddev(sims, 0, 1);
+        CHECK(arma::abs((emean - m) / s).eval().elem(active).max() < 0.1);
+        CHECK(arma::abs(esd / s - 1).eval().elem(active).max() < 0.05);
+      }
+    }
+  }
+
+  SECTION("update points on the simulation design are reproduced exactly") {
+    Kriging kr(y, X, "matern5_2", Trend::RegressionModel::Constant, true);
+    const arma::mat X_on = X_n.rows(arma::uvec{10, 30});
+    kr.simulate(100, 7, X_n, true);
+    const arma::mat sims = kr.update_simulate(f(X_on), X_on);
+    CHECK(arma::abs(sims.row(10) - f(X_on)(0)).max() < 1e-6);
+    CHECK(arma::abs(sims.row(30) - f(X_on)(1)).max() < 1e-6);
   }
 }
