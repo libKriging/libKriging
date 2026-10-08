@@ -571,7 +571,7 @@ TEST_CASE("MultiOutputKriging separable at fixed theta", "[multioutput][separabl
     const arma::vec e = arma::vectorise(E);
     double ld, sg;
     arma::log_det(ld, sg, K);
-    const double ll = -0.5 * (n * q * std::log(2 * M_PI) + ld + arma::as_scalar(e.t() * arma::solve(K, e)));
+    const double ll = -0.5 * (n * q * std::log(2 * arma::datum::pi) + ld + arma::as_scalar(e.t() * arma::solve(K, e)));
     CHECK(std::abs(sep.logLikelihood() - ll) < 1e-8 * std::abs(ll));
     // more parameters than "shared" at the same theta
     CHECK(sep.logLikelihood() >= sh.logLikelihood());
