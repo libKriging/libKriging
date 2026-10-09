@@ -34,6 +34,14 @@ past release, see the corresponding entry on the
   `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
   (described as `NuggetKriging` / `NoiseKriging` by the loader, which these
   two bindings did not map back to `Kriging`).
+- Python: deadlock in code paths where libKriging allocates from worker
+  threads while the calling Python thread holds the GIL: NestedKriging NK
+  `predict` (OpenMP pair loop) and WarpKriging parallel multistart
+  (`BFGS<k>`). The numpy allocator handed to libKriging reports to
+  tracemalloc, which takes the GIL; it is now used only from threads holding
+  the GIL, other threads use `std::malloc` (each block is freed by the C
+  runtime that allocated it). The NestedKriging Python tests are now
+  registered in CTest, with a subprocess/timeout regression test.
 - Octave/Matlab `Kriging.load` built and printed a throw-away
   `Kriging([1], [1], "gauss")` model, whose mex reference was then
   overwritten and never released. It now wraps the loaded reference directly,

@@ -4,7 +4,11 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include <cstdlib>
 #include <iostream>
+#include <mutex>
+#include <unordered_set>
+#include <vector>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
 
@@ -47,6 +51,72 @@ constexpr bool strings_equal(char const* a, char const* b) {
 
 namespace py = pybind11;
 
+// Allocator handed to libKriging (lkalloc), hence used by every Armadillo
+// allocation of the library and of this module.
+//
+// numpy's PyDataMem_NEW/FREE (cnalloc::npy_malloc/npy_free) report to
+// tracemalloc, which takes the GIL. libKriging also allocates from worker
+// threads (OpenMP regions, multistart std::threads) while the calling Python
+// thread still holds the GIL and waits for them: routing those allocations to
+// numpy deadlocks (e.g. NestedKriging NK predict, WarpKriging "BFGS<k>").
+//
+// So numpy is only used from a thread holding the GIL; other threads use
+// std::malloc/std::free. A pointer is always released by the C runtime that
+// allocated it (they can differ on Windows, e.g. a debug module next to a
+// release numpy): blocks from std::malloc are registered, and a numpy block
+// released without the GIL is queued, then freed at the next call made with
+// the GIL.
+namespace {
+std::mutex g_alloc_mutex;
+std::unordered_set<void*> g_raw_blocks;  // from std::malloc, without the GIL
+std::vector<void*> g_deferred_npy_free;  // numpy blocks released without the GIL
+
+void flush_deferred_npy_free() {  // GIL held
+  std::vector<void*> todo;
+  {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    if (g_deferred_npy_free.empty())
+      return;
+    todo.swap(g_deferred_npy_free);
+  }
+  for (void* ptr : todo)
+    cnalloc::npy_free(ptr);
+}
+
+void* gil_aware_malloc(size_t n_bytes) {
+  if (PyGILState_Check()) {
+    flush_deferred_npy_free();
+    return cnalloc::npy_malloc(n_bytes);
+  }
+  void* ptr = std::malloc(n_bytes);
+  if (ptr != nullptr) {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    g_raw_blocks.insert(ptr);
+  }
+  return ptr;
+}
+
+void gil_aware_free(void* ptr) {
+  if (ptr == nullptr)
+    return;
+  {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    auto it = g_raw_blocks.find(ptr);
+    if (it != g_raw_blocks.end()) {
+      g_raw_blocks.erase(it);
+      std::free(ptr);
+      return;
+    }
+    if (!PyGILState_Check()) {
+      g_deferred_npy_free.push_back(ptr);
+      return;
+    }
+  }
+  cnalloc::npy_free(ptr);
+  flush_deferred_npy_free();
+}
+}  // namespace
+
 static py::object load_any(const std::string& filename) {
   auto ktype = KrigingLoader::describe(filename);
   switch (ktype) {
@@ -67,7 +137,7 @@ static py::object load_any(const std::string& filename) {
 
 PYBIND11_MODULE(_pylibkriging, m) {
   // to avoid mixing allocators from default libKriging and Python
-  lkalloc::set_allocation_functions(cnalloc::npy_malloc, cnalloc::npy_free);
+  lkalloc::set_allocation_functions(gil_aware_malloc, gil_aware_free);
 
   m.doc() = R"pbdoc(
         pylibkriging example plugin
