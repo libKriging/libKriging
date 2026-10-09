@@ -94,7 +94,8 @@ Full demo: [tests/pylibkriging_demo.py](pylibkriging/tests/pylibkriging_demo.py)
 ## scikit-learn compatible estimators
 
 `pylibkriging.sklearn` exposes `KrigingRegressor`, `WarpKrigingRegressor`,
-`MLPKrigingRegressor` and `NestedKrigingRegressor`, implementing the
+`MLPKrigingRegressor`, `NestedKrigingRegressor` and
+`MultiOutputKrigingRegressor` (multi-output, `y` of shape `(n, q)`), implementing the
 scikit-learn estimator API (`fit`/`predict`, `get_params`/`set_params`,
 `clone`), so they drop into `Pipeline` and `GridSearchCV`. They need scikit-learn, an optional dependency:
 `pip3 install pylibkriging[sklearn]`.
@@ -110,6 +111,17 @@ pipe = Pipeline([
 ]).fit(X_train, y_train)
 
 pred, stdev = pipe.predict(X_test, return_std=True)
+```
+
+With several outputs (one column of `Y_train` per output, e.g. a curve per run):
+
+```python
+from pylibkriging.sklearn import MultiOutputKrigingRegressor
+
+reg = MultiOutputKrigingRegressor(kernel="matern5_2", output_model="pca").fit(X_train, Y_train)
+pred, stdev = reg.predict(X_test, return_std=True)  # both (m, q)
+sims = reg.sample_y(X_test, n_samples=100)          # (m, q, 100)
+# reg.model_ is the pylibkriging.MultiOutputKriging (joint covariance, update, save)
 ```
 
 ## CI

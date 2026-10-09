@@ -27,7 +27,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 - **Large designs**: `NestedKriging`, the `LLVecchia(m)` and `LLNystrom(k)` objectives, and `subsetOfData` (k-means pre-fit row selection); see [docs/math/Scalability.md](docs/math/Scalability.md).
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
-- **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for `Kriging`, `WarpKriging`, `MLPKriging` and `NestedKriging`, usable in `Pipeline`/`GridSearchCV`.
+- **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for `Kriging`, `WarpKriging`, `MLPKriging`, `NestedKriging` and `MultiOutputKriging`, usable in `Pipeline`/`GridSearchCV`.
 
 
 Table of contents

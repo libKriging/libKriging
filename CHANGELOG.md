@@ -29,7 +29,16 @@ past release, see the corresponding entry on the
   Octave/MATLAB, Julia), with one worked notebook per binding
   (`bindings/*/multioutputkriging_*.ipynb`) and
   [docs/math/MultiOutput.md](docs/math/MultiOutput.md). Not yet: noise /
-  nugget, scikit-learn estimator.
+  nugget.
+- `pylibkriging.sklearn.MultiOutputKrigingRegressor`: scikit-learn
+  multi-output regressor wrapping `MultiOutputKriging` (`y` of shape
+  `(n, q)`, `predict` returning `(m, q)` arrays, `return_cov` one `m × m`
+  covariance per target as `GaussianProcessRegressor` does, `sample_y`
+  `(m, q, n_samples)`).
+- `pylibkriging.sklearn`: fitted estimators are picklable (joblib,
+  `GridSearchCV(n_jobs=…)`, `copy.deepcopy`), the model being carried as the
+  JSON of its `save()`; `NestedKrigingRegressor` is not, `NestedKriging`
+  having no `save`.
 - `KrigingLoader::KrigingType::MultiOutputKriging`. The Octave `class_saved`
   now also maps saved nugget / noise `Kriging` models to `"Kriging"`.
 - Octave/MATLAB: `Kriging('__ref__', ref)` wraps an existing backend object
@@ -44,6 +53,11 @@ past release, see the corresponding entry on the
   identical.
 
 ### Fixed
+- `pylibkriging.sklearn`: `predict` of `KrigingRegressor`,
+  `WarpKrigingRegressor`, `MLPKrigingRegressor` and `NestedKrigingRegressor`
+  returned `(n, 1)` arrays instead of `(n,)`; `check_estimator` passes again
+  for all of them (the sklearn tests do not run in CI, scikit-learn being an
+  optional dependency).
 - Documentation: code examples that did not run as written are fixed
   (`skills/libkriging/references/*.md`, the binding READMEs, the main README
   and `docs/math`): `Kriging::predict` returns 5 values in C++ and Python,

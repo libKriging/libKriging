@@ -239,8 +239,10 @@ saved: call `simulate(..., will_update=true)` again before `update_simulate`.
   `"LMP"`, `"LLVecchia"` and `"LLNystrom"`. `"pca"` forwards `objective` to
   each latent `Kriging`, so any `Kriging` objective works there.
 - **Bindings.** `MultiOutputKriging` is available in C++ and in every binding
-  (Python, R, Octave/MATLAB, Julia). The scikit-learn estimators of
-  `pylibkriging.sklearn` do not wrap it.
+  (Python, R, Octave/MATLAB, Julia), and in scikit-learn form as
+  `pylibkriging.sklearn.MultiOutputKrigingRegressor`, whose `predict(X,
+  return_cov=True)` returns only the per-output `m × m` blocks (as
+  `GaussianProcessRegressor` does).
 
 ## References
 

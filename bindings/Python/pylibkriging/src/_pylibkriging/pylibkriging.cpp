@@ -330,8 +330,9 @@ discards n - n_max points outright.)pbdoc")
 
         Y is n x q (rows = observations, like X). output_model="pca(K)" / "pca(v)" / "pca":
         Karhunen-Loeve reduction of Y, one Kriging per principal score, truncation residual
-        added to the prediction variance. "shared" / "separable" / "separable(<kernel>)" are
-        not implemented yet. predict returns (mean m x q, stdev m x q, cov mq x mq over
+        added to the prediction variance. "shared": one theta, independent outputs.
+        "separable": Kronecker model with a free q x q output covariance. "separable(<kernel>)":
+        output covariance sigma2 R_t(phi) over output_coordinates (required). predict returns (mean m x q, stdev m x q, cov mq x mq over
         vec(Y_n), mean derivative m x d x q); simulate returns an m x q x nsim array.
     )pbdoc")
       .def(py::init<const std::string&, const std::string&>(), py::arg("kernel"), py::arg("output_model") = "pca")

@@ -213,7 +213,7 @@ output coordinates). Shapes are the same in every binding: `mean` and `stdev` ar
 > `Params("theta", …, "output_theta", …)`). `"shared"` and `"separable"` accept `objective="LL"` or `"LOO"`,
 > `"separable(<kernel>)"` only `"LL"`; `"pca"` forwards `objective` to each latent `Kriging`. With
 > `"separable(<kernel>)"`, `logLikelihoodFun` takes θ followed by φ. A loaded model does not keep the last `simulate`:
-> simulate again before `update_simulate`. No `noise=` yet, and no scikit-learn estimator.
+> simulate again before `update_simulate`. No `noise=` yet.
 
 ---
 
@@ -221,7 +221,7 @@ output coordinates). Shapes are the same in every binding: `mean` and `stdev` ar
 
 `pylibkriging.sklearn` (`pip install pylibkriging[sklearn]`) wraps each class as a scikit-learn regressor implementing
 `fit` / `predict`, `get_params` / `set_params` and `clone`, so it works in `Pipeline`, `GridSearchCV` and
-`cross_val_score`:
+`cross_val_score`, and a fitted estimator can be pickled (except `NestedKrigingRegressor`):
 
 | Estimator | Wraps |
 |---|---|
@@ -229,6 +229,7 @@ output coordinates). Shapes are the same in every binding: `mean` and `stdev` ar
 | `WarpKrigingRegressor` | `WarpKriging` |
 | `MLPKrigingRegressor` | `MLPKriging` |
 | `NestedKrigingRegressor` | `NestedKriging` |
+| `MultiOutputKrigingRegressor` | `MultiOutputKriging` (`y` of shape `(n, q)`) |
 
 See [bindings/Python/README.md](Python/README.md#scikit-learn-compatible-estimators) for an example.
 

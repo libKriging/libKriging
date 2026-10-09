@@ -2,7 +2,7 @@
 
 This module is a thin adapter, not a reimplementation: every estimator
 here simply constructs and delegates to the corresponding class in
-``pylibkriging`` (``Kriging``, ...), while conforming to scikit-learn's
+``pylibkriging`` (``Kriging``, ..., ``MultiOutputKriging``), while conforming to scikit-learn's
 estimator API (``fit``/``predict``, ``get_params``/``set_params``,
 cloning, ``Pipeline``/``GridSearchCV``/``cross_val_score`` compatibility).
 
@@ -17,6 +17,9 @@ of pylibkriging (see the ``sklearn`` extra in ``setup.py``) -- importing
 ``pylibkriging`` itself never requires it.
 """
 from __future__ import annotations
+
+import os
+import tempfile
 
 import numpy as np
 
@@ -37,7 +40,9 @@ except ImportError as exc:  # pragma: no cover - exercised via import error path
     ) from exc
 
 from . import Kriging as _Kriging
+from . import load as _load
 from . import MLPKriging as _MLPKriging
+from . import MultiOutputKriging as _MultiOutputKriging
 from . import NestedKriging as _NestedKriging
 from . import WarpKriging as _WarpKriging
 
@@ -46,7 +51,30 @@ __all__ = [
     "WarpKrigingRegressor",
     "MLPKrigingRegressor",
     "NestedKrigingRegressor",
+    "MultiOutputKrigingRegressor",
 ]
+
+
+class _SavedModel(str):
+    """JSON text of a saved libKriging model, inside a pickled estimator."""
+
+
+def _model_to_json(model):
+    if not hasattr(model, "save"):
+        raise TypeError(f"cannot pickle a fitted {type(model).__name__}: it has no save()")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "model.json")
+        model.save(path)
+        with open(path) as f:
+            return _SavedModel(f.read())
+
+
+def _model_from_json(text):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "model.json")
+        with open(path, "w") as f:
+            f.write(text)
+        return _load(path)
 
 
 class _BaseKrigingEstimator(RegressorMixin, BaseEstimator):
@@ -68,12 +96,32 @@ class _BaseKrigingEstimator(RegressorMixin, BaseEstimator):
                 f"was fitted with {self.n_features_in_} features.")
         return X
 
-    def _validate_X_fit_y(self, X, y):
+    def _validate_X_fit_y(self, X, y, multi_output=False, ensure_min_samples=1):
+        kw = dict(y_numeric=True, multi_output=multi_output, ensure_min_samples=ensure_min_samples)
         if validate_data is not None:
-            return validate_data(self, X, y, y_numeric=True, multi_output=False)
-        X, y = check_X_y(X, y, y_numeric=True, multi_output=False)
+            return validate_data(self, X, y, **kw)
+        X, y = check_X_y(X, y, **kw)
         self.n_features_in_ = X.shape[1]
         return X, y
+
+    # Pickling (joblib, GridSearchCV(n_jobs=...), copy.deepcopy): the
+    # fitted libKriging model is a C++ object, so it is carried as the JSON
+    # text of its save() and rebuilt with pylibkriging.load().
+    def __getstate__(self):
+        state = super().__getstate__() if hasattr(super(), "__getstate__") else self.__dict__.copy()
+        if state.get("model_") is not None:
+            state = dict(state)
+            state["model_"] = _model_to_json(state["model_"])
+        return state
+
+    def __setstate__(self, state):
+        state = dict(state)
+        if isinstance(state.get("model_"), _SavedModel):
+            state["model_"] = _model_from_json(state["model_"])
+        if hasattr(super(), "__setstate__"):
+            super().__setstate__(state)
+        else:
+            self.__dict__.update(state)
 
     def _more_tags(self):
         # Pre-1.6 tag protocol.
@@ -225,11 +273,12 @@ class KrigingRegressor(_BaseKrigingEstimator):
         # actually computed, not how many are returned.
         mean, stdev, cov, _mean_deriv, _stdev_deriv = self.model_.predict(
             X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+        # Kriging.predict returns (n, 1) columns; sklearn expects (n,)
         if return_cov:
-            return mean, cov
+            return np.ravel(mean), cov
         if return_std:
-            return mean, stdev
-        return mean
+            return np.ravel(mean), np.ravel(stdev)
+        return np.ravel(mean)
 
     def sample_y(self, X, n_samples=1, random_state=0):
         """Draw sample paths at X, conditional on the fitted data.
@@ -338,11 +387,12 @@ class WarpKrigingRegressor(_BaseKrigingEstimator):
         X = self._validate_X_predict(X)
         mean, stdev, cov, _md, _sd = self.model_.predict(
             X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+        # Kriging.predict returns (n, 1) columns; sklearn expects (n,)
         if return_cov:
-            return mean, cov
+            return np.ravel(mean), cov
         if return_std:
-            return mean, stdev
-        return mean
+            return np.ravel(mean), np.ravel(stdev)
+        return np.ravel(mean)
 
     def sample_y(self, X, n_samples=1, random_state=0):
         check_is_fitted(self, "model_")
@@ -425,11 +475,12 @@ class MLPKrigingRegressor(_BaseKrigingEstimator):
         X = self._validate_X_predict(X)
         mean, stdev, cov, _md, _sd = self.model_.predict(
             X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+        # Kriging.predict returns (n, 1) columns; sklearn expects (n,)
         if return_cov:
-            return mean, cov
+            return np.ravel(mean), cov
         if return_std:
-            return mean, stdev
-        return mean
+            return np.ravel(mean), np.ravel(stdev)
+        return np.ravel(mean)
 
     def sample_y(self, X, n_samples=1, random_state=0):
         check_is_fitted(self, "model_")
@@ -486,6 +537,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
       underlying binding's `predict` doesn't compute a covariance matrix
       at all (2-tuple return, unlike the other three classes' 5-tuple).
     - No `sample_y`: `NestedKriging` doesn't expose `simulate`.
+    - Not picklable once fitted: `NestedKriging` has no `save`.
     """
 
     def __init__(self, kernel="matern5_2", nb_groups=10, aggregation="NK",
@@ -503,7 +555,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
         self.warping = warping
 
     def fit(self, X, y):
-        X, y = self._validate_X_fit_y(X, y)
+        X, y = self._validate_X_fit_y(X, y, ensure_min_samples=2)
         if self.aggregation == "NK" and self.regmodel != "constant":
             raise ValueError(
                 "aggregation='NK' requires regmodel='constant' (simple-kriging "
@@ -530,5 +582,143 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
         X = self._validate_X_predict(X)
         mean, stdev = self.model_.predict(X, return_stdev=return_std)
         if return_std:
-            return mean, stdev
-        return mean
+            return np.ravel(mean), np.ravel(stdev)
+        return np.ravel(mean)
+
+
+class MultiOutputKrigingRegressor(_BaseKrigingEstimator):
+    """MultiOutputKriging as a scikit-learn-compatible multi-output
+    regressor: `y` of shape (n_samples, n_targets) on an isotopic design
+    (every target observed at every row of `X`), e.g. a curve per run.
+
+    A thin wrapper around :class:`pylibkriging.MultiOutputKriging`. See
+    ``skills/libkriging/SKILL.md`` (if present in your checkout), section
+    1.7, for the choice of `output_model`. A 1-D `y` is one output, and
+    `predict`/`sample_y` then return the shapes of a single-output
+    regressor.
+
+    Parameters
+    ----------
+    kernel : str, default="matern5_2"
+    output_model : str, default="pca"
+        ``"pca"`` / ``"pca(K)"`` / ``"pca(v)"`` (one Kriging per principal
+        score), ``"shared"`` (one theta, independent outputs),
+        ``"separable"`` (free target covariance) or
+        ``"separable(<kernel>)"`` (target covariance from a kernel over
+        `output_coordinates`, required then).
+    regmodel : str, default="constant"
+    normalize : bool, default=False
+    optim : str, default="BFGS"
+    objective : str, default="LL"
+        ``"LL"`` or ``"LOO"`` (``"LL"`` only for ``"separable(<kernel>)"``);
+        ``"pca"`` forwards it to each latent Kriging.
+    parameters : dict or None, default=None
+        ``theta``, ``is_theta_estim`` and ``output_theta``.
+    output_coordinates : array-like of shape (n_targets, d_t) or None, default=None
+        Coordinates of the targets (e.g. time steps).
+
+    Attributes
+    ----------
+    model_ : pylibkriging.MultiOutputKriging
+        The fitted model, for what the sklearn API has no equivalent for:
+        the joint covariance over all targets (``model_.predict(X, True,
+        True)``), ``predictCovFactors``, ``update``, ``update_simulate``,
+        ``save``, etc.
+    n_features_in_ : int
+    n_targets_ : int
+
+    Notes
+    -----
+    Like ``GaussianProcessRegressor`` with several targets,
+    ``predict(X, return_cov=True)`` returns one covariance per target, of
+    shape (n_samples, n_samples, n_targets): the cross-target blocks are
+    left out (``model_.predict`` returns the full joint covariance).
+    ``return_std`` and ``return_cov`` are mutually exclusive.
+    """
+
+    def __init__(self, kernel="matern5_2", output_model="pca", regmodel="constant",
+                 normalize=False, optim="BFGS", objective="LL", parameters=None,
+                 output_coordinates=None):
+        self.kernel = kernel
+        self.output_model = output_model
+        self.regmodel = regmodel
+        self.normalize = normalize
+        self.optim = optim
+        self.objective = objective
+        self.parameters = parameters
+        self.output_coordinates = output_coordinates
+
+    def fit(self, X, y):
+        """Fit to X (n_samples, n_features) and y (n_samples,) or
+        (n_samples, n_targets)."""
+        X, y = self._validate_X_fit_y(X, y, multi_output=True, ensure_min_samples=2)
+        self._y_1d = y.ndim == 1
+        Y = np.asarray(y, dtype=float).reshape(X.shape[0], -1)
+        self.n_targets_ = Y.shape[1]
+        parameters = {} if self.parameters is None else dict(self.parameters)
+        for key in ("theta", "output_theta"):  # one row per starting point
+            if key in parameters:
+                parameters[key] = np.atleast_2d(np.asarray(parameters[key], dtype=float))
+        coords = (None if self.output_coordinates is None
+                  else np.asarray(self.output_coordinates, dtype=float).reshape(self.n_targets_, -1))
+        self.model_ = _MultiOutputKriging(
+            Y, X, self.kernel,
+            output_model=self.output_model,
+            regmodel=self.regmodel,
+            normalize=self.normalize,
+            optim=self.optim,
+            objective=self.objective,
+            parameters=parameters,
+            output_coordinates=coords,
+        )
+        return self
+
+    def predict(self, X, return_std=False, return_cov=False):
+        """Predict at X.
+
+        Returns
+        -------
+        mean : ndarray of shape (n_samples,) or (n_samples, n_targets)
+        std : ndarray, same shape as `mean`, optional
+        cov : ndarray of shape (n_samples, n_samples) or (n_samples, n_samples, n_targets), optional
+        """
+        if return_std and return_cov:
+            raise RuntimeError(
+                "At most one of return_std or return_cov can be requested.")
+        check_is_fitted(self, "model_")
+        X = self._validate_X_predict(X)
+        mean, stdev, cov, _md = self.model_.predict(
+            X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+        if return_cov:
+            # cov is over vec(Y_n): target j occupies rows/cols j*m:(j+1)*m
+            m = X.shape[0]
+            cov = np.stack([cov[j * m:(j + 1) * m, j * m:(j + 1) * m]
+                            for j in range(self.n_targets_)], axis=2)
+            return self._squeeze(mean), (cov[:, :, 0] if self._y_1d else cov)
+        if return_std:
+            return self._squeeze(mean), self._squeeze(stdev)
+        return self._squeeze(mean)
+
+    def sample_y(self, X, n_samples=1, random_state=0):
+        """Draw joint sample paths at X, conditional on the fitted data.
+
+        Returns
+        -------
+        ndarray of shape (n_samples_X, n_samples) or (n_samples_X, n_targets, n_samples)
+        """
+        check_is_fitted(self, "model_")
+        X = self._validate_X_predict(X)
+        seed = int(random_state) if random_state is not None else 123
+        sims = self.model_.simulate(nsim=n_samples, seed=seed, X=X)
+        return sims[:, 0, :] if self._y_1d else sims
+
+    def _squeeze(self, a):
+        return np.ravel(a) if self._y_1d else a
+
+    def _more_tags(self):
+        return {"requires_y": True, "poor_score": True, "multioutput": True}
+
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.target_tags.multi_output = True
+        return tags

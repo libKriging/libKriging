@@ -161,20 +161,33 @@ model2 = lk.MultiOutputKriging.load("mo.json")   # or lk.load("mo.json"); simula
 `logLikelihoodFun()`, `leaveOneOutFun()` are for `"shared"`/`"separable"`/
 `"separable(<kernel>)"` (plus `output_theta()` for the last one);
 `nb_components()`, `pca_basis()`, `pca_explained()`, `pca_residual()` for
-`"pca"`. No `noise=`, no scikit-learn estimator yet.
+`"pca"`. No `noise=` yet. scikit-learn: `MultiOutputKrigingRegressor` below.
 
 ## scikit-learn estimators
 
 ```python
 # pip install pylibkriging[sklearn]
 from pylibkriging.sklearn import KrigingRegressor   # also WarpKrigingRegressor,
-                                                    # MLPKrigingRegressor, NestedKrigingRegressor
+                                                    # MLPKrigingRegressor, NestedKrigingRegressor,
+                                                    # MultiOutputKrigingRegressor
 est = KrigingRegressor(kernel="matern5_2").fit(X, y)   # sklearn order: (X, y)
 mean, std = est.predict(Xnew, return_std=True)         # return_std and return_cov are exclusive
 ```
 Constructor parameters mirror the `Kriging` ones (`regmodel`, `normalize`,
 `optim`, `objective`, `noise`, `parameters`), so `get_params` / `set_params` /
 `clone`, `Pipeline` and `GridSearchCV` work as for any scikit-learn regressor.
+Fitted estimators pickle (except `NestedKrigingRegressor`).
+
+```python
+from pylibkriging.sklearn import MultiOutputKrigingRegressor
+est = MultiOutputKrigingRegressor(kernel="matern5_2", output_model="pca").fit(X, Y)  # Y: n x q
+mean, std = est.predict(Xnew, return_std=True)   # (m, q) each; a 1-D y gives (m,)
+mean, cov = est.predict(Xnew, return_cov=True)   # cov (m, m, q): per-output blocks only
+sims = est.sample_y(Xnew, n_samples=100)         # (m, q, 100), joint over outputs
+```
+Extra parameters: `output_model`, `output_coordinates` (needed for
+`"separable(<kernel>)"`); `parameters` takes `theta`, `is_theta_estim`,
+`output_theta`. The joint `mq × mq` covariance is on `est.model_.predict`.
 
 ## Loading a saved model
 

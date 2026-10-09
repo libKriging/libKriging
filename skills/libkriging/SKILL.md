@@ -110,7 +110,8 @@ Ask, in order:
    outputs have very different regularities. `save`/`load` are available
    (the generic `load` of each binding recognizes the file). Current
    restrictions: isotopic design only (no missing value in `Y`), no
-   noise/nugget, no scikit-learn estimator.
+   noise/nugget. Python: `pylibkriging.sklearn.MultiOutputKrigingRegressor`
+   for scikit-learn code with a 2-D `y`.
 
 Don't reach for `NestedKriging`, Vecchia or Nystrom by default — for the common case
 (n in the hundreds to low thousands), plain `Kriging` with default options
