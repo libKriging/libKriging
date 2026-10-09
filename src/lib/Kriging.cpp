@@ -1073,6 +1073,117 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
 }
 
 // =============================================================================
+/* Vecchia (local) simulation: sequential conditional simulation in the row
+ * order of X_n. Point t is drawn from its simple-kriging conditional given
+ * its m nearest neighbors among the observations and the points 0..t-1
+ * already simulated (same draw shared by all nsim trajectories for the
+ * neighbor selection and kriging weights; only the conditioning values
+ * differ per trajectory). Chain rule => exact joint (beta known) as soon as
+ * every point conditions on all its predecessors (m >= n + q - 1). */
+LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m) {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword q = X_n.n_rows;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("simulateVecchia: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+  if (m_noise_model != NoiseModel::None)
+    throw std::runtime_error("simulateVecchia: only available for NoiseModel::None (no nugget/noise channel)");
+  if (nsim <= 0)
+    throw std::invalid_argument("simulateVecchia: nsim should be > 0");
+  if (m == 0)
+    m = (m_vecchia_m > 0) ? m_vecchia_m : 30;
+  const arma::uword m_obs = std::min<arma::uword>(m, n);
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  // 1) m nearest OBSERVATIONS of each simulation point: independent across
+  //    points, hence parallel (same search as predictVecchia).
+  arma::umat Nobs(m_obs, q);
+  arma::mat Dobs(m_obs, q);
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m_obs >= 40000)
+#endif
+  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+    std::vector<std::pair<double, arma::uword>> cand(n);
+    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+    for (arma::uword j = 0; j < n; ++j) {
+      double s = 0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double dk = x_t(k) - xp[j * d + k];
+        s += dk * dk;
+      }
+      cand[j] = {s, j};
+    }
+    if (m_obs < n)
+      std::nth_element(cand.begin(), cand.begin() + m_obs, cand.end());
+    for (arma::uword j = 0; j < m_obs; ++j) {
+      Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
+      Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
+    }
+  }
+
+  // 2) sequential pass: the m nearest of (observations U previous simulation
+  //    points) are among (m nearest observations U previous simulation points).
+  //    Candidate index c < n is observation c, c >= n is simulation point c-n.
+  const arma::vec resid_o = m_y - m_F * m_beta;  // observed residuals (shared by all trajectories)
+  arma::mat Z(q, nsim, arma::fill::zeros);       // simulated residuals (normalized scale)
+  Random::reset_seed(seed);
+  const arma::mat eps = Random::randn_mat(q, nsim);
+  const double sigma = std::sqrt(m_sigma2);
+
+  auto row_of = [&](arma::uword c) -> arma::rowvec { return (c < n) ? m_X.row(c) : Xn_n.row(c - n); };
+
+  std::vector<std::pair<double, arma::uword>> cand;
+  for (arma::uword t = 0; t < q; ++t) {
+    cand.clear();
+    for (arma::uword j = 0; j < m_obs; ++j)
+      cand.emplace_back(Dobs(j, t), Nobs(j, t));
+    const arma::rowvec x_t = Xn_n.row(t);
+    for (arma::uword s = 0; s < t; ++s)
+      cand.emplace_back(arma::accu(arma::square(x_t - Xn_n.row(s))), n + s);
+    const arma::uword mt = std::min<arma::uword>(m, cand.size());
+    if (mt < cand.size())
+      std::nth_element(cand.begin(), cand.begin() + mt, cand.end());
+
+    double cond_var = 1.0;
+    arma::rowvec cond_mean(nsim, arma::fill::zeros);
+    if (mt > 0) {
+      arma::mat RN(mt, mt, arma::fill::ones);
+      arma::vec r(mt);
+      arma::mat ZN(mt, nsim);
+      for (arma::uword a = 0; a < mt; ++a) {
+        const arma::uword ca = cand[a].second;
+        const arma::rowvec xa = row_of(ca);
+        for (arma::uword b = a + 1; b < mt; ++b) {
+          const arma::vec dx = (xa - row_of(cand[b].second)).t();
+          RN(a, b) = RN(b, a) = _Cov(dx, m_theta);
+        }
+        r(a) = _Cov((xa - x_t).t(), m_theta);
+        if (ca < n)
+          ZN.row(a).fill(resid_o(ca));
+        else
+          ZN.row(a) = Z.row(ca - n);
+      }
+      RN.diag() += LinearAlgebra::num_nugget;
+      const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+      const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+      cond_mean = a_vec.t() * ZN;
+      cond_var = std::max(0.0, 1.0 - arma::dot(r, a_vec));
+    }
+    Z.row(t) = cond_mean + sigma * std::sqrt(cond_var) * eps.row(t);
+  }
+
+  arma::mat y_n = Z;
+  y_n.each_col() += F_n * m_beta;
+  return m_centerY + m_scaleY * y_n;
+}
+
 // Nystrom approximated log-likelihood (objective="LLNystrom(k)")
 //
 // Global low-rank alternative to Vecchia: R ~= R_ns * R_ss^-1 * R_ns.t(),
@@ -2419,6 +2530,18 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                       /*var_scale=*/sigma2);
 }
 
+// Simulation on a light (non-factorized) Vecchia or Nystrom fit: routes to
+// the matching approximate simulator. No exact factorization exists to cache
+// for update_simulate, so will_update=true is refused.
+arma::mat Kriging::simulate_light(int nsim, int seed, const arma::mat& X_n, bool will_update) {
+  if (will_update)
+    throw std::runtime_error(std::string("simulate: will_update=true is not available on a ")
+                             + (m_nystrom_light ? "Nystrom fit (refit with objective=\"LL\""
+                                                : "light Vecchia fit (refit with set_vecchia_exact_commit(true)")
+                             + ", or call simulate(..., false))");
+  return m_nystrom_light ? simulateNystrom(nsim, seed, X_n) : simulateVecchia(nsim, seed, X_n);
+}
+
 /** Draw sample trajectories of kriging at given points X'
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
@@ -2430,14 +2553,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
-  check_not_vecchia_light("simulate");
-  if (m_nystrom_light) {
-    if (will_update)
-      throw std::runtime_error(
-          "simulate: will_update=true is not available on a Nystrom fit "
-          "(refit with objective=\"LL\", or call simulate(..., false))");
-    return simulateNystrom(nsim, seed, X_n);
-  }
+  if (m_vecchia_light || m_nystrom_light)
+    return simulate_light(nsim, seed, X_n, will_update);
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -2456,6 +2573,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const bool with_nugget,
                                               const bool will_update) {
+  // Light (non-factorized) fits are NoiseModel::None only, so there is no
+  // nugget to add: same draw as simulate(nsim, seed, X_n, will_update).
+  if (m_vecchia_light || m_nystrom_light)
+    return simulate_light(nsim, seed, X_n, will_update);
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
   arma::mat y_n = simulate_impl(nsim,
@@ -2480,15 +2601,17 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
-  arma::mat y_n = simulate_impl(nsim,
-                                seed,
-                                X_n,
-                                will_update,
-                                /*R_on_factor=*/1.0,
-                                /*R_on_coincident_to_one=*/false,
-                                /*R_nn_factor=*/1.0,
-                                /*R_nn_diag=*/arma::vec(),
-                                /*Sigma_divisor=*/1.0);
+  const bool light = m_vecchia_light || m_nystrom_light;
+  arma::mat y_n = light ? simulate_light(nsim, seed, X_n, will_update)
+                        : simulate_impl(nsim,
+                                        seed,
+                                        X_n,
+                                        will_update,
+                                        /*R_on_factor=*/1.0,
+                                        /*R_on_coincident_to_one=*/false,
+                                        /*R_nn_factor=*/1.0,
+                                        /*R_nn_diag=*/arma::vec(),
+                                        /*Sigma_divisor=*/1.0);
   if (will_update)
     m_lastsim_with_noise = with_noise;
   arma::mat eps(n_n, nsim, arma::fill::none);

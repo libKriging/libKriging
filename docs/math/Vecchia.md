@@ -80,8 +80,34 @@ costly, calling `set_vecchia_exact_commit(false)` before fitting skips it
 entirely (**C++ API only**: no binding exposes this method, nor `predictVecchia`,
 so the light mode cannot be used from Python, R, Julia or Octave/Matlab): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
 `predict` automatically routes through the local Vecchia predictor
-(mean/stdev only — `return_cov`/`return_deriv`, `simulate`, `update`
-and `save` raise a clear error on such a "light" model).
+(mean/stdev only — `return_cov`/`return_deriv`, `update_simulate`,
+`update` and `save` raise a clear error on such a "light" model), and
+`simulate` through `simulateVecchia` (below; `will_update=true` raises).
+
+## Vecchia simulation (`simulateVecchia`, C++ only)
+
+`simulateVecchia(nsim, seed, X_n, m)` draws joint trajectories at the
+q rows of `X_n` by sequential conditioning, in the row order of `X_n`
+("response-first" ordering, Katzfuss et al. 2020): the t-th point is
+drawn from its simple-kriging conditional law (β treated as known, as in
+`predictVecchia`) given its m nearest neighbors among the n observations
+**and** the t−1 points already simulated:
+
+$$
+Z_t \mid Z_{N(t)} \sim \mathcal{N}\big(f_t^\top\beta + r_t^\top R_{N}^{-1}(z_{N} - F_{N}\beta),\;
+\sigma^2 (1 - r_t^\top R_{N}^{-1} r_t)\big).
+$$
+
+- Cost O(q (n + q) d) for the neighbor search plus O(q m³) for the local
+  solves (shared by the nsim trajectories), instead of O(q³) for the
+  exact joint factorization: usable for large n **and** large q.
+- Exact (β known) when every point conditions on all its predecessors,
+  i.e. m ≥ n + q − 1 (chain rule). For smaller m, correlations beyond the
+  m nearest neighbors are truncated, and the trajectories depend on the
+  row order of `X_n`.
+- Usable after any `NoiseModel::None` fit (m defaults to
+  `vecchia_neighbors()` after an LLVecchia fit, 30 otherwise); no
+  `will_update` / `update_simulate`.
 
 ## Current limitations
 

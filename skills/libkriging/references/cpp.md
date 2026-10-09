@@ -50,6 +50,8 @@ Vecchia approximation: same class, just change `objective`:
 ```cpp
 model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
 auto [mean, stdev] = model.predictVecchia(Xnew, /*return_stdev=*/true);
+// sequential conditional simulation on m nearest (observed or already simulated) points
+arma::mat sims = model.simulateVecchia(/*nsim=*/10, /*seed=*/123, Xnew /*, m=0 -> vecchia_neighbors() or 30 */);
 ```
 
 Nystrom approximation: same class, just change `objective`:
@@ -69,7 +71,8 @@ Kriging small(y.elem(idx), X.rows(idx), "matern5_2");
 model.nystrom_rank();   // rank k of an LLNystrom fit, 0 otherwise
 model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
 // Factorization-free "light" Vecchia mode: call BEFORE fit(..., "LLVecchia(m)");
-// predict() then routes to predictVecchia (no cov/deriv, simulate, update or save).
+// predict()/simulate() then route to predictVecchia/simulateVecchia
+// (no cov/deriv, will_update, update_simulate, update or save).
 model.set_vecchia_exact_commit(false);
 ```
 

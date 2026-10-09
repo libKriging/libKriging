@@ -85,7 +85,7 @@ k = Kriging(y, X, "matern5_2"; objective="LLNystrom(50)")   # higher d
 nystrom_rank(k)   # 50 (0 if the model was not fitted with LLNystrom)
 ```
 `predict` is the only prediction entry point from Julia: `predictVecchia`,
-`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
 Vecchia mode) exist in C++ only.
 
 ## NestedKriging

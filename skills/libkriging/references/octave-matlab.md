@@ -73,7 +73,7 @@ k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % 
 k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
 ```
 `predict` is the only prediction entry point from Octave/MATLAB:
-`predictVecchia`, `predictNystrom`, `simulateNystrom` and
+`predictVecchia`, `predictNystrom`, `simulateNystrom`, `simulateVecchia` and
 `set_vecchia_exact_commit` (the "light" Vecchia mode) exist in C++ only.
 
 ## NestedKriging

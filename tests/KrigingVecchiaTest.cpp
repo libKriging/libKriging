@@ -244,7 +244,8 @@ TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]
   // unsupported operations throw with a clear message
   CHECK_THROWS_AS(k.predict(Xt, true, true, false), std::runtime_error);  // return_cov
   CHECK_THROWS_AS(k.predict(Xt, true, false, true), std::runtime_error);  // return_deriv
-  CHECK_THROWS_AS(k.simulate(3, 123, Xt, false), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt, true), std::runtime_error);      // will_update
+  CHECK_NOTHROW(k.simulate(3, 123, Xt, false));                           // routed to simulateVecchia
   arma::vec yu(5, arma::fill::randu);
   arma::mat Xu(5, 2, arma::fill::randu);
   CHECK_THROWS_AS(k.update(yu, Xu, true), std::runtime_error);
@@ -310,7 +311,11 @@ TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kr
     auto [m_v, s_v] = k.predictVecchia(Xt, true);
     CHECK(arma::abs(m_pred - m_v).max() == 0.0);
     CHECK(arma::abs(s_pred - s_v).max() == 0.0);
-    CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), false), std::runtime_error);
+    // simulate routes to simulateVecchia (no exact factorization to use),
+    // but will_update has nothing to cache
+    CHECK(arma::approx_equal(
+        k.simulate(3, 123, Xt.rows(0, 2), false), k.simulateVecchia(3, 123, Xt.rows(0, 2)), "absdiff", 0.0));
+    CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), true), std::runtime_error);
     CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
   }
 
@@ -325,6 +330,95 @@ TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kr
     auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
     CHECK(arma::abs(mean - y).max() < 1e-3);  // exact commit interpolates
   }
+}
+
+TEST_CASE("simulateVecchia with all predecessors matches the exact conditional law", "[vecchia][kriging]") {
+  // No trend: the exact predict() covariance is then the simple-kriging one,
+  // which is what sequential conditioning on ALL predecessors (m >= n+q-1)
+  // reproduces exactly (chain rule).
+  arma::mat X;
+  arma::vec y;
+  make_data(30, X, y);
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(5, Xt, yt, 456);
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
+  params.is_theta_estim = false;
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::None, false, "none", "LL", params);
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, true, false);
+
+  const int nsim = 20000;
+  arma::mat sims = k.simulateVecchia(nsim, 42, Xt, X.n_rows + Xt.n_rows);
+  REQUIRE(sims.n_rows == Xt.n_rows);
+  REQUIRE(sims.n_cols == static_cast<arma::uword>(nsim));
+  const arma::vec emp_mean = arma::mean(sims, 1);
+  const arma::mat emp_cov = arma::cov(sims.t());
+  INFO("mean exact " << mean.t() << "mean emp " << emp_mean.t());
+  INFO("cov exact\n" << cov << "cov emp\n" << emp_cov);
+  // Monte-Carlo tolerances: ~5 standard errors
+  CHECK(arma::all(arma::abs(emp_mean - mean) < 5.0 * stdev / std::sqrt(nsim) + 1e-12));
+  const double smax = stdev.max();
+  CHECK(arma::abs(emp_cov - cov).max() < 5.0 * std::sqrt(2.0 / nsim) * smax * smax + 1e-12);
+
+  // reproducible with the seed
+  CHECK(arma::approx_equal(k.simulateVecchia(10, 7, Xt, 8), k.simulateVecchia(10, 7, Xt, 8), "absdiff", 0.0));
+}
+
+TEST_CASE("simulateVecchia first point matches predictVecchia; trajectories are coherent", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(200, X, y);
+  Kriging::Parameters params;
+  params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
+  params.is_theta_estim = false;
+  Kriging k("matern5_2");
+  k.set_vecchia_exact_commit(false);
+  k.fit(y, X, Trend::RegressionModel::Constant, false, "none", "LLVecchia(15)", params);
+  REQUIRE(k.is_vecchia_light());
+
+  // the first simulation point conditions on observations only: its marginal
+  // law is exactly the predictVecchia one, with the same m
+  arma::mat Xt = {{0.31, 0.62}, {0.315, 0.62}, {0.9, 0.1}};
+  const int nsim = 20000;
+  arma::mat sims = k.simulate(nsim, 3, Xt, false);
+  auto [m_v, s_v] = k.predictVecchia(Xt, true);
+  const double emp_m0 = arma::mean(sims.row(0));
+  const double emp_s0 = arma::stddev(sims.row(0));
+  INFO("predictVecchia " << m_v(0) << " +/- " << s_v(0) << ", emp " << emp_m0 << " +/- " << emp_s0);
+  CHECK(std::abs(emp_m0 - m_v(0)) < 5.0 * s_v(0) / std::sqrt(nsim));
+  CHECK(std::abs(emp_s0 - s_v(0)) < 5.0 * s_v(0) * std::sqrt(0.5 / nsim));
+
+  // second point is 0.005 away from the first one and conditions on it:
+  // strongly correlated trajectories (independent marginals would not be)
+  const double corr01 = arma::as_scalar(arma::cor(sims.row(0).t(), sims.row(1).t()));
+  CHECK(corr01 > 0.9);
+
+  // at an observed point, every trajectory interpolates
+  arma::mat sims_at_X = k.simulate(50, 9, X.row(0), false);
+  CHECK(arma::abs(sims_at_X - y(0)).max() < 1e-3);
+
+  // the nugget/noise overloads route to the light simulator too, instead of
+  // using a non-existing exact factorization
+  CHECK(arma::approx_equal(k.simulate(4, 5, Xt, false, false), k.simulateVecchia(4, 5, Xt), "absdiff", 0.0));
+  CHECK(arma::approx_equal(k.simulate(4, 5, Xt, arma::vec{0.0}, false), k.simulateVecchia(4, 5, Xt), "absdiff", 0.0));
+  CHECK_THROWS_AS(k.simulate(4, 5, Xt, false, true), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(4, 5, Xt, arma::vec{0.0}, true), std::runtime_error);
+  CHECK_THROWS_AS(k.update_simulate(y.head(2), X.rows(0, 1)), std::runtime_error);
+}
+
+TEST_CASE("simulateVecchia argument checks", "[vecchia][kriging]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(40, X, y);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL");
+  CHECK_THROWS_AS(k.simulateVecchia(3, 1, arma::mat(2, 3, arma::fill::randu)), std::invalid_argument);
+  CHECK_THROWS_AS(k.simulateVecchia(0, 1, X.rows(0, 1)), std::invalid_argument);
+  CHECK_NOTHROW(k.simulateVecchia(3, 1, X.rows(0, 1)));  // usable after any (noise-free) fit
+
+  Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
+  knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+  CHECK_THROWS_AS(knug.simulateVecchia(3, 1, X.rows(0, 1)), std::runtime_error);
 }
 
 TEST_CASE("LLVecchia benchmark", "[.benchmark]") {

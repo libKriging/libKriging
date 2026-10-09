@@ -11,7 +11,19 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
+  (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
+  instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
+  on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
+  raise; `will_update=true` still raises there.
+
 ### Fixed
+- `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
+  (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
+  light Vecchia fit they went to the exact simulator, which has no
+  factorization to use. They now route to `simulateNystrom` /
+  `simulateVecchia` like the base overload (and refuse `will_update=true`).
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

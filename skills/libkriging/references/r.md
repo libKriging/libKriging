@@ -85,7 +85,7 @@ k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # higher d
 k$nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
 ```
 `predict` is the only prediction entry point from R: `predictVecchia`,
-`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
 Vecchia mode) exist in C++ only.
 
 ## NestedKriging
