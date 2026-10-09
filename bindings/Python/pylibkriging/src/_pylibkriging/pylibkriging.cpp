@@ -6,11 +6,11 @@
 #include <carma>
 #include <cstdlib>
 #include <iostream>
+#include <libKriging/KrigingLoader.hpp>
+#include <libKriging/Optim.hpp>
 #include <mutex>
 #include <unordered_set>
 #include <vector>
-#include <libKriging/KrigingLoader.hpp>
-#include <libKriging/Optim.hpp>
 
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
