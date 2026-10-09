@@ -1427,7 +1427,296 @@ beta0(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_beta0), Floa
 Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
 
-export Kriging, WarpKriging, MLPKriging, NestedKriging
+# ─── MultiOutputKriging ───────────────────────────────────────────
+
+mutable struct MultiOutputKriging
+    ptr::Ptr{Nothing}
+    # size (m, nsim) of the last simulate(...; will_update=true), for update_simulate
+    lastsim::Tuple{Int,Int}
+
+    function MultiOutputKriging(ptr::Ptr{Nothing})
+        obj = new(ptr, (0, 0))
+        finalizer(obj) do o
+            if o.ptr != C_NULL
+                ccall(dlsym(_lk(), :lk_mo_kriging_delete), Nothing, (Ptr{Nothing},), o.ptr)
+                o.ptr = C_NULL
+            end
+        end
+        return obj
+    end
+end
+
+"""
+    MultiOutputKriging(kernel; output_model="pca")
+    MultiOutputKriging(Y, X, kernel; output_model="pca", regmodel="constant", normalize=false,
+                       optim="BFGS", objective="LL", theta=nothing, is_theta_estim=true,
+                       output_coordinates=nothing)
+
+Kriging of several outputs observed at the same design points (isotopic
+design): `Y` is `n × q` (one column per output), `X` is `n × d`.
+`output_model` is `"pca"`, `"pca(K)"` or `"pca(v)"` (Karhunen-Loève reduction,
+one `Kriging` per principal score; `"pca"` is `"pca(0.99)"`), `"shared"` (one θ
+for all outputs, outputs independent given θ) or `"separable"` (intrinsic
+coregionalization model with a free `q × q` output covariance). `theta`
+(`d`-vector, or `k × d` matrix of starting points) seeds or, with
+`is_theta_estim=false` / `optim="none"`, fixes θ.
+"""
+function MultiOutputKriging(kernel::String; output_model::String="pca")
+    ptr = ccall(dlsym(_lk(), :lk_mo_kriging_new), Ptr{Nothing}, (Cstring, Cstring), kernel, output_model)
+    return MultiOutputKriging(_check_ptr(ptr))
+end
+
+function MultiOutputKriging(Y::Matrix{Float64}, X::Matrix{Float64}, kernel::String;
+                            output_model::String="pca",
+                            output_coordinates::Union{Nothing,AbstractVecOrMat{Float64}}=nothing,
+                            kwargs...)
+    k = MultiOutputKriging(kernel; output_model=output_model)
+    output_coordinates === nothing || set_output_coordinates!(k, output_coordinates)
+    fit!(k, Y, X; kwargs...)
+    return k
+end
+
+MultiOutputKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String; kwargs...) =
+    MultiOutputKriging(reshape(y, :, 1), X, kernel; kwargs...)
+
+function set_output_coordinates!(k::MultiOutputKriging, t::AbstractVecOrMat{Float64})
+    tm = Matrix{Float64}(reshape(t, size(t, 1), :))
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_set_output_coordinates), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint), k.ptr, tm, size(tm, 1), size(tm, 2))
+    _check_error(ret)
+    return k
+end
+
+function fit!(k::MultiOutputKriging, Y::Matrix{Float64}, X::Matrix{Float64};
+              regmodel::String="constant",
+              normalize::Bool=false,
+              optim::String="BFGS",
+              objective::String="LL",
+              theta::Union{Nothing,AbstractVecOrMat{Float64}}=nothing,
+              is_theta_estim::Bool=true)
+    n, q = size(Y)
+    nX, d = size(X)
+    th = theta === nothing ? nothing : Matrix{Float64}(reshape(theta, :, d))
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_fit), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Cint,
+                 Cstring, Cint, Cstring, Cstring, Ptr{Float64}, Cint, Cint),
+                k.ptr, Y, n, q, X, nX, d,
+                regmodel, normalize ? 1 : 0, optim, objective,
+                th === nothing ? C_NULL : th, th === nothing ? 0 : size(th, 1),
+                is_theta_estim ? 1 : 0)
+    _check_error(ret)
+    k.lastsim = (0, 0)
+    return k
+end
+
+"""
+    predict(k::MultiOutputKriging, X_n; return_stdev=true, return_cov=false, return_deriv=false)
+
+Named tuple `(mean, stdev, cov, mean_deriv)`: `mean` and `stdev` are `m × q`,
+`cov` is the joint `mq × mq` covariance over `vec(Y_n)` (the `m` points of
+output 1, then output 2, …) and `mean_deriv` is `m × d × q`; `nothing` when not
+requested.
+"""
+function predict(k::MultiOutputKriging, X_n::Matrix{Float64};
+                 return_stdev::Bool=true, return_cov::Bool=false, return_deriv::Bool=false)
+    m, d = size(X_n)
+    q = nb_outputs(k)
+    mean_out = Matrix{Float64}(undef, m, q)
+    stdev_out = return_stdev ? Matrix{Float64}(undef, m, q) : Matrix{Float64}(undef, 0, 0)
+    cov_out = return_cov ? Matrix{Float64}(undef, m * q, m * q) : Matrix{Float64}(undef, 0, 0)
+    deriv_out = return_deriv ? Array{Float64,3}(undef, m, d, q) : Array{Float64,3}(undef, 0, 0, 0)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_predict), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Cint, Cint, Cint,
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, X_n, m, d, return_stdev ? 1 : 0, return_cov ? 1 : 0, return_deriv ? 1 : 0,
+                mean_out, return_stdev ? stdev_out : C_NULL,
+                return_cov ? cov_out : C_NULL, return_deriv ? deriv_out : C_NULL)
+    _check_error(ret)
+    return (mean=mean_out,
+            stdev=return_stdev ? stdev_out : nothing,
+            cov=return_cov ? cov_out : nothing,
+            mean_deriv=return_deriv ? deriv_out : nothing)
+end
+
+"""
+    simulate(k::MultiOutputKriging, nsim, seed, X_n; will_update=false)
+
+Joint conditional draws, an `m × q × nsim` array (`sims[:, :, s]` is one draw
+of all outputs).
+"""
+function simulate(k::MultiOutputKriging, nsim::Int, seed::Int, X_n::Matrix{Float64}; will_update::Bool=false)
+    m, d = size(X_n)
+    out = Array{Float64,3}(undef, m, nb_outputs(k), nsim)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_simulate), Cint,
+                (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint, Cint, Ptr{Float64}),
+                k.ptr, nsim, seed, X_n, m, d, will_update ? 1 : 0, out)
+    _check_error(ret)
+    k.lastsim = will_update ? (m, nsim) : (0, 0)
+    return out
+end
+
+"""
+    update_simulate(k::MultiOutputKriging, Y_u, X_u)
+
+Condition the draws of the last `simulate(...; will_update=true)` on new data
+`(X_u, Y_u)` without changing the model: an `m × q × nsim` array.
+"""
+function update_simulate(k::MultiOutputKriging, Y_u::Matrix{Float64}, X_u::Matrix{Float64})
+    m, nsim = k.lastsim
+    m == 0 && error("libKriging error: MultiOutputKriging::update_simulate: call simulate(...; will_update=true) first")
+    nu, q = size(Y_u)
+    out = Array{Float64,3}(undef, m, q, nsim)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_update_simulate), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Ptr{Float64}),
+                k.ptr, Y_u, nu, q, X_u, size(X_u, 2), out)
+    _check_error(ret)
+    return out
+end
+
+"""
+    update!(k::MultiOutputKriging, Y_u, X_u; refit=true)
+
+Add observations. `refit=true` refits on all data (PCA basis recomputed for
+`"pca"`); `refit=false` keeps θ (and the basis) and conditions on the new data.
+"""
+function update!(k::MultiOutputKriging, Y_u::Matrix{Float64}, X_u::Matrix{Float64}; refit::Bool=true)
+    nu, q = size(Y_u)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_update), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Cint),
+                k.ptr, Y_u, nu, q, X_u, size(X_u, 2), refit ? 1 : 0)
+    _check_error(ret)
+    k.lastsim = (0, 0)
+    return k
+end
+
+"""
+    leave_one_out_mat(k::MultiOutputKriging)
+
+Closed-form leave-one-out predictions `(mean, stdev)`, both `n × q`.
+"""
+function leave_one_out_mat(k::MultiOutputKriging)
+    n = size(X(k), 1)
+    q = nb_outputs(k)
+    mean_out = Matrix{Float64}(undef, n, q)
+    stdev_out = Matrix{Float64}(undef, n, q)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_leave_one_out_mat), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Ptr{Float64}), k.ptr, mean_out, stdev_out)
+    _check_error(ret)
+    return (mean=mean_out, stdev=stdev_out)
+end
+
+function _mo_scalar(sym::Symbol, k::MultiOutputKriging)
+    v = ccall(dlsym(_lk(), sym), Float64, (Ptr{Nothing},), k.ptr)
+    isnan(v) && _check_error(Cint(-1))
+    return v
+end
+
+leave_one_out(k::MultiOutputKriging) = _mo_scalar(:lk_mo_kriging_leave_one_out, k)
+log_likelihood(k::MultiOutputKriging) = _mo_scalar(:lk_mo_kriging_log_likelihood, k)
+
+function _mo_fun(sym::Symbol, k::MultiOutputKriging, theta::Vector{Float64}, return_grad::Bool)
+    d = length(theta)
+    val = Ref{Float64}(0.0)
+    grad = return_grad ? Vector{Float64}(undef, d) : Float64[]
+    ret = ccall(dlsym(_lk(), sym), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, theta, d, return_grad ? 1 : 0, val, return_grad ? grad : C_NULL)
+    _check_error(ret)
+    return val[], (return_grad ? grad : nothing)
+end
+
+function log_likelihood_fun(k::MultiOutputKriging, theta::Vector{Float64}; return_grad::Bool=false)
+    ll, g = _mo_fun(:lk_mo_kriging_log_likelihood_fun, k, theta, return_grad)
+    return (ll=ll, grad=g)
+end
+
+function leave_one_out_fun(k::MultiOutputKriging, theta::Vector{Float64}; return_grad::Bool=false)
+    loo, g = _mo_fun(:lk_mo_kriging_leave_one_out_fun, k, theta, return_grad)
+    return (loo=loo, grad=g)
+end
+
+"""
+    predict_cov_factors(k::MultiOutputKriging, X_n)
+
+Kronecker factors `(Cx, Sigma)` of the predictive covariance of `"shared"` and
+`"separable"`: `Cov(vec Y_n) = kron(Sigma, Cx)`, with `Cx` `m × m` and `Sigma`
+`q × q` on the original scale.
+"""
+function predict_cov_factors(k::MultiOutputKriging, X_n::Matrix{Float64})
+    m, d = size(X_n)
+    q = nb_outputs(k)
+    Cx = Matrix{Float64}(undef, m, m)
+    S = Matrix{Float64}(undef, q, q)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_predict_cov_factors), Cint,
+                (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Ptr{Float64}),
+                k.ptr, X_n, m, d, Cx, S)
+    _check_error(ret)
+    return (Cx=Cx, Sigma=S)
+end
+
+"""
+    component(k::MultiOutputKriging, i)
+
+Copy of the `i`-th latent `Kriging` of a `"pca"` model (1-based).
+"""
+function component(k::MultiOutputKriging, i::Int)
+    ptr = ccall(dlsym(_lk(), :lk_mo_kriging_component), Ptr{Nothing}, (Ptr{Nothing}, Cint), k.ptr, i - 1)
+    return Kriging(_check_ptr(ptr))
+end
+
+function _mo_string(sym::Symbol, k::MultiOutputKriging)
+    s = ccall(dlsym(_lk(), sym), Cstring, (Ptr{Nothing},), k.ptr)
+    s == C_NULL && _check_error(Cint(-1))
+    return unsafe_string(s)
+end
+
+summary(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_summary, k)
+kernel(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_kernel, k)
+output_model(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_output_model, k)
+regmodel(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_regmodel, k)
+optim(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_optim, k)
+objective(k::MultiOutputKriging) = _mo_string(:lk_mo_kriging_objective, k)
+normalize(k::MultiOutputKriging) = ccall(dlsym(_lk(), :lk_mo_kriging_normalize), Cint, (Ptr{Nothing},), k.ptr) != 0
+nb_outputs(k::MultiOutputKriging) = Int(ccall(dlsym(_lk(), :lk_mo_kriging_nb_outputs), Cint, (Ptr{Nothing},), k.ptr))
+nb_components(k::MultiOutputKriging) = Int(ccall(dlsym(_lk(), :lk_mo_kriging_nb_components), Cint, (Ptr{Nothing},), k.ptr))
+
+function _mo_mat(sym::Symbol, k::MultiOutputKriging)
+    r = Ref{Cint}(0)
+    c = Ref{Cint}(0)
+    _check_error(ccall(dlsym(_lk(), sym), Cint, (Ptr{Nothing}, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}), k.ptr, C_NULL, r, c))
+    out = Matrix{Float64}(undef, r[], c[])
+    _check_error(ccall(dlsym(_lk(), sym), Cint, (Ptr{Nothing}, Ptr{Float64}, Ptr{Cint}, Ptr{Cint}), k.ptr, out, r, c))
+    return out
+end
+
+function _mo_vec(sym::Symbol, k::MultiOutputKriging)
+    n = Ref{Cint}(0)
+    _check_error(ccall(dlsym(_lk(), sym), Cint, (Ptr{Nothing}, Ptr{Float64}, Ptr{Cint}), k.ptr, C_NULL, n))
+    out = Vector{Float64}(undef, n[])
+    _check_error(ccall(dlsym(_lk(), sym), Cint, (Ptr{Nothing}, Ptr{Float64}, Ptr{Cint}), k.ptr, out, n))
+    return out
+end
+
+X(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_X, k)
+Y(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_Y, k)
+output_coordinates(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_output_coordinates, k)
+beta(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_beta, k)
+output_cov(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_output_cov, k)
+pca_basis(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_pca_basis, k)
+pca_residual(k::MultiOutputKriging) = _mo_mat(:lk_mo_kriging_get_pca_residual, k)
+centerY(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_centerY, k)
+scaleY(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_scaleY, k)
+theta(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_theta, k)
+sigma2(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_sigma2, k)
+pca_explained(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_pca_explained, k)
+
+Base.show(io::IO, k::MultiOutputKriging) = print(io, summary(k))
+
+
+export Kriging, WarpKriging, MLPKriging, NestedKriging, MultiOutputKriging
+export set_output_coordinates!, leave_one_out_mat, predict_cov_factors, component
+export output_model, nb_outputs, nb_components, Y, output_coordinates, output_cov
+export pca_basis, pca_explained, pca_residual
 export nb_groups, aggregation, beta0
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
 export load, load_kriging, load_warp_kriging, load_mlp_kriging

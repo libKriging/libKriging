@@ -7,7 +7,12 @@ classdef Kriging < handle
     methods
         function obj = Kriging(varargin)
             % fprintf("New Kriging\n");
-            obj.ref = mLibKriging("Kriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                % wrap an existing backend object (e.g. MultiOutputKriging.component)
+                obj.ref = varargin{2};
+            else
+                obj.ref = mLibKriging("Kriging::new", varargin{:});
+            end
         end
 
         function varargout = copy(obj, varargin)

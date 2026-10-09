@@ -1,5 +1,6 @@
 #include "Kriging_binding.hpp"
 #include "MLPKriging_binding.hpp"
+#include "MultiOutputKriging_binding.hpp"
 #include "NestedKriging_binding.hpp"
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
@@ -179,6 +180,81 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::is_nugget_estim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::noise"_hash:
       return KrigingBinding::noise(nlhs, plhs, nrhs - 1, prhs + 1);
+
+    case "MultiOutputKriging::new"_hash:
+      return MultiOutputKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::new_empty"_hash:
+      return MultiOutputKrigingBinding::build_empty(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::delete"_hash:
+      return MultiOutputKrigingBinding::destroy(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::fit"_hash:
+      return MultiOutputKrigingBinding::fit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::set_output_coordinates"_hash:
+      return MultiOutputKrigingBinding::set_output_coordinates(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::predict"_hash:
+      return MultiOutputKrigingBinding::predict(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::simulate"_hash:
+      return MultiOutputKrigingBinding::simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::update_simulate"_hash:
+      return MultiOutputKrigingBinding::update_simulate(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::update"_hash:
+      return MultiOutputKrigingBinding::update(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::leaveOneOutMat"_hash:
+      return MultiOutputKrigingBinding::leaveOneOutMat(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::leaveOneOut"_hash:
+      return MultiOutputKrigingBinding::leaveOneOut(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::logLikelihood"_hash:
+      return MultiOutputKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::logLikelihoodFun"_hash:
+      return MultiOutputKrigingBinding::logLikelihoodFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::leaveOneOutFun"_hash:
+      return MultiOutputKrigingBinding::leaveOneOutFun(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::predictCovFactors"_hash:
+      return MultiOutputKrigingBinding::predictCovFactors(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::component"_hash:
+      return MultiOutputKrigingBinding::component(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::summary"_hash:
+      return MultiOutputKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::kernel"_hash:
+      return MultiOutputKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::output_model"_hash:
+      return MultiOutputKrigingBinding::output_model(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::nb_outputs"_hash:
+      return MultiOutputKrigingBinding::nb_outputs(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::X"_hash:
+      return MultiOutputKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::Y"_hash:
+      return MultiOutputKrigingBinding::Y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::output_coordinates"_hash:
+      return MultiOutputKrigingBinding::output_coordinates(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::regmodel"_hash:
+      return MultiOutputKrigingBinding::regmodel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::normalize"_hash:
+      return MultiOutputKrigingBinding::normalize(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::optim"_hash:
+      return MultiOutputKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::objective"_hash:
+      return MultiOutputKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::centerY"_hash:
+      return MultiOutputKrigingBinding::centerY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::scaleY"_hash:
+      return MultiOutputKrigingBinding::scaleY(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::theta"_hash:
+      return MultiOutputKrigingBinding::theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::sigma2"_hash:
+      return MultiOutputKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::beta"_hash:
+      return MultiOutputKrigingBinding::beta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::output_cov"_hash:
+      return MultiOutputKrigingBinding::output_cov(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::nb_components"_hash:
+      return MultiOutputKrigingBinding::nb_components(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::pca_basis"_hash:
+      return MultiOutputKrigingBinding::pca_basis(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::pca_explained"_hash:
+      return MultiOutputKrigingBinding::pca_explained(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::pca_residual"_hash:
+      return MultiOutputKrigingBinding::pca_residual(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NestedKriging::new"_hash:
       return NestedKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

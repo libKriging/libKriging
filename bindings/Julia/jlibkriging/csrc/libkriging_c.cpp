@@ -2,6 +2,7 @@
 
 #include <libKriging/Kriging.hpp>
 #include <libKriging/MLPKriging.hpp>
+#include <libKriging/MultiOutputKriging.hpp>
 #include <libKriging/NestedKriging.hpp>
 
 #include <libKriging/Trend.hpp>
@@ -2014,4 +2015,384 @@ double lk_nested_kriging_get_sigma2(void* ptr) {
 
 double lk_nested_kriging_get_beta0(void* ptr) {
   return static_cast<NestedKriging*>(ptr)->beta0();
+}
+
+/* ========================================================================== */
+/*  MultiOutputKriging                                                        */
+/* ========================================================================== */
+
+static MultiOutputKriging* as_mo(void* ptr) {
+  return static_cast<MultiOutputKriging*>(ptr);
+}
+
+static int copy_mat(const arma::mat& v, double* out, int* rows, int* cols) {
+  if (rows)
+    *rows = static_cast<int>(v.n_rows);
+  if (cols)
+    *cols = static_cast<int>(v.n_cols);
+  if (out)
+    std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+  return 0;
+}
+
+template <typename V>
+static int copy_vec(const V& v, double* out, int* n) {
+  if (n)
+    *n = static_cast<int>(v.n_elem);
+  if (out)
+    std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+  return 0;
+}
+
+static const char* string_buffer(const std::string& s) {
+  static thread_local std::string buf;
+  buf = s;
+  return buf.c_str();
+}
+
+void* lk_mo_kriging_new(const char* kernel, const char* output_model) {
+  try {
+    return new MultiOutputKriging(kernel ? kernel : "matern5_2", output_model ? output_model : "pca");
+  }
+  CATCH_RETURN_NULL
+}
+
+void lk_mo_kriging_delete(void* ptr) {
+  delete as_mo(ptr);
+}
+
+int lk_mo_kriging_set_output_coordinates(void* ptr, const double* t, int rows, int cols) {
+  try {
+    as_mo(ptr)->set_output_coordinates(arma::mat(const_cast<double*>(t), rows, cols, false, true));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_fit(void* ptr,
+                      const double* Y,
+                      int n,
+                      int q,
+                      const double* X,
+                      int nX,
+                      int d,
+                      const char* regmodel,
+                      int normalize,
+                      const char* optim,
+                      const char* objective,
+                      const double* theta,
+                      int theta_rows,
+                      int is_theta_estim) {
+  try {
+    arma::mat Y_m(const_cast<double*>(Y), n, q, false, true);
+    arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
+    MultiOutputKriging::Parameters params;
+    if (theta && theta_rows > 0)
+      params.theta = arma::mat(const_cast<double*>(theta), theta_rows, d, true, true);
+    params.is_theta_estim = is_theta_estim != 0;
+    as_mo(ptr)->fit(Y_m,
+                    X_m,
+                    Trend::fromString(regmodel ? regmodel : "constant"),
+                    normalize != 0,
+                    optim ? optim : "BFGS",
+                    objective ? objective : "LL",
+                    params);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_predict(void* ptr,
+                          const double* X_n,
+                          int m,
+                          int d,
+                          int return_stdev,
+                          int return_cov,
+                          int return_deriv,
+                          double* mean_out,
+                          double* stdev_out,
+                          double* cov_out,
+                          double* deriv_out) {
+  try {
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    auto [mean, stdev, cov, deriv] = as_mo(ptr)->predict(X_m, return_stdev != 0, return_cov != 0, return_deriv != 0);
+    if (mean_out)
+      std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
+    if (stdev_out && return_stdev)
+      std::memcpy(stdev_out, stdev.memptr(), stdev.n_elem * sizeof(double));
+    if (cov_out && return_cov)
+      std::memcpy(cov_out, cov.memptr(), cov.n_elem * sizeof(double));
+    if (deriv_out && return_deriv)
+      std::memcpy(deriv_out, deriv.memptr(), deriv.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_simulate(void* ptr,
+                           int nsim,
+                           int seed,
+                           const double* X_n,
+                           int m,
+                           int d,
+                           int will_update,
+                           double* sim_out) {
+  try {
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    const arma::cube sims = as_mo(ptr)->simulate(nsim, seed, X_m, will_update != 0);
+    if (sim_out)
+      std::memcpy(sim_out, sims.memptr(), sims.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_update_simulate(void* ptr,
+                                  const double* Y_u,
+                                  int nu,
+                                  int q,
+                                  const double* X_u,
+                                  int d,
+                                  double* sim_out) {
+  try {
+    arma::mat Y_m(const_cast<double*>(Y_u), nu, q, false, true);
+    arma::mat X_m(const_cast<double*>(X_u), nu, d, false, true);
+    const arma::cube sims = as_mo(ptr)->update_simulate(Y_m, X_m);
+    if (sim_out)
+      std::memcpy(sim_out, sims.memptr(), sims.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_update(void* ptr, const double* Y_u, int nu, int q, const double* X_u, int d, int refit) {
+  try {
+    arma::mat Y_m(const_cast<double*>(Y_u), nu, q, false, true);
+    arma::mat X_m(const_cast<double*>(X_u), nu, d, false, true);
+    as_mo(ptr)->update(Y_m, X_m, refit != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_leave_one_out_mat(void* ptr, double* mean_out, double* stdev_out) {
+  try {
+    auto [mean, stdev] = as_mo(ptr)->leaveOneOutMat();
+    if (mean_out)
+      std::memcpy(mean_out, mean.memptr(), mean.n_elem * sizeof(double));
+    if (stdev_out)
+      std::memcpy(stdev_out, stdev.memptr(), stdev.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+double lk_mo_kriging_leave_one_out(void* ptr) {
+  try {
+    return as_mo(ptr)->leaveOneOut();
+  }
+  CATCH_RETURN_NAN
+}
+
+double lk_mo_kriging_log_likelihood(void* ptr) {
+  try {
+    return as_mo(ptr)->logLikelihood();
+  }
+  CATCH_RETURN_NAN
+}
+
+int lk_mo_kriging_log_likelihood_fun(void* ptr,
+                                     const double* theta,
+                                     int d,
+                                     int return_grad,
+                                     double* ll_out,
+                                     double* grad_out) {
+  try {
+    arma::vec th(const_cast<double*>(theta), d, false, true);
+    auto [ll, grad] = as_mo(ptr)->logLikelihoodFun(th, return_grad != 0);
+    if (ll_out)
+      *ll_out = ll;
+    if (grad_out && return_grad)
+      std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_leave_one_out_fun(void* ptr,
+                                    const double* theta,
+                                    int d,
+                                    int return_grad,
+                                    double* loo_out,
+                                    double* grad_out) {
+  try {
+    arma::vec th(const_cast<double*>(theta), d, false, true);
+    auto [loo, grad] = as_mo(ptr)->leaveOneOutFun(th, return_grad != 0);
+    if (loo_out)
+      *loo_out = loo;
+    if (grad_out && return_grad)
+      std::memcpy(grad_out, grad.memptr(), grad.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_predict_cov_factors(void* ptr, const double* X_n, int m, int d, double* Cx_out, double* sigma_out) {
+  try {
+    arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
+    auto [Cx, S] = as_mo(ptr)->predictCovFactors(X_m);
+    if (Cx_out)
+      std::memcpy(Cx_out, Cx.memptr(), Cx.n_elem * sizeof(double));
+    if (sigma_out)
+      std::memcpy(sigma_out, S.memptr(), S.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_mo_kriging_component(void* ptr, int k) {
+  try {
+    if (k < 0)
+      throw std::out_of_range("MultiOutputKriging::component: negative index");
+    return new Kriging(as_mo(ptr)->component(static_cast<arma::uword>(k)), ExplicitCopySpecifier{});
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_summary(void* ptr) {
+  try {
+    return string_buffer(as_mo(ptr)->summary());
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_kernel(void* ptr) {
+  try {
+    return string_buffer(as_mo(ptr)->kernel());
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_output_model(void* ptr) {
+  try {
+    return string_buffer(as_mo(ptr)->output_model_string());
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_regmodel(void* ptr) {
+  try {
+    return string_buffer(Trend::toString(as_mo(ptr)->regmodel()));
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_optim(void* ptr) {
+  try {
+    return string_buffer(as_mo(ptr)->optim());
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_mo_kriging_objective(void* ptr) {
+  try {
+    return string_buffer(as_mo(ptr)->objective());
+  }
+  CATCH_RETURN_NULL
+}
+
+int lk_mo_kriging_normalize(void* ptr) {
+  return as_mo(ptr)->normalize() ? 1 : 0;
+}
+
+int lk_mo_kriging_nb_outputs(void* ptr) {
+  return static_cast<int>(as_mo(ptr)->nb_outputs());
+}
+
+int lk_mo_kriging_nb_components(void* ptr) {
+  return static_cast<int>(as_mo(ptr)->nb_components());
+}
+
+int lk_mo_kriging_get_X(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->X(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_Y(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->Y(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_output_coordinates(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->output_coordinates(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_beta(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->beta(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_output_cov(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->output_cov(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_pca_basis(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->pca_basis(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_pca_residual(void* ptr, double* out, int* rows, int* cols) {
+  try {
+    return copy_mat(as_mo(ptr)->pca_residual(), out, rows, cols);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_centerY(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->centerY(), out, n);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_scaleY(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->scaleY(), out, n);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_theta(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->theta(), out, n);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_sigma2(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->sigma2(), out, n);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_get_pca_explained(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->pca_explained(), out, n);
+  }
+  CATCH_RETURN
 }

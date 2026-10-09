@@ -136,7 +136,7 @@ class MultiOutputKriging {
   /** Re-draw the last simulate() trajectories conditionally on new data
    * (X_u, Y_u), without changing the model. "pca": the basis is kept, Y_u is
    * projected on it and each latent Kriging is updated with its scores.
-   * "shared": exact conditioning of the stored draws (θ, σ_j² kept).
+   * "shared" / "separable": exact conditioning of the stored draws (θ, Σ kept).
    * @return m × q × nsim cube */
   LIBKRIGING_EXPORT arma::cube update_simulate(const arma::mat& Y_u, const arma::mat& X_u);
 

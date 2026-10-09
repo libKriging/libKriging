@@ -172,6 +172,13 @@ inline void setter<arma::mat>(const arma::mat& v, mxArray*& x) {
 }
 
 template <>
+inline void setter<arma::cube>(const arma::cube& v, mxArray*& x) {
+  const mwSize dims[3] = {v.n_rows, v.n_cols, v.n_slices};
+  x = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
+  std::memcpy(mxGetPr(x), v.memptr(), sizeof(double) * v.n_elem);
+}
+
+template <>
 inline void setter<uint64_t>(const uint64_t& v, mxArray*& x) {
   x = mxCreateNumericMatrix(1, 1, mxUINT64_CLASS, mxREAL);
   *static_cast<uint64_t*>(mxGetData(x)) = v;
