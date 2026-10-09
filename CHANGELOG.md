@@ -46,6 +46,12 @@ past release, see the corresponding entry on the
   with the other classes.
 
 ### Changed
+- Python: supported versions are now 3.9 to 3.13 (`python_requires >= 3.9`).
+  Python 3.7 and 3.8 are dropped; wheels are built for 3.9 to 3.13, and the
+  Windows CI jobs test 3.9 and 3.13.
+- CI: the `pylibkriging.sklearn` tests are registered in CTest and
+  scikit-learn is installed with the Python test dependencies
+  (`dev-requirements.txt`).
 - `KrigingImpl`: the factorization layer accepts an `n × q` right-hand side
   (`KModel::ystar/Estar/betahat` are matrices, `populate_Model(…, &Y)`, the LL
   gradient takes several columns); `cross_corr` and `fit_setup_X_impl` are
@@ -56,8 +62,7 @@ past release, see the corresponding entry on the
 - `pylibkriging.sklearn`: `predict` of `KrigingRegressor`,
   `WarpKrigingRegressor`, `MLPKrigingRegressor` and `NestedKrigingRegressor`
   returned `(n, 1)` arrays instead of `(n,)`; `check_estimator` passes again
-  for all of them (the sklearn tests do not run in CI, scikit-learn being an
-  optional dependency).
+  for all of them (the sklearn tests did not run in CI; they now do).
 - Documentation: code examples that did not run as written are fixed
   (`skills/libkriging/references/*.md`, the binding READMEs, the main README
   and `docs/math`): `Kriging::predict` returns 5 values in C++ and Python,

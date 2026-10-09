@@ -10,7 +10,7 @@ fi
 PYVER=$1
 if [ -z "$PYVER" ]; then
   echo "Usage: $0 <python-version>"
-  echo "Example: $0 3.8"
+  echo "Example: $0 3.13"
   exit 1
 fi
 
@@ -37,9 +37,6 @@ fi
 
 # Map Python version to manylinux binary path
 case $PYVER in
-  3.8)
-    PYBIN=/opt/python/cp38-cp38/bin
-    ;;
   3.9)
     PYBIN=/opt/python/cp39-cp39/bin
     ;;
@@ -51,6 +48,9 @@ case $PYVER in
     ;;
   3.12)
     PYBIN=/opt/python/cp312-cp312/bin
+    ;;
+  3.13)
+    PYBIN=/opt/python/cp313-cp313/bin
     ;;
   *)
     echo "Unsupported Python version: $PYVER"

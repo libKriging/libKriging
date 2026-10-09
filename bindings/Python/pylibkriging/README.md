@@ -10,7 +10,7 @@ regression (fit, predict, simulate, update, input warpings, and scalable variant
 pip3 install pylibkriging
 ```
 
-Requires Python ≥ 3.7 and NumPy (≥ 1.18, NumPy 2 is supported). Pre-built wheels are published for the usual
+Requires Python ≥ 3.9 and NumPy (≥ 1.18, NumPy 2 is supported). Pre-built wheels are published for the usual
 Linux / macOS / Windows targets; see the
 [releases page](https://github.com/libKriging/libKriging/releases) for the other packages.
 

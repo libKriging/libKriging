@@ -83,16 +83,16 @@ jobs:
             os: macOS-latest
             mode: Debug
             enable_python: on
-          - name: "Python (3.7) Windows Debug"
-            os: windows-latest
-            mode: Debug
-            enable_python: on
-            python-version: 3.7
           - name: "Python (3.9) Windows Debug"
             os: windows-latest
             mode: Debug
             enable_python: on
-            python-version: 3.9
+            python-version: "3.9"
+          - name: "Python (3.13) Windows Debug"
+            os: windows-latest
+            mode: Debug
+            enable_python: on
+            python-version: "3.13"
           - name: "Octave Linux"
             os: ubuntu-22.04 # required to ease the support of octave ≥ 6
             mode: Release

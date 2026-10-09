@@ -16,7 +16,7 @@ fi
 echo "Release tag '${GIT_TAG}' in branch '$(git branch --show-current)'"
 
 # Get Python version from environment
-PYTHON_VERSION=${PYTHON_VERSION:-3.8}
+PYTHON_VERSION=${PYTHON_VERSION:-3.13}
 echo "Building for Python ${PYTHON_VERSION}"
 
 case $ARCH in

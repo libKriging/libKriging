@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python ≥ 3.7 with pip
+- Python ≥ 3.9 with pip
 - C++ compiler with C++17 support
 - CMake ≥ 3.13
 - Linear algebra library (BLAS/LAPACK, OpenBLAS, or MKL)
@@ -132,5 +132,5 @@ Tested in GitHub Actions (`main.yml`):
 |:-----------------------|:-------------|
 | Linux Debug            | Ubuntu 22.04 |
 | macOS Debug            | macOS latest |
-| Python (3.7) Windows   | Windows      |
 | Python (3.9) Windows   | Windows      |
+| Python (3.13) Windows  | Windows      |
