@@ -115,6 +115,10 @@ add_python_test(NAME KrigingDemo FILENAME pylibkriging_demo.py)
 add_python_test(NAME WarpKriging FILENAME WarpKriging_test.py)
 add_python_test(NAME MLPKriging FILENAME MLPKriging_test.py)
 add_python_test(NAME MultiOutputKriging FILENAME MultiOutputKriging_test.py)
-add_python_test(NAME SklearnEstimator FILENAME sklearn_estimator_test.py)
-add_python_test(NAME SklearnMultiModel FILENAME sklearn_multimodel_test.py)
-add_python_test(NAME SklearnMultiOutput FILENAME sklearn_multioutput_test.py)
+# scikit-learn's check_estimator runs hundreds of fits: too slow under valgrind
+# or coverage instrumentation, and it exercises the Python wrappers only
+if (NOT ENABLE_MEMCHECK AND NOT ENABLE_COVERAGE)
+    add_python_test(NAME SklearnEstimator FILENAME sklearn_estimator_test.py)
+    add_python_test(NAME SklearnMultiModel FILENAME sklearn_multimodel_test.py)
+    add_python_test(NAME SklearnMultiOutput FILENAME sklearn_multioutput_test.py)
+endif ()
