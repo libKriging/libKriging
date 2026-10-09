@@ -46,6 +46,10 @@ past release, see the corresponding entry on the
   `Kriging([1], [1], "gauss")` model, whose mex reference was then
   overwritten and never released. It now wraps the loaded reference directly,
   like `WarpKriging.load` / `MLPKriging.load`.
+- Octave/Matlab `Kriging.copy` returned the raw mex reference of the copy
+  instead of a `Kriging` object (and leaked it when the result was not
+  assigned). It now returns a `Kriging` object, like `WarpKriging.copy` /
+  `MLPKriging.copy`.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

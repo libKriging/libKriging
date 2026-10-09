@@ -14,8 +14,9 @@ classdef Kriging < handle
             end
         end
 
-        function varargout = copy(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::copy", obj.ref, varargin{:});
+        function k2 = copy(obj)
+            ref_copy = mLibKriging("Kriging::copy", obj.ref);
+            k2 = Kriging('__ref__', ref_copy);
         end
         
         function delete(obj, varargin)
