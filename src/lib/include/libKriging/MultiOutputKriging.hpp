@@ -17,6 +17,9 @@
 struct MultiOutputKrigingParameters {
   std::optional<arma::mat> theta;  ///< d (several rows = multistart starting points)
   bool is_theta_estim = true;
+  /// "separable(<kernel>)" only: φ of the output kernel, d_t (several rows =
+  /// starting points); estimated with θ unless is_theta_estim is false
+  std::optional<arma::mat> output_theta;
 };
 
 /** Multi-output Kriging, isotopic design: q outputs observed at the same n
@@ -59,15 +62,23 @@ struct MultiOutputKrigingParameters {
  *       n − p ≥ q and a non-singular Σ̂ (otherwise use "pca" or
  *       "separable(<kernel>)").
  *
- *   "separable(<kernel>)"
- *       Σ = σ² R_t(φ) from output coordinates: parsed but not implemented
- *       yet (fit throws).
+ *   "separable(<kernel>)", e.g. "separable(matern5_2)"
+ *       Separable model with a parametric output covariance (Rougier 2008):
+ *         Cov(vec Y) = σ² R_t(φ) ⊗ r_θ,
+ *       R_t the correlation of <kernel> (same names as covType) over the
+ *       output coordinates t (q × d_t, set_output_coordinates, required).
+ *       −2ℓ = nq log 2πσ̂² + q log|R| + n log|R_t| + nq, σ̂² = tr(R_t⁻¹ E*ᵀE*)/(nq),
+ *       maximized in (θ, φ). Same predictive mean as "shared"; coherent
+ *       joint covariance with d_t parameters instead of q(q+1)/2, so q may
+ *       exceed n (O(q³) per evaluation). Objective "LL" only (LOO does not
+ *       depend on φ).
  *
  * Covariance ordering: joint covariances are over vec(Y_n), i.e. the m
  * prediction points of output 1, then output 2, … (column-major).
  *
  * Restrictions: isotopic only (no missing Y); one regmodel for all latent
- * submodels; no nugget/noise; save/load not yet implemented.
+ * submodels; no nugget/noise. save/load keep the fitted model, not the state
+ * of the last simulate (update_simulate needs a new simulate after load).
  */
 class MultiOutputKriging {
  public:
@@ -99,9 +110,9 @@ class MultiOutputKriging {
                                        const std::string& objective = "LL",
                                        const Parameters& parameters = {});
 
-  /** Output coordinates (e.g. time steps), q × d_t. Used by
-   * "separable(<kernel>)" (not implemented yet); stored and checked against q
-   * at fit time otherwise. A vector is taken as a single column. */
+  /** Output coordinates (e.g. time steps), q × d_t. Required by
+   * "separable(<kernel>)"; stored and checked against q at fit time
+   * otherwise. A vector is taken as a single column. */
   LIBKRIGING_EXPORT void set_output_coordinates(const arma::mat& t);
 
   /** Fit on (X, Y).
@@ -176,8 +187,11 @@ class MultiOutputKriging {
   [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& theta() const;   ///< θ, d
   [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& sigma2() const;  ///< σ_j², q
   [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& beta() const;    ///< β_j, p × q
-  /// Σ (q × q): diag(σ_j²) in "shared", free in "separable"
+  /// Σ (q × q): diag(σ_j²) in "shared", free in "separable", σ² R_t(φ) in
+  /// "separable(<kernel>)"
   [[nodiscard]] LIBKRIGING_EXPORT const arma::mat& output_cov() const;
+  /// φ of the output kernel, d_t ("separable(<kernel>)" only)
+  [[nodiscard]] LIBKRIGING_EXPORT const arma::vec& output_theta() const;
   /** Kronecker factors of the predictive covariance at X_n (m × d):
    * (C_x [m × m] correlation, Σ_raw [q × q] on the original scale) with
    * Cov(vec Y_n) = kron(Σ_raw, C_x), without forming the dense mq × mq. */
@@ -185,7 +199,8 @@ class MultiOutputKriging {
   /// Summed log-likelihood at the fitted θ
   LIBKRIGING_EXPORT double logLikelihood();
   /// Summed concentrated log-likelihood at θ (normalized scale), with its
-  /// gradient in θ when grad is true
+  /// gradient in θ when grad is true. "separable(<kernel>)": θ is followed
+  /// by φ (d + d_t values, gradient likewise)
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& theta, bool grad = false);
   /// LOO mean squared error summed over outputs (normalized scale) at θ,
   /// with its gradient in θ when grad is true
@@ -199,6 +214,11 @@ class MultiOutputKriging {
   [[nodiscard]] LIBKRIGING_EXPORT const Kriging& component(arma::uword k) const;
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /// Save the model (configuration, data and fitted state) to a JSON file
+  LIBKRIGING_EXPORT void save(const std::string& filename) const;
+  /// Load a model saved by save()
+  LIBKRIGING_EXPORT static MultiOutputKriging load(const std::string& filename);
 
  private:
   // configuration
@@ -230,6 +250,7 @@ class MultiOutputKriging {
 
   // Shared state (KrigingImpl-derived, defined in MultiOutputKriging.cpp)
   class SharedModel;
+  class OutputKernel;
   std::unique_ptr<SharedModel> m_shared;
 
   void parse_output_model(const std::string& s);

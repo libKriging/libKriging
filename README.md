@@ -7,7 +7,7 @@
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (affine, boxcox, kumaraswamy, neural_mono, knots, mlp, mlp_joint, categorical, ordinal).
-It fits several outputs at once (`MultiOutputKriging`: PCA reduction, shared correlation or intrinsic coregionalization).
+It fits several outputs at once (`MultiOutputKriging`: PCA reduction, shared correlation, intrinsic coregionalization or a kernel over the output coordinates).
 It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods, or by fitting on a k-means reduced design (`subsetOfData`).
 It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
 
@@ -20,7 +20,7 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 
 ## Features
 
-- **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), `NestedKriging` for large designs, and `MultiOutputKriging` for several outputs on the same design (`"pca"`, `"shared"` and `"separable"` output models, see [docs/math/MultiOutput.md](docs/math/MultiOutput.md)).
+- **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), `NestedKriging` for large designs, and `MultiOutputKriging` for several outputs on the same design (`"pca"`, `"shared"`, `"separable"` and `"separable(<kernel>)"` output models, see [docs/math/MultiOutput.md](docs/math/MultiOutput.md)).
 - **Covariance kernels**: `gauss`, `exp`, `matern3_2`, `matern5_2`.
 - **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the scalable approximations `LLVecchia(m)` (Vecchia) and `LLNystrom(k)` (Nystrom low-rank).
 - **Input warpings** (`WarpKriging`, one per input column): affine, boxcox, kumaraswamy, neural_mono, knots, mlp, categorical, ordinal; `mlp_joint` (a joint feature map over all inputs) through `MLPKriging`.

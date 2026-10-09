@@ -19,7 +19,7 @@ whole project is in [../dev/References.md](../dev/References.md).
 
 | Page | Content |
 |---|---|
-| [MultiOutput.md](MultiOutput.md) | `MultiOutputKriging`: `Y` is n × q; output models `"pca"` (Karhunen-Loève), `"shared"` (parallel partial GP) and `"separable"` (ICM); one worked notebook per binding (`bindings/*/multioutputkriging_*.ipynb`) |
+| [MultiOutput.md](MultiOutput.md) | `MultiOutputKriging`: `Y` is n × q; output models `"pca"` (Karhunen-Loève), `"shared"` (parallel partial GP), `"separable"` (ICM) and `"separable(<kernel>)"` (kernel over the output coordinates); save/load; one worked notebook per binding (`bindings/*/multioutputkriging_*.ipynb`) |
 
 ## Large designs
 

@@ -14,13 +14,14 @@
 static MultiOutputKriging::Parameters params_from_dict(const py::dict& dict) {
   for (const auto& kv : dict) {
     const auto key = kv.first.cast<std::string>();
-    if (key != "theta" && key != "is_theta_estim")
+    if (key != "theta" && key != "is_theta_estim" && key != "output_theta")
       throw std::invalid_argument("MultiOutputKriging: unsupported parameter '" + key
-                                  + "' (only 'theta' and 'is_theta_estim')");
+                                  + "' (only 'theta', 'is_theta_estim' and 'output_theta')");
   }
   MultiOutputKriging::Parameters p;
   p.theta = get_entry<arma::mat>(dict, "theta");
   p.is_theta_estim = get_entry<bool>(dict, "is_theta_estim").value_or(true);
+  p.output_theta = get_entry<arma::mat>(dict, "output_theta");
   return p;
 }
 
@@ -61,7 +62,18 @@ PyMultiOutputKriging::PyMultiOutputKriging(const py::array_t<double>& Y,
   fit(Y, X, regmodel, normalize, optim, objective, dict);
 }
 
+PyMultiOutputKriging::PyMultiOutputKriging(std::unique_ptr<MultiOutputKriging> internal)
+    : m_internal{std::move(internal)} {}
+
 PyMultiOutputKriging::~PyMultiOutputKriging() {}
+
+void PyMultiOutputKriging::save(const std::string& filename) const {
+  m_internal->save(filename);
+}
+
+PyMultiOutputKriging PyMultiOutputKriging::load(const std::string& filename) {
+  return PyMultiOutputKriging(std::make_unique<MultiOutputKriging>(MultiOutputKriging::load(filename)));
+}
 
 void PyMultiOutputKriging::fit(const py::array_t<double>& Y,
                                const py::array_t<double>& X,
@@ -220,6 +232,10 @@ std::tuple<double, py::array_t<double>> PyMultiOutputKriging::leaveOneOutFun(con
   const arma::vec th = arma::vectorise(to_mat(theta));
   auto [loo, g] = m_internal->leaveOneOutFun(th, return_grad);
   return std::make_tuple(loo, vec_to_arr(g));
+}
+
+py::array_t<double> PyMultiOutputKriging::output_theta() const {
+  return vec_to_arr(m_internal->output_theta());
 }
 
 py::array_t<double> PyMultiOutputKriging::output_cov() const {

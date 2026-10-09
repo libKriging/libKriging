@@ -10,7 +10,7 @@
 #include "retrofit_utils.hpp"
 
 // MultiOutputKriging::Parameters from an R named list: theta (one row per
-// starting point) and is_theta_estim
+// starting point), is_theta_estim and output_theta ("separable(<kernel>)")
 static MultiOutputKriging::Parameters mo_parameters_from_list(Rcpp::Nullable<Rcpp::List> parameters) {
   MultiOutputKriging::Parameters out;
   if (parameters.isNotNull()) {
@@ -19,14 +19,18 @@ static MultiOutputKriging::Parameters mo_parameters_from_list(Rcpp::Nullable<Rcp
       Rcpp::CharacterVector names = params.names();
       for (R_xlen_t i = 0; i < names.size(); ++i) {
         const std::string key = Rcpp::as<std::string>(names[i]);
-        if (key != "theta" && key != "is_theta_estim")
-          Rcpp::stop("MultiOutputKriging: unsupported parameter '%s' (only 'theta' and 'is_theta_estim')", key.c_str());
+        if (key != "theta" && key != "is_theta_estim" && key != "output_theta")
+          Rcpp::stop(
+              "MultiOutputKriging: unsupported parameter '%s' (only 'theta', 'is_theta_estim' and 'output_theta')",
+              key.c_str());
       }
     }
     if (params.containsElementNamed("theta"))
       out.theta = Rcpp::as<arma::mat>(params["theta"]);
     if (params.containsElementNamed("is_theta_estim"))
       out.is_theta_estim = Rcpp::as<bool>(params["is_theta_estim"]);
+    if (params.containsElementNamed("output_theta"))
+      out.output_theta = Rcpp::as<arma::mat>(params["output_theta"]);
   }
   return out;
 }
@@ -257,6 +261,21 @@ arma::mat multioutputkriging_beta(Rcpp::List k) {
 // [[Rcpp::export]]
 arma::mat multioutputkriging_output_cov(Rcpp::List k) {
   return mo_ptr(k)->output_cov();
+}
+
+// [[Rcpp::export]]
+arma::vec multioutputkriging_output_theta(Rcpp::List k) {
+  return mo_ptr(k)->output_theta();
+}
+
+// [[Rcpp::export]]
+void multioutputkriging_save(Rcpp::List k, std::string filename) {
+  mo_ptr(k)->save(filename);
+}
+
+// [[Rcpp::export]]
+Rcpp::List multioutputkriging_load(std::string filename) {
+  return mo_wrap(new MultiOutputKriging(MultiOutputKriging::load(filename)));
 }
 
 // [[Rcpp::export]]

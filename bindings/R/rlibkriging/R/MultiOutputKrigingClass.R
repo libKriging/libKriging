@@ -9,14 +9,14 @@
 classMultiOutputKriging <- function(mo) {
     class(mo) <- "MultiOutputKriging"
     for (f in c('fit', 'predict', 'print', 'show', 'simulate', 'update', 'update_simulate',
-                'leaveOneOut', 'logLikelihood', 'logLikelihoodFun', 'leaveOneOutFun')) {
+                'leaveOneOut', 'logLikelihood', 'logLikelihoodFun', 'leaveOneOutFun', 'save')) {
         eval(parse(text = paste0(
             "mo$", f, " <- function(...) ", f, "(mo,...)"
             )))
     }
     for (d in c('kernel', 'output_model', 'nb_outputs', 'X', 'Y', 'output_coordinates',
                 'regmodel', 'normalize', 'optim', 'objective', 'centerY', 'scaleY',
-                'theta', 'sigma2', 'beta', 'output_cov',
+                'theta', 'sigma2', 'beta', 'output_cov', 'output_theta',
                 'nb_components', 'pca_basis', 'pca_explained', 'pca_residual',
                 'leaveOneOutMat')) {
         eval(parse(text = paste0(
@@ -59,7 +59,13 @@ classMultiOutputKriging <- function(mo) {
 #'     process, Gu & Berger 2016).
 #'   \item \code{"separable"}: intrinsic coregionalization model,
 #'     \eqn{Cov(vec Y) = \Sigma \otimes R_\theta} with a free q x q
-#'     output covariance \eqn{\Sigma} (Conti & O'Hagan 2010).
+#'     output covariance \eqn{\Sigma} (Conti & O'Hagan 2010). Needs
+#'     n - p >= q.
+#'   \item \code{"separable(<kernel>)"}, e.g. \code{"separable(matern5_2)"}:
+#'     \eqn{Cov(vec Y) = \sigma^2 R_t(\phi) \otimes R_\theta}, with
+#'     \eqn{R_t} the correlation of \code{<kernel>} over the
+#'     \code{output_coordinates} (required). d_t parameters instead of
+#'     q(q+1)/2, so q may exceed n. Objective \code{"LL"} only.
 #' }
 #'
 #' @author Yann Richet \email{yann.richet@asnr.fr}
@@ -82,9 +88,11 @@ classMultiOutputKriging <- function(mo) {
 #'     \code{"pca"} forwards it to each latent \code{Kriging} (so any
 #'     \code{Kriging} objective is allowed there).
 #' @param parameters Optional named list with \code{theta} (matrix, one row
-#'     per starting point) and \code{is_theta_estim}.
+#'     per starting point), \code{is_theta_estim} and, for
+#'     \code{"separable(<kernel>)"}, \code{output_theta} (matrix, d_t columns:
+#'     ranges of the output kernel).
 #' @param output_coordinates Optional output coordinates (q x d_t), e.g. the
-#'     time steps of curve outputs.
+#'     time steps of curve outputs; required by \code{"separable(<kernel>)"}.
 #'
 #' @return An object with S3 class \code{"MultiOutputKriging"}.
 #'
@@ -263,7 +271,8 @@ logLikelihood.MultiOutputKriging <- function(object, ...) {
 #'
 #' @param object S3 MultiOutputKriging object.
 #' @param theta Correlation ranges: a vector of length d, or a matrix with
-#'     one row per value of theta.
+#'     one row per value of theta. With \code{"separable(<kernel>)"}, the
+#'     d ranges on x are followed by the d_t ranges of the output kernel.
 #' @param return_grad Logical, also return the gradient in theta.
 #' @param ... Ignored.
 #'
@@ -275,6 +284,8 @@ logLikelihood.MultiOutputKriging <- function(object, ...) {
 logLikelihoodFun.MultiOutputKriging <- function(object, theta, return_grad = FALSE, ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     d <- ncol(multioutputkriging_X(object))
+    if (startsWith(multioutputkriging_output_model(object), "separable("))
+        d <- d + ncol(multioutputkriging_output_coordinates(object))
     if (!is.matrix(theta)) theta <- matrix(theta, ncol = d)
     out <- list(logLikelihood = matrix(NA, nrow = nrow(theta)),
                 logLikelihoodGrad = matrix(NA, nrow = nrow(theta), ncol = d))
@@ -383,3 +394,37 @@ sigma2.MultiOutputKriging <- function(object, ...) multioutputkriging_sigma2(obj
 #' @method beta MultiOutputKriging
 #' @export
 beta.MultiOutputKriging <- function(object, ...) multioutputkriging_beta(object)
+
+#' Save a \code{MultiOutputKriging} model to a file (JSON).
+#'
+#' @param object S3 MultiOutputKriging object.
+#' @param filename File name to save in.
+#' @param ... Not used.
+#'
+#' @method save MultiOutputKriging
+#' @export
+save.MultiOutputKriging <- function(object, filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    multioutputkriging_save(object, filename)
+    invisible(NULL)
+}
+
+#' Load a \code{MultiOutputKriging} model saved by \code{save}.
+#'
+#' The state of the last \code{simulate} is not saved: call \code{simulate}
+#' again before \code{update_simulate}.
+#'
+#' @param filename File name to load from.
+#' @param ... Not used.
+#'
+#' @return The loaded MultiOutputKriging object.
+#'
+#' @export
+load.MultiOutputKriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    classMultiOutputKriging(multioutputkriging_load(filename))
+}

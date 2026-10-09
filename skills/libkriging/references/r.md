@@ -110,13 +110,13 @@ predict(nk, x = Xnew, return_stdev = TRUE)
 ```r
 # Y is n x q (one column per output), X is n x d, same rows
 mo <- MultiOutputKriging(Y, X, kernel = "matern5_2",
-                         output_model = "pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable"
+                         output_model = "pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable" | "separable(<kernel>)"
                          regmodel = "constant",
                          normalize = FALSE,
                          optim = "BFGS",
-                         objective = "LL",       # "shared"/"separable": "LL" | "LOO"
-                         parameters = NULL,      # list(theta = ..., is_theta_estim = ...) only
-                         output_coordinates = NULL)
+                         objective = "LL",       # "shared"/"separable": "LL" | "LOO"; "separable(<kernel>)": "LL"
+                         parameters = NULL,      # list(theta = ..., is_theta_estim = ..., output_theta = ...) only
+                         output_coordinates = NULL)  # q x d_t, required by "separable(<kernel>)"
 p <- predict(mo, Xnew, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE)
 # p$mean, p$stdev: m x q; p$cov: mq x mq; p$mean_deriv: m x d x q array
 sims <- simulate(mo, nsim = 100, seed = 1, x = Xnew, will_update = TRUE)   # m x q x nsim array
@@ -126,8 +126,16 @@ k1 <- mo$component(1)             # "pca": copy of latent Kriging 1 (1-based)
 
 sep <- MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = "separable")
 f <- sep$predictCovFactors(Xnew)  # cov of predict(sep, ...) == kronecker(f$Sigma, f$Cx)
+
+# curves: Sigma = sigma2 R_t(phi), a matern 5/2 kernel over the time steps t (q may exceed n)
+sk <- MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = "separable(matern5_2)",
+                         output_coordinates = t)
+sk$output_theta()                 # phi; logLikelihoodFun(sk, c(theta, phi)) takes both
+
+save(mo, "mo.json")               # JSON; load("mo.json") or load.MultiOutputKriging("mo.json")
+mo2 <- load("mo.json")            # simulate again before update_simulate
 ```
-No noise, no save/load yet.
+No noise yet.
 
 ## Common pitfalls to flag in review
 

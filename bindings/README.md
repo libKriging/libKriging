@@ -177,7 +177,8 @@ only.
 ## MultiOutputKriging
 
 `Y` is `n × q` (one column per output) and `X` is `n × d`, with the same rows. `output_model` is `"pca"`, `"pca(K)"`,
-`"pca(v)"`, `"shared"` or `"separable"`. Shapes are the same in every binding: `mean` and `stdev` are `m × q`, `cov` is
+`"pca(v)"`, `"shared"`, `"separable"` or `"separable(<kernel>)"` (e.g. `"separable(matern5_2)"`, which needs the
+output coordinates). Shapes are the same in every binding: `mean` and `stdev` are `m × q`, `cov` is
 `mq × mq` over `vec(Y)` (the `m` points of output 1, then output 2, …), `mean_deriv` is `m × d × q` and `simulate` /
 `update_simulate` return `m × q × nsim`.
 
@@ -198,16 +199,21 @@ only.
 | Covariance factors | `obj$predictCovFactors(x)` → `list(Cx,Sigma)` | `obj.predictCovFactors(X)` → `(Cx,Sigma)` | `[Cx,Sigma] = predictCovFactors(obj,X)` | `predict_cov_factors(obj,X)` → `(Cx,Sigma)` |
 | Latent `Kriging` (`"pca"`) | `obj$component(k)` (1-based) | `obj.component(k)` (0-based) | `component(obj,k)` (1-based) | `component(obj,k)` (1-based) |
 | Summary | `print(obj)` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Save | `save(obj,filename)` | `obj.save(filename)` | `save(obj,filename)` | `save(obj,filename)` |
+| Load | `load(filename)`, `load.MultiOutputKriging(filename)` | `pylibkriging.load(filename)`, `MultiOutputKriging.load(filename)` | `load_kriging(filename)`, `MultiOutputKriging.load(filename)` | `load(filename)`, `load_multi_output_kriging(filename)` |
 | **Accessors** | `obj$kernel()`, … | `obj.kernel()`, … | `kernel(obj)`, … | `kernel(obj)`, … |
 | configuration | `kernel`, `output_model`, `regmodel`, `normalize`, `optim`, `objective` | same | same | same |
 | data | `X`, `Y`, `nb_outputs`, `centerY`, `scaleY`, `output_coordinates` | same | same | same |
-| `"shared"` / `"separable"` | `theta`, `sigma2`, `beta`, `output_cov` | same | same | same |
+| `"shared"` / `"separable"` / `"separable(<kernel>)"` | `theta`, `sigma2`, `beta`, `output_cov` | same | same | same |
+| `"separable(<kernel>)"` | `output_theta` | same | same | same |
 | `"pca"` | `nb_components`, `pca_basis`, `pca_explained`, `pca_residual` | same | same | same |
 
-> `parameters` only takes `theta` (one row per starting point) and `is_theta_estim` (Julia: the `theta=` and
-> `is_theta_estim=` keywords; Octave/Matlab: `Params("theta", …)`). `"shared"` and `"separable"` accept
-> `objective="LL"` or `"LOO"`; `"pca"` forwards `objective` to each latent `Kriging`. No `noise=`, no `save()`/`load()`
-> yet, and no scikit-learn estimator.
+> `parameters` only takes `theta` (one row per starting point), `is_theta_estim` and, for `"separable(<kernel>)"`,
+> `output_theta` (Julia: the `theta=`, `is_theta_estim=` and `output_theta=` keywords; Octave/Matlab:
+> `Params("theta", …, "output_theta", …)`). `"shared"` and `"separable"` accept `objective="LL"` or `"LOO"`,
+> `"separable(<kernel>)"` only `"LL"`; `"pca"` forwards `objective` to each latent `Kriging`. With
+> `"separable(<kernel>)"`, `logLikelihoodFun` takes θ followed by φ. A loaded model does not keep the last `simulate`:
+> simulate again before `update_simulate`. No `noise=` yet, and no scikit-learn estimator.
 
 ---
 
@@ -261,7 +267,7 @@ Each notebook fits the Branin 2D function with one class or option, in each lang
 | `WarpKriging`, `mlp` warping | [Python](Python/warpkriging_mlp_branin2d_py.ipynb) | [R](R/warpkriging_mlp_branin2d_r.ipynb) | [Julia](Julia/warpkriging_mlp_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_mlp_branin2d_octave.ipynb) |
 | `WarpKriging`, `categorical` warping | [Python](Python/warpkriging_categorical_branin2d_py.ipynb) | [R](R/warpkriging_categorical_branin2d_r.ipynb) | [Julia](Julia/warpkriging_categorical_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_categorical_branin2d_octave.ipynb) |
 | `WarpKriging`, `ordinal` warping | [Python](Python/warpkriging_ordinal_branin2d_py.ipynb) | [R](R/warpkriging_ordinal_branin2d_r.ipynb) | [Julia](Julia/warpkriging_ordinal_branin2d_julia.ipynb) | [Octave](Octave/warpkriging_ordinal_branin2d_octave.ipynb) |
-| `MultiOutputKriging` (`"pca"`, `"shared"`, `"separable"`) on a damped-oscillation curve | [Python](Python/multioutputkriging_py.ipynb) | [R](R/multioutputkriging_r.ipynb) | [Julia](Julia/multioutputkriging_julia.ipynb) | [Octave](Octave/multioutputkriging_octave.ipynb) |
+| `MultiOutputKriging` (`"pca"`, `"shared"`, `"separable"`, `"separable(matern5_2)"`, save/load) on a damped-oscillation curve | [Python](Python/multioutputkriging_py.ipynb) | [R](R/multioutputkriging_r.ipynb) | [Julia](Julia/multioutputkriging_julia.ipynb) | [Octave](Octave/multioutputkriging_octave.ipynb) |
 
 The `nuggetkriging_*` and `noisekriging_*` notebooks keep the names of the classes that were merged into `Kriging`; they
 use `Kriging` with `noise=`. Other notebooks: [docs/math](../docs/math) (large-design methods against exact Cholesky) and

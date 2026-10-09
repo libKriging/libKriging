@@ -2082,7 +2082,10 @@ int lk_mo_kriging_fit(void* ptr,
                       const char* objective,
                       const double* theta,
                       int theta_rows,
-                      int is_theta_estim) {
+                      int is_theta_estim,
+                      const double* output_theta,
+                      int output_theta_rows,
+                      int output_theta_cols) {
   try {
     arma::mat Y_m(const_cast<double*>(Y), n, q, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
@@ -2090,6 +2093,9 @@ int lk_mo_kriging_fit(void* ptr,
     if (theta && theta_rows > 0)
       params.theta = arma::mat(const_cast<double*>(theta), theta_rows, d, true, true);
     params.is_theta_estim = is_theta_estim != 0;
+    if (output_theta && output_theta_rows > 0)
+      params.output_theta
+          = arma::mat(const_cast<double*>(output_theta), output_theta_rows, output_theta_cols, true, true);
     as_mo(ptr)->fit(Y_m,
                     X_m,
                     Trend::fromString(regmodel ? regmodel : "constant"),
@@ -2381,6 +2387,28 @@ int lk_mo_kriging_get_theta(void* ptr, double* out, int* n) {
     return copy_vec(as_mo(ptr)->theta(), out, n);
   }
   CATCH_RETURN
+}
+
+int lk_mo_kriging_get_output_theta(void* ptr, double* out, int* n) {
+  try {
+    return copy_vec(as_mo(ptr)->output_theta(), out, n);
+  }
+  CATCH_RETURN
+}
+
+int lk_mo_kriging_save(void* ptr, const char* filename) {
+  try {
+    as_mo(ptr)->save(filename);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_mo_kriging_load(const char* filename) {
+  try {
+    return new MultiOutputKriging(MultiOutputKriging::load(filename));
+  }
+  CATCH_RETURN_NULL
 }
 
 int lk_mo_kriging_get_sigma2(void* ptr, double* out, int* n) {

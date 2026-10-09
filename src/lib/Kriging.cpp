@@ -2822,9 +2822,7 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
   return Kriging::NoiseModel::None;
 }
 
-void Kriging::save(const std::string filename) const {
-  check_not_vecchia_light("save");
-  nlohmann::json j;
+void Kriging::dump_to_json(nlohmann::json& j) const {
   j["version"] = 2;
   j["content"] = "Kriging";
   dump_common_to_json(j);
@@ -2845,39 +2843,51 @@ void Kriging::save(const std::string filename) const {
     j["nystrom_U"] = to_json(m_nystrom_U);
     j["nystrom_D"] = to_json(m_nystrom_D);
   }
+}
 
+void Kriging::save(const std::string filename) const {
+  check_not_vecchia_light("save");
+  nlohmann::json j;
+  dump_to_json(j);
   std::ofstream f(filename);
   f << std::setw(4) << j;
+}
+
+Kriging::NoiseModel Kriging::noise_model_from_json(const nlohmann::json& j, const std::string& source) {
+  uint32_t version = j["version"].template get<uint32_t>();
+  if (version != 2)
+    throw std::runtime_error(asString("Bad version to load from '", source, "'; found ", version, ", requires 2"));
+  std::string content = j["content"].template get<std::string>();
+  if (content != "Kriging")
+    throw std::runtime_error(
+        asString("Bad content to load from '", source, "'; found '", content, "', requires 'Kriging'"));
+  return j.contains("noise_model") ? noise_model_from_string(j["noise_model"].template get<std::string>())
+                                   : NoiseModel::None;
+}
+
+void Kriging::load_from_json(const nlohmann::json& j) {
+  load_common_from_json(j);
+  if (m_noise_model == NoiseModel::Nugget) {
+    m_nugget = j["nugget"].template get<double>();
+    m_est_nugget = j["est_nugget"].template get<bool>();
+    m_alpha = j["alpha"].template get<double>();
+  }
+  // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
+  if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
+    m_nystrom_light = true;
+    m_nystrom_k = j["nystrom_k"].template get<arma::uword>();
+    m_nystrom_landmarks = arma::uvec(j["nystrom_landmarks"].template get<std::vector<arma::uword>>());
+    m_nystrom_U = mat_from_json(j["nystrom_U"]);
+    m_nystrom_D = colvec_from_json(j["nystrom_D"]);
+  }
 }
 
 Kriging Kriging::load(const std::string filename) {
   std::ifstream f(filename);
   nlohmann::json j = nlohmann::json::parse(f);
 
-  uint32_t version = j["version"].template get<uint32_t>();
-  if (version != 2)
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
-  std::string content = j["content"].template get<std::string>();
-  if (content != "Kriging")
-    throw std::runtime_error(
-        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'Kriging'"));
-
-  NoiseModel nm = j.contains("noise_model") ? noise_model_from_string(j["noise_model"].template get<std::string>())
-                                            : NoiseModel::None;
+  NoiseModel nm = noise_model_from_json(j, filename);
   Kriging kr(j["covType"].template get<std::string>(), nm);  // _Cov_pow & std::function embedded by make_Cov
-  kr.load_common_from_json(j);
-  if (nm == NoiseModel::Nugget) {
-    kr.m_nugget = j["nugget"].template get<double>();
-    kr.m_est_nugget = j["est_nugget"].template get<bool>();
-    kr.m_alpha = j["alpha"].template get<double>();
-  }
-  // Absent on pre-Nystrom save files: defaults to a normal (non-Nystrom) load.
-  if (j.contains("nystrom_light") && j["nystrom_light"].template get<bool>()) {
-    kr.m_nystrom_light = true;
-    kr.m_nystrom_k = j["nystrom_k"].template get<arma::uword>();
-    kr.m_nystrom_landmarks = arma::uvec(j["nystrom_landmarks"].template get<std::vector<arma::uword>>());
-    kr.m_nystrom_U = mat_from_json(j["nystrom_U"]);
-    kr.m_nystrom_D = colvec_from_json(j["nystrom_D"]);
-  }
+  kr.load_from_json(j);
   return kr;
 }

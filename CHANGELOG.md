@@ -13,20 +13,25 @@ past release, see the corresponding entry on the
 
 ### Added
 - `MultiOutputKriging`: Kriging of several outputs observed at the same design
-  points, `Y` being an `n × q` matrix (rows = observations, as for `X`). Three
+  points, `Y` being an `n × q` matrix (rows = observations, as for `X`). Four
   output models: `"pca"` / `"pca(K)"` / `"pca(v)"` (Karhunen-Loève reduction,
   one `Kriging` per principal score, truncation residual kept as white noise;
   Higdon et al. 2008), `"shared"` (one θ for all outputs, β_j and σ_j² per
   output, `LL` or `LOO` objective; Gu & Berger 2016, checked against
   `RobustGaSP::ppgasp`) and `"separable"` (intrinsic coregionalization model
   with a free q × q output covariance, joint covariance and joint simulations;
-  Conti & O'Hagan 2010). `predict`, `simulate`, `update`, `update_simulate`,
-  closed-form leave-one-out and `predictCovFactors` (Kronecker factors of the
-  predictive covariance). Available in C++ and in every binding (Python, R,
+  Conti & O'Hagan 2010) and `"separable(<kernel>)"` (output covariance
+  σ² R_t(φ) of a kernel over the output coordinates, φ estimated with θ, so
+  q may exceed n; Rougier 2008). `predict`, `simulate`, `update`,
+  `update_simulate`, closed-form leave-one-out, `predictCovFactors`
+  (Kronecker factors of the predictive covariance) and `save`/`load` (JSON,
+  recognized by the generic loaders of the bindings). Available in C++ and in every binding (Python, R,
   Octave/MATLAB, Julia), with one worked notebook per binding
   (`bindings/*/multioutputkriging_*.ipynb`) and
   [docs/math/MultiOutput.md](docs/math/MultiOutput.md). Not yet: noise /
-  nugget, save/load, `"separable(<kernel>)"`, scikit-learn estimator.
+  nugget, scikit-learn estimator.
+- `KrigingLoader::KrigingType::MultiOutputKriging`. The Octave `class_saved`
+  now also maps saved nugget / noise `Kriging` models to `"Kriging"`.
 - Octave/MATLAB: `Kriging('__ref__', ref)` wraps an existing backend object
   (used by `MultiOutputKriging.component`); `NestedKriging.m` is now installed
   with the other classes.

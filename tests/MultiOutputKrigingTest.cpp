@@ -8,6 +8,8 @@
 #include "libKriging/MultiOutputKriging.hpp"
 // clang-format on
 
+#include <cstdio>
+
 // Temporal-output toy code: x = (frequency, damping) in [0,1]^2 -> curve on t
 static arma::rowvec curve(const arma::rowvec& x, const arma::vec& t) {
   const double f = 0.5 + 1.5 * x(0), a = 0.1 + 0.5 * x(1);
@@ -49,7 +51,8 @@ TEST_CASE("MultiOutputKriging output model parsing", "[multioutput]") {
   arma::arma_rng::set_seed(1);
   arma::mat X(10, 2, arma::fill::randu), Y(10, 3, arma::fill::randu);
   MultiOutputKriging sep("gauss", "separable(matern5_2)");
-  CHECK_THROWS_AS(sep.fit(Y, X), std::runtime_error);  // not implemented yet
+  CHECK_THROWS_AS(sep.fit(Y, X), std::invalid_argument);  // no output coordinates
+  CHECK_THROWS(MultiOutputKriging("gauss", "separable(foo)"));
   MultiOutputKriging pc("gauss", "pca");
   CHECK_THROWS_AS(pc.predict(X), std::runtime_error);  // not fitted
   CHECK_THROWS_AS(pc.fit(Y, X.rows(0, 8)), std::invalid_argument);
@@ -674,4 +677,226 @@ TEST_CASE("MultiOutputKriging separable restrictions", "[multioutput][separable]
 
   MultiOutputKriging pc(Y3, X2, "matern5_2", "pca");
   CHECK_THROWS_AS(pc.output_cov(), std::runtime_error);
+}
+
+// -----------------------------------------------------------------------------
+// "separable(<kernel>)"
+// -----------------------------------------------------------------------------
+
+// matern 5/2 correlation, product over dimensions (rows of A, B are points)
+static arma::mat matern52(const arma::mat& A, const arma::mat& B, const arma::vec& theta) {
+  arma::mat R(A.n_rows, B.n_rows, arma::fill::ones);
+  for (arma::uword i = 0; i < A.n_rows; ++i)
+    for (arma::uword j = 0; j < B.n_rows; ++j)
+      for (arma::uword k = 0; k < theta.n_elem; ++k) {
+        const double h = std::sqrt(5.0) * std::abs(A(i, k) - B(j, k)) / theta(k);
+        R(i, j) *= (1 + h + h * h / 3) * std::exp(-h);
+      }
+  return R;
+}
+
+TEST_CASE("MultiOutputKriging separable(kernel) likelihood equals the dense Gaussian density",
+          "[multioutput][separable_kernel]") {
+  arma::arma_rng::set_seed(61);
+  const arma::mat X(8, 2, arma::fill::randu);
+  const arma::vec t = arma::linspace(0.2, 10, 5);
+  const arma::mat Y = curves(X, t);
+  const arma::vec theta = {0.4, 0.7}, phi = {2.5};
+
+  MultiOutputKriging mo("matern5_2", "separable(matern5_2)");
+  mo.set_output_coordinates(t);
+  MultiOutputKriging::Parameters p;
+  p.theta = arma::mat(theta.t());
+  p.output_theta = arma::mat(phi.t());
+  p.is_theta_estim = false;
+  mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p);
+
+  // dense: vec(Y - 1 b') ~ N(0, s2 R_t ⊗ R_x), b the per-output GLS, s2 its MLE
+  const arma::uword n = X.n_rows, q = t.n_elem;
+  const arma::mat Rx = matern52(X, X, theta), Rt = matern52(t, t, phi);
+  const arma::mat Rxi = arma::inv_sympd(Rx);
+  const arma::vec one(n, arma::fill::ones);
+  const arma::rowvec b = (one.t() * Rxi * Y) / arma::as_scalar(one.t() * Rxi * one);
+  const arma::mat E = Y - one * b;
+  const arma::vec e = arma::vectorise(E);
+  const arma::mat Om1 = arma::kron(Rt, Rx);
+  const double s2 = arma::as_scalar(e.t() * arma::solve(Om1, e)) / (n * q);
+  double logdet, sign;
+  arma::log_det(logdet, sign, s2 * Om1);
+  const double ll_dense = -0.5 * (n * q * std::log(2 * arma::datum::pi) + logdet + n * q);
+
+  CHECK(std::abs(mo.logLikelihood() - ll_dense) < 1e-8 * std::abs(ll_dense));
+  CHECK(arma::abs(mo.beta().row(0) - b).max() < 1e-10);
+  CHECK(arma::abs(mo.output_cov() - s2 * Rt).max() < 1e-10 * s2);
+  CHECK(arma::abs(mo.theta() - theta).max() == 0);
+  CHECK(arma::abs(mo.output_theta() - phi).max() == 0);
+
+  arma::vec tp = arma::join_cols(theta, phi);
+  CHECK(std::abs(std::get<0>(mo.logLikelihoodFun(tp)) - ll_dense) < 1e-8 * std::abs(ll_dense));
+  CHECK_THROWS_AS(mo.logLikelihoodFun(theta), std::invalid_argument);  // θ and φ expected
+
+  // predictive covariance: kron(σ² R_t, C_x), C_x the kriging correlation
+  const arma::mat Xn(3, 2, arma::fill::randu);
+  auto [mean, sd, cov, dm] = mo.predict(Xn, true, true, false);
+  auto [Cx, Sig] = mo.predictCovFactors(Xn);
+  CHECK(arma::abs(cov - arma::kron(Sig, Cx)).max() < 1e-12);
+  CHECK(arma::abs(Sig - s2 * Rt).max() < 1e-10 * s2);
+}
+
+TEST_CASE("MultiOutputKriging separable(kernel) fit with q > n", "[multioutput][separable_kernel]") {
+  arma::arma_rng::set_seed(62);
+  const arma::mat X(25, 2, arma::fill::randu);
+  const arma::vec t = arma::linspace(0.2, 10, 40);  // q = 40 > n - p = 24
+  const arma::mat Y = curves(X, t);
+  MultiOutputKriging mo("matern5_2", "separable(matern5_2)");
+  mo.set_output_coordinates(t);
+  mo.fit(Y, X);
+  INFO(mo.summary());
+  REQUIRE(mo.output_theta().n_elem == 1);
+
+  // gradient in (θ, φ)
+  const arma::vec tp = {0.4, 0.8, 1.5};
+  auto [ll, g] = mo.logLikelihoodFun(tp, true);
+  REQUIRE(g.n_elem == 3);
+  for (arma::uword k = 0; k < 3; ++k) {
+    const double h = 1e-5;
+    arma::vec a = tp, b = tp;
+    a(k) += h;
+    b(k) -= h;
+    const double fd = (std::get<0>(mo.logLikelihoodFun(a)) - std::get<0>(mo.logLikelihoodFun(b))) / (2 * h);
+    CHECK(std::abs(g(k) - fd) < 1e-4 * std::max(1.0, std::abs(fd)));
+  }
+
+  // optimum
+  const arma::vec best = arma::join_cols(mo.theta(), mo.output_theta());
+  const double ll_hat = mo.logLikelihood();
+  CHECK(std::abs(std::get<0>(mo.logLikelihoodFun(best)) - ll_hat) < 1e-10 * std::abs(ll_hat));
+  for (arma::uword k = 0; k < 3; ++k)
+    for (double f : {0.9, 1.1}) {
+      arma::vec tk = best;
+      tk(k) *= f;
+      CHECK(std::get<0>(mo.logLikelihoodFun(tk)) <= ll_hat + 1e-6 * std::abs(ll_hat));
+    }
+
+  // same mean as "shared" at the same θ, coherent covariance
+  const arma::mat Xt(50, 2, arma::fill::randu);
+  const arma::mat Yt = curves(Xt, t);
+  auto [mean, sd, cov, dm] = mo.predict(Xt);
+  const arma::vec z = arma::vectorise((mean - Yt) / sd);
+  INFO("RMSE " << std::sqrt(arma::accu(arma::square(mean - Yt)) / Yt.n_elem) << ", sd(z) " << arma::stddev(z));
+  CHECK(std::sqrt(arma::accu(arma::square(mean - Yt)) / Yt.n_elem) < 0.2 * arma::stddev(arma::vectorise(Yt)));
+  CHECK(arma::stddev(z) < 2);
+  CHECK(arma::stddev(z) > 0.2);  // conservative: one σ² for decaying curves
+  MultiOutputKriging::Parameters p;
+  p.theta = arma::mat(mo.theta().t());
+  p.is_theta_estim = false;
+  MultiOutputKriging sh(Y, X, "matern5_2", "shared", Trend::RegressionModel::Constant, false, "BFGS", "LL", p);
+  CHECK(arma::abs(std::get<0>(sh.predict(Xt)) - mean).max() < 1e-10);
+
+  // simulate / update_simulate / update
+  const arma::cube sims = mo.simulate(10, 3, Xt.rows(0, 3), true);
+  CHECK(sims.n_rows == 4);
+  CHECK(sims.n_cols == 40);
+  CHECK(sims.n_slices == 10);
+  const arma::mat X_u(2, 2, arma::fill::randu);
+  const arma::cube up = mo.update_simulate(curves(X_u, t), X_u);
+  CHECK(up.n_slices == 10);
+  mo.update(curves(X_u, t), X_u, false);
+  CHECK(arma::abs(std::get<0>(mo.predict(X_u)) - curves(X_u, t)).max() < 1e-6);
+  CHECK(arma::abs(mo.output_theta() - best.tail(1)).max() == 0);
+}
+
+TEST_CASE("MultiOutputKriging separable(kernel) restrictions", "[multioutput][separable_kernel]") {
+  arma::arma_rng::set_seed(63);
+  const arma::mat X(12, 2, arma::fill::randu);
+  const arma::vec t = arma::linspace(0, 1, 6);
+  const arma::mat Y = curves(X, t);
+  MultiOutputKriging mo("matern5_2", "separable(gauss)");
+  mo.set_output_coordinates(t);
+  CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LOO"), std::invalid_argument);
+  MultiOutputKriging::Parameters p;
+  p.theta = arma::mat{{0.5, 0.5}};
+  p.is_theta_estim = false;
+  CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p),
+                  std::invalid_argument);  // output_theta missing
+  p.output_theta = arma::mat{{0.5, 0.5}};
+  CHECK_THROWS_AS(mo.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p),
+                  std::invalid_argument);  // d_t = 1
+  mo.set_output_coordinates(arma::vec(6, arma::fill::ones));
+  CHECK_THROWS_AS(mo.fit(Y, X), std::invalid_argument);  // constant coordinates
+
+  MultiOutputKriging sh("matern5_2", "shared");
+  p.output_theta = arma::mat(1, 1, arma::fill::value(0.5));
+  CHECK_THROWS_AS(sh.fit(Y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", p), std::invalid_argument);
+  sh.fit(Y, X);
+  CHECK_THROWS_AS(sh.output_theta(), std::runtime_error);
+}
+
+// -----------------------------------------------------------------------------
+// save / load
+// -----------------------------------------------------------------------------
+
+static void check_same(MultiOutputKriging& a, MultiOutputKriging& b, const arma::mat& Xn) {
+  CHECK(a.output_model_string() == b.output_model_string());
+  CHECK(a.summary() == b.summary());
+  auto [ma, sa, ca, da] = a.predict(Xn, true, true, true);
+  auto [mb, sb, cb, db] = b.predict(Xn, true, true, true);
+  CHECK(arma::abs(ma - mb).max() <= 1e-12 * std::max(1.0, arma::abs(ma).max()));
+  CHECK(arma::abs(sa - sb).max() <= 1e-12 * std::max(1.0, sa.max()));
+  CHECK(arma::abs(ca - cb).max() <= 1e-12 * std::max(1.0, arma::abs(ca).max()));
+  CHECK(arma::abs(da - db).max() <= 1e-10 * std::max(1.0, arma::abs(da).max()));
+  CHECK(arma::abs(a.simulate(5, 9, Xn) - b.simulate(5, 9, Xn)).max() <= 1e-10);
+}
+
+TEST_CASE("MultiOutputKriging save and load", "[multioutput][save]") {
+  arma::arma_rng::set_seed(71);
+  const arma::mat X(25, 2, arma::fill::randu);
+  const arma::vec t = arma::linspace(0.2, 10, 20);
+  const arma::mat Xn(4, 2, arma::fill::randu);
+  const arma::mat X_u(3, 2, arma::fill::randu);
+  const std::string file = "MultiOutputKrigingTest_save.json";
+
+  for (const std::string model : {"pca(0.999)", "shared", "separable", "separable(matern5_2)"}) {
+    for (bool normalize : {false, true}) {
+      INFO(model << (normalize ? ", normalize" : ""));
+      const bool few = model == "separable";
+      const arma::mat Y = few ? few_outputs(X) : curves(X, t);
+      const arma::mat Y_u = few ? few_outputs(X_u) : curves(X_u, t);
+      MultiOutputKriging mo("matern5_2", model);
+      if (!few)
+        mo.set_output_coordinates(t);
+      mo.fit(Y, X, Trend::RegressionModel::Linear, normalize);
+      mo.save(file);
+      MultiOutputKriging lo = MultiOutputKriging::load(file);
+      CHECK(arma::abs(lo.Y() - mo.Y()).max() == 0);
+      CHECK(arma::approx_equal(lo.output_coordinates(), mo.output_coordinates(), "absdiff", 0));
+      CHECK(lo.regmodel() == mo.regmodel());
+      CHECK(lo.normalize() == normalize);
+      check_same(mo, lo, Xn);
+
+      // update without refit, then save / load again (basis and θ kept)
+      mo.update(Y_u, X_u, false);
+      lo.update(Y_u, X_u, false);
+      check_same(mo, lo, Xn);
+      mo.save(file);
+      MultiOutputKriging lo2 = MultiOutputKriging::load(file);
+      check_same(mo, lo2, Xn);
+
+      // refit uses the saved options
+      mo.update(Y_u, X_u, true);
+      lo2.update(Y_u, X_u, true);
+      check_same(mo, lo2, Xn);
+    }
+  }
+
+  MultiOutputKriging empty("gauss", "pca(3)");
+  empty.save(file);
+  MultiOutputKriging le = MultiOutputKriging::load(file);
+  CHECK(le.output_model_string() == "pca(3)");
+  CHECK_THROWS_AS(le.predict(Xn), std::runtime_error);
+
+  Kriging k(arma::vec(X.col(0)), X, "gauss");
+  k.save(file);
+  CHECK_THROWS_AS(MultiOutputKriging::load(file), std::runtime_error);
+  std::remove(file.c_str());
 }

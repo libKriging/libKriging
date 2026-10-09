@@ -62,7 +62,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       std::string klass;
       switch (KrigingLoader::describe(filename)) {
         case KrigingLoader::KrigingType::Kriging:
-
+        case KrigingLoader::KrigingType::NuggetKriging:  // merged into Kriging (noise_model)
+        case KrigingLoader::KrigingType::NoiseKriging:
           klass = "Kriging";
           break;
         case KrigingLoader::KrigingType::WarpKriging:
@@ -70,6 +71,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
           break;
         case KrigingLoader::KrigingType::MLPKriging:
           klass = "MLPKriging";
+          break;
+        case KrigingLoader::KrigingType::MultiOutputKriging:
+          klass = "MultiOutputKriging";
           break;
         case KrigingLoader::KrigingType::Unknown:
           mexErrMsgIdAndTxt("mLibKriging:class_saved", "Unknown Kriging type in file");
@@ -255,6 +259,12 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MultiOutputKrigingBinding::pca_explained(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MultiOutputKriging::pca_residual"_hash:
       return MultiOutputKrigingBinding::pca_residual(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::output_theta"_hash:
+      return MultiOutputKrigingBinding::output_theta(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::save"_hash:
+      return MultiOutputKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MultiOutputKriging::load"_hash:
+      return MultiOutputKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "NestedKriging::new"_hash:
       return NestedKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

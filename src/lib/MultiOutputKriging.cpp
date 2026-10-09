@@ -9,7 +9,11 @@
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
 #include "libKriging/utils/data_from_arma_vec.hpp"
+#include "libKriging/utils/jsonutils.hpp"
+#include "libKriging/utils/nlohmann/json.hpp"
 
+#include <fstream>
+#include <iomanip>
 #include <lbfgsb_cpp/lbfgsb.hpp>
 #include <limits>
 #include <random>
@@ -18,20 +22,84 @@
 
 // =============================================================================
 // "shared" and "separable" output models: one θ for all outputs, β_j per
-// output; Cov(vec Y) = Σ ⊗ R_θ with Σ diagonal (shared, PP-GaSP) or free
-// q × q (separable, ICM). Both give the same θ-profile of the trend and the
-// same predictive mean (autokrigeability, isotopic design).
+// output; Cov(vec Y) = Σ ⊗ R_θ with Σ diagonal (shared, PP-GaSP), free q × q
+// (separable, ICM) or σ² R_t(φ) from output coordinates (separable(<kernel>)).
+// All give the same θ-profile of the trend and the same predictive mean
+// (autokrigeability, isotopic design).
 // =============================================================================
+
+/// Correlation kernel on the output coordinates t (q × d_t), for
+/// "separable(<kernel>)": R_t(φ) and its gradient loop, reusing the
+/// KrigingImpl kernel machinery with t as the "design".
+class MultiOutputKriging::OutputKernel : public KrigingImpl {
+ public:
+  OutputKernel(const std::string& covType, const arma::mat& t) {
+    m_covType = covType;
+    make_Cov(covType);
+    m_X = t;
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+  }
+
+  /// R_t(φ), q × q
+  [[nodiscard]] arma::mat corr(const arma::vec& phi) const {
+    arma::mat R(m_X.n_rows, m_X.n_rows, arma::fill::none);
+    LinearAlgebra::covMat_sym_X(&R, arma::trans(m_X), phi, _Cov, 1.0, KrigingImpl::ones);
+    return R;
+  }
+
+  /// Σ_ij ∂R_ij x_i·x_j and −tr(R⁻¹ ∂R), per φ_k (see compute_ll_grad_theta_vecs)
+  void grad_terms(const arma::mat& R,
+                  const arma::mat& Rinv,
+                  const arma::mat& x,
+                  const arma::vec& phi,
+                  arma::vec& term1,
+                  arma::vec& term2) const {
+    term1.zeros(phi.n_elem);
+    term2.zeros(phi.n_elem);
+    compute_ll_grad_theta_vecs(R, Rinv, x, phi, term1, term2);
+  }
+
+  /// φ bounds: same factors of the coordinate ranges as θ in Kriging
+  [[nodiscard]] std::pair<arma::vec, arma::vec> bounds() const {
+    return Optim::theta_bounds(m_maxdX, m_dX, arma::vec(), 0);
+  }
+
+  [[nodiscard]] arma::uword dim() const { return m_X.n_cols; }
+};
+
+static void check_output_kernel(const std::string& covType) {
+  struct Probe : KrigingImpl {
+    explicit Probe(const std::string& k) { make_Cov(k); }
+  };
+  Probe probe(covType);
+}
 
 class MultiOutputKriging::SharedModel : public KrigingImpl {
  public:
-  SharedModel(const std::string& covType, bool full_cov) : full(full_cov) {
+  enum class SigmaForm {
+    Diag,    ///< Σ diagonal ("shared")
+    Full,    ///< Σ free q × q ("separable")
+    Kernel,  ///< Σ = σ² R_t(φ) ("separable(<kernel>)")
+  };
+
+  SharedModel(const std::string& covType,
+              SigmaForm form,
+              const std::string& output_covType = "",
+              const arma::mat& t = arma::mat())
+      : sigma_form(form), full(form != SigmaForm::Diag) {
     m_covType = covType;
     make_Cov(covType);
+    if (form == SigmaForm::Kernel)
+      tker = std::make_unique<OutputKernel>(output_covType, t);
   }
 
-  /// false: Σ diagonal ("shared"); true: Σ free q × q ("separable")
+  SigmaForm sigma_form = SigmaForm::Diag;
+  /// Σ not diagonal: outputs mixed through its Cholesky factor
   bool full = false;
+  /// kernel on t and its fitted φ ("separable(<kernel>)" only)
+  std::unique_ptr<OutputKernel> tker;
+  arma::vec phi;
 
   // normalized outputs (n × q), whitened residuals (n × q), trend (p × q),
   // variances (q), output centering / scaling (1 × q)
@@ -58,6 +126,7 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
 
   [[nodiscard]] bool fitted() const { return !m_is_empty; }
   [[nodiscard]] const arma::vec& theta_() const { return m_theta; }
+  [[nodiscard]] bool kernel_form() const { return sigma_form == SigmaForm::Kernel; }
 
   void normalize_outputs(const arma::mat& Yraw, bool normalize) {
     const arma::uword q = Yraw.n_cols;
@@ -81,6 +150,9 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
                                                           : arma::uvec(arma::find(range > 0));
     if (active.is_empty())
       throw std::invalid_argument("MultiOutputKriging: all outputs are constant");
+    // Σ = σ² R_t keeps every output: a constant one only has a zero residual
+    if (kernel_form())
+      active = arma::regspace<arma::uvec>(0, Yraw.n_cols - 1);
   }
 
   KModel make_model(const arma::vec& theta) const {
@@ -132,6 +204,58 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       arma::vec term2(d, arma::fill::zeros);
       compute_ll_grad_theta_vecs(m.R, m.Rinv, x, theta, term1, term2);
       *grad_out = (term1 + q * term2) / 2.0;
+    }
+    return ll;
+  }
+
+  /// σ̂² = tr(R_t⁻¹ E*ᵀ E*) / (nq) and the Cholesky factor of R_t(φ)
+  std::pair<double, arma::mat> kernel_sigma2(const arma::mat& E, const arma::vec& phi_) const {
+    const arma::mat Lt = LinearAlgebra::safe_chol_lower(tker->corr(phi_));
+    const arma::mat W = LinearAlgebra::solve_lower(Lt, E.t());  // q × n
+    return {arma::accu(W % W) / static_cast<double>(E.n_elem), Lt};
+  }
+
+  // "separable(<kernel>)": vec(Y − F B) ~ N(0, σ² R_t(φ) ⊗ R_x(θ)), with
+  //   −2ℓ = nq log 2π + q log|R_x| + n log|R_t| + nq log σ̂² + nq,
+  //   σ̂² = tr(R_t⁻¹ E*ᵀ E*) / (nq)  (B̂ is the per-output GLS, as in "shared").
+  // Gradient in θ (d) then φ (d_t): the rows of E* are iid N(0, σ² R_t), so
+  // φ enters as θ does, with E*ᵀ as data and n in place of q.
+  double logLikelihoodKernel(const arma::vec& theta, const arma::vec& phi_, arma::vec* grad_out, KModel* model) const {
+    const double n = static_cast<double>(m_X.n_rows);
+    const double q = static_cast<double>(Y.n_cols);
+    const arma::uword d = m_X.n_cols;
+
+    KModel m_local;
+    if (model != nullptr)
+      populate_Model(*model, theta, 1.0, KrigingImpl::ones, false, nullptr, &Y);
+    else
+      m_local = make_model(theta);
+    KModel& m = (model != nullptr) ? *model : m_local;
+
+    const arma::mat& E = m.Estar;
+    auto [s2_, Lt] = kernel_sigma2(E, phi_);
+    const double logdetL = arma::sum(arma::log(m.L.diag()));
+    const double logdetLt = arma::sum(arma::log(Lt.diag()));
+    const double ll = -0.5 * (n * q * std::log(2 * arma::datum::pi * s2_) + 2 * q * logdetL + 2 * n * logdetLt + n * q);
+
+    if (grad_out != nullptr) {
+      grad_out->set_size(d + phi_.n_elem);
+      const double sd = std::sqrt(s2_);
+      if ((m.Rinv.memptr() == nullptr) || (arma::size(m.Rinv) != arma::size(m.L)))
+        m.Rinv = LinearAlgebra::inv_sympd(m.L);
+      // θ: x = R_x⁻¹ (Y − F B) whitened across outputs by (σ̂ L_t)⁻ᵀ
+      arma::mat x = LinearAlgebra::solve_upper(m.L.t(), E);
+      x = arma::trans(LinearAlgebra::solve_lower(Lt, x.t())) / sd;
+      arma::vec term1(d, arma::fill::zeros);
+      arma::vec term2(d, arma::fill::zeros);
+      compute_ll_grad_theta_vecs(m.R, m.Rinv, x, theta, term1, term2);
+      grad_out->head(d) = (term1 + q * term2) / 2.0;
+      // φ: x_t = R_t⁻¹ E*ᵀ / σ̂ (q × n)
+      const arma::mat Rt = tker->corr(phi_);
+      const arma::mat xt = LinearAlgebra::solve_upper(Lt.t(), LinearAlgebra::solve_lower(Lt, E.t())) / sd;
+      arma::vec t1, t2;
+      tker->grad_terms(Rt, LinearAlgebra::inv_sympd(Lt), xt, phi_, t1, t2);
+      grad_out->tail(phi_.n_elem) = (t1 + n * t2) / 2.0;
     }
     return ll;
   }
@@ -210,7 +334,12 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     s2 = arma::vec(q, arma::fill::zeros);
     Sig = arma::mat(q, q, arma::fill::zeros);
     Lsig = arma::mat(q, q, arma::fill::zeros);
-    if (full) {
+    if (kernel_form()) {
+      auto [s2_, Lt] = kernel_sigma2(Z, phi);
+      Sig = s2_ * tker->corr(phi);
+      Lsig = std::sqrt(s2_) * Lt;
+      s2 = Sig.diag();
+    } else if (full) {
       const arma::mat Za = Z.cols(active);
       const arma::mat S = Za.t() * Za / n;
       Sig.submat(active, active) = S;
@@ -235,8 +364,12 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       throw std::invalid_argument("MultiOutputKriging: objective '" + objective
                                   + "' is not supported by the \"shared\" output model (LL or LOO)");
     const bool loo = objective == "LOO";
+    if (loo && kernel_form())
+      throw std::invalid_argument("MultiOutputKriging: objective 'LOO' does not depend on the output kernel; use 'LL'");
     const arma::uword n = X.n_rows;
     const arma::uword d = X.n_cols;
+    const arma::uword dt = kernel_form() ? tker->dim() : 0;
+    const arma::uword D = d + dt;  // optimized parameters: θ, then φ
     m_optim = optim;
     m_objective = objective;
     m_is_empty = true;
@@ -245,7 +378,7 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     normalize_outputs(Yraw, normalize);
     arma::mat theta0 = fit_setup_X_impl(X, regmodel, normalize, parameters.theta);
     set_active(Yraw);
-    if (full && active.n_elem > n - m_F.n_cols)
+    if (sigma_form == SigmaForm::Full && active.n_elem > n - m_F.n_cols)
       throw std::invalid_argument("MultiOutputKriging: \"separable\" estimates a free " + std::to_string(active.n_elem)
                                   + " x " + std::to_string(active.n_elem) + " output covariance, which needs n - p >= q"
                                   + " (here n - p = " + std::to_string(n - m_F.n_cols)
@@ -253,11 +386,23 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     m_est_beta = true;
     m_est_sigma2 = true;
 
+    if (parameters.output_theta.has_value()) {
+      if (!kernel_form())
+        throw std::invalid_argument(
+            "MultiOutputKriging: output_theta is only used by the \"separable(<kernel>)\" output model");
+      if (parameters.output_theta->n_cols != dt)
+        throw std::invalid_argument("MultiOutputKriging: output_theta must have " + std::to_string(dt)
+                                    + " columns (one per output coordinate)");
+    }
+
     if (optim == "none" || !parameters.is_theta_estim) {
-      if (!parameters.theta.has_value())
-        throw std::invalid_argument("MultiOutputKriging: theta must be given (1 x " + std::to_string(d)
-                                    + ") when optim = \"none\" or is_theta_estim = false");
+      if (!parameters.theta.has_value() || (kernel_form() && !parameters.output_theta.has_value()))
+        throw std::invalid_argument("MultiOutputKriging: theta (1 x " + std::to_string(d) + ")"
+                                    + (kernel_form() ? " and output_theta (1 x " + std::to_string(dt) + ")" : "")
+                                    + " must be given when optim = \"none\" or is_theta_estim = false");
       m_theta = trans(theta0.row(0));
+      if (kernel_form())
+        phi = trans(parameters.output_theta->row(0));
       m_est_theta = false;
       KModel m = make_model(m_theta);
       commit(m);
@@ -276,25 +421,46 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
 
     // starting points: same draw as Kriging (so q = 1 reproduces it)
     Random::init();
-    int multistart = Optim::parse_method(optim, "BFGS").second;
-    arma::mat theta0_rand
-        = arma::repmat(trans(theta_lower), multistart, 1)
-          + Random::randu_mat(multistart, d) % arma::repmat(trans(theta_upper - theta_lower), multistart, 1);
-    if (parameters.theta.has_value()) {
+    const int multistart_parsed = Optim::parse_method(optim, "BFGS").second;
+    // given starting points first, then random ones, up to the larger count
+    auto starts = [](const std::optional<arma::mat>& given, const arma::mat& rand, int count) {
+      arma::mat out = given.has_value() ? arma::mat(arma::join_cols(*given, rand)) : rand;
+      return arma::mat(out.rows(0, count - 1));
+    };
+    int multistart = multistart_parsed;
+    if (parameters.theta.has_value())
       multistart = std::max(multistart, static_cast<int>(theta0.n_rows));
-      theta0 = arma::join_cols(theta0, theta0_rand);
-      theta0.resize(multistart, theta0.n_cols);
-    } else {
-      theta0 = theta0_rand;
+    if (parameters.output_theta.has_value())
+      multistart = std::max(multistart, static_cast<int>(parameters.output_theta->n_rows));
+    const arma::mat theta0_rand = arma::repmat(trans(theta_lower), multistart_parsed, 1)
+                                  + Random::randu_mat(multistart_parsed, d)
+                                        % arma::repmat(trans(theta_upper - theta_lower), multistart_parsed, 1);
+    theta0 = starts(parameters.theta.has_value() ? std::optional<arma::mat>(theta0) : std::nullopt,
+                    arma::join_cols(theta0_rand, arma::repmat(theta0_rand.row(0), multistart, 1)),
+                    multistart);
+    if (kernel_form()) {
+      // φ: bounds from the ranges of t, starts drawn after those of θ
+      auto [phi_lower, phi_upper] = tker->bounds();
+      const arma::mat phi0_rand = arma::repmat(trans(phi_lower), multistart_parsed, 1)
+                                  + Random::randu_mat(multistart_parsed, dt)
+                                        % arma::repmat(trans(phi_upper - phi_lower), multistart_parsed, 1);
+      theta0 = arma::join_rows(theta0,
+                               starts(parameters.output_theta,
+                                      arma::join_cols(phi0_rand, arma::repmat(phi0_rand.row(0), multistart, 1)),
+                                      multistart));
+      theta_lower = arma::join_cols(theta_lower, phi_lower);
+      theta_upper = arma::join_cols(theta_upper, phi_upper);
     }
 
     auto to_gamma = [](const arma::vec& t) { return Optim::reparametrize ? Optim::reparam_to(t) : t; };
     auto from_gamma = [](const arma::vec& g) { return Optim::reparametrize ? Optim::reparam_from(g) : g; };
-    // minimized in γ: −LL, or the LOO mean squared error
+    // minimized in γ (θ, then φ): −LL, or the LOO mean squared error
     auto ofn = [&](const arma::vec& gamma, arma::vec* grad_out, KModel* m) -> double {
       const arma::vec theta = from_gamma(gamma);
       const double sign = loo ? 1.0 : -1.0;
-      double f = loo ? leaveOneOutObj(theta, grad_out, m) : logLikelihood(theta, grad_out, m);
+      double f = loo             ? leaveOneOutObj(theta, grad_out, m)
+                 : kernel_form() ? logLikelihoodKernel(theta.head(d), theta.tail(dt), grad_out, m)
+                                 : logLikelihood(theta, grad_out, m);
       if (grad_out != nullptr)
         *grad_out = sign * (Optim::reparametrize ? arma::vec(Optim::reparam_from_deriv(theta, *grad_out)) : *grad_out);
       return sign * f;
@@ -314,14 +480,14 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
         arma::vec upper = arma::max(gamma, gamma_upper);
 
         KModel m = allocate_KModel();
-        lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
+        lbfgsb::Optimizer optimizer{static_cast<unsigned int>(D)};
         optimizer.iprint = -1;
         optimizer.max_iter = Optim::max_iteration;
         // tolerances scaled by n² for LOO, as in Kriging
         const double tol_scale = loo ? static_cast<double>(n * n) : 1.0;
         optimizer.pgtol = Optim::gradient_tolerance / tol_scale;
         optimizer.factr = Optim::objective_rel_tolerance / 1E-13 / tol_scale;
-        arma::ivec bounds_type{d, arma::fill::value(2)};
+        arma::ivec bounds_type{D, arma::fill::value(2)};
 
         // same restart policy as Kriging
         double start_best = std::numeric_limits<double>::infinity();
@@ -362,7 +528,9 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
       throw std::runtime_error("MultiOutputKriging: all " + std::to_string(multistart) + " optimization starts failed ("
                                + last_error + ")");
 
-    m_theta = best_theta;
+    m_theta = best_theta.head(d);
+    if (kernel_form())
+      phi = best_theta.tail(dt);
     m_est_theta = true;
     KModel m = make_model(m_theta);
     commit(m);
@@ -596,11 +764,61 @@ class MultiOutputKriging::SharedModel : public KrigingImpl {
     return std::make_tuple(std::move(mean), std::move(sd));
   }
 
+  // save / load: normalized data and fitted (θ, φ); the factorization is
+  // rebuilt on load exactly as at the end of fit / update
+  void dump(nlohmann::json& j) const {
+    j["X"] = to_json(m_X);
+    j["centerX"] = to_json(m_centerX);
+    j["scaleX"] = to_json(m_scaleX);
+    j["Y"] = to_json(Y);
+    j["centerY"] = to_json(centerY);
+    j["scaleY"] = to_json(scaleY);
+    j["active"] = std::vector<arma::uword>(active.begin(), active.end());
+    j["normalize"] = m_normalize;
+    j["regmodel"] = Trend::toString(m_regmodel);
+    j["optim"] = m_optim;
+    j["objective"] = m_objective;
+    j["theta"] = to_json(m_theta);
+    j["est_theta"] = m_est_theta;
+    if (kernel_form())
+      j["output_theta"] = to_json(phi);
+  }
+
+  void restore(const nlohmann::json& j) {
+    m_X = mat_from_json(j["X"]);
+    m_centerX = rowvec_from_json(j["centerX"]);
+    m_scaleX = rowvec_from_json(j["scaleX"]);
+    Y = mat_from_json(j["Y"]);
+    centerY = rowvec_from_json(j["centerY"]);
+    scaleY = rowvec_from_json(j["scaleY"]);
+    active = arma::uvec(j["active"].template get<std::vector<arma::uword>>());
+    m_normalize = j["normalize"].template get<bool>();
+    m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
+    m_optim = j["optim"].template get<std::string>();
+    m_objective = j["objective"].template get<std::string>();
+    m_theta = colvec_from_json(j["theta"]);
+    m_est_theta = j["est_theta"].template get<bool>();
+    if (kernel_form())
+      phi = colvec_from_json(j["output_theta"]);
+    m_dX = LinearAlgebra::compute_dX(m_X);
+    m_maxdX = arma::max(arma::abs(m_dX), 1);
+    m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+    m_est_beta = true;
+    m_est_sigma2 = true;
+    KModel m = make_model(m_theta);
+    commit(m);
+  }
+
   std::string summary() const {
     std::ostringstream os;
     os << "  * theta: " << arma::trans(m_theta);
-    os << "  * sigma2: " << arma::trans(s2);
-    if (full) {
+    if (kernel_form())
+      os << "  * sigma2: " << s2(0) << "\n";
+    else
+      os << "  * sigma2: " << arma::trans(s2);
+    if (kernel_form()) {
+      os << "  * output kernel: " << tker->kernel() << ", theta: " << arma::trans(phi);
+    } else if (full) {
       const arma::vec sd = arma::sqrt(s2);
       arma::mat C = Sig;
       for (arma::uword i = 0; i < C.n_rows; ++i)
@@ -674,6 +892,8 @@ void MultiOutputKriging::parse_output_model(const std::string& s) {
   } else if (head == "separable") {
     m_output_model = arg.empty() ? OutputModel::Separable : OutputModel::SeparableKernel;
     m_output_covType = arg;
+    if (!arg.empty())
+      check_output_kernel(arg);
   } else {
     throw std::invalid_argument("MultiOutputKriging: unknown output model '" + s
                                 + "' (expected pca, pca(K), pca(v), shared, separable or separable(<kernel>))");
@@ -709,7 +929,7 @@ void MultiOutputKriging::check_fitted(const std::string& where) const {
 }
 
 const MultiOutputKriging::SharedModel& MultiOutputKriging::shared(const std::string& where) const {
-  if (m_output_model != OutputModel::Shared && m_output_model != OutputModel::Separable)
+  if (m_output_model == OutputModel::PCA)
     throw std::runtime_error("MultiOutputKriging::" + where
                              + ": only available with the \"shared\" and \"separable\" output models"
                              + (m_output_model == OutputModel::PCA ? " (use component(k) in \"pca\")" : ""));
@@ -748,7 +968,16 @@ std::tuple<arma::mat, arma::mat> MultiOutputKriging::predictCovFactors(const arm
 
 double MultiOutputKriging::logLikelihood() {
   const SharedModel& sm = shared("logLikelihood");
+  if (sm.kernel_form())
+    return sm.logLikelihoodKernel(sm.theta_(), sm.phi, nullptr, nullptr);
   return sm.logLikelihood(sm.theta_(), nullptr, nullptr);
+}
+
+const arma::vec& MultiOutputKriging::output_theta() const {
+  const SharedModel& sm = shared("output_theta");
+  if (!sm.kernel_form())
+    throw std::runtime_error("MultiOutputKriging::output_theta: only available with \"separable(<kernel>)\"");
+  return sm.phi;
 }
 
 std::tuple<double, arma::vec> MultiOutputKriging::leaveOneOutFun(const arma::vec& theta, bool grad) {
@@ -763,10 +992,16 @@ std::tuple<double, arma::vec> MultiOutputKriging::leaveOneOutFun(const arma::vec
 
 std::tuple<double, arma::vec> MultiOutputKriging::logLikelihoodFun(const arma::vec& theta, bool grad) {
   const SharedModel& sm = shared("logLikelihoodFun");
-  if (theta.n_elem != m_X.n_cols)
-    throw std::invalid_argument("MultiOutputKriging::logLikelihoodFun: theta must have " + std::to_string(m_X.n_cols)
-                                + " elements");
+  const arma::uword d = m_X.n_cols;
+  const arma::uword np = d + (sm.kernel_form() ? m_t.n_cols : 0);
+  if (theta.n_elem != np)
+    throw std::invalid_argument("MultiOutputKriging::logLikelihoodFun: theta must have " + std::to_string(np)
+                                + " elements" + (sm.kernel_form() ? " (theta, then output_theta)" : ""));
   arma::vec g;
+  if (sm.kernel_form()) {
+    const double ll = sm.logLikelihoodKernel(theta.head(d), theta.tail(np - d), grad ? &g : nullptr, nullptr);
+    return std::make_tuple(ll, std::move(g));
+  }
   const double ll = sm.logLikelihood(theta, grad ? &g : nullptr, nullptr);
   return std::make_tuple(ll, std::move(g));
 }
@@ -812,10 +1047,6 @@ void MultiOutputKriging::fit(const arma::mat& Y,
                              const std::string& optim,
                              const std::string& objective,
                              const Parameters& parameters) {
-  if (m_output_model == OutputModel::SeparableKernel)
-    throw std::runtime_error("MultiOutputKriging: output model '" + output_model_string()
-                             + "' is not implemented yet (pca, shared and separable are)");
-
   const arma::uword n = Y.n_rows;
   const arma::uword q = Y.n_cols;
   if (X.n_rows != n)
@@ -829,6 +1060,18 @@ void MultiOutputKriging::fit(const arma::mat& Y,
   if (m_t.n_elem > 0 && m_t.n_rows != q)
     throw std::invalid_argument("MultiOutputKriging::fit: output_coordinates has " + std::to_string(m_t.n_rows)
                                 + " rows but Y has " + std::to_string(q) + " columns (outputs)");
+  if (parameters.output_theta.has_value() && m_output_model != OutputModel::SeparableKernel)
+    throw std::invalid_argument(
+        "MultiOutputKriging: output_theta is only used by the \"separable(<kernel>)\" output model");
+  if (m_output_model == OutputModel::SeparableKernel) {
+    if (m_t.n_elem == 0)
+      throw std::invalid_argument("MultiOutputKriging::fit: \"" + output_model_string()
+                                  + "\" needs the output coordinates (q x d_t): call set_output_coordinates first");
+    const arma::rowvec range = arma::max(m_t, 0) - arma::min(m_t, 0);
+    if (q < 2 || range.min() <= 0)
+      throw std::invalid_argument(
+          "MultiOutputKriging::fit: output coordinates must vary along each of their columns (q >= 2)");
+  }
 
   m_X = X;
   m_Y = Y;
@@ -841,8 +1084,12 @@ void MultiOutputKriging::fit(const arma::mat& Y,
   m_components.clear();
   m_shared.reset();
 
-  if (m_output_model == OutputModel::Shared || m_output_model == OutputModel::Separable) {
-    m_shared = std::make_unique<SharedModel>(m_covType, m_output_model == OutputModel::Separable);
+  if (m_output_model != OutputModel::PCA) {
+    using Form = SharedModel::SigmaForm;
+    const Form form = m_output_model == OutputModel::Shared      ? Form::Diag
+                      : m_output_model == OutputModel::Separable ? Form::Full
+                                                                 : Form::Kernel;
+    m_shared = std::make_unique<SharedModel>(m_covType, form, m_output_covType, m_t);
     m_shared->fit(Y, X, regmodel, normalize, optim, objective, parameters);
     m_centerY = m_shared->centerY;
     m_scaleY = m_shared->scaleY;
@@ -1161,4 +1408,109 @@ std::string MultiOutputKriging::summary() const {
        << ", theta " << arma::trans(km.theta());
   }
   return os.str();
+}
+
+// =============================================================================
+// save / load
+// =============================================================================
+
+void MultiOutputKriging::save(const std::string& filename) const {
+  nlohmann::json j;
+  j["version"] = 2;
+  j["content"] = "MultiOutputKriging";
+  j["covType"] = m_covType;
+  j["output_model"] = output_model_string();
+  j["pca_spec"] = m_pca_spec;
+  j["regmodel"] = Trend::toString(m_regmodel);
+  j["normalize"] = m_normalize;
+  j["optim"] = m_optim;
+  j["objective"] = m_objective;
+  nlohmann::json jp;
+  jp["is_theta_estim"] = m_parameters.is_theta_estim;
+  if (m_parameters.theta.has_value())
+    jp["theta"] = to_json(*m_parameters.theta);
+  if (m_parameters.output_theta.has_value())
+    jp["output_theta"] = to_json(*m_parameters.output_theta);
+  j["parameters"] = jp;
+  j["X"] = to_json(m_X);
+  j["Y"] = to_json(m_Y);
+  j["output_coordinates"] = to_json(m_t);
+  j["centerY"] = to_json(m_centerY);
+  j["scaleY"] = to_json(m_scaleY);
+  j["fitted"] = !m_components.empty() || (m_shared && m_shared->fitted());
+  if (m_shared && m_shared->fitted()) {
+    nlohmann::json js;
+    m_shared->dump(js);
+    j["shared"] = js;
+  }
+  if (!m_components.empty()) {
+    j["pca_basis"] = to_json(m_pca_basis);
+    j["pca_explained"] = to_json(m_pca_explained);
+    j["pca_residual"] = to_json(m_pca_residual);
+    nlohmann::json jc = nlohmann::json::array();
+    for (const auto& km : m_components) {
+      nlohmann::json jk;
+      km->dump_to_json(jk);
+      jc.push_back(jk);
+    }
+    j["pca_components"] = jc;  // sorts after "content" (tools that scan for the first "content")
+  }
+  std::ofstream f(filename);
+  if (!f)
+    throw std::runtime_error("MultiOutputKriging::save: cannot write '" + filename + "'");
+  f << std::setw(4) << j;
+}
+
+MultiOutputKriging MultiOutputKriging::load(const std::string& filename) {
+  std::ifstream f(filename);
+  if (!f)
+    throw std::runtime_error("MultiOutputKriging::load: cannot read '" + filename + "'");
+  nlohmann::json j = nlohmann::json::parse(f);
+  const std::string content = j.contains("content") ? j["content"].template get<std::string>() : "";
+  if (content != "MultiOutputKriging")
+    throw std::runtime_error("MultiOutputKriging::load: bad content in '" + filename + "'; found '" + content
+                             + "', requires 'MultiOutputKriging'");
+  const auto version = j["version"].template get<uint32_t>();
+  if (version != 2)
+    throw std::runtime_error("MultiOutputKriging::load: bad version in '" + filename + "'; found "
+                             + std::to_string(version) + ", requires 2");
+
+  MultiOutputKriging mo(j["covType"].template get<std::string>(), j["output_model"].template get<std::string>());
+  mo.m_pca_spec = j["pca_spec"].template get<double>();
+  mo.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
+  mo.m_normalize = j["normalize"].template get<bool>();
+  mo.m_optim = j["optim"].template get<std::string>();
+  mo.m_objective = j["objective"].template get<std::string>();
+  const nlohmann::json& jp = j["parameters"];
+  mo.m_parameters.is_theta_estim = jp["is_theta_estim"].template get<bool>();
+  if (jp.contains("theta"))
+    mo.m_parameters.theta = mat_from_json(jp["theta"]);
+  if (jp.contains("output_theta"))
+    mo.m_parameters.output_theta = mat_from_json(jp["output_theta"]);
+  mo.m_X = mat_from_json(j["X"]);
+  mo.m_Y = mat_from_json(j["Y"]);
+  mo.m_t = mat_from_json(j["output_coordinates"]);
+  mo.m_centerY = rowvec_from_json(j["centerY"]);
+  mo.m_scaleY = rowvec_from_json(j["scaleY"]);
+
+  if (j.contains("shared")) {
+    using Form = SharedModel::SigmaForm;
+    const Form form = mo.m_output_model == OutputModel::Shared      ? Form::Diag
+                      : mo.m_output_model == OutputModel::Separable ? Form::Full
+                                                                    : Form::Kernel;
+    mo.m_shared = std::make_unique<SharedModel>(mo.m_covType, form, mo.m_output_covType, mo.m_t);
+    mo.m_shared->restore(j["shared"]);
+  }
+  if (j.contains("pca_components")) {
+    mo.m_pca_basis = mat_from_json(j["pca_basis"]);
+    mo.m_pca_explained = colvec_from_json(j["pca_explained"]);
+    mo.m_pca_residual = mat_from_json(j["pca_residual"]);
+    for (const auto& jk : j["pca_components"]) {
+      const Kriging::NoiseModel nm = Kriging::noise_model_from_json(jk, filename);
+      auto km = std::make_unique<Kriging>(jk["covType"].template get<std::string>(), nm);
+      km->load_from_json(jk);
+      mo.m_components.push_back(std::move(km));
+    }
+  }
+  return mo;
 }

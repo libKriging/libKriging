@@ -9,13 +9,23 @@
 #include "tools/MxMapper.hpp"
 #include "tools/ObjectAccessor.hpp"
 
-// theta (one row per starting point) and is_theta_estim
+// matrix entry, a scalar being taken as 1 x 1 (one-dimensional theta)
+static std::optional<arma::mat> get_mat(const Params& params, const std::string& key) {
+  try {
+    return params.get<arma::mat>(key);
+  } catch (const MxException&) {
+    return arma::mat(1, 1, arma::fill::value(params.get<double>(key).value()));
+  }
+}
+
+// theta (one row per starting point), is_theta_estim and output_theta ("separable(<kernel>)")
 static MultiOutputKriging::Parameters makeParameters(std::optional<Params*> dict) {
   MultiOutputKriging::Parameters p;
   if (dict) {
     const Params& params = *dict.value();
-    p.theta = params.get<arma::mat>("theta");
+    p.theta = get_mat(params, "theta");
     p.is_theta_estim = params.get<bool>("is_theta_estim").value_or(true);
+    p.output_theta = get_mat(params, "output_theta");
   }
   return p;
 }
@@ -71,6 +81,28 @@ void build_empty(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto kernel = input.get<std::string>(0, "kernel");
   const auto output_model = input.getOptional<std::string>(1, "output model").value_or("pca");
   auto mo = buildObject<MultiOutputKriging>(kernel, output_model);
+  output.set(0, mo, "new object reference");
+}
+
+// MultiOutputKriging::save(ref, filename)
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* mo = input.getObjectFromRef<MultiOutputKriging>(0, "MultiOutputKriging reference");
+  mo->save(input.get<std::string>(1, "filename"));
+}
+
+// MultiOutputKriging::load(filename) -> new object reference
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto mo = buildObject<MultiOutputKriging>(MultiOutputKriging::load(input.get<std::string>(0, "filename")));
   output.set(0, mo, "new object reference");
 }
 
@@ -305,6 +337,10 @@ void scaleY(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
 
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   accessor(nlhs, plhs, nrhs, prhs, "theta", [](MultiOutputKriging& mo) { return mo.theta(); });
+}
+
+void output_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  accessor(nlhs, plhs, nrhs, prhs, "output_theta", [](MultiOutputKriging& mo) { return mo.output_theta(); });
 }
 
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

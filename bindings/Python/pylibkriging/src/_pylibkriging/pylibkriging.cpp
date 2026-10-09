@@ -57,6 +57,8 @@ static py::object load_any(const std::string& filename) {
       return py::cast(PyWarpKriging::load(filename));
     case KrigingLoader::KrigingType::MLPKriging:
       return py::cast(PyMLPKriging::load(filename));
+    case KrigingLoader::KrigingType::MultiOutputKriging:
+      return py::cast(PyMultiOutputKriging::load(filename));
     default:
       throw std::runtime_error("Unknown Kriging type in file: " + filename);
   }
@@ -401,11 +403,14 @@ discards n - n_max points outright.)pbdoc")
       .def("sigma2", &PyMultiOutputKriging::sigma2)
       .def("beta", &PyMultiOutputKriging::beta)
       .def("output_cov", &PyMultiOutputKriging::output_cov)
+      .def("output_theta", &PyMultiOutputKriging::output_theta)
       .def("predictCovFactors", &PyMultiOutputKriging::predictCovFactors, py::arg("X"))
       .def("logLikelihood", &PyMultiOutputKriging::logLikelihood)
       .def(
           "logLikelihoodFun", &PyMultiOutputKriging::logLikelihoodFun, py::arg("theta"), py::arg("return_grad") = false)
       .def("leaveOneOutFun", &PyMultiOutputKriging::leaveOneOutFun, py::arg("theta"), py::arg("return_grad") = false)
+      .def("save", &PyMultiOutputKriging::save, py::arg("filename"))
+      .def_static("load", &PyMultiOutputKriging::load, py::arg("filename"))
       .def("__repr__", [](const PyMultiOutputKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")

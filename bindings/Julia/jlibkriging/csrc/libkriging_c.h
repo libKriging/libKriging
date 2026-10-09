@@ -502,7 +502,10 @@ int lk_mo_kriging_fit(void* ptr,
                       const char* objective,
                       const double* theta,
                       int theta_rows,
-                      int is_theta_estim);
+                      int is_theta_estim,
+                      const double* output_theta,
+                      int output_theta_rows,
+                      int output_theta_cols);
 /* mean_out, stdev_out: m x q; cov_out: mq x mq; deriv_out: m x d x q (NULL to skip) */
 int lk_mo_kriging_predict(void* ptr,
                           const double* X_n,
@@ -574,6 +577,9 @@ int lk_mo_kriging_get_pca_residual(void* ptr, double* out, int* rows, int* cols)
 int lk_mo_kriging_get_centerY(void* ptr, double* out, int* n);
 int lk_mo_kriging_get_scaleY(void* ptr, double* out, int* n);
 int lk_mo_kriging_get_theta(void* ptr, double* out, int* n);
+int lk_mo_kriging_get_output_theta(void* ptr, double* out, int* n);
+int lk_mo_kriging_save(void* ptr, const char* filename);
+void* lk_mo_kriging_load(const char* filename);
 int lk_mo_kriging_get_sigma2(void* ptr, double* out, int* n);
 int lk_mo_kriging_get_pca_explained(void* ptr, double* out, int* n);
 

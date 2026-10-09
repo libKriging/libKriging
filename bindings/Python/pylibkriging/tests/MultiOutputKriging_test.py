@@ -117,8 +117,9 @@ def test_errors(data):
     X, Y, _, _ = data
     with pytest.raises(ValueError):
         lk.MultiOutputKriging("gauss", "pca(1.5)")
-    with pytest.raises(RuntimeError, match="not implemented"):
-        lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable(matern5_2)", output_coordinates=t)
+    with pytest.raises(ValueError, match="LOO"):
+        lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable(matern5_2)", objective="LOO",
+                              output_coordinates=t)
     with pytest.raises(ValueError, match="output_coordinates"):
         lk.MultiOutputKriging(Y, X, "matern5_2", output_coordinates=t[:10])
     with pytest.raises(ValueError, match="unsupported parameter"):
@@ -258,3 +259,56 @@ def test_separable_restrictions(data):
     X, Y, _, _ = data
     with pytest.raises(ValueError, match="n - p >= q"):
         lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable")  # q = 200 > n - p = 39
+
+
+def test_separable_kernel(data):
+    X, Y, Xnew, Ynew = data
+    tq = t[::5]  # q = 40 > n - p = 39
+    Yq, Ynq = Y[:, ::5], Ynew[:, ::5]
+    with pytest.raises(Exception):  # output coordinates required
+        lk.MultiOutputKriging(Yq, X, "matern5_2", output_model="separable(matern5_2)")
+    mo = lk.MultiOutputKriging(Yq, X, "matern5_2", output_model="separable(matern5_2)", output_coordinates=tq)
+    assert mo.output_model() == "separable(matern5_2)"
+    phi = mo.output_theta()
+    assert phi.shape == (1,)
+    S = mo.output_cov()
+    assert np.allclose(np.diag(S), S[0, 0])  # σ² R_t: constant variance
+    mean, stdev, cov, _ = mo.predict(Xnew, True, True, False)
+    assert mean.shape == Ynq.shape and cov.shape == (5 * 40, 5 * 40)
+    assert np.sqrt(np.mean((mean - Ynq) ** 2)) < 0.2 * Ynq.std()
+    Cx, Sig = mo.predictCovFactors(Xnew)
+    assert np.allclose(cov, np.kron(Sig, Cx))
+
+    # log-likelihood in (theta, output_theta), gradient by finite differences
+    p = np.concatenate([mo.theta(), phi])
+    ll, g = mo.logLikelihoodFun(p, True)
+    assert ll == pytest.approx(mo.logLikelihood(), rel=1e-10)
+    h = 1e-5
+    for k in range(3):
+        e = np.zeros(3)
+        e[k] = h
+        fd = (mo.logLikelihoodFun(p + e)[0] - mo.logLikelihoodFun(p - e)[0]) / (2 * h)
+        assert g[k] == pytest.approx(fd, rel=1e-3, abs=1e-3)
+
+    # fixed parameters
+    fixed = lk.MultiOutputKriging(Yq, X, "matern5_2", output_model="separable(matern5_2)", optim="none",
+                                  parameters={"theta": mo.theta().reshape(1, -1),
+                                              "output_theta": phi.reshape(1, -1)},
+                                  output_coordinates=tq)
+    assert fixed.logLikelihood() == pytest.approx(mo.logLikelihood(), rel=1e-12)
+
+
+@pytest.mark.parametrize("model", ["pca(0.99)", "shared", "separable", "separable(matern5_2)"])
+def test_save_load(data, tmp_path, model):
+    X, Y, Xnew, _ = data
+    Yq = Y[:, :3] if model == "separable" else Y[:, ::10]
+    mo = lk.MultiOutputKriging(Yq, X, "matern5_2", output_model=model, normalize=True,
+                               output_coordinates=None if model == "separable" else t[::10])
+    f = str(tmp_path / "mo.json")
+    mo.save(f)
+    for lo in (lk.MultiOutputKriging.load(f), lk.load(f)):
+        assert lo.output_model() == mo.output_model()
+        assert lo.summary() == mo.summary()
+        for a, b in zip(mo.predict(Xnew, True, True, True), lo.predict(Xnew, True, True, True)):
+            np.testing.assert_allclose(a, b, rtol=1e-12, atol=1e-14)
+        np.testing.assert_array_equal(mo.simulate(3, 1, Xnew), lo.simulate(3, 1, Xnew))

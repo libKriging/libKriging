@@ -100,4 +100,44 @@ outputs(X) = Matrix{Float64}(reduce(vcat, [code(X[i, :])' for i in 1:size(X, 1)]
         @test theta(k2) ≈ [0.3, 0.4]
         @test_throws ErrorException MultiOutputKriging(Y, X, "matern5_2"; output_model="foo")
     end
+
+    @testset "separable(<kernel>)" begin
+        tq = collect(t_out)
+        k = MultiOutputKriging(Y[1:20, :], X[1:20, :], "matern5_2"; output_model="separable(matern5_2)",
+                               output_coordinates=tq)
+        phi = output_theta(k)
+        @test length(phi) == 1
+        S = output_cov(k)
+        @test all(abs.([S[i, i] for i in 1:size(S, 1)] .- S[1, 1]) .< 1e-10 * S[1, 1])
+        p = vcat(theta(k), phi)
+        r = log_likelihood_fun(k, p; return_grad=true)
+        @test isapprox(r.ll, log_likelihood(k); rtol=1e-10)
+        h = 1e-4
+        for j in 1:3
+            e = zeros(3); e[j] = h
+            fd = (log_likelihood_fun(k, p .+ e).ll - log_likelihood_fun(k, p .- e).ll) / (2h)
+            @test abs(r.grad[j] - fd) < 1e-3 * max(1, abs(fd))
+        end
+        k2 = MultiOutputKriging("matern5_2"; output_model="separable(matern5_2)")
+        set_output_coordinates!(k2, tq)
+        fit!(k2, Y[1:20, :], X[1:20, :]; optim="none", theta=theta(k), output_theta=phi)
+        @test isapprox(log_likelihood(k2), log_likelihood(k); rtol=1e-10)
+    end
+
+    @testset "save and load" begin
+        f = tempname() * ".json"
+        for om in ["pca(0.999)", "shared", "separable(matern5_2)"]
+            k = MultiOutputKriging(Y, X, "matern5_2"; output_model=om, output_coordinates=collect(t_out),
+                                   regmodel="linear", normalize=true)
+            save(k, f)
+            for l in (load_multi_output_kriging(f), load(f))
+                @test l isa MultiOutputKriging
+                @test jlibkriging.summary(l) == jlibkriging.summary(k)
+                p1, p2 = predict(k, Xt), predict(l, Xt)
+                @test maximum(abs.(p1.mean .- p2.mean)) < 1e-12
+                @test maximum(abs.(p1.stdev .- p2.stdev)) < 1e-12
+            end
+        end
+        rm(f)
+    end
 end

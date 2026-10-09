@@ -3,9 +3,9 @@
 Dossier de travail pour le support de sorties multiples (`Y` n × q) dans
 libKriging, avec un focus sur les sorties temporelles / fonctionnelles.
 
-**État :** `MultiOutputKriging` implémenté en C++ et Python pour les modèles
-`"pca"`, `"shared"` et `"separable"` (`src/lib/MultiOutputKriging.cpp`) ;
-`"separable(<kernel>)"` à venir.
+**État :** `MultiOutputKriging` implémenté en C++ et dans les quatre bindings
+pour les modèles `"pca"`, `"shared"`, `"separable"` et `"separable(<kernel>)"`
+(`src/lib/MultiOutputKriging.cpp`), avec save/load.
 
 ## Contenu
 
@@ -23,8 +23,10 @@ libKriging, avec un focus sur les sorties temporelles / fonctionnelles.
    `"separable"` (Σ libre, `predictCovFactors`), bindings Python / R /
    Octave-MATLAB / Julia (même API, sorties `m × q` et `m × q × nsim`), doc
    (`docs/math/MultiOutput.md`, skill, README des bindings) et un notebook par
-   binding (`bindings/*/multioutputkriging_*.ipynb`) ; reste
-   `"separable(<kernel>)"`, save/load.
+   binding (`bindings/*/multioutputkriging_*.ipynb`), `"separable(<kernel>)"`
+   (Σ = σ² R_t(φ), φ estimé avec θ, vraisemblance vérifiée contre la densité
+   gaussienne dense) et save/load (JSON, version 2, état ajusté restitué à
+   l'identique). Reste : estimateur scikit-learn, Q1 et Q7.
 
 Validation de `"shared"` contre `RobustGaSP::ppgasp(method = "mle", nugget.est = FALSE)`
 (n = 40, q = 30, matern 5/2, 2026-10-08) : θ identiques à 7 chiffres, LL égales

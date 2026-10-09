@@ -129,3 +129,52 @@ test_that("bad usage fails clearly", {
   expect_error(MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = "shared", objective = "LMP"))
   expect_error(MultiOutputKriging(Y, X, kernel = "matern5_2", parameters = list(sigma2 = 1)))
 })
+
+test_that("separable(<kernel>): q > n - p, likelihood in (theta, output_theta)", {
+  expect_error(MultiOutputKriging(Y[1:20, ], X[1:20, ], kernel = "matern5_2",
+                                  output_model = "separable(matern5_2)"))  # no output coordinates
+  mo <- MultiOutputKriging(Y[1:20, ], X[1:20, ], kernel = "matern5_2",
+                           output_model = "separable(matern5_2)", output_coordinates = t_out)
+  phi <- mo$output_theta()
+  expect_length(phi, 1)
+  S <- mo$output_cov()
+  expect_equal(diag(S), rep(S[1, 1], ncol(Y)), tolerance = 1e-10)
+  p <- c(theta(mo), phi)
+  ll <- logLikelihoodFun(mo, p, return_grad = TRUE)
+  expect_equal(ll$logLikelihood[1], logLikelihood(mo), tolerance = 1e-10)
+  h <- 1e-4
+  for (j in 1:3) {
+    e <- replace(numeric(3), j, h)
+    fd <- (logLikelihoodFun(mo, p + e)$logLikelihood[1] - logLikelihoodFun(mo, p - e)$logLikelihood[1]) / (2 * h)
+    expect_lt(abs(ll$logLikelihoodGrad[1, j] - fd), 1e-3 * max(1, abs(fd)))
+  }
+  pr <- predict(mo, Xt, return_cov = TRUE)
+  f <- mo$predictCovFactors(Xt)
+  expect_equal(pr$cov, kronecker(f$Sigma, f$Cx), tolerance = 1e-12)
+  fixed <- MultiOutputKriging(Y[1:20, ], X[1:20, ], kernel = "matern5_2", output_model = "separable(matern5_2)",
+                              optim = "none", output_coordinates = t_out,
+                              parameters = list(theta = matrix(theta(mo), nrow = 1),
+                                                output_theta = matrix(phi, nrow = 1)))
+  expect_equal(logLikelihood(fixed), logLikelihood(mo), tolerance = 1e-10)
+  expect_error(MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = "separable(matern5_2)",
+                                  objective = "LOO", output_coordinates = t_out))
+})
+
+test_that("save / load", {
+  f <- tempfile(fileext = ".json")
+  for (om in c("pca(0.999)", "shared", "separable(matern5_2)")) {
+    mo <- MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = om, regmodel = "linear",
+                             normalize = TRUE, output_coordinates = t_out)
+    save(mo, f)
+    for (lo in list(load.MultiOutputKriging(f), load(f))) {
+      expect_s3_class(lo, "MultiOutputKriging")
+      expect_equal(lo$output_model(), mo$output_model())
+      p1 <- predict(mo, Xt)
+      p2 <- predict(lo, Xt)
+      expect_equal(p2$mean, p1$mean, tolerance = 1e-12)
+      expect_equal(p2$stdev, p1$stdev, tolerance = 1e-12)
+      expect_equal(simulate(lo, 3, 1, Xt), simulate(mo, 3, 1, Xt))
+    }
+  }
+  unlink(f)
+})

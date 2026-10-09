@@ -456,5 +456,5 @@ Restent ouvertes (numérotation d'origine) :
    sortie), cohérence avec `MarkovCoKriging` (branche `feature/multi-fidelity-cokriging`).
    Choix appliqué aux 4 bindings (2026-10-09) : matrices `m × q`, covariance
    `mq × mq` sur `vec(Y)`, simulations `m × q × nsim`, dérivées `m × d × q`.
-7. Calendrier `LMP` / `LLVecchia` / `LLNystrom` et save/load pour
-   `MultiOutputKriging`.
+7. Calendrier `LMP` / `LLVecchia` / `LLNystrom` pour `MultiOutputKriging`
+   (save/load fait le 2026-10-09 : JSON version 2, `"content": "MultiOutputKriging"`).

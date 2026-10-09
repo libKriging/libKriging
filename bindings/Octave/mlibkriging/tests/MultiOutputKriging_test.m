@@ -149,7 +149,69 @@ catch err
     n_failed = n_failed + 1;
 end
 
+% -----------------------------------------------------------------------
+% Test 8: separable(<kernel>), q = 30 > n - p with n = 20
+% -----------------------------------------------------------------------
+try
+    k = MultiOutputKriging("matern5_2", "separable(matern5_2)");
+    k.set_output_coordinates(t_out');
+    k.fit(Y(1:20, :), X(1:20, :));
+    phi = k.output_theta();
+    assert(numel(phi) == 1);
+    S = k.output_cov();
+    assert(max(abs(diag(S) - S(1, 1))) < 1e-10 * S(1, 1));
+    p = [k.theta(); phi];
+    [ll, g] = k.logLikelihoodFun(p, true);
+    assert(abs(ll - k.logLikelihood()) < 1e-10 * abs(ll));
+    assert(numel(g) == 3);
+    h = 1e-4;
+    for j = 1:3
+        e = zeros(3, 1); e(j) = h;
+        fd = (k.logLikelihoodFun(p + e) - k.logLikelihoodFun(p - e)) / (2 * h);
+        assert(abs(g(j) - fd) < 1e-3 * max(1, abs(fd)));
+    end
+    [m, s, c] = k.predict(Xt, true, true, false);
+    [Cx, Sig] = k.predictCovFactors(Xt);
+    assert(max(abs(c(:) - reshape(kron(Sig, Cx), [], 1))) < 1e-12);
+    k2 = MultiOutputKriging("matern5_2", "separable(matern5_2)");
+    k2.set_output_coordinates(t_out');
+    k2.fit(Y(1:20, :), X(1:20, :), "constant", false, "none", "LL", Params("theta", k.theta()', "output_theta", phi'));
+    assert(abs(k2.logLikelihood() - k.logLikelihood()) < 1e-10 * abs(ll));
+    fprintf("  Test 8 separable(matern5_2) OK (phi=%.3f)\n", phi);
+catch err
+    fprintf("  Test 8 FAILED: %s\n", err.message);
+    n_failed = n_failed + 1;
+end
+
+% -----------------------------------------------------------------------
+% Test 9: save / load
+% -----------------------------------------------------------------------
+try
+    f = [tempname(), ".json"];
+    models = {"pca(0.999)", "shared", "separable(matern5_2)"};
+    for i = 1:numel(models)
+        k = MultiOutputKriging("matern5_2", models{i});
+        k.set_output_coordinates(t_out');
+        k.fit(Y, X, "linear", true);
+        k.save(f);
+        assert(strcmp(class_saved(f), "MultiOutputKriging"));
+        for lo = {MultiOutputKriging.load(f), load_kriging(f)}
+            l = lo{1};
+            assert(strcmp(l.summary(), k.summary()));
+            [m1, s1] = k.predict(Xt, true, false, false);
+            [m2, s2] = l.predict(Xt, true, false, false);
+            assert(max(abs(m1(:) - m2(:))) < 1e-12);
+            assert(max(abs(s1(:) - s2(:))) < 1e-12);
+        end
+    end
+    delete(f);
+    fprintf("  Test 9 save / load OK\n");
+catch err
+    fprintf("  Test 9 FAILED: %s\n", err.message);
+    n_failed = n_failed + 1;
+end
+
 if n_failed > 0
     error("MultiOutputKriging tests: %d failed", n_failed);
 end
-fprintf("MultiOutputKriging tests: all 7 passed\n");
+fprintf("MultiOutputKriging tests: all 9 passed\n");

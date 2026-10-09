@@ -16,6 +16,7 @@ linked:
 | `"pca"`, `"pca(K)"`, `"pca(v)"` | Karhunen-Loève reduction, one `Kriging` per score | one (θ, σ², β) per component | many correlated outputs (curves, fields), q ≫ n possible |
 | `"shared"` | parallel partial GP: one θ, outputs independent given θ | θ shared, (β_j, σ_j²) per output | a few to many outputs of similar regularity |
 | `"separable"` | intrinsic coregionalization model (ICM), free Σ | θ shared, β_j per output, Σ (q × q) | a few correlated outputs, joint covariance or joint simulations needed |
+| `"separable(<kernel>)"` | separable model, Σ = σ² R_t(φ) over output coordinates | θ shared, β_j per output, σ², φ (d_t) | curves or fields with coordinates (time, space), joint covariance with q ≫ n |
 
 ```python
 import pylibkriging as lk
@@ -24,10 +25,10 @@ mean, stdev, cov, deriv = mo.predict(Xnew)        # mean, stdev: m × q
 sims = mo.simulate(nsim=100, seed=1, X=Xnew)      # m × q × nsim
 ```
 
-All three models use the same kernels, trends (`regmodel`), `normalize`
+All models use the same kernels, trends (`regmodel`), `normalize`
 flag and optimizer as `Kriging` (see [Kriging.md](Kriging.md)). A worked
-example (a curve-valued simulator, the three output models, an
-independent-`Kriging` baseline and `update_simulate`) exists in each
+example (a curve-valued simulator, the four output models, an
+independent-`Kriging` baseline, `update_simulate` and save/load) exists in each
 binding: [Python](../../bindings/Python/multioutputkriging_py.ipynb),
 [R](../../bindings/R/multioutputkriging_r.ipynb),
 [Julia](../../bindings/Julia/multioutputkriging_julia.ipynb),
@@ -154,6 +155,45 @@ free q × q matrix Σ:
   outputs that are nearly linearly dependent, such as finely sampled smooth
   curves. In that case use `"pca"`.
 
+### `"separable(<kernel>)"`: parametric output covariance
+
+When the outputs have coordinates t (q × d_t, e.g. the time steps of a
+curve, given by `set_output_coordinates`), Σ can be a correlation kernel over
+them (Rougier 2008; Conti & O'Hagan 2010):
+
+  Cov(vec Y) = σ² R_t(φ) ⊗ R_θ
+
+with R_t the correlation of `<kernel>` (any `Kriging` kernel name, e.g.
+`"separable(matern5_2)"`) with ranges φ (d_t values).
+
+- **Profiled likelihood.** The trend B̂ is again the per-output GLS of
+  `"shared"`. With E* = L⁻¹(Y − F B̂),
+
+  σ̂² = tr(R_t⁻¹ E*ᵀ E*) / (nq)
+
+  −2ℓ(θ, φ) = nq log(2π σ̂²) + q log|R| + n log|R_t| + nq
+
+  maximized in (θ, φ) by the same BFGS as `Kriging`. The bounds and random
+  starting points of φ are built from the ranges of t as those of θ from the
+  ranges of X.
+- **Gradient.** In θ, as in `"separable"` with Σ̂ = σ̂² R_t. In φ, the rows
+  of E* are iid N(0, σ² R_t), so φ enters as θ does, with E*ᵀ as the data
+  and n in place of q.
+- **Why.** d_t + 1 parameters replace the q(q + 1)/2 of a free Σ: q may
+  exceed n, and finely sampled smooth curves (singular Σ̂ in `"separable"`)
+  are fine. The cost per evaluation adds O(q³) for R_t.
+- **Limits.** R_t is stationary: one variance σ² for all outputs on the
+  internal scale. With `normalize=true` each output keeps its own scale
+  (Σ_raw = diag(s) σ̂² R_t diag(s)); without it, curves whose amplitude
+  changes along t (transients, decays) get a variance that is too large where
+  they are small. `"pca"` handles such non-stationarity better. The
+  objective is `"LL"` only: the LOO error does not depend on φ.
+- `logLikelihoodFun` takes (θ, φ) concatenated (d + d_t values) and returns
+  the gradient in the same order; `output_theta()` returns φ̂.
+
+Prediction, `predictCovFactors`, `simulate` and `update_simulate` are those of
+`"separable"` with Σ̂ = σ̂² R_t(φ̂).
+
 ### `update_simulate` for `"shared"` and `"separable"`
 
 With θ and Σ kept, let S be the joint conditional correlation of
@@ -175,6 +215,19 @@ new `simulate`. The two agree in distribution, not path by path.
 | `"pca"` | K × `Kriging` (O(n³) each), plus one SVD O(n q min(n, q)) | K × `Kriging` + O(m q K) |
 | `"shared"` | one O(n³) Cholesky + O(n² q) | O(n² m + n m q) |
 | `"separable"` | same as `"shared"` + O(q³) | same + O(q²) |
+| `"separable(<kernel>)"` | same as `"shared"` + O(q³ + n q²) | same + O(q²) |
+
+## Save and load
+
+`save(filename)` writes the configuration, the data and the fitted state to
+a JSON file (`"content": "MultiOutputKriging"`, version 2), and
+`MultiOutputKriging::load(filename)` restores it. The generic loaders of the
+bindings (`pylibkriging.load`, R `load`, Octave `load_kriging`, Julia
+`load`) recognize it. The fitted state is kept exactly, including after an
+`update(..., refit=false)`: the PCA basis and the latent `Kriging` models
+for `"pca"`, θ (and φ) with the normalized data for the other models, from
+which the factorization is rebuilt. The state of the last `simulate` is not
+saved: call `simulate(..., will_update=true)` again before `update_simulate`.
 
 ## Current limitations
 
@@ -182,11 +235,8 @@ new `simulate`. The two agree in distribution, not path by path.
   `regmodel` is used for all outputs.
 - **No noise channel.** There is no `nugget` and no `noise` for now.
 - **Objectives.** `"shared"` and `"separable"` accept `objective="LL"` or
-  `"LOO"`. `"pca"` forwards `objective` to each latent `Kriging`.
-- **Not implemented yet.** `"separable(<kernel>)"` (Σ = σ² R_t(φ) built from
-  output coordinates set with `set_output_coordinates`) is parsed, but `fit`
-  throws.
-- **No save/load yet.**
+  `"LOO"`, `"separable(<kernel>)"` only `"LL"`. `"pca"` forwards `objective`
+  to each latent `Kriging`.
 - **Bindings.** `MultiOutputKriging` is available in C++ and in every binding
   (Python, R, Octave/MATLAB, Julia). The scikit-learn estimators of
   `pylibkriging.sklearn` do not wrap it.
@@ -203,6 +253,9 @@ new `simulate`. The two agree in distribution, not path by path.
 - Conti, S., & O'Hagan, A. (2010). *Bayesian emulation of complex
   multi-output and dynamic computer models*. Journal of Statistical Planning
   and Inference, 140(3), 640–651 (the separable `"separable"` model).
+- Rougier, J. (2008). *Efficient emulators for multivariate deterministic
+  functions*. Journal of Computational and Graphical Statistics, 17(4),
+  827–843 (separable emulators with a parametric output covariance).
 - Álvarez, M. A., Rosasco, L., & Lawrence, N. D. (2012). *Kernels for
   vector-valued functions: a review*. Foundations and Trends in Machine
   Learning, 4(3), 195–266 (ICM, LMC, autokrigeability).

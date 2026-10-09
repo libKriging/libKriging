@@ -31,6 +31,8 @@ class PyMultiOutputKriging {
                        const std::string& objective,
                        const py::dict& dict,
                        const py::object& output_coordinates);
+  explicit PyMultiOutputKriging(std::unique_ptr<MultiOutputKriging> internal);
+  PyMultiOutputKriging(PyMultiOutputKriging&&) noexcept = default;
   ~PyMultiOutputKriging();
 
   void fit(const py::array_t<double>& Y,
@@ -77,12 +79,16 @@ class PyMultiOutputKriging {
   [[nodiscard]] py::array_t<double> sigma2() const;
   [[nodiscard]] py::array_t<double> beta() const;
   [[nodiscard]] py::array_t<double> output_cov() const;
+  [[nodiscard]] py::array_t<double> output_theta() const;
   std::tuple<py::array_t<double>, py::array_t<double>> predictCovFactors(const py::array_t<double>& X_n);
   double logLikelihood();
   std::tuple<double, py::array_t<double>> logLikelihoodFun(const py::array_t<double>& theta, bool return_grad);
   std::tuple<double, py::array_t<double>> leaveOneOutFun(const py::array_t<double>& theta, bool return_grad);
   /// Copy of the k-th latent Kriging (independent of this model afterwards)
   [[nodiscard]] PyKriging component(unsigned long k) const;
+
+  void save(const std::string& filename) const;
+  static PyMultiOutputKriging load(const std::string& filename);
 
  private:
   std::unique_ptr<MultiOutputKriging> m_internal;

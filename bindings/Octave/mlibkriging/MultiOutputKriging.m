@@ -6,7 +6,9 @@ classdef MultiOutputKriging < handle
     % Y is n x q (one column per output), X is n x d.
     % output_model: "pca" | "pca(K)" | "pca(v)" (Karhunen-Loeve, default "pca" = "pca(0.99)")
     %             | "shared" (one theta, outputs independent) | "separable" (ICM, free q x q Sigma)
-    % parameters  : Params("theta", theta0, "is_theta_estim", false)
+    %             | "separable(<kernel>)" (Sigma = sigma2 R_t(phi) over output_coordinates, required)
+    % parameters  : Params("theta", theta0, "is_theta_estim", false, "output_theta", phi0)
+    % k.save(filename) / MultiOutputKriging.load(filename) (or load_kriging(filename))
     % [mean, stdev, cov, mean_deriv] = k.predict(X_n)  -> m x q, m x q, mq x mq, m x d x q
     % sims = k.simulate(int32(nsim), int32(seed), X_n, [will_update])  -> m x q x nsim
     properties
@@ -147,6 +149,14 @@ classdef MultiOutputKriging < handle
             [varargout{1:nargout}] = mLibKriging("MultiOutputKriging::beta", obj.ref, varargin{:});
         end
 
+        function varargout = output_theta(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MultiOutputKriging::output_theta", obj.ref, varargin{:});
+        end
+
+        function save(obj, filename)
+            mLibKriging("MultiOutputKriging::save", obj.ref, filename);
+        end
+
         function varargout = output_cov(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("MultiOutputKriging::output_cov", obj.ref, varargin{:});
         end
@@ -169,6 +179,13 @@ classdef MultiOutputKriging < handle
 
         function disp(obj, varargin)
             disp(obj.summary());
+        end
+    end
+
+    methods (Static = true)
+        % Load a model saved by save (the state of the last simulate is not saved)
+        function obj = load(filename)
+            obj = MultiOutputKriging('__ref__', mLibKriging("MultiOutputKriging::load", filename));
         end
     end
 end

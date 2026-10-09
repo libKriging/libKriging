@@ -119,20 +119,29 @@ noise/nugget channel, no save/load yet.
 #include "libKriging/MultiOutputKriging.hpp"
 
 // Y is n x q (one column per output), X is n x d, same rows
-MultiOutputKriging model(Y, X, "matern5_2", "pca(0.999)",   // or "shared", "separable"
+MultiOutputKriging model(Y, X, "matern5_2", "pca(0.999)",   // or "shared", "separable", "separable(matern5_2)"
                          Trend::RegressionModel::Constant,
                          /*normalize=*/false, "BFGS", "LL");
 auto [mean, stdev, cov, mean_deriv] = model.predict(Xnew, true, false, false);  // mean, stdev: m x q
 arma::cube sims = model.simulate(nsim, seed, Xnew, /*will_update=*/true);       // m x q x nsim
 arma::cube upd = model.update_simulate(Y_u, X_u);
 model.update(Y_u, X_u, /*refit=*/false);
+model.save("mo.json");
+MultiOutputKriging loaded = MultiOutputKriging::load("mo.json");  // simulate again before update_simulate
+
+// curves: Σ = σ² R_t(φ), a kernel over the output coordinates t (q × d_t, required)
+MultiOutputKriging sk("matern5_2", "separable(matern5_2)");
+sk.set_output_coordinates(t);
+sk.fit(Y, X);
+arma::vec phi = sk.output_theta();  // logLikelihoodFun(join_cols(theta, phi)) takes both
 ```
-`MultiOutputKriging::Parameters` has only `theta` (rows = starting points) and
-`is_theta_estim`. `cov` is over `vec(Y_n)` (the m points of output 1, then
-output 2, …). `"shared"`/`"separable"` take `objective` `"LL"` or `"LOO"`;
+`MultiOutputKriging::Parameters` has only `theta` (rows = starting points),
+`is_theta_estim` and `output_theta` (φ, `"separable(<kernel>)"` only). `cov` is over `vec(Y_n)` (the m points of output 1, then
+output 2, …). `"shared"`/`"separable"` take `objective` `"LL"` or `"LOO"`,
+`"separable(<kernel>)"` only `"LL"`;
 `"pca"` forwards it to each latent `Kriging` (`component(k)`, 0-based).
 `predictCovFactors(Xnew)` gives the Kronecker factors `(C_x, Σ)` without the
-dense `mq × mq` matrix. No noise/nugget, no save/load yet. See `SKILL.md` §1.7.
+dense `mq × mq` matrix. No noise/nugget yet. See `SKILL.md` §1.7.
 
 ## Common pitfalls to flag in review
 

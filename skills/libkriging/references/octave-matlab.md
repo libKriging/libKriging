@@ -98,7 +98,7 @@ argument, no `normalize` support, no save/load yet on `NestedKriging`.
 ```matlab
 % Y is n x q (one column per output), X is n x d, same rows
 % k = MultiOutputKriging(Y, X, kernel, output_model, regmodel, normalize, optim, objective, parameters, output_coordinates)
-k = MultiOutputKriging(Y, X, "matern5_2", "pca(0.999)");   % or "shared", "separable"
+k = MultiOutputKriging(Y, X, "matern5_2", "pca(0.999)");   % or "shared", "separable", "separable(matern5_2)"
 [m, s, c, dm] = k.predict(Xnew, true, true, true);   % m, s: m x q; c: mq x mq; dm: m x d x q
 sims = k.simulate(int32(100), int32(1), Xnew, true); % m x q x nsim
 upd = k.update_simulate(Y_u, X_u);
@@ -111,9 +111,19 @@ sep = MultiOutputKriging(Y, X, "matern5_2", "separable");
 % Unfitted object, then fit with a fixed theta
 k = MultiOutputKriging("matern5_2", "shared");
 k.fit(Y, X, "constant", false, "none", "LL", Params("theta", 0.3 * ones(1, size(X, 2))));
+
+% curves: Sigma = sigma2 R_t(phi), a matern 5/2 kernel over the time steps t (q may exceed n)
+sk = MultiOutputKriging("matern5_2", "separable(matern5_2)");
+sk.set_output_coordinates(t(:));
+sk.fit(Y, X);
+phi = sk.output_theta();                              % logLikelihoodFun([sk.theta(); phi]) takes both
+
+k.save("mo.json");                                    % JSON
+k2 = MultiOutputKriging.load("mo.json");              % or load_kriging("mo.json")
 ```
-`parameters` only takes `theta` and `is_theta_estim`. `"shared"`/`"separable"`
-accept `objective` `"LL"` or `"LOO"`. No noise, no save/load yet.
+`parameters` only takes `theta`, `is_theta_estim` and `output_theta`.
+`"shared"`/`"separable"` accept `objective` `"LL"` or `"LOO"`,
+`"separable(<kernel>)"` only `"LL"`. No noise yet.
 
 ## Common pitfalls to flag in review
 

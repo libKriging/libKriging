@@ -130,13 +130,13 @@ mean, stdev = model.predict(Xnew, return_stdev=True)
 # Y is n x q (one column per output), X is n x d, same rows
 model = lk.MultiOutputKriging(
     Y, X, "matern5_2",
-    output_model="pca(0.999)",  # "pca" (= "pca(0.99)") | "pca(K)" | "pca(v)" | "shared" | "separable"
+    output_model="pca(0.999)",  # "pca" (= "pca(0.99)") | "pca(K)" | "pca(v)" | "shared" | "separable" | "separable(<kernel>)"
     regmodel="constant",
     normalize=False,
     optim="BFGS",
-    objective="LL",             # "shared"/"separable": "LL" | "LOO"; "pca": any Kriging objective
-    parameters={},              # only "theta" (rows = starting points) and "is_theta_estim"
-    output_coordinates=None,    # q x d_t, e.g. the time steps of curve outputs
+    objective="LL",             # "shared"/"separable": "LL" | "LOO"; "separable(<kernel>)": "LL"; "pca": any Kriging objective
+    parameters={},              # only "theta" (rows = starting points), "is_theta_estim", "output_theta"
+    output_coordinates=None,    # q x d_t, e.g. the time steps of curve outputs; required by "separable(<kernel>)"
 )
 mean, stdev, cov, mean_deriv = model.predict(Xnew, return_stdev=True, return_cov=False, return_deriv=False)
 # mean, stdev: m x q; cov: mq x mq over vec(Y) (points of output 1, then output 2, ...);
@@ -148,12 +148,20 @@ k0 = model.component(0)                     # "pca": copy of latent Kriging 0 (0
 
 sep = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable")
 Cx, Sigma = sep.predictCovFactors(Xnew)     # cov of sep.predict(...) == kron(Sigma, Cx)
+
+# curves: Sigma = sigma2 R_t(phi), a matern 5/2 kernel over the time steps t (q may exceed n)
+sk = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable(matern5_2)", output_coordinates=t)
+phi = sk.output_theta()                     # logLikelihoodFun(np.r_[sk.theta(), phi]) takes both
+
+model.save("mo.json")                       # JSON
+model2 = lk.MultiOutputKriging.load("mo.json")   # or lk.load("mo.json"); simulate again before update_simulate
 ```
 `model.component(k)` returns a copy of the k-th latent `Kriging` of `"pca"`
 (0-based). `theta()`, `sigma2()`, `beta()`, `output_cov()`, `logLikelihood()`,
-`logLikelihoodFun()`, `leaveOneOutFun()` are for `"shared"`/`"separable"`;
+`logLikelihoodFun()`, `leaveOneOutFun()` are for `"shared"`/`"separable"`/
+`"separable(<kernel>)"` (plus `output_theta()` for the last one);
 `nb_components()`, `pca_basis()`, `pca_explained()`, `pca_residual()` for
-`"pca"`. No `noise=`, no `save()`/`load()`, no scikit-learn estimator yet.
+`"pca"`. No `noise=`, no scikit-learn estimator yet.
 
 ## scikit-learn estimators
 

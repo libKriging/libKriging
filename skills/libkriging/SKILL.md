@@ -98,11 +98,19 @@ Ask, in order:
    - **A few correlated outputs whose joint covariance or joint simulations
      matter** (e.g. a sum or a difference of outputs) → `"separable"`: free
      q × q output covariance Σ. Needs n − p ≥ q; it refuses nearly linearly
-     dependent outputs (finely sampled smooth curves): use `"pca"` there.
+     dependent outputs (finely sampled smooth curves): use `"pca"` or the
+     next model there.
+   - **Outputs with coordinates (time steps, locations) whose joint
+     covariance matters, q possibly ≫ n** → `"separable(<kernel>)"`, e.g.
+     `"separable(matern5_2)"`: Σ = σ² R_t(φ), a kernel over the
+     `output_coordinates` (required), d_t + 1 parameters instead of
+     q(q+1)/2. Stationary in t: prefer `"pca"` (or `normalize=true`) for
+     curves whose amplitude changes a lot along t. Objective `"LL"` only.
    Independent `Kriging` fits per output remain a valid baseline when the
-   outputs have very different regularities. Current restrictions: isotopic
-   design only (no missing value in `Y`), no noise/nugget, save/load not yet
-   implemented, no scikit-learn estimator.
+   outputs have very different regularities. `save`/`load` are available
+   (the generic `load` of each binding recognizes the file). Current
+   restrictions: isotopic design only (no missing value in `Y`), no
+   noise/nugget, no scikit-learn estimator.
 
 Don't reach for `NestedKriging`, Vecchia or Nystrom by default — for the common case
 (n in the hundreds to low thousands), plain `Kriging` with default options

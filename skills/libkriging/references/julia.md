@@ -109,11 +109,12 @@ predict(nk, Xnew; return_stdev=true)
 ```julia
 # Y is n x q Matrix{Float64} (one column per output), X is n x d, same rows
 mo = MultiOutputKriging(Y, X, "matern5_2";
-                        output_model="pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable"
+                        output_model="pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable" | "separable(<kernel>)"
                         regmodel="constant", normalize=false,
-                        optim="BFGS", objective="LL",   # "shared"/"separable": "LL" | "LOO"
+                        optim="BFGS", objective="LL",   # "shared"/"separable": "LL" | "LOO"; "separable(<kernel>)": "LL"
                         theta=nothing, is_theta_estim=true,
-                        output_coordinates=nothing)
+                        output_theta=nothing,           # φ of "separable(<kernel>)"
+                        output_coordinates=nothing)     # q x d_t, required by "separable(<kernel>)"
 p = predict(mo, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 # p.mean, p.stdev: m x q; p.cov: mq x mq; p.mean_deriv: m x d x q
 sims = simulate(mo, 100, 1, Xnew; will_update=true)   # m x q x nsim
@@ -123,11 +124,18 @@ k1 = component(mo, 1)               # "pca": copy of latent Kriging 1 (1-based)
 
 sep = MultiOutputKriging(Y, X, "matern5_2"; output_model="separable")
 f = predict_cov_factors(sep, Xnew)  # cov of predict(sep, ...) == kron(f.Sigma, f.Cx)
+
+# curves: Sigma = sigma2 R_t(phi), a matern 5/2 kernel over the time steps t (q may exceed n)
+sk = MultiOutputKriging(Y, X, "matern5_2"; output_model="separable(matern5_2)", output_coordinates=t)
+phi = output_theta(sk)              # log_likelihood_fun(sk, vcat(theta(sk), phi)) takes both
+
+save(mo, "mo.json")                 # JSON
+mo2 = load("mo.json")               # or load_multi_output_kriging; simulate again before update_simulate
 ```
 Accessors: `nb_outputs`, `output_model`, `theta`, `sigma2`, `beta`,
 `output_cov`, `nb_components`, `pca_basis`, `pca_explained`, `pca_residual`,
-`leave_one_out_mat`, `log_likelihood_fun`, `leave_one_out_fun`. No noise, no
-save/load yet.
+`leave_one_out_mat`, `log_likelihood_fun`, `leave_one_out_fun`,
+`output_theta`. No noise yet.
 
 ## Common pitfalls to flag in review
 

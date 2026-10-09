@@ -7,6 +7,9 @@ namespace MultiOutputKrigingBinding {
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void build_empty(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void output_theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void set_output_coordinates(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

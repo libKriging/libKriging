@@ -370,6 +370,8 @@ function load(filename::String)
         return load_warp_kriging(filename)
     elseif content == "MLPKriging"
         return load_mlp_kriging(filename)
+    elseif content == "MultiOutputKriging"
+        return load_multi_output_kriging(filename)
     else
         error("Unknown Kriging type in file: $filename")
     end
@@ -1456,10 +1458,12 @@ Kriging of several outputs observed at the same design points (isotopic
 design): `Y` is `n × q` (one column per output), `X` is `n × d`.
 `output_model` is `"pca"`, `"pca(K)"` or `"pca(v)"` (Karhunen-Loève reduction,
 one `Kriging` per principal score; `"pca"` is `"pca(0.99)"`), `"shared"` (one θ
-for all outputs, outputs independent given θ) or `"separable"` (intrinsic
-coregionalization model with a free `q × q` output covariance). `theta`
-(`d`-vector, or `k × d` matrix of starting points) seeds or, with
-`is_theta_estim=false` / `optim="none"`, fixes θ.
+for all outputs, outputs independent given θ), `"separable"` (intrinsic
+coregionalization model with a free `q × q` output covariance) or
+`"separable(<kernel>)"` (output covariance `σ² R_t(φ)` of `<kernel>` over the
+`output_coordinates`, required). `theta` (`d`-vector, or `k × d` matrix of
+starting points) seeds or, with `is_theta_estim=false` / `optim="none"`, fixes
+θ; `output_theta` (`d_t`-vector or `k × d_t`) does the same for φ.
 """
 function MultiOutputKriging(kernel::String; output_model::String="pca")
     ptr = ccall(dlsym(_lk(), :lk_mo_kriging_new), Ptr{Nothing}, (Cstring, Cstring), kernel, output_model)
@@ -1493,17 +1497,22 @@ function fit!(k::MultiOutputKriging, Y::Matrix{Float64}, X::Matrix{Float64};
               optim::String="BFGS",
               objective::String="LL",
               theta::Union{Nothing,AbstractVecOrMat{Float64}}=nothing,
-              is_theta_estim::Bool=true)
+              is_theta_estim::Bool=true,
+              output_theta::Union{Nothing,AbstractVecOrMat{Float64}}=nothing)
     n, q = size(Y)
     nX, d = size(X)
     th = theta === nothing ? nothing : Matrix{Float64}(reshape(theta, :, d))
+    # a vector is one starting point (1 × d_t)
+    ot = output_theta === nothing ? nothing :
+         Matrix{Float64}(output_theta isa AbstractVector ? reshape(output_theta, 1, :) : output_theta)
     ret = ccall(dlsym(_lk(), :lk_mo_kriging_fit), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Cint,
-                 Cstring, Cint, Cstring, Cstring, Ptr{Float64}, Cint, Cint),
+                 Cstring, Cint, Cstring, Cstring, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cint, Cint),
                 k.ptr, Y, n, q, X, nX, d,
                 regmodel, normalize ? 1 : 0, optim, objective,
                 th === nothing ? C_NULL : th, th === nothing ? 0 : size(th, 1),
-                is_theta_estim ? 1 : 0)
+                is_theta_estim ? 1 : 0,
+                ot === nothing ? C_NULL : ot, ot === nothing ? 0 : size(ot, 1), ot === nothing ? 0 : size(ot, 2))
     _check_error(ret)
     k.lastsim = (0, 0)
     return k
@@ -1708,6 +1717,23 @@ centerY(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_centerY, k)
 scaleY(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_scaleY, k)
 theta(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_theta, k)
 sigma2(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_sigma2, k)
+output_theta(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_output_theta, k)
+
+function save(k::MultiOutputKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_mo_kriging_save), Cint, (Ptr{Nothing}, Cstring), k.ptr, filename)
+    _check_error(ret)
+end
+
+"""
+    load_multi_output_kriging(filename)
+
+Load a `MultiOutputKriging` saved by `save` (also reached by `load`). The state
+of the last `simulate` is not saved: simulate again before `update_simulate`.
+"""
+function load_multi_output_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_mo_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return MultiOutputKriging(_check_ptr(ptr))
+end
 pca_explained(k::MultiOutputKriging) = _mo_vec(:lk_mo_kriging_get_pca_explained, k)
 
 Base.show(io::IO, k::MultiOutputKriging) = print(io, summary(k))
@@ -1715,11 +1741,11 @@ Base.show(io::IO, k::MultiOutputKriging) = print(io, summary(k))
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging, MultiOutputKriging
 export set_output_coordinates!, leave_one_out_mat, predict_cov_factors, component
-export output_model, nb_outputs, nb_components, Y, output_coordinates, output_cov
+export output_model, nb_outputs, nb_components, Y, output_coordinates, output_cov, output_theta
 export pca_basis, pca_explained, pca_residual
 export nb_groups, aggregation, beta0
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
-export load, load_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_multi_output_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
