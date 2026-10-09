@@ -447,14 +447,20 @@ deviennent des `mat`, `populate_Model` accepte un second membre `n × q`,
 `fit_setup_X_impl` sont extraits. L'état multi-sorties (`Y`, `Z`, `B`, `σ_j²`)
 vit dans la classe dérivée qui implémente `"shared"`.
 
-Restent ouvertes (numérotation d'origine) :
+Tranchées le 2026-10-09 :
 
-1. Cas d'usage cible : sorties fonctionnelles (`q` grand, isotopique) ou
-   quelques sorties hétérogènes (`q` petit, hétérotopique) ? Cela décide
-   entre l'étape 1 et l'étape 2 en priorité.
+- **Q1 — cas d'usage cible** : les deux. D'abord les sorties fonctionnelles
+  (`q` grand, isotopique : étape 1, faite avec `MultiOutputKriging`), puis
+  quelques sorties hétérogènes (`q` petit, hétérotopique : étape 2, ICM sur
+  données empilées, §3), dans une PR séparée.
+- **Q7 — `LMP` / `LLVecchia` / `LLNystrom`** : hors périmètre pour l'instant ;
+  les modèles partagés restent limités à `LL` et `LOO` (`LL` seul pour
+  `"separable(<kernel>)"`) ; `"pca"` transmet l'objectif à chaque `Kriging`. Save/load est fait (JSON version 2,
+  `"content": "MultiOutputKriging"`).
+
+Reste ouverte (numérotation d'origine) :
+
 4. Format de sortie de `predict` dans les bindings (matrice vs liste par
    sortie), cohérence avec `MarkovCoKriging` (branche `feature/multi-fidelity-cokriging`).
    Choix appliqué aux 4 bindings (2026-10-09) : matrices `m × q`, covariance
    `mq × mq` sur `vec(Y)`, simulations `m × q × nsim`, dérivées `m × d × q`.
-7. Calendrier `LMP` / `LLVecchia` / `LLNystrom` pour `MultiOutputKriging`
-   (save/load fait le 2026-10-09 : JSON version 2, `"content": "MultiOutputKriging"`).

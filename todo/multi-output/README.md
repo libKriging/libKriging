@@ -17,7 +17,7 @@ pour les modèles `"pca"`, `"shared"`, `"separable"` et `"separable(<kernel>)"`
 
 ## Reprise rapide
 
-1. `ANALYSIS.md` §6 : Q2, Q3, Q5, Q6 tranchées ; Q1, Q4, Q7 ouvertes.
+1. `ANALYSIS.md` §6 : Q1, Q2, Q3, Q5, Q6, Q7 tranchées ; Q4 ouverte.
 2. `ANALYSIS.md` §5.4 : fait `"pca"`, généralisation de la factorisation de
    `KrigingImpl`, `"shared"` (objectifs `LL`/`LOO`, `update_simulate`),
    `"separable"` (Σ libre, `predictCovFactors`), bindings Python / R /
@@ -26,7 +26,9 @@ pour les modèles `"pca"`, `"shared"`, `"separable"` et `"separable(<kernel>)"`
    binding (`bindings/*/multioutputkriging_*.ipynb`), `"separable(<kernel>)"`
    (Σ = σ² R_t(φ), φ estimé avec θ, vraisemblance vérifiée contre la densité
    gaussienne dense) et save/load (JSON, version 2, état ajusté restitué à
-   l'identique). Reste : estimateur scikit-learn, Q1 et Q7.
+   l'identique). Reste : estimateur scikit-learn,
+   puis étape 2 (ICM hétérotopique, `q` petit, PR séparée, Q1). Q7 hors
+   périmètre pour l'instant.
 
 Validation de `"shared"` contre `RobustGaSP::ppgasp(method = "mle", nugget.est = FALSE)`
 (n = 40, q = 30, matern 5/2, 2026-10-08) : θ identiques à 7 chiffres, LL égales

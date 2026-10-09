@@ -235,8 +235,9 @@ saved: call `simulate(..., will_update=true)` again before `update_simulate`.
   `regmodel` is used for all outputs.
 - **No noise channel.** There is no `nugget` and no `noise` for now.
 - **Objectives.** `"shared"` and `"separable"` accept `objective="LL"` or
-  `"LOO"`, `"separable(<kernel>)"` only `"LL"`. `"pca"` forwards `objective`
-  to each latent `Kriging`.
+  `"LOO"`, `"separable(<kernel>)"` only `"LL"`: these models refuse
+  `"LMP"`, `"LLVecchia"` and `"LLNystrom"`. `"pca"` forwards `objective` to
+  each latent `Kriging`, so any `Kriging` objective works there.
 - **Bindings.** `MultiOutputKriging` is available in C++ and in every binding
   (Python, R, Octave/MATLAB, Julia). The scikit-learn estimators of
   `pylibkriging.sklearn` do not wrap it.
