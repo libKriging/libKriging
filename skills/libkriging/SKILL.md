@@ -179,7 +179,7 @@ an optimization-landscape issue, not a bug.
 For worked, end-to-end examples — fitting the same test function with
 libKriging and a competitor package, then mimicking one of the
 competitor's specific features (DiceKriging's `knots` warp, RobustGaSP's
-LMP objective, SMT's KPLS reduction, OpenTURNS's joint conditional
+LMP objective and `ppgasp()` functional outputs vs `MultiOutputKriging`, SMT's KPLS reduction, OpenTURNS's joint conditional
 simulation, GPy's inducing points, scikit-learn's `WhiteKernel`, GPflow's
 HMC hyperparameters, GaussianProcesses.jl's composable kernels, GPyTorch's
 iterative/GPU scalability vs. `LLNystrom`) — see the

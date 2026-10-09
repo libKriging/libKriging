@@ -252,7 +252,8 @@ saved: call `simulate(..., will_update=true)` again before `update_simulate`.
 - Gu, M., & Berger, J. O. (2016). *Parallel partial Gaussian process
   emulation for computer models with massive output*. Annals of Applied
   Statistics, 10(3), 1317–1347 (the `"shared"` model; R package
-  `RobustGaSP::ppgasp`).
+  `RobustGaSP::ppgasp`, compared in
+  [docs/comparisons/libKriging_vs_RobustGaSP.ipynb](../comparisons/libKriging_vs_RobustGaSP.ipynb), §5).
 - Conti, S., & O'Hagan, A. (2010). *Bayesian emulation of complex
   multi-output and dynamic computer models*. Journal of Statistical Planning
   and Inference, 140(3), 640–651 (the separable `"separable"` model).
