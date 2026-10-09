@@ -877,20 +877,20 @@ void* lk_warp_kriging_new_fit_noise(const double* y,
 }
 
 int lk_warp_kriging_fit_noise(void* ptr,
-                               const double* y,
-                               int n,
-                               const double* noise,
-                               int n_noise,
-                               const double* X,
-                               int nX,
-                               int d,
-                               const char* regmodel,
-                               int normalize,
-                               const char* optim,
-                               const char* objective,
-                               const char** param_keys,
-                               const char** param_vals,
-                               int n_params) {
+                              const double* y,
+                              int n,
+                              const double* noise,
+                              int n_noise,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
@@ -985,7 +985,14 @@ int lk_warp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
+int lk_warp_kriging_simulate(void* ptr,
+                             int nsim,
+                             int seed,
+                             const double* X_n,
+                             int m,
+                             int d,
+                             int will_update,
+                             double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
@@ -1484,7 +1491,14 @@ int lk_mlp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
+int lk_mlp_kriging_simulate(void* ptr,
+                            int nsim,
+                            int seed,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int will_update,
+                            double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);

@@ -34,6 +34,10 @@ past release, see the corresponding entry on the
   `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
   (described as `NuggetKriging` / `NoiseKriging` by the loader, which these
   two bindings did not map back to `Kriging`).
+- Octave/Matlab `Kriging.load` built and printed a throw-away
+  `Kriging([1], [1], "gauss")` model, whose mex reference was then
+  overwritten and never released. It now wraps the loaded reference directly,
+  like `WarpKriging.load` / `MLPKriging.load`.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

@@ -225,20 +225,20 @@ int lk_warp_kriging_fit(void* ptr,
                         const char** param_vals,
                         int n_params);
 int lk_warp_kriging_fit_noise(void* ptr,
-                               const double* y,
-                               int n,
-                               const double* noise,
-                               int n_noise,
-                               const double* X,
-                               int nX,
-                               int d,
-                               const char* regmodel,
-                               int normalize,
-                               const char* optim,
-                               const char* objective,
-                               const char** param_keys,
-                               const char** param_vals,
-                               int n_params);
+                              const double* y,
+                              int n,
+                              const double* noise,
+                              int n_noise,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params);
 
 int lk_warp_kriging_predict(void* ptr,
                             const double* X_n,
@@ -253,7 +253,14 @@ int lk_warp_kriging_predict(void* ptr,
                             double* mean_deriv_out,
                             double* stdev_deriv_out);
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
+int lk_warp_kriging_simulate(void* ptr,
+                             int nsim,
+                             int seed,
+                             const double* X_n,
+                             int m,
+                             int d,
+                             int will_update,
+                             double* sim_out);
 
 /* noise_u: per-update-point noise variances (NULL / noise_u_n = 0 when the
  * model was fitted noise-free; required otherwise). */
@@ -371,7 +378,14 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* mean_deriv_out,
                            double* stdev_deriv_out);
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
+int lk_mlp_kriging_simulate(void* ptr,
+                            int nsim,
+                            int seed,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int will_update,
+                            double* sim_out);
 
 int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
 int lk_mlp_kriging_update_simulate(void* ptr,

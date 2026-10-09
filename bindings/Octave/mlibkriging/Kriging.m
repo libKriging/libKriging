@@ -7,7 +7,11 @@ classdef Kriging < handle
     methods
         function obj = Kriging(varargin)
             % fprintf("New Kriging\n");
-            obj.ref = mLibKriging("Kriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                obj.ref = varargin{2};  % wrap an existing mex reference (see load)
+            else
+                obj.ref = mLibKriging("Kriging::new", varargin{:});
+            end
         end
 
         function varargout = copy(obj, varargin)
@@ -195,8 +199,8 @@ classdef Kriging < handle
 
     methods (Static = true)
         function obj = load(varargin)
-            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
-            obj.ref = mLibKriging("Kriging::load", varargin{:});
+            ref = mLibKriging("Kriging::load", varargin{:});
+            obj = Kriging('__ref__', ref);
         end
 
         % Subset-of-data pre-fit reduction: select n_max rows of X

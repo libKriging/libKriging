@@ -99,7 +99,8 @@ namespace {
 void libkriging_atfork_quiesce() {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
-  if (fn) fn(1);
+  if (fn)
+    fn(1);
 #endif
 #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -108,9 +109,9 @@ void libkriging_atfork_quiesce() {
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,  // prepare: quiesce before fork
-                   nullptr,                    // parent:  restored by next fit()
-                   libkriging_atfork_quiesce); // child:   ensure clean state
+    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
+                   nullptr,                     // parent:  restored by next fit()
+                   libkriging_atfork_quiesce);  // child:   ensure clean state
   }
 };
 static ForkSafeRegistrar fork_safe_registrar;
@@ -1937,17 +1938,20 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           active = true;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(static_cast<int>(n));
+          if (fn)
+            fn(static_cast<int>(n));
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(static_cast<int>(n));
 #endif
         }
         ~ThreadCountGuard() {
-          if (!active) return;
+          if (!active)
+            return;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(1);
+          if (fn)
+            fn(1);
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(1);

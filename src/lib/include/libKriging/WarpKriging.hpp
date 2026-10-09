@@ -591,11 +591,11 @@ class LIBKRIGING_EXPORT WarpKnots final : public IWarp {
   void set_input_range(double lo, double hi) override;
 
  private:
-  arma::uword m_K;              ///< number of interior knots
-  std::vector<double> m_breaks; ///< K+2 breakpoints (including 0 and 1)
-  arma::vec m_log_slopes;       ///< K+1 unconstrained log-slopes
-  double m_xlo = 0.0;           ///< lower end of the variable's training range
-  double m_xhi = 1.0;           ///< upper end of the variable's training range
+  arma::uword m_K;               ///< number of interior knots
+  std::vector<double> m_breaks;  ///< K+2 breakpoints (including 0 and 1)
+  arma::vec m_log_slopes;        ///< K+1 unconstrained log-slopes
+  double m_xlo = 0.0;            ///< lower end of the variable's training range
+  double m_xhi = 1.0;            ///< upper end of the variable's training range
 
   /// Affinely map a raw input value into the reference domain [0, 1] and clamp.
   double to_unit(double x) const;
