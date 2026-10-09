@@ -2946,8 +2946,14 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 }
 
 void Kriging::save(const std::string filename) const {
-  check_not_vecchia_light("save");
   nlohmann::json j;
+  dump_to_json(j);
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+void Kriging::dump_to_json(nlohmann::json& j) const {
+  check_not_vecchia_light("save");
   j["version"] = 2;
   j["content"] = "Kriging";
   dump_common_to_json(j);
@@ -2968,15 +2974,15 @@ void Kriging::save(const std::string filename) const {
     j["nystrom_U"] = to_json(m_nystrom_U);
     j["nystrom_D"] = to_json(m_nystrom_D);
   }
-
-  std::ofstream f(filename);
-  f << std::setw(4) << j;
 }
 
 Kriging Kriging::load(const std::string filename) {
   std::ifstream f(filename);
   nlohmann::json j = nlohmann::json::parse(f);
+  return load_from_json(j, filename);
+}
 
+Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& filename) {
   uint32_t version = j["version"].template get<uint32_t>();
   if (version != 2)
     throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));

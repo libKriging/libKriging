@@ -8,7 +8,7 @@
 #' @return An object of class "NestedKriging" with methods to access and manipulate the data
 classNestedKriging <- function(nk) {
     class(nk) <- "NestedKriging"
-    for (f in c('predict', 'print', 'show')) {
+    for (f in c('predict', 'print', 'show', 'save')) {
         eval(parse(text = paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -110,4 +110,49 @@ predict.NestedKriging <- function(object, x, return_stdev = TRUE, ...) {
 print.NestedKriging <- function(x, ...) {
     cat(nestedkriging_summary(x))
     invisible(x)
+}
+
+#' Save a \code{NestedKriging} model to a file.
+#'
+#' @param object S3 NestedKriging object.
+#' @param filename File name to save in (JSON).
+#' @param ... Ignored.
+#'
+#' @return No return value. NestedKriging object argument is written in the file.
+#'
+#' @method save NestedKriging
+#' @export
+#'
+#' @examples
+#' f <- function(X) apply(X, 1, function(x) sin(3 * x[1]) + cos(5 * x[2]))
+#' set.seed(123)
+#' X <- matrix(runif(2 * 60), ncol = 2)
+#' y <- f(X)
+#' k <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 3)
+#' outfile <- tempfile("nk.json")
+#' save(k, outfile)
+#' print(load(outfile))
+#' unlink(outfile)
+save.NestedKriging <- function(object, filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    nestedkriging_save(object, filename)
+    invisible(NULL)
+}
+
+#' Load a \code{NestedKriging} model from a file.
+#'
+#' @param filename File name to load from.
+#' @param ... Ignored.
+#'
+#' @return The loaded NestedKriging object.
+#'
+#' @method load NestedKriging
+#' @export
+load.NestedKriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    classNestedKriging(nestedkriging_load(filename))
 }

@@ -144,3 +144,11 @@ void PyNestedKriging::set_predict_chunk(unsigned long chunk) {
 void PyNestedKriging::set_warp_subsample(unsigned long m) {
   m_internal->set_warp_subsample(m);
 }
+
+void PyNestedKriging::save(const std::string filename) const {
+  m_internal->save(filename);
+}
+
+PyNestedKriging PyNestedKriging::load(const std::string filename) {
+  return PyNestedKriging(std::make_unique<NestedKriging>(NestedKriging::load(filename)));
+}

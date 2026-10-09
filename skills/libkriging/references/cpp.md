@@ -111,7 +111,9 @@ auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true);
 ```
 `Aggregation` is `PoE, gPoE, BCM, rBCM, NK` — see `SKILL.md` §3. Remember:
 `NK` requires `Trend::RegressionModel::Constant`; no `normalize`, no
-noise/nugget channel, no save/load yet.
+noise/nugget channel. `nk.save(file)` / `NestedKriging::load(file)`
+round-trip the fitted model (`KrigingLoader::describe` reports
+`KrigingType::NestedKriging`).
 
 ## Common pitfalls to flag in review
 

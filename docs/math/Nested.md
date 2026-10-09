@@ -113,7 +113,10 @@ same n (which would not fit in memory anyway).
 
 - `NoiseModel::None` only — no nugget/noise channel.
 - `normalize` is not supported.
-- `save`/`load` are not yet implemented.
+- `save`/`load` store the configuration, the data, the partition, the
+  common prior and every submodel (JSON, `"content": "NestedKriging"`); the
+  NK precomputations (one Cholesky per group) are rebuilt at load time, at
+  the same O(p (n/p)³) cost as the end of `fit`.
 - Combined with `warping`: NK aggregation requires evaluating the
   warped kernel between arbitrary points (supported since `WarpKriging`
   exposes a public `covMat`); the common (θ, warp) prior is estimated

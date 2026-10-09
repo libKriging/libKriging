@@ -173,3 +173,21 @@ arma::vec nestedkriging_y(Rcpp::List k) {
   Rcpp::XPtr<NestedKriging> impl_ptr(impl);
   return impl_ptr->y();
 }
+
+// [[Rcpp::export]]
+void nestedkriging_save(Rcpp::List k, std::string filename) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  impl_ptr->save(filename);
+}
+
+// [[Rcpp::export]]
+Rcpp::List nestedkriging_load(std::string filename) {
+  Rcpp::XPtr<NestedKriging> impl_ptr(new NestedKriging(NestedKriging::load(filename)));
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "NestedKriging";
+  return obj;
+}

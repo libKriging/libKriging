@@ -15,6 +15,8 @@ void nb_groups(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void beta0(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace NestedKrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_NESTEDKRIGING_BINDING_HPP

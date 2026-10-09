@@ -88,7 +88,8 @@ nk = NestedKriging(y, X, "matern5_2", 8, "PoE");
 ```
 `aggregation = "NK"` (the default) requires the `regmodel` in position 8 to
 be `"constant"` (also the default) — see `SKILL.md` §3. No `noise`
-argument, no `normalize` support, no save/load yet on `NestedKriging`.
+argument, no `normalize` support. `nk.save("nk.json")` /
+`NestedKriging.load("nk.json")` (or `load_kriging`) work as for the other classes.
 
 ## Common pitfalls to flag in review
 

@@ -2015,3 +2015,18 @@ double lk_nested_kriging_get_sigma2(void* ptr) {
 double lk_nested_kriging_get_beta0(void* ptr) {
   return static_cast<NestedKriging*>(ptr)->beta0();
 }
+
+int lk_nested_kriging_save(void* ptr, const char* filename) {
+  try {
+    static_cast<NestedKriging*>(ptr)->save(filename);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_nested_kriging_load(const char* filename) {
+  try {
+    return new NestedKriging(NestedKriging::load(filename));
+  }
+  CATCH_RETURN_NULL
+}

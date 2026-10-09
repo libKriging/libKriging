@@ -480,6 +480,8 @@ int lk_nested_kriging_nb_groups(void* ptr);
 int lk_nested_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_nested_kriging_get_sigma2(void* ptr);
 double lk_nested_kriging_get_beta0(void* ptr);
+int lk_nested_kriging_save(void* ptr, const char* filename);
+void* lk_nested_kriging_load(const char* filename);
 
 #ifdef __cplusplus
 }

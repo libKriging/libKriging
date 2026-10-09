@@ -314,6 +314,13 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);
 
  private:
+  // JSON (de)serialization behind save()/load(), also used by NestedKriging
+  // to embed its submodels in its own save file.
+  friend class NestedKriging;
+  void dump_to_json(nlohmann::json& j) const;
+  /// @param filename only used in error messages
+  static Kriging load_from_json(const nlohmann::json& j, const std::string& filename);
+
   NoiseModel m_noise_model = NoiseModel::None;
   double m_nugget = 0.0;
   bool m_est_nugget = false;

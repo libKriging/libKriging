@@ -103,7 +103,8 @@ nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
 predict(nk, x = Xnew, return_stdev = TRUE)
 ```
 `aggregation = "NK"` requires `regmodel = "constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging`.
+`normalize=`. `save(nk, "nk.json")` / `load("nk.json")` work as for the
+other classes.
 
 ## Common pitfalls to flag in review
 

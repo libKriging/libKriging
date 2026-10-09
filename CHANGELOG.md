@@ -17,6 +17,12 @@ past release, see the corresponding entry on the
   instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
   on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
   raise; `will_update=true` still raises there.
+- `NestedKriging::save` / `NestedKriging::load` (C++, Python, R, Julia,
+  Octave/Matlab): configuration, data, partition, common prior and submodels
+  (`Kriging` or `WarpKriging`) in one JSON file; the NK precomputations are
+  rebuilt at load. `KrigingLoader::describe` reports
+  `KrigingType::NestedKriging`, so the generic `load` of each binding
+  dispatches to it.
 
 ### Fixed
 - `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
@@ -24,6 +30,10 @@ past release, see the corresponding entry on the
   light Vecchia fit they went to the exact simulator, which has no
   factorization to use. They now route to `simulateNystrom` /
   `simulateVecchia` like the base overload (and refuse `will_update=true`).
+- Python `pylibkriging.load()` and Octave/Matlab `class_saved` /
+  `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
+  (described as `NuggetKriging` / `NoiseKriging` by the loader, which these
+  two bindings did not map back to `Kriging`).
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

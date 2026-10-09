@@ -10,7 +10,11 @@ classdef NestedKriging < handle
 
     methods
         function obj = NestedKriging(varargin)
-            obj.ref = mLibKriging("NestedKriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                obj.ref = varargin{2};
+            else
+                obj.ref = mLibKriging("NestedKriging::new", varargin{:});
+            end
         end
 
         function delete(obj, varargin)
@@ -57,6 +61,17 @@ classdef NestedKriging < handle
 
         function disp(obj, varargin)
             disp(obj.summary());
+        end
+
+        function varargout = save(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::save", obj.ref, varargin{:});
+        end
+    end
+
+    methods (Static = true)
+        function obj = load(varargin)
+            ref = mLibKriging("NestedKriging::load", varargin{:});
+            obj = NestedKriging('__ref__', ref);
         end
     end
 end

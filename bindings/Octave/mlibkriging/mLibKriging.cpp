@@ -61,7 +61,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       std::string klass;
       switch (KrigingLoader::describe(filename)) {
         case KrigingLoader::KrigingType::Kriging:
-
+        case KrigingLoader::KrigingType::NuggetKriging:  // Kriging(noise="nugget")
+        case KrigingLoader::KrigingType::NoiseKriging:   // Kriging(noise=noise_vector)
           klass = "Kriging";
           break;
         case KrigingLoader::KrigingType::WarpKriging:
@@ -69,6 +70,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
           break;
         case KrigingLoader::KrigingType::MLPKriging:
           klass = "MLPKriging";
+          break;
+        case KrigingLoader::KrigingType::NestedKriging:
+          klass = "NestedKriging";
           break;
         case KrigingLoader::KrigingType::Unknown:
           mexErrMsgIdAndTxt("mLibKriging:class_saved", "Unknown Kriging type in file");
@@ -202,6 +206,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NestedKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::beta0"_hash:
       return NestedKrigingBinding::beta0(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::save"_hash:
+      return NestedKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::load"_hash:
+      return NestedKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "WarpKriging::new"_hash:
       return WarpKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

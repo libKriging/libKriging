@@ -51,11 +51,15 @@ static py::object load_any(const std::string& filename) {
   auto ktype = KrigingLoader::describe(filename);
   switch (ktype) {
     case KrigingLoader::KrigingType::Kriging:
+    case KrigingLoader::KrigingType::NuggetKriging:  // Kriging(noise="nugget")
+    case KrigingLoader::KrigingType::NoiseKriging:   // Kriging(noise=noise_vector)
       return py::cast(PyKriging::load(filename));
     case KrigingLoader::KrigingType::WarpKriging:
       return py::cast(PyWarpKriging::load(filename));
     case KrigingLoader::KrigingType::MLPKriging:
       return py::cast(PyMLPKriging::load(filename));
+    case KrigingLoader::KrigingType::NestedKriging:
+      return py::cast(PyNestedKriging::load(filename));
     default:
       throw std::runtime_error("Unknown Kriging type in file: " + filename);
   }
@@ -317,6 +321,8 @@ discards n - n_max points outright.)pbdoc")
       .def("y", &PyNestedKriging::y)
       .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
       .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
+      .def("save", &PyNestedKriging::save, py::arg("filename"))
+      .def_static("load", &PyNestedKriging::load, py::arg("filename"))
       .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")

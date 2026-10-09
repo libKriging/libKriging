@@ -413,3 +413,82 @@ TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[
                                 std::vector<std::string>{"kumaraswamy", "kumaraswamy"}),
                   std::invalid_argument);
 }
+
+#include "libKriging/KrigingLoader.hpp"
+
+TEST_CASE("NestedKriging save & load", "[nested][kriging][save]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(120, 2, X, y);
+  arma::mat Xt(25, 2, arma::fill::randu);
+
+  auto check_roundtrip = [&](NestedKriging& nk, const std::string& filename) {
+    nk.save(filename);
+    CHECK(KrigingLoader::describe(filename) == KrigingLoader::KrigingType::NestedKriging);
+    NestedKriging nk2 = NestedKriging::load(filename);
+    CHECK(nk2.kernel() == nk.kernel());
+    CHECK(nk2.aggregation() == nk.aggregation());
+    CHECK(nk2.nb_groups() == nk.nb_groups());
+    CHECK(nk2.warping() == nk.warping());
+    CHECK(arma::approx_equal(nk2.theta(), nk.theta(), "absdiff", 0.0));
+    CHECK(nk2.sigma2() == nk.sigma2());
+    CHECK(nk2.beta0() == nk.beta0());
+    CHECK(arma::approx_equal(nk2.X(), nk.X(), "absdiff", 0.0));
+    CHECK(arma::approx_equal(nk2.y(), nk.y(), "absdiff", 0.0));
+    for (arma::uword g = 0; g < nk.nb_groups(); ++g)
+      CHECK(arma::all(nk2.groups()[g] == nk.groups()[g]));
+    auto [m1, s1] = nk.predict(Xt, true);
+    auto [m2, s2] = nk2.predict(Xt, true);
+    CHECK(arma::abs(m1 - m2).max() < 1e-10);
+    CHECK(arma::abs(s1 - s2).max() < 1e-10);
+  };
+
+  SECTION("plain submodels, every aggregation") {
+    for (auto agg : {NestedKriging::Aggregation::NK,
+                     NestedKriging::Aggregation::PoE,
+                     NestedKriging::Aggregation::gPoE,
+                     NestedKriging::Aggregation::BCM,
+                     NestedKriging::Aggregation::rBCM}) {
+      INFO("aggregation = " << NestedKriging::aggregationToString(agg));
+      NestedKriging nk(y, X, "matern5_2", /*nb_groups=*/3, agg);
+      check_roundtrip(nk, "nested_dump.json");
+    }
+  }
+
+  SECTION("plain submodels, linear trend (PoE family)") {
+    NestedKriging nk(y,
+                     X,
+                     "matern3_2",
+                     3,
+                     NestedKriging::Aggregation::gPoE,
+                     NestedKriging::Partition::Random,
+                     7,
+                     Trend::RegressionModel::Linear);
+    check_roundtrip(nk, "nested_dump_linear.json");
+  }
+
+  SECTION("warped submodels") {
+    const std::vector<std::string> warping{"kumaraswamy", "kumaraswamy"};
+    NestedKriging nk(y,
+                     X,
+                     "gauss",
+                     /*nb_groups=*/3,
+                     NestedKriging::Aggregation::NK,
+                     NestedKriging::Partition::KMeans,
+                     123,
+                     Trend::RegressionModel::Constant,
+                     "BFGS",
+                     "LL",
+                     {},
+                     warping);
+    check_roundtrip(nk, "nested_dump_warp.json");
+  }
+
+  SECTION("not fitted / wrong content") {
+    NestedKriging empty("gauss");
+    CHECK_THROWS_AS(empty.save("nested_dump_empty.json"), std::runtime_error);
+    Kriging k(y, X, "gauss");
+    k.save("kriging_dump_for_nested.json");
+    CHECK_THROWS_AS(NestedKriging::load("kriging_dump_for_nested.json"), std::runtime_error);
+  }
+}

@@ -67,3 +67,22 @@ test_that("warped submodels (WarpKriging) are supported", {
   expect_lt(max(abs(p$mean - y)), 1e-3)  # NK interpolates under warping
   expect_true(all(p$stdev >= 0))
 })
+
+test_that("save/load roundtrip (plain and generic load)", {
+  for (agg in c("NK", "gPoE")) {
+    k <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 4, aggregation = agg)
+    outfile <- tempfile(fileext = ".json")
+    save(k, outfile)
+    for (k2 in list(load(outfile), load.NestedKriging(outfile))) {
+      expect_s3_class(k2, "NestedKriging")
+      expect_equal(k2$aggregation(), agg)
+      expect_equal(k2$nb_groups(), k$nb_groups())
+      expect_equal(k2$theta(), k$theta())
+      p1 <- predict(k, Xt)
+      p2 <- predict(k2, Xt)
+      expect_equal(p2$mean, p1$mean, tolerance = 1e-10)
+      expect_equal(p2$stdev, p1$stdev, tolerance = 1e-10)
+    }
+    unlink(outfile)
+  }
+})

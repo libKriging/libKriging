@@ -61,6 +61,8 @@
 #include <variant>
 #include <vector>
 
+class NestedKriging;  // friend of WarpKriging (save/load of warped submodels)
+
 namespace libKriging {
 
 // =========================================================================
@@ -860,6 +862,8 @@ class WarpKriging : protected KrigingImpl {
 
   // MLPKriging is a thin facade that needs access to private members for save/load.
   friend class MLPKriging;
+  // NestedKriging embeds its warped submodels in its own save file.
+  friend class ::NestedKriging;
 
   // WarpKrigingPerWarpTest's "warp-parameter gradient vs FD" regression test
   // needs to drive the cache directly (pack/unpack_warp_params, refresh_cache,

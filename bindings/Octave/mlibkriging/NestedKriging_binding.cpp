@@ -199,4 +199,26 @@ void beta0(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->beta0(), "beta0");
 }
 
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* nk = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference");
+  const auto filename = input.get<std::string>(1, "filename");
+  nk->save(filename);
+}
+
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto filename = input.get<std::string>(0, "filename");
+  auto nk = buildObject<NestedKriging>(NestedKriging::load(filename));
+  output.set(0, nk, "new object reference");
+}
+
 }  // namespace NestedKrigingBinding

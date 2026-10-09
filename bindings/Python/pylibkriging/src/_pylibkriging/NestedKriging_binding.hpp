@@ -15,6 +15,9 @@
 namespace py = pybind11;
 
 class PyNestedKriging {
+ private:
+  explicit PyNestedKriging(std::unique_ptr<NestedKriging>&& internal) : m_internal(std::move(internal)) {}
+
  public:
   // Kernel-only constructor (no data)
   explicit PyNestedKriging(const std::string& kernel);
@@ -33,6 +36,7 @@ class PyNestedKriging {
                   const py::dict& dict,
                   const std::vector<std::string>& warping);
   ~PyNestedKriging();
+  PyNestedKriging(PyNestedKriging&&) = default;
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
@@ -61,6 +65,9 @@ class PyNestedKriging {
 
   void set_predict_chunk(unsigned long chunk);
   void set_warp_subsample(unsigned long m);
+
+  void save(const std::string filename) const;
+  static PyNestedKriging load(const std::string filename);
 
  private:
   std::unique_ptr<NestedKriging> m_internal;

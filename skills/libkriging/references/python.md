@@ -122,7 +122,8 @@ model = lk.NestedKriging(
 mean, stdev = model.predict(Xnew, return_stdev=True)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
-`normalize=`, no `save()`/`load()` yet on `NestedKriging`.
+`normalize=`. `nk.save("nk.json")` / `lk.NestedKriging.load("nk.json")` (or
+the generic `lk.load`) work as for the other classes.
 
 ## scikit-learn estimators
 

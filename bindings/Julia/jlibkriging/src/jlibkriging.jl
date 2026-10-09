@@ -370,6 +370,8 @@ function load(filename::String)
         return load_warp_kriging(filename)
     elseif content == "MLPKriging"
         return load_mlp_kriging(filename)
+    elseif content == "NestedKriging"
+        return load_nested_kriging(filename)
     else
         error("Unknown Kriging type in file: $filename")
     end
@@ -1426,11 +1428,21 @@ beta0(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_beta0), Floa
 
 Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
+function save(k::NestedKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_save), Cint, (Ptr{Nothing}, Cstring), k.ptr, filename)
+    _check_error(ret)
+end
+
+function load_nested_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_nested_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return NestedKriging(_check_ptr(ptr))
+end
+
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
 export nb_groups, aggregation, beta0
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
-export load, load_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
