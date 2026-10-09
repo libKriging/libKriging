@@ -1,7 +1,7 @@
 # libKriging — C++
 
 Headers: `libKriging/Kriging.hpp`, `WarpKriging.hpp`, `MLPKriging.hpp`,
-`NestedKriging.hpp`, `Trend.hpp` (regression models), `Covariance.hpp`
+`NestedKriging.hpp`, `MultiOutputKriging.hpp`, `Trend.hpp` (regression models), `Covariance.hpp`
 (kernels), `Optim.hpp`.
 
 See `SKILL.md` in this directory for *which* class/options to pick; this
@@ -37,8 +37,9 @@ Quadratic` (`Trend::fromString("constant")` also works if you have a
 string).
 
 ```cpp
-auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true,
-                                    /*return_cov=*/false, /*return_deriv=*/false);
+// predict() always returns a 5-tuple; the flags only control what is computed
+auto [mean, stdev, cov, mean_deriv, stdev_deriv]
+    = model.predict(Xnew, /*return_stdev=*/true, /*return_cov=*/false, /*return_deriv=*/false);
 arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew);
 model.update(y_new, X_new, /*refit=*/true);
 
@@ -79,8 +80,8 @@ model.set_vecchia_exact_commit(false);
 #include "libKriging/WarpKriging.hpp"
 
 WarpKriging model(y, X, {"kumaraswamy", "categorical(5,2)", "none"}, "gauss");
-model.fit(y, X, {"kumaraswamy", "categorical(5,2)", "none"});
-auto [mean, stdev] = model.predict(Xnew, true, false, false);
+model.fit(y_new, X_new);   // refit on new data: the warping is set by the constructor
+auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(Xnew, true, false, false);
 ```
 One spec string per column of `X`, in column order (see `SKILL.md` §4 for
 the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
@@ -102,13 +103,36 @@ no nugget mode).
 #include "libKriging/NestedKriging.hpp"
 
 NestedKriging model(y, X, "matern5_2", nb_groups,
-                     Trend::RegressionModel::Constant,
-                     NestedKriging::Aggregation::NK);
+                    NestedKriging::Aggregation::NK,      // default
+                    NestedKriging::Partition::KMeans,    // default
+                    /*seed=*/123,
+                    Trend::RegressionModel::Constant);
 auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true);
 ```
 `Aggregation` is `PoE, gPoE, BCM, rBCM, NK` — see `SKILL.md` §3. Remember:
 `NK` requires `Trend::RegressionModel::Constant`; no `normalize`, no
 noise/nugget channel, no save/load yet.
+
+## MultiOutputKriging
+
+```cpp
+#include "libKriging/MultiOutputKriging.hpp"
+
+// Y is n x q (one column per output), X is n x d, same rows
+MultiOutputKriging model(Y, X, "matern5_2", "pca(0.999)",   // or "shared", "separable"
+                         Trend::RegressionModel::Constant,
+                         /*normalize=*/false, "BFGS", "LL");
+auto [mean, stdev, cov, mean_deriv] = model.predict(Xnew, true, false, false);  // mean, stdev: m x q
+arma::cube sims = model.simulate(nsim, seed, Xnew, /*will_update=*/true);       // m x q x nsim
+arma::cube upd = model.update_simulate(Y_u, X_u);
+model.update(Y_u, X_u, /*refit=*/false);
+```
+`MultiOutputKriging::Parameters` has only `theta` (rows = starting points) and
+`is_theta_estim`. `cov` is over `vec(Y_n)` (the m points of output 1, then
+output 2, …). `"shared"`/`"separable"` take `objective` `"LL"` or `"LOO"`;
+`"pca"` forwards it to each latent `Kriging` (`component(k)`, 0-based).
+`predictCovFactors(Xnew)` gives the Kronecker factors `(C_x, Σ)` without the
+dense `mq × mq` matrix. No noise/nugget, no save/load yet. See `SKILL.md` §1.7.
 
 ## Common pitfalls to flag in review
 

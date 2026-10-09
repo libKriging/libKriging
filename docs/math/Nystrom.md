@@ -94,7 +94,7 @@ y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, stdev = TRUE)
+pred <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
 ## Current limitations

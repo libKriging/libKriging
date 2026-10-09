@@ -69,7 +69,7 @@ y = np.sin(3 * (X[:, 0] + X[:, 1])) + rng.normal(scale=0.03, size=n)
 
 model = lk.MLPKriging(y, X, hidden_dims=[16, 8], d_out=2, activation="selu",
                        kernel="gauss", regmodel="constant")
-mean, stdev = model.predict(rng.uniform(size=(10, 2)), return_stdev=True)
+mean, stdev, *_ = model.predict(rng.uniform(size=(10, 2)), return_stdev=True)
 ```
 
 ## References

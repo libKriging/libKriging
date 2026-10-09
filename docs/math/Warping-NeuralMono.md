@@ -63,7 +63,7 @@ X = rng.uniform(size=(40, 1))
 y = np.log1p(5 * X[:, 0]) + rng.normal(scale=0.03, size=40)  # monotone, non-power-law shape
 
 model = lk.WarpKriging(y, X, ["neural_mono(8)"], kernel="matern5_2", regmodel="constant")
-mean, stdev = model.predict(np.linspace(0, 1, 21).reshape(-1, 1), return_stdev=True)
+mean, stdev, *_ = model.predict(np.linspace(0, 1, 21).reshape(-1, 1), return_stdev=True)
 ```
 
 ## References

@@ -33,7 +33,7 @@ model.update(y_u, X_u, refit=True)
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)
+ll, grad, hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # always a 3-tuple
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to
@@ -53,7 +53,7 @@ model = lk.WarpKriging(
     kernel="gauss",
     regmodel="constant",
     normalize=False,
-    optim="BFGS",
+    optim="BFGS+Adam",    # default; "BFGS", "BFGS10+Adam", "none", ...
     objective="LL",       # only "LL": any other value is ignored
     parameters={},
     noise=None,   # None | per-observation variance vector (no "nugget" mode, unlike Kriging)
@@ -123,6 +123,37 @@ mean, stdev = model.predict(Xnew, return_stdev=True)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
 `normalize=`, no `save()`/`load()` yet on `NestedKriging`.
+
+## MultiOutputKriging
+
+```python
+# Y is n x q (one column per output), X is n x d, same rows
+model = lk.MultiOutputKriging(
+    Y, X, "matern5_2",
+    output_model="pca(0.999)",  # "pca" (= "pca(0.99)") | "pca(K)" | "pca(v)" | "shared" | "separable"
+    regmodel="constant",
+    normalize=False,
+    optim="BFGS",
+    objective="LL",             # "shared"/"separable": "LL" | "LOO"; "pca": any Kriging objective
+    parameters={},              # only "theta" (rows = starting points) and "is_theta_estim"
+    output_coordinates=None,    # q x d_t, e.g. the time steps of curve outputs
+)
+mean, stdev, cov, mean_deriv = model.predict(Xnew, return_stdev=True, return_cov=False, return_deriv=False)
+# mean, stdev: m x q; cov: mq x mq over vec(Y) (points of output 1, then output 2, ...);
+# mean_deriv: m x d x q
+sims = model.simulate(nsim=100, seed=1, X=Xnew, will_update=True)   # m x q x nsim
+upd = model.update_simulate(Y_u, X_u)                               # conditioned on (X_u, Y_u)
+model.update(Y_u, X_u, refit=False)
+k0 = model.component(0)                     # "pca": copy of latent Kriging 0 (0-based)
+
+sep = lk.MultiOutputKriging(Y, X, "matern5_2", output_model="separable")
+Cx, Sigma = sep.predictCovFactors(Xnew)     # cov of sep.predict(...) == kron(Sigma, Cx)
+```
+`model.component(k)` returns a copy of the k-th latent `Kriging` of `"pca"`
+(0-based). `theta()`, `sigma2()`, `beta()`, `output_cov()`, `logLikelihood()`,
+`logLikelihoodFun()`, `leaveOneOutFun()` are for `"shared"`/`"separable"`;
+`nb_components()`, `pca_basis()`, `pca_explained()`, `pca_residual()` for
+`"pca"`. No `noise=`, no `save()`/`load()`, no scikit-learn estimator yet.
 
 ## scikit-learn estimators
 

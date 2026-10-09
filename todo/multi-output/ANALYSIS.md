@@ -454,6 +454,7 @@ Restent ouvertes (numérotation d'origine) :
    entre l'étape 1 et l'étape 2 en priorité.
 4. Format de sortie de `predict` dans les bindings (matrice vs liste par
    sortie), cohérence avec `MarkovCoKriging` (branche `feature/multi-fidelity-cokriging`).
-   Choix provisoire du binding Python : matrices `m × q`.
+   Choix appliqué aux 4 bindings (2026-10-09) : matrices `m × q`, covariance
+   `mq × mq` sur `vec(Y)`, simulations `m × q × nsim`, dérivées `m × d × q`.
 7. Calendrier `LMP` / `LLVecchia` / `LLNystrom` et save/load pour
    `MultiOutputKriging`.

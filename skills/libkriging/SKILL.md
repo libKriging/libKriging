@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Covers multi-output responses (several outputs or a curve per run, MultiOutputKriging). Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, MultiOutputKriging, multi-output / vector-valued / functional outputs, PCA or Karhunen-Loeve emulation, coregionalization (ICM), Vecchia/LLVecchia, Nystrom/LLNystrom, or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -81,6 +81,28 @@ Ask, in order:
    if a user's request would hit them. `NestedKriging` is exposed in
    `pylibkriging` (alongside `Kriging`/`WarpKriging`/`MLPKriging`), plus
    the other bindings (C++/R/Julia/Octave-MATLAB).
+
+7. **Does each run return several outputs (a few scalars, or a curve / field
+   sampled at q points), observed at the same design points?**
+   → `MultiOutputKriging`, with `Y` an `n × q` matrix (rows = observations,
+   like `X`). See [MultiOutput.md](../../docs/math/MultiOutput.md). Pick the
+   `output_model`:
+   - **Many correlated outputs (curves, time series, fields), possibly
+     q ≫ n** → `"pca"` (default, `"pca(0.99)"`; `"pca(K)"` or `"pca(v)"` to
+     set the number of components or the explained-variance fraction). One
+     `Kriging` per principal score, plus the truncation residual.
+   - **A few to many outputs of similar regularity, marginal predictions
+     wanted** → `"shared"`: one θ for all outputs (one Cholesky per
+     likelihood evaluation), β_j and σ_j² per output. With q = 1 it is
+     exactly `Kriging`.
+   - **A few correlated outputs whose joint covariance or joint simulations
+     matter** (e.g. a sum or a difference of outputs) → `"separable"`: free
+     q × q output covariance Σ. Needs n − p ≥ q; it refuses nearly linearly
+     dependent outputs (finely sampled smooth curves): use `"pca"` there.
+   Independent `Kriging` fits per output remain a valid baseline when the
+   outputs have very different regularities. Current restrictions: isotopic
+   design only (no missing value in `Y`), no noise/nugget, save/load not yet
+   implemented, no scikit-learn estimator.
 
 Don't reach for `NestedKriging`, Vecchia or Nystrom by default — for the common case
 (n in the hundreds to low thousands), plain `Kriging` with default options

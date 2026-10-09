@@ -11,7 +11,45 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- `MultiOutputKriging`: Kriging of several outputs observed at the same design
+  points, `Y` being an `n × q` matrix (rows = observations, as for `X`). Three
+  output models: `"pca"` / `"pca(K)"` / `"pca(v)"` (Karhunen-Loève reduction,
+  one `Kriging` per principal score, truncation residual kept as white noise;
+  Higdon et al. 2008), `"shared"` (one θ for all outputs, β_j and σ_j² per
+  output, `LL` or `LOO` objective; Gu & Berger 2016, checked against
+  `RobustGaSP::ppgasp`) and `"separable"` (intrinsic coregionalization model
+  with a free q × q output covariance, joint covariance and joint simulations;
+  Conti & O'Hagan 2010). `predict`, `simulate`, `update`, `update_simulate`,
+  closed-form leave-one-out and `predictCovFactors` (Kronecker factors of the
+  predictive covariance). Available in C++ and in every binding (Python, R,
+  Octave/MATLAB, Julia), with one worked notebook per binding
+  (`bindings/*/multioutputkriging_*.ipynb`) and
+  [docs/math/MultiOutput.md](docs/math/MultiOutput.md). Not yet: noise /
+  nugget, save/load, `"separable(<kernel>)"`, scikit-learn estimator.
+- Octave/MATLAB: `Kriging('__ref__', ref)` wraps an existing backend object
+  (used by `MultiOutputKriging.component`); `NestedKriging.m` is now installed
+  with the other classes.
+
+### Changed
+- `KrigingImpl`: the factorization layer accepts an `n × q` right-hand side
+  (`KModel::ystar/Estar/betahat` are matrices, `populate_Model(…, &Y)`, the LL
+  gradient takes several columns); `cross_corr` and `fit_setup_X_impl` are
+  factored out. The public API of `Kriging` is unchanged and its results are
+  identical.
+
 ### Fixed
+- Documentation: code examples that did not run as written are fixed
+  (`skills/libkriging/references/*.md`, the binding READMEs, the main README
+  and `docs/math`): `Kriging::predict` returns 5 values in C++ and Python,
+  `logLikelihoodFun` 3 values in Python, R's `predict` takes `return_stdev`
+  (not `stdev`) and `Kriging()` takes `noise=` (not `noise_model=`) and a
+  matrix `X`, Julia's `predict` takes `return_stdev`/`return_cov`, Octave's
+  `Kriging.simulate` needs its `will_update` argument and getters must be
+  assigned (a bare `k.logLikelihood();` fails), `NestedKriging.predict` takes
+  no flag in Octave, the C++ `NestedKriging` and `WarpKriging::fit` examples
+  had wrong arguments, and `docs/math/Update.md` described the
+  `update_simulate` algorithm replaced in this release.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

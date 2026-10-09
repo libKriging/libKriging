@@ -104,6 +104,31 @@ predict(nk, Xnew; return_stdev=true)
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
 `normalize=`, no save/load yet on `NestedKriging`.
 
+## MultiOutputKriging
+
+```julia
+# Y is n x q Matrix{Float64} (one column per output), X is n x d, same rows
+mo = MultiOutputKriging(Y, X, "matern5_2";
+                        output_model="pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable"
+                        regmodel="constant", normalize=false,
+                        optim="BFGS", objective="LL",   # "shared"/"separable": "LL" | "LOO"
+                        theta=nothing, is_theta_estim=true,
+                        output_coordinates=nothing)
+p = predict(mo, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
+# p.mean, p.stdev: m x q; p.cov: mq x mq; p.mean_deriv: m x d x q
+sims = simulate(mo, 100, 1, Xnew; will_update=true)   # m x q x nsim
+upd = update_simulate(mo, Y_u, X_u)
+update!(mo, Y_u, X_u; refit=false)
+k1 = component(mo, 1)               # "pca": copy of latent Kriging 1 (1-based)
+
+sep = MultiOutputKriging(Y, X, "matern5_2"; output_model="separable")
+f = predict_cov_factors(sep, Xnew)  # cov of predict(sep, ...) == kron(f.Sigma, f.Cx)
+```
+Accessors: `nb_outputs`, `output_model`, `theta`, `sigma2`, `beta`,
+`output_cov`, `nb_components`, `pca_basis`, `pca_explained`, `pca_residual`,
+`leave_one_out_mat`, `log_likelihood_fun`, `leave_one_out_fun`. No noise, no
+save/load yet.
+
 ## Common pitfalls to flag in review
 
 - Using a `NuggetKriging`/`NoiseKriging` constructor for a new fit.

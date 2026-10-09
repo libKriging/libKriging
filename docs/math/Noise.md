@@ -20,16 +20,17 @@ of treating observation noise, selected by `NoiseModel` /
   sizes, or a simulator that reports its own numerical error per run).
 
 ```r
-k <- Kriging(y, X, kernel = "matern5_2", noise_model = "nugget")
-k2 <- Kriging(y, X, kernel = "matern5_2", noise_model = "heterogeneous",
-              parameters = list(), noise = noise_variances)
+k <- Kriging(y, X, kernel = "matern5_2", noise = "nugget")          # estimated nugget
+k2 <- Kriging(y, X, kernel = "matern5_2", noise = noise_variances)  # known variances
 ```
 
 `NuggetKriging(...)` / `NoiseKriging(...)` constructor calls have been
-removed from every binding — use `Kriging(..., noise=...)` /
-`noise_model=` instead (`noise=NULL` ⟹ `none`, `noise="nugget"` ⟹
-`nugget`, `noise=<vector>` ⟹ `heterogeneous`, matching the per-language
-convenience wrappers described in `bindings/README.md`).
+removed from every binding — use `Kriging(..., noise=...)` instead
+(`noise=NULL` ⟹ `none`, `noise="nugget"` ⟹ `nugget`, `noise=<vector>` ⟹
+`heterogeneous`) in R, Python and Julia. Octave/MATLAB take the noise model
+positionally: `Kriging(y, X, kernel, regmodel, normalize, optim, objective,
+parameters, noise_model, noise)` with `noise_model` `"none"`, `"nugget"` or
+`"heterogeneous"`. See `bindings/README.md`.
 
 ## Mathematical description
 

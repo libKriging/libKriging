@@ -20,8 +20,11 @@ libKriging, avec un focus sur les sorties temporelles / fonctionnelles.
 1. `ANALYSIS.md` §6 : Q2, Q3, Q5, Q6 tranchées ; Q1, Q4, Q7 ouvertes.
 2. `ANALYSIS.md` §5.4 : fait `"pca"`, généralisation de la factorisation de
    `KrigingImpl`, `"shared"` (objectifs `LL`/`LOO`, `update_simulate`),
-   `"separable"` (Σ libre, `predictCovFactors`) ; reste `"separable(<kernel>)"`,
-   puis bindings R / Octave / Julia.
+   `"separable"` (Σ libre, `predictCovFactors`), bindings Python / R /
+   Octave-MATLAB / Julia (même API, sorties `m × q` et `m × q × nsim`), doc
+   (`docs/math/MultiOutput.md`, skill, README des bindings) et un notebook par
+   binding (`bindings/*/multioutputkriging_*.ipynb`) ; reste
+   `"separable(<kernel>)"`, save/load.
 
 Validation de `"shared"` contre `RobustGaSP::ppgasp(method = "mle", nugget.est = FALSE)`
 (n = 40, q = 30, matern 5/2, 2026-10-08) : θ identiques à 7 chiffres, LL égales

@@ -16,6 +16,11 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
    - n ≳ few thousand → keep `Kriging` (noise-free; `WarpKriging` only fits
      with `"LL"`) with `objective="LLVecchia(m)"` (d ≲ 5, local structure) or `"LLNystrom(k)"`
      (higher d); n ~ 10⁴–10⁶ and partitionable → `NestedKriging`.
+   - several outputs per run (scalars, or a curve sampled at q points), all
+     observed at the same design points → `MultiOutputKriging` with `Y`
+     `n × q` (§1.7): `"pca"` for many correlated outputs / curves,
+     `"shared"` for one θ across outputs, `"separable"` for a few outputs
+     whose joint covariance matters.
 
 2. Pick options from §2: `kernel="matern5_2"` and `regmodel="constant"` and
    `objective="LL"` and `optim="BFGS"` as defaults; deviate only with a
@@ -29,6 +34,7 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
 4. Check data layout before writing the call: `X` is `n × d` (rows =
    observations), `y` is a plain length-`n` vector (float64 / `Vector{Float64}`
    / `as.numeric(...)`), integer args passed with the language's integer type.
+   For `MultiOutputKriging`, `Y` is an `n × q` matrix with the same rows as `X`.
 
 5. Emit the fit call. If the data is available and the binding is built,
    run it and report: chosen class + options (with rationale), fitted

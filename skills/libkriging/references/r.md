@@ -105,6 +105,30 @@ predict(nk, x = Xnew, return_stdev = TRUE)
 `aggregation = "NK"` requires `regmodel = "constant"`. No `noise=`, no
 `normalize=`, no save/load yet on `NestedKriging`.
 
+## MultiOutputKriging
+
+```r
+# Y is n x q (one column per output), X is n x d, same rows
+mo <- MultiOutputKriging(Y, X, kernel = "matern5_2",
+                         output_model = "pca(0.999)",  # "pca" | "pca(K)" | "pca(v)" | "shared" | "separable"
+                         regmodel = "constant",
+                         normalize = FALSE,
+                         optim = "BFGS",
+                         objective = "LL",       # "shared"/"separable": "LL" | "LOO"
+                         parameters = NULL,      # list(theta = ..., is_theta_estim = ...) only
+                         output_coordinates = NULL)
+p <- predict(mo, Xnew, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE)
+# p$mean, p$stdev: m x q; p$cov: mq x mq; p$mean_deriv: m x d x q array
+sims <- simulate(mo, nsim = 100, seed = 1, x = Xnew, will_update = TRUE)   # m x q x nsim array
+upd <- update_simulate(mo, Y_u, X_u)
+update(mo, Y_u, X_u, refit = FALSE)
+k1 <- mo$component(1)             # "pca": copy of latent Kriging 1 (1-based)
+
+sep <- MultiOutputKriging(Y, X, kernel = "matern5_2", output_model = "separable")
+f <- sep$predictCovFactors(Xnew)  # cov of predict(sep, ...) == kronecker(f$Sigma, f$Cx)
+```
+No noise, no save/load yet.
+
 ## Common pitfalls to flag in review
 
 - `NuggetKriging()`/`NoiseKriging()` calls for new fits.

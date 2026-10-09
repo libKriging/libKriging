@@ -18,10 +18,13 @@ Update a fitted libKriging model with new observations. Context / arguments: $AR
      Bayesian optimization / active learning inner loop) where a full
      re-optimization each step is too costly; re-fit periodically.
 
-3. `NestedKriging` has no in-place update path and no `noise=` channel —
+3. For `MultiOutputKriging`, `Y_u` is an `n_u × q` matrix. With `"pca"`,
+   `refit=false` keeps the PCA basis and projects `Y_u` on it.
+
+4. `NestedKriging` has no in-place update path and no `noise=` channel —
    if the model is a `NestedKriging`, say so and re-fit instead.
 
-4. After updating, report how the fit changed: new `theta` / `sigma2` /
+5. After updating, report how the fit changed: new `theta` / `sigma2` /
    `beta` vs. the previous values, and the new objective value. Note if
    any new point lay outside the previous design range (it extends the
    region the model interpolates).
