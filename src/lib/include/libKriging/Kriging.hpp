@@ -354,6 +354,9 @@ class Kriging : public KrigingImpl {
   bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
   /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
   void check_not_vecchia_light(const char* what) const;
+  /// True when the (normalized) output is, to rounding, in the span of the
+  /// trend matrix: zero residual whatever theta (see fit()).
+  [[nodiscard]] bool y_in_trend_span() const;
   /// simulate() on a light Vecchia/Nystrom fit (no exact factorization)
   arma::mat simulate_light(int nsim, int seed, const arma::mat& X_n, bool will_update);
 

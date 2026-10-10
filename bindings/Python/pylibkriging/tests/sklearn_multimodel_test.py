@@ -106,12 +106,9 @@ def test_nested_has_no_sample_y():
 
 def test_nested_check_estimator():
     from sklearn.utils.estimator_checks import check_estimator
-    # sklearn's checks fit 10-point samples with step-valued y: any grouping
-    # leaves groups with a constant y, on which the Kriging submodel fit fails
-    # (a Kriging limitation, also hit by KrigingRegressor on a constant y).
-    # The API conformance is checked with a single group; grouping itself is
-    # covered by the other NestedKrigingRegressor tests.
-    check_estimator(NestedKrigingRegressor(nb_groups=1))
+    # sklearn's checks fit 10-point samples with step-valued y, so groups with
+    # a constant y occur: the submodel fit must handle them (sigma2 = 0)
+    check_estimator(NestedKrigingRegressor())
 
 
 # --- cross-cutting: all three behave inside sklearn machinery -------------

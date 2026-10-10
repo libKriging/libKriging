@@ -975,6 +975,17 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _theta,
   return vll;
 }
 
+bool Kriging::y_in_trend_span() const {
+  arma::vec r = m_y;
+  if (m_F.n_cols > 0) {
+    arma::vec b;
+    if (!arma::solve(b, m_F, m_y, arma::solve_opts::no_approx))
+      return false;
+    r = m_y - m_F * b;
+  }
+  return arma::norm(r, "inf") <= 1e-10 * arma::norm(m_y, "inf");
+}
+
 void Kriging::check_not_vecchia_light(const char* what) const {
   if (m_vecchia_light)
     throw std::runtime_error(std::string(what)
@@ -1795,11 +1806,44 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   const double scaleY = m_scaleY;
   const arma::rowvec& scaleX = m_scaleX;
 
-  if (optim == "none") {  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
-    if (!parameters.theta.has_value())
+  // Degenerate data: y is (to rounding) in the span of the trend (e.g. a
+  // constant y with a constant trend). The residual y - F*beta is then zero
+  // for every theta, so sigma2 = 0 and the likelihood is unbounded: theta is
+  // not identifiable and an optimizer only drives it to a bound where R is
+  // singular. Skip the optimization instead and commit the model at the given
+  // theta (or the default starting point): beta = least squares, sigma2 = 0,
+  // i.e. predictions equal to the trend with zero variance.
+  // With a nugget, the estimated total variance is zero too (sigma2 = nugget
+  // = 0). With a known heterogeneous noise, the sigma2 estimate is 0, which
+  // the R = C + diag(noise / sigma2) parameterization cannot represent:
+  // reject such data explicitly rather than with an opaque optimizer failure.
+  const bool degenerate
+      = (optim != "none") && (m_noise_model != NoiseModel::Heterogeneous) && !parameters.sigma2.has_value()
+        && !(m_noise_model == NoiseModel::Nugget && parameters.nugget.has_value()) && y_in_trend_span();
+  if (optim != "none" && m_noise_model == NoiseModel::Heterogeneous && !parameters.sigma2.has_value()
+      && y_in_trend_span())
+    throw std::invalid_argument(
+        "fit: y lies in the span of the trend (no residual variability), so the process variance sigma2 is 0, "
+        "which a heterogeneous-noise model cannot represent; use noise=\"nugget\" or no noise, or give sigma2");
+  if (degenerate && Optim::log_level > Optim::log_none)
+    arma::cout << "Warning: y lies in the span of the trend (no residual variability): theta is not identifiable; "
+                  "fit skips the optimization (sigma2 = 0)"
+               << arma::endl;
+
+  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
+  if (optim == "none" || degenerate) {
+    if (!parameters.theta.has_value() && !degenerate)
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
-    m_theta = trans(theta0.row(0));
+    if (!theta0.is_empty()) {
+      m_theta = trans(theta0.row(0));
+    } else {  // degenerate data, no theta given: deterministic default (typical
+              // inter-point spacing, which keeps R well conditioned); theta has
+              // no effect on predictions since sigma2 = 0
+      const double n_pow = std::pow(static_cast<double>(n), -1.0 / static_cast<double>(d));
+      m_theta = arma::vec(m_maxdX) * n_pow;
+      m_theta.replace(0.0, 1.0);
+    }
     m_est_theta = false;
 
     double sigma2 = -1;
@@ -2251,8 +2295,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                        ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
                                                                               : Optim::reparam_from(gamma_tmp).head(d))
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
-            double sol_to_lb = arma::min(arma::abs(theta_part - theta_lower));
-            double sol_to_ub = arma::min(arma::abs(theta_part - theta_upper));
+            // over free dimensions only: a pinned one (lower == upper, e.g. a
+            // constant input) is always "at its bound"
+            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
+            double sol_to_lb = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_lower(free_dims)));
+            double sol_to_ub = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
             // Check abnormal termination or convergence at bounds to decide on restart
@@ -2269,7 +2320,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
               }
 
               // Restart with contracted bounds around initial point (theta part only)
-              arma::vec restart_theta = (theta_start + theta_lower) / pow(2.0, retry + 1);
+              // kept inside [theta_lower, theta_upper]: L-BFGS-B does not
+              // project its starting point, so an outside one gave a theta
+              // outside the bounds
+              arma::vec restart_theta = arma::max(
+                  arma::min(arma::vec((theta_start + theta_lower) / pow(2.0, retry + 1)), theta_upper), theta_lower);
               gamma_tmp.head(d) = restart_theta;
               if (m_noise_model != NoiseModel::None)
                 gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];

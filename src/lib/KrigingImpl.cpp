@@ -743,6 +743,11 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
     scaleX = max(X, 0) - min(X, 0);
     centerY = min(y);
     scaleY = max(y) - min(y);
+    // a constant column / output has a zero range: keep it unscaled (only
+    // centered) instead of dividing by zero
+    scaleX.replace(0.0, 1.0);
+    if (scaleY == 0.0)
+      scaleY = 1.0;
   } else {
     centerX = arma::rowvec(d, arma::fill::zeros);
     scaleX = arma::rowvec(d, arma::fill::ones);

@@ -64,6 +64,25 @@ past release, see the corresponding entry on the
   `Kriging([1], [1], "gauss")` model, whose mex reference was then
   overwritten and never released. It now wraps the loaded reference directly,
   like `WarpKriging.load` / `MLPKriging.load`.
+- `Kriging::fit` on degenerate data:
+  - `y` in the span of the trend (constant `y` with a constant trend, affine
+    `y` with a linear one, ...): the residual is zero for every theta, so
+    sigma2 = 0 and theta is not identifiable; the optimizer drove theta to a
+    bound where R is singular and failed ("All 1 optimization attempts
+    failed"). The fit now skips the optimization and commits the model at the
+    given theta (or a deterministic default): least-squares trend, sigma2 = 0
+    (and nugget = 0), i.e. trend predictions with zero variance. With a known
+    heterogeneous noise, sigma2 = 0 is not representable: explicit error.
+  - a constant input column got [0, 0] theta bounds (theta = 0: division by
+    zero in the kernel); its theta is now pinned to 1.
+  - `normalize = true` divided by a zero range for a constant output or input
+    column (shared by Kriging, WarpKriging, MLPKriging); it is now only
+    centered.
+  - BFGS restarts started from `(theta_start + theta_lower) / 2^k`, which can
+    lie below `theta_lower`; L-BFGS-B does not project its starting point, so
+    the returned theta could be outside its bounds. The restart point is now
+    clamped to the bounds, and the "stuck at a bound" test ignores pinned
+    dimensions.
 - R: `WarpKriging` and `MLPKriging` had no `k$F()` / `k$T()` (only
   `k$F_()` / `k$T_()`), although `bindings/README.md` documents `obj$F()`,
   and `Kriging` had no `F_()` / `T_()`. All three classes now provide both
