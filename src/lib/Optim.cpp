@@ -205,6 +205,15 @@ LIBKRIGING_EXPORT std::pair<arma::vec, arma::vec> Optim::theta_bounds(const arma
       theta_upper = arma::max(theta_lower, theta_upper);
     }
   }
+  // A constant input (zero range) carries no information on its range
+  // parameter, and [0, 0] bounds would give theta = 0, i.e. a division by
+  // zero in the kernel: pin it to 1 instead (lower = upper).
+  for (arma::uword k = 0; k < maxdX.n_elem; ++k) {
+    if (maxdX.at(k) == 0.0) {
+      theta_lower.at(k) = 1.0;
+      theta_upper.at(k) = 1.0;
+    }
+  }
   return {theta_lower, theta_upper};
 }
 

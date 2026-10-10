@@ -170,7 +170,7 @@ Xnew <- seq(0, 1, , 21)
 p <- predict(k, Xnew)                       # exact conditional mean/stdev
 
 # simulate 10 paths at Xnew, keep internals for a later update_simulate
-sims <- simulate(k, nsim = 10, seed = 123, X = Xnew, will_update = TRUE)
+sims <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)
 
 # a new real observation arrives
 X_u <- 0.5; y_u <- f(X_u)
@@ -182,7 +182,7 @@ sims_updated <- update_simulate(k, y_u, X_u)
 # equivalent (but more expensive) reference: refit then resimulate
 k2 <- copy(k)
 update(k2, y_u, X_u, refit = FALSE)
-sims_ref <- simulate(k2, nsim = 10, seed = 123, X = Xnew)
+sims_ref <- simulate(k2, nsim = 10, seed = 123, x = Xnew)
 # sims_updated ≈ sims_ref
 ```
 
@@ -194,6 +194,11 @@ sims_ref <- simulate(k2, nsim = 10, seed = 123, X = Xnew)
 - `update_simulate` requires a preceding `simulate(..., will_update=TRUE)`
   call on the same model — it reuses that call's cached factors and
   random stream.
+- Fits without an exact factorization (`objective="LLNystrom(k)"`, and
+  the C++-only light Vecchia mode) simulate through their approximate
+  simulators (`simulateNystrom`, `simulateVecchia`), with no
+  `will_update` and hence no `update_simulate`
+  ([Nystrom.md](Nystrom.md), [Vecchia.md](Vecchia.md)).
 - Numerical correctness is validated by mockup R scripts comparing a
   from-scratch reference implementation (independent Cholesky/QR
   formulas) against the library's `predict`/`simulate`/`update`, for

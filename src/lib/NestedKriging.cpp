@@ -1,7 +1,13 @@
 #include "libKriging/NestedKriging.hpp"
 
+#include "libKriging/utils/jsonutils.hpp"
+#include "libKriging/utils/nlohmann/json.hpp"
+#include "libKriging/utils/utils.hpp"
+
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 
@@ -528,4 +534,113 @@ std::string NestedKriging::summary() const {
   oss << "* variance: " << m_sigma2 << "\n";
   oss << "* covariance: " << m_covType << ", range: " << m_theta.t();
   return oss.str();
+}
+
+// =============================================================================
+// save / load
+// =============================================================================
+
+void NestedKriging::save(const std::string filename) const {
+  if (!m_is_fitted)
+    throw std::runtime_error("NestedKriging::save: model is not fitted");
+  nlohmann::json j;
+  j["version"] = 3;
+  j["content"] = "NestedKriging";
+  j["covType"] = m_covType;
+  j["aggregation"] = aggregationToString(m_aggregation);
+  j["partition"] = (m_partition_method == Partition::KMeans) ? "kmeans" : "random";
+  j["seed"] = m_seed;
+  j["predict_chunk"] = m_chunk;
+  j["warp_subsample"] = m_warp_subsample;
+  j["regmodel"] = Trend::toString(m_regmodel);
+  j["warping"] = m_warping;
+  j["X"] = to_json(m_X);
+  j["y"] = to_json(m_y);
+  nlohmann::json groups = nlohmann::json::array();
+  for (const arma::uvec& g : m_groups)
+    groups.push_back(std::vector<arma::uword>(g.begin(), g.end()));
+  j["groups"] = groups;
+  j["theta"] = to_json(m_theta);
+  j["sigma2"] = m_sigma2;
+  j["beta0"] = m_beta0;
+  // submodels are stored with their own (Kriging / WarpKriging) schema
+  nlohmann::json subs = nlohmann::json::array();
+  if (warped()) {
+    for (const auto& wk : m_wsubmodels) {
+      nlohmann::json js;
+      js["version"] = 3;
+      js["content"] = "WarpKriging";
+      wk->dump_to_json(js);
+      subs.push_back(js);
+    }
+  } else {
+    for (const auto& km : m_submodels) {
+      nlohmann::json js;
+      km->dump_to_json(js);
+      subs.push_back(js);
+    }
+  }
+  j["submodels"] = subs;
+
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+NestedKriging NestedKriging::load(const std::string filename) {
+  std::ifstream f(filename);
+  nlohmann::json j = nlohmann::json::parse(f);
+
+  const uint32_t version = j["version"].template get<uint32_t>();
+  if (version != 3)
+    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 3"));
+  const std::string content = j["content"].template get<std::string>();
+  if (content != "NestedKriging")
+    throw std::runtime_error(
+        asString("Bad content to load from '", filename, "'; found '", content, "', requires 'NestedKriging'"));
+
+  NestedKriging nk(j["covType"].template get<std::string>());
+  nk.m_aggregation = aggregationFromString(j["aggregation"].template get<std::string>());
+  nk.m_partition_method
+      = (j["partition"].template get<std::string>() == "kmeans") ? Partition::KMeans : Partition::Random;
+  nk.m_seed = j["seed"].template get<int>();
+  nk.m_chunk = j["predict_chunk"].template get<arma::uword>();
+  nk.m_warp_subsample = j["warp_subsample"].template get<arma::uword>();
+  nk.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
+  nk.m_warping = j["warping"].template get<std::vector<std::string>>();
+  nk.m_X = mat_from_json(j["X"]);
+  nk.m_y = colvec_from_json(j["y"]);
+  for (const auto& g : j["groups"])
+    nk.m_groups.emplace_back(g.template get<std::vector<arma::uword>>());
+  nk.m_theta = colvec_from_json(j["theta"]);
+  nk.m_sigma2 = j["sigma2"].template get<double>();
+  nk.m_beta0 = j["beta0"].template get<double>();
+
+  const auto& subs = j["submodels"];
+  if (subs.size() != nk.m_groups.size())
+    throw std::runtime_error(asString("Bad content to load from '",
+                                      filename,
+                                      "'; found ",
+                                      subs.size(),
+                                      " submodels for ",
+                                      nk.m_groups.size(),
+                                      " groups"));
+  for (const auto& js : subs) {
+    if (nk.warped()) {
+      auto wk = std::make_unique<libKriging::WarpKriging>(nk.m_warping, nk.m_covType);
+      wk->load_from_json(js);
+      // load_from_json() calibrates the warps on the submodel's own design;
+      // restore the full-design calibration shared by all groups (see fit())
+      wk->recalibrate_warps(nk.m_X);
+      nk.m_wsubmodels.push_back(std::move(wk));
+    } else {
+      nk.m_submodels.push_back(std::make_unique<Kriging>(Kriging::load_from_json(js, filename)));
+    }
+  }
+
+  // NK precomputations are not stored: rebuilt from the common prior, exactly
+  // as at the end of fit()
+  if (nk.m_aggregation == Aggregation::NK)
+    nk.precompute_nk();
+  nk.m_is_fitted = true;
+  return nk;
 }

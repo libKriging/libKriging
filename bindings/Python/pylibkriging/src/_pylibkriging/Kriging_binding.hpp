@@ -99,6 +99,7 @@ class PyKriging {
   std::string optim();
   std::string objective();
   int nystrom_rank();
+  int vecchia_neighbors();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

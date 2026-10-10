@@ -64,13 +64,14 @@ domain.
   factorization is exact and `LLNystrom(n)` reproduces the exact
   concentrated log-likelihood at any θ (used as a correctness check in
   `KrigingNystromTest.cpp`).
-- **Prediction**: after fitting, `predict` uses one exact O(n³)
-  factorization at the fitted θ* by default (small/medium n).
-  `predictNystrom` (C++ API only, like `simulateNystrom`; bindings only
-  expose `predict`) instead reuses the committed rank-k factors (U, D)
-  from the fit via the Woodbury identity — no n×n factorization, usable
-  after any `"LLNystrom(k)"` fit. `simulateNystrom` similarly draws
-  joint sample trajectories through the same low-rank machinery.
+- **Prediction**: a Nystrom fit commits no exact factorization, so
+  `predict` routes to `predictNystrom`, which reuses the committed rank-k
+  factors (U, D) via the Woodbury identity — O(n k q) instead of
+  O(n² q) for q points (mean and stdev only: `return_cov` /
+  `return_deriv` raise). Likewise `simulate` routes to `simulateNystrom`
+  (joint trajectories through the same low-rank machinery; no
+  `will_update`). `predictNystrom` / `simulateNystrom` themselves are C++
+  API only; from a binding, `predict` / `simulate` reach them.
 - **Update/save**: a Nystrom fit never holds an exact n×n
   factorization (unlike Vecchia's optional "light" mode, this is the
   *only* mode Nystrom has). `update` routes through a dedicated
@@ -94,7 +95,7 @@ y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, stdev = TRUE)
+pred <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
 ## Current limitations

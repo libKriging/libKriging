@@ -173,3 +173,68 @@ arma::vec nestedkriging_y(Rcpp::List k) {
   Rcpp::XPtr<NestedKriging> impl_ptr(impl);
   return impl_ptr->y();
 }
+
+// [[Rcpp::export]]
+void nestedkriging_save(Rcpp::List k, std::string filename) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  impl_ptr->save(filename);
+}
+
+// [[Rcpp::export]]
+Rcpp::List nestedkriging_load(std::string filename) {
+  Rcpp::XPtr<NestedKriging> impl_ptr(new NestedKriging(NestedKriging::load(filename)));
+  Rcpp::List obj;
+  obj.attr("object") = impl_ptr;
+  obj.attr("class") = "NestedKriging";
+  return obj;
+}
+
+// [[Rcpp::export]]
+void nestedkriging_fit(Rcpp::List k,
+                       arma::vec y,
+                       arma::mat X,
+                       unsigned long nb_groups,
+                       std::string regmodel = "constant",
+                       std::string optim = "BFGS",
+                       std::string objective = "LL",
+                       Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                       Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  impl_ptr->fit(y,
+                X,
+                nb_groups,
+                Trend::fromString(regmodel),
+                optim,
+                objective,
+                parameters_from_list(parameters, optim),
+                warping.isNotNull() ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
+                                    : std::vector<std::string>{});
+}
+
+// [[Rcpp::export]]
+void nestedkriging_set_predict_chunk(Rcpp::List k, int chunk) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  if (chunk < 1)
+    Rcpp::stop("chunk must be >= 1");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  impl_ptr->set_predict_chunk(static_cast<arma::uword>(chunk));
+}
+
+// [[Rcpp::export]]
+void nestedkriging_set_warp_subsample(Rcpp::List k, int m) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  if (m < 1)
+    Rcpp::stop("m must be >= 1");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  impl_ptr->set_warp_subsample(static_cast<arma::uword>(m));
+}

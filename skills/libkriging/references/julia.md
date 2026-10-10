@@ -24,8 +24,12 @@ k = Kriging(y, X, "matern5_2";
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 # p.mean, p.stdev, p.cov, p.mean_deriv, p.stdev_deriv
 
-s = simulate(k, 10, 123, Xnew; will_update=false)   # (k, nsim, seed, X)
+s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
+s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
+
+save(k, "k.json")              # JSON, any libKriging class
+k = jlibkriging.load("k.json")  # auto-detects the class
 
 log_likelihood(k)
 leave_one_out(k)
@@ -83,9 +87,10 @@ k = Kriging(y[idx], X[idx, :], "matern5_2")
 k = Kriging(y, X, "matern5_2"; objective="LLVecchia(30)")   # d <~ 5
 k = Kriging(y, X, "matern5_2"; objective="LLNystrom(50)")   # higher d
 nystrom_rank(k)   # 50 (0 if the model was not fitted with LLNystrom)
+vecchia_neighbors(k)   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
 `predict` is the only prediction entry point from Julia: `predictVecchia`,
-`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
 Vecchia mode) exist in C++ only.
 
 ## NestedKriging
@@ -102,7 +107,8 @@ nk = NestedKriging(y, X, "matern5_2", 20;   # nb_groups
 predict(nk, Xnew; return_stdev=true)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging`.
+`normalize=`. `save(nk, "nk.json")` / `load("nk.json")` (or
+`load_nested_kriging`) work as for the other classes.
 
 ## Common pitfalls to flag in review
 

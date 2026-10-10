@@ -17,7 +17,7 @@ Gaussian-process-regression setup (Rasmussen & Williams, 2006).
 
 ```r
 k <- Kriging(y, X, kernel = "matern5_2", regmodel = "constant", objective = "LL")
-p <- predict(k, Xnew, stdev = TRUE)
+p <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
 ## Mathematical description
@@ -102,7 +102,7 @@ y = np.sin(3 * X[:, 0]) + rng.normal(scale=0.02, size=20)
 
 model = lk.Kriging(y, X, "matern5_2", regmodel="constant", objective="LL")
 Xnew = np.linspace(0, 1, 50).reshape(-1, 1)
-mean, stdev = model.predict(Xnew, return_stdev=True)
+mean, stdev, _, _, _ = model.predict(Xnew, return_stdev=True)
 print(model.theta(), model.sigma2())
 ```
 

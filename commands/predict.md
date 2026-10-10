@@ -18,9 +18,11 @@ Predict with a fitted libKriging model. Context / arguments: $ARGUMENTS
    - gradient of mean / stdev w.r.t. inputs (sensitivity, gradient-based
      optimization) → `return_deriv=True`.
 
-3. Mind the return shape: in Python `predict()` always returns the fixed
-   5-tuple `(mean, stdev, cov, mean_deriv, stdev_deriv)` — the flags only
-   decide which entries are filled, not the arity. R/Julia/Octave-MATLAB
+3. Mind the return shape: in Python `predict()` of `Kriging` / `WarpKriging` /
+   `MLPKriging` always returns the fixed 5-tuple
+   `(mean, stdev, cov, mean_deriv, stdev_deriv)` — the flags only decide which
+   entries are filled, not the arity — with 1-D `mean` / `stdev` of shape
+   `(n,)`; `NestedKriging.predict()` returns `(mean, stdev)`. R/Julia/Octave-MATLAB
    return the analogous named fields per their reference file.
 
 4. Report mean ± stdev (and cov/deriv if requested). Flag any `Xnew` rows

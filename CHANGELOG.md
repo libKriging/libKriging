@@ -11,7 +11,125 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Changed
+- **Python (breaking):** every vector-valued output of `Kriging`,
+  `WarpKriging` and `MLPKriging` is now a 1-D numpy array of shape `(n,)`
+  instead of `(n, 1)` (or `(1, d)` for `centerX` / `scaleX`): `predict` mean
+  and stdev, `theta`, `beta`, `y`, `z`, `noise`, `warp_params`, gradients of
+  `logLikelihoodFun` / `leaveOneOutFun` / `logMargPostFun`, `leaveOneOutVec`,
+  `subsetOfData` indices and the matching `model()` entries. This matches
+  `NestedKriging` and scikit-learn; matrices (`X`, `F`, `T`, `M`, covariances,
+  derivatives, simulations) are unchanged. Code indexing `[:, 0]` on those
+  outputs must drop the index; `ravel()` / `flatten()` / `reshape(...)` keep
+  working.
+
+### Added
+- `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
+  (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
+  instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
+  on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
+  raise; `will_update=true` still raises there.
+- NestedKriging API parity across bindings: `X`, `y`, `groups`, `warping`,
+  `set_predict_chunk` and `set_warp_subsample` in Julia
+  (`set_predict_chunk!` / `set_warp_subsample!`) and Octave/Matlab; `fit` on
+  an existing object (refit), `set_predict_chunk` and `set_warp_subsample` in
+  R. `groups` are 1-based in R, Julia and Octave/Matlab, 0-based in Python.
+- `vecchia_neighbors()` in every binding (Python, R, Julia, Octave/Matlab),
+  alongside the already exposed `nystrom_rank()`: number `m` of conditioning
+  neighbors of an `LLVecchia(m)` fit, 0 otherwise.
+- Python: `pickle` support for `Kriging`, `WarpKriging`, `MLPKriging` and
+  `NestedKriging` (through their JSON save/load), so the scikit-learn
+  wrappers can be cloned, cached and sent to worker processes.
+- `NestedKriging::save` / `NestedKriging::load` (C++, Python, R, Julia,
+  Octave/Matlab): configuration, data, partition, common prior and submodels
+  (`Kriging` or `WarpKriging`) in one JSON file; the NK precomputations are
+  rebuilt at load. `KrigingLoader::describe` reports
+  `KrigingType::NestedKriging`, so the generic `load` of each binding
+  dispatches to it.
+
 ### Fixed
+- `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
+  (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
+  light Vecchia fit they went to the exact simulator, which has no
+  factorization to use. They now route to `simulateNystrom` /
+  `simulateVecchia` like the base overload (and refuse `will_update=true`).
+- Python `pylibkriging.load()` and Octave/Matlab `class_saved` /
+  `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
+  (described as `NuggetKriging` / `NoiseKriging` by the loader, which these
+  two bindings did not map back to `Kriging`).
+- Python: deadlock in code paths where libKriging allocates from worker
+  threads while the calling Python thread holds the GIL: NestedKriging NK
+  `predict` (OpenMP pair loop) and WarpKriging parallel multistart
+  (`BFGS<k>`). The numpy allocator handed to libKriging reports to
+  tracemalloc, which takes the GIL; it is now used only from threads holding
+  the GIL, other threads use `std::malloc` (each block is freed by the C
+  runtime that allocated it). The NestedKriging Python tests are now
+  registered in CTest, with a subprocess/timeout regression test.
+- Octave/Matlab `Kriging.load` built and printed a throw-away
+  `Kriging([1], [1], "gauss")` model, whose mex reference was then
+  overwritten and never released. It now wraps the loaded reference directly,
+  like `WarpKriging.load` / `MLPKriging.load`.
+- `Kriging::fit` on degenerate data:
+  - `y` in the span of the trend (constant `y` with a constant trend, affine
+    `y` with a linear one, ...): the residual is zero for every theta, so
+    sigma2 = 0 and theta is not identifiable; the optimizer drove theta to a
+    bound where R is singular and failed ("All 1 optimization attempts
+    failed"). The fit now skips the optimization and commits the model at the
+    given theta (or a deterministic default): least-squares trend, sigma2 = 0
+    (and nugget = 0), i.e. trend predictions with zero variance. With a known
+    heterogeneous noise, sigma2 = 0 is not representable: explicit error.
+  - a constant input column got [0, 0] theta bounds (theta = 0: division by
+    zero in the kernel); its theta is now pinned to 1.
+  - `normalize = true` divided by a zero range for a constant output or input
+    column (shared by Kriging, WarpKriging, MLPKriging); it is now only
+    centered.
+  - BFGS restarts started from `(theta_start + theta_lower) / 2^k`, which can
+    lie below `theta_lower`; L-BFGS-B does not project its starting point, so
+    the returned theta could be outside its bounds. The restart point is now
+    clamped to the bounds, and the "stuck at a bound" test ignores pinned
+    dimensions.
+- R: `WarpKriging` and `MLPKriging` had no `k$F()` / `k$T()` (only
+  `k$F_()` / `k$T_()`), although `bindings/README.md` documents `obj$F()`,
+  and `Kriging` had no `F_()` / `T_()`. All three classes now provide both
+  `k$F()` / `k$T()` and `F_(k)` / `T_(k)` (the S3 generics stay named `F_` /
+  `T_` so as not to mask `base::F` / `base::T`).
+- Python scikit-learn wrapper `NestedKrigingRegressor`: `nb_groups` is
+  capped to `n // (d + 2)` (value used stored in `nb_groups_`, with a warning)
+  and fewer than `d + 2` samples raise a clear `ValueError`, instead of the
+  native "nb_groups should be in [1, n/(d+2)]" error on small samples.
+- Python tests `test_new_features.py`, `sklearn_estimator_test.py` and
+  `sklearn_multimodel_test.py` were never run by CTest (and the scikit-learn
+  ones failed); they are now registered and pass.
+- Documentation, skills and plugin commands checked against the bindings
+  code (calls, argument names, return shapes; Python snippets executed, C++
+  snippets compiled):
+  - `bindings/README.md`: Octave/Matlab constructors are `Kriging(...)`,
+    `WarpKriging(...)`, ... (not `build(...)`); Python loads are
+    `Kriging.load(f)` / `pylibkriging.load(f)` (no `load_kriging`); R object
+    methods are `feature_dim()`, `is_fitted()`, `hidden_dims()`; Python
+    `subsetOfData` returns a 1-D array; the "C++ only" list now has
+    `simulateVecchia` and no longer `vecchia_neighbors`.
+  - `predict` unpacked as a pair for `Kriging` / `WarpKriging` /
+    `MLPKriging` (5-tuple) in `docs/math/Kriging.md`,
+    `Warping-MLPJoint.md`, `Warping-NeuralMono.md` and the C++ reference;
+    Python `logLikelihoodFun` returns `(ll, grad, hess)`.
+  - R examples passed `stdev = TRUE` (argument is `return_stdev`),
+    `noise_model =` (argument is `noise`) and `simulate(..., X = )`
+    (argument is `x`); Julia README examples passed `stdev=` / `cov=`
+    (keywords are `return_stdev` / `return_cov`).
+  - C++ reference: `WarpKriging` lives in `libKriging::`, its `fit` takes no
+    warping list, and the `NestedKriging` constructor takes the aggregation,
+    partition and seed before the trend.
+  - `docs/math/Nystrom.md` said `predict` used an exact factorization after
+    an `LLNystrom` fit; it routes to the Nystrom predictor / simulator.
+  - `commands/simulate.md`: results are `npred × nsim` (one column per
+    path) in every binding.
+  - Every language reference now shows save / load and
+    `simulate(..., will_update)` + `update_simulate`.
+- Octave/Matlab `Kriging.copy` returned the raw mex reference of the copy
+  instead of a `Kriging` object (and leaked it when the result was not
+  assigned). It now returns a `Kriging` object, like `WarpKriging.copy` /
+  `MLPKriging.copy`.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

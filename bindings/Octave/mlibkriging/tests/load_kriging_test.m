@@ -2,7 +2,8 @@
 
 f1d = @(x) 1 - 0.5 * (sin(12 * x) ./ (1 + x) + 2 * cos(7 * x) .* x.^5 + 0.7);
 
-cleanup_files = {"load_kriging_k.json", "load_kriging_wk.json", "load_kriging_mlp.json"};
+cleanup_files = {"load_kriging_k.json", "load_kriging_wk.json", "load_kriging_mlp.json", ...
+                 "load_kriging_nuk.json", "load_kriging_nk.json"};
 for i = 1:numel(cleanup_files)
     if exist(cleanup_files{i}, "file")
         unlink(cleanup_files{i});
@@ -30,6 +31,25 @@ try
     assert(strcmp(class_saved("load_kriging_mlp.json"), "MLPKriging"));
     mk2 = load_kriging("load_kriging_mlp.json");
     assert(isa(mk2, "MLPKriging"));
+
+    % Kriging with a nugget: described as NuggetKriging, loaded as Kriging
+    nuk = Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", [], "nugget");
+    nuk.save("load_kriging_nuk.json");
+    assert(strcmp(class_saved("load_kriging_nuk.json"), "Kriging"));
+    assert(isa(load_kriging("load_kriging_nuk.json"), "Kriging"));
+
+    X2 = rand(40, 2);
+    y2 = sin(3 * X2(:, 1)) + X2(:, 2);
+    nk = NestedKriging(y2, X2, "gauss", 2);
+    nk.save("load_kriging_nk.json");
+    assert(strcmp(class_saved("load_kriging_nk.json"), "NestedKriging"));
+    nk2 = load_kriging("load_kriging_nk.json");
+    assert(isa(nk2, "NestedKriging"));
+    Xt = rand(10, 2);
+    [m1, s1] = nk.predict(Xt);
+    [m2, s2] = nk2.predict(Xt);
+    assert(max(abs(m1 - m2)) < 1e-10);
+    assert(max(abs(s1 - s2)) < 1e-10);
 catch err
     for i = 1:numel(cleanup_files)
         if exist(cleanup_files{i}, "file")

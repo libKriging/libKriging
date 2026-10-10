@@ -45,8 +45,7 @@
  *   - NK aggregation requires a Constant trend (simple-kriging theory);
  *     PoE family works with any trend.
  *   - no nugget/noise channel;
- *   - `normalize` not yet supported (do it outside if needed);
- *   - save/load not yet implemented.
+ *   - `normalize` not yet supported (do it outside if needed).
  */
 class NestedKriging {
  public:
@@ -132,6 +131,15 @@ class NestedKriging {
   [[nodiscard]] arma::uword warp_subsample() const { return m_warp_subsample; }
 
   LIBKRIGING_EXPORT std::string summary() const;
+
+  /** Dump the fitted model (configuration, data, partition, common prior and
+   * every submodel) into a JSON file; NK precomputations are rebuilt by load().
+   * @param filename */
+  LIBKRIGING_EXPORT void save(const std::string filename) const;
+
+  /** Load a NestedKriging object saved by save()
+   * @param filename */
+  LIBKRIGING_EXPORT static NestedKriging load(const std::string filename);
 
  private:
   // configuration

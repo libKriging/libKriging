@@ -99,7 +99,8 @@ namespace {
 void libkriging_atfork_quiesce() {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
-  if (fn) fn(1);
+  if (fn)
+    fn(1);
 #endif
 #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -108,9 +109,9 @@ void libkriging_atfork_quiesce() {
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,  // prepare: quiesce before fork
-                   nullptr,                    // parent:  restored by next fit()
-                   libkriging_atfork_quiesce); // child:   ensure clean state
+    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
+                   nullptr,                     // parent:  restored by next fit()
+                   libkriging_atfork_quiesce);  // child:   ensure clean state
   }
 };
 static ForkSafeRegistrar fork_safe_registrar;
@@ -974,6 +975,17 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _theta,
   return vll;
 }
 
+bool Kriging::y_in_trend_span() const {
+  arma::vec r = m_y;
+  if (m_F.n_cols > 0) {
+    arma::vec b;
+    if (!arma::solve(b, m_F, m_y, arma::solve_opts::no_approx))
+      return false;
+    r = m_y - m_F * b;
+  }
+  return arma::norm(r, "inf") <= 1e-10 * arma::norm(m_y, "inf");
+}
+
 void Kriging::check_not_vecchia_light(const char* what) const {
   if (m_vecchia_light)
     throw std::runtime_error(std::string(what)
@@ -1073,6 +1085,117 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
 }
 
 // =============================================================================
+/* Vecchia (local) simulation: sequential conditional simulation in the row
+ * order of X_n. Point t is drawn from its simple-kriging conditional given
+ * its m nearest neighbors among the observations and the points 0..t-1
+ * already simulated (same draw shared by all nsim trajectories for the
+ * neighbor selection and kriging weights; only the conditioning values
+ * differ per trajectory). Chain rule => exact joint (beta known) as soon as
+ * every point conditions on all its predecessors (m >= n + q - 1). */
+LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m) {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword q = X_n.n_rows;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("simulateVecchia: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+  if (m_noise_model != NoiseModel::None)
+    throw std::runtime_error("simulateVecchia: only available for NoiseModel::None (no nugget/noise channel)");
+  if (nsim <= 0)
+    throw std::invalid_argument("simulateVecchia: nsim should be > 0");
+  if (m == 0)
+    m = (m_vecchia_m > 0) ? m_vecchia_m : 30;
+  const arma::uword m_obs = std::min<arma::uword>(m, n);
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  // 1) m nearest OBSERVATIONS of each simulation point: independent across
+  //    points, hence parallel (same search as predictVecchia).
+  arma::umat Nobs(m_obs, q);
+  arma::mat Dobs(m_obs, q);
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m_obs >= 40000)
+#endif
+  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+    std::vector<std::pair<double, arma::uword>> cand(n);
+    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+    for (arma::uword j = 0; j < n; ++j) {
+      double s = 0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double dk = x_t(k) - xp[j * d + k];
+        s += dk * dk;
+      }
+      cand[j] = {s, j};
+    }
+    if (m_obs < n)
+      std::nth_element(cand.begin(), cand.begin() + m_obs, cand.end());
+    for (arma::uword j = 0; j < m_obs; ++j) {
+      Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
+      Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
+    }
+  }
+
+  // 2) sequential pass: the m nearest of (observations U previous simulation
+  //    points) are among (m nearest observations U previous simulation points).
+  //    Candidate index c < n is observation c, c >= n is simulation point c-n.
+  const arma::vec resid_o = m_y - m_F * m_beta;  // observed residuals (shared by all trajectories)
+  arma::mat Z(q, nsim, arma::fill::zeros);       // simulated residuals (normalized scale)
+  Random::reset_seed(seed);
+  const arma::mat eps = Random::randn_mat(q, nsim);
+  const double sigma = std::sqrt(m_sigma2);
+
+  auto row_of = [&](arma::uword c) -> arma::rowvec { return (c < n) ? m_X.row(c) : Xn_n.row(c - n); };
+
+  std::vector<std::pair<double, arma::uword>> cand;
+  for (arma::uword t = 0; t < q; ++t) {
+    cand.clear();
+    for (arma::uword j = 0; j < m_obs; ++j)
+      cand.emplace_back(Dobs(j, t), Nobs(j, t));
+    const arma::rowvec x_t = Xn_n.row(t);
+    for (arma::uword s = 0; s < t; ++s)
+      cand.emplace_back(arma::accu(arma::square(x_t - Xn_n.row(s))), n + s);
+    const arma::uword mt = std::min<arma::uword>(m, cand.size());
+    if (mt < cand.size())
+      std::nth_element(cand.begin(), cand.begin() + mt, cand.end());
+
+    double cond_var = 1.0;
+    arma::rowvec cond_mean(nsim, arma::fill::zeros);
+    if (mt > 0) {
+      arma::mat RN(mt, mt, arma::fill::ones);
+      arma::vec r(mt);
+      arma::mat ZN(mt, nsim);
+      for (arma::uword a = 0; a < mt; ++a) {
+        const arma::uword ca = cand[a].second;
+        const arma::rowvec xa = row_of(ca);
+        for (arma::uword b = a + 1; b < mt; ++b) {
+          const arma::vec dx = (xa - row_of(cand[b].second)).t();
+          RN(a, b) = RN(b, a) = _Cov(dx, m_theta);
+        }
+        r(a) = _Cov((xa - x_t).t(), m_theta);
+        if (ca < n)
+          ZN.row(a).fill(resid_o(ca));
+        else
+          ZN.row(a) = Z.row(ca - n);
+      }
+      RN.diag() += LinearAlgebra::num_nugget;
+      const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+      const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+      cond_mean = a_vec.t() * ZN;
+      cond_var = std::max(0.0, 1.0 - arma::dot(r, a_vec));
+    }
+    Z.row(t) = cond_mean + sigma * std::sqrt(cond_var) * eps.row(t);
+  }
+
+  arma::mat y_n = Z;
+  y_n.each_col() += F_n * m_beta;
+  return m_centerY + m_scaleY * y_n;
+}
+
 // Nystrom approximated log-likelihood (objective="LLNystrom(k)")
 //
 // Global low-rank alternative to Vecchia: R ~= R_ns * R_ss^-1 * R_ns.t(),
@@ -1683,11 +1806,44 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   const double scaleY = m_scaleY;
   const arma::rowvec& scaleX = m_scaleX;
 
-  if (optim == "none") {  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
-    if (!parameters.theta.has_value())
+  // Degenerate data: y is (to rounding) in the span of the trend (e.g. a
+  // constant y with a constant trend). The residual y - F*beta is then zero
+  // for every theta, so sigma2 = 0 and the likelihood is unbounded: theta is
+  // not identifiable and an optimizer only drives it to a bound where R is
+  // singular. Skip the optimization instead and commit the model at the given
+  // theta (or the default starting point): beta = least squares, sigma2 = 0,
+  // i.e. predictions equal to the trend with zero variance.
+  // With a nugget, the estimated total variance is zero too (sigma2 = nugget
+  // = 0). With a known heterogeneous noise, the sigma2 estimate is 0, which
+  // the R = C + diag(noise / sigma2) parameterization cannot represent:
+  // reject such data explicitly rather than with an opaque optimizer failure.
+  const bool degenerate
+      = (optim != "none") && (m_noise_model != NoiseModel::Heterogeneous) && !parameters.sigma2.has_value()
+        && !(m_noise_model == NoiseModel::Nugget && parameters.nugget.has_value()) && y_in_trend_span();
+  if (optim != "none" && m_noise_model == NoiseModel::Heterogeneous && !parameters.sigma2.has_value()
+      && y_in_trend_span())
+    throw std::invalid_argument(
+        "fit: y lies in the span of the trend (no residual variability), so the process variance sigma2 is 0, "
+        "which a heterogeneous-noise model cannot represent; use noise=\"nugget\" or no noise, or give sigma2");
+  if (degenerate && Optim::log_level > Optim::log_none)
+    arma::cout << "Warning: y lies in the span of the trend (no residual variability): theta is not identifiable; "
+                  "fit skips the optimization (sigma2 = 0)"
+               << arma::endl;
+
+  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
+  if (optim == "none" || degenerate) {
+    if (!parameters.theta.has_value() && !degenerate)
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
-    m_theta = trans(theta0.row(0));
+    if (!theta0.is_empty()) {
+      m_theta = trans(theta0.row(0));
+    } else {  // degenerate data, no theta given: deterministic default (typical
+              // inter-point spacing, which keeps R well conditioned); theta has
+              // no effect on predictions since sigma2 = 0
+      const double n_pow = std::pow(static_cast<double>(n), -1.0 / static_cast<double>(d));
+      m_theta = arma::vec(m_maxdX) * n_pow;
+      m_theta.replace(0.0, 1.0);
+    }
     m_est_theta = false;
 
     double sigma2 = -1;
@@ -1826,17 +1982,20 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           active = true;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(static_cast<int>(n));
+          if (fn)
+            fn(static_cast<int>(n));
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(static_cast<int>(n));
 #endif
         }
         ~ThreadCountGuard() {
-          if (!active) return;
+          if (!active)
+            return;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(1);
+          if (fn)
+            fn(1);
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(1);
@@ -2136,8 +2295,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                        ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
                                                                               : Optim::reparam_from(gamma_tmp).head(d))
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
-            double sol_to_lb = arma::min(arma::abs(theta_part - theta_lower));
-            double sol_to_ub = arma::min(arma::abs(theta_part - theta_upper));
+            // over free dimensions only: a pinned one (lower == upper, e.g. a
+            // constant input) is always "at its bound"
+            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
+            double sol_to_lb = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_lower(free_dims)));
+            double sol_to_ub = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
             // Check abnormal termination or convergence at bounds to decide on restart
@@ -2154,7 +2320,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
               }
 
               // Restart with contracted bounds around initial point (theta part only)
-              arma::vec restart_theta = (theta_start + theta_lower) / pow(2.0, retry + 1);
+              // kept inside [theta_lower, theta_upper]: L-BFGS-B does not
+              // project its starting point, so an outside one gave a theta
+              // outside the bounds
+              arma::vec restart_theta = arma::max(
+                  arma::min(arma::vec((theta_start + theta_lower) / pow(2.0, retry + 1)), theta_upper), theta_lower);
               gamma_tmp.head(d) = restart_theta;
               if (m_noise_model != NoiseModel::None)
                 gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
@@ -2419,6 +2589,18 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                       /*var_scale=*/sigma2);
 }
 
+// Simulation on a light (non-factorized) Vecchia or Nystrom fit: routes to
+// the matching approximate simulator. No exact factorization exists to cache
+// for update_simulate, so will_update=true is refused.
+arma::mat Kriging::simulate_light(int nsim, int seed, const arma::mat& X_n, bool will_update) {
+  if (will_update)
+    throw std::runtime_error(std::string("simulate: will_update=true is not available on a ")
+                             + (m_nystrom_light ? "Nystrom fit (refit with objective=\"LL\""
+                                                : "light Vecchia fit (refit with set_vecchia_exact_commit(true)")
+                             + ", or call simulate(..., false))");
+  return m_nystrom_light ? simulateNystrom(nsim, seed, X_n) : simulateVecchia(nsim, seed, X_n);
+}
+
 /** Draw sample trajectories of kriging at given points X'
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
@@ -2430,14 +2612,8 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
-  check_not_vecchia_light("simulate");
-  if (m_nystrom_light) {
-    if (will_update)
-      throw std::runtime_error(
-          "simulate: will_update=true is not available on a Nystrom fit "
-          "(refit with objective=\"LL\", or call simulate(..., false))");
-    return simulateNystrom(nsim, seed, X_n);
-  }
+  if (m_vecchia_light || m_nystrom_light)
+    return simulate_light(nsim, seed, X_n, will_update);
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -2456,6 +2632,10 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const bool with_nugget,
                                               const bool will_update) {
+  // Light (non-factorized) fits are NoiseModel::None only, so there is no
+  // nugget to add: same draw as simulate(nsim, seed, X_n, will_update).
+  if (m_vecchia_light || m_nystrom_light)
+    return simulate_light(nsim, seed, X_n, will_update);
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
   arma::mat y_n = simulate_impl(nsim,
@@ -2480,15 +2660,17 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
-  arma::mat y_n = simulate_impl(nsim,
-                                seed,
-                                X_n,
-                                will_update,
-                                /*R_on_factor=*/1.0,
-                                /*R_on_coincident_to_one=*/false,
-                                /*R_nn_factor=*/1.0,
-                                /*R_nn_diag=*/arma::vec(),
-                                /*Sigma_divisor=*/1.0);
+  const bool light = m_vecchia_light || m_nystrom_light;
+  arma::mat y_n = light ? simulate_light(nsim, seed, X_n, will_update)
+                        : simulate_impl(nsim,
+                                        seed,
+                                        X_n,
+                                        will_update,
+                                        /*R_on_factor=*/1.0,
+                                        /*R_on_coincident_to_one=*/false,
+                                        /*R_nn_factor=*/1.0,
+                                        /*R_nn_diag=*/arma::vec(),
+                                        /*Sigma_divisor=*/1.0);
   if (will_update)
     m_lastsim_with_noise = with_noise;
   arma::mat eps(n_n, nsim, arma::fill::none);
@@ -2823,8 +3005,14 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 }
 
 void Kriging::save(const std::string filename) const {
-  check_not_vecchia_light("save");
   nlohmann::json j;
+  dump_to_json(j);
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+void Kriging::dump_to_json(nlohmann::json& j) const {
+  check_not_vecchia_light("save");
   j["version"] = 2;
   j["content"] = "Kriging";
   dump_common_to_json(j);
@@ -2845,15 +3033,15 @@ void Kriging::save(const std::string filename) const {
     j["nystrom_U"] = to_json(m_nystrom_U);
     j["nystrom_D"] = to_json(m_nystrom_D);
   }
-
-  std::ofstream f(filename);
-  f << std::setw(4) << j;
 }
 
 Kriging Kriging::load(const std::string filename) {
   std::ifstream f(filename);
   nlohmann::json j = nlohmann::json::parse(f);
+  return load_from_json(j, filename);
+}
 
+Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& filename) {
   uint32_t version = j["version"].template get<uint32_t>();
   if (version != 2)
     throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));

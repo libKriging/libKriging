@@ -15,7 +15,8 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
 
   uint32_t version = j["version"].template get<uint32_t>();
   if (version < 2 || version > 3) {
-    throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
+    throw std::runtime_error(
+        asString("Bad version to load from '", filename, "'; found ", version, ", requires 2 or 3"));
   }
   content = j["content"].template get<std::string>();
 
@@ -36,6 +37,8 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
     return KrigingType::WarpKriging;
   } else if (content == "MLPKriging") {
     return KrigingType::MLPKriging;
+  } else if (content == "NestedKriging") {
+    return KrigingType::NestedKriging;
   } else {
     return KrigingType::Unknown;
   }

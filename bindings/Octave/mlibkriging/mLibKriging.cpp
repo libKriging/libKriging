@@ -61,7 +61,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       std::string klass;
       switch (KrigingLoader::describe(filename)) {
         case KrigingLoader::KrigingType::Kriging:
-
+        case KrigingLoader::KrigingType::NuggetKriging:  // Kriging(noise="nugget")
+        case KrigingLoader::KrigingType::NoiseKriging:   // Kriging(noise=noise_vector)
           klass = "Kriging";
           break;
         case KrigingLoader::KrigingType::WarpKriging:
@@ -69,6 +70,9 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
           break;
         case KrigingLoader::KrigingType::MLPKriging:
           klass = "MLPKriging";
+          break;
+        case KrigingLoader::KrigingType::NestedKriging:
+          klass = "NestedKriging";
           break;
         case KrigingLoader::KrigingType::Unknown:
           mexErrMsgIdAndTxt("mLibKriging:class_saved", "Unknown Kriging type in file");
@@ -135,6 +139,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::nystrom_rank"_hash:
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::vecchia_neighbors"_hash:
+      return KrigingBinding::vecchia_neighbors(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::X"_hash:
       return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::centerX"_hash:
@@ -202,6 +208,22 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NestedKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::beta0"_hash:
       return NestedKrigingBinding::beta0(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::X"_hash:
+      return NestedKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::y"_hash:
+      return NestedKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::groups"_hash:
+      return NestedKrigingBinding::groups(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::warping"_hash:
+      return NestedKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::set_predict_chunk"_hash:
+      return NestedKrigingBinding::set_predict_chunk(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::set_warp_subsample"_hash:
+      return NestedKrigingBinding::set_warp_subsample(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::save"_hash:
+      return NestedKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::load"_hash:
+      return NestedKrigingBinding::load(nlhs, plhs, nrhs - 1, prhs + 1);
 
     case "WarpKriging::new"_hash:
       return WarpKrigingBinding::build(nlhs, plhs, nrhs - 1, prhs + 1);

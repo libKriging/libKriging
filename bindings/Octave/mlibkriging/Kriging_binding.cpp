@@ -474,6 +474,16 @@ void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, static_cast<int>(km->nystrom_rank()), "nystrom_rank");
 }
 
+void vecchia_neighbors(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, static_cast<int>(km->vecchia_neighbors()), "vecchia_neighbors");
+}
+
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,

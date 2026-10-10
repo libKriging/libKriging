@@ -32,7 +32,7 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
@@ -1116,4 +1116,22 @@ logMargPost.Kriging <- function(object, ...) {
 copy.Kriging <- function(object, ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
   return(classKriging(kriging_copy(object)))
+}
+
+#' @title Get trend matrix F for a Kriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @method F_ Kriging
+#' @export
+F_.Kriging <- function(object, ...) {
+  kriging_F(object)
+}
+
+#' @title Get Cholesky factor T for a Kriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @method T_ Kriging
+#' @export
+T_.Kriging <- function(object, ...) {
+  kriging_T(object)
 }

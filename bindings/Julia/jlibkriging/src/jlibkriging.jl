@@ -370,6 +370,8 @@ function load(filename::String)
         return load_warp_kriging(filename)
     elseif content == "MLPKriging"
         return load_mlp_kriging(filename)
+    elseif content == "NestedKriging"
+        return load_nested_kriging(filename)
     else
         error("Unknown Kriging type in file: $filename")
     end
@@ -482,6 +484,10 @@ end
 
 function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
+end
+
+function vecchia_neighbors(k::Kriging)
+    return Int(ccall(dlsym(_lk(), :lk_kriging_vecchia_neighbors), Cint, (Ptr{Nothing},), k.ptr))
 end
 
 function normalize(k::Kriging)
@@ -1426,16 +1432,72 @@ beta0(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_beta0), Floa
 
 Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
+X(k::NestedKriging) = _get_mat(:lk_nested_kriging_get_X, k.ptr)
+y(k::NestedKriging) = _get_vec(:lk_nested_kriging_get_y, k.ptr)
+
+"""
+    groups(k::NestedKriging) -> Vector{Vector{Int}}
+
+Partition of the rows of `X(k)`: one vector of 1-based row indices per group.
+"""
+function groups(k::NestedKriging)
+    out = Vector{Vector{Int}}(undef, nb_groups(k))
+    for g in 1:length(out)
+        n = Ref{Cint}(0)
+        ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_group), Cint,
+                    (Ptr{Nothing}, Cint, Ptr{Cint}, Ptr{Cint}), k.ptr, g - 1, C_NULL, n)
+        _check_error(ret)
+        idx = Vector{Cint}(undef, n[])
+        ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_group), Cint,
+                    (Ptr{Nothing}, Cint, Ptr{Cint}, Ptr{Cint}), k.ptr, g - 1, idx, n)
+        _check_error(ret)
+        out[g] = Int.(idx) .+ 1
+    end
+    return out
+end
+
+function warping(k::NestedKriging)
+    n_ref = Ref{Cint}(0)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}), k.ptr, C_NULL, n_ref)
+    _check_error(ret)
+    ptrs = Vector{Ptr{Cchar}}(undef, n_ref[])
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}), k.ptr, ptrs, n_ref)
+    _check_error(ret)
+    return [unsafe_string(p) for p in ptrs]
+end
+
+function set_predict_chunk!(k::NestedKriging, chunk::Integer)
+    _check_error(ccall(dlsym(_lk(), :lk_nested_kriging_set_predict_chunk), Cint, (Ptr{Nothing}, Cint), k.ptr, chunk))
+    return k
+end
+
+function set_warp_subsample!(k::NestedKriging, m::Integer)
+    _check_error(ccall(dlsym(_lk(), :lk_nested_kriging_set_warp_subsample), Cint, (Ptr{Nothing}, Cint), k.ptr, m))
+    return k
+end
+
+function save(k::NestedKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_save), Cint, (Ptr{Nothing}, Cstring), k.ptr, filename)
+    _check_error(ret)
+end
+
+function load_nested_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_nested_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return NestedKriging(_check_ptr(ptr))
+end
+
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
-export nb_groups, aggregation, beta0
+export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
-export load, load_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
-export nystrom_rank
+export nystrom_rank, vecchia_neighbors
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim

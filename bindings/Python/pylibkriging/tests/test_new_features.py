@@ -94,9 +94,9 @@ class TestModel:
         assert params['normalize'] == True
         assert params['regmodel'] == 'linear'
         
-        # Check array shapes (carma returns column vectors as 2D (n,1) arrays)
+        # Check array shapes: X is a matrix, vectors are 1-D
         assert params['X'].shape == (n, 1)
-        assert params['y'].shape == (n, 1)
+        assert params['y'].shape == (n,)
         assert len(params['theta']) > 0
         assert len(params['beta']) > 0
     
@@ -113,7 +113,7 @@ class TestModel:
         
         # Heterogeneous noise Kriging should have 'noise' field
         assert 'noise' in params, "Heterogeneous noise model should have 'noise' field"
-        assert params['noise'].shape == (n, 1)
+        assert params['noise'].shape == (n,)
         assert params['noise_model'] == 'heterogeneous'
     
     def test_model_nugget_kriging(self):
@@ -328,3 +328,14 @@ class TestConsistency:
     
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_vecchia_neighbors_and_nystrom_rank():
+    rng = np.random.default_rng(5)
+    X = rng.uniform(size=(30, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    assert lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)").vecchia_neighbors() == 7
+    assert lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)").nystrom_rank() == 5
+    k = lk.Kriging(y, X, "matern5_2")
+    assert k.vecchia_neighbors() == 0
+    assert k.nystrom_rank() == 0

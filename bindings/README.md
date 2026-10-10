@@ -19,7 +19,7 @@ This document lists all methods exposed by each language binding for accessing t
 
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
-| Constructor | `new_Kriging(kernel)` | — | `Kriging(kernel)` / `Kriging(kernel, noise_model)` | `build(y,X,kernel,…)` | `Kriging(kernel)` / `Kriging(y,X,kernel;…)` |
+| Constructor | `new_Kriging(kernel)` | — | `Kriging(kernel)` / `Kriging(kernel, noise_model)` | `Kriging(y,X,kernel,…)` | `Kriging(kernel)` / `Kriging(y,X,kernel;…)` |
 | Fit | `kriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `kriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `kriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
@@ -27,7 +27,7 @@ This document lists all methods exposed by each language binding for accessing t
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
 | Update simulate | `kriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
-| Load | `kriging_load(file)` | `load.Kriging(file)` | `load_kriging(file)` | `load(file)` | `load_kriging(file)` |
+| Load | `kriging_load(file)` | `load.Kriging(file)` / `load(file)` | `Kriging.load(file)` / `pylibkriging.load(file)` | `Kriging.load(file)` / `load_kriging(file)` | `load_kriging(file)` / `load(file)` |
 | Summary | `kriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Covariance matrix | `kriging_covMat(obj,x1,x2)` | `obj$covMat(x1,x2)` | `obj.covMat(x1,x2)` | `covMat(obj,x1,x2)` | `cov_mat(obj,X1,X2)` |
 | Log-likelihood | `kriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
@@ -56,27 +56,34 @@ This document lists all methods exposed by each language binding for accessing t
 | `nugget` / `is_nugget_estim` | `kriging_nugget(obj)` / `kriging_is_nugget_estim(obj)` | `obj$nugget()` / `obj$is_nugget_estim()` | `obj.nugget()` / `obj.is_nugget_estim()` | `nugget(obj)` / `is_nugget_estim(obj)` | `nugget(obj)` / `is_nugget_estim(obj)` |
 | `noise` | `kriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `nystrom_rank` | `kriging_nystrom_rank(obj)` | `obj$nystrom_rank()` | `obj.nystrom_rank()` | `nystrom_rank(obj)` | `nystrom_rank(obj)` |
+| `vecchia_neighbors` | `kriging_vecchia_neighbors(obj)` | `obj$vecchia_neighbors()` | `obj.vecchia_neighbors()` | `vecchia_neighbors(obj)` | `vecchia_neighbors(obj)` |
 | **Pre-fit data reduction** | | | | | |
 | `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
 
 `subsetOfData` picks `n_max` representative rows of `X` (`method="kmeans"`, default: k-means centroids snapped to the
 nearest real observation; or `"random"`) to fit on a reduced design; see [docs/math/SubsetOfData.md](../docs/math/SubsetOfData.md).
-It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and Octave/Matlab**; the Python result is an
-`(n_max, 1)` integer array. Keep the matching `y` entries.
+It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and Octave/Matlab**; the Python result is a
+1-D integer array of length `n_max` (so `X[idx]` / `y[idx]` index directly). Keep the matching `y` entries.
 
 ### Fit objectives
 
 `Kriging` accepts `objective` = `"LL"` (default), `"LOO"`, `"LMP"`, and the two large-`n` approximations
 `"LLVecchia"` / `"LLVecchia(m)"` (Vecchia, see [docs/math/Vecchia.md](../docs/math/Vecchia.md)) and `"LLNystrom"` /
 `"LLNystrom(k)"` (Nystrom low-rank, see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). `nystrom_rank()` returns the
-rank `k` of a `LLNystrom` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
+rank `k` of a `LLNystrom` fit (0 otherwise), `vecchia_neighbors()` the number `m` of conditioning neighbors of a
+`LLVecchia` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
 longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
 only.
 
 > **C++ only**: the following `Kriging` methods are not exposed by any binding: `predictVecchia`, `predictNystrom`,
-> `simulateNystrom`, `set_vecchia_exact_commit` / `vecchia_exact_commit` (the factorization-free "light" Vecchia mode),
-> `is_vecchia_light`, `vecchia_neighbors`, `is_nystrom_light`, `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun`.
-> From a binding, `predict` is the only prediction entry point.
+> `simulateVecchia`, `simulateNystrom`, `set_vecchia_exact_commit` / `vecchia_exact_commit` (the factorization-free
+> "light" Vecchia mode), `is_vecchia_light`, `is_nystrom_light`, `logLikelihoodVecchiaFun` and
+> `logLikelihoodNystromFun`. From a binding, `predict` / `simulate` are the entry points: after an `LLNystrom(k)` fit
+> they go through the Nystrom predictor / simulator.
+
+> **Python output shapes**: every vector-valued output (`predict` mean / stdev, `theta`, `beta`, `y`, `centerX`, …) is a
+> 1-D array of shape `(n,)`; matrices (`X`, `F`, `T`, `M`, covariances, derivatives, `simulate` results of shape
+> `(n_points, nsim)`) are 2-D. All four Python classes can be pickled (through their JSON save/load).
 
 ---
 
@@ -84,7 +91,7 @@ only.
 
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
-| Constructor | `warpKriging_new(warping,kernel)` | — | `WarpKriging(warping,kernel)` | `build(y,X,warping,kernel,…)` | `WarpKriging(warping,kernel)` / `WarpKriging(y,X,…)` |
+| Constructor | `warpKriging_new(warping,kernel)` | — | `WarpKriging(warping,kernel)` | `WarpKriging(y,X,warping,kernel,…)` | `WarpKriging(warping,kernel)` / `WarpKriging(y,X,…)` |
 | Fit | `warpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `warpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `warpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
@@ -92,14 +99,14 @@ only.
 | Update | `warpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `warpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `warpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
-| Load | `warpkriging_load(file)` | `load.WarpKriging(file)` | `load_warp_kriging(file)` | `load(file)` | `load_warp_kriging(file)` |
+| Load | `warpkriging_load(file)` | `load.WarpKriging(file)` / `load(file)` | `WarpKriging.load(file)` / `pylibkriging.load(file)` | `WarpKriging.load(file)` / `load_kriging(file)` | `load_warp_kriging(file)` / `load(file)` |
 | Summary | `warpKriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Log-likelihood | `warpKriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
 | Log-likelihood function | `warpKriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
 | `kernel` | `warpKriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `warping` | `warpKriging_warping(obj)` | `obj$warping()` | `obj.warping()` | `warping(obj)` | `warping(obj)` |
-| `feature_dim` | `warpKriging_featureDim(obj)` | `obj$featureDim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
-| `is_fitted` | `warpKriging_isFitted(obj)` | `obj$isFitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
+| `feature_dim` | `warpKriging_featureDim(obj)` | `obj$feature_dim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
+| `is_fitted` | `warpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `optim` / `objective` | `warpKriging_optim(obj)` / `warpKriging_objective(obj)` | `obj$optim()` / `obj$objective()` | `obj.optim()` / `obj.objective()` | `optim(obj)` / `objective(obj)` | `optim(obj)` / `objective(obj)` |
 | `noise` | `warpKriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `warp_params` | `warpKriging_warpParams(obj)` | `obj$warp_params()` | `obj.warp_params()` | `warp_params(obj)` | `warp_params(obj)` |
@@ -123,7 +130,7 @@ only.
 
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
-| Constructor | `mlpKriging_new(hidden,d_out,kernel,warping)` | — | `MLPKriging(hidden,d_out,kernel,warping)` | `build(y,X,hidden,…)` | `MLPKriging(hidden,d_out;…)` / `MLPKriging(y,X,…)` |
+| Constructor | `mlpKriging_new(hidden,d_out,kernel,warping)` | — | `MLPKriging(hidden,d_out,kernel,warping)` | `MLPKriging(y,X,hidden,…)` | `MLPKriging(hidden,d_out;…)` / `MLPKriging(y,X,…)` |
 | Fit | `mlpKriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `mlpKriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `mlpKriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
@@ -131,15 +138,15 @@ only.
 | Update | `mlpKriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u)` |
 | Update simulate | `mlpKriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `mlpKriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
-| Load | `mlpkriging_load(file)` | `load.MLPKriging(file)` | `load_mlp_kriging(file)` | `load(file)` | `load_mlp_kriging(file)` |
+| Load | `mlpkriging_load(file)` | `load.MLPKriging(file)` / `load(file)` | `MLPKriging.load(file)` / `pylibkriging.load(file)` | `MLPKriging.load(file)` / `load_kriging(file)` | `load_mlp_kriging(file)` / `load(file)` |
 | Summary | `mlpKriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Log-likelihood | `mlpKriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
 | Log-likelihood function | `mlpKriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
 | `kernel` | `mlpKriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
-| `feature_dim` | `mlpKriging_featureDim(obj)` | `obj$featureDim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
-| `hidden_dims` | `mlpKriging_hiddenDims(obj)` | `obj$hiddenDims()` | `obj.hidden_dims()` | `hidden_dims(obj)` | `hidden_dims(obj)` |
+| `feature_dim` | `mlpKriging_featureDim(obj)` | `obj$feature_dim()` | `obj.feature_dim()` | `feature_dim(obj)` | `feature_dim(obj)` |
+| `hidden_dims` | `mlpKriging_hiddenDims(obj)` | `obj$hidden_dims()` | `obj.hidden_dims()` | `hidden_dims(obj)` | `hidden_dims(obj)` |
 | `activation` | `mlpKriging_activation(obj)` | `obj$activation()` | `obj.activation()` | `activation(obj)` | `activation(obj)` |
-| `is_fitted` | `mlpKriging_isFitted(obj)` | `obj$isFitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
+| `is_fitted` | `mlpKriging_isFitted(obj)` | `obj$is_fitted()` | `obj.is_fitted()` | `is_fitted(obj)` | `is_fitted(obj)` |
 | `X` / `y` | `mlpKriging_X(obj)` / `mlpKriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
 | `centerX` / `scaleX` | `mlpKriging_centerX(obj)` / `mlpKriging_scaleX(obj)` | `obj$centerX()` / `obj$scaleX()` | `obj.centerX()` / `obj.scaleX()` | `centerX(obj)` / `scaleX(obj)` | `centerX(obj)` / `scaleX(obj)` |
 | `centerY` / `scaleY` | `mlpKriging_centerY(obj)` / `mlpKriging_scaleY(obj)` | `obj$centerY()` / `obj$scaleY()` | `obj.centerY()` / `obj.scaleY()` | `centerY(obj)` / `scaleY(obj)` | `centerY(obj)` / `scaleY(obj)` |
@@ -154,22 +161,24 @@ only.
 
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
-| Constructor + fit | `new_NestedKrigingFit(y,X,kernel,nb_groups,…)` | — | `NestedKriging(y,X,kernel,nb_groups=…,…)` | `build(y,X,kernel,nb_groups,…)` | `NestedKriging(y,X,kernel,nb_groups;…)` |
+| Constructor + fit | `new_NestedKrigingFit(y,X,kernel,nb_groups,…)` | — | `NestedKriging(y,X,kernel,nb_groups=…,…)` | `NestedKriging(y,X,kernel,nb_groups,…)` | `NestedKriging(y,X,kernel,nb_groups;…)` |
+| Fit (refit) | `nestedkriging_fit(obj,y,X,nb_groups,…)` | `obj$fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `fit!(obj,y,X,nb_groups;…)` |
 | Predict | `nestedkriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
 | Summary | `nestedkriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Save / Load | `nestedkriging_save(obj,f)` / `nestedkriging_load(f)` | `save(obj,f)` / `load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `save(obj,f)` / `load_nested_kriging(f)` |
 | `kernel` | `nestedkriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `aggregation` | `nestedkriging_aggregation(obj)` | `obj$aggregation()` | `obj.aggregation()` | `aggregation(obj)` | `aggregation(obj)` |
 | `nb_groups` | `nestedkriging_nb_groups(obj)` | `obj$nb_groups()` | `obj.nb_groups()` | `nb_groups(obj)` | `nb_groups(obj)` |
-| `groups` | `nestedkriging_groups(obj)` | `obj$groups()` | `obj.groups()` | — | — |
+| `groups` | `nestedkriging_groups(obj)` | `obj$groups()` (1-based) | `obj.groups()` (0-based) | `groups(obj)` (cell, 1-based) | `groups(obj)` (1-based) |
 | `theta` | `nestedkriging_theta(obj)` | `obj$theta()` | `obj.theta()` | `theta(obj)` | `theta(obj)` |
 | `sigma2` | `nestedkriging_sigma2(obj)` | `obj$sigma2()` | `obj.sigma2()` | `sigma2(obj)` | `sigma2(obj)` |
 | `beta0` | `nestedkriging_beta0(obj)` | `obj$beta0()` | `obj.beta0()` | `beta0(obj)` | `beta0(obj)` |
-| `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | — | — |
-| `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | — | — |
-| `set_predict_chunk` | — | — | `obj.set_predict_chunk(chunk)` | — | — |
-| `set_warp_subsample` | — | — | `obj.set_warp_subsample(m)` | — | — |
+| `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | `warping(obj)` | `warping(obj)` |
+| `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
+| `set_predict_chunk` | `nestedkriging_set_predict_chunk(obj,chunk)` | `obj$set_predict_chunk(chunk)` | `obj.set_predict_chunk(chunk)` | `set_predict_chunk(obj,chunk)` | `set_predict_chunk!(obj,chunk)` |
+| `set_warp_subsample` | `nestedkriging_set_warp_subsample(obj,m)` | `obj$set_warp_subsample(m)` | `obj.set_warp_subsample(m)` | `set_warp_subsample(obj,m)` | `set_warp_subsample!(obj,m)` |
 
-> No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
+> No `noise=`, no `normalize=` on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 
 ---
 

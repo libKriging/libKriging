@@ -77,7 +77,7 @@ Ask, in order:
    group (`Kriging` by default, `WarpKriging` if a warp spec is given),
    unifies hyperparameters, then aggregates predictions. See §3 for the
    aggregation choice. Current restrictions: no nugget/noise channel,
-   `normalize` unsupported, save/load not yet implemented — mention these
+   `normalize` unsupported — mention these
    if a user's request would hit them. `NestedKriging` is exposed in
    `pylibkriging` (alongside `Kriging`/`WarpKriging`/`MLPKriging`), plus
    the other bindings (C++/R/Julia/Octave-MATLAB).

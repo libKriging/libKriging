@@ -51,6 +51,33 @@ NestedKriging = WrappedPyNestedKriging
 MLPKriging = WrappedPyMLPKriging
 
 import warnings as _warnings
+import os as _os
+import tempfile as _tempfile
+
+
+# --- pickle support -----------------------------------------------------
+# Native models are (de)serialized through their JSON save()/load(), which
+# store every fitted quantity exactly (matrices are base64-encoded).
+def _lk_unpickle(cls, content):
+    with _tempfile.TemporaryDirectory() as d:
+        path = _os.path.join(d, "model.json")
+        with open(path, "w") as f:
+            f.write(content)
+        return cls.load(path)
+
+
+def _lk_reduce(self):
+    with _tempfile.TemporaryDirectory() as d:
+        path = _os.path.join(d, "model.json")
+        self.save(path)
+        with open(path) as f:
+            content = f.read()
+    return (_lk_unpickle, (type(self), content))
+
+
+for _cls in (WrappedPyKriging, WrappedPyWarpKriging, WrappedPyMLPKriging, WrappedPyNestedKriging):
+    _cls.__reduce__ = _lk_reduce
+del _cls
 
 import re as _re
 import numpy as _np

@@ -37,10 +37,14 @@ Quadratic` (`Trend::fromString("constant")` also works if you have a
 string).
 
 ```cpp
-auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true,
-                                    /*return_cov=*/false, /*return_deriv=*/false);
-arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew);
+auto [mean, stdev, cov, mean_deriv, stdev_deriv]
+    = model.predict(Xnew, /*return_stdev=*/true, /*return_cov=*/false, /*return_deriv=*/false);
+arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew, /*will_update=*/true);  // Xnew.n_rows x nsim
+arma::mat sims_u = model.update_simulate(y_new, X_new);  // condition those paths on new observations
 model.update(y_new, X_new, /*refit=*/true);
+
+model.save("k.json");                        // JSON
+Kriging model_loaded = Kriging::load("k.json");
 
 double ll  = model.logLikelihood();
 auto [ll2, grad] = model.logLikelihoodFun(theta, /*return_grad=*/true, /*bench=*/false);
@@ -50,6 +54,8 @@ Vecchia approximation: same class, just change `objective`:
 ```cpp
 model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
 auto [mean, stdev] = model.predictVecchia(Xnew, /*return_stdev=*/true);
+// sequential conditional simulation on m nearest (observed or already simulated) points
+arma::mat sims = model.simulateVecchia(/*nsim=*/10, /*seed=*/123, Xnew /*, m=0 -> vecchia_neighbors() or 30 */);
 ```
 
 Nystrom approximation: same class, just change `objective`:
@@ -69,7 +75,8 @@ Kriging small(y.elem(idx), X.rows(idx), "matern5_2");
 model.nystrom_rank();   // rank k of an LLNystrom fit, 0 otherwise
 model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
 // Factorization-free "light" Vecchia mode: call BEFORE fit(..., "LLVecchia(m)");
-// predict() then routes to predictVecchia (no cov/deriv, simulate, update or save).
+// predict()/simulate() then route to predictVecchia/simulateVecchia
+// (no cov/deriv, will_update, update_simulate, update or save).
 model.set_vecchia_exact_commit(false);
 ```
 
@@ -78,9 +85,10 @@ model.set_vecchia_exact_commit(false);
 ```cpp
 #include "libKriging/WarpKriging.hpp"
 
-WarpKriging model(y, X, {"kumaraswamy", "categorical(5,2)", "none"}, "gauss");
-model.fit(y, X, {"kumaraswamy", "categorical(5,2)", "none"});
-auto [mean, stdev] = model.predict(Xnew, true, false, false);
+// WarpKriging and MLPKriging live in namespace libKriging
+libKriging::WarpKriging model(y, X, {"kumaraswamy", "categorical(5,2)", "none"}, "gauss");  // builds and fits
+model.fit(y, X);  // refit on new data (warpings fixed at construction)
+auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(Xnew, true, false, false);
 ```
 One spec string per column of `X`, in column order (see `SKILL.md` §4 for
 the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
@@ -102,13 +110,17 @@ no nugget mode).
 #include "libKriging/NestedKriging.hpp"
 
 NestedKriging model(y, X, "matern5_2", nb_groups,
-                     Trend::RegressionModel::Constant,
-                     NestedKriging::Aggregation::NK);
+                    NestedKriging::Aggregation::NK,
+                    NestedKriging::Partition::KMeans,
+                    /*seed=*/123,
+                    Trend::RegressionModel::Constant);
 auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true);
 ```
 `Aggregation` is `PoE, gPoE, BCM, rBCM, NK` — see `SKILL.md` §3. Remember:
 `NK` requires `Trend::RegressionModel::Constant`; no `normalize`, no
-noise/nugget channel, no save/load yet.
+noise/nugget channel. `nk.save(file)` / `NestedKriging::load(file)`
+round-trip the fitted model (`KrigingLoader::describe` reports
+`KrigingType::NestedKriging`).
 
 ## Common pitfalls to flag in review
 

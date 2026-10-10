@@ -57,7 +57,7 @@ idx <- subsetOfData(X, 500)
 k <- Kriging(y[idx], X[idx, ], "matern5_2")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, stdev = TRUE)
+pred <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
 ## Current limitations

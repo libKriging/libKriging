@@ -267,7 +267,7 @@ k = Kriging(y, X, "gauss")
 println(JLibKriging.summary(k))
 
 x = reshape(collect(0:0.01:1), :, 1)
-p = predict(k, x; stdev=true, cov=false)
+p = predict(k, x; return_stdev=true, return_cov=false)
 println("Predicted mean: ", p.mean[1:5])
 println("Predicted stdev: ", p.stdev[1:5])
 

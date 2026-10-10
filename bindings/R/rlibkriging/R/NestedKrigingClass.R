@@ -8,7 +8,7 @@
 #' @return An object of class "NestedKriging" with methods to access and manipulate the data
 classNestedKriging <- function(nk) {
     class(nk) <- "NestedKriging"
-    for (f in c('predict', 'print', 'show')) {
+    for (f in c('predict', 'print', 'show', 'save', 'fit')) {
         eval(parse(text = paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -18,6 +18,8 @@ classNestedKriging <- function(nk) {
             "nk$", d, " <- function() nestedkriging_", d, "(nk)"
             )))
     }
+    nk$set_predict_chunk <- function(chunk) nestedkriging_set_predict_chunk(nk, as.integer(chunk))
+    nk$set_warp_subsample <- function(m) nestedkriging_set_warp_subsample(nk, as.integer(m))
     nk
 }
 
@@ -110,4 +112,82 @@ predict.NestedKriging <- function(object, x, return_stdev = TRUE, ...) {
 print.NestedKriging <- function(x, ...) {
     cat(nestedkriging_summary(x))
     invisible(x)
+}
+
+#' Save a \code{NestedKriging} model to a file.
+#'
+#' @param object S3 NestedKriging object.
+#' @param filename File name to save in (JSON).
+#' @param ... Ignored.
+#'
+#' @return No return value. NestedKriging object argument is written in the file.
+#'
+#' @method save NestedKriging
+#' @export
+#'
+#' @examples
+#' f <- function(X) apply(X, 1, function(x) sin(3 * x[1]) + cos(5 * x[2]))
+#' set.seed(123)
+#' X <- matrix(runif(2 * 60), ncol = 2)
+#' y <- f(X)
+#' k <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 3)
+#' outfile <- tempfile("nk.json")
+#' save(k, outfile)
+#' print(load(outfile))
+#' unlink(outfile)
+save.NestedKriging <- function(object, filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    nestedkriging_save(object, filename)
+    invisible(NULL)
+}
+
+#' Load a \code{NestedKriging} model from a file.
+#'
+#' @param filename File name to load from.
+#' @param ... Ignored.
+#'
+#' @return The loaded NestedKriging object.
+#'
+#' @method load NestedKriging
+#' @export
+load.NestedKriging <- function(filename, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.character(filename))
+        stop("'filename' must be a string")
+    classNestedKriging(nestedkriging_load(filename))
+}
+
+#' Fit (or refit) a \code{NestedKriging} object on new data.
+#'
+#' The partition, the submodels and the common prior are recomputed; the
+#' aggregation, partition method and seed given at construction are kept.
+#'
+#' @param object S3 NestedKriging object.
+#' @param y Numeric vector of response values.
+#' @param X Numeric matrix of input design.
+#' @param nb_groups Number of groups.
+#' @param regmodel Trend: \code{"constant"} (required by NK), \code{"linear"}, ...
+#' @param optim Optimizer for the submodels / common prior (\code{"BFGS"}, \code{"none"}).
+#' @param objective \code{"LL"}, \code{"LOO"}, \code{"LMP"} or \code{"LLVecchia(m)"}.
+#' @param parameters Optional list of starting / fixed hyperparameters.
+#' @param warping Optional character vector of per-dimension warpings.
+#' @param ... Ignored.
+#'
+#' @return No return value (the object is modified in place).
+#'
+#' @method fit NestedKriging
+#' @export
+fit.NestedKriging <- function(object, y, X, nb_groups,
+                              regmodel = "constant",
+                              optim = "BFGS",
+                              objective = "LL",
+                              parameters = NULL,
+                              warping = NULL, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.matrix(X)) X <- as.matrix(X)
+    nestedkriging_fit(object, as.numeric(y), X, nb_groups,
+                      regmodel, optim, objective, parameters, warping)
+    invisible(NULL)
 }

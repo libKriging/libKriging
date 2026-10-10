@@ -28,7 +28,8 @@ def find_dir():
 
 
 def relative_error(x, y):
-    # FIXME check compatible vector sizes
+    # same shapes only: numpy broadcasting would silently compare (n,) to (n, 1)
+    assert np.shape(x) == np.shape(y), f"shape mismatch: {np.shape(x)} vs {np.shape(y)}"
     x_norm = np.linalg.norm(x)
     y_norm = np.linalg.norm(y)
     if x_norm > 0 or y_norm > 0:
@@ -53,11 +54,11 @@ def test_data1():
     file_loo = refpath / f"{prefix}-result-leaveOneOut.csv"
     file_loograd = refpath / f"{prefix}-result-leaveOneOutGrad.csv"
     loo_ref = np.genfromtxt(file_loo, delimiter=',')
-    loograd_ref = np.genfromtxt(file_loograd, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    loograd_ref = np.atleast_1d(np.genfromtxt(file_loograd, delimiter=','))
     file_ll = refpath / f"{prefix}-result-logLikelihood.csv"
     file_llgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
     ll_ref = np.genfromtxt(file_ll, delimiter=',')
-    llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    llgrad_ref = np.atleast_1d(np.genfromtxt(file_llgrad, delimiter=','))
 
     kernel = "gauss"
     r = lk.Kriging(y, X, kernel, "constant", False, "BFGS", "LL")
@@ -83,7 +84,7 @@ def test_data2(i):
     file_ll = refpath / f"{prefix}-result-logLikelihood.csv"
     file_llgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
     ll_ref = np.genfromtxt(file_ll, delimiter=',')
-    llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    llgrad_ref = np.atleast_1d(np.genfromtxt(file_llgrad, delimiter=','))
 
     kernel = "gauss"
     r = lk.Kriging(y, X, kernel)  # use defaults: lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())
@@ -106,7 +107,7 @@ def test_data2_with_save_reload(i):
     file_ll = refpath / f"{prefix}-result-logLikelihood.csv"
     file_llgrad = refpath / f"{prefix}-result-logLikelihoodGrad.csv"
     ll_ref = np.genfromtxt(file_ll, delimiter=',')
-    llgrad_ref = np.genfromtxt(file_llgrad, delimiter=',').reshape(-1, 1)  # FIXME should be a col vec
+    llgrad_ref = np.atleast_1d(np.genfromtxt(file_llgrad, delimiter=','))
 
     kernel = "gauss"
     r = lk.Kriging(y, X, kernel)  # use defaults: lk.RegressionModel.Constant, False, "BFGS", "LL", lk.Parameters())

@@ -12,6 +12,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -490,6 +491,13 @@ int lk_kriging_nystrom_rank(void* ptr) {
   CATCH_RETURN
 }
 
+int lk_kriging_vecchia_neighbors(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->vecchia_neighbors());
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_is_normalize(void* ptr) {
   try {
     return static_cast<Kriging*>(ptr)->normalize() ? 1 : 0;
@@ -877,20 +885,20 @@ void* lk_warp_kriging_new_fit_noise(const double* y,
 }
 
 int lk_warp_kriging_fit_noise(void* ptr,
-                               const double* y,
-                               int n,
-                               const double* noise,
-                               int n_noise,
-                               const double* X,
-                               int nX,
-                               int d,
-                               const char* regmodel,
-                               int normalize,
-                               const char* optim,
-                               const char* objective,
-                               const char** param_keys,
-                               const char** param_vals,
-                               int n_params) {
+                              const double* y,
+                              int n,
+                              const double* noise,
+                              int n_noise,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params) {
   try {
     arma::vec y_vec(const_cast<double*>(y), n, false, true);
     arma::mat X_mat(const_cast<double*>(X), nX, d, false, true);
@@ -985,7 +993,14 @@ int lk_warp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
+int lk_warp_kriging_simulate(void* ptr,
+                             int nsim,
+                             int seed,
+                             const double* X_n,
+                             int m,
+                             int d,
+                             int will_update,
+                             double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto result = static_cast<WarpKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
@@ -1484,7 +1499,14 @@ int lk_mlp_kriging_predict(void* ptr,
   CATCH_RETURN
 }
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out) {
+int lk_mlp_kriging_simulate(void* ptr,
+                            int nsim,
+                            int seed,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int will_update,
+                            double* sim_out) {
   try {
     arma::mat X_mat(const_cast<double*>(X_n), m, d, false, true);
     auto result = static_cast<MLPKriging*>(ptr)->simulate(nsim, seed, X_mat, will_update != 0);
@@ -2014,4 +2036,96 @@ double lk_nested_kriging_get_sigma2(void* ptr) {
 
 double lk_nested_kriging_get_beta0(void* ptr) {
   return static_cast<NestedKriging*>(ptr)->beta0();
+}
+
+int lk_nested_kriging_get_X(void* ptr, double* out, int* n, int* d) {
+  try {
+    const arma::mat& v = static_cast<NestedKriging*>(ptr)->X();
+    if (n)
+      *n = static_cast<int>(v.n_rows);
+    if (d)
+      *d = static_cast<int>(v.n_cols);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_get_y(void* ptr, double* out, int* n) {
+  try {
+    const arma::vec& v = static_cast<NestedKriging*>(ptr)->y();
+    if (n)
+      *n = static_cast<int>(v.n_elem);
+    if (out)
+      std::memcpy(out, v.memptr(), v.n_elem * sizeof(double));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+/* 0-based row indices of group g (0 <= g < nb_groups) */
+int lk_nested_kriging_get_group(void* ptr, int g, int* out, int* n) {
+  try {
+    const auto& groups = static_cast<NestedKriging*>(ptr)->groups();
+    if (g < 0 || static_cast<size_t>(g) >= groups.size())
+      throw std::out_of_range("group index out of range");
+    const arma::uvec& idx = groups[static_cast<size_t>(g)];
+    if (n)
+      *n = static_cast<int>(idx.n_elem);
+    if (out)
+      for (arma::uword i = 0; i < idx.n_elem; ++i)
+        out[i] = static_cast<int>(idx(i));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_get_warping(void* ptr, char** out, int* n_warping) {
+  try {
+    static thread_local std::vector<std::string> warping;
+    warping = static_cast<NestedKriging*>(ptr)->warping();
+    if (n_warping)
+      *n_warping = static_cast<int>(warping.size());
+    if (out)
+      for (size_t i = 0; i < warping.size(); ++i)
+        out[i] = const_cast<char*>(warping[i].c_str());
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_set_predict_chunk(void* ptr, int chunk) {
+  try {
+    if (chunk < 1)
+      throw std::invalid_argument("chunk must be >= 1");
+    static_cast<NestedKriging*>(ptr)->set_predict_chunk(static_cast<arma::uword>(chunk));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_set_warp_subsample(void* ptr, int m) {
+  try {
+    if (m < 1)
+      throw std::invalid_argument("m must be >= 1");
+    static_cast<NestedKriging*>(ptr)->set_warp_subsample(static_cast<arma::uword>(m));
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_nested_kriging_save(void* ptr, const char* filename) {
+  try {
+    static_cast<NestedKriging*>(ptr)->save(filename);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+void* lk_nested_kriging_load(const char* filename) {
+  try {
+    return new NestedKriging(NestedKriging::load(filename));
+  }
+  CATCH_RETURN_NULL
 }

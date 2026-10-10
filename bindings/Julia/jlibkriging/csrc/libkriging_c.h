@@ -150,6 +150,7 @@ const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
+int lk_kriging_vecchia_neighbors(void* ptr);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);
@@ -225,20 +226,20 @@ int lk_warp_kriging_fit(void* ptr,
                         const char** param_vals,
                         int n_params);
 int lk_warp_kriging_fit_noise(void* ptr,
-                               const double* y,
-                               int n,
-                               const double* noise,
-                               int n_noise,
-                               const double* X,
-                               int nX,
-                               int d,
-                               const char* regmodel,
-                               int normalize,
-                               const char* optim,
-                               const char* objective,
-                               const char** param_keys,
-                               const char** param_vals,
-                               int n_params);
+                              const double* y,
+                              int n,
+                              const double* noise,
+                              int n_noise,
+                              const double* X,
+                              int nX,
+                              int d,
+                              const char* regmodel,
+                              int normalize,
+                              const char* optim,
+                              const char* objective,
+                              const char** param_keys,
+                              const char** param_vals,
+                              int n_params);
 
 int lk_warp_kriging_predict(void* ptr,
                             const double* X_n,
@@ -253,7 +254,14 @@ int lk_warp_kriging_predict(void* ptr,
                             double* mean_deriv_out,
                             double* stdev_deriv_out);
 
-int lk_warp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
+int lk_warp_kriging_simulate(void* ptr,
+                             int nsim,
+                             int seed,
+                             const double* X_n,
+                             int m,
+                             int d,
+                             int will_update,
+                             double* sim_out);
 
 /* noise_u: per-update-point noise variances (NULL / noise_u_n = 0 when the
  * model was fitted noise-free; required otherwise). */
@@ -371,7 +379,14 @@ int lk_mlp_kriging_predict(void* ptr,
                            double* mean_deriv_out,
                            double* stdev_deriv_out);
 
-int lk_mlp_kriging_simulate(void* ptr, int nsim, int seed, const double* X_n, int m, int d, int will_update, double* sim_out);
+int lk_mlp_kriging_simulate(void* ptr,
+                            int nsim,
+                            int seed,
+                            const double* X_n,
+                            int m,
+                            int d,
+                            int will_update,
+                            double* sim_out);
 
 int lk_mlp_kriging_update(void* ptr, const double* y_u, int n, const double* X_u, int nX, int d, int refit);
 int lk_mlp_kriging_update_simulate(void* ptr,
@@ -480,6 +495,14 @@ int lk_nested_kriging_nb_groups(void* ptr);
 int lk_nested_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_nested_kriging_get_sigma2(void* ptr);
 double lk_nested_kriging_get_beta0(void* ptr);
+int lk_nested_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_nested_kriging_get_y(void* ptr, double* out, int* n);
+int lk_nested_kriging_get_group(void* ptr, int g, int* out, int* n);
+int lk_nested_kriging_get_warping(void* ptr, char** out, int* n_warping);
+int lk_nested_kriging_set_predict_chunk(void* ptr, int chunk);
+int lk_nested_kriging_set_warp_subsample(void* ptr, int m);
+int lk_nested_kriging_save(void* ptr, const char* filename);
+void* lk_nested_kriging_load(const char* filename);
 
 #ifdef __cplusplus
 }

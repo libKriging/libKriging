@@ -20,8 +20,12 @@ k <- Kriging(y, X, kernel = "matern5_2",
              noise = NULL)                # NULL | "nugget" | numeric vector
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
-s <- simulate(k, nsim = 10, seed = 123, x = Xnew)
+s <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)   # length(Xnew) x nsim
+s_u <- update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update(k, y_u, X_u, refit = TRUE)
+
+save(k, "k.json")      # JSON, any libKriging class
+k <- load("k.json")    # auto-detects the class
 
 logLikelihood(k)
 leaveOneOut(k)
@@ -83,9 +87,10 @@ k <- Kriging(y[idx], X[idx, , drop = FALSE], "matern5_2")
 k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")   # d <~ 5
 k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # higher d
 k$nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
+k$vecchia_neighbors()   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
 `predict` is the only prediction entry point from R: `predictVecchia`,
-`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
+`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
 Vecchia mode) exist in C++ only.
 
 ## NestedKriging
@@ -103,7 +108,8 @@ nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
 predict(nk, x = Xnew, return_stdev = TRUE)
 ```
 `aggregation = "NK"` requires `regmodel = "constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging`.
+`normalize=`. `save(nk, "nk.json")` / `load("nk.json")` work as for the
+other classes.
 
 ## Common pitfalls to flag in review
 

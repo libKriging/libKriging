@@ -19,9 +19,13 @@ k = Kriging(y, X, "matern5_2");
 
 [p_mean, p_stdev] = k.predict(Xnew, true, false, false);
 %                             (X, return_stdev, return_cov, return_deriv)
-s = k.simulate(int32(10), int32(123), Xnew, false);
+s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 %              (nsim, seed, X, will_update)
+s_u = k.update_simulate(y_u, X_u);   % condition those paths on new observations
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
+
+k.save("k.json");              % JSON, any libKriging class
+k = load_kriging("k.json");    % auto-detects the class
 
 k.logLikelihood();
 k.leaveOneOut();
@@ -71,9 +75,10 @@ k = Kriging(y(idx), X(idx, :), "matern5_2");
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");   % d <~ 5
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % higher d
 k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
+k.vecchia_neighbors()   % 30 for an LLVecchia(30) fit (0 otherwise)
 ```
 `predict` is the only prediction entry point from Octave/MATLAB:
-`predictVecchia`, `predictNystrom`, `simulateNystrom` and
+`predictVecchia`, `predictNystrom`, `simulateNystrom`, `simulateVecchia` and
 `set_vecchia_exact_commit` (the "light" Vecchia mode) exist in C++ only.
 
 ## NestedKriging
@@ -88,7 +93,8 @@ nk = NestedKriging(y, X, "matern5_2", 8, "PoE");
 ```
 `aggregation = "NK"` (the default) requires the `regmodel` in position 8 to
 be `"constant"` (also the default) — see `SKILL.md` §3. No `noise`
-argument, no `normalize` support, no save/load yet on `NestedKriging`.
+argument, no `normalize` support. `nk.save("nk.json")` /
+`NestedKriging.load("nk.json")` (or `load_kriging`) work as for the other classes.
 
 ## Common pitfalls to flag in review
 

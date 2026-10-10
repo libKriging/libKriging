@@ -60,6 +60,9 @@ std::string class_saved(std::string filename) {
     case KrigingLoader::KrigingType::MLPKriging:
       return "MLPKriging";
       break;
+    case KrigingLoader::KrigingType::NestedKriging:
+      return "NestedKriging";
+      break;
     case KrigingLoader::KrigingType::Unknown:
       Rcpp::stop("Kriging object type unknown.");
       break;

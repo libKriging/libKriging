@@ -196,6 +196,22 @@ class Kriging : public KrigingImpl {
                                                                     bool return_stdev = true,
                                                                     arma::uword m = 0);
 
+  /** Vecchia (local, sequential) simulation: draws joint sample trajectories
+   * at X_n by sequential conditioning, in the given row order of X_n: the
+   * t-th simulation point is drawn from its simple-kriging conditional
+   * (beta treated as known, like predictVecchia) given its m nearest
+   * neighbors among the observations AND the t-1 points already simulated
+   * (response-first Vecchia, Katzfuss et al. 2020). O(q (n + q) d + q m^3)
+   * instead of O(q^3): usable for large n AND large q, and on a light
+   * Vecchia fit (simulate() routes here). Exact (up to beta known) when
+   * m >= n + q - 1; otherwise long-range correlations are truncated and
+   * the result depends on the row order of X_n. NoiseModel::None only; no
+   * `will_update` (no update_simulate on top of it).
+   * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
+   *          fitted with LLVecchia, else 30)
+   * @return output is n_n*nsim matrix of simulations at X_n */
+  LIBKRIGING_EXPORT arma::mat simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m = 0);
+
   /** Nystrom (global low-rank) approximated log-likelihood at given theta
    * (objective="LLNystrom(k)"). Requires the model to have been fitted with
    * objective="LLNystrom" or "LLNystrom(k)".
@@ -298,6 +314,13 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);
 
  private:
+  // JSON (de)serialization behind save()/load(), also used by NestedKriging
+  // to embed its submodels in its own save file.
+  friend class NestedKriging;
+  void dump_to_json(nlohmann::json& j) const;
+  /// @param filename only used in error messages
+  static Kriging load_from_json(const nlohmann::json& j, const std::string& filename);
+
   NoiseModel m_noise_model = NoiseModel::None;
   double m_nugget = 0.0;
   bool m_est_nugget = false;
@@ -331,6 +354,11 @@ class Kriging : public KrigingImpl {
   bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
   /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
   void check_not_vecchia_light(const char* what) const;
+  /// True when the (normalized) output is, to rounding, in the span of the
+  /// trend matrix: zero residual whatever theta (see fit()).
+  [[nodiscard]] bool y_in_trend_span() const;
+  /// simulate() on a light Vecchia/Nystrom fit (no exact factorization)
+  arma::mat simulate_light(int nsim, int seed, const arma::mat& X_n, bool will_update);
 
   // --- Nystrom approximated likelihood (objective="LLNystrom(k)") ---------------
   // Unlike Vecchia (which by default still performs one exact O(n^3)
