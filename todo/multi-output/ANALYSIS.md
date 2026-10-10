@@ -263,6 +263,8 @@ Noyau `B[t_i, t_j] · r(x_i, x_j)` sur données empilées, `B = L Lᵀ` de rang
 composition ou extension de `WarpKriging` (le plongement catégoriel existant
 est presque cela, il manque variances par niveau et corrélations signées).
 Coût `O(N³)` sur `N = Σ n_j`.
+Même format de données que `MarkovCoKriging` (`fit(y, X, level)`, D3) :
+voir §7.
 
 ### Hors périmètre (renvoyer vers GPyTorch / MOGPTK / gstlearn)
 LMC à plusieurs portées, convolutions, Matérn multivarié : coût,
@@ -464,3 +466,57 @@ Reste ouverte (numérotation d'origine) :
    sortie), cohérence avec `MarkovCoKriging` (branche `feature/multi-fidelity-cokriging`).
    Choix appliqué aux 4 bindings (2026-10-09) : matrices `m × q`, covariance
    `mq × mq` sur `vec(Y)`, simulations `m × q × nsim`, dérivées `m × d × q`.
+
+## 7. Rapprochement avec `MarkovCoKriging`
+
+Branche `feature/multi-fidelity-cokriging` (PR #350, conception seule) :
+AR(1) de Kennedy & O'Hagan / Le Gratiet et co-krigeage collocalisé,
+`Z_t = ρ_{t-1} Z_{t-1} + δ_t`, plans emboîtés, `fit(y, X, level)` (D3).
+
+### 7.1 Lien mathématique
+
+À `ρ` constant, même noyau et même `θ` à tous les niveaux, en isotopique,
+l'AR(1) est un ICM :
+
+    s = 2 :  Cov = [ σ0²     ρ σ0²        ] ⊗ R(θ)
+                   [ ρ σ0²   ρ² σ0² + σ1² ]
+
+- `s = 2` : toute `Σ` 2×2 définie positive s'écrit ainsi (`ρ = Σ01/Σ00`,
+  `σ1² = Σ11 − Σ01²/Σ00`, `β1 − ρ β0` pour la tendance de `δ_1`). La
+  vraisemblance se factorise en `L(y_0) · L(y_1 | y_0)` dans les deux
+  paramétrisations : à `θ` fixé, les deux maximums de vraisemblance coïncident
+  avec `"separable"`.
+- `s ≥ 3` : la chaîne impose que `y_t` ne dépende que de `y_{t-1}`, ce qui
+  donne un ICM contraint (`Σ⁻¹` tridiagonale).
+- Ce que le Markov apporte en plus : un `θ_t` par niveau (LMC triangulaire,
+  §1.D), et des plans emboîtés hétérotopiques en `O(Σ n_t³)` au lieu de
+  `O((Σ n_t)³)`.
+
+### 7.2 À partager
+
+1. **Format des données empilées.** L'étape 2 (§3, ICM hétérotopique)
+   reprend exactement la signature `fit(y, X, level)` de D3, avec
+   `level ∈ [0, s-1]` : le marshalling dans les bindings est le même.
+2. **Conventions de sortie** (Q4) : `predict` en `m × s`, covariance
+   `ms × ms` sur `vec(Y)`, `simulate` en `m × s × nsim`, dérivées
+   `m × d × s`, `component(i)` pour les sous-`Kriging`, `update` et
+   `update_simulate`, JSON de save/load avec un `"content"` propre.
+3. **Test croisé** : `s = 2`, isotopique, `θ` fixé et partagé ⇒
+   `MarkovCoKriging` doit redonner `MultiOutputKriging("separable")`
+   (`ρ`, `σ²`, LL, moyenne et variance prédites). Oracle interne en plus de
+   MuFiCokriging.
+4. **D2 (plans non emboîtés)** : le « co-krigeage complet » de D2 est
+   l'ICM hétérotopique de l'étape 2. Répartition possible : emboîté ⇒
+   Markov (factorisé, rapide) ; non emboîté ⇒ étape 2 (exact, `θ` partagé).
+
+### 7.3 Non retenu pour l'instant
+
+`output_model = "markov"` dans `MultiOutputKriging` : son API est `Y n × q`
+isotopique, alors que l'intérêt du multi-fidélité vient des plans emboîtés
+(peu de points haute fidélité). En isotopique, il n'apporterait que les
+`θ_t` par niveau.
+
+À trancher au démarrage de l'étape 2 : une classe hétérotopique unique
+`fit(y, X, level)` avec deux modèles, `"icm"` (vraisemblance jointe) et
+`"markov"` (factorisée), qui réunirait l'étape 2 et `MarkovCoKriging`. Les
+deux sont à concevoir ensemble.

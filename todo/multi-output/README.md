@@ -27,7 +27,8 @@ pour les modèles `"pca"`, `"shared"`, `"separable"` et `"separable(<kernel>)"`
    (Σ = σ² R_t(φ), φ estimé avec θ, vraisemblance vérifiée contre la densité
    gaussienne dense) et save/load (JSON, version 2, état ajusté restitué à
    l'identique). Estimateur scikit-learn
-   `MultiOutputKrigingRegressor` fait. Reste : étape 2 (ICM hétérotopique, `q` petit, PR séparée, Q1). Q7 hors
+   `MultiOutputKrigingRegressor` fait. Reste : étape 2 (ICM hétérotopique, `q` petit, PR séparée, Q1 ; à concevoir
+   avec `MarkovCoKriging`, `ANALYSIS.md` §7). Q7 hors
    périmètre pour l'instant.
 
 Validation de `"shared"` contre `RobustGaSP::ppgasp(method = "mle", nugget.est = FALSE)`
