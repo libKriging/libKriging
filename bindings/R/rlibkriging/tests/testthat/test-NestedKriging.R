@@ -86,3 +86,22 @@ test_that("save/load roundtrip (plain and generic load)", {
     unlink(outfile)
   }
 })
+
+test_that("fit refits an existing object; tuning setters", {
+  k <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 4)
+  X2 <- matrix(runif(2 * 120), ncol = 2)
+  y2 <- f(X2)
+  k$fit(y2, X2, 3)
+  expect_equal(k$nb_groups(), 3)
+  expect_equal(k$X(), X2)
+  p <- predict(k, X2)
+  expect_lt(max(abs(p$mean - y2)), 1e-3)  # NK interpolates the new design
+
+  k$set_predict_chunk(5)
+  p5 <- predict(k, Xt)
+  k$set_predict_chunk(128)
+  p128 <- predict(k, Xt)
+  expect_equal(p5$mean, p128$mean, tolerance = 1e-10)
+  expect_error(k$set_predict_chunk(0))
+  expect_error(k$set_warp_subsample(500), NA)
+})

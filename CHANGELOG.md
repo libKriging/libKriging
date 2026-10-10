@@ -29,6 +29,11 @@ past release, see the corresponding entry on the
   instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
   on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
   raise; `will_update=true` still raises there.
+- NestedKriging API parity across bindings: `X`, `y`, `groups`, `warping`,
+  `set_predict_chunk` and `set_warp_subsample` in Julia
+  (`set_predict_chunk!` / `set_warp_subsample!`) and Octave/Matlab; `fit` on
+  an existing object (refit), `set_predict_chunk` and `set_warp_subsample` in
+  R. `groups` are 1-based in R, Julia and Octave/Matlab, 0-based in Python.
 - `vecchia_neighbors()` in every binding (Python, R, Julia, Octave/Matlab),
   alongside the already exposed `nystrom_rank()`: number `m` of conditioning
   neighbors of an `LLVecchia(m)` fit, 0 otherwise.

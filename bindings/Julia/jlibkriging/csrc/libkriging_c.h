@@ -495,6 +495,12 @@ int lk_nested_kriging_nb_groups(void* ptr);
 int lk_nested_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_nested_kriging_get_sigma2(void* ptr);
 double lk_nested_kriging_get_beta0(void* ptr);
+int lk_nested_kriging_get_X(void* ptr, double* out, int* n, int* d);
+int lk_nested_kriging_get_y(void* ptr, double* out, int* n);
+int lk_nested_kriging_get_group(void* ptr, int g, int* out, int* n);
+int lk_nested_kriging_get_warping(void* ptr, char** out, int* n_warping);
+int lk_nested_kriging_set_predict_chunk(void* ptr, int chunk);
+int lk_nested_kriging_set_warp_subsample(void* ptr, int m);
 int lk_nested_kriging_save(void* ptr, const char* filename);
 void* lk_nested_kriging_load(const char* filename);
 

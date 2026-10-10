@@ -108,3 +108,28 @@ end
         end
     end
 end
+
+@testset "NestedKriging accessors and setters" begin
+    import Random
+    rng = Random.MersenneTwister(7)
+    n, d = 60, 2
+    X = rand(rng, n, d)
+    y = [f_test(X[i, :]) for i in 1:n]
+    k = NestedKriging(y, X, "gauss", 3)
+    @test jlibkriging.X(k) == X
+    @test jlibkriging.y(k) == y
+    g = groups(k)
+    @test length(g) == 3
+    @test sort(vcat(g...)) == collect(1:n)  # 1-based partition of the rows
+    @test isempty(warping(k))
+    Xt = rand(rng, 10, d)
+    set_predict_chunk!(k, 3)
+    p1 = predict(k, Xt)
+    set_predict_chunk!(k, 128)
+    p2 = predict(k, Xt)
+    @test maximum(abs.(p1.mean .- p2.mean)) < 1e-10
+    @test set_warp_subsample!(k, 500) === k
+    @test_throws ErrorException set_predict_chunk!(k, 0)
+    kw = NestedKriging(y, X, "gauss", 2; warping=["kumaraswamy", "kumaraswamy"])
+    @test warping(kw) == ["kumaraswamy", "kumaraswamy"]
+end

@@ -8,7 +8,7 @@
 #' @return An object of class "NestedKriging" with methods to access and manipulate the data
 classNestedKriging <- function(nk) {
     class(nk) <- "NestedKriging"
-    for (f in c('predict', 'print', 'show', 'save')) {
+    for (f in c('predict', 'print', 'show', 'save', 'fit')) {
         eval(parse(text = paste0(
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
@@ -18,6 +18,8 @@ classNestedKriging <- function(nk) {
             "nk$", d, " <- function() nestedkriging_", d, "(nk)"
             )))
     }
+    nk$set_predict_chunk <- function(chunk) nestedkriging_set_predict_chunk(nk, as.integer(chunk))
+    nk$set_warp_subsample <- function(m) nestedkriging_set_warp_subsample(nk, as.integer(m))
     nk
 }
 
@@ -155,4 +157,37 @@ load.NestedKriging <- function(filename, ...) {
     if (!is.character(filename))
         stop("'filename' must be a string")
     classNestedKriging(nestedkriging_load(filename))
+}
+
+#' Fit (or refit) a \code{NestedKriging} object on new data.
+#'
+#' The partition, the submodels and the common prior are recomputed; the
+#' aggregation, partition method and seed given at construction are kept.
+#'
+#' @param object S3 NestedKriging object.
+#' @param y Numeric vector of response values.
+#' @param X Numeric matrix of input design.
+#' @param nb_groups Number of groups.
+#' @param regmodel Trend: \code{"constant"} (required by NK), \code{"linear"}, ...
+#' @param optim Optimizer for the submodels / common prior (\code{"BFGS"}, \code{"none"}).
+#' @param objective \code{"LL"}, \code{"LOO"}, \code{"LMP"} or \code{"LLVecchia(m)"}.
+#' @param parameters Optional list of starting / fixed hyperparameters.
+#' @param warping Optional character vector of per-dimension warpings.
+#' @param ... Ignored.
+#'
+#' @return No return value (the object is modified in place).
+#'
+#' @method fit NestedKriging
+#' @export
+fit.NestedKriging <- function(object, y, X, nb_groups,
+                              regmodel = "constant",
+                              optim = "BFGS",
+                              objective = "LL",
+                              parameters = NULL,
+                              warping = NULL, ...) {
+    if (length(L <- list(...)) > 0) warnOnDots(L)
+    if (!is.matrix(X)) X <- as.matrix(X)
+    nestedkriging_fit(object, as.numeric(y), X, nb_groups,
+                      regmodel, optim, objective, parameters, warping)
+    invisible(NULL)
 }

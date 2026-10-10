@@ -157,21 +157,23 @@ only.
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
 | Constructor + fit | `new_NestedKrigingFit(y,X,kernel,nb_groups,…)` | — | `NestedKriging(y,X,kernel,nb_groups=…,…)` | `build(y,X,kernel,nb_groups,…)` | `NestedKriging(y,X,kernel,nb_groups;…)` |
+| Fit (refit) | `nestedkriging_fit(obj,y,X,nb_groups,…)` | `obj$fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `obj.fit(y,X,nb_groups,…)` | `fit!(obj,y,X,nb_groups;…)` |
 | Predict | `nestedkriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
 | Summary | `nestedkriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
+| Save / Load | `nestedkriging_save(obj,f)` / `nestedkriging_load(f)` | `save(obj,f)` / `load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `obj.save(f)` / `NestedKriging.load(f)` | `save(obj,f)` / `load_nested_kriging(f)` |
 | `kernel` | `nestedkriging_kernel(obj)` | `obj$kernel()` | `obj.kernel()` | `kernel(obj)` | `kernel(obj)` |
 | `aggregation` | `nestedkriging_aggregation(obj)` | `obj$aggregation()` | `obj.aggregation()` | `aggregation(obj)` | `aggregation(obj)` |
 | `nb_groups` | `nestedkriging_nb_groups(obj)` | `obj$nb_groups()` | `obj.nb_groups()` | `nb_groups(obj)` | `nb_groups(obj)` |
-| `groups` | `nestedkriging_groups(obj)` | `obj$groups()` | `obj.groups()` | — | — |
+| `groups` | `nestedkriging_groups(obj)` | `obj$groups()` (1-based) | `obj.groups()` (0-based) | `groups(obj)` (cell, 1-based) | `groups(obj)` (1-based) |
 | `theta` | `nestedkriging_theta(obj)` | `obj$theta()` | `obj.theta()` | `theta(obj)` | `theta(obj)` |
 | `sigma2` | `nestedkriging_sigma2(obj)` | `obj$sigma2()` | `obj.sigma2()` | `sigma2(obj)` | `sigma2(obj)` |
 | `beta0` | `nestedkriging_beta0(obj)` | `obj$beta0()` | `obj.beta0()` | `beta0(obj)` | `beta0(obj)` |
-| `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | — | — |
-| `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | — | — |
-| `set_predict_chunk` | — | — | `obj.set_predict_chunk(chunk)` | — | — |
-| `set_warp_subsample` | — | — | `obj.set_warp_subsample(m)` | — | — |
+| `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | `warping(obj)` | `warping(obj)` |
+| `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
+| `set_predict_chunk` | `nestedkriging_set_predict_chunk(obj,chunk)` | `obj$set_predict_chunk(chunk)` | `obj.set_predict_chunk(chunk)` | `set_predict_chunk(obj,chunk)` | `set_predict_chunk!(obj,chunk)` |
+| `set_warp_subsample` | `nestedkriging_set_warp_subsample(obj,m)` | `obj$set_warp_subsample(m)` | `obj.set_warp_subsample(m)` | `set_warp_subsample(obj,m)` | `set_warp_subsample!(obj,m)` |
 
-> No `noise=`, no `normalize=`, no `save()`/`load()` yet on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
+> No `noise=`, no `normalize=` on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 
 ---
 

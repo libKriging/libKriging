@@ -208,6 +208,18 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NestedKrigingBinding::sigma2(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::beta0"_hash:
       return NestedKrigingBinding::beta0(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::X"_hash:
+      return NestedKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::y"_hash:
+      return NestedKrigingBinding::y(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::groups"_hash:
+      return NestedKrigingBinding::groups(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::warping"_hash:
+      return NestedKrigingBinding::warping(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::set_predict_chunk"_hash:
+      return NestedKrigingBinding::set_predict_chunk(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::set_warp_subsample"_hash:
+      return NestedKrigingBinding::set_warp_subsample(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::save"_hash:
       return NestedKrigingBinding::save(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::load"_hash:

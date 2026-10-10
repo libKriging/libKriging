@@ -63,6 +63,31 @@ classdef NestedKriging < handle
             disp(obj.summary());
         end
 
+        function varargout = X(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::X", obj.ref, varargin{:});
+        end
+
+        function varargout = y(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::y", obj.ref, varargin{:});
+        end
+
+        function varargout = groups(obj, varargin)
+            % cell array of 1-based row indices (one column vector per group)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::groups", obj.ref, varargin{:});
+        end
+
+        function varargout = warping(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::warping", obj.ref, varargin{:});
+        end
+
+        function set_predict_chunk(obj, chunk)
+            mLibKriging("NestedKriging::set_predict_chunk", obj.ref, int32(chunk));
+        end
+
+        function set_warp_subsample(obj, m)
+            mLibKriging("NestedKriging::set_warp_subsample", obj.ref, int32(m));
+        end
+
         function varargout = save(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NestedKriging::save", obj.ref, varargin{:});
         end
