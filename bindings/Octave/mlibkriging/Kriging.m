@@ -108,6 +108,10 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::nystrom_rank", obj.ref, varargin{:});
         end
 
+        function varargout = vecchia_neighbors(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_neighbors", obj.ref, varargin{:});
+        end
+
         function varargout = X(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::X", obj.ref, varargin{:});
         end

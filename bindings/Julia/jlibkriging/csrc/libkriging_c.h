@@ -150,6 +150,7 @@ const char* lk_kriging_kernel(void* ptr);
 const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
+int lk_kriging_vecchia_neighbors(void* ptr);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);

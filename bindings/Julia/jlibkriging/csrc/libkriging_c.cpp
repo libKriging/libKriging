@@ -490,6 +490,13 @@ int lk_kriging_nystrom_rank(void* ptr) {
   CATCH_RETURN
 }
 
+int lk_kriging_vecchia_neighbors(void* ptr) {
+  try {
+    return static_cast<int>(static_cast<Kriging*>(ptr)->vecchia_neighbors());
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_is_normalize(void* ptr) {
   try {
     return static_cast<Kriging*>(ptr)->normalize() ? 1 : 0;

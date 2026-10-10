@@ -83,6 +83,7 @@ k <- Kriging(y[idx], X[idx, , drop = FALSE], "matern5_2")
 k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")   # d <~ 5
 k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # higher d
 k$nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
+k$vecchia_neighbors()   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
 `predict` is the only prediction entry point from R: `predictVecchia`,
 `predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"

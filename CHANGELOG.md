@@ -29,6 +29,9 @@ past release, see the corresponding entry on the
   instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
   on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
   raise; `will_update=true` still raises there.
+- `vecchia_neighbors()` in every binding (Python, R, Julia, Octave/Matlab),
+  alongside the already exposed `nystrom_rank()`: number `m` of conditioning
+  neighbors of an `LLVecchia(m)` fit, 0 otherwise.
 - Python: `pickle` support for `Kriging`, `WarpKriging`, `MLPKriging` and
   `NestedKriging` (through their JSON save/load), so the scikit-learn
   wrappers can be cloned, cached and sent to worker processes.

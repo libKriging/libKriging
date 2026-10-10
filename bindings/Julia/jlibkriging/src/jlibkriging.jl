@@ -486,6 +486,10 @@ function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
 end
 
+function vecchia_neighbors(k::Kriging)
+    return Int(ccall(dlsym(_lk(), :lk_kriging_vecchia_neighbors), Cint, (Ptr{Nothing},), k.ptr))
+end
+
 function normalize(k::Kriging)
     return ccall(dlsym(_lk(), :lk_kriging_is_normalize), Cint, (Ptr{Nothing},), k.ptr) != 0
 end
@@ -1447,7 +1451,7 @@ export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
-export nystrom_rank
+export nystrom_rank, vecchia_neighbors
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim

@@ -308,6 +308,10 @@ int PyKriging::nystrom_rank() {
   return static_cast<int>(m_internal->nystrom_rank());
 }
 
+int PyKriging::vecchia_neighbors() {
+  return static_cast<int>(m_internal->vecchia_neighbors());
+}
+
 py::array_t<double> PyKriging::X() {
   return carma::mat_to_arr(m_internal->X());
 }

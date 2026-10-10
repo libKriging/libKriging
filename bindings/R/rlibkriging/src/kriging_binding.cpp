@@ -634,6 +634,15 @@ int kriging_nystrom_rank(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
+int kriging_vecchia_neighbors(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return static_cast<int>(impl_ptr->vecchia_neighbors());
+}
+
+// [[Rcpp::export]]
 arma::mat kriging_X(Rcpp::List k) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

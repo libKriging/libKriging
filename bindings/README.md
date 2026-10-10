@@ -56,6 +56,7 @@ This document lists all methods exposed by each language binding for accessing t
 | `nugget` / `is_nugget_estim` | `kriging_nugget(obj)` / `kriging_is_nugget_estim(obj)` | `obj$nugget()` / `obj$is_nugget_estim()` | `obj.nugget()` / `obj.is_nugget_estim()` | `nugget(obj)` / `is_nugget_estim(obj)` | `nugget(obj)` / `is_nugget_estim(obj)` |
 | `noise` | `kriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `nystrom_rank` | `kriging_nystrom_rank(obj)` | `obj$nystrom_rank()` | `obj.nystrom_rank()` | `nystrom_rank(obj)` | `nystrom_rank(obj)` |
+| `vecchia_neighbors` | `kriging_vecchia_neighbors(obj)` | `obj$vecchia_neighbors()` | `obj.vecchia_neighbors()` | `vecchia_neighbors(obj)` | `vecchia_neighbors(obj)` |
 | **Pre-fit data reduction** | | | | | |
 | `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
 
@@ -69,7 +70,8 @@ It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and
 `Kriging` accepts `objective` = `"LL"` (default), `"LOO"`, `"LMP"`, and the two large-`n` approximations
 `"LLVecchia"` / `"LLVecchia(m)"` (Vecchia, see [docs/math/Vecchia.md](../docs/math/Vecchia.md)) and `"LLNystrom"` /
 `"LLNystrom(k)"` (Nystrom low-rank, see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). `nystrom_rank()` returns the
-rank `k` of a `LLNystrom` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
+rank `k` of a `LLNystrom` fit (0 otherwise), `vecchia_neighbors()` the number `m` of conditioning neighbors of a
+`LLVecchia` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
 longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
 only.
 

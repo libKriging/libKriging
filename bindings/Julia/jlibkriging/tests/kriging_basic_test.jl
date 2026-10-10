@@ -168,3 +168,13 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test all(loo_vec.stderr .>= 0.0)
     end
 end
+
+@testset "vecchia_neighbors / nystrom_rank" begin
+    X = reshape(collect(range(0.01, 0.99; length=20)), :, 1)
+    y = [f_test(x) for x in X[:, 1]]
+    @test vecchia_neighbors(Kriging(y, X, "matern5_2"; objective="LLVecchia(5)")) == 5
+    @test nystrom_rank(Kriging(y, X, "matern5_2"; objective="LLNystrom(4)")) == 4
+    k = Kriging(y, X, "matern5_2")
+    @test vecchia_neighbors(k) == 0
+    @test nystrom_rank(k) == 0
+end

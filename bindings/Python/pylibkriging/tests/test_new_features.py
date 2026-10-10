@@ -328,3 +328,14 @@ class TestConsistency:
     
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_vecchia_neighbors_and_nystrom_rank():
+    rng = np.random.default_rng(5)
+    X = rng.uniform(size=(30, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    assert lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)").vecchia_neighbors() == 7
+    assert lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)").nystrom_rank() == 5
+    k = lk.Kriging(y, X, "matern5_2")
+    assert k.vecchia_neighbors() == 0
+    assert k.nystrom_rank() == 0

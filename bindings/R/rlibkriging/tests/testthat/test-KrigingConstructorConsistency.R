@@ -14,6 +14,14 @@ test_that("objective = 'LLVecchia(m)' is accepted (Vecchia log-likelihood)", {
   expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia"), NA)
 })
 
+test_that("vecchia_neighbors / nystrom_rank report the approximation size", {
+  expect_equal(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)")$vecchia_neighbors(), 3)
+  expect_equal(Kriging(y, X, "matern5_2", objective = "LLNystrom(4)")$nystrom_rank(), 4)
+  k <- Kriging(y, X, "matern5_2")
+  expect_equal(k$vecchia_neighbors(), 0)
+  expect_equal(k$nystrom_rank(), 0)
+})
+
 test_that("objective still accepts LL / LOO / LMP and rejects unknown values", {
   expect_error(Kriging(y, X, "gauss", objective = "LOO"), NA)
   expect_error(Kriging(y, X, "gauss", objective = "LMP"), NA)
