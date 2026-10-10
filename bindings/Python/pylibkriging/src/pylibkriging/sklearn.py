@@ -18,6 +18,8 @@ of pylibkriging (see the ``sklearn`` extra in ``setup.py``) -- importing
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 try:
@@ -512,8 +514,22 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
                 "('PoE'/'gPoE'/'BCM'/'rBCM').")
         parameters = {} if self.parameters is None else dict(self.parameters)
         warping = [] if self.warping is None else list(self.warping)
+        # NestedKriging needs groups of at least d+2 points: cap nb_groups for
+        # small samples (cross-validation folds, sklearn's estimator checks)
+        # instead of failing; the value actually used is nb_groups_.
+        n, d = X.shape
+        if n < d + 2:
+            raise ValueError(
+                f"NestedKrigingRegressor needs at least d + 2 = {d + 2} samples; "
+                f"got n_samples={n}.")
+        self.nb_groups_ = max(1, min(int(self.nb_groups), n // (d + 2)))
+        if self.nb_groups_ != self.nb_groups:
+            warnings.warn(
+                f"nb_groups={self.nb_groups} is too large for n={n}, d={d} "
+                f"(at most n // (d + 2) = {n // (d + 2)} groups); "
+                f"using nb_groups={self.nb_groups_}.")
         self.model_ = _NestedKriging(
-            y, X, self.kernel, self.nb_groups,
+            y, X, self.kernel, self.nb_groups_,
             aggregation=self.aggregation,
             partition=self.partition,
             seed=self.seed,

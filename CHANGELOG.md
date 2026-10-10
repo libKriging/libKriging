@@ -11,12 +11,27 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Changed
+- **Python (breaking):** every vector-valued output of `Kriging`,
+  `WarpKriging` and `MLPKriging` is now a 1-D numpy array of shape `(n,)`
+  instead of `(n, 1)` (or `(1, d)` for `centerX` / `scaleX`): `predict` mean
+  and stdev, `theta`, `beta`, `y`, `z`, `noise`, `warp_params`, gradients of
+  `logLikelihoodFun` / `leaveOneOutFun` / `logMargPostFun`, `leaveOneOutVec`,
+  `subsetOfData` indices and the matching `model()` entries. This matches
+  `NestedKriging` and scikit-learn; matrices (`X`, `F`, `T`, `M`, covariances,
+  derivatives, simulations) are unchanged. Code indexing `[:, 0]` on those
+  outputs must drop the index; `ravel()` / `flatten()` / `reshape(...)` keep
+  working.
+
 ### Added
 - `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
   (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
   instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
   on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
   raise; `will_update=true` still raises there.
+- Python: `pickle` support for `Kriging`, `WarpKriging`, `MLPKriging` and
+  `NestedKriging` (through their JSON save/load), so the scikit-learn
+  wrappers can be cloned, cached and sent to worker processes.
 - `NestedKriging::save` / `NestedKriging::load` (C++, Python, R, Julia,
   Octave/Matlab): configuration, data, partition, common prior and submodels
   (`Kriging` or `WarpKriging`) in one JSON file; the NK precomputations are
@@ -46,6 +61,13 @@ past release, see the corresponding entry on the
   `Kriging([1], [1], "gauss")` model, whose mex reference was then
   overwritten and never released. It now wraps the loaded reference directly,
   like `WarpKriging.load` / `MLPKriging.load`.
+- Python scikit-learn wrapper `NestedKrigingRegressor`: `nb_groups` is
+  capped to `n // (d + 2)` (value used stored in `nb_groups_`, with a warning)
+  and fewer than `d + 2` samples raise a clear `ValueError`, instead of the
+  native "nb_groups should be in [1, n/(d+2)]" error on small samples.
+- Python tests `test_new_features.py`, `sklearn_estimator_test.py` and
+  `sklearn_multimodel_test.py` were never run by CTest (and the scikit-learn
+  ones failed); they are now registered and pass.
 - Octave/Matlab `Kriging.copy` returned the raw mex reference of the copy
   instead of a `Kriging` object (and leaked it when the result was not
   assigned). It now returns a `Kriging` object, like `WarpKriging.copy` /

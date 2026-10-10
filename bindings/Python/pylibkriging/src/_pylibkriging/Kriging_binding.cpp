@@ -7,6 +7,7 @@
 #include <libKriging/Kriging.hpp>
 #include <libKriging/Trend.hpp>
 #include "py_to_cpp_cast.hpp"
+#include "vec_to_arr.hpp"
 
 #include <random>
 #include <stdexcept>
@@ -139,8 +140,8 @@ PyKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool retur
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
       = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
-  return std::make_tuple(carma::col_to_arr(y_predict, true),
-                         carma::col_to_arr(y_stderr, true),
+  return std::make_tuple(vec_to_arr(y_predict),
+                         vec_to_arr(y_stderr),
                          carma::mat_to_arr(y_cov, true),
                          carma::mat_to_arr(y_mean_deriv, true),
                          carma::mat_to_arr(y_stderr_deriv, true));
@@ -154,7 +155,7 @@ py::array_t<int> PyKriging::subsetOfData(const py::array_t<double>& X, int n_max
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   arma::uvec idx = Kriging::subsetOfData(mat_X, static_cast<arma::uword>(n_max), method, seed);
   arma::Col<int> idx_i = arma::conv_to<arma::Col<int>>::from(idx);  // 0-based, matches Python indexing
-  return carma::col_to_arr(idx_i, true);
+  return vec_to_arr(idx_i);
 }
 
 // --- simulate ---
@@ -254,13 +255,13 @@ std::tuple<double, py::array_t<double>> PyKriging::leaveOneOutFun(const py::arra
                                                                   const bool return_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [llo, grad] = m_internal->leaveOneOutFun(vec_theta, return_grad, false);
-  return {llo, carma::col_to_arr(grad)};
+  return {llo, vec_to_arr(grad)};
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>> PyKriging::leaveOneOutVec(const py::array_t<double>& theta) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [yhat_mean, yhat_sd] = m_internal->leaveOneOutVec(vec_theta);
-  return {carma::col_to_arr(yhat_mean), carma::col_to_arr(yhat_sd)};
+  return {vec_to_arr(yhat_mean), vec_to_arr(yhat_sd)};
 }
 
 double PyKriging::leaveOneOut() {
@@ -271,7 +272,7 @@ std::tuple<double, py::array_t<double>, py::array_t<double>>
 PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool /*want_hess*/) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [llo, grad] = m_internal->logLikelihoodFun(vec_theta, return_grad, false);
-  return {llo, carma::col_to_arr(grad), {}};
+  return {llo, vec_to_arr(grad), {}};
 }
 
 double PyKriging::logLikelihood() {
@@ -282,7 +283,7 @@ std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::arra
                                                                   const bool return_grad) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [lmp, grad] = m_internal->logMargPostFun(vec_theta, return_grad, false);
-  return {lmp, carma::col_to_arr(grad)};
+  return {lmp, vec_to_arr(grad)};
 }
 
 double PyKriging::logMargPost() {
@@ -312,15 +313,15 @@ py::array_t<double> PyKriging::X() {
 }
 
 py::array_t<double> PyKriging::centerX() {
-  return carma::row_to_arr(m_internal->centerX());
+  return vec_to_arr(m_internal->centerX());
 }
 
 py::array_t<double> PyKriging::scaleX() {
-  return carma::row_to_arr(m_internal->scaleX());
+  return vec_to_arr(m_internal->scaleX());
 }
 
 py::array_t<double> PyKriging::y() {
-  return carma::col_to_arr(m_internal->y());
+  return vec_to_arr(m_internal->y());
 }
 
 double PyKriging::centerY() {
@@ -352,11 +353,11 @@ py::array_t<double> PyKriging::M() {
 }
 
 py::array_t<double> PyKriging::z() {
-  return carma::col_to_arr(m_internal->z());
+  return vec_to_arr(m_internal->z());
 }
 
 py::array_t<double> PyKriging::beta() {
-  return carma::col_to_arr(m_internal->beta());
+  return vec_to_arr(m_internal->beta());
 }
 
 bool PyKriging::is_beta_estim() {
@@ -364,7 +365,7 @@ bool PyKriging::is_beta_estim() {
 }
 
 py::array_t<double> PyKriging::theta() {
-  return carma::col_to_arr(m_internal->theta());
+  return vec_to_arr(m_internal->theta());
 }
 
 bool PyKriging::is_theta_estim() {
@@ -394,7 +395,7 @@ bool PyKriging::is_nugget_estim() {
 }
 
 py::array_t<double> PyKriging::noise() {
-  return carma::col_to_arr(m_internal->noise());
+  return vec_to_arr(m_internal->noise());
 }
 
 // --- covMat ---
@@ -416,7 +417,7 @@ py::dict PyKriging::model() const {
   d["noise_model"] = noise_model_to_string(m_internal->noise_model());
 
   arma::vec theta = m_internal->theta();
-  d["theta"] = carma::col_to_arr(theta);
+  d["theta"] = vec_to_arr(theta);
   d["is_theta_estim"] = m_internal->is_theta_estim();
   d["sigma2"] = m_internal->sigma2();
   d["is_sigma2_estim"] = m_internal->is_sigma2_estim();
@@ -427,24 +428,24 @@ py::dict PyKriging::model() const {
   }
   if (m_internal->noise_model() == Kriging::NoiseModel::Heterogeneous) {
     arma::vec noise = m_internal->noise();
-    d["noise"] = carma::col_to_arr(noise);
+    d["noise"] = vec_to_arr(noise);
   }
 
   arma::mat X = m_internal->X();
   d["X"] = carma::mat_to_arr(X);
   arma::rowvec centerX = m_internal->centerX();
-  d["centerX"] = carma::row_to_arr(centerX);
+  d["centerX"] = vec_to_arr(centerX);
   arma::rowvec scaleX = m_internal->scaleX();
-  d["scaleX"] = carma::row_to_arr(scaleX);
+  d["scaleX"] = vec_to_arr(scaleX);
   arma::vec y = m_internal->y();
-  d["y"] = carma::col_to_arr(y);
+  d["y"] = vec_to_arr(y);
   d["centerY"] = m_internal->centerY();
   d["scaleY"] = m_internal->scaleY();
   d["normalize"] = m_internal->normalize();
   d["regmodel"] = Trend::toString(m_internal->regmodel());
 
   arma::vec beta = m_internal->beta();
-  d["beta"] = carma::col_to_arr(beta);
+  d["beta"] = vec_to_arr(beta);
   d["is_beta_estim"] = m_internal->is_beta_estim();
   arma::mat F = m_internal->F();
   d["F"] = carma::mat_to_arr(F);
@@ -453,6 +454,6 @@ py::dict PyKriging::model() const {
   arma::mat M = m_internal->M();
   d["M"] = carma::mat_to_arr(M);
   arma::vec z = m_internal->z();
-  d["z"] = carma::col_to_arr(z);
+  d["z"] = vec_to_arr(z);
   return d;
 }

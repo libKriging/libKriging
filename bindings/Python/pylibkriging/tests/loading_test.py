@@ -63,3 +63,29 @@ def test_generic_load_dispatches_classes():
         for filename in filenames:
             if os.path.exists(filename):
                 os.remove(filename)
+
+
+def test_pickle_roundtrip_all_classes():
+    import pickle
+
+    rng = np.random.default_rng(3)
+    X = rng.uniform(size=(40, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    Xt = rng.uniform(size=(7, 2))
+    models = [
+        m.Kriging(y, X, "gauss"),
+        m.WarpKriging(y, X, ["kumaraswamy", "none"], "gauss"),
+        m.MLPKriging(y, X, [4], 2, "selu", "gauss"),
+        m.NestedKriging(y, X, "gauss", 2),
+    ]
+    for k in models:
+        k2 = pickle.loads(pickle.dumps(k))
+        assert type(k2) is type(k)
+        np.testing.assert_array_equal(k2.theta(), k.theta())
+        if isinstance(k, m.NestedKriging):
+            p1, p2 = k.predict(Xt, True), k2.predict(Xt, True)
+        else:
+            p1, p2 = k.predict(Xt, True, False, False)[:2], k2.predict(Xt, True, False, False)[:2]
+        for a, b in zip(p1, p2):
+            assert a.shape == (7,)  # vector outputs are 1-D for every class
+            np.testing.assert_allclose(b, a, rtol=0, atol=1e-12)

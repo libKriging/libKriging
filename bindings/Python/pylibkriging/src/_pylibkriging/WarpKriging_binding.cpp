@@ -3,6 +3,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include "vec_to_arr.hpp"
 
 #include <libKriging/Trend.hpp>
 #include <libKriging/WarpKriging.hpp>
@@ -100,8 +101,8 @@ std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::ar
 PyWarpKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
-  return std::make_tuple(carma::col_to_arr(mean, true),
-                         carma::col_to_arr(stdev, true),
+  return std::make_tuple(vec_to_arr(mean),
+                         vec_to_arr(stdev),
                          carma::mat_to_arr(cov, true),
                          carma::mat_to_arr(mean_deriv, true),
                          carma::mat_to_arr(stdev_deriv, true));
@@ -154,7 +155,7 @@ std::tuple<double, py::array_t<double>, py::array_t<double>>
 PyWarpKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
-  return {ll, carma::col_to_arr(grad), carma::mat_to_arr(hess)};
+  return {ll, vec_to_arr(grad), carma::mat_to_arr(hess)};
 }
 
 py::array_t<double> PyWarpKriging::covMat(const py::array_t<double>& X1, const py::array_t<double>& X2) {
@@ -176,11 +177,11 @@ std::string PyWarpKriging::objective() {
 }
 
 py::array_t<double> PyWarpKriging::noise() {
-  return carma::col_to_arr(m_internal->noise());
+  return vec_to_arr(m_internal->noise());
 }
 
 py::array_t<double> PyWarpKriging::warp_params() {
-  return carma::col_to_arr(m_internal->warp_params());
+  return vec_to_arr(m_internal->warp_params());
 }
 
 py::array_t<double> PyWarpKriging::X() {
@@ -188,15 +189,15 @@ py::array_t<double> PyWarpKriging::X() {
 }
 
 py::array_t<double> PyWarpKriging::centerX() {
-  return carma::row_to_arr(m_internal->centerX());
+  return vec_to_arr(m_internal->centerX());
 }
 
 py::array_t<double> PyWarpKriging::scaleX() {
-  return carma::row_to_arr(m_internal->scaleX());
+  return vec_to_arr(m_internal->scaleX());
 }
 
 py::array_t<double> PyWarpKriging::y() {
-  return carma::col_to_arr(m_internal->y());
+  return vec_to_arr(m_internal->y());
 }
 
 double PyWarpKriging::centerY() {
@@ -228,15 +229,15 @@ py::array_t<double> PyWarpKriging::M() {
 }
 
 py::array_t<double> PyWarpKriging::z() {
-  return carma::col_to_arr(m_internal->z());
+  return vec_to_arr(m_internal->z());
 }
 
 py::array_t<double> PyWarpKriging::beta() {
-  return carma::col_to_arr(m_internal->beta());
+  return vec_to_arr(m_internal->beta());
 }
 
 py::array_t<double> PyWarpKriging::theta() {
-  return carma::col_to_arr(m_internal->theta());
+  return vec_to_arr(m_internal->theta());
 }
 
 double PyWarpKriging::sigma2() {
