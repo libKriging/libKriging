@@ -15,7 +15,7 @@ groups and, for the `NK` variant, across pairs of groups.
 ```r
 nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
                      aggregation = "NK", partition = "kmeans")
-pred <- predict(nk, Xnew, stdev = TRUE)
+pred <- predict(nk, Xnew, return_stdev = TRUE)
 ```
 
 ## Mathematical description

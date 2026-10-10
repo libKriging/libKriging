@@ -27,13 +27,15 @@ mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
 # predict() always returns this fixed 5-tuple; the boolean flags only
 # control whether cov/mean_deriv/stdev_deriv are actually computed
 # (empty arrays otherwise), not how many values come back.
-sims = model.simulate(nsim=10, seed=123, X=Xnew)
+# mean / stdev are 1-D, shape (q,); cov is (q, q).
+sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q, nsim)
+sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)
 
 model.logLikelihood()
 model.leaveOneOut()
 model.logMargPost()
-ll, grad = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)
+ll, grad, _hess = model.logLikelihoodFun(theta, return_grad=True, want_hess=False)  # (ll, grad, hess)
 ```
 
 Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to
@@ -92,7 +94,7 @@ specifically wants SELU's less-saturating behavior for deep/wide MLPs.
 
 ```python
 # Pre-fit reduction: keep n_max representative rows (k-means centroids snapped
-# to real observations). Returns 0-based row indices, shape (n_max, 1).
+# to real observations). Returns 0-based row indices, a 1-D array of length n_max.
 idx = lk.Kriging.subsetOfData(X, n_max=2000, method="kmeans", seed=123).ravel()
 model = lk.Kriging(y[idx], X[idx], "matern5_2")
 
@@ -142,7 +144,9 @@ Constructor parameters mirror the `Kriging` ones (`regmodel`, `normalize`,
 ## Loading a saved model
 
 ```python
-model = lk.load("model.h5")  # auto-detects class, incl. legacy Nugget/NoiseKriging saves
+model.save("model.json")     # JSON, any class (Kriging, WarpKriging, MLPKriging, NestedKriging)
+model = lk.load("model.json")  # auto-detects class, incl. legacy Nugget/NoiseKriging saves
+# models are also picklable (pickle / joblib / multiprocessing)
 ```
 
 ## Common pitfalls to flag in review

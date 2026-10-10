@@ -100,6 +100,32 @@ past release, see the corresponding entry on the
 - Python tests `test_new_features.py`, `sklearn_estimator_test.py` and
   `sklearn_multimodel_test.py` were never run by CTest (and the scikit-learn
   ones failed); they are now registered and pass.
+- Documentation, skills and plugin commands checked against the bindings
+  code (calls, argument names, return shapes; Python snippets executed, C++
+  snippets compiled):
+  - `bindings/README.md`: Octave/Matlab constructors are `Kriging(...)`,
+    `WarpKriging(...)`, ... (not `build(...)`); Python loads are
+    `Kriging.load(f)` / `pylibkriging.load(f)` (no `load_kriging`); R object
+    methods are `feature_dim()`, `is_fitted()`, `hidden_dims()`; Python
+    `subsetOfData` returns a 1-D array; the "C++ only" list now has
+    `simulateVecchia` and no longer `vecchia_neighbors`.
+  - `predict` unpacked as a pair for `Kriging` / `WarpKriging` /
+    `MLPKriging` (5-tuple) in `docs/math/Kriging.md`,
+    `Warping-MLPJoint.md`, `Warping-NeuralMono.md` and the C++ reference;
+    Python `logLikelihoodFun` returns `(ll, grad, hess)`.
+  - R examples passed `stdev = TRUE` (argument is `return_stdev`),
+    `noise_model =` (argument is `noise`) and `simulate(..., X = )`
+    (argument is `x`); Julia README examples passed `stdev=` / `cov=`
+    (keywords are `return_stdev` / `return_cov`).
+  - C++ reference: `WarpKriging` lives in `libKriging::`, its `fit` takes no
+    warping list, and the `NestedKriging` constructor takes the aggregation,
+    partition and seed before the trend.
+  - `docs/math/Nystrom.md` said `predict` used an exact factorization after
+    an `LLNystrom` fit; it routes to the Nystrom predictor / simulator.
+  - `commands/simulate.md`: results are `npred × nsim` (one column per
+    path) in every binding.
+  - Every language reference now shows save / load and
+    `simulate(..., will_update)` + `update_simulate`.
 - Octave/Matlab `Kriging.copy` returned the raw mex reference of the copy
   instead of a `Kriging` object (and leaked it when the result was not
   assigned). It now returns a `Kriging` object, like `WarpKriging.copy` /

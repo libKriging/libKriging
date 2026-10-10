@@ -24,8 +24,12 @@ k = Kriging(y, X, "matern5_2";
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 # p.mean, p.stdev, p.cov, p.mean_deriv, p.stdev_deriv
 
-s = simulate(k, 10, 123, Xnew; will_update=false)   # (k, nsim, seed, X)
+s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
+s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
+
+save(k, "k.json")              # JSON, any libKriging class
+k = jlibkriging.load("k.json")  # auto-detects the class
 
 log_likelihood(k)
 leave_one_out(k)

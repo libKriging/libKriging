@@ -20,8 +20,12 @@ k <- Kriging(y, X, kernel = "matern5_2",
              noise = NULL)                # NULL | "nugget" | numeric vector
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
-s <- simulate(k, nsim = 10, seed = 123, x = Xnew)
+s <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)   # length(Xnew) x nsim
+s_u <- update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update(k, y_u, X_u, refit = TRUE)
+
+save(k, "k.json")      # JSON, any libKriging class
+k <- load("k.json")    # auto-detects the class
 
 logLikelihood(k)
 leaveOneOut(k)

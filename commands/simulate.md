@@ -15,8 +15,8 @@ Simulate sample paths from a fitted libKriging model. Context / arguments: $ARGU
    type: `int32(...)` in Octave/MATLAB, `Int`/`Int32` in Julia — a plain
    double raises a low-level error far from the call site.
 
-3. Result is `nsim × npred` (one row per path, or per that file's stated
-   orientation). For a smooth path picture, use a dense ordered `Xnew`.
+3. Result is `npred × nsim` in every binding (one row per point of `Xnew`,
+   one column per path). For a smooth path picture, use a dense ordered `Xnew`.
 
 4. Report the result shape and a summary (per-point mean and an empirical
    band across paths). If the user then wants to condition on further
