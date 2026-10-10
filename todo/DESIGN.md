@@ -157,6 +157,12 @@ Justification du changement de position :
 mode approché derrière une option nommée sans ambiguïté
 (`allow_non_nested=true`) documentée comme approximation.**
 
+Note (rapprochement avec `MultiOutputKriging`, §8) : l'option *co-krigeage
+complet* est l'ICM hétérotopique prévu à l'étape 2 de `MultiOutputKriging`
+(`θ` partagé, `O((Σ n_t)³)`). D2 pourrait donc se réduire à : plans emboîtés
+⇒ `MarkovCoKriging` ; plans non emboîtés ⇒ ICM hétérotopique, le mode
+approché restant l'alternative bon marché.
+
 ### D3. Forme de la signature `fit` : TRANCHÉE — variante B (`level`)
 `fit(arma::vec y, arma::mat X, arma::uvec level, …)` — un seul jeu de
 données plus un vecteur d'index de niveau (`level[i] ∈ [0, s-1]`,
@@ -267,3 +273,56 @@ une implémentation `gstat`/gslib du MM1, en plus de l'oracle
   c'est une source d'erreur classique (certains outils numérotent à l'envers).
 - `s ≥ 2` ; `s = 1` doit soit être refusé, soit dégénérer proprement en
   `Kriging`.
+
+## 8. Rapprochement avec `MultiOutputKriging`
+
+`MultiOutputKriging` (PR #372, branche `feature/multi-output-kriging`) :
+multi-sorties isotopique, `Y n × q`, modèles `"pca"`, `"shared"`,
+`"separable"` (ICM, `Σ ⊗ R(θ)`) et `"separable(<kernel>)"`. Analyse
+détaillée côté multi-sorties : `todo/multi-output/ANALYSIS.md` §7 sur cette
+branche.
+
+### 8.1 Lien mathématique
+
+À `ρ` constant, même noyau et même `θ` à tous les niveaux, en isotopique,
+le modèle de Markov est un ICM :
+
+    s = 2 :  Cov = [ σ1²     ρ σ1²        ] ⊗ R(θ)
+                   [ ρ σ1²   ρ² σ1² + σ2² ]
+
+- `s = 2` : toute `Σ` 2×2 définie positive s'écrit ainsi (`ρ = Σ12/Σ11`,
+  `σ2² = Σ22 − Σ12²/Σ11`). La vraisemblance se factorise en
+  `L(y_1) · L(y_2 | y_1)` dans les deux paramétrisations : à `θ` fixé, les
+  maximums de vraisemblance coïncident avec `"separable"`, quelle que soit
+  l'option retenue en D1 (le profilage de `ρ` atteint le même optimum que
+  le GLS).
+- `s ≥ 3` : `y_t` ne dépend que de `y_{t-1}`, ce qui donne un ICM contraint
+  (`Σ⁻¹` tridiagonale).
+- Ce que `MarkovCoKriging` apporte en plus : un `θ_t` par niveau (LMC
+  triangulaire) et des plans emboîtés hétérotopiques en `O(Σ n_t³)`.
+
+### 8.2 À partager
+
+1. **Format des données empilées** : l'ICM hétérotopique prévu à l'étape 2
+   de `MultiOutputKriging` reprend la signature `fit(y, X, level)` de D3.
+2. **Conventions de sortie**, déjà appliquées à `MultiOutputKriging` dans
+   les 4 bindings : `predict` en `m × s`, covariance `ms × ms` sur `vec(Y)`,
+   `simulate` en `m × s × nsim`, dérivées `m × d × s`. Également
+   `component(i)` pour les sous-`Kriging`, `update` / `update_simulate`, et
+   un JSON de save/load avec un `"content"` propre.
+3. **Test croisé** : `s = 2`, isotopique, `θ` fixé et partagé ⇒ mêmes `ρ`,
+   `σ²`, LL, moyenne et variance prédites que
+   `MultiOutputKriging("separable")`. Oracle interne en plus de
+   MuFiCokriging (`PLAN.md`, Phase 1).
+4. **D2** : le « co-krigeage complet » est l'ICM hétérotopique de l'étape 2
+   de `MultiOutputKriging`. Voir la note sous D2.
+
+### 8.3 Non retenu pour l'instant
+
+`output_model = "markov"` dans `MultiOutputKriging` : son API est
+isotopique, alors que l'intérêt du multi-fidélité vient des plans emboîtés.
+
+À trancher au démarrage de l'étape 2 : une classe hétérotopique unique
+`fit(y, X, level)` avec deux modèles, `"icm"` (vraisemblance jointe) et
+`"markov"` (factorisée), réunissant `MarkovCoKriging` et l'étape 2. Les deux
+sont à concevoir ensemble.

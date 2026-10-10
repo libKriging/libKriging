@@ -29,7 +29,11 @@ Rien n'a encore été modifié dans `src/`, `bindings/`, `tests/` ou `skills/`.
    5 bindings. Voir `DESIGN.md` D3.
 3. Lire `DESIGN.md` §« Décisions ouvertes » restantes (D2 plans
    non-emboîtés, D4 options par niveau, D5 nom).
-4. Puis suivre `PLAN.md` phase 0 → 5 (Phase 1 inclut désormais un oracle
+4. Lien avec `MultiOutputKriging` (PR #372) : à `θ` partagé, l'AR(1)
+   isotopique est un ICM (`"separable"`) ; format `(y, X, level)` et
+   conventions de sortie à partager avec l'ICM hétérotopique prévu
+   (étape 2). Voir `DESIGN.md` §8.
+5. Puis suivre `PLAN.md` phase 0 → 5 (Phase 1 inclut désormais un oracle
    collocalisé en plus de `MuFiCokriging`).
 
 ## Contexte projet au moment de l'analyse
