@@ -26,6 +26,10 @@ classMLPKriging <- function(obj) {
                 'normalize','regmodel','F_','T_','M','z','beta')) {
         eval(parse(text=paste0("obj$", d, " <- function() ", d, "(obj)")))
     }
+    # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
+    # as not to mask base::F / base::T)
+    obj$F <- function() F_(obj)
+    obj$T <- function() T_(obj)
     obj
 }
 

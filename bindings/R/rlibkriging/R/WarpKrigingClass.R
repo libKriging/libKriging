@@ -33,6 +33,10 @@ classWarpKriging <- function(obj) {
     # `optim` does not mask stats::optim), matching the Kriging binding style.
     obj$optim <- function() warpKriging_optim(obj$ptr)
     obj$objective <- function() warpKriging_objective(obj$ptr)
+    # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
+    # as not to mask base::F / base::T)
+    obj$F <- function() F_(obj)
+    obj$T <- function() T_(obj)
     obj
 }
 

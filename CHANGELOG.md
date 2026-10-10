@@ -64,6 +64,11 @@ past release, see the corresponding entry on the
   `Kriging([1], [1], "gauss")` model, whose mex reference was then
   overwritten and never released. It now wraps the loaded reference directly,
   like `WarpKriging.load` / `MLPKriging.load`.
+- R: `WarpKriging` and `MLPKriging` had no `k$F()` / `k$T()` (only
+  `k$F_()` / `k$T_()`), although `bindings/README.md` documents `obj$F()`,
+  and `Kriging` had no `F_()` / `T_()`. All three classes now provide both
+  `k$F()` / `k$T()` and `F_(k)` / `T_(k)` (the S3 generics stay named `F_` /
+  `T_` so as not to mask `base::F` / `base::T`).
 - Python scikit-learn wrapper `NestedKrigingRegressor`: `nb_groups` is
   capped to `n // (d + 2)` (value used stored in `nb_groups_`, with a warning)
   and fewer than `d + 2` samples raise a clear `ValueError`, instead of the

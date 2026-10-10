@@ -1117,3 +1117,21 @@ copy.Kriging <- function(object, ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
   return(classKriging(kriging_copy(object)))
 }
+
+#' @title Get trend matrix F for a Kriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @method F_ Kriging
+#' @export
+F_.Kriging <- function(object, ...) {
+  kriging_F(object)
+}
+
+#' @title Get Cholesky factor T for a Kriging model
+#' @param object A Kriging/MLPKriging/WarpKriging model object.
+#' @param ... Unused.
+#' @method T_ Kriging
+#' @export
+T_.Kriging <- function(object, ...) {
+  kriging_T(object)
+}
