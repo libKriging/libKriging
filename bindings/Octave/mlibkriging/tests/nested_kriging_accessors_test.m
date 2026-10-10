@@ -21,8 +21,8 @@ nk.set_predict_chunk(7);
 [m1, s1] = nk.predict(X(1:10, :));
 nk.set_predict_chunk(128);
 [m2, s2] = nk.predict(X(1:10, :));
-assert(max(abs(m1 - m2)) < 1e-10);  % chunking does not change the result
-assert(max(abs(s1 - s2)) < 1e-10);
+assert(max(abs(m1 - m2)) < 1e-8);  % chunking does not change the result (up to summation order)
+assert(max(abs(s1 - s2)) < 1e-8);
 
 nk.set_warp_subsample(500);  % accepted (used by warped fits)
 

@@ -127,7 +127,7 @@ end
     p1 = predict(k, Xt)
     set_predict_chunk!(k, 128)
     p2 = predict(k, Xt)
-    @test maximum(abs.(p1.mean .- p2.mean)) < 1e-10
+    @test maximum(abs.(p1.mean .- p2.mean)) < 1e-8  # up to BLAS blocking / summation order
     @test set_warp_subsample!(k, 500) === k
     @test_throws ErrorException set_predict_chunk!(k, 0)
     kw = NestedKriging(y, X, "gauss", 2; warping=["kumaraswamy", "kumaraswamy"])
