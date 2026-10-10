@@ -1,7 +1,7 @@
 # libKriging — Octave / MATLAB (mLibKriging)
 
 Octave and MATLAB share the same `.m` classes (`Kriging`, `WarpKriging`,
-`MLPKriging`, `NestedKriging`), backed by the `mLibKriging` mex function.
+`MLPKriging`, `NestedKriging`, `MultiOutputKriging`), backed by the `mLibKriging` mex function.
 Arguments are **positional**, not named — order matters and there is no
 keyword-argument fallback. See `SKILL.md` in this directory for *which*
 class/options to pick.
@@ -11,7 +11,7 @@ class/options to pick.
 ## Kriging (noise-free or noisy)
 
 ```matlab
-% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise)
+% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL");
 
 % Or all-default:
@@ -23,18 +23,21 @@ s = k.simulate(int32(10), int32(123), Xnew, false);
 %              (nsim, seed, X, will_update)
 k.update(y_u, X_u, true);   % (y_u, X_u, refit)
 
-k.logLikelihood();
-k.leaveOneOut();
-k.logMargPost();
+ll = k.logLikelihood();   % assign the result: a bare `k.logLikelihood();`
+loo = k.leaveOneOut();    % is called with nargout = 0 and fails
+lmp = k.logMargPost();
 ```
 
 Optional starting/fixed hyperparameters go through `Params(...)`, e.g.
 `Kriging(y, X, "gauss", "constant", false, "BFGS", "LL", Params("is_sigma2_estim", true))`.
 
 Do **not** call `NuggetKriging(...)`/`NoiseKriging(...)` for new models —
-libKriging's noise handling is unified into `Kriging`'s trailing `noise`
-argument (see `SKILL.md` §1.2); older class names remain only for loading
-legacy saved models via `load_kriging(...)`.
+libKriging's noise handling is unified into `Kriging`'s trailing
+`noise_model` (`"none"`, `"nugget"` or `"heterogeneous"`) and `noise`
+(variance vector, with `"heterogeneous"`) arguments (see `SKILL.md` §1.2),
+e.g. `Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", Params(), "nugget")`;
+older class names remain only for loading legacy saved models via
+`load_kriging(...)`.
 
 ## WarpKriging
 
@@ -70,7 +73,7 @@ k = Kriging(y(idx), X(idx, :), "matern5_2");
 % Or keep every point and approximate the objective (noise-free Kriging only)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");   % d <~ 5
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % higher d
-k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
+r = k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
 ```
 `predict` is the only prediction entry point from Octave/MATLAB:
 `predictVecchia`, `predictNystrom`, `simulateNystrom` and
@@ -81,7 +84,7 @@ k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
 ```matlab
 % nk = NestedKriging(y, X, kernel, nb_groups, aggregation, partition, seed, regmodel, optim, objective, parameters, warping)
 nk = NestedKriging(y, X, "matern5_2", 8);  % aggregation="NK", partition="kmeans" by default
-[p_mean, p_stdev] = nk.predict(Xnew, true);
+[p_mean, p_stdev] = nk.predict(Xnew);   % stdev is computed when a 2nd output is requested
 
 % Explicit aggregation choice:
 nk = NestedKriging(y, X, "matern5_2", 8, "PoE");
@@ -89,6 +92,38 @@ nk = NestedKriging(y, X, "matern5_2", 8, "PoE");
 `aggregation = "NK"` (the default) requires the `regmodel` in position 8 to
 be `"constant"` (also the default) — see `SKILL.md` §3. No `noise`
 argument, no `normalize` support, no save/load yet on `NestedKriging`.
+
+## MultiOutputKriging
+
+```matlab
+% Y is n x q (one column per output), X is n x d, same rows
+% k = MultiOutputKriging(Y, X, kernel, output_model, regmodel, normalize, optim, objective, parameters, output_coordinates)
+k = MultiOutputKriging(Y, X, "matern5_2", "pca(0.999)");   % or "shared", "separable", "separable(matern5_2)"
+[m, s, c, dm] = k.predict(Xnew, true, true, true);   % m, s: m x q; c: mq x mq; dm: m x d x q
+sims = k.simulate(int32(100), int32(1), Xnew, true); % m x q x nsim
+upd = k.update_simulate(Y_u, X_u);
+k.update(Y_u, X_u, false);
+km = k.component(1);                                  % "pca": copy of latent Kriging 1 (1-based)
+
+sep = MultiOutputKriging(Y, X, "matern5_2", "separable");
+[Cx, Sigma] = sep.predictCovFactors(Xnew);            % cov of sep.predict == kron(Sigma, Cx)
+
+% Unfitted object, then fit with a fixed theta
+k = MultiOutputKriging("matern5_2", "shared");
+k.fit(Y, X, "constant", false, "none", "LL", Params("theta", 0.3 * ones(1, size(X, 2))));
+
+% curves: Sigma = sigma2 R_t(phi), a matern 5/2 kernel over the time steps t (q may exceed n)
+sk = MultiOutputKriging("matern5_2", "separable(matern5_2)");
+sk.set_output_coordinates(t(:));
+sk.fit(Y, X);
+phi = sk.output_theta();                              % logLikelihoodFun([sk.theta(); phi]) takes both
+
+k.save("mo.json");                                    % JSON
+k2 = MultiOutputKriging.load("mo.json");              % or load_kriging("mo.json")
+```
+`parameters` only takes `theta`, `is_theta_estim` and `output_theta`.
+`"shared"`/`"separable"` accept `objective` `"LL"` or `"LOO"`,
+`"separable(<kernel>)"` only `"LL"`. No noise yet.
 
 ## Common pitfalls to flag in review
 
@@ -100,6 +135,9 @@ argument, no `normalize` support, no save/load yet on `NestedKriging`.
   `simulate(...)`.
 - `NestedKriging(..., "NK", ...)` (5th positional arg) combined with a
   non-`"constant"` `regmodel` (8th positional arg).
+- Calling a getter as a bare statement (`k.logLikelihood();`): the mex is
+  then called with no output and fails with "Output requires exactly 1
+  arguments". Assign the result (`ll = k.logLikelihood();`).
 
 ## See also
 

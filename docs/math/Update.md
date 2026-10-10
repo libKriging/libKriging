@@ -116,11 +116,10 @@ path is then
   Y(X_n) = mean(X_n) + σ · chol(Σ(X_n)/σ²) · Z,   Z ~ N(0, I)
 
 using libKriging's seeded RNG so paths are reproducible. When called
-with `will_update=TRUE`, `simulate` additionally caches the
-intermediate matrices (`L_on`, `Fstar_on`, `Rinv_on`, …) needed to
-later call `update_simulate` cheaply — these are exactly the
-Schur-complement building blocks (`L_AB`-style cross terms) that
-`update_simulate` would otherwise have to recompute from scratch.
+with `will_update=TRUE`, `simulate` additionally keeps the drawn paths,
+the seed and the conditional factors at `X_n` (`R_on^⋆`, `Ê_n` and the
+Cholesky factor of `Σ(X_n)`), so that `update_simulate` only has to
+compute the blocks involving the new points `X_u`.
 
 ### `update_simulate`: rewinding simulated paths onto new real data
 
@@ -135,25 +134,35 @@ only. New real data `(X_u, y_u)` arrives. Instead of resimulating
 
 is used:
 
-  1. Simulate `Y_sim(X_u)` at the new points `X_u`, jointly/consistently
-     with the already-drawn `Y_sim(X_n)` (reusing the same cached
-     factors and the same random seed/stream as the original
-     `simulate` call).
-  2. Compute the conditional-kriging weights `W̃_{n|u}` of `X_n` on `X_u`
-     given `y_o` — a small `n_u × n_u` Schur-complement system (block
-     `A` = the conditional covariance of `Y(X_u)` given `y_o`, already
-     available from step 1's cache), not a full refit.
+  1. Extend each drawn path to the new points `X_u`, jointly with the
+     already-drawn `Y_sim(X_n)`. With `Σ` the conditional covariance of
+     `(Y(X_n), Y(X_u))` given `y_o` (including the trend uncertainty) and
+     `L_n` the Cholesky factor of its `X_n` block, this is a
+     block-Cholesky extension:
+
+     Y_sim(X_u) = mean(X_u) + σ · ( Aᵀ Z_n + L_u Z_u ),
+     A = L_n⁻¹ Σ_nu / σ²,   L_u L_uᵀ = Σ_uu / σ² − Aᵀ A
+
+     where `Z_n` are the standard normals behind `Y_sim(X_n)`
+     (regenerated from the seed of `simulate`), `Z_u` are fresh normals,
+     and `L_u` is a positive semi-definite square root of the Schur
+     complement (zero when `X_u` lies on `X_n`). No (n_o + n_n)-size
+     matrix is inverted.
+  2. Compute the conditional-kriging weights of `X_n` on `X_u` given
+     `y_o`: `W̃_{n|u} = Σ_nu Σ_uu⁻¹`, a small `n_u × n_u` system.
   3. Correct each already-drawn path:
 
      Y_upd(X_n) = Y_sim(X_n) + W̃_{n|u} · (y_u − Y_sim(X_u))
 
-Because `Y_sim(X_u)` was drawn from the correct conditional law given
-`y_o`, replacing it by the true `y_u` and propagating the discrepancy
-through the conditional-kriging weights yields paths distributed
-exactly as `Y(X_n) | y_o, y_u` — matching what `update(X_u, y_u)`
+Because `(Y_sim(X_n), Y_sim(X_u))` is a joint draw from the correct
+conditional law given `y_o`, replacing `Y_sim(X_u)` by the true `y_u`
+and propagating the discrepancy through the conditional-kriging weights
+yields paths distributed exactly as `Y(X_n) | y_o, y_u`, for fixed
+hyperparameters. This is the law that `update(y_u, X_u, refit=FALSE)`
 followed by a fresh `simulate(X_n)` would give, at a fraction of the
-cost (no re-factorization of the full design, only the small `n_u`-size
-Schur-complement system from step 2).
+cost. The two agree in distribution, not path by path. All of this is
+done on the internal (normalized) output scale, so `normalize=TRUE` is
+handled consistently.
 
 ## Simple example
 
@@ -161,7 +170,7 @@ Schur-complement system from step 2).
 library(rlibkriging)
 
 f <- function(x) 1 - 0.5 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
-X_o <- seq(0, 1, length.out = 5)
+X_o <- matrix(seq(0, 1, length.out = 5))   # X is always a matrix (n x d)
 y_o <- f(X_o)
 
 k <- Kriging(y_o, X_o, kernel = "gauss", regmodel = "linear")
@@ -170,7 +179,7 @@ Xnew <- seq(0, 1, , 21)
 p <- predict(k, Xnew)                       # exact conditional mean/stdev
 
 # simulate 10 paths at Xnew, keep internals for a later update_simulate
-sims <- simulate(k, nsim = 10, seed = 123, X = Xnew, will_update = TRUE)
+sims <- simulate(k, nsim = 1000, seed = 123, x = Xnew, will_update = TRUE)
 
 # a new real observation arrives
 X_u <- 0.5; y_u <- f(X_u)
@@ -179,21 +188,28 @@ X_u <- 0.5; y_u <- f(X_u)
 # without resimulating from scratch:
 sims_updated <- update_simulate(k, y_u, X_u)
 
-# equivalent (but more expensive) reference: refit then resimulate
+# reference with the same law (but more expensive): update then resimulate
 k2 <- copy(k)
 update(k2, y_u, X_u, refit = FALSE)
-sims_ref <- simulate(k2, nsim = 10, seed = 123, X = Xnew)
-# sims_updated ≈ sims_ref
+sims_ref <- simulate(k2, nsim = 1000, seed = 123, x = Xnew)
+# same distribution, not the same paths:
+# rowMeans(sims_updated) ≈ predict(k2, Xnew)$mean, and likewise for the stdev
 ```
 
 ## Current notes
 
 - `update`/`simulate`/`update_simulate` are implemented for `Kriging`
-  (all `noise_model` variants, see [Noise.md](Noise.md)), `WarpKriging`
-  and `MLPKriging`.
+  (all `noise_model` variants, see [Noise.md](Noise.md)), `WarpKriging`,
+  `MLPKriging` and `MultiOutputKriging` (see
+  [MultiOutput.md](MultiOutput.md)).
 - `update_simulate` requires a preceding `simulate(..., will_update=TRUE)`
-  call on the same model — it reuses that call's cached factors and
-  random stream.
+  call on the same model: it reuses that call's paths, seed and cached
+  factors.
+- The moments of the updated paths are tested against the updated model
+  (`tests/KrigingUpdateSimulateTest.cpp`), together with Kolmogorov-Smirnov
+  checks for the nugget and noise variants. With the `gauss` kernel,
+  `simulate` itself adds a small numerical nugget, which leaves a floor
+  on very small posterior variances.
 - Numerical correctness is validated by mockup R scripts comparing a
   from-scratch reference implementation (independent Cholesky/QR
   formulas) against the library's `predict`/`simulate`/`update`, for

@@ -298,6 +298,13 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);
 
  private:
+  // MultiOutputKriging ("pca") saves its latent Kriging models inside its own file
+  friend class MultiOutputKriging;
+  void dump_to_json(nlohmann::json& j) const;
+  void load_from_json(const nlohmann::json& j);
+  /// Checks version / content of a saved Kriging and returns its noise model
+  static NoiseModel noise_model_from_json(const nlohmann::json& j, const std::string& source);
+
   NoiseModel m_noise_model = NoiseModel::None;
   double m_nugget = 0.0;
   bool m_est_nugget = false;

@@ -11,7 +11,69 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Added
+- `MultiOutputKriging`: Kriging of several outputs observed at the same design
+  points, `Y` being an `n × q` matrix (rows = observations, as for `X`). Four
+  output models: `"pca"` / `"pca(K)"` / `"pca(v)"` (Karhunen-Loève reduction,
+  one `Kriging` per principal score, truncation residual kept as white noise;
+  Higdon et al. 2008), `"shared"` (one θ for all outputs, β_j and σ_j² per
+  output, `LL` or `LOO` objective; Gu & Berger 2016, checked against
+  `RobustGaSP::ppgasp`) and `"separable"` (intrinsic coregionalization model
+  with a free q × q output covariance, joint covariance and joint simulations;
+  Conti & O'Hagan 2010) and `"separable(<kernel>)"` (output covariance
+  σ² R_t(φ) of a kernel over the output coordinates, φ estimated with θ, so
+  q may exceed n; Rougier 2008). `predict`, `simulate`, `update`,
+  `update_simulate`, closed-form leave-one-out, `predictCovFactors`
+  (Kronecker factors of the predictive covariance) and `save`/`load` (JSON,
+  recognized by the generic loaders of the bindings). Available in C++ and in every binding (Python, R,
+  Octave/MATLAB, Julia), with one worked notebook per binding
+  (`bindings/*/multioutputkriging_*.ipynb`) and
+  [docs/math/MultiOutput.md](docs/math/MultiOutput.md). Not yet: noise /
+  nugget.
+- `pylibkriging.sklearn.MultiOutputKrigingRegressor`: scikit-learn
+  multi-output regressor wrapping `MultiOutputKriging` (`y` of shape
+  `(n, q)`, `predict` returning `(m, q)` arrays, `return_cov` one `m × m`
+  covariance per target as `GaussianProcessRegressor` does, `sample_y`
+  `(m, q, n_samples)`).
+- `pylibkriging.sklearn`: fitted estimators are picklable (joblib,
+  `GridSearchCV(n_jobs=…)`, `copy.deepcopy`), the model being carried as the
+  JSON of its `save()`; `NestedKrigingRegressor` is not, `NestedKriging`
+  having no `save`.
+- `KrigingLoader::KrigingType::MultiOutputKriging`. The Octave `class_saved`
+  now also maps saved nugget / noise `Kriging` models to `"Kriging"`.
+- Octave/MATLAB: `Kriging('__ref__', ref)` wraps an existing backend object
+  (used by `MultiOutputKriging.component`); `NestedKriging.m` is now installed
+  with the other classes.
+
+### Changed
+- Python: supported versions are now 3.9 to 3.13 (`python_requires >= 3.9`).
+  Python 3.7 and 3.8 are dropped; wheels are built for 3.9 to 3.13, and the
+  Windows CI jobs test 3.9 and 3.13.
+- CI: the `pylibkriging.sklearn` tests are registered in CTest and
+  scikit-learn is installed with the Python test dependencies
+  (`dev-requirements.txt`).
+- `KrigingImpl`: the factorization layer accepts an `n × q` right-hand side
+  (`KModel::ystar/Estar/betahat` are matrices, `populate_Model(…, &Y)`, the LL
+  gradient takes several columns); `cross_corr` and `fit_setup_X_impl` are
+  factored out. The public API of `Kriging` is unchanged and its results are
+  identical.
+
 ### Fixed
+- `pylibkriging.sklearn`: `predict` of `KrigingRegressor`,
+  `WarpKrigingRegressor`, `MLPKrigingRegressor` and `NestedKrigingRegressor`
+  returned `(n, 1)` arrays instead of `(n,)`; `check_estimator` passes again
+  for all of them (the sklearn tests did not run in CI; they now do).
+- Documentation: code examples that did not run as written are fixed
+  (`skills/libkriging/references/*.md`, the binding READMEs, the main README
+  and `docs/math`): `Kriging::predict` returns 5 values in C++ and Python,
+  `logLikelihoodFun` 3 values in Python, R's `predict` takes `return_stdev`
+  (not `stdev`) and `Kriging()` takes `noise=` (not `noise_model=`) and a
+  matrix `X`, Julia's `predict` takes `return_stdev`/`return_cov`, Octave's
+  `Kriging.simulate` needs its `will_update` argument and getters must be
+  assigned (a bare `k.logLikelihood();` fails), `NestedKriging.predict` takes
+  no flag in Octave, the C++ `NestedKriging` and `WarpKriging::fit` examples
+  had wrong arguments, and `docs/math/Update.md` described the
+  `update_simulate` algorithm replaced in this release.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

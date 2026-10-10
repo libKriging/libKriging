@@ -8,6 +8,8 @@ function obj = load_kriging(filename)
             obj = WarpKriging.load(filename);
         case 'MLPKriging'
             obj = MLPKriging.load(filename);
+        case 'MultiOutputKriging'
+            obj = MultiOutputKriging.load(filename);
         otherwise
             error('Unknown Kriging class in file: %s', filename);
     end

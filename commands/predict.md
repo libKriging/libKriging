@@ -22,6 +22,9 @@ Predict with a fitted libKriging model. Context / arguments: $ARGUMENTS
    5-tuple `(mean, stdev, cov, mean_deriv, stdev_deriv)` — the flags only
    decide which entries are filled, not the arity. R/Julia/Octave-MATLAB
    return the analogous named fields per their reference file.
+   `MultiOutputKriging` returns `(mean, stdev, cov, mean_deriv)` with `mean`
+   and `stdev` `npred × q`, `cov` `(npred·q) × (npred·q)` over `vec(Y)` and
+   `mean_deriv` `npred × d × q`.
 
 4. Report mean ± stdev (and cov/deriv if requested). Flag any `Xnew` rows
    outside the training design's per-column range: Kriging reverts toward

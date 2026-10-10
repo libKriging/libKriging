@@ -481,6 +481,108 @@ int lk_nested_kriging_get_theta(void* ptr, double* out, int* n);
 double lk_nested_kriging_get_sigma2(void* ptr);
 double lk_nested_kriging_get_beta0(void* ptr);
 
+/* ═══ MultiOutputKriging ══════════════════════════════════════════
+   Y is n x q, X is n x d, all column-major. output_model: "pca", "pca(K)",
+   "pca(v)", "shared" or "separable". theta (theta_rows x d, NULL to skip):
+   starting points, or fixed values with is_theta_estim = 0 / optim "none". */
+
+void* lk_mo_kriging_new(const char* kernel, const char* output_model);
+void lk_mo_kriging_delete(void* ptr);
+int lk_mo_kriging_set_output_coordinates(void* ptr, const double* t, int rows, int cols);
+int lk_mo_kriging_fit(void* ptr,
+                      const double* Y,
+                      int n,
+                      int q,
+                      const double* X,
+                      int nX,
+                      int d,
+                      const char* regmodel,
+                      int normalize,
+                      const char* optim,
+                      const char* objective,
+                      const double* theta,
+                      int theta_rows,
+                      int is_theta_estim,
+                      const double* output_theta,
+                      int output_theta_rows,
+                      int output_theta_cols);
+/* mean_out, stdev_out: m x q; cov_out: mq x mq; deriv_out: m x d x q (NULL to skip) */
+int lk_mo_kriging_predict(void* ptr,
+                          const double* X_n,
+                          int m,
+                          int d,
+                          int return_stdev,
+                          int return_cov,
+                          int return_deriv,
+                          double* mean_out,
+                          double* stdev_out,
+                          double* cov_out,
+                          double* deriv_out);
+/* sim_out: m x q x nsim */
+int lk_mo_kriging_simulate(void* ptr,
+                           int nsim,
+                           int seed,
+                           const double* X_n,
+                           int m,
+                           int d,
+                           int will_update,
+                           double* sim_out);
+/* sim_out: m x q x nsim of the last simulate(..., will_update = 1) */
+int lk_mo_kriging_update_simulate(void* ptr,
+                                  const double* Y_u,
+                                  int nu,
+                                  int q,
+                                  const double* X_u,
+                                  int d,
+                                  double* sim_out);
+int lk_mo_kriging_update(void* ptr, const double* Y_u, int nu, int q, const double* X_u, int d, int refit);
+/* mean_out, stdev_out: n x q */
+int lk_mo_kriging_leave_one_out_mat(void* ptr, double* mean_out, double* stdev_out);
+double lk_mo_kriging_leave_one_out(void* ptr);
+double lk_mo_kriging_log_likelihood(void* ptr);
+int lk_mo_kriging_log_likelihood_fun(void* ptr,
+                                     const double* theta,
+                                     int d,
+                                     int return_grad,
+                                     double* ll_out,
+                                     double* grad_out);
+int lk_mo_kriging_leave_one_out_fun(void* ptr,
+                                    const double* theta,
+                                    int d,
+                                    int return_grad,
+                                    double* loo_out,
+                                    double* grad_out);
+/* Cx_out: m x m; sigma_out: q x q */
+int lk_mo_kriging_predict_cov_factors(void* ptr, const double* X_n, int m, int d, double* Cx_out, double* sigma_out);
+/* new Kriging (to delete with lk_kriging_delete): copy of latent model k, 0-based */
+void* lk_mo_kriging_component(void* ptr, int k);
+const char* lk_mo_kriging_summary(void* ptr);
+const char* lk_mo_kriging_kernel(void* ptr);
+const char* lk_mo_kriging_output_model(void* ptr);
+const char* lk_mo_kriging_regmodel(void* ptr);
+const char* lk_mo_kriging_optim(void* ptr);
+const char* lk_mo_kriging_objective(void* ptr);
+int lk_mo_kriging_normalize(void* ptr);
+int lk_mo_kriging_nb_outputs(void* ptr);
+int lk_mo_kriging_nb_components(void* ptr);
+/* matrices: (out, rows, cols), out NULL to get the size first */
+int lk_mo_kriging_get_X(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_Y(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_output_coordinates(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_beta(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_output_cov(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_pca_basis(void* ptr, double* out, int* rows, int* cols);
+int lk_mo_kriging_get_pca_residual(void* ptr, double* out, int* rows, int* cols);
+/* vectors: (out, n), out NULL to get the size first */
+int lk_mo_kriging_get_centerY(void* ptr, double* out, int* n);
+int lk_mo_kriging_get_scaleY(void* ptr, double* out, int* n);
+int lk_mo_kriging_get_theta(void* ptr, double* out, int* n);
+int lk_mo_kriging_get_output_theta(void* ptr, double* out, int* n);
+int lk_mo_kriging_save(void* ptr, const char* filename);
+void* lk_mo_kriging_load(const char* filename);
+int lk_mo_kriging_get_sigma2(void* ptr, double* out, int* n);
+int lk_mo_kriging_get_pca_explained(void* ptr, double* out, int* n);
+
 #ifdef __cplusplus
 }
 #endif

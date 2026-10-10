@@ -84,7 +84,7 @@ disp(k_m.summary());
 x = reshape(0:(1/99):1,100,1);
 [p_mean, p_stdev] = k_m.predict(x, true, false);
 
-s = k_m.simulate(int32(10), int32(123), x);
+s = k_m.simulate(int32(10), int32(123), x, false);   % (nsim, seed, X, will_update)
 ```
 
 Full demo: [mlibkriging/tests/mLibKriging_demo.m](mlibkriging/tests/mLibKriging_demo.m)

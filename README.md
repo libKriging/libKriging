@@ -7,6 +7,7 @@
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (affine, boxcox, kumaraswamy, neural_mono, knots, mlp, mlp_joint, categorical, ordinal).
+It fits several outputs at once (`MultiOutputKriging`: PCA reduction, shared correlation, intrinsic coregionalization or a kernel over the output coordinates).
 It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods, or by fitting on a k-means reduced design (`subsetOfData`).
 It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
 
@@ -19,14 +20,14 @@ Many bindings are available to use 'libKriging' from Python, R, Octave, Matlab a
 
 ## Features
 
-- **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), and `NestedKriging` for large designs.
+- **Models**: `Kriging` (`noise_model`: `none`, `nugget`, `heterogeneous`), `WarpKriging` (input warping), `MLPKriging` (MLP feature mapping), `NestedKriging` for large designs, and `MultiOutputKriging` for several outputs on the same design (`"pca"`, `"shared"`, `"separable"` and `"separable(<kernel>)"` output models, see [docs/math/MultiOutput.md](docs/math/MultiOutput.md)).
 - **Covariance kernels**: `gauss`, `exp`, `matern3_2`, `matern5_2`.
 - **Fit objectives**: log-likelihood (`LL`), leave-one-out (`LOO`), log-marginal-posterior (`LMP`), and the scalable approximations `LLVecchia(m)` (Vecchia) and `LLNystrom(k)` (Nystrom low-rank).
 - **Input warpings** (`WarpKriging`, one per input column): affine, boxcox, kumaraswamy, neural_mono, knots, mlp, categorical, ordinal; `mlp_joint` (a joint feature map over all inputs) through `MLPKriging`.
 - **Large designs**: `NestedKriging`, the `LLVecchia(m)` and `LLNystrom(k)` objectives, and `subsetOfData` (k-means pre-fit row selection); see [docs/math/Scalability.md](docs/math/Scalability.md).
 - **Operations**: fit, predict, simulate, update, save/load, and cross-language model exchange.
 - **Bindings**: Python, R, Octave, Matlab, Julia — see [bindings/README.md](bindings/README.md) for the full method reference.
-- **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for all four Kriging classes, usable in `Pipeline`/`GridSearchCV`.
+- **Python**: scikit-learn compatible estimators (`pylibkriging.sklearn`) for `Kriging`, `WarpKriging`, `MLPKriging`, `NestedKriging` and `MultiOutputKriging`, usable in `Pipeline`/`GridSearchCV`.
 
 
 Table of contents
@@ -230,7 +231,7 @@ poly = fill([x; flip(x)], [(p_mean-2*p_stdev); flip(p_mean+2*p_stdev)],'b');
 set( poly, 'facealpha', 0.2);
 hold off;
 
-s = k_m.simulate(int32(10),int32(123), x);
+s = k_m.simulate(int32(10),int32(123), x, false);
 
 h = figure(2)
 hold on;
@@ -267,7 +268,7 @@ k = Kriging(y, X, "gauss")
 println(JLibKriging.summary(k))
 
 x = reshape(collect(0:0.01:1), :, 1)
-p = predict(k, x; stdev=true, cov=false)
+p = predict(k, x; return_stdev=true, return_cov=false)
 println("Predicted mean: ", p.mean[1:5])
 println("Predicted stdev: ", p.stdev[1:5])
 
@@ -297,7 +298,7 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
 
 |        | Linux (Ubuntu 22.04)                        | macOS (latest runner)                       | Windows (latest runner)                     |
 |:-------|:--------------------------------------------|:--------------------------------------------|:--------------------------------------------|
-| Python | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> 3.7, 3.9 |
+| Python | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> runner default | <span style="color:green">✔</span> 3.9, 3.13 |
 | R      | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release | <span style="color:green">✔</span> latest release |
 | Octave | <span style="color:green">✔</span> distribution package (6.x) | <span style="color:green">✔</span> Homebrew (latest) | <span style="color:green">✔</span> 9.2 |
 | Matlab | <span style="color:orange"><b>?</b></span> CI job disabled | no pre-built package or CI | no pre-built package or CI |
@@ -307,7 +308,7 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
   token and has been disabled since v0.9.3; Matlab ≥ R2021 is supported by the code but not checked on each change.
 
 * Pre-built Python wheels of the latest release: Linux x86-64, macOS (universal2) and Windows (x86-64) for
-  Python 3.9 to 3.12, plus Python 3.7 on Windows. Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
+  Python 3.9 to 3.12, plus Python 3.7 on Windows (from the next release: Python 3.9 to 3.13). Pre-built Octave packages: Linux x86-64, macOS ARM and Windows
   (MinGW-64). See [the releases page](https://github.com/libKriging/libKriging/releases).
 
 * Julia ≥ 1.10 is required.
@@ -324,7 +325,7 @@ Continuous integration (`main.yml`, libKriging 1.2) builds and tests each bindin
 
   You can use standard Blas and Lapack, OpenBlas or MKL.
 
-* Python ≥ 3.7 (optional)
+* Python ≥ 3.9 (optional)
 
 * Octave ≥ 6.0 (optional)
 

@@ -36,6 +36,8 @@ KrigingLoader::KrigingType KrigingLoader::describe(std::string filename) {
     return KrigingType::WarpKriging;
   } else if (content == "MLPKriging") {
     return KrigingType::MLPKriging;
+  } else if (content == "MultiOutputKriging") {
+    return KrigingType::MultiOutputKriging;
   } else {
     return KrigingType::Unknown;
   }

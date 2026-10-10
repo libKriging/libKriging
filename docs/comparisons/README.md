@@ -18,7 +18,7 @@ Each notebook ends with an argument-correspondence table between libKriging and 
 | [libKriging_vs_SMT.ipynb](libKriging_vs_SMT.ipynb) | SMT | Python | KPLS dimension reduction |
 | [libKriging_vs_OpenTURNS.ipynb](libKriging_vs_OpenTURNS.ipynb) | OpenTURNS | Python | joint conditional simulation of sample paths |
 | [libKriging_vs_DiceKriging.ipynb](libKriging_vs_DiceKriging.ipynb) | DiceKriging | R | the `knots` warping, vs `WarpKriging(..., "knots(K)")` |
-| [libKriging_vs_RobustGaSP.ipynb](libKriging_vs_RobustGaSP.ipynb) | RobustGaSP | R | robust marginal-posterior-mode estimation, vs `objective="LMP"` |
+| [libKriging_vs_RobustGaSP.ipynb](libKriging_vs_RobustGaSP.ipynb) | RobustGaSP | R | robust marginal-posterior-mode estimation, vs `objective="LMP"`; functional outputs, `ppgasp()` vs `MultiOutputKriging(..., "shared")` |
 | [libKriging_vs_GaussianProcessesJL.ipynb](libKriging_vs_GaussianProcessesJL.ipynb) | GaussianProcesses.jl | Julia | composable kernels (`k1 + k2`, `k1 * k2`) |
 | [libKriging_vs_STK.ipynb](libKriging_vs_STK.ipynb) | STK | Octave | conditional sample paths (`stk_generate_samplepaths`), vs `simulate` |
 

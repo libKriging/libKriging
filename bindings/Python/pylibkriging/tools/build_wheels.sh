@@ -41,7 +41,7 @@ function repair_wheel {
 yum install -y openblas-devel # hdf5-devel
 
 # Compile wheels
-for PYVER in cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+for PYVER in cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313; do
     echo "------------------------------------------"
     echo "Building pyquantlib for Python ${PYVER}"
     echo "------------------------------------------"
@@ -58,7 +58,7 @@ done
 
 # Install packages and test
 # Temporarily disabled to focus on build
-#for PYVER in cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312; do
+#for PYVER in cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313; do
 #    echo "-----------------------------------------"
 #    echo "Testing pyquantlib for Python ${PYVER}"
 #    echo "-----------------------------------------"

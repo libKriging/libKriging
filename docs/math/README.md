@@ -15,6 +15,12 @@ whole project is in [../dev/References.md](../dev/References.md).
 | [LMP.md](LMP.md) | the `objective="LMP"` criterion (log-marginal-posterior) |
 | [Update.md](Update.md) | incremental `update`, `simulate` and `update_simulate` |
 
+## Several outputs
+
+| Page | Content |
+|---|---|
+| [MultiOutput.md](MultiOutput.md) | `MultiOutputKriging`: `Y` is n × q; output models `"pca"` (Karhunen-Loève), `"shared"` (parallel partial GP), `"separable"` (ICM) and `"separable(<kernel>)"` (kernel over the output coordinates); save/load; one worked notebook per binding (`bindings/*/multioutputkriging_*.ipynb`) |
+
 ## Large designs
 
 Start with [Scalability.md](Scalability.md): it compares the methods and says which one to pick. Each method has a page

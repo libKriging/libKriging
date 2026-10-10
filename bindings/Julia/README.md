@@ -101,7 +101,7 @@ k = Kriging(y, X, "gauss")
 println(jlibkriging.summary(k))
 
 x = reshape(collect(0:0.01:1), :, 1)
-p = predict(k, x; stdev=true, cov=false)
+p = predict(k, x; return_stdev=true, return_cov=false)
 
 s = simulate(k, 10, 123, x)
 ```

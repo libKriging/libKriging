@@ -48,6 +48,7 @@ _cpp_load = load
 # Type alias to switch to the right binding
 Kriging = WrappedPyKriging
 NestedKriging = WrappedPyNestedKriging
+MultiOutputKriging = WrappedPyMultiOutputKriging
 MLPKriging = WrappedPyMLPKriging
 
 import warnings as _warnings

@@ -75,7 +75,8 @@ void KrigingImpl::populate_Model(KModel& m,
                                  const double alpha,
                                  const arma::vec& diag_norm,
                                  const bool update_eligible,
-                                 std::map<std::string, double>* bench) const {
+                                 std::map<std::string, double>* bench,
+                                 const arma::mat* Y) const {
   auto t0 = Bench::tic();
   // m_dX may have been skipped at fit time for objectives that never call
   // populate_Model (Nystrom, light Vecchia) -- if a caller reaches here
@@ -111,7 +112,8 @@ void KrigingImpl::populate_Model(KModel& m,
 
   // Direct GLS: compute whitened matrices using triangular solves
   m.Fstar = LinearAlgebra::solve_lower(m.L, m_F);
-  m.ystar = LinearAlgebra::solve_lower(m.L, m_y);
+  const arma::mat& y = (Y != nullptr) ? *Y : static_cast<const arma::mat&>(m_y);
+  m.ystar = LinearAlgebra::solve_lower(m.L, y);
   t0 = Bench::toc(bench, "F* = L \\ F, y* = L \\ y", t0);
 
   // Gram matrix and its upper Cholesky
@@ -124,12 +126,12 @@ void KrigingImpl::populate_Model(KModel& m,
 
   // Always compute GLS β̂ for residual and SSE (even when beta is fixed
   // externally). Derived wrappers overwrite m.betahat afterwards if needed.
-  arma::vec betahat_gls
+  arma::mat betahat_gls
       = LinearAlgebra::solve_upper(m.Rstar, LinearAlgebra::solve_lower(m.Rstar.t(), m.Fstar.t() * m.ystar));
   t0 = Bench::toc(bench, "^b = R*^-1 R*'^-1 F*'y*", t0);
   m.betahat = betahat_gls;
 
-  arma::vec residual = m_y - m_F * betahat_gls;
+  arma::mat residual = y - m_F * betahat_gls;
   m.Estar = LinearAlgebra::solve_lower(m.L, residual);
   m.SSEstar = arma::dot(m.Estar, m.Estar);
   t0 = Bench::toc(bench, "z = L \\ (y - F*b), SSE = z'z", t0);
@@ -145,12 +147,50 @@ KrigingImpl::KModel KrigingImpl::allocate_KModel() const {
   m.Linv = arma::mat();  // filled on demand in gradient computation
   m.Rinv = arma::mat();  // computed lazily, on demand, by whichever gradient consumer first needs it
   m.Fstar = arma::mat(n, p, arma::fill::none);
-  m.ystar = arma::vec(n, arma::fill::none);
+  m.ystar = arma::mat(n, 1, arma::fill::none);
   m.Rstar = arma::mat(p, p, arma::fill::none);
   m.Qstar = arma::mat(n, p, arma::fill::none);
-  m.Estar = arma::vec(n, arma::fill::none);
-  m.betahat = arma::vec(p, arma::fill::none);
+  m.Estar = arma::mat(n, 1, arma::fill::none);
+  m.betahat = arma::mat(p, 1, arma::fill::none);
   return m;
+}
+
+arma::mat KrigingImpl::cross_corr(const arma::mat& Xn_o,
+                                  const arma::mat& Xn_n,
+                                  double factor,
+                                  bool coincident_to_one) const {
+  const arma::uword n_o = Xn_o.n_cols;
+  const arma::uword n_n = Xn_n.n_cols;
+  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
+#ifdef _OPENMP
+  arma::uword total_work = n_o * n_n;
+  if (total_work >= 40000) {
+    int optimal_threads = get_optimal_threads(2);
+#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
+    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
+      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (coincident_to_one && dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta) * factor;
+      }
+    }
+  } else {
+#endif
+    for (arma::uword i = 0; i < n_o; i++) {
+      for (arma::uword j = 0; j < n_n; j++) {
+        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
+        if (coincident_to_one && dij.is_zero(arma::datum::eps))
+          R_on.at(i, j) = 1.0;
+        else
+          R_on.at(i, j) = _Cov(dij, m_theta) * factor;
+      }
+    }
+#ifdef _OPENMP
+  }
+#endif
+  return R_on;
 }
 
 std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::predict_impl(
@@ -201,35 +241,7 @@ std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> KrigingImpl::p
   }
 
   auto t0 = Bench::tic();
-  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-#ifdef _OPENMP
-  arma::uword total_work = n_o * n_n;
-  if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(2);
-#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
-      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-  } else {
-#endif
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-#ifdef _OPENMP
-  }
-#endif
+  arma::mat R_on = cross_corr(Xn_o, Xn_n, R_on_factor, true);
   t0 = Bench::toc(nullptr, "R_on       ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -344,35 +356,7 @@ arma::mat KrigingImpl::simulate_impl(int nsim,
   LinearAlgebra::covMat_sym_X(&R_nn, Xn_n, m_theta, _Cov, R_nn_factor, R_nn_diag);
   t0 = Bench::toc(nullptr, "R_nn          ", t0);
 
-  arma::mat R_on = arma::mat(n_o, n_n, arma::fill::none);
-#ifdef _OPENMP
-  arma::uword total_work = n_o * n_n;
-  if (total_work >= 40000) {
-    int optimal_threads = get_optimal_threads(2);
-#pragma omp parallel for schedule(static) collapse(2) num_threads(optimal_threads) if (total_work >= 40000)
-    for (arma::sword i = 0; i < static_cast<arma::sword>(n_o); i++) {
-      for (arma::sword j = 0; j < static_cast<arma::sword>(n_n); j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (R_on_coincident_to_one && dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-  } else {
-#endif
-    for (arma::uword i = 0; i < n_o; i++) {
-      for (arma::uword j = 0; j < n_n; j++) {
-        arma::vec dij = Xn_o.col(i) - Xn_n.col(j);
-        if (R_on_coincident_to_one && dij.is_zero(arma::datum::eps))
-          R_on.at(i, j) = 1.0;
-        else
-          R_on.at(i, j) = _Cov(dij, m_theta) * R_on_factor;
-      }
-    }
-#ifdef _OPENMP
-  }
-#endif
+  arma::mat R_on = cross_corr(Xn_o, Xn_n, R_on_factor, R_on_coincident_to_one);
   t0 = Bench::toc(nullptr, "R_on        ", t0);
 
   arma::mat Rstar_on = LinearAlgebra::solve_lower(m_T, R_on);
@@ -730,36 +714,59 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
                                       const std::optional<arma::vec>& beta,
                                       const std::optional<arma::mat>& theta,
                                       bool build_dX) {
-  const arma::uword d = X.n_cols;
-
-  // Normalization of inputs and output
-  arma::rowvec centerX;
-  arma::rowvec scaleX;
+  // Normalization of output
   double centerY;
   double scaleY;
+  if (normalize) {
+    centerY = min(y);
+    scaleY = max(y) - min(y);
+  } else {
+    centerY = 0;
+    scaleY = 1;
+  }
+  m_centerY = centerY;
+  m_scaleY = scaleY;
+  m_y = (y - centerY) / scaleY;
+
+  arma::mat theta0 = fit_setup_X_impl(X, regmodel, normalize, theta, build_dX);
+
+  m_est_beta = is_beta_estim && (m_regmodel != Trend::RegressionModel::None);
+  if (!m_est_beta && beta.has_value() && beta.value().n_elem > 0) {  // Force beta fixed (not estimated, no variance)
+    m_est_beta = false;
+    m_beta = beta.value();
+    if (m_normalize)
+      m_beta /= scaleY;
+  } else
+    m_est_beta = true;
+
+  return theta0;
+}
+
+arma::mat KrigingImpl::fit_setup_X_impl(const arma::mat& X,
+                                        const Trend::RegressionModel& regmodel,
+                                        bool normalize,
+                                        const std::optional<arma::mat>& theta,
+                                        bool build_dX) {
+  const arma::uword d = X.n_cols;
+
+  // Normalization of inputs
+  arma::rowvec centerX;
+  arma::rowvec scaleX;
   m_normalize = normalize;
   if (m_normalize) {
     centerX = min(X, 0);
     scaleX = max(X, 0) - min(X, 0);
-    centerY = min(y);
-    scaleY = max(y) - min(y);
   } else {
     centerX = arma::rowvec(d, arma::fill::zeros);
     scaleX = arma::rowvec(d, arma::fill::ones);
-    centerY = 0;
-    scaleY = 1;
   }
   m_centerX = centerX;
   m_scaleX = scaleX;
-  m_centerY = centerY;
-  m_scaleY = scaleY;
   {
     arma::mat newX = X;
     newX.each_row() -= centerX;
     newX.each_row() /= scaleX;
-    arma::vec newy = (y - centerY) / scaleY;
     m_X = newX;
-    m_y = newy;
   }
 
   // Distance matrix between points (transposed compared to m_X)
@@ -777,14 +784,6 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
   // Regression matrix
   m_regmodel = regmodel;
   m_F = Trend::regressionModelMatrix(regmodel, m_X);
-  m_est_beta = is_beta_estim && (m_regmodel != Trend::RegressionModel::None);
-  if (!m_est_beta && beta.has_value() && beta.value().n_elem > 0) {  // Force beta fixed (not estimated, no variance)
-    m_est_beta = false;
-    m_beta = beta.value();
-    if (m_normalize)
-      m_beta /= scaleY;
-  } else
-    m_est_beta = true;
 
   // Normalize theta0 if provided
   arma::mat theta0;
@@ -829,12 +828,13 @@ void KrigingImpl::compute_ll_grad_theta_vecs(const arma::mat& R,
   // its complexity class.
   arma::mat dX_local;
   const arma::mat& dX = m_dX.is_empty() ? (dX_local = LinearAlgebra::compute_dX(m_X)) : m_dX;
+  const bool multi = x.n_cols > 1;
   for (arma::uword i = 0; i < n; i++) {
     for (arma::uword j = 0; j < i; j++) {
       arma::vec dlnCov = _DlnCovDtheta(dX.col(i * n + j), theta);
       double R_ij = R.at(i, j);
-      double x_i = x.at(i);
-      double x_j = x.at(j);
+      double x_i = multi ? 1.0 : x.at(i);
+      double x_j = multi ? arma::dot(x.row(i), x.row(j)) : x.at(j);
       double Rinv_ij = Rinv.at(i, j);
       for (arma::uword k = 0; k < d; k++) {
         double gradR_k_ij = R_ij * dlnCov.at(k);
