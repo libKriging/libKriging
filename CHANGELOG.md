@@ -100,6 +100,12 @@ past release, see the corresponding entry on the
 - Python tests `test_new_features.py`, `sklearn_estimator_test.py` and
   `sklearn_multimodel_test.py` were never run by CTest (and the scikit-learn
   ones failed); they are now registered and pass.
+- CI: the "Linux Debug without OpenMP" and "R Linux without OpenMP" jobs
+  built with OpenMP. They only removed `libomp-dev` (LLVM's runtime), while
+  GCC ships its own (`libgomp`, `omp.h`), so `find_package(OpenMP)` still
+  found `-fopenmp`. They now configure with
+  `-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON`, and a new step fails if the
+  installed libKriging references any `omp_*` / `GOMP_*` symbol.
 - Documentation, skills and plugin commands checked against the bindings
   code (calls, argument names, return shapes; Python snippets executed, C++
   snippets compiled):
