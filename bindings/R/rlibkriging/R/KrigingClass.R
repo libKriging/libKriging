@@ -39,8 +39,9 @@ classKriging <- function(nk) {
     }
     # With objective = "LLVecchia(m)", FALSE skips the final exact O(n^3)
     # factorization at the next fit ("light" fit, see `k$is_vecchia_light()`):
-    # predict / simulate then use the Vecchia predictor / simulator, and
-    # return_cov, return_deriv, update and save are not available.
+    # the exact predict / simulate (method = "exact", the default) then raise,
+    # method = "vecchia" is passed explicitly; update and save / load stay
+    # available.
     nk$set_vecchia_exact_commit <- function(exact) kriging_set_vecchia_exact_commit(nk, as.logical(exact))
     nk
 }
@@ -79,7 +80,11 @@ classKriging <- function(nk) {
 #'     large designs in low dimension; and \code{"LLNystrom"} or
 #'     \code{"LLNystrom(k)"} for the Nystrom (global low-rank) approximated
 #'     log-likelihood with rank \code{k} (default 50): each evaluation costs
-#'     O(n k^2) instead of O(n^3), also recommended for large designs.
+#'     O(n k^2) instead of O(n^3), also recommended for large designs. The
+#'     objective does not select the prediction method: \code{predict},
+#'     \code{simulate} and \code{logLikelihood} take \code{method}
+#'     (\code{"exact"} by default; \code{"nystrom"} is required after an
+#'     \code{LLNystrom} fit, which holds no exact factorization).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the

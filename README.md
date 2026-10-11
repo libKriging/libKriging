@@ -7,7 +7,7 @@
 
 
 'libKriging' is a C++ library that provides most standard Kriging / Gaussian process features (fit, prediction, simulation, update) and many warping of input (affine, boxcox, kumaraswamy, neural_mono, knots, mlp, mlp_joint, categorical, ordinal).
-It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods, or by fitting on a k-means reduced design (`subsetOfData`).
+It also supports large designs (n up to ~10^5-10^6) through the `NestedKriging` divide-and-conquer class (PoE/gPoE/BCM/rBCM and the optimal nested-kriging aggregation) and the Vecchia (`objective="LLVecchia(m)"`, with local prediction and a factorization-free "light" mode) and Nystrom low-rank (`objective="LLNystrom(k)"`) approximated log-likelihoods (the exact / Vecchia / Nystrom method is explicit at every step: `predict` / `simulate` / `logLikelihood` take `method="exact"` (default), `"vecchia"` or `"nystrom"`, see [bindings/README.md](bindings/README.md)), or by fitting on a k-means reduced design (`subsetOfData`).
 It targets to provide a fast, robust and easy to use implementation of Kriging / Gaussian process regression for industrial applications of Machine Learning, Design of Experiments, Bayesian Optimization, etc.
 
 

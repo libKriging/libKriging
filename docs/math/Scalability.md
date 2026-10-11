@@ -23,6 +23,14 @@ All of these (Vecchia, Nystrom, NestedKriging, subsetOfData) are usable
 independently and, where noted below, combinable — none of them require
 opting out of the others.
 
+For `Kriging`, the approximation is explicit at every step, never inferred
+from the fit objective: `predict` / `simulate` / `logLikelihood` take
+`method="exact"` (default, needs the exact factorization), `"vecchia"` /
+`"vecchia(m)"` (local predictor / sequential simulator, usable after any
+fit, O(q·m³)) or `"nystrom"` (after an `LLNystrom` fit). An `LLNystrom` fit
+or a light `LLVecchia` fit holds no exact factorization, so `"exact"` raises
+there. Step × method table: [bindings/README.md](../../bindings/README.md).
+
 ## Which one, when
 
 1. **Is the *fit* itself (not just prediction) too slow, and you're

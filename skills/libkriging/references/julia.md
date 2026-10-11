@@ -22,6 +22,8 @@ k = Kriging(y, X, "matern5_2";
             noise=nothing)         # nothing | "nugget" | Float64 | Vector{Float64}
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
+#   predict / simulate / log_likelihood also take method="exact" (default) |
+#   "vecchia" | "vecchia(m)" | "nystrom" -- see "Large designs" below
 # p.mean, p.stdev, p.cov, p.mean_deriv, p.stdev_deriv
 
 s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim

@@ -28,6 +28,8 @@ mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
 # control whether cov/mean_deriv/stdev_deriv are actually computed
 # (empty arrays otherwise), not how many values come back.
 # mean / stdev are 1-D, shape (q,); cov is (q, q).
+# predict / simulate / logLikelihood also take method="exact" (default) |
+# "vecchia" | "vecchia(m)" | "nystrom" -- see "Large designs" below.
 sims = model.simulate(nsim=10, seed=123, X=Xnew, will_update=True)   # shape (q, nsim)
 sims_u = model.update_simulate(y_u, X_u)   # condition those paths on new observations
 model.update(y_u, X_u, refit=True)

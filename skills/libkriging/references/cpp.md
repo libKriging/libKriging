@@ -40,6 +40,9 @@ string).
 auto [mean, stdev, cov, mean_deriv, stdev_deriv]
     = model.predict(Xnew, /*return_stdev=*/true, /*return_cov=*/false, /*return_deriv=*/false);
 arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew, /*will_update=*/true);  // Xnew.n_rows x nsim
+// exact by default; explicit method overloads: predict(X, stdev, cov, deriv, method),
+// simulate(nsim, seed, X, method, will_update), logLikelihood(method),
+// method = "exact" | "vecchia" | "vecchia(m)" | "nystrom"
 arma::mat sims_u = model.update_simulate(y_new, X_new);  // condition those paths on new observations
 model.update(y_new, X_new, /*refit=*/true);
 

@@ -20,6 +20,8 @@ k <- Kriging(y, X, kernel = "matern5_2",
              noise = NULL)                # NULL | "nugget" | numeric vector
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
+#   predict / simulate / logLikelihood also take method = "exact" (default) |
+#   "vecchia" | "vecchia(m)" | "nystrom" -- see "Large designs" below
 s <- simulate(k, nsim = 10, seed = 123, x = Xnew, will_update = TRUE)   # length(Xnew) x nsim
 s_u <- update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update(k, y_u, X_u, refit = TRUE)

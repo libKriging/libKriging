@@ -88,7 +88,10 @@ the same trend uncertainty term as the concentrated likelihood. See
 [Update.md](Update.md) for the exact formulas shared
 by `predict`, `simulate`, `update` and `update_simulate`, all
 implemented via the same cached Cholesky/QR factorization rather than
-independent from-scratch computations.
+independent from-scratch computations. This is `method="exact"` (the
+default); the approximate predictors / simulators of the large-n
+objectives are requested explicitly (`method="vecchia"` or `"nystrom"`,
+see [Vecchia.md](Vecchia.md) and [Nystrom.md](Nystrom.md)).
 
 ## Simple example
 

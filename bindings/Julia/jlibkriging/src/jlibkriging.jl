@@ -92,7 +92,10 @@ with `m` conditioning neighbors (default 30) — O(n m^3) per evaluation instead
 of O(n^3), recommended for large designs in low dimension — or
 `"LLNystrom"`/`"LLNystrom(k)"` for the Nystrom (global low-rank) approximated
 log-likelihood with rank `k` (default 50) — O(n k^2) per evaluation instead
-of O(n^3), also recommended for large designs.
+of O(n^3), also recommended for large designs. The objective does not select
+the prediction method: `predict`, `simulate` and `log_likelihood` take
+`method` (`"exact"` by default; `"nystrom"` is required after an `LLNystrom`
+fit, which holds no exact factorization).
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
 `theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same
@@ -523,9 +526,9 @@ end
 
 With `objective="LLVecchia(m)"`, `false` skips the final exact O(n^3)
 factorization at the next `fit!` ("light" fit, see `is_vecchia_light`):
-`predict` / `simulate` then use the Vecchia predictor / simulator, and
-`return_cov`, `return_deriv`, `update!` and `save` are not available.
-Default `true`.
+the exact `predict` / `simulate` (`method="exact"`, the default) then raise,
+`method="vecchia"` is passed explicitly; `update!` and `save` / load stay
+available. Default `true`.
 """
 function set_vecchia_exact_commit!(k::Kriging, exact::Bool)
     _check_error(ccall(dlsym(_lk(), :lk_kriging_set_vecchia_exact_commit), Cint, (Ptr{Nothing}, Cint), k.ptr, exact ? 1 : 0))

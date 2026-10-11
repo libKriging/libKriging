@@ -322,8 +322,9 @@ discards n - n_max points outright.)pbdoc")
            &PyKriging::set_vecchia_exact_commit,
            py::arg("exact"),
            "With objective=\"LLVecchia(m)\", False skips the final exact O(n^3) factorization at the "
-           "next fit (\"light\" fit): predict / simulate then use the Vecchia predictor / simulator; "
-           "return_cov, return_deriv, update and save are not available. Default True.")
+           "next fit (\"light\" fit): the exact predict / simulate (method=\"exact\", the default) then "
+           "raise, method=\"vecchia\" is passed explicitly; update and save / load stay available. "
+           "Default True.")
       .def("vecchia_exact_commit", &PyKriging::vecchia_exact_commit)
       .def("is_vecchia_light", &PyKriging::is_vecchia_light)
       .def("is_nystrom_light", &PyKriging::is_nystrom_light)

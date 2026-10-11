@@ -119,8 +119,9 @@ classdef Kriging < handle
 
         % With objective "LLVecchia(m)", false skips the final exact O(n^3)
         % factorization at the next fit ("light" fit, see is_vecchia_light):
-        % predict / simulate then use the Vecchia predictor / simulator, and
-        % return_cov, return_deriv, update and save are not available.
+        % the exact predict / simulate (method "exact", the default) then
+        % raise, "vecchia" is passed explicitly; update and save / load stay
+        % available.
         function set_vecchia_exact_commit(obj, exact)
             mLibKriging("Kriging::set_vecchia_exact_commit", obj.ref, logical(exact));
         end

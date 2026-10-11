@@ -22,6 +22,7 @@ k_nug = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget"
 k = Kriging(y, X, "matern5_2");
 
 [p_mean, p_stdev] = k.predict(Xnew, true, false, false);
+%   optional 5th argument: method "exact" (default) | "vecchia" | "vecchia(m)" | "nystrom" (see Large designs)
 %                             (X, return_stdev, return_cov, return_deriv)
 s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 %              (nsim, seed, X, will_update)
@@ -31,9 +32,9 @@ k.update(y_u, X_u, true);   % (y_u, X_u, refit)
 k.save("k.json");              % JSON, any libKriging class
 k = load_kriging("k.json");    % auto-detects the class
 
-k.logLikelihood();
-k.leaveOneOut();
-k.logMargPost();
+ll = k.logLikelihood();    % a mex method returning a value needs an output variable
+loo = k.leaveOneOut();
+lmp = k.logMargPost();
 ```
 
 Optional starting/fixed hyperparameters go through `Params(...)`, e.g.
