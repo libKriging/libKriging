@@ -19,7 +19,7 @@ This document lists all methods exposed by each language binding for accessing t
 
 | Method | R (C++ fn) | R (object method) | Python | Octave/Matlab | Julia |
 |---|---|---|---|---|---|
-| Constructor | `new_Kriging(kernel)` | — | `Kriging(kernel)` / `Kriging(kernel, noise_model)` | `Kriging(y,X,kernel,…)` | `Kriging(kernel)` / `Kriging(y,X,kernel;…)` |
+| Constructor | `new_Kriging(kernel)` | — | `Kriging(kernel)` / `Kriging(kernel, noise_model)` | `Kriging(kernel)` / `Kriging(kernel, noise_model)` / `Kriging(y,X,kernel,…)` | `Kriging(kernel)` / `Kriging(y,X,kernel;…)` |
 | Fit | `kriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `kriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
 | Predict | `kriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
@@ -57,6 +57,8 @@ This document lists all methods exposed by each language binding for accessing t
 | `noise` | `kriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `nystrom_rank` | `kriging_nystrom_rank(obj)` | `obj$nystrom_rank()` | `obj.nystrom_rank()` | `nystrom_rank(obj)` | `nystrom_rank(obj)` |
 | `vecchia_neighbors` | `kriging_vecchia_neighbors(obj)` | `obj$vecchia_neighbors()` | `obj.vecchia_neighbors()` | `vecchia_neighbors(obj)` | `vecchia_neighbors(obj)` |
+| `set_vecchia_exact_commit` / `vecchia_exact_commit` | `kriging_set_vecchia_exact_commit(obj,b)` / `kriging_vecchia_exact_commit(obj)` | `obj$set_vecchia_exact_commit(b)` / `obj$vecchia_exact_commit()` | `obj.set_vecchia_exact_commit(b)` / `obj.vecchia_exact_commit()` | `obj.set_vecchia_exact_commit(b)` / `obj.vecchia_exact_commit()` | `set_vecchia_exact_commit!(obj,b)` / `vecchia_exact_commit(obj)` |
+| `is_vecchia_light` / `is_nystrom_light` | `kriging_is_vecchia_light(obj)` / `kriging_is_nystrom_light(obj)` | `obj$is_vecchia_light()` / `obj$is_nystrom_light()` | `obj.is_vecchia_light()` / `obj.is_nystrom_light()` | `obj.is_vecchia_light()` / `obj.is_nystrom_light()` | `is_vecchia_light(obj)` / `is_nystrom_light(obj)` |
 | **Pre-fit data reduction** | | | | | |
 | `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
 
@@ -75,11 +77,14 @@ rank `k` of a `LLNystrom` fit (0 otherwise), `vecchia_neighbors()` the number `m
 longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
 only.
 
-> **C++ only**: the following `Kriging` methods are not exposed by any binding: `predictVecchia`, `predictNystrom`,
-> `simulateVecchia`, `simulateNystrom`, `set_vecchia_exact_commit` / `vecchia_exact_commit` (the factorization-free
-> "light" Vecchia mode), `is_vecchia_light`, `is_nystrom_light`, `logLikelihoodVecchiaFun` and
-> `logLikelihoodNystromFun`. From a binding, `predict` / `simulate` are the entry points: after an `LLNystrom(k)` fit
-> they go through the Nystrom predictor / simulator.
+**Light Vecchia mode**: `set_vecchia_exact_commit(false)` *before* a fit with `objective="LLVecchia(m)"` skips the final
+exact O(n³) factorization (on an unfitted model, `Kriging(kernel)`, then `fit`, or as a refit of an existing model).
+`is_vecchia_light()` is then true and `predict` / `simulate` go through the Vecchia predictor / simulator; `return_cov`,
+`return_deriv`, `update`, `update_simulate` and `save` raise an error. A model fitted with `LLNystrom(k)` is always
+light (`is_nystrom_light()`): `predict` / `simulate` go through the Nystrom predictor / simulator.
+
+> **C++ only**: `predictVecchia`, `predictNystrom`, `simulateVecchia`, `simulateNystrom` (explicit `m` / rank arguments),
+> `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun`. From a binding, `predict` / `simulate` are the entry points.
 
 > **Python output shapes**: every vector-valued output (`predict` mean / stdev, `theta`, `beta`, `y`, `centerX`, …) is a
 > 1-D array of shape `(n,)`; matrices (`X`, `F`, `T`, `M`, covariances, derivatives, `simulate` results of shape

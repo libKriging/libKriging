@@ -37,6 +37,16 @@ past release, see the corresponding entry on the
 - `vecchia_neighbors()` in every binding (Python, R, Julia, Octave/Matlab),
   alongside the already exposed `nystrom_rank()`: number `m` of conditioning
   neighbors of an `LLVecchia(m)` fit, 0 otherwise.
+- Light Vecchia mode in every binding (Python, R, Julia, Octave/Matlab):
+  `set_vecchia_exact_commit(b)` (Julia `set_vecchia_exact_commit!`),
+  `vecchia_exact_commit()`, `is_vecchia_light()` and `is_nystrom_light()`.
+  `set_vecchia_exact_commit(false)` on an unfitted `Kriging(kernel)`, then a
+  fit with `objective="LLVecchia(m)"`, skips the final exact O(n^3)
+  factorization: `predict` / `simulate` go through `predictVecchia` /
+  `simulateVecchia`, which were out of reach from the bindings until now.
+- Octave/Matlab: `Kriging(kernel)` / `Kriging(kernel, noise_model)` build an
+  unfitted model (to configure, e.g. `set_vecchia_exact_commit`, before
+  `fit`), as `Kriging(kernel)` already did in Python, R and Julia.
 - Python: `pickle` support for `Kriging`, `WarpKriging`, `MLPKriging` and
   `NestedKriging` (through their JSON save/load), so the scikit-learn
   wrappers can be cloned, cached and sent to worker processes.

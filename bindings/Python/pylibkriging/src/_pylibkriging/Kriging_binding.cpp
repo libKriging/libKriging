@@ -312,6 +312,22 @@ int PyKriging::vecchia_neighbors() {
   return static_cast<int>(m_internal->vecchia_neighbors());
 }
 
+void PyKriging::set_vecchia_exact_commit(bool b) {
+  m_internal->set_vecchia_exact_commit(b);
+}
+
+bool PyKriging::vecchia_exact_commit() {
+  return m_internal->vecchia_exact_commit();
+}
+
+bool PyKriging::is_vecchia_light() {
+  return m_internal->is_vecchia_light();
+}
+
+bool PyKriging::is_nystrom_light() {
+  return m_internal->is_nystrom_light();
+}
+
 py::array_t<double> PyKriging::X() {
   return carma::mat_to_arr(m_internal->X());
 }

@@ -643,6 +643,42 @@ int kriging_vecchia_neighbors(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
+void kriging_set_vecchia_exact_commit(Rcpp::List k, bool exact) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  impl_ptr->set_vecchia_exact_commit(exact);
+}
+
+// [[Rcpp::export]]
+bool kriging_vecchia_exact_commit(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->vecchia_exact_commit();
+}
+
+// [[Rcpp::export]]
+bool kriging_is_vecchia_light(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->is_vecchia_light();
+}
+
+// [[Rcpp::export]]
+bool kriging_is_nystrom_light(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->is_nystrom_light();
+}
+
+// [[Rcpp::export]]
 arma::mat kriging_X(Rcpp::List k) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");

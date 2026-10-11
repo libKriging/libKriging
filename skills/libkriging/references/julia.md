@@ -89,9 +89,17 @@ k = Kriging(y, X, "matern5_2"; objective="LLNystrom(50)")   # higher d
 nystrom_rank(k)   # 50 (0 if the model was not fitted with LLNystrom)
 vecchia_neighbors(k)   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
-`predict` is the only prediction entry point from Julia: `predictVecchia`,
-`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
-Vecchia mode) exist in C++ only.
+Factorization-free "light" Vecchia mode (no exact O(n^3) commit; no
+return_cov / return_deriv, update or save on such a model):
+```julia
+k = Kriging("matern5_2")
+set_vecchia_exact_commit!(k, false)  # before fit!
+fit!(k, y, X; objective="LLVecchia(30)")
+is_vecchia_light(k)                  # true: predict / simulate use Vecchia
+```
+`predict` / `simulate` are the only prediction / simulation entry points from Julia:
+`predictVecchia`, `predictNystrom`, `simulateNystrom` and `simulateVecchia`
+(explicit `m` / rank arguments) exist in C++ only.
 
 ## NestedKriging
 

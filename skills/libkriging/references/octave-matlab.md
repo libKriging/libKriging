@@ -11,8 +11,12 @@ class/options to pick.
 ## Kriging (noise-free or noisy)
 
 ```matlab
-% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise)
+% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise)
+%   noise_model: "none" (default), "nugget" or "heterogeneous" (then noise = variance vector)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL");
+k_nug = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget");
+% Unfitted model, to configure before fit:
+% k0 = Kriging("matern5_2"); k0.fit(y, X, "constant", false, "BFGS", "LL");
 
 % Or all-default:
 k = Kriging(y, X, "matern5_2");
@@ -77,9 +81,17 @@ k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % 
 k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
 k.vecchia_neighbors()   % 30 for an LLVecchia(30) fit (0 otherwise)
 ```
-`predict` is the only prediction entry point from Octave/MATLAB:
-`predictVecchia`, `predictNystrom`, `simulateNystrom`, `simulateVecchia` and
-`set_vecchia_exact_commit` (the "light" Vecchia mode) exist in C++ only.
+Factorization-free "light" Vecchia mode (no exact O(n^3) commit; no
+return_cov / return_deriv, update or save on such a model):
+```matlab
+k = Kriging("matern5_2");
+k.set_vecchia_exact_commit(false);   % before fit
+k.fit(y, X, "constant", false, "BFGS", "LLVecchia(30)");
+k.is_vecchia_light()                 % true: predict / simulate use Vecchia
+```
+`predict` / `simulate` are the only prediction / simulation entry points from
+Octave/MATLAB: `predictVecchia`, `predictNystrom`, `simulateNystrom` and
+`simulateVecchia` (explicit `m` / rank arguments) exist in C++ only.
 
 ## NestedKriging
 

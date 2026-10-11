@@ -498,6 +498,35 @@ int lk_kriging_vecchia_neighbors(void* ptr) {
   CATCH_RETURN
 }
 
+int lk_kriging_set_vecchia_exact_commit(void* ptr, int exact) {
+  try {
+    static_cast<Kriging*>(ptr)->set_vecchia_exact_commit(exact != 0);
+    return 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_vecchia_exact_commit(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->vecchia_exact_commit() ? 1 : 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_is_vecchia_light(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->is_vecchia_light() ? 1 : 0;
+  }
+  CATCH_RETURN
+}
+
+int lk_kriging_is_nystrom_light(void* ptr) {
+  try {
+    return static_cast<Kriging*>(ptr)->is_nystrom_light() ? 1 : 0;
+  }
+  CATCH_RETURN
+}
+
 int lk_kriging_is_normalize(void* ptr) {
   try {
     return static_cast<Kriging*>(ptr)->normalize() ? 1 : 0;

@@ -104,9 +104,17 @@ model = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(50)")   # higher d
 model.nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
 model.vecchia_neighbors()   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
-`predict` is the only prediction entry point from Python: `predictVecchia`,
-`predictNystrom`, `simulateNystrom`, `simulateVecchia` and `set_vecchia_exact_commit` (the "light"
-Vecchia mode) exist in C++ only.
+Factorization-free "light" Vecchia mode (no exact O(n^3) commit; no
+return_cov / return_deriv, update or save on such a model):
+```python
+k = lk.Kriging("matern5_2")
+k.set_vecchia_exact_commit(False)   # before fit
+k.fit(y, X, "constant", False, "BFGS", "LLVecchia(30)", {})
+k.is_vecchia_light()                 # True: predict / simulate use Vecchia
+```
+`predict` / `simulate` are the only prediction / simulation entry points from Python:
+`predictVecchia`, `predictNystrom`, `simulateNystrom` and `simulateVecchia`
+(explicit `m` / rank arguments) exist in C++ only.
 
 ## NestedKriging
 

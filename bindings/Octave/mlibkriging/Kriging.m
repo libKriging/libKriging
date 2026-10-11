@@ -112,6 +112,26 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_neighbors", obj.ref, varargin{:});
         end
 
+        % With objective "LLVecchia(m)", false skips the final exact O(n^3)
+        % factorization at the next fit ("light" fit, see is_vecchia_light):
+        % predict / simulate then use the Vecchia predictor / simulator, and
+        % return_cov, return_deriv, update and save are not available.
+        function set_vecchia_exact_commit(obj, exact)
+            mLibKriging("Kriging::set_vecchia_exact_commit", obj.ref, logical(exact));
+        end
+
+        function varargout = vecchia_exact_commit(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_exact_commit", obj.ref, varargin{:});
+        end
+
+        function varargout = is_vecchia_light(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::is_vecchia_light", obj.ref, varargin{:});
+        end
+
+        function varargout = is_nystrom_light(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::is_nystrom_light", obj.ref, varargin{:});
+        end
+
         function varargout = X(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::X", obj.ref, varargin{:});
         end

@@ -52,8 +52,16 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 10}};
+                 RequiresArg::Range{1, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  if (nrhs <= 2) {
+    // Kriging(kernel [, noise_model]): unfitted model, to configure (e.g.
+    // set_vecchia_exact_commit) before fit
+    const auto noise_model = parseNoiseModel(input.getOptional<std::string>(1, "noise_model").value_or("none"));
+    auto km = buildObject<Kriging>(input.get<std::string>(0, "kernel"), noise_model);
+    output.set(0, km, "new object reference");
+    return;
+  }
   const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
   const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
@@ -482,6 +490,46 @@ void vecchia_neighbors(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs)
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   output.set(0, static_cast<int>(km->vecchia_neighbors()), "vecchia_neighbors");
+}
+
+void set_vecchia_exact_commit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  km->set_vecchia_exact_commit(input.get<bool>(1, "exact"));
+}
+
+void vecchia_exact_commit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->vecchia_exact_commit(), "vecchia_exact_commit");
+}
+
+void is_vecchia_light(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->is_vecchia_light(), "is_vecchia_light");
+}
+
+void is_nystrom_light(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->is_nystrom_light(), "is_nystrom_light");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

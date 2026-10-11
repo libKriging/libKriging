@@ -178,8 +178,9 @@ class Kriging : public KrigingImpl {
   /** Large-n mode: when set to false BEFORE a fit with objective="LLVecchia(m)",
    * the final exact O(n^3) factorization is skipped. The model then stores
    * theta* plus LLVecchia-profiled beta/sigma2, and `predict` transparently routes
-   * to `predictVecchia` (mean/stdev only); return_cov/return_deriv, simulate,
-   * update and save are not available on such a "light" model. */
+   * to `predictVecchia` (mean/stdev only) and `simulate` to `simulateVecchia`;
+   * return_cov/return_deriv, will_update, update_simulate, update and save are
+   * not available on such a "light" model. */
   LIBKRIGING_EXPORT void set_vecchia_exact_commit(bool b) { m_vecchia_exact_commit = b; }
   [[nodiscard]] bool vecchia_exact_commit() const { return m_vecchia_exact_commit; }
   /// True when the current fit skipped the exact factorization (light mode)

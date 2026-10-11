@@ -100,6 +100,10 @@ class PyKriging {
   std::string objective();
   int nystrom_rank();
   int vecchia_neighbors();
+  void set_vecchia_exact_commit(bool b);
+  bool vecchia_exact_commit();
+  bool is_vecchia_light();
+  bool is_nystrom_light();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

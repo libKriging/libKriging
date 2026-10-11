@@ -339,3 +339,37 @@ def test_vecchia_neighbors_and_nystrom_rank():
     k = lk.Kriging(y, X, "matern5_2")
     assert k.vecchia_neighbors() == 0
     assert k.nystrom_rank() == 0
+
+
+def test_vecchia_light_fit():
+    rng = np.random.default_rng(6)
+    X = rng.uniform(size=(60, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    Xn = rng.uniform(size=(7, 2))
+
+    k = lk.Kriging("matern5_2")
+    assert k.vecchia_exact_commit()
+    k.set_vecchia_exact_commit(False)
+    assert not k.vecchia_exact_commit()
+    k.fit(y, X, "constant", False, "BFGS", "LLVecchia(10)", {})
+    assert k.is_vecchia_light()
+    assert not k.is_nystrom_light()
+
+    # predict / simulate route to the Vecchia predictor / simulator
+    mean, stdev, _, _, _ = k.predict(Xn, True, False, False)
+    assert mean.shape == (7,) and stdev.shape == (7,)
+    assert np.all(np.isfinite(mean)) and np.all(stdev >= 0)
+    sims = k.simulate(4, 123, Xn)
+    assert sims.shape == (7, 4)
+    with pytest.raises(RuntimeError):
+        k.predict(Xn, True, True, False)
+    with pytest.raises(RuntimeError):
+        k.save("light.json")
+
+    # refit with the exact commit: no longer light
+    k.set_vecchia_exact_commit(True)
+    k.fit(y, X, "constant", False, "BFGS", "LLVecchia(10)", {})
+    assert not k.is_vecchia_light()
+
+    assert lk.Kriging(y, X, "matern5_2", objective="LLNystrom(8)").is_nystrom_light()
+    assert not lk.Kriging(y, X, "matern5_2").is_nystrom_light()

@@ -32,11 +32,16 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','vecchia_exact_commit','is_vecchia_light','is_nystrom_light')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
     }
+    # With objective = "LLVecchia(m)", FALSE skips the final exact O(n^3)
+    # factorization at the next fit ("light" fit, see `k$is_vecchia_light()`):
+    # predict / simulate then use the Vecchia predictor / simulator, and
+    # return_cov, return_deriv, update and save are not available.
+    nk$set_vecchia_exact_commit <- function(exact) kriging_set_vecchia_exact_commit(nk, as.logical(exact))
     nk
 }
 

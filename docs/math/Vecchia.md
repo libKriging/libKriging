@@ -77,8 +77,9 @@ pred <- predict(k, Xnew, return_stdev = TRUE)
 
 For n large enough that even the final exact commit (O(n³)) is too
 costly, calling `set_vecchia_exact_commit(false)` before fitting skips it
-entirely (**C++ API only**: no binding exposes this method, nor `predictVecchia`,
-so the light mode cannot be used from Python, R, Julia or Octave/Matlab): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
+entirely (exposed in every binding, `is_vecchia_light()` reports it; in a
+binding, call it on an unfitted `Kriging(kernel)` and then `fit`, since the
+data constructor fits at once): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
 `predict` automatically routes through the local Vecchia predictor
 (mean/stdev only — `return_cov`/`return_deriv`, `update_simulate`,
 `update` and `save` raise a clear error on such a "light" model), and

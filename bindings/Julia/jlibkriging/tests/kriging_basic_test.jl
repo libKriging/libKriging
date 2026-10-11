@@ -178,3 +178,32 @@ end
     @test vecchia_neighbors(k) == 0
     @test nystrom_rank(k) == 0
 end
+
+@testset "Vecchia light fit" begin
+    X = [mod.(0.3819660 .* (1:60), 1.0) mod.(0.7548777 .* (1:60), 1.0)]  # Kronecker design
+    y = [f_test(x) for x in X[:, 1]] .+ X[:, 2]
+    Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
+
+    k = Kriging("matern5_2")
+    @test vecchia_exact_commit(k)
+    set_vecchia_exact_commit!(k, false)
+    @test !vecchia_exact_commit(k)
+    fit!(k, y, X; objective="LLVecchia(10)")
+    @test is_vecchia_light(k)
+    @test !is_nystrom_light(k)
+
+    p = predict(k, Xn; return_stdev=true)
+    @test length(p.mean) == 3
+    @test all(isfinite, p.mean)
+    @test all(p.stdev .>= 0)
+    @test size(simulate(k, 4, 123, Xn)) == (3, 4)
+    @test_throws ErrorException predict(k, Xn; return_stdev=true, return_cov=true)
+    @test_throws ErrorException save(k, tempname() * ".json")
+
+    set_vecchia_exact_commit!(k, true)
+    fit!(k, y, X; objective="LLVecchia(10)")
+    @test !is_vecchia_light(k)
+
+    @test is_nystrom_light(Kriging(y, X, "matern5_2"; objective="LLNystrom(8)"))
+    @test !is_nystrom_light(Kriging(y, X, "matern5_2"))
+end

@@ -490,6 +490,32 @@ function vecchia_neighbors(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_vecchia_neighbors), Cint, (Ptr{Nothing},), k.ptr))
 end
 
+"""
+    set_vecchia_exact_commit!(k::Kriging, exact::Bool) -> Kriging
+
+With `objective="LLVecchia(m)"`, `false` skips the final exact O(n^3)
+factorization at the next `fit!` ("light" fit, see `is_vecchia_light`):
+`predict` / `simulate` then use the Vecchia predictor / simulator, and
+`return_cov`, `return_deriv`, `update!` and `save` are not available.
+Default `true`.
+"""
+function set_vecchia_exact_commit!(k::Kriging, exact::Bool)
+    _check_error(ccall(dlsym(_lk(), :lk_kriging_set_vecchia_exact_commit), Cint, (Ptr{Nothing}, Cint), k.ptr, exact ? 1 : 0))
+    return k
+end
+
+function vecchia_exact_commit(k::Kriging)
+    return ccall(dlsym(_lk(), :lk_kriging_vecchia_exact_commit), Cint, (Ptr{Nothing},), k.ptr) == 1
+end
+
+function is_vecchia_light(k::Kriging)
+    return ccall(dlsym(_lk(), :lk_kriging_is_vecchia_light), Cint, (Ptr{Nothing},), k.ptr) == 1
+end
+
+function is_nystrom_light(k::Kriging)
+    return ccall(dlsym(_lk(), :lk_kriging_is_nystrom_light), Cint, (Ptr{Nothing},), k.ptr) == 1
+end
+
 function normalize(k::Kriging)
     return ccall(dlsym(_lk(), :lk_kriging_is_normalize), Cint, (Ptr{Nothing},), k.ptr) != 0
 end
@@ -1498,6 +1524,7 @@ export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
 export nystrom_rank, vecchia_neighbors
+export set_vecchia_exact_commit!, vecchia_exact_commit, is_vecchia_light, is_nystrom_light
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim

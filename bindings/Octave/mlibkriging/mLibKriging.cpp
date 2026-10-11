@@ -141,6 +141,14 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::vecchia_neighbors"_hash:
       return KrigingBinding::vecchia_neighbors(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::set_vecchia_exact_commit"_hash:
+      return KrigingBinding::set_vecchia_exact_commit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::vecchia_exact_commit"_hash:
+      return KrigingBinding::vecchia_exact_commit(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_vecchia_light"_hash:
+      return KrigingBinding::is_vecchia_light(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::is_nystrom_light"_hash:
+      return KrigingBinding::is_nystrom_light(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::X"_hash:
       return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::centerX"_hash:
