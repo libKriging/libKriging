@@ -195,10 +195,10 @@ sims_ref <- simulate(k2, nsim = 10, seed = 123, x = Xnew)
   call on the same model — it reuses that call's cached factors and
   random stream.
 - Fits without an exact factorization (`objective="LLNystrom(k)"`, and
-  the C++-only light Vecchia mode) simulate through their approximate
-  simulators (`simulateNystrom`, `simulateVecchia`), with no
-  `will_update` and hence no `update_simulate`
-  ([Nystrom.md](Nystrom.md), [Vecchia.md](Vecchia.md)).
+  the light Vecchia mode) simulate only with an explicit approximate
+  method (`simulate(…, method="nystrom")` / `method="vecchia"`), with no
+  `will_update` and hence no `update_simulate`; the exact `simulate`
+  raises on them ([Nystrom.md](Nystrom.md), [Vecchia.md](Vecchia.md)).
 - Numerical correctness is validated by mockup R scripts comparing a
   from-scratch reference implementation (independent Cholesky/QR
   formulas) against the library's `predict`/`simulate`/`update`, for

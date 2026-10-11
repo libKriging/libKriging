@@ -120,6 +120,13 @@ class KrigingRegressor(_BaseKrigingEstimator):
         ``"LLVecchia(m)"`` (Vecchia approximation, for large ``n``), or
         ``"LLNystrom"``/``"LLNystrom(k)"`` (Nystrom low-rank approximation,
         also for large ``n``).
+    method : str, default="exact"
+        Prediction / sampling method used by ``predict`` and ``sample_y``:
+        ``"exact"``, ``"vecchia"``/``"vecchia(m)"`` (local Vecchia
+        predictor) or ``"nystrom"`` (requires ``objective="LLNystrom..."``).
+        Nothing is chosen from ``objective``: an ``LLNystrom`` fit needs
+        ``method="nystrom"`` (it holds no exact factorization). The
+        approximate methods give mean / std only (no ``return_cov``).
     noise : None, "nugget", float, or array-like of shape (n_samples,), default=None
         ``None`` for noise-free (exact interpolation), ``"nugget"`` for
         an estimated homogeneous nugget, or a per-observation variance
@@ -157,7 +164,8 @@ class KrigingRegressor(_BaseKrigingEstimator):
     """
 
     def __init__(self, kernel="matern5_2", regmodel="constant", normalize=False,
-                 optim="BFGS", objective="LL", noise=None, parameters=None):
+                 optim="BFGS", objective="LL", noise=None, parameters=None,
+                 method="exact"):
         # sklearn convention: __init__ must only assign parameters to
         # identically-named attributes, with no validation or other
         # logic -- see scikit-learn's "Developing scikit-learn estimators"
@@ -169,6 +177,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
         self.objective = objective
         self.noise = noise
         self.parameters = parameters
+        self.method = method
 
     def fit(self, X, y):
         """Fit a Kriging model to (X, y).
@@ -226,7 +235,8 @@ class KrigingRegressor(_BaseKrigingEstimator):
         # return_cov flags only control whether those entries are
         # actually computed, not how many are returned.
         mean, stdev, cov, _mean_deriv, _stdev_deriv = self.model_.predict(
-            X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+            X, return_stdev=return_std, return_cov=return_cov, return_deriv=False,
+            method=self.method)
         if return_cov:
             return mean, cov
         if return_std:
@@ -252,7 +262,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
         check_is_fitted(self, "model_")
         X = self._validate_X_predict(X)
         seed = int(random_state) if random_state is not None else 123
-        return self.model_.simulate(nsim=n_samples, seed=seed, X=X)
+        return self.model_.simulate(nsim=n_samples, seed=seed, X=X, method=self.method)
 
 
 class WarpKrigingRegressor(_BaseKrigingEstimator):

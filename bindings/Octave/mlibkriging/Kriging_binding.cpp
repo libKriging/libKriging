@@ -149,14 +149,16 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 5}};
+                 RequiresArg::Range{2, 6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
   const bool return_cov = flag_output_compliance(input, 3, "return_cov", output, 2);
   const bool return_deriv = flag_output_compliance(input, 4, "return_deriv", output, 3);
+  // method: "exact" (default), "vecchia", "vecchia(m)" or "nystrom"
+  const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
   auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m]
-      = km->predict(input.get<arma::mat>(1, "matrix"), return_stdev, return_cov, return_deriv);
+      = km->predict(input.get<arma::mat>(1, "matrix"), return_stdev, return_cov, return_deriv, method);
   output.set(0, y_pred, "predicted response");
   output.setOptional(1, stderr_v, "stderr vector");
   output.setOptional(2, cov_m, "cov matrix");
@@ -194,8 +196,10 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto seed = input.get<int>(2, "seed");
   const auto X_n = input.get<arma::mat>(3, "X_n");
   if (km->noise_model() == Kriging::NoiseModel::None) {
-    // simulate(nsim, seed, X_n, will_update)
-    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "will_update"));
+    // simulate(nsim, seed, X_n, will_update [, method]); method: "exact"
+    // (default), "vecchia", "vecchia(m)" or "nystrom"
+    const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
+    auto result = km->simulate(nsim, seed, X_n, method, input.get<bool>(4, "will_update"));
     output.set(0, result, "simulated response");
   } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
     // simulate(nsim, seed, X_n, with_nugget, will_update)
@@ -332,10 +336,12 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{1, 2}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  output.set(0, km->logLikelihood(), "Model logLikelihood");
+  // method: "exact" (default), "vecchia" or "nystrom"
+  const auto method = input.getOptional<std::string>(1, "method").value_or("exact");
+  output.set(0, km->logLikelihood(method), "Model logLikelihood");
 }
 
 void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

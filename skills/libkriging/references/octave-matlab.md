@@ -78,20 +78,29 @@ k = Kriging(y(idx), X(idx, :), "matern5_2");
 % Or keep every point and approximate the objective (noise-free Kriging only)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");   % d <~ 5
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % higher d
-k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
-k.vecchia_neighbors()   % 30 for an LLVecchia(30) fit (0 otherwise)
+r = k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
+m = k.vecchia_neighbors()   % 30 for an LLVecchia(30) fit (0 otherwise)
 ```
-Factorization-free "light" Vecchia mode (no exact O(n^3) commit; no
-return_cov / return_deriv, update or save on such a model):
+The method is explicit at every step (`"exact"` by default, never inferred from the fit):
+```matlab
+kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % no exact factorization
+[m, s] = kn.predict(Xnew, true, false, false, "nystrom");   % "exact" would raise
+sims = kn.simulate(int32(10), int32(123), Xnew, false, "nystrom");
+ll = kn.logLikelihood("nystrom");                            % the fitted objective
+kv = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");    % exact commit (default)
+[m, s, c] = kv.predict(Xnew, true, true, false);             % exact, with covariance
+[m, s] = kv.predict(Xnew, true, false, false, "vecchia");    % local Vecchia, any fit
+```
+Factorization-free "light" Vecchia mode (no exact O(n^3) commit; the exact methods raise,
+`"vecchia"` is passed explicitly; update and save / load stay available):
 ```matlab
 k = Kriging("matern5_2");
 k.set_vecchia_exact_commit(false);   % before fit
 k.fit(y, X, "constant", false, "BFGS", "LLVecchia(30)");
-k.is_vecchia_light()                 % true: predict / simulate use Vecchia
+tf = k.is_vecchia_light()            % true
+[m, s] = k.predict(Xnew, true, false, false, "vecchia");
 ```
-`predict` / `simulate` are the only prediction / simulation entry points from
-Octave/MATLAB: `predictVecchia`, `predictNystrom`, `simulateNystrom` and
-`simulateVecchia` (explicit `m` / rank arguments) exist in C++ only.
+`predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging
 

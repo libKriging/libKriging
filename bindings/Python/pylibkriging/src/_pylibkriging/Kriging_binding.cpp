@@ -136,10 +136,14 @@ void PyKriging::fit(const py::array_t<double>& y,
 // --- predict ---
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-PyKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
+PyKriging::predict(const py::array_t<double>& X_n,
+                   bool return_stdev,
+                   bool return_cov,
+                   bool return_deriv,
+                   const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [y_predict, y_stderr, y_cov, y_mean_deriv, y_stderr_deriv]
-      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
+      = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv, method);
   return std::make_tuple(vec_to_arr(y_predict),
                          vec_to_arr(y_stderr),
                          carma::mat_to_arr(y_cov, true),
@@ -164,8 +168,17 @@ py::array_t<double> PyKriging::simulate(const int nsim,
                                         const int seed,
                                         const py::array_t<double>& X_n,
                                         const bool will_update,
-                                        const py::object& with_noise) {
+                                        const py::object& with_noise,
+                                        const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
+
+  if (method != "exact") {
+    // approximate simulators: NoiseModel::None only, no noise to add
+    if (!with_noise.is_none())
+      throw std::invalid_argument("simulate: with_noise is only available with method=\"exact\"");
+    auto result = m_internal->simulate(nsim, seed, mat_X, method, will_update);
+    return carma::mat_to_arr(result, true);
+  }
 
   if (with_noise.is_none()) {
     // Plain simulate (NoiseModel::None)
@@ -275,8 +288,8 @@ PyKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_
   return {llo, vec_to_arr(grad), {}};
 }
 
-double PyKriging::logLikelihood() {
-  return m_internal->logLikelihood();
+double PyKriging::logLikelihood(const std::string& method) {
+  return m_internal->logLikelihood(method);
 }
 
 std::tuple<double, py::array_t<double>> PyKriging::logMargPostFun(const py::array_t<double>& theta,

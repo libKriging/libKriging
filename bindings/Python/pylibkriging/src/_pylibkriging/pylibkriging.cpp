@@ -253,7 +253,12 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("X"),
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
-           py::arg("return_deriv") = false)
+           py::arg("return_deriv") = false,
+           py::arg("method") = "exact",
+           R"pbdoc(Prediction at X. method: "exact" (default, needs the exact factorization),
+"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit) or "nystrom" (needs an
+LLNystrom fit); the approximate methods return mean / stdev only. Nothing is chosen implicitly:
+on a light Vecchia or an LLNystrom fit, "exact" raises.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -272,7 +277,10 @@ discards n - n_max points outright.)pbdoc")
            py::arg("seed") = 123,
            py::arg("X"),
            py::arg("will_update") = false,
-           py::arg("with_noise") = py::none())
+           py::arg("with_noise") = py::none(),
+           py::arg("method") = "exact",
+           R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
+"vecchia(m)" or "nystrom" (see predict); will_update and with_noise need "exact".)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),
@@ -295,7 +303,11 @@ discards n - n_max points outright.)pbdoc")
            py::arg("return_grad") = false,
            py::arg("want_hess") = false)
       .def("logMargPostFun", &PyKriging::logMargPostFun)
-      .def("logLikelihood", &PyKriging::logLikelihood)
+      .def("logLikelihood",
+           &PyKriging::logLikelihood,
+           py::arg("method") = "exact",
+           "Log-likelihood at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
+           "(requires an LLVecchia fit) or \"nystrom\" (requires an LLNystrom fit).")
       .def("logMargPost", &PyKriging::logMargPost)
       .def("leaveOneOut", &PyKriging::leaveOneOut)
       .def("covMat", &PyKriging::covMat)

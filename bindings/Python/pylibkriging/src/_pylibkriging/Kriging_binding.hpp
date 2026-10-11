@@ -48,7 +48,11 @@ class PyKriging {
            const py::object& noise);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
-  predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv);
+  predict(const py::array_t<double>& X_n,
+          bool return_stdev,
+          bool return_cov,
+          bool return_deriv,
+          const std::string& method);
 
   // Subset-of-data pre-fit reduction: k-means (or random) subset of n_max
   // rows of X, returned as 0-based row-indices to keep.
@@ -59,7 +63,8 @@ class PyKriging {
                                const int seed,
                                const py::array_t<double>& X_n,
                                const bool will_update,
-                               const py::object& with_noise);
+                               const py::object& with_noise,
+                               const std::string& method);
 
   // noise_u: py::none() for None/Nugget, array for Heterogeneous
   void update(const py::array_t<double>& y_u,
@@ -87,7 +92,7 @@ class PyKriging {
 
   std::tuple<double, py::array_t<double>> logMargPostFun(const py::array_t<double>& theta, const bool return_grad);
 
-  double logLikelihood();
+  double logLikelihood(const std::string& method);
   double leaveOneOut();
   double logMargPost();
 

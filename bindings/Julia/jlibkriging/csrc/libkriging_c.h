@@ -66,7 +66,8 @@ int lk_kriging_predict(void* ptr,
                        double* stdev_out,
                        double* cov_out,
                        double* mean_deriv_out,
-                       double* stdev_deriv_out);
+                       double* stdev_deriv_out,
+                       const char* method); /* "exact" (NULL), "vecchia", "vecchia(m)" or "nystrom" */
 
 /* Subset-of-data pre-fit reduction: select n_max rows of X (k-means
    centroids snapped to the nearest real point, or a uniform random
@@ -86,7 +87,8 @@ int lk_kriging_simulate(void* ptr,
                         const double* with_noise,
                         int noise_n,
                         int will_update,
-                        double* sim_out);
+                        double* sim_out,
+                        const char* method); /* "exact" (NULL), "vecchia", "vecchia(m)" or "nystrom" */
 
 int lk_kriging_update(void* ptr,
                       const double* y_u,
@@ -138,6 +140,8 @@ int lk_kriging_log_marg_post_fun(void* ptr,
                                  double* grad_out);
 
 double lk_kriging_log_likelihood(void* ptr);
+/* log-likelihood with an explicit method ("exact", "vecchia" or "nystrom"); 0 or -1 on error */
+int lk_kriging_log_likelihood_method(void* ptr, const char* method, double* ll_out);
 double lk_kriging_leave_one_out(void* ptr);
 double lk_kriging_log_marg_post(void* ptr);
 

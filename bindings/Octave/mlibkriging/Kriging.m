@@ -32,6 +32,11 @@ classdef Kriging < handle
             mLibKriging("Kriging::fit", obj.ref, varargin{:});
         end
         
+        % predict(X, return_stdev, return_cov, return_deriv [, method]) and
+        % simulate(nsim, seed, X, will_update [, method]): method "exact"
+        % (default, needs the exact factorization), "vecchia" / "vecchia(m)"
+        % (local Vecchia, usable after any fit) or "nystrom" (needs an
+        % LLNystrom fit); nothing is chosen implicitly.
         function varargout = predict(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::predict", obj.ref, varargin{:});
         end

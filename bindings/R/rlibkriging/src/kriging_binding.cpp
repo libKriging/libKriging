@@ -329,7 +329,8 @@ Rcpp::List kriging_predict(Rcpp::List k,
                            arma::mat X_n,
                            bool return_stdev = true,
                            bool return_cov = false,
-                           bool return_deriv = false) {
+                           bool return_deriv = false,
+                           std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -340,7 +341,7 @@ Rcpp::List kriging_predict(Rcpp::List k,
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
-  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv);
+  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv, method);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   if (return_stdev) {
@@ -371,7 +372,8 @@ arma::mat kriging_simulate(Rcpp::List k,
                            int seed,
                            arma::mat X_n,
                            Rcpp::Nullable<Rcpp::NumericVector> with_noise = R_NilValue,
-                           bool will_update = false) {
+                           bool will_update = false,
+                           std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -381,6 +383,13 @@ arma::mat kriging_simulate(Rcpp::List k,
   int d = impl_ptr->X().n_cols;
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  if (method != "exact") {
+    // approximate simulators: NoiseModel::None only, no noise to add
+    if (with_noise.isNotNull())
+      Rcpp::stop("simulate: with_noise is only available with method = \"exact\"");
+    return impl_ptr->simulate(nsim, seed, X_n, method, will_update);
+  }
 
   if (with_noise.isNotNull()) {
     Rcpp::NumericVector wn(with_noise);
@@ -508,14 +517,14 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
-double kriging_logLikelihood(Rcpp::List k) {
+double kriging_logLikelihood(Rcpp::List k, std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->logLikelihood();
+  return impl_ptr->logLikelihood(method);
 }
 
 // [[Rcpp::export]]

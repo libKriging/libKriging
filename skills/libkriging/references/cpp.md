@@ -53,6 +53,8 @@ auto [ll2, grad] = model.logLikelihoodFun(theta, /*return_grad=*/true, /*bench=*
 Vecchia approximation: same class, just change `objective`:
 ```cpp
 model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
+// explicit method at each step (default "exact"); same as predictVecchia(Xnew, true)
+auto [m_v, s_v, c_v, dm_v, ds_v] = model.predict(Xnew, true, false, false, "vecchia");
 auto [mean, stdev] = model.predictVecchia(Xnew, /*return_stdev=*/true);
 // sequential conditional simulation on m nearest (observed or already simulated) points
 arma::mat sims = model.simulateVecchia(/*nsim=*/10, /*seed=*/123, Xnew /*, m=0 -> vecchia_neighbors() or 30 */);
@@ -61,8 +63,10 @@ arma::mat sims = model.simulateVecchia(/*nsim=*/10, /*seed=*/123, Xnew /*, m=0 -
 Nystrom approximation: same class, just change `objective`:
 ```cpp
 model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)", {});
-auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);
-arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);
+auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);   // = predict(..., "nystrom")
+arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);  // = simulate(..., "nystrom")
+// no exact factorization after LLNystrom: predict(Xnew, ...) (method "exact") raises
+double ll_nys = model.logLikelihood("nystrom");
 ```
 
 Pre-fit reduction and accessors:
@@ -75,8 +79,8 @@ Kriging small(y.elem(idx), X.rows(idx), "matern5_2");
 model.nystrom_rank();   // rank k of an LLNystrom fit, 0 otherwise
 model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
 // Factorization-free "light" Vecchia mode: call BEFORE fit(..., "LLVecchia(m)");
-// predict()/simulate() then route to predictVecchia/simulateVecchia
-// (no cov/deriv, will_update, update_simulate, update or save).
+// the exact methods then raise: use method "vecchia" (predict / simulate),
+// logLikelihood("vecchia"); update and save / load stay available.
 model.set_vecchia_exact_commit(false);
 ```
 

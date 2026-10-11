@@ -333,6 +333,12 @@ fit.Kriging <- function(object, y, X,
 #'     the predictions is returned.
 #' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
+#' @param method \code{Character}: \code{"exact"} (default, needs the exact
+#'     factorization), \code{"vecchia"} / \code{"vecchia(m)"} (local Vecchia
+#'     predictor, usable after any fit) or \code{"nystrom"} (needs an
+#'     \code{LLNystrom} fit). The approximate methods return mean / stdev only.
+#'     Nothing is chosen implicitly: on a light Vecchia or an \code{LLNystrom}
+#'     fit, \code{"exact"} raises an error.
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -364,12 +370,13 @@ fit.Kriging <- function(object, y, X,
 #' lines(x, p$mean, col = "blue")
 #' polygon(c(x, rev(x)), c(p$mean - 2 * p$stdev, rev(p$mean + 2 * p$stdev)),
 #'  border = NA, col = rgb(0, 0, 1, 0.2))
-predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE, ...) {
+predict.Kriging <- function(object, x, return_stdev = TRUE, return_cov = FALSE, return_deriv = FALSE,
+                            method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     ## manage the data frame case. Ideally we should then warn
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
-    return(kriging_predict(object, x, return_stdev, return_cov, return_deriv))
+    return(kriging_predict(object, x, return_stdev, return_cov, return_deriv, method))
 }
 
 
@@ -427,7 +434,10 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 #'     \code{TRUE} to include fitted noise when available, \code{FALSE}
 #'     to exclude nugget noise, or \code{NULL} for the default behaviour.
 #' @param will_update Set to \code{TRUE} if you plan to call
-#'     \code{update_simulate()} later.
+#'     \code{update_simulate()} later (only with \code{method = "exact"}).
+#' @param method \code{Character}: \code{"exact"} (default),
+#'     \code{"vecchia"} / \code{"vecchia(m)"} or \code{"nystrom"} (see
+#'     \code{predict.Kriging}); \code{with_noise} needs \code{"exact"}.
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}
@@ -461,7 +471,8 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 #' lines(x, s[ , 1], col = "blue")
 #' lines(x, s[ , 2], col = "blue")
 #' lines(x, s[ , 3], col = "blue")
-simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE, ...) {
+simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL, will_update = FALSE,
+                             method = "exact", ...) {
     args <- list(...)
     # Accept with_nugget as alias for with_noise (backward compat for NuggetKriging)
     if (!is.null(args$with_nugget)) {
@@ -475,7 +486,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
         # (which uses alpha-scaled correlations).  Passing FALSE would trigger
         # the hetero path with noise=0 and wrong (non-alpha) correlation factors.
         with_noise <- NULL
-    } else if (is.null(with_noise) && is_nugget) {
+    } else if (is.null(with_noise) && is_nugget && method == "exact") {
         # For nugget models, default to including the nugget noise
         # (backward compat: old simulate.NuggetKriging defaulted to with_nugget=TRUE)
         with_noise <- TRUE
@@ -485,7 +496,8 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
     if (is.data.frame(x)) x = data.matrix(x)
     if (!is.matrix(x)) x=matrix(x,ncol=ncol(object$X()))
     if (is.null(seed)) seed <- floor(runif(1) * 99999)
-    return(kriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_noise = with_noise, will_update = will_update))
+    return(kriging_simulate(object, nsim = nsim, seed = seed, X_n = x, with_noise = with_noise,
+                            will_update = will_update, method = method))
 }
 
 #' Update previous simulation of a \code{Kriging} model object.
@@ -831,6 +843,9 @@ logLikelihoodFun.Kriging <- function(object, theta,
 #' @author Yann Richet \email{yann.richet@asnr.fr}
 #'
 #' @param object An S3 Kriging object.
+#' @param method \code{Character}: \code{"exact"} (default),
+#'     \code{"vecchia"} (requires an \code{LLVecchia} fit) or
+#'     \code{"nystrom"} (requires an \code{LLNystrom} fit).
 #' @param ... Not used.
 #'
 #' @return The log-Likelihood computed for fitted
@@ -850,9 +865,9 @@ logLikelihoodFun.Kriging <- function(object, theta,
 #' print(k)
 #'
 #' logLikelihood(k)
-logLikelihood.Kriging <- function(object, ...) {
+logLikelihood.Kriging <- function(object, method = "exact", ...) {
   if (length(L <- list(...)) > 0) warnOnDots(L)
-  return(kriging_logLikelihood(object))
+  return(kriging_logLikelihood(object, method))
 }
 
 

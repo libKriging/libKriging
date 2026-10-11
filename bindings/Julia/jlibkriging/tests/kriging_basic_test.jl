@@ -179,7 +179,7 @@ end
     @test nystrom_rank(k) == 0
 end
 
-@testset "Vecchia light fit" begin
+@testset "Explicit Vecchia / Nystrom methods" begin
     X = [mod.(0.3819660 .* (1:60), 1.0) mod.(0.7548777 .* (1:60), 1.0)]  # Kronecker design
     y = [f_test(x) for x in X[:, 1]] .+ X[:, 2]
     Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
@@ -192,18 +192,48 @@ end
     @test is_vecchia_light(k)
     @test !is_nystrom_light(k)
 
-    p = predict(k, Xn; return_stdev=true)
+    # explicit method: no implicit switch from the exact predictor
+    @test_throws ErrorException predict(k, Xn)
+    @test_throws ErrorException simulate(k, 4, 123, Xn)
+    p = predict(k, Xn; return_stdev=true, method="vecchia")
     @test length(p.mean) == 3
     @test all(isfinite, p.mean)
     @test all(p.stdev .>= 0)
-    @test size(simulate(k, 4, 123, Xn)) == (3, 4)
-    @test_throws ErrorException predict(k, Xn; return_stdev=true, return_cov=true)
-    @test_throws ErrorException save(k, tempname() * ".json")
+    @test size(simulate(k, 4, 123, Xn; method="vecchia")) == (3, 4)
+    @test size(simulate(k, 4, 123, Xn; method="vecchia(5)")) == (3, 4)
+    @test_throws ErrorException predict(k, Xn; return_cov=true, method="vecchia")
+    @test_throws ErrorException predict(k, Xn; method="unknown")
+    @test isfinite(log_likelihood(k; method="vecchia"))
 
+    # update (Vecchia refit) and save / load on a light fit
+    Xu = [0.12 0.81; 0.52 0.33]
+    yu = [f_test(x) for x in Xu[:, 1]] .+ Xu[:, 2]
+    update!(k, yu, Xu; refit=false)
+    @test is_vecchia_light(k)
+    @test size(X(k), 1) == 62
+    @test maximum(abs.(predict(k, Xu; method="vecchia").mean .- yu)) < 1e-3
+    f = tempname() * ".json"
+    save(k, f)
+    kl = load_kriging(f)
+    @test is_vecchia_light(kl)
+    @test vecchia_neighbors(kl) == 10
+    @test maximum(abs.(predict(kl, Xn; method="vecchia").mean .- predict(k, Xn; method="vecchia").mean)) < 1e-12
+
+    # refit with the exact commit: exact and Vecchia methods available
     set_vecchia_exact_commit!(k, true)
     fit!(k, y, X; objective="LLVecchia(10)")
     @test !is_vecchia_light(k)
+    @test size(predict(k, Xn; return_cov=true).cov) == (3, 3)
+    @test length(predict(k, Xn; method="vecchia").mean) == 3
+    @test log_likelihood(k) == log_likelihood(k; method="exact")
 
-    @test is_nystrom_light(Kriging(y, X, "matern5_2"; objective="LLNystrom(8)"))
+    # Nystrom fits need method="nystrom"
+    kn = Kriging(y, X, "matern5_2"; objective="LLNystrom(8)")
+    @test is_nystrom_light(kn)
+    @test_throws ErrorException predict(kn, Xn)
+    @test length(predict(kn, Xn; method="nystrom").mean) == 3
+    @test size(simulate(kn, 3, 1, Xn; method="nystrom")) == (3, 3)
+    @test isfinite(log_likelihood(kn; method="nystrom"))
+    @test_throws ErrorException log_likelihood(kn; method="vecchia")
     @test !is_nystrom_light(Kriging(y, X, "matern5_2"))
 end

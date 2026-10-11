@@ -17,6 +17,13 @@ Predict with a fitted libKriging model. Context / arguments: $ARGUMENTS
      Do not request the full covariance for large `Xnew` unless it is needed.
    - gradient of mean / stdev w.r.t. inputs (sensitivity, gradient-based
      optimization) → `return_deriv=True`.
+   - `Kriging` method, always explicit (never inferred from the fit):
+     `method="exact"` (default) needs the exact factorization; after an
+     `LLNystrom` fit pass `method="nystrom"`, after a light Vecchia fit
+     (`set_vecchia_exact_commit(false)`) `method="vecchia"` — `"exact"`
+     raises there. `"vecchia"` / `"vecchia(m)"` (local predictor, any fit)
+     also suits very many prediction points. The approximate methods give
+     mean / stdev only (no `return_cov` / `return_deriv`).
 
 3. Mind the return shape: in Python `predict()` of `Kriging` / `WarpKriging` /
    `MLPKriging` always returns the fixed 5-tuple

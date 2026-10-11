@@ -22,15 +22,15 @@ This document lists all methods exposed by each language binding for accessing t
 | Constructor | `new_Kriging(kernel)` | — | `Kriging(kernel)` / `Kriging(kernel, noise_model)` | `Kriging(kernel)` / `Kriging(kernel, noise_model)` / `Kriging(y,X,kernel,…)` | `Kriging(kernel)` / `Kriging(y,X,kernel;…)` |
 | Fit | `kriging_fit(obj,y,X,…)` | `obj$fit(y,X,…)` | `obj.fit(y,X,…)` | `fit(obj,y,X,…)` | `fit!(obj,y,X;…)` |
 | Copy | `kriging_copy(obj)` | `obj$copy()` | `obj.copy()` | `copy(obj)` | `copy(obj)` |
-| Predict | `kriging_predict(obj,x,…)` | `obj$predict(x,…)` | `obj.predict(x,…)` | `predict(obj,x,…)` | `predict(obj,X;…)` |
-| Simulate | `kriging_simulate(obj,nsim,seed,x,…)` | `obj$simulate(nsim,seed,x,…)` | `obj.simulate(nsim,seed,x,…)` | `simulate(obj,nsim,seed,x,…)` | `simulate(obj,nsim,seed,X;…)` |
+| Predict | `kriging_predict(obj,x,…,method)` | `obj$predict(x,…,method=)` | `obj.predict(x,…,method=)` | `predict(obj,x,stdev,cov,deriv[,method])` | `predict(obj,X;…,method=)` |
+| Simulate | `kriging_simulate(obj,nsim,seed,x,…,method)` | `obj$simulate(nsim,seed,x,…,method=)` | `obj.simulate(nsim,seed,x,…,method=)` | `simulate(obj,nsim,seed,x,will_update[,method])` | `simulate(obj,nsim,seed,X;…,method=)` |
 | Update | `kriging_update(obj,y_u,X_u,…)` | `obj$update(y_u,X_u,…)` | `obj.update(y_u,X_u,…)` | `update(obj,y_u,X_u,…)` | `update!(obj,y_u,X_u;…)` |
 | Update simulate | `kriging_update_simulate(obj,y_u,X_u)` | `obj$update_simulate(y_u,X_u)` | `obj.update_simulate(y_u,X_u)` | `update_simulate(obj,y_u,X_u)` | `update_simulate(obj,y_u,X_u)` |
 | Save | `kriging_save(obj,file)` | `obj$save(file)` | `obj.save(file)` | `save(obj,file)` | `save(obj,file)` |
 | Load | `kriging_load(file)` | `load.Kriging(file)` / `load(file)` | `Kriging.load(file)` / `pylibkriging.load(file)` | `Kriging.load(file)` / `load_kriging(file)` | `load_kriging(file)` / `load(file)` |
 | Summary | `kriging_summary(obj)` | `obj$print()` | `obj.summary()` | `summary(obj)` | `summary(obj)` |
 | Covariance matrix | `kriging_covMat(obj,x1,x2)` | `obj$covMat(x1,x2)` | `obj.covMat(x1,x2)` | `covMat(obj,x1,x2)` | `cov_mat(obj,X1,X2)` |
-| Log-likelihood | `kriging_logLikelihood(obj)` | `obj$logLikelihood()` | `obj.logLikelihood()` | `logLikelihood(obj)` | `log_likelihood(obj)` |
+| Log-likelihood | `kriging_logLikelihood(obj,method)` | `obj$logLikelihood(method=)` | `obj.logLikelihood(method=)` | `logLikelihood(obj[,method])` | `log_likelihood(obj;method=)` |
 | Log-likelihood function | `kriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
 | Leave-one-out | `kriging_leaveOneOut(obj)` | `obj$leaveOneOut()` | `obj.leaveOneOut()` | `leaveOneOut(obj)` | `leave_one_out(obj)` |
 | Leave-one-out function | `kriging_leaveOneOutFun(obj,theta,…)` | `obj$leaveOneOutFun(theta,…)` | `obj.leaveOneOutFun(theta,…)` | `leaveOneOutFun(obj,theta,…)` | `leave_one_out_fun(obj,theta;…)` |
@@ -77,14 +77,28 @@ rank `k` of a `LLNystrom` fit (0 otherwise), `vecchia_neighbors()` the number `m
 longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
 only.
 
-**Light Vecchia mode**: `set_vecchia_exact_commit(false)` *before* a fit with `objective="LLVecchia(m)"` skips the final
-exact O(n³) factorization (on an unfitted model, `Kriging(kernel)`, then `fit`, or as a refit of an existing model).
-`is_vecchia_light()` is then true and `predict` / `simulate` go through the Vecchia predictor / simulator; `return_cov`,
-`return_deriv`, `update`, `update_simulate` and `save` raise an error. A model fitted with `LLNystrom(k)` is always
-light (`is_nystrom_light()`): `predict` / `simulate` go through the Nystrom predictor / simulator.
+**Exact / Vecchia / Nystrom methods — always explicit.** The approximation is chosen at each step, never inferred from
+the fit:
 
-> **C++ only**: `predictVecchia`, `predictNystrom`, `simulateVecchia`, `simulateNystrom` (explicit `m` / rank arguments),
-> `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun`. From a binding, `predict` / `simulate` are the entry points.
+| Step | exact | Vecchia | Nystrom |
+|---|---|---|---|
+| fit (`objective`) | `"LL"`, `"LOO"`, `"LMP"` | `"LLVecchia(m)"`: Vecchia estimation, then an exact O(n³) commit, unless `set_vecchia_exact_commit(false)` was called before the fit ("light" fit, `is_vecchia_light()`) | `"LLNystrom(k)"`: never an exact commit (`is_nystrom_light()`) |
+| `predict(…, method=)` | `"exact"` (default): needs the exact factorization | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"`: after an `LLNystrom` fit |
+| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit | `"nystrom"`: after an `LLNystrom` fit |
+| `logLikelihood(method=)` | `"exact"` (default) | `"vecchia"`: after an `LLVecchia` fit | `"nystrom"`: after an `LLNystrom` fit |
+| `update` | refit as fitted (exact commit) | light fit: Vecchia refit, no exact commit | Nystrom update (same landmarks) |
+| `update_simulate` | yes | — | — |
+| `save` / `load` | yes | yes (light fit included) | yes |
+
+On a light Vecchia fit or an `LLNystrom` fit, `method="exact"` (the default) raises an error naming the method to use;
+the approximate methods return mean / stdev only (`return_cov` / `return_deriv` raise). `set_vecchia_exact_commit(false)`
+is called on an unfitted model (`Kriging(kernel)`, then `fit`) or before a refit. Argument names: Python / R
+`method="…"` keyword, Julia `method="…"` keyword, Octave/Matlab trailing positional argument
+(`predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, will_update, "vecchia")`,
+`logLikelihood("vecchia")`).
+
+> **C++ only**: `predictVecchia`, `predictNystrom`, `simulateVecchia`, `simulateNystrom` (the methods behind
+> `method=`), `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun` (at a given θ).
 
 > **Python output shapes**: every vector-valued output (`predict` mean / stdev, `theta`, `beta`, `y`, `centerX`, …) is a
 > 1-D array of shape `(n,)`; matrices (`X`, `F`, `T`, `M`, covariances, derivatives, `simulate` results of shape

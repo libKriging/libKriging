@@ -64,17 +64,20 @@ domain.
   factorization is exact and `LLNystrom(n)` reproduces the exact
   concentrated log-likelihood at any θ (used as a correctness check in
   `KrigingNystromTest.cpp`).
-- **Prediction**: a Nystrom fit commits no exact factorization, so
-  `predict` routes to `predictNystrom`, which reuses the committed rank-k
-  factors (U, D) via the Woodbury identity — O(n k q) instead of
-  O(n² q) for q points (mean and stdev only: `return_cov` /
-  `return_deriv` raise). Likewise `simulate` routes to `simulateNystrom`
-  (joint trajectories through the same low-rank machinery; no
-  `will_update`). `predictNystrom` / `simulateNystrom` themselves are C++
-  API only; from a binding, `predict` / `simulate` reach them.
+- **Prediction**: the method is always explicit. A Nystrom fit commits
+  no exact factorization, so `predict` / `simulate` with method
+  `"exact"` (the default) raise an error; `predict(…, method="nystrom")`
+  (C++ `predictNystrom`) reuses the committed rank-k factors (U, D) via
+  the Woodbury identity — O(n k q) instead of O(n² q) for q points
+  (mean and stdev only: `return_cov` / `return_deriv` raise), and
+  `simulate(…, method="nystrom")` (C++ `simulateNystrom`) draws joint
+  trajectories through the same low-rank machinery (no `will_update`).
+  Method `"vecchia"` (local predictor, needs only θ / β / σ²) is also
+  available, and `logLikelihood(method="nystrom")` gives the fitted
+  Nystrom objective (`"exact"` recomputes the exact one, O(n³)).
 - **Update/save**: a Nystrom fit never holds an exact n×n
   factorization (unlike Vecchia's optional "light" mode, this is the
-  *only* mode Nystrom has). `update` routes through a dedicated
+  *only* mode Nystrom has). `update` goes through a dedicated
   incremental path (`update_nystrom`, extends the landmarks-fixed
   factorization without a full O(n³) refit) and `save`/`load` serialize
   the committed rank-k factors (U, D) directly; `update_simulate`
@@ -95,7 +98,7 @@ y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, return_stdev = TRUE)
+pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: no exact factorization
 ```
 
 ## Current limitations

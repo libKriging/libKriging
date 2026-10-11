@@ -206,12 +206,13 @@ int lk_kriging_predict(void* ptr,
                        double* stdev_out,
                        double* cov_out,
                        double* mean_deriv_out,
-                       double* stdev_deriv_out) {
+                       double* stdev_deriv_out,
+                       const char* method) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     auto [mean_v, stdev_v, cov_m, mean_deriv_m, stdev_deriv_m]
-        = k->predict(X_m, return_stdev != 0, return_cov != 0, return_deriv != 0);
+        = k->predict(X_m, return_stdev != 0, return_cov != 0, return_deriv != 0, method ? method : "exact");
     if (mean_out)
       std::memcpy(mean_out, mean_v.memptr(), mean_v.n_elem * sizeof(double));
     if (stdev_out && return_stdev)
@@ -251,12 +252,19 @@ int lk_kriging_simulate(void* ptr,
                         const double* with_noise,
                         int noise_n,
                         int will_update,
-                        double* sim_out) {
+                        double* sim_out,
+                        const char* method) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     arma::mat sim;
-    if (with_noise && noise_n > 0) {
+    const std::string meth = method ? method : "exact";
+    if (meth != "exact") {
+      // approximate simulators: NoiseModel::None only, no noise to add
+      if (with_noise && noise_n > 0)
+        throw std::invalid_argument("simulate: with_noise is only available with method \"exact\"");
+      sim = k->simulate(nsim, seed, X_m, meth, will_update != 0);
+    } else if (with_noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(with_noise), noise_n, false, true);
       sim = k->simulate(nsim, seed, X_m, noise_v, will_update != 0);
     } else if (k->noise_model() == Kriging::NoiseModel::Nugget) {
@@ -418,6 +426,14 @@ double lk_kriging_log_likelihood(void* ptr) {
     return static_cast<Kriging*>(ptr)->logLikelihood();
   }
   CATCH_RETURN_NAN
+}
+
+int lk_kriging_log_likelihood_method(void* ptr, const char* method, double* ll_out) {
+  try {
+    *ll_out = static_cast<Kriging*>(ptr)->logLikelihood(std::string(method ? method : "exact"));
+    return 0;
+  }
+  CATCH_RETURN
 }
 
 double lk_kriging_leave_one_out(void* ptr) {

@@ -229,10 +229,20 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
     return k
 end
 
+"""
+    predict(k::Kriging, X_n; return_stdev=true, return_cov=false, return_deriv=false, method="exact")
+
+`method`: `"exact"` (default, needs the exact factorization), `"vecchia"` /
+`"vecchia(m)"` (local Vecchia predictor, usable after any fit) or `"nystrom"`
+(needs an `LLNystrom` fit). The approximate methods return mean / stdev only.
+Nothing is chosen implicitly: on a light Vecchia or an `LLNystrom` fit,
+`"exact"` raises.
+"""
 function predict(k::Kriging, X_n::Matrix{Float64};
                  return_stdev::Bool=true,
                  return_cov::Bool=false,
-                 return_deriv::Bool=false)
+                 return_deriv::Bool=false,
+                 method::String="exact")
     m, d = size(X_n)
     mean_out = Vector{Float64}(undef, m)
     stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
@@ -243,14 +253,15 @@ function predict(k::Kriging, X_n::Matrix{Float64};
     ret = ccall(dlsym(_lk(), :lk_kriging_predict), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
                  Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Cstring),
                 k.ptr, X_n, m, d,
                 return_stdev ? 1 : 0, return_cov ? 1 : 0, return_deriv ? 1 : 0,
                 mean_out,
                 return_stdev ? stdev_out : C_NULL,
                 return_cov ? cov_out : C_NULL,
                 return_deriv ? mean_deriv_out : C_NULL,
-                return_deriv ? stdev_deriv_out : C_NULL)
+                return_deriv ? stdev_deriv_out : C_NULL,
+                method)
     _check_error(ret)
     return (mean=mean_out,
             stdev=return_stdev ? stdev_out : nothing,
@@ -285,20 +296,27 @@ function subsetOfData(X::Matrix{Float64}, n_max::Int; method::String="kmeans", s
     return Int.(idx_out[1:ret])
 end
 
+"""
+    simulate(k::Kriging, nsim, seed, X_n; with_nugget=true, with_noise=nothing, will_update=false, method="exact")
+
+`method`: `"exact"` (default), `"vecchia"` / `"vecchia(m)"` or `"nystrom"`
+(see `predict`); `will_update` and `with_noise` need `"exact"`.
+"""
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Bool=true,
                   with_noise::Union{Nothing,Vector{Float64}}=nothing,
-                  will_update::Bool=false)
+                  will_update::Bool=false,
+                  method::String="exact")
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
     noise_ptr = with_noise === nothing ? C_NULL : pointer(with_noise)
     noise_n = with_noise === nothing ? 0 : length(with_noise)
     ret = ccall(dlsym(_lk(), :lk_kriging_simulate), Cint,
                 (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint,
-                 Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                 Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cstring),
                 k.ptr, nsim, seed, X_n, m, d,
                 with_nugget ? 1 : 0, noise_ptr, noise_n,
-                will_update ? 1 : 0, sim_out)
+                will_update ? 1 : 0, sim_out, method)
     _check_error(ret)
     return sim_out
 end
@@ -429,8 +447,18 @@ function log_marg_post_fun(k::Kriging, theta::Vector{Float64};
     return (lmp=lmp[], grad=return_grad ? grad : nothing)
 end
 
-function log_likelihood(k::Kriging)
-    return ccall(dlsym(_lk(), :lk_kriging_log_likelihood), Float64, (Ptr{Nothing},), k.ptr)
+"""
+    log_likelihood(k::Kriging; method="exact")
+
+Log-likelihood at the fitted parameters; `method`: `"exact"` (default),
+`"vecchia"` (requires an `LLVecchia` fit) or `"nystrom"` (requires an
+`LLNystrom` fit).
+"""
+function log_likelihood(k::Kriging; method::String="exact")
+    ll = Ref{Float64}(0.0)
+    _check_error(ccall(dlsym(_lk(), :lk_kriging_log_likelihood_method), Cint,
+                       (Ptr{Nothing}, Cstring, Ptr{Float64}), k.ptr, method, ll))
+    return ll[]
 end
 
 function leave_one_out(k::Kriging)

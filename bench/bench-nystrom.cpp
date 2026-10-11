@@ -103,6 +103,14 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   // fitted LLNystrom model reused for the objective-evaluation/predict/simulate rows
   Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)");
   const arma::vec theta_eval(d, arma::fill::value(0.3));
+  // exact model at the same parameters: baseline of the exact predict row
+  // (an LLNystrom fit holds no exact factorization)
+  Kriging::Parameters exact_params;
+  exact_params.theta = arma::mat(k_eval.theta().t());
+  exact_params.is_theta_estim = false;
+  exact_params.sigma2 = k_eval.sigma2();
+  exact_params.is_sigma2_estim = false;
+  Kriging k_exact_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "none", "LL", exact_params);
 
   for (int iter = 0; iter < n_iterations; ++iter) {
     // --- fit with the Nystrom objective ---
@@ -134,7 +142,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     // --- prediction: exact vs Nystrom (Woodbury, committed rank-k factors) ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k_eval.predict(X_pred, true, false, false);
+      k_exact_eval.predict(X_pred, true, false, false);
       auto t1 = std::chrono::high_resolution_clock::now();
       predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 

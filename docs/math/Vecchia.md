@@ -45,14 +45,16 @@ subset N(i) ⊂ {1, …, i−1} of size at most m:
   β is profiled by generalized least squares per-conditional (constant,
   linear and quadratic trends are supported); the gradient in θ is
   analytic (envelope theorem handles β̂).
-- **Prediction**: after fitting, `predict` uses one exact O(n³)
-  factorization at the fitted θ* by default (small/medium n). For
-  large n, a local Vecchia predictor (Katzfuss & Guinness 2021,
-  response-only) conditions each prediction point on its own m nearest
-  neighbors — O(q·m³), embarrassingly parallel, usable after any fit.
-  It gives the universal-kriging mean with the fitted β but a
+- **Prediction**: the method is always explicit. `predict` (method
+  `"exact"`, the default) uses the exact O(n³) factorization committed
+  at the fitted θ* (the default after an LLVecchia fit, small/medium n).
+  `predict(…, method="vecchia")` (or `"vecchia(m)"`; C++
+  `predictVecchia`) is a local Vecchia predictor (Katzfuss & Guinness
+  2021, response-only): each prediction point is conditioned on its own
+  m nearest neighbors — O(q·m³), embarrassingly parallel, usable after
+  any fit. It gives the universal-kriging mean with the fitted β but a
   simple-kriging variance (no cross-covariance between prediction
-  points — use the exact `predict` for the joint distribution).
+  points — use method `"exact"` for the joint distribution).
 - **Screening**: the approximation degrades in higher input dimension
   because nearest neighbors become less informative; it is recommended
   for d ≲ 5, and complements `NestedKriging` (which is dimension-robust)
@@ -79,13 +81,23 @@ For n large enough that even the final exact commit (O(n³)) is too
 costly, calling `set_vecchia_exact_commit(false)` before fitting skips it
 entirely (exposed in every binding, `is_vecchia_light()` reports it; in a
 binding, call it on an unfitted `Kriging(kernel)` and then `fit`, since the
-data constructor fits at once): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
-`predict` automatically routes through the local Vecchia predictor
-(mean/stdev only — `return_cov`/`return_deriv`, `update_simulate`,
-`update` and `save` raise a clear error on such a "light" model), and
-`simulate` through `simulateVecchia` (below; `will_update=true` raises).
+data constructor fits at once): θ* comes from the optimizer, β/σ² from the LLVecchia profile. Such a "light" model
+holds no exact factorization, and nothing switches implicitly: the exact methods (`predict` / `simulate` with
+method `"exact"`, the default, and `update_simulate`) raise an error naming the alternative, and method `"vecchia"`
+is used explicitly (`predict(…, method="vecchia")`, `simulate(…, method="vecchia")`, mean/stdev only).
+`logLikelihood(method="vecchia")` gives the fitted Vecchia objective; `update` refits with the Vecchia
+likelihood (no exact commit) and `save` / `load` keep the light state.
 
-## Vecchia simulation (`simulateVecchia`, C++ only)
+| Step | exact-commit LLVecchia fit (default) | light LLVecchia fit |
+|---|---|---|
+| `predict` / `simulate`, method `"exact"` | yes | error |
+| `predict` / `simulate`, method `"vecchia"` | yes | yes |
+| `logLikelihood`, method `"exact"` / `"vecchia"` | yes / yes | yes (O(n³)) / yes |
+| `update` | Vecchia refit + exact commit | Vecchia refit, light |
+| `update_simulate` | yes | error |
+| `save` / `load` | yes | yes |
+
+## Vecchia simulation (`simulate(…, method="vecchia")`, C++ `simulateVecchia`)
 
 `simulateVecchia(nsim, seed, X_n, m)` draws joint trajectories at the
 q rows of `X_n` by sequential conditioning, in the row order of `X_n`
@@ -107,8 +119,8 @@ $$
   m nearest neighbors are truncated, and the trajectories depend on the
   row order of `X_n`.
 - Usable after any `NoiseModel::None` fit (m defaults to
-  `vecchia_neighbors()` after an LLVecchia fit, 30 otherwise); no
-  `will_update` / `update_simulate`.
+  `vecchia_neighbors()` after an LLVecchia fit, 30 otherwise; method
+  `"vecchia(m)"` sets it); no `will_update` / `update_simulate`.
 
 ## Current limitations
 
@@ -116,7 +128,8 @@ $$
 - The default exact commit after optimization is still O(n³)
   time/memory — practical up to n ~ 2·10⁴; use the "light" mode above
   beyond that.
-- Vecchia neighbor sets are not serialized (rebuilt on refit).
+- Vecchia neighbor sets are not serialized (rebuilt on refit, and on
+  demand by `logLikelihood(method="vecchia")` after `load`).
 
 ## See also
 

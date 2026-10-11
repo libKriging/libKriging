@@ -22,13 +22,28 @@ past release, see the corresponding entry on the
   derivatives, simulations) are unchanged. Code indexing `[:, 0]` on those
   outputs must drop the index; `ravel()` / `flatten()` / `reshape(...)` keep
   working.
+- **Kriging (breaking): exact / Vecchia / Nystrom methods are explicit at
+  every step, never inferred from the fit.** `predict` and `simulate` used
+  to switch silently to `predictNystrom` / `simulateNystrom` after an
+  `LLNystrom` fit (and to the Vecchia ones on a light Vecchia fit). They
+  now take a `method` (`"exact"`, the default, `"vecchia"` /
+  `"vecchia(m)"` or `"nystrom"`): C++ `predict(X, stdev, cov, deriv,
+  method)` / `simulate(nsim, seed, X, method, will_update)`, Python / R /
+  Julia `method=` keyword, Octave/Matlab trailing argument. Method
+  `"exact"` on a model without an exact factorization (LLNystrom fit, light
+  Vecchia fit) raises an error naming the method to use, instead of
+  answering with an approximation. `logLikelihood(method)` gives the
+  Vecchia / Nystrom objective of an LLVecchia / LLNystrom fit (`"exact"`,
+  the default, is unchanged). Code predicting after an `LLNystrom` fit must
+  pass `method="nystrom"`; scikit-learn `KrigingRegressor` gains a
+  `method` parameter for the same purpose.
 
 ### Added
 - `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
   (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
-  instead of O(q³), exact when m ≥ n + q − 1. `simulate()` now routes to it
-  on a light Vecchia fit (`set_vecchia_exact_commit(false)`), which used to
-  raise; `will_update=true` still raises there.
+  instead of O(q³), exact when m ≥ n + q − 1; `simulate(…, method=
+  "vecchia")` in every binding (usable after any fit, including a light
+  Vecchia fit, where the exact `simulate` is not available).
 - NestedKriging API parity across bindings: `X`, `y`, `groups`, `warping`,
   `set_predict_chunk` and `set_warp_subsample` in Julia
   (`set_predict_chunk!` / `set_warp_subsample!`) and Octave/Matlab; `fit` on
@@ -42,8 +57,10 @@ past release, see the corresponding entry on the
   `vecchia_exact_commit()`, `is_vecchia_light()` and `is_nystrom_light()`.
   `set_vecchia_exact_commit(false)` on an unfitted `Kriging(kernel)`, then a
   fit with `objective="LLVecchia(m)"`, skips the final exact O(n^3)
-  factorization: `predict` / `simulate` go through `predictVecchia` /
-  `simulateVecchia`, which were out of reach from the bindings until now.
+  factorization (predict / simulate then with `method="vecchia"`). A light
+  Vecchia fit now supports `update` (Vecchia refit, no exact commit) and
+  `save` / `load` (both used to raise); the Vecchia sets are rebuilt on
+  demand after `load`, and `vecchia_neighbors()` is restored.
 - Octave/Matlab: `Kriging(kernel)` / `Kriging(kernel, noise_model)` build an
   unfitted model (to configure, e.g. `set_vecchia_exact_commit`, before
   `fit`), as `Kriging(kernel)` already did in Python, R and Julia.
@@ -61,8 +78,8 @@ past release, see the corresponding entry on the
 - `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
   (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
   light Vecchia fit they went to the exact simulator, which has no
-  factorization to use. They now route to `simulateNystrom` /
-  `simulateVecchia` like the base overload (and refuse `will_update=true`).
+  factorization to use. They now raise a clear error there, like the base
+  overload (see the explicit `method` entry above).
 - Python `pylibkriging.load()` and Octave/Matlab `class_saved` /
   `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
   (described as `NuggetKriging` / `NoiseKriging` by the loader, which these

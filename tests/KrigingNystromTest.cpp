@@ -122,7 +122,7 @@ TEST_CASE("LLNystrom analytic gradient matches finite differences", "[nystrom][k
   }
 }
 
-TEST_CASE("LLNystrom fit is a permanent light fit: predict routes to predictNystrom", "[nystrom][kriging]") {
+TEST_CASE("LLNystrom fit is a permanent light fit: method nystrom, no exact methods", "[nystrom][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(150, X, y);
@@ -131,21 +131,26 @@ TEST_CASE("LLNystrom fit is a permanent light fit: predict routes to predictNyst
   CHECK(k.is_nystrom_light());
   CHECK(k.nystrom_rank() == 30);
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false, "nystrom");
   auto [m_nys, s_nys] = k.predictNystrom(X, true);
   CHECK(arma::abs(mean - m_nys).max() == 0.0);  // same code path
   CHECK(arma::abs(stdev - s_nys).max() == 0.0);
 
-  // return_cov/return_deriv are not supported on a Nystrom fit
-  CHECK_THROWS_AS(k.predict(X, true, true, false), std::runtime_error);
-  CHECK_THROWS_AS(k.predict(X, true, false, true), std::runtime_error);
-
-  // simulate() IS available (routes to simulateNystrom), but not with
-  // will_update=true (no update_simulate for Nystrom fits); update()/save()
-  // ARE available -- see the dedicated tests below
-  CHECK_NOTHROW(k.simulate(3, 123, X.rows(0, 4), false));
-  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), true), std::runtime_error);
+  // no exact factorization: the exact methods raise (no implicit routing)
+  CHECK_THROWS_AS(k.predict(X, true, false, false), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), false), std::runtime_error);
+  // return_cov/return_deriv / will_update only exist for method "exact"
+  CHECK_THROWS_AS(k.predict(X, true, true, false, "nystrom"), std::invalid_argument);
+  CHECK_THROWS_AS(k.predict(X, true, false, true, "nystrom"), std::invalid_argument);
+  CHECK(arma::approx_equal(
+      k.simulate(3, 123, X.rows(0, 4), "nystrom"), k.simulateNystrom(3, 123, X.rows(0, 4)), "absdiff", 0.0));
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), "nystrom", true), std::invalid_argument);
   CHECK_THROWS_AS(k.update_simulate(y.head(5), X.rows(0, 4)), std::runtime_error);
+  // the Vecchia predictor needs only theta / beta / sigma2: usable here too
+  CHECK_NOTHROW(k.predict(X, true, false, false, "vecchia(10)"));
+  // the Nystrom log-likelihood is the fitted objective
+  CHECK(k.logLikelihood("nystrom") == std::get<0>(k.logLikelihoodNystromFun(k.theta(), false)));
+  CHECK_THROWS_AS(k.logLikelihood("vecchia"), std::runtime_error);
 }
 
 TEST_CASE("LLNystrom(k) with k close to n interpolates the training data", "[nystrom][kriging]") {
@@ -157,7 +162,7 @@ TEST_CASE("LLNystrom(k) with k close to n interpolates the training data", "[nys
   // the fit should recover the training data closely (like the exact "LL" fit)
   Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(79)");
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false, "nystrom");
   CHECK(arma::abs(mean - y).max() < 5e-2 * arma::stddev(y));
 }
 
@@ -175,7 +180,7 @@ TEST_CASE("LLNystrom(k) estimation is consistent with the exact MLE", "[nystrom]
   CHECK(k_n.nystrom_rank() == 40);
 
   auto [m_ll, s1, c1, d1, e1] = k_ll.predict(Xt, false, false, false);
-  auto [m_n, s2, c2, d2, e2] = k_n.predict(Xt, false, false, false);
+  auto [m_n, s2, c2, d2, e2] = k_n.predict(Xt, false, false, false, "nystrom");
   const double rmse_ll = std::sqrt(arma::mean(arma::square(m_ll - yt)));
   const double rmse_n = std::sqrt(arma::mean(arma::square(m_n - yt)));
   INFO("theta LL = " << k_ll.theta().t() << " theta LLNystrom = " << k_n.theta().t());
@@ -257,7 +262,7 @@ TEST_CASE("LLNystrom update(refit=false) extends data at fixed theta/landmarks",
   arma::mat Xt;
   arma::vec yt;
   make_data(100, Xt, yt, 789);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -288,7 +293,7 @@ TEST_CASE("LLNystrom update(refit=true) warm-restarts theta over the same landma
   arma::mat Xt;
   arma::vec yt;
   make_data(100, Xt, yt, 789);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -325,7 +330,7 @@ TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNys
   auto [mean, stdev] = k.predictNystrom(Xt, true);
 
   const int nsim = 20000;
-  arma::mat sims = k.simulate(nsim, 42, Xt, false);
+  arma::mat sims = k.simulate(nsim, 42, Xt, "nystrom");
   REQUIRE(sims.n_rows == 20);
   REQUIRE(sims.n_cols == static_cast<arma::uword>(nsim));
 
@@ -351,7 +356,7 @@ TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNys
   CHECK(arma::abs(sim_sd - stdev).max() < 0.5 * noise_scale);
 
   // interpolation: simulating exactly at a training point collapses to (near) zero variance
-  arma::mat sims_at_X = k.simulate(2000, 7, X.row(0), false);
+  arma::mat sims_at_X = k.simulate(2000, 7, X.row(0), "nystrom");
   CHECK(arma::stddev(sims_at_X.row(0).t()) < 0.05 * noise_scale);
   CHECK(std::abs(arma::mean(sims_at_X.row(0).t()) - y(0)) < 0.05 * arma::stddev(y));
 }
@@ -374,13 +379,13 @@ TEST_CASE("LLNystrom save/load round-trip", "[nystrom][kriging]") {
   arma::vec yt;
   make_data(60, Xt, yt, 456);
 
-  auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false);
-  auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false);
+  auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false, "nystrom");
+  auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false, "nystrom");
   CHECK(arma::abs(m1 - m2).max() == 0.0);
   CHECK(arma::abs(s1 - s2).max() == 0.0);
 
   // the reloaded model supports the same light-fit operations
-  CHECK_NOTHROW(k2.simulate(2, 123, Xt.rows(0, 4), false));
+  CHECK_NOTHROW(k2.simulate(2, 123, Xt.rows(0, 4), "nystrom"));
   arma::mat Xu;
   arma::vec yu;
   make_data(10, Xu, yu, 789);
@@ -401,7 +406,7 @@ TEST_CASE("LLNystrom large-n smoke test", "[nystrom][kriging][intensive]") {
   arma::mat Xt;
   arma::vec yt;
   make_data(200, Xt, yt, 456);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -439,11 +444,11 @@ TEST_CASE("LLNystrom honors optim=none identically to optim=BFGS", "[nystrom][kr
   CHECK(k.is_nystrom_light());
   CHECK(k.nystrom_rank() == 30);
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false, "nystrom");
   auto [m_nys, s_nys] = k.predictNystrom(Xt, true);
   CHECK(arma::abs(mean - m_nys).max() == 0.0);
   CHECK(arma::abs(stdev - s_nys).max() == 0.0);
-  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), true), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), "nystrom", true), std::invalid_argument);
   CHECK_THROWS_AS(k.update_simulate(y.head(3), X.rows(0, 2)), std::runtime_error);
 }
 

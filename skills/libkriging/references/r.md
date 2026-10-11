@@ -89,17 +89,26 @@ k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # higher d
 k$nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
 k$vecchia_neighbors()   # 30 for an LLVecchia(30) fit (0 otherwise)
 ```
-Factorization-free "light" Vecchia mode (no exact O(n^3) commit; no
-return_cov / return_deriv, update or save on such a model):
+The method is explicit at every step (`method = "exact"` by default, never inferred from the fit):
+```r
+kn <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # no exact factorization
+p <- kn$predict(Xnew, method = "nystrom")                        # "exact" would raise
+s <- kn$simulate(nsim = 10, seed = 123, x = Xnew, method = "nystrom")
+kn$logLikelihood(method = "nystrom")                             # the fitted objective
+kv <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")    # exact commit (default)
+kv$predict(Xnew, return_cov = TRUE)                              # exact, with covariance
+kv$predict(Xnew, method = "vecchia")                             # local Vecchia, any fit
+```
+Factorization-free "light" Vecchia mode (no exact O(n^3) commit; the exact methods raise,
+`method = "vecchia"` is passed explicitly; update and save / load stay available):
 ```r
 k <- Kriging(kernel = "matern5_2")
 k$set_vecchia_exact_commit(FALSE)    # before fit
 k$fit(y, X, objective = "LLVecchia(30)")
-k$is_vecchia_light()                 # TRUE: predict / simulate use Vecchia
+k$is_vecchia_light()                 # TRUE
+p <- k$predict(Xnew, method = "vecchia")
 ```
-`predict` / `simulate` are the only prediction / simulation entry points from R:
-`predictVecchia`, `predictNystrom`, `simulateNystrom` and `simulateVecchia`
-(explicit `m` / rank arguments) exist in C++ only.
+`predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging
 

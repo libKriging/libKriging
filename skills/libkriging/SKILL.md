@@ -69,6 +69,13 @@ Ask, in order:
      landmarks): a global low-rank approximation, dimension-robust in the
      same way `NestedKriging`'s `NK` aggregation is, but a single model
      rather than a partition. See [Nystrom.md](../../docs/math/Nystrom.md).
+   - The method is explicit at every later step, never inferred from the
+     fit: `predict` / `simulate` / `logLikelihood` take
+     `method="exact"` (default), `"vecchia"` / `"vecchia(m)"` or
+     `"nystrom"`. An `LLNystrom` fit (and a light Vecchia fit,
+     `set_vecchia_exact_commit(false)`) holds no exact factorization, so
+     pass `method="nystrom"` / `"vecchia"` there — `"exact"` raises. See
+     the table in [bindings/README.md](../../bindings/README.md).
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too
    slow, and the design can be partitioned / prediction can be

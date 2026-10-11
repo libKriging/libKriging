@@ -225,11 +225,11 @@ TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]
   CHECK(arma::abs(arma::log(k.theta()) - arma::log(k_ref.theta())).max() < 0.5);
   CHECK(k.sigma2() > 0);
 
-  // predict auto-routes to predictVecchia (mean/stdev only)
+  // method "vecchia" = predictVecchia (mean/stdev only); no implicit routing
   arma::mat Xt;
   arma::vec yt;
   make_data(100, Xt, yt, 456);
-  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false, "vecchia");
   auto [m_v, s_v] = k.predictVecchia(Xt, true);
   CHECK(arma::abs(mean - m_v).max() == 0.0);  // same code path
   CHECK(arma::abs(stdev - s_v).max() == 0.0);
@@ -237,25 +237,59 @@ TEST_CASE("light Vecchia fit skips the exact factorization", "[vecchia][kriging]
   INFO("rmse = " << rmse);
   CHECK(rmse < 0.05 * arma::stddev(y));
 
-  // interpolation still holds through the routed predict
-  auto [m_at_X, s_at_X, c2, d2, e2] = k.predict(X.rows(0, 49), true, false, false);
+  // interpolation holds with the Vecchia predictor
+  auto [m_at_X, s_at_X, c2, d2, e2] = k.predict(X.rows(0, 49), true, false, false, "vecchia");
   CHECK(arma::abs(m_at_X - y.head(50)).max() < 1e-3);
 
-  // unsupported operations throw with a clear message
-  CHECK_THROWS_AS(k.predict(Xt, true, true, false), std::runtime_error);  // return_cov
-  CHECK_THROWS_AS(k.predict(Xt, true, false, true), std::runtime_error);  // return_deriv
-  CHECK_THROWS_AS(k.simulate(3, 123, Xt, true), std::runtime_error);      // will_update
-  CHECK_NOTHROW(k.simulate(3, 123, Xt, false));                           // routed to simulateVecchia
-  arma::vec yu(5, arma::fill::randu);
-  arma::mat Xu(5, 2, arma::fill::randu);
-  CHECK_THROWS_AS(k.update(yu, Xu, true), std::runtime_error);
-  CHECK_THROWS_AS(k.save("/tmp/should_not_exist.json"), std::runtime_error);
+  // the exact methods need the exact factorization: explicit error, never a
+  // silent switch to the approximation
+  CHECK_THROWS_AS(k.predict(Xt, true, false, false), std::runtime_error);
+  CHECK_THROWS_AS(k.predict(Xt, true, false, false, "exact"), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt, false), std::runtime_error);
+  CHECK_THROWS_AS(k.predict(Xt, true, true, false, "vecchia"), std::invalid_argument);   // return_cov
+  CHECK_THROWS_AS(k.predict(Xt, true, false, true, "vecchia"), std::invalid_argument);   // return_deriv
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt, "vecchia", true), std::invalid_argument);       // will_update
+  CHECK_THROWS_AS(k.predict(Xt, true, false, false, "nystrom"), std::runtime_error);     // no LLNystrom fit
+  CHECK_THROWS_AS(k.predict(Xt, true, false, false, "Vecchia"), std::invalid_argument);  // unknown method
+  CHECK(arma::approx_equal(k.simulate(3, 123, Xt, "vecchia"), k.simulateVecchia(3, 123, Xt), "absdiff", 0.0));
+  CHECK(arma::approx_equal(k.simulate(3, 123, Xt, "vecchia(5)"), k.simulateVecchia(3, 123, Xt, 5), "absdiff", 0.0));
+
+  // the Vecchia log-likelihood is the fitted objective
+  CHECK(k.logLikelihood("vecchia") == std::get<0>(k.logLikelihoodVecchiaFun(k.theta(), false)));
+  CHECK_THROWS_AS(k.logLikelihood("nystrom"), std::runtime_error);
+
+  // update (Vecchia refit) and save / load work on a light fit
+  arma::mat Xu;
+  arma::vec yu;
+  make_data(20, Xu, yu, 789);
+  CHECK_NOTHROW(k.update(yu, Xu, false));
+  CHECK(k.is_vecchia_light());
+  CHECK(k.X().n_rows == 320);
+  CHECK_NOTHROW(k.update(yu, Xu, true));
+  CHECK(k.X().n_rows == 340);
+  auto [m_u, s_u, cu, du, eu] = k.predict(Xu, true, false, false, "vecchia");
+  CHECK(arma::abs(m_u - yu).max() < 1e-3);  // interpolates the added data
+  const std::string fname = "light_vecchia_saved.json";
+  k.save(fname);
+  Kriging kl = Kriging::load(fname);
+  CHECK(kl.is_vecchia_light());
+  CHECK(kl.vecchia_neighbors() == 20);
+  auto [m_l, s_l, cl, dl, el] = kl.predict(Xt, true, false, false, "vecchia");
+  auto [m_k, s_k, ck, dk, ek] = k.predict(Xt, true, false, false, "vecchia");
+  CHECK(arma::abs(m_l - m_k).max() < 1e-12);
+  CHECK(std::abs(kl.logLikelihood("vecchia") - k.logLikelihood("vecchia")) < 1e-9);
+  CHECK_THROWS_AS(kl.predict(Xt, true, false, false), std::runtime_error);
 
   // a subsequent standard fit clears the light state
   k.set_vecchia_exact_commit(true);
   k.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(20)", {});
   CHECK(!k.is_vecchia_light());
   CHECK_NOTHROW(k.simulate(2, 123, Xt.rows(0, 9), false));
+  // exact and Vecchia methods both available on an exact-commit fit
+  CHECK_NOTHROW(k.predict(Xt, true, true, false, "exact"));
+  CHECK_NOTHROW(k.predict(Xt, true, false, false, "vecchia"));
+  CHECK(k.logLikelihood("exact") == k.logLikelihood());
+  CHECK_NOTHROW(k.logLikelihood("vecchia"));
 }
 
 TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensive]") {
@@ -274,7 +308,7 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
   arma::mat Xt;
   arma::vec yt;
   make_data(200, Xt, yt, 456);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "vecchia");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -284,8 +318,8 @@ TEST_CASE("light Vecchia full pipeline at large n", "[vecchia][kriging][intensiv
 // Regression test for a real bug: optim="none" used to silently fall through
 // to a plain exact factorization for LLVecchia's light mode
 // (set_vecchia_exact_commit(false)), ignoring the requested objective. The
-// contract under test: whatever objective is given at fit time is what
-// predict()/etc actually use afterwards, for EVERY supported value of optim.
+// contract under test: the light / exact commit requested at fit time is
+// what the model holds afterwards, for EVERY supported value of optim.
 TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kriging]") {
   arma::mat X;
   arma::vec y;
@@ -307,16 +341,13 @@ TEST_CASE("LLVecchia honors optim=none identically to optim=BFGS", "[vecchia][kr
     k.fit(y, X, Trend::RegressionModel::Constant, false, optim, "LLVecchia(20)", params);
     CHECK(k.is_vecchia_light());
 
-    auto [m_pred, s_pred, cov, dm, ds] = k.predict(Xt, true, false, false);
+    auto [m_pred, s_pred, cov, dm, ds] = k.predict(Xt, true, false, false, "vecchia");
     auto [m_v, s_v] = k.predictVecchia(Xt, true);
     CHECK(arma::abs(m_pred - m_v).max() == 0.0);
     CHECK(arma::abs(s_pred - s_v).max() == 0.0);
-    // simulate routes to simulateVecchia (no exact factorization to use),
-    // but will_update has nothing to cache
-    CHECK(arma::approx_equal(
-        k.simulate(3, 123, Xt.rows(0, 2), false), k.simulateVecchia(3, 123, Xt.rows(0, 2)), "absdiff", 0.0));
-    CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), true), std::runtime_error);
-    CHECK_THROWS_AS(k.save("unused.json"), std::runtime_error);
+    // no exact factorization: the exact methods raise
+    CHECK_THROWS_AS(k.predict(Xt, true, false, false), std::runtime_error);
+    CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), false), std::runtime_error);
   }
 
   SECTION("default set_vecchia_exact_commit(true): stays an exact (fully-factorized) fit") {
@@ -381,7 +412,7 @@ TEST_CASE("simulateVecchia first point matches predictVecchia; trajectories are 
   // law is exactly the predictVecchia one, with the same m
   arma::mat Xt = {{0.31, 0.62}, {0.315, 0.62}, {0.9, 0.1}};
   const int nsim = 20000;
-  arma::mat sims = k.simulate(nsim, 3, Xt, false);
+  arma::mat sims = k.simulate(nsim, 3, Xt, "vecchia");
   auto [m_v, s_v] = k.predictVecchia(Xt, true);
   const double emp_m0 = arma::mean(sims.row(0));
   const double emp_s0 = arma::stddev(sims.row(0));
@@ -395,15 +426,13 @@ TEST_CASE("simulateVecchia first point matches predictVecchia; trajectories are 
   CHECK(corr01 > 0.9);
 
   // at an observed point, every trajectory interpolates
-  arma::mat sims_at_X = k.simulate(50, 9, X.row(0), false);
+  arma::mat sims_at_X = k.simulate(50, 9, X.row(0), "vecchia");
   CHECK(arma::abs(sims_at_X - y(0)).max() < 1e-3);
 
-  // the nugget/noise overloads route to the light simulator too, instead of
-  // using a non-existing exact factorization
-  CHECK(arma::approx_equal(k.simulate(4, 5, Xt, false, false), k.simulateVecchia(4, 5, Xt), "absdiff", 0.0));
-  CHECK(arma::approx_equal(k.simulate(4, 5, Xt, arma::vec{0.0}, false), k.simulateVecchia(4, 5, Xt), "absdiff", 0.0));
-  CHECK_THROWS_AS(k.simulate(4, 5, Xt, false, true), std::runtime_error);
-  CHECK_THROWS_AS(k.simulate(4, 5, Xt, arma::vec{0.0}, true), std::runtime_error);
+  // the exact simulate overloads (incl. nugget / noise) need the exact
+  // factorization: explicit error, never a silent switch to simulateVecchia
+  CHECK_THROWS_AS(k.simulate(4, 5, Xt, false, false), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(4, 5, Xt, arma::vec{0.0}, false), std::runtime_error);
   CHECK_THROWS_AS(k.update_simulate(y.head(2), X.rows(0, 1)), std::runtime_error);
 }
 

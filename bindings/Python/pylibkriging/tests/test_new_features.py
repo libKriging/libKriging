@@ -341,7 +341,7 @@ def test_vecchia_neighbors_and_nystrom_rank():
     assert k.nystrom_rank() == 0
 
 
-def test_vecchia_light_fit():
+def test_vecchia_light_fit(tmp_path):
     rng = np.random.default_rng(6)
     X = rng.uniform(size=(60, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
@@ -355,21 +355,69 @@ def test_vecchia_light_fit():
     assert k.is_vecchia_light()
     assert not k.is_nystrom_light()
 
-    # predict / simulate route to the Vecchia predictor / simulator
-    mean, stdev, _, _, _ = k.predict(Xn, True, False, False)
+    # explicit method: no implicit switch from the exact predictor
+    with pytest.raises(RuntimeError):
+        k.predict(Xn, True, False, False)
+    with pytest.raises(RuntimeError):
+        k.simulate(4, 123, Xn)
+    mean, stdev, _, _, _ = k.predict(Xn, True, False, False, method="vecchia")
     assert mean.shape == (7,) and stdev.shape == (7,)
     assert np.all(np.isfinite(mean)) and np.all(stdev >= 0)
-    sims = k.simulate(4, 123, Xn)
-    assert sims.shape == (7, 4)
-    with pytest.raises(RuntimeError):
-        k.predict(Xn, True, True, False)
-    with pytest.raises(RuntimeError):
-        k.save("light.json")
+    assert k.simulate(4, 123, Xn, method="vecchia").shape == (7, 4)
+    assert k.simulate(4, 123, Xn, method="vecchia(5)").shape == (7, 4)
+    with pytest.raises(ValueError):
+        k.predict(Xn, True, True, False, method="vecchia")  # return_cov
+    with pytest.raises(ValueError):
+        k.predict(Xn, method="unknown")
+    assert np.isfinite(k.logLikelihood(method="vecchia"))
 
-    # refit with the exact commit: no longer light
+    # update (Vecchia refit) and save / load on a light fit
+    Xu = rng.uniform(size=(5, 2))
+    yu = np.sin(3 * Xu[:, 0]) + Xu[:, 1]
+    k.update(yu, Xu, False)
+    assert k.is_vecchia_light() and k.X().shape == (65, 2)
+    m_u = k.predict(Xu, method="vecchia")[0]
+    assert np.max(np.abs(m_u - yu)) < 1e-3
+    fname = str(tmp_path / "light_vecchia_py.json")
+    k.save(fname)
+    kl = lk.Kriging.load(fname)
+    assert kl.is_vecchia_light() and kl.vecchia_neighbors() == 10
+    np.testing.assert_allclose(kl.predict(Xn, method="vecchia")[0], k.predict(Xn, method="vecchia")[0],
+                               atol=1e-12)
+
+    # refit with the exact commit: exact and Vecchia methods both available
     k.set_vecchia_exact_commit(True)
     k.fit(y, X, "constant", False, "BFGS", "LLVecchia(10)", {})
     assert not k.is_vecchia_light()
+    k.predict(Xn, True, True, False)
+    k.predict(Xn, method="vecchia")
+    assert k.logLikelihood() == k.logLikelihood(method="exact")
 
-    assert lk.Kriging(y, X, "matern5_2", objective="LLNystrom(8)").is_nystrom_light()
+
+def test_nystrom_fit_explicit_method():
+    rng = np.random.default_rng(7)
+    X = rng.uniform(size=(60, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    Xn = rng.uniform(size=(7, 2))
+    k = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(8)")
+    assert k.is_nystrom_light()
+    with pytest.raises(RuntimeError):
+        k.predict(Xn)
+    mean, stdev, _, _, _ = k.predict(Xn, method="nystrom")
+    assert mean.shape == (7,) and np.all(stdev >= 0)
+    assert k.simulate(3, 1, Xn, method="nystrom").shape == (7, 3)
+    assert np.isfinite(k.logLikelihood(method="nystrom"))
+    with pytest.raises(RuntimeError):
+        k.logLikelihood(method="vecchia")  # not an LLVecchia fit
     assert not lk.Kriging(y, X, "matern5_2").is_nystrom_light()
+
+
+def test_sklearn_regressor_method():
+    pytest.importorskip("sklearn")
+    from pylibkriging.sklearn import KrigingRegressor
+    rng = np.random.default_rng(8)
+    X = rng.uniform(size=(40, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    reg = KrigingRegressor(objective="LLNystrom(8)", method="nystrom").fit(X, y)
+    assert reg.predict(X[:3]).shape == (3,)
+    assert reg.sample_y(X[:3], n_samples=2).shape == (3, 2)
