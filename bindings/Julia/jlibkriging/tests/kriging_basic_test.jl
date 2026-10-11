@@ -210,7 +210,7 @@ end
     yu = [f_test(x) for x in Xu[:, 1]] .+ Xu[:, 2]
     update!(k, yu, Xu; refit=false)
     @test is_vecchia_light(k)
-    @test size(X(k), 1) == 62
+    @test size(jlibkriging.X(k), 1) == 62  # local X is the design matrix
     @test maximum(abs.(predict(k, Xu; method="vecchia").mean .- yu)) < 1e-3
     f = tempname() * ".json"
     save(k, f)
