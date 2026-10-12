@@ -13,8 +13,8 @@ method has its own page with the full derivation.
 
 | Method | Axis | Cost | Approximates | Dimension sensitivity | Doc |
 |---|---|---|---|---|---|
-| `LLVecchia(m)` | fit objective | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
-| `LLNystrom(k)` | fit objective | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
+| `method="vecchia(m)"` | fit method (`objective="LL"`) | O(n·m³)/eval | *local* conditioning (m neighbors) | degrades for d ≳ 5 (nearest neighbors less informative) | [Vecchia.md](Vecchia.md) |
+| `method="nystrom(k)"` | fit method (`objective="LL"`) | O(n·k²)/eval | *global* low-rank covariance (k landmarks) | dimension-robust | [Nystrom.md](Nystrom.md) |
 | `NestedKriging` | fit + predict, whole model | O(n³/p²) fit, O(q·n²/p) or O(q·n²) predict | divide-and-conquer (p groups) + aggregation | dimension-robust (submodels are exact Kriging) | [Nested.md](Nested.md) |
 | `subsetOfData` | pre-fit data reduction | O(n_max) k-means pass, then ordinary O(n_max³) fit | *nothing* — exact fit, just on fewer points | none (discards points outright rather than approximating structure) | [SubsetOfData.md](SubsetOfData.md) |
 | OpenMP | fit + predict, cross-cutting | same asymptotic cost, smaller constant | *nothing* — exact, just parallel | none | — (build-time; no dedicated objective/method, always on when available) |
@@ -23,13 +23,16 @@ All of these (Vecchia, Nystrom, NestedKriging, subsetOfData) are usable
 independently and, where noted below, combinable — none of them require
 opting out of the others.
 
-For `Kriging`, the approximation is explicit at every step, never inferred
-from the fit objective: `predict` / `simulate` / `logLikelihood` take
-`method="exact"` (default, needs the exact factorization), `"vecchia"` /
-`"vecchia(m)"` (local predictor / sequential simulator, usable after any
-fit, O(q·m³)) or `"nystrom"` (after an `LLNystrom` fit). An `LLNystrom` fit
-or a light `LLVecchia` fit holds no exact factorization, so `"exact"` raises
-there. Step × method table: [bindings/README.md](../../bindings/README.md).
+For `Kriging`, the method is explicit at every step, never inferred from
+the fit: `fit` takes `method="exact"` (default), `"vecchia(m)"` or
+`"nystrom(k)"` (with `objective="LL"`), and `predict` / `simulate` /
+`logLikelihood` take `method="exact"` (default, needs an exact fit),
+`"vecchia"` / `"vecchia(m)"` (local predictor / sequential simulator,
+usable after any fit, O(q·m³)) or `"nystrom"` (after a Nystrom fit). A
+Vecchia or Nystrom fit holds no exact factorization, so `"exact"` raises
+there; the exact model at the approximate estimate is a separate exact
+fit with `optim="none"` and the fitted θ. Step × method table:
+[bindings/README.md](../../bindings/README.md).
 
 ## Which one, when
 
@@ -37,11 +40,11 @@ there. Step × method table: [bindings/README.md](../../bindings/README.md).
    willing to accept a genuinely different objective — not just a
    cheaper way to evaluate the same one?**
    - **Low-to-moderate dimension (d ≲ 5), spatially local structure**
-     → `objective="LLVecchia(m)"`. Local conditioning on m nearest
+     → `method="vecchia(m)"`. Local conditioning on m nearest
      neighbors; the approximation degrades as nearest neighbors become
      less informative in higher dimension.
    - **Higher dimension, or no reliable local/spatial structure**
-     → `objective="LLNystrom(k)"`. Global low-rank approximation,
+     → `method="nystrom(k)"`. Global low-rank approximation,
      dimension-robust the same way `NestedKriging`'s `NK` aggregation
      is, but as a single model rather than a partition.
    - **n large enough (~10⁴–10⁶) that even Vecchia/Nystrom struggle, and
@@ -70,15 +73,14 @@ target* it converges to as group size grows.
 
 ## Combining methods
 
-- **`NestedKriging` + `LLVecchia`**: `NestedKriging`'s common-prior fit
-  can estimate the shared (θ, σ², β) via one global light Vecchia fit
-  (`objective="LLVecchia(m)"`) instead of a full O(n³) reference fit —
-  see [Nested.md](Nested.md)'s "Common prior" section. `LLNystrom` is
-  **not** currently wired into `NestedKriging`'s common-prior path.
+- **`NestedKriging` + Vecchia / Nystrom**: `NestedKriging`'s common-prior
+  fit can estimate the shared (θ, σ², β) via one global Vecchia or
+  Nystrom fit (`method="vecchia(m)"` / `"nystrom(k)"`) instead of
+  per-group fits — see [Nested.md](Nested.md)'s "Common prior" section.
 - **`subsetOfData` before any of the above**: since it's a plain
   pre-fit row selection, not a fit objective, it composes with every
   other method here — reduce `(X, y)` first, then fit with
-  `LLVecchia`/`LLNystrom`/`NestedKriging`/exact `"LL"` on the reduced
+  Vecchia / Nystrom / `NestedKriging` / exact `"LL"` on the reduced
   design if it's still large enough to warrant one of them.
 - **Vecchia/Nystrom + `NoiseModel`**: neither supports a nugget/noise
   channel yet (`NoiseModel::None` only) — see each method's own

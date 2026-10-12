@@ -11,18 +11,22 @@ class/options to pick.
 ## Kriging (noise-free or noisy)
 
 ```matlab
-% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise)
+% k = Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise, method)
 %   noise_model: "none" (default), "nugget" or "heterogeneous" (then noise = variance vector)
+%   method: "exact" (default) | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (see Large designs)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL");
 k_nug = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget");
 % Unfitted model, to configure before fit:
 % k0 = Kriging("matern5_2"); k0.fit(y, X, "constant", false, "BFGS", "LL");
+%   fit(y, X, regmodel, normalize, optim, objective, parameters, method)
+%   (heterogeneous noise: fit(y, noise, X, regmodel, normalize, optim, objective, parameters, method))
 
 % Or all-default:
 k = Kriging(y, X, "matern5_2");
 
 [p_mean, p_stdev] = k.predict(Xnew, true, false, false);
 %   optional 5th argument: method "exact" (default) | "vecchia" | "vecchia(m)" | "nystrom" (see Large designs)
+%   k.method() returns the fit method: "exact", "vecchia(m)" or "nystrom(k)"
 %                             (X, return_stdev, return_cov, return_deriv)
 s = k.simulate(int32(10), int32(123), Xnew, true);   % size(Xnew,1) x nsim
 %              (nsim, seed, X, will_update)
@@ -48,7 +52,8 @@ legacy saved models via `load_kriging(...)`.
 ## WarpKriging
 
 ```matlab
-% k = WarpKriging(y, X, warping, kernel, regmodel, normalize, optim, objective, parameters, noise)
+% k = WarpKriging(y, X, warping, kernel, regmodel, normalize, optim, objective, parameters, noise, method)
+%   method: only "exact" is implemented (same for MLPKriging)
 k = WarpKriging(y, X, {"kumaraswamy", "categorical(3,2)"}, "matern5_2");
 [p_mean, p_stdev] = k.predict(Xnew, true);
 ```
@@ -76,37 +81,43 @@ correct; this is an optimization-landscape issue, not a bug).
 idx = Kriging.subsetOfData(X, int32(2000), "kmeans", int32(123));
 k = Kriging(y(idx), X(idx, :), "matern5_2");
 
-% Or keep every point and approximate the objective (noise-free Kriging only)
-k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");   % d <~ 5
-k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % higher d
-r = k.nystrom_rank()   % 50 (0 if the model was not fitted with LLNystrom)
-m = k.vecchia_neighbors()   % 30 for an LLVecchia(30) fit (0 otherwise)
+% Or keep every point and approximate the likelihood (objective "LL", noise-free Kriging only):
+% method is the 11th constructor argument ([] for unused parameters / noise)
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(30)");   % d <~ 5
+k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "nystrom(50)");   % higher d
+mth = k.method()   % "nystrom(50)"; k.objective() is "LL"
+r = k.nystrom_rank()   % 50 (0 if the model was not fitted with method "nystrom")
+m = k.vecchia_neighbors()   % 30 for a "vecchia(30)" fit (0 otherwise)
 ```
-The method is explicit at every step (`"exact"` by default, never inferred from the fit):
+An approximate fit keeps no exact factorization, and the method is explicit at every step
+(`"exact"` by default, never inferred from the fit):
 ```matlab
-kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLNystrom(50)");   % no exact factorization
+kn = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "nystrom(50)");
 [m, s] = kn.predict(Xnew, true, false, false, "nystrom");   % "exact" would raise
 sims = kn.simulate(int32(10), int32(123), Xnew, false, "nystrom");
 ll = kn.logLikelihood("nystrom");                            % the fitted objective
-kv = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LLVecchia(30)");    % exact commit (default)
-[m, s, c] = kv.predict(Xnew, true, true, false);             % exact, with covariance
-[m, s] = kv.predict(Xnew, true, false, false, "vecchia");    % local Vecchia, any fit
+kv = Kriging("matern5_2");
+kv.fit(y, X, "constant", false, "BFGS", "LL", [], "vecchia(30)");
+[m, s] = kv.predict(Xnew, true, false, false, "vecchia");    % or kv.method()
+kv.update(y_u, X_u, true);                                   % Vecchia refit, still approximate
+% the exact model at the Vecchia estimate: a separate exact fit, theta fixed
+th = kv.theta();
+ke = Kriging(y, X, "matern5_2", "constant", false, "none", "LL", ...
+             Params("theta", th(:)', "is_theta_estim", false));
+[m, s, c] = ke.predict(Xnew, true, true, false);             % exact, with covariance
 ```
-Factorization-free "light" Vecchia mode (no exact O(n^3) commit; the exact methods raise,
-`"vecchia"` is passed explicitly; update and save / load stay available):
-```matlab
-k = Kriging("matern5_2");
-k.set_vecchia_exact_commit(false);   % before fit
-k.fit(y, X, "constant", false, "BFGS", "LLVecchia(30)");
-tf = k.is_vecchia_light()            % true
-[m, s] = k.predict(Xnew, true, false, false, "vecchia");
-```
+The Vecchia predictor (`"vecchia"`) is also usable after an exact fit. Approximate methods
+return mean / stdev only (`return_cov`, `return_deriv`, `will_update` raise).
+Objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated** aliases of `"LL"` with
+method `"vecchia(m)"` / `"nystrom(k)"`.
 `predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging
 
 ```matlab
-% nk = NestedKriging(y, X, kernel, nb_groups, aggregation, partition, seed, regmodel, optim, objective, parameters, warping)
+% nk = NestedKriging(y, X, kernel, nb_groups, aggregation, partition, seed, regmodel, optim, objective, parameters, warping, method)
+%   method (13th; 9th of nk.fit): "exact" (default) | "vecchia(m)" | "nystrom(k)" (common prior from one global
+%   approximate fit, objective "LL", no warping); nk.method() / nk.objective() report it
 nk = NestedKriging(y, X, "matern5_2", 8);  % aggregation="NK", partition="kmeans" by default
 [p_mean, p_stdev] = nk.predict(Xnew, true);
 

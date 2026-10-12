@@ -13,9 +13,14 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
    - categorical / ordinal / non-linearly-scaled inputs, or a wanted input
      transform → `WarpKriging` (one warp spec per column, §4).
    - single deep joint feature map over all inputs → `MLPKriging`.
-   - n ≳ few thousand → keep `Kriging` (noise-free; `WarpKriging` only fits
-     with `"LL"`) with `objective="LLVecchia(m)"` (d ≲ 5, local structure) or `"LLNystrom(k)"`
-     (higher d); n ~ 10⁴–10⁶ and partitionable → `NestedKriging`.
+   - n ≳ few thousand → keep `Kriging` (noise-free, `objective="LL"`;
+     `WarpKriging` / `MLPKriging` only implement `method="exact"`) with
+     `method="vecchia(m)"` (d ≲ 5, local structure) or `method="nystrom(k)"`
+     (higher d) — not the deprecated `objective="LLVecchia(m)"` /
+     `"LLNystrom(k)"`; n ~ 10⁴–10⁶ and partitionable → `NestedKriging`
+     (optionally `method="vecchia(m)"` / `"nystrom(k)"` for its common prior).
+     An approximate fit keeps no exact factorization: later
+     `predict` / `simulate` / `logLikelihood` calls pass the same method.
 
 2. Pick options from §2: `kernel="matern5_2"` and `regmodel="constant"` and
    `objective="LL"` and `optim="BFGS"` as defaults; deviate only with a
@@ -32,6 +37,8 @@ Fit a libKriging model. Context / arguments: $ARGUMENTS
 
 5. Emit the fit call. If the data is available and the binding is built,
    run it and report: chosen class + options (with rationale), fitted
-   hyperparameters (`theta`, `sigma2`, `beta`, nugget/noise), and the
-   objective value (`logLikelihood()` / `leaveOneOut()` / `logMargPost()`).
+   hyperparameters (`theta`, `sigma2`, `beta`, nugget/noise), the method
+   (`method()`), and the objective value (`logLikelihood()` /
+   `leaveOneOut()` / `logMargPost()`; `logLikelihood(method=...)` after a
+   Vecchia / Nystrom fit).
    State plainly if anything failed or was skipped.

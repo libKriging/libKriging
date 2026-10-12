@@ -18,10 +18,12 @@ Predict with a fitted libKriging model. Context / arguments: $ARGUMENTS
    - gradient of mean / stdev w.r.t. inputs (sensitivity, gradient-based
      optimization) → `return_deriv=True`.
    - `Kriging` method, always explicit (never inferred from the fit):
-     `method="exact"` (default) needs the exact factorization; after an
-     `LLNystrom` fit pass `method="nystrom"`, after a light Vecchia fit
-     (`set_vecchia_exact_commit(false)`) `method="vecchia"` — `"exact"`
-     raises there. `"vecchia"` / `"vecchia(m)"` (local predictor, any fit)
+     `method="exact"` (default) needs an exact fit; after a
+     `method="nystrom(k)"` fit pass `method="nystrom"`, after a
+     `method="vecchia(m)"` fit `method="vecchia"` (or pass `model.method()`
+     as is) — `"exact"` raises there. If the joint covariance or derivatives
+     are needed after an approximate fit, refit exactly with `optim="none"`
+     at the fitted `theta`. `"vecchia"` / `"vecchia(m)"` (local predictor, any fit)
      also suits very many prediction points. The approximate methods give
      mean / stdev only (no `return_cov` / `return_deriv`).
 

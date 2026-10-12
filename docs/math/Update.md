@@ -194,8 +194,8 @@ sims_ref <- simulate(k2, nsim = 10, seed = 123, x = Xnew)
 - `update_simulate` requires a preceding `simulate(..., will_update=TRUE)`
   call on the same model — it reuses that call's cached factors and
   random stream.
-- Fits without an exact factorization (`objective="LLNystrom(k)"`, and
-  the light Vecchia mode) simulate only with an explicit approximate
+- Fits without an exact factorization (`method="vecchia(m)"` and
+  `method="nystrom(k)"`) simulate only with an explicit approximate
   method (`simulate(…, method="nystrom")` / `method="vecchia"`), with no
   `will_update` and hence no `update_simulate`; the exact `simulate`
   raises on them ([Nystrom.md](Nystrom.md), [Vecchia.md](Vecchia.md)).

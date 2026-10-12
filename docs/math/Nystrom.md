@@ -1,4 +1,4 @@
-# Nystrom approximation (`objective="LLNystrom(k)"`)
+# Nystrom approximation (`method="nystrom(k)"`)
 
 ## Idea
 
@@ -16,16 +16,18 @@ the O(n³) exact factorization into O(n·k²) work per likelihood
 evaluation via the Woodbury identity, without ever materializing the
 n×n matrix R.
 
-libKriging exposes it as an alternative fitting objective,
-`objective="LLNystrom"` (default k = 50 landmarks) or
-`objective="LLNystrom(k)"` for an explicit rank k, usable from any
-binding since `objective` is just a string forwarded to the C++ core.
+libKriging exposes it as a fit method of the log-likelihood objective,
+`method="nystrom"` (default k = 50 landmarks) or `method="nystrom(k)"`
+for an explicit rank k (with `objective="LL"`, the default), in C++ and
+every binding. `method()` then returns `"nystrom(k)"`, `objective()`
+`"LL"`. `objective="LLNystrom(k)"` is a deprecated alias of
+`objective="LL", method="nystrom(k)"` (one-time warning).
 
 ```r
-k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")   # or "LLNystrom"
+k <- Kriging(y, X, "matern5_2", method = "nystrom(50)")   # or "nystrom"
 ```
 
-Complementary to `LLVecchia`: Vecchia is a *local* approximation (each
+Complementary to `method="vecchia(m)"`: Vecchia is a *local* approximation (each
 point conditions on a handful of nearest neighbors) whereas Nystrom is a
 *global* low-rank approximation (every point shares the same k landmarks).
 Nystrom tends to degrade more gracefully with input dimension than
@@ -61,12 +63,15 @@ domain.
   sensitive to the likelihood surface's local curvature near
   small-θ / near-singular-R regions than the analytic form is.
 - **Exactness at k = n**: with k equal to the sample size, the
-  factorization is exact and `LLNystrom(n)` reproduces the exact
+  factorization is exact and `method="nystrom(n)"` reproduces the exact
   concentrated log-likelihood at any θ (used as a correctness check in
   `KrigingNystromTest.cpp`).
-- **Prediction**: the method is always explicit. A Nystrom fit commits
+- **Prediction**: the method is always explicit. A Nystrom fit keeps
   no exact factorization, so `predict` / `simulate` with method
-  `"exact"` (the default) raise an error; `predict(…, method="nystrom")`
+  `"exact"` (the default) raise an error (`logLikelihood()` recomputes the
+  exact log-likelihood at the fitted θ, in O(n³));
+  `predict(…, method="nystrom")` (or exactly the fitted `"nystrom(k)"`,
+  e.g. the string returned by `method()`; another k raises)
   (C++ `predictNystrom`) reuses the committed rank-k factors (U, D) via
   the Woodbury identity — O(n k q) instead of O(n² q) for q points
   (mean and stdev only: `return_cov` / `return_deriv` raise), and
@@ -74,13 +79,14 @@ domain.
   trajectories through the same low-rank machinery (no `will_update`).
   Method `"vecchia"` (local predictor, needs only θ / β / σ²) is also
   available, and `logLikelihood(method="nystrom")` gives the fitted
-  Nystrom objective (`"exact"` recomputes the exact one, O(n³)).
+  Nystrom objective. The exact model at the Nystrom θ* is a separate
+  exact fit with `optim="none"` and the fitted θ (as for Vecchia, see
+  [Vecchia.md](Vecchia.md)).
 - **Update/save**: a Nystrom fit never holds an exact n×n
-  factorization (unlike Vecchia's optional "light" mode, this is the
-  *only* mode Nystrom has). `update` goes through a dedicated
+  factorization (as a Vecchia fit). `update` goes through a dedicated
   incremental path (`update_nystrom`, extends the landmarks-fixed
   factorization without a full O(n³) refit) and `save`/`load` serialize
-  the committed rank-k factors (U, D) directly; `update_simulate`
+  the committed rank-k factors (U, D) directly (and the method); `update_simulate`
   raises a clear error (no such path exists yet, see Current
   limitations).
 
@@ -95,7 +101,7 @@ X <- matrix(runif(2 * n), ncol = 2)
 y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 
 # Exact objective would cost O(n^3) ~ 8e9 ops; Nystrom costs O(n*k^2).
-k <- Kriging(y, X, "matern5_2", objective = "LLNystrom(50)")
+k <- Kriging(y, X, "matern5_2", method = "nystrom(50)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
 pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: no exact factorization
@@ -103,16 +109,17 @@ pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: n
 
 ## Current limitations
 
-- `NoiseModel::None` only (no nugget/noise channel).
+- `objective="LL"` and `NoiseModel::None` only (no LOO / LMP version,
+  no nugget/noise channel).
 - Landmarks are not serialized (rebuilt on refit).
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.
 - **Free MLE fits (`optim="BFGS"` with no starting `theta`) can drift
   toward a large-θ degenerate optimum on smooth/near-deterministic test
   functions**, giving a poor predictor despite a high objective value.
-  This is not specific to `LLNystrom`: it is the standard GP-MLE
+  This is not specific to the Nystrom method: it is the standard GP-MLE
   degeneracy that affects the exact `"LL"` objective just as much on
-  such data (verified directly — both the exact and `LLNystrom`
+  such data (verified directly — both the exact and Nystrom
   concentrated log-likelihoods increase together with θ once σ² is
   correctly profiled at each θ, rather than held fixed). The practical
   mitigation is the same one used throughout this codebase's own test
@@ -124,7 +131,7 @@ pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: n
 [llnystrom_vs_cholesky.ipynb](llnystrom_vs_cholesky.ipynb) for a worked,
 executed notebook: the math above illustrated on a running example, with
 rank-$k$ convergence/accuracy/timing plots and references.
-[Scalability.md](Scalability.md) for how this compares to `LLVecchia`
+[Scalability.md](Scalability.md) for how this compares to `method="vecchia(m)"`
 and `NestedKriging`, and how to pick between them.
 
 ## References

@@ -57,8 +57,7 @@ This document lists all methods exposed by each language binding for accessing t
 | `noise` | `kriging_noise(obj)` | `obj$noise()` | `obj.noise()` | `noise(obj)` | `noise(obj)` |
 | `nystrom_rank` | `kriging_nystrom_rank(obj)` | `obj$nystrom_rank()` | `obj.nystrom_rank()` | `nystrom_rank(obj)` | `nystrom_rank(obj)` |
 | `vecchia_neighbors` | `kriging_vecchia_neighbors(obj)` | `obj$vecchia_neighbors()` | `obj.vecchia_neighbors()` | `vecchia_neighbors(obj)` | `vecchia_neighbors(obj)` |
-| `set_vecchia_exact_commit` / `vecchia_exact_commit` | `kriging_set_vecchia_exact_commit(obj,b)` / `kriging_vecchia_exact_commit(obj)` | `obj$set_vecchia_exact_commit(b)` / `obj$vecchia_exact_commit()` | `obj.set_vecchia_exact_commit(b)` / `obj.vecchia_exact_commit()` | `obj.set_vecchia_exact_commit(b)` / `obj.vecchia_exact_commit()` | `set_vecchia_exact_commit!(obj,b)` / `vecchia_exact_commit(obj)` |
-| `is_vecchia_light` / `is_nystrom_light` | `kriging_is_vecchia_light(obj)` / `kriging_is_nystrom_light(obj)` | `obj$is_vecchia_light()` / `obj$is_nystrom_light()` | `obj.is_vecchia_light()` / `obj.is_nystrom_light()` | `obj.is_vecchia_light()` / `obj.is_nystrom_light()` | `is_vecchia_light(obj)` / `is_nystrom_light(obj)` |
+| `method` | `kriging_method(obj)` | `obj$method()` | `obj.method()` | `method(obj)` | `method(obj)` |
 | **Pre-fit data reduction** | | | | | |
 | `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
 
@@ -69,32 +68,45 @@ It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and
 
 ### Fit objectives
 
-`Kriging` accepts `objective` = `"LL"` (default), `"LOO"`, `"LMP"`, and the two large-`n` approximations
-`"LLVecchia"` / `"LLVecchia(m)"` (Vecchia, see [docs/math/Vecchia.md](../docs/math/Vecchia.md)) and `"LLNystrom"` /
-`"LLNystrom(k)"` (Nystrom low-rank, see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). `nystrom_rank()` returns the
-rank `k` of a `LLNystrom` fit (0 otherwise), `vecchia_neighbors()` the number `m` of conditioning neighbors of a
-`LLVecchia` fit (0 otherwise). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
-longer accepted. Both approximations require the noise-free model (`noise_model` `none`). `WarpKriging` fits with `"LL"`
-only.
+`Kriging` accepts `objective` = `"LL"` (default), `"LOO"`, `"LMP"` (the criterion), and a separate `method` (how the
+covariance is evaluated, for the fit and for what the model keeps afterwards): `"exact"` (default, dense O(n³)
+Cholesky), `"vecchia"` / `"vecchia(m)"` (Vecchia, m conditioning neighbors, default 30, O(n·m³), see
+[docs/math/Vecchia.md](../docs/math/Vecchia.md)) or `"nystrom"` / `"nystrom(k)"` (rank-k Nystrom, default 50, O(n·k²),
+see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). The approximate methods exist only with `objective="LL"` and the
+noise-free model (`noise_model` `none`); other combinations raise. `method()` returns the canonical string with its
+size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`), `objective()` returns `"LL"` for an approximate fit;
+`nystrom_rank()` returns the rank `k` of a Nystrom fit (0 otherwise), `vecchia_neighbors()` the number `m` of
+conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKriging` take `method` too, but only
+`"exact"` is implemented.
 
-**Exact / Vecchia / Nystrom methods — always explicit.** The approximation is chosen at each step, never inferred from
-the fit:
+> **Deprecated aliases**: `objective="LLVecchia(m)"` is `objective="LL", method="vecchia(m)"` and
+> `objective="LLNystrom(k)"` is `objective="LL", method="nystrom(k)"` (still accepted, with a one-time warning; a
+> conflicting explicit `method` raises). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
+> longer accepted.
+
+**Exact / Vecchia / Nystrom methods — always explicit.** The method is passed at each step, never inferred from the
+fit:
 
 | Step | exact | Vecchia | Nystrom |
 |---|---|---|---|
-| fit (`objective`) | `"LL"`, `"LOO"`, `"LMP"` | `"LLVecchia(m)"`: Vecchia estimation, then an exact O(n³) commit, unless `set_vecchia_exact_commit(false)` was called before the fit ("light" fit, `is_vecchia_light()`) | `"LLNystrom(k)"`: never an exact commit (`is_nystrom_light()`) |
-| `predict(…, method=)` | `"exact"` (default): needs the exact factorization | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"`: after an `LLNystrom` fit |
-| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit | `"nystrom"`: after an `LLNystrom` fit |
-| `logLikelihood(method=)` | `"exact"` (default) | `"vecchia"`: after an `LLVecchia` fit | `"nystrom"`: after an `LLNystrom` fit |
-| `update` | refit as fitted (exact commit) | light fit: Vecchia refit, no exact commit | Nystrom update (same landmarks) |
+| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, `objective="LL"`: Vecchia estimation, no exact factorization is kept | `"nystrom(k)"`, `objective="LL"`: no exact factorization is kept |
+| `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
+| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit | `"nystrom"`: after a Nystrom fit |
+| `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
+| `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks) |
 | `update_simulate` | yes | — | — |
-| `save` / `load` | yes | yes (light fit included) | yes |
+| `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
 
-On a light Vecchia fit or an `LLNystrom` fit, `method="exact"` (the default) raises an error naming the method to use;
-the approximate methods return mean / stdev only (`return_cov` / `return_deriv` raise). `set_vecchia_exact_commit(false)`
-is called on an unfitted model (`Kriging(kernel)`, then `fit`) or before a refit. Argument names: Python / R
-`method="…"` keyword, Julia `method="…"` keyword, Octave/Matlab trailing positional argument
-(`predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, will_update, "vecchia")`,
+On a Vecchia or Nystrom fit, `predict` / `simulate` with `method="exact"` (the default) raise an error naming the method to use; the approximate
+methods return mean / stdev only (`return_cov` / `return_deriv` / `will_update` raise). The string returned by
+`method()` can be passed back as is. To get the exact model at the Vecchia (or Nystrom) estimate, make a separate exact
+fit with `optim="none"` and the fitted `theta` (`is_theta_estim` false), e.g. in Python
+`lk.Kriging(y, X, kernel, optim="none", parameters={"theta": np.atleast_2d(k.theta()), "is_theta_estim": False})`.
+Old save files (libKriging ≤ 1.2) with objective `"LLVecchia(m)"` load as `method="vecchia(m)"`, keeping their stored
+exact factorization until the next `update`. Argument names: Python / R `method="…"` keyword, Julia `method="…"`
+keyword, Octave/Matlab trailing positional argument (constructor 11th argument
+`Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise, method)`, `fit` 8th
+argument, `predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, will_update, "vecchia")`,
 `logLikelihood("vecchia")`).
 
 > **C++ only**: `predictVecchia`, `predictNystrom`, `simulateVecchia`, `simulateNystrom` (the methods behind
@@ -141,7 +153,8 @@ is called on an unfitted model (`Kriging(kernel)`, then `fit`) or before a refit
 > `WarpKriging` constructor / `fit` accept `noise=` as a per-observation variance vector (there is no `"nugget"` mode),
 > and `parameters=` with numeric `theta`, `warp_params` and `noise` seeds; with `optim="none"` they freeze the
 > hyper-parameters. `update` and `update_simulate` accept `noise_u=` (variances of the new points) when the model was
-> fitted with noise. `WarpKriging` always fits with `objective="LL"`.
+> fitted with noise. `WarpKriging` always fits with `objective="LL"`. `WarpKriging` and `MLPKriging` accept `method=`
+> for API consistency, but only `"exact"` is implemented.
 
 ---
 
@@ -192,10 +205,15 @@ is called on an unfitted model (`Kriging(kernel)`, then `fit`) or before a refit
 | `theta` | `nestedkriging_theta(obj)` | `obj$theta()` | `obj.theta()` | `theta(obj)` | `theta(obj)` |
 | `sigma2` | `nestedkriging_sigma2(obj)` | `obj$sigma2()` | `obj.sigma2()` | `sigma2(obj)` | `sigma2(obj)` |
 | `beta0` | `nestedkriging_beta0(obj)` | `obj$beta0()` | `obj.beta0()` | `beta0(obj)` | `beta0(obj)` |
+| `objective` / `method` | `nestedkriging_objective(obj)` / `nestedkriging_method(obj)` | `obj$objective()` / `obj$method()` | `obj.objective()` / `obj.method()` | `objective(obj)` / `method(obj)` | `objective(obj)` / `method(obj)` |
 | `warping` | `nestedkriging_warping(obj)` | `obj$warping()` | `obj.warping()` | `warping(obj)` | `warping(obj)` |
 | `X` / `y` | `nestedkriging_X(obj)` / `nestedkriging_y(obj)` | `obj$X()` / `obj$y()` | `obj.X()` / `obj.y()` | `X(obj)` / `y(obj)` | `X(obj)` / `y(obj)` |
 | `set_predict_chunk` | `nestedkriging_set_predict_chunk(obj,chunk)` | `obj$set_predict_chunk(chunk)` | `obj.set_predict_chunk(chunk)` | `set_predict_chunk(obj,chunk)` | `set_predict_chunk!(obj,chunk)` |
 | `set_warp_subsample` | `nestedkriging_set_warp_subsample(obj,m)` | `obj$set_warp_subsample(m)` | `obj.set_warp_subsample(m)` | `set_warp_subsample(obj,m)` | `set_warp_subsample!(obj,m)` |
+
+> `method` (after `warping`; Octave/Matlab 13th constructor / 9th `fit` argument): `"exact"` (default, per-group
+> fits), or `"vecchia(m)"` / `"nystrom(k)"`: the common prior is estimated by one global Vecchia / Nystrom fit
+> (`objective="LL"`, no warping), then exact submodels are fitted.
 
 > No `noise=`, no `normalize=` on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 
@@ -239,7 +257,7 @@ Each notebook fits the Branin 2D function with one class or option, in each lang
 | Example | Python | R | Julia | Octave |
 |---|---|---|---|---|
 | `Kriging` | [Python](Python/kriging_branin2d_py.ipynb) | [R](R/kriging_branin2d_r.ipynb) | [Julia](Julia/kriging_branin2d_julia.ipynb) | [Octave](Octave/kriging_branin2d_octave.ipynb) |
-| `Kriging` with `objective="LLVecchia(m)"` | [Python](Python/kriging_vecchia_branin2d_py.ipynb) | [R](R/kriging_vecchia_branin2d_r.ipynb) | [Julia](Julia/kriging_vecchia_branin2d_julia.ipynb) | [Octave](Octave/kriging_vecchia_branin2d_octave.ipynb) |
+| `Kriging` with `method="vecchia(m)"` | [Python](Python/kriging_vecchia_branin2d_py.ipynb) | [R](R/kriging_vecchia_branin2d_r.ipynb) | [Julia](Julia/kriging_vecchia_branin2d_julia.ipynb) | [Octave](Octave/kriging_vecchia_branin2d_octave.ipynb) |
 | `NestedKriging` | [Python](Python/nestedkriging_branin2d_py.ipynb) | [R](R/nestedkriging_branin2d_r.ipynb) | [Julia](Julia/nestedkriging_branin2d_julia.ipynb) | [Octave](Octave/nestedkriging_branin2d_octave.ipynb) |
 | `Kriging` with an estimated nugget (`noise="nugget"`) | [Python](Python/nuggetkriging_branin2d_py.ipynb) | [R](R/nuggetkriging_branin2d_r.ipynb) | [Julia](Julia/nuggetkriging_branin2d_julia.ipynb) | — |
 | `Kriging` with known noise variances (`noise=` vector) | [Python](Python/noisekriging_branin2d_py.ipynb) | [R](R/noisekriging_branin2d_r.ipynb) | [Julia](Julia/noisekriging_branin2d_julia.ipynb) | — |

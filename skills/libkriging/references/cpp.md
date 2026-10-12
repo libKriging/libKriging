@@ -18,7 +18,8 @@ Kriging model(y, X, "matern5_2",
               /*normalize=*/false,
               "BFGS",                              // optim
               "LL",                                // objective
-              /*parameters=*/{});
+              /*parameters=*/{},
+              "exact");                            // method (default)
 
 // Or default-construct, then fit (equivalent):
 Kriging model2("matern5_2");
@@ -42,7 +43,7 @@ auto [mean, stdev, cov, mean_deriv, stdev_deriv]
 arma::mat sims = model.simulate(/*nsim=*/10, /*seed=*/123, Xnew, /*will_update=*/true);  // Xnew.n_rows x nsim
 // exact by default; explicit method overloads: predict(X, stdev, cov, deriv, method),
 // simulate(nsim, seed, X, method, will_update), logLikelihood(method),
-// method = "exact" | "vecchia" | "vecchia(m)" | "nystrom"
+// method = "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (the fitted k)
 arma::mat sims_u = model.update_simulate(y_new, X_new);  // condition those paths on new observations
 model.update(y_new, X_new, /*refit=*/true);
 
@@ -53,24 +54,40 @@ double ll  = model.logLikelihood();
 auto [ll2, grad] = model.logLikelihoodFun(theta, /*return_grad=*/true, /*bench=*/false);
 ```
 
-Vecchia approximation: same class, just change `objective`:
+Vecchia approximation: same class, `objective="LL"`, trailing `method`:
 ```cpp
-model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
-// explicit method at each step (default "exact"); same as predictVecchia(Xnew, true)
+model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(30)");
+model.method();   // "vecchia(30)"; objective() is "LL"
+// no exact factorization is kept: the method is explicit at each step,
+// "exact" (the default) raises; same as predictVecchia(Xnew, true)
 auto [m_v, s_v, c_v, dm_v, ds_v] = model.predict(Xnew, true, false, false, "vecchia");
 auto [mean, stdev] = model.predictVecchia(Xnew, /*return_stdev=*/true);
 // sequential conditional simulation on m nearest (observed or already simulated) points
 arma::mat sims = model.simulateVecchia(/*nsim=*/10, /*seed=*/123, Xnew /*, m=0 -> vecchia_neighbors() or 30 */);
+double ll_v = model.logLikelihood(model.method());   // = logLikelihood("vecchia")
 ```
 
-Nystrom approximation: same class, just change `objective`:
+Nystrom approximation: same class, `objective="LL"`, trailing `method`:
 ```cpp
-model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)", {});
+model.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(50)");
 auto [mean, stdev] = model.predictNystrom(Xnew, /*return_stdev=*/true);   // = predict(..., "nystrom")
 arma::mat sims = model.simulateNystrom(/*nsim=*/10, /*seed=*/123, Xnew);  // = simulate(..., "nystrom")
-// no exact factorization after LLNystrom: predict(Xnew, ...) (method "exact") raises
+// no exact factorization after a Nystrom fit: predict(Xnew, ...) (method "exact") raises
 double ll_nys = model.logLikelihood("nystrom");
 ```
+
+Exact model at the Vecchia / Nystrom estimate (separate exact fit, θ fixed):
+```cpp
+Kriging::Parameters params;
+params.theta = arma::mat(model.theta().t());
+params.is_theta_estim = false;
+Kriging exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
+```
+Approximate methods: `objective="LL"` and `NoiseModel::None` only (else
+`std::invalid_argument`); `update` keeps the method, `save` / `load` too.
+`Kriging::fit_objective_method(objective, method)` returns the canonical
+(objective, method) pair. Deprecated: objective `"LLVecchia(m)"` /
+`"LLNystrom(k)"` (aliases of `"LL"` + `"vecchia(m)"` / `"nystrom(k)"`).
 
 Pre-fit reduction and accessors:
 ```cpp
@@ -79,12 +96,12 @@ Pre-fit reduction and accessors:
 arma::uvec idx = Kriging::subsetOfData(X, /*n_max=*/2000, /*method=*/"kmeans", /*seed=*/123);
 Kriging small(y.elem(idx), X.rows(idx), "matern5_2");
 
-model.nystrom_rank();   // rank k of an LLNystrom fit, 0 otherwise
-model.vecchia_neighbors();   // m of an LLVecchia fit, 0 otherwise
-// Factorization-free "light" Vecchia mode: call BEFORE fit(..., "LLVecchia(m)");
-// the exact methods then raise: use method "vecchia" (predict / simulate),
-// logLikelihood("vecchia"); update and save / load stay available.
-model.set_vecchia_exact_commit(false);
+model.method();         // "exact", "vecchia(m)" or "nystrom(k)"
+model.nystrom_rank();   // rank k of a Nystrom fit, 0 otherwise
+model.vecchia_neighbors();   // m of a Vecchia fit, 0 otherwise
+model.is_vecchia_light(); model.is_nystrom_light();   // C++ only: no exact factorization held
+// Deprecated: set_vecchia_exact_commit(false) is a no-op, (true) throws;
+// vecchia_exact_commit() returns false (a Vecchia fit is always light).
 ```
 
 ## WarpKriging
@@ -99,7 +116,8 @@ auto [mean, stdev, cov, mean_deriv, stdev_deriv] = model.predict(Xnew, true, fal
 ```
 One spec string per column of `X`, in column order (see `SKILL.md` §4 for
 the spec vocabulary). `WarpKriging::fit` ignores its `objective` argument
-(always `"LL"`), and its noise is a per-observation variance vector (there is
+(always `"LL"`), takes a trailing `method` of which only `"exact"` is
+implemented (same for `MLPKriging`), and its noise is a per-observation variance vector (there is
 no nugget mode).
 
 ## MLPKriging
@@ -121,7 +139,10 @@ NestedKriging model(y, X, "matern5_2", nb_groups,
                     NestedKriging::Partition::KMeans,
                     /*seed=*/123,
                     Trend::RegressionModel::Constant);
+// trailing args: optim, objective, parameters, warping, method ("exact" default;
+// "vecchia(m)" / "nystrom(k)" = common prior from one global approximate fit)
 auto [mean, stdev] = model.predict(Xnew, /*return_stdev=*/true);
+model.method();   // and model.objective()
 ```
 `Aggregation` is `PoE, gPoE, BCM, rBCM, NK` — see `SKILL.md` §3. Remember:
 `NK` requires `Trend::RegressionModel::Constant`; no `normalize`, no

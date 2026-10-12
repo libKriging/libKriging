@@ -14,8 +14,9 @@ Simulate sample paths from a fitted libKriging model. Context / arguments: $ARGU
    `simulate` signature. Pass `nsim` and `seed` with the language's integer
    type: `int32(...)` in Octave/MATLAB, `Int`/`Int32` in Julia — a plain
    double raises a low-level error far from the call site. For `Kriging`,
-   the method is explicit: `method="exact"` (default); after an `LLNystrom`
-   fit pass `method="nystrom"`, after a light Vecchia fit `method="vecchia"`
+   the method is explicit: `method="exact"` (default); after a
+   `method="nystrom(k)"` fit pass `method="nystrom"`, after a
+   `method="vecchia(m)"` fit `method="vecchia"`
    (`"vecchia(m)"`, sequential local conditioning, also usable after any
    fit for many points) — no `will_update` with the approximate methods.
 

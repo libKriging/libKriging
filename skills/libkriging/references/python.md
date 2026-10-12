@@ -17,9 +17,10 @@ model = lk.Kriging(
     regmodel="constant",       # "none" | "constant" | "linear" | "interactive" | "quadratic"
     normalize=False,
     optim="BFGS",              # "BFGS", "BFGS10" (10 restarts), "none"
-    objective="LL",            # "LL" | "LOO" | "LMP" | "LLVecchia" | "LLVecchia(m)" | "LLNystrom" | "LLNystrom(k)"
+    objective="LL",            # "LL" | "LOO" | "LMP"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector
+    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL, noise=None only)
 )
 
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(
@@ -45,7 +46,7 @@ Do **not** instantiate `NuggetKriging`/`NoiseKriging` — pass `noise=` to
 appear, are for `pylibkriging.load(filename)` reading models saved by older
 libKriging versions.
 
-Introspection: `model.kernel()`, `.optim()`, `.objective()`, `.theta()`,
+Introspection: `model.kernel()`, `.optim()`, `.objective()`, `.method()`, `.theta()`,
 `.sigma2()`, `.beta()`, `.nugget()`, `.noise()`, `.is_theta_estim()`, etc.
 mirror every constructor argument and fitted hyperparameter 1:1.
 
@@ -61,6 +62,7 @@ model = lk.WarpKriging(
     objective="LL",       # only "LL": any other value is ignored
     parameters={},
     noise=None,   # None | per-observation variance vector (no "nugget" mode, unlike Kriging)
+    method="exact",       # only "exact" is implemented (same for MLPKriging)
 )
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(Xnew, return_stdev=True)
 ```
@@ -100,31 +102,32 @@ specifically wants SELU's less-saturating behavior for deep/wide MLPs.
 idx = lk.Kriging.subsetOfData(X, n_max=2000, method="kmeans", seed=123).ravel()
 model = lk.Kriging(y[idx], X[idx], "matern5_2")
 
-# Or keep every point and approximate the objective (noise-free Kriging only)
-model = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(30)")   # d <~ 5
-model = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(50)")   # higher d
-model.nystrom_rank()   # 50 (0 if the model was not fitted with LLNystrom)
-model.vecchia_neighbors()   # 30 for an LLVecchia(30) fit (0 otherwise)
+# Or keep every point and approximate the likelihood (objective="LL", noise-free Kriging only)
+model = lk.Kriging(y, X, "matern5_2", method="vecchia(30)")   # d <~ 5
+model = lk.Kriging(y, X, "matern5_2", method="nystrom(50)")   # higher d
+model.method()         # "nystrom(50)"; model.objective() is "LL"
+model.nystrom_rank()   # 50 (0 if the model was not fitted with method="nystrom")
+model.vecchia_neighbors()   # 30 for a method="vecchia(30)" fit (0 otherwise)
 ```
-The method is explicit at every step (`method="exact"` by default, never inferred from the fit):
+An approximate fit keeps no exact factorization, and the method is explicit at every step
+(`method="exact"` by default, never inferred from the fit):
 ```python
-kn = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(50)")   # no exact factorization
+kn = lk.Kriging(y, X, "matern5_2", method="nystrom(50)")
 mean, stdev, *_ = kn.predict(Xnew, method="nystrom")            # "exact" would raise
 sims = kn.simulate(10, 123, Xnew, method="nystrom")
 kn.logLikelihood(method="nystrom")                               # the fitted objective
-kv = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(30)")    # exact commit (default)
-kv.predict(Xnew, True, True, False)                              # exact, with covariance
-kv.predict(Xnew, method="vecchia")                               # local Vecchia, any fit
+kv = lk.Kriging(y, X, "matern5_2", method="vecchia(30)")
+mean, stdev, *_ = kv.predict(Xnew, method="vecchia")             # or method=kv.method()
+kv.update(y_u, X_u)                                              # Vecchia refit, still approximate
+# the exact model at the Vecchia estimate: a separate exact fit, theta fixed
+ke = lk.Kriging(y, X, "matern5_2", optim="none",
+                parameters={"theta": np.atleast_2d(kv.theta()), "is_theta_estim": False})
+ke.predict(Xnew, True, True, False)                              # exact, with covariance
 ```
-Factorization-free "light" Vecchia mode (no exact O(n^3) commit; the exact methods raise,
-`method="vecchia"` is passed explicitly; update and save / load stay available):
-```python
-k = lk.Kriging("matern5_2")
-k.set_vecchia_exact_commit(False)   # before fit
-k.fit(y, X, "constant", False, "BFGS", "LLVecchia(30)", {})
-k.is_vecchia_light()                 # True
-mean, stdev, *_ = k.predict(Xnew, method="vecchia")
-```
+The Vecchia predictor (`method="vecchia"`) is also usable after an exact fit. Approximate
+methods return mean / stdev only (`return_cov`, `return_deriv`, `will_update` raise).
+`objective="LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated** aliases of
+`objective="LL", method="vecchia(m)"` / `"nystrom(k)"`.
 `predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging
@@ -137,11 +140,13 @@ model = lk.NestedKriging(
     seed=123,
     regmodel="constant",
     optim="BFGS",
-    objective="LL",         # "LLVecchia(m)" to fit the common prior via one global Vecchia fit
+    objective="LL",
     parameters={},
     warping=[],             # non-empty -> submodels are WarpKriging instead of Kriging
+    method="exact",         # "vecchia(m)" / "nystrom(k)": common prior from one global approximate fit
 )
 mean, stdev = model.predict(Xnew, return_stdev=True)
+model.method(), model.objective()
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
 `normalize=`. `nk.save("nk.json")` / `lk.NestedKriging.load("nk.json")` (or
@@ -157,7 +162,8 @@ est = KrigingRegressor(kernel="matern5_2").fit(X, y)   # sklearn order: (X, y)
 mean, std = est.predict(Xnew, return_std=True)         # return_std and return_cov are exclusive
 ```
 Constructor parameters mirror the `Kriging` ones (`regmodel`, `normalize`,
-`optim`, `objective`, `noise`, `parameters`), so `get_params` / `set_params` /
+`optim`, `objective`, `noise`, `parameters`, `method` — which applies to `fit`, `predict`
+and `sample_y`), so `get_params` / `set_params` /
 `clone`, `Pipeline` and `GridSearchCV` work as for any scikit-learn regressor.
 
 ## Loading a saved model

@@ -14,7 +14,7 @@ Each notebook ends with an argument-correspondence table between libKriging and 
 | [libKriging_vs_sklearn.ipynb](libKriging_vs_sklearn.ipynb) | scikit-learn `GaussianProcessRegressor` | Python | noise estimated with a `WhiteKernel` term, vs `noise="nugget"` |
 | [libKriging_vs_GPy.ipynb](libKriging_vs_GPy.ipynb) | GPy | Python | sparse / inducing-point approximation (`SparseGPRegression`) |
 | [libKriging_vs_GPflow.ipynb](libKriging_vs_GPflow.ipynb) | GPflow | Python | full-Bayesian hyperparameters by HMC, vs `objective="LMP"` |
-| [libKriging_vs_GPyTorch.ipynb](libKriging_vs_GPyTorch.ipynb) | GPyTorch | Python | scaling exact inference with iterative linear algebra, vs `LLNystrom` |
+| [libKriging_vs_GPyTorch.ipynb](libKriging_vs_GPyTorch.ipynb) | GPyTorch | Python | scaling exact inference with iterative linear algebra, vs `method="nystrom(k)"` |
 | [libKriging_vs_SMT.ipynb](libKriging_vs_SMT.ipynb) | SMT | Python | KPLS dimension reduction |
 | [libKriging_vs_OpenTURNS.ipynb](libKriging_vs_OpenTURNS.ipynb) | OpenTURNS | Python | joint conditional simulation of sample paths |
 | [libKriging_vs_DiceKriging.ipynb](libKriging_vs_DiceKriging.ipynb) | DiceKriging | R | the `knots` warping, vs `WarpKriging(..., "knots(K)")` |

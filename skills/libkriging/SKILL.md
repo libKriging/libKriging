@@ -1,6 +1,6 @@
 ---
 name: libkriging
-description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia/LLVecchia, Nystrom/LLNystrom, or any of the libKriging bindings above.
+description: Use whenever writing or reviewing code that fits, predicts, or simulates a Gaussian-process / Kriging model with libKriging, in C++, Python (pylibkriging), R (rlibkriging), Julia (jlibkriging), Octave, or MATLAB. Covers which class to use for a given problem (plain GP, noisy data, mixed/categorical inputs, large n), and which kernel/trend/objective/optimizer options to pass. Trigger on mentions of Kriging, GP regression, surrogate model, emulator, NestedKriging, WarpKriging, MLPKriging, Vecchia, Nystrom (method="vecchia"/"nystrom", or the deprecated LLVecchia/LLNystrom objectives), or any of the libKriging bindings above.
 ---
 
 # libKriging usage
@@ -54,35 +54,44 @@ Ask, in order:
    more than a few thousand points?** (See
    [Scalability.md](../../docs/math/Scalability.md) for the full method
    inventory and combinability notes.)
-   → Keep `Kriging` (not `WarpKriging`: it always fits with `"LL"` and
-   ignores the `objective` argument) but switch the fit objective to one of
-   the two scalable approximations (both O(n·k³)/O(n·k²) instead of O(n³),
-   both give an alternative *objective*, not just a cheaper way to
-   evaluate the same one — don't expect bit-identical results to `"LL"`):
+   → Keep `Kriging` (not `WarpKriging` / `MLPKriging`: they accept
+   `method` but only implement `"exact"`), noise-free, `objective="LL"`,
+   but switch the fit `method` to one of the two scalable approximations
+   (O(n·m³) / O(n·k²) instead of O(n³); each approximates the
+   likelihood, so don't expect bit-identical results to the exact `"LL"`
+   fit):
    - **Low-to-moderate dimension, spatially local structure** →
-     `objective="LLVecchia"` or `"LLVecchia(m)"` (default `m=30`
+     `method="vecchia"` or `"vecchia(m)"` (default `m=30`
      conditioning neighbors). Degrades in higher dimension because nearest
      neighbors become less informative (recommended for d ≲ 5). See
      [Vecchia.md](../../docs/math/Vecchia.md).
    - **Higher dimension, or no reliable local/spatial structure** →
-     `objective="LLNystrom"` or `"LLNystrom(k)"` (default `k=50`
+     `method="nystrom"` or `"nystrom(k)"` (default `k=50`
      landmarks): a global low-rank approximation, dimension-robust in the
      same way `NestedKriging`'s `NK` aggregation is, but a single model
      rather than a partition. See [Nystrom.md](../../docs/math/Nystrom.md).
    - The method is explicit at every later step, never inferred from the
      fit: `predict` / `simulate` / `logLikelihood` take
      `method="exact"` (default), `"vecchia"` / `"vecchia(m)"` or
-     `"nystrom"`. An `LLNystrom` fit (and a light Vecchia fit,
-     `set_vecchia_exact_commit(false)`) holds no exact factorization, so
-     pass `method="nystrom"` / `"vecchia"` there — `"exact"` raises. See
-     the table in [bindings/README.md](../../bindings/README.md).
+     `"nystrom"`. A Vecchia or Nystrom fit holds no exact factorization,
+     so pass `method="vecchia"` / `"nystrom"` there (or `k.method()` as
+     is) — `"exact"` raises; approximate methods give mean / stdev only.
+     For the exact model at the fitted θ, make a separate exact fit with
+     `optim="none"` and that `theta` (`is_theta_estim` false). `update`
+     and `save` / `load` keep the method. See the table in
+     [bindings/README.md](../../bindings/README.md).
+   - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated**
+     aliases of `objective="LL"` with `method="vecchia(m)"` /
+     `"nystrom(k)"` — write the `method=` form in new code.
 
 6. **Is `n` large enough (~10⁴–10⁶) that even Vecchia/Nystrom are too
    slow, and the design can be partitioned / prediction can be
    parallelized?**
    → `NestedKriging`: splits `(X, y)` into groups, fits one submodel per
    group (`Kriging` by default, `WarpKriging` if a warp spec is given),
-   unifies hyperparameters, then aggregates predictions. See §3 for the
+   unifies hyperparameters, then aggregates predictions;
+   `method="vecchia(m)"` / `"nystrom(k)"` estimates the common prior with
+   one global approximate fit instead. See §3 for the
    aggregation choice. Current restrictions: no nugget/noise channel,
    `normalize` unsupported — mention these
    if a user's request would hit them. `NestedKriging` is exposed in
@@ -100,7 +109,8 @@ is both simpler and, for NestedKriging's NK aggregation, actually a
 |---|---|---|
 | `kernel` / `covType` | `"gauss"`, `"exp"`, `"matern3_2"`, `"matern5_2"` (`"whitenoise"` exists but is an internal building block, not a modelling choice) | `"matern5_2"` is the sane general-purpose default (smoother than Matérn 3/2, less rigid than Gaussian, which tends to numerical ill-conditioning). Use `"gauss"` only if the underlying function is known to be very smooth/analytic. See [Kernels.md](../../docs/math/Kernels.md) for formulas. |
 | `regmodel` / trend | `"constant"`, `"linear"`, `"interactive"`, `"quadratic"` (`"none"` = zero mean) | `"constant"` (ordinary kriging) is the default and usually the right start. Move to `"linear"` if the response has an obvious global trend the GP should not have to explain via short-range correlation. Avoid `"quadratic"`/`"interactive"` in high dimension — parameter count grows fast and can overfit the trend, starving the covariance part. |
-| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)), `"LLVecchia"` / `"LLVecchia(m)"` (Vecchia), `"LLNystrom"` / `"LLNystrom(k)"` (Nystrom) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. `"LLVecchia(m)"`/`"LLNystrom(k)"` only for scaling, on noise-free `Kriging` (see §1.5) — each changes the objective, not just its cost, so don't use them on small problems expecting identical results to `"LL"`. |
+| `objective` | `"LL"` (log-likelihood, default), `"LOO"` (leave-one-out, [details](../../docs/math/LOO.md)), `"LMP"` (log marginal posterior, [details](../../docs/math/LMP.md)) | `"LL"` by default. `"LOO"` is a reasonable alternative when you specifically care about predictive accuracy at the design points rather than the full likelihood. `"LMP"` is a good alternative with few observations, where `"LL"` can drift θ into a degenerate (too small/too large) range. |
+| `method` | `"exact"` (default), `"vecchia"` / `"vecchia(m)"`, `"nystrom"` / `"nystrom(k)"` | How the covariance is evaluated, for the fit and afterwards. Approximate methods only for scaling, with `objective="LL"` on noise-free `Kriging` (see §1.5) — they approximate the likelihood, so don't use them on small problems expecting identical results to the exact fit. |
 | `optim` | `"BFGS"` (default), `"BFGSk"` for k random restarts (e.g. `"BFGS10"`), `"none"` | Use `"none"` only when supplying fixed/known hyperparameters via `parameters` (e.g. reusing a fit, or a controlled experiment). For a difficult/multimodal likelihood (many inputs, clustered design), multistart (`"BFGS10"`+) is cheap insurance against a bad local optimum — recommend it over blindly trusting a single `"BFGS"` run when the user reports an unstable or suspicious fit. |
 | `normalize` | boolean, default off | Turn on when input dimensions have very different scales/units — it rescales `X`/`y` to `[0,1]` internally, which helps the optimizer's bounds and starting values. Not supported yet on `NestedKriging`. |
 | `noise` | vector, `"nugget"`, or absent | See §1.2. |
@@ -158,7 +168,7 @@ competitor's specific features (DiceKriging's `knots` warp, RobustGaSP's
 LMP objective, SMT's KPLS reduction, OpenTURNS's joint conditional
 simulation, GPy's inducing points, scikit-learn's `WhiteKernel`, GPflow's
 HMC hyperparameters, GaussianProcesses.jl's composable kernels, GPyTorch's
-iterative/GPU scalability vs. `LLNystrom`) — see the
+iterative/GPU scalability vs. `method="nystrom(k)"`) — see the
 notebooks under `docs/comparisons/libKriging_vs_*.ipynb`. Each ends with an
 argument-correspondence table between libKriging and the competitor's API,
 and is a good source to check exact option names against if this file and
