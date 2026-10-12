@@ -116,17 +116,14 @@ class KrigingRegressor(_BaseKrigingEstimator):
         k random restarts (e.g. ``"BFGS10"``), or ``"none"`` to keep
         `parameters` fixed rather than estimate them.
     objective : str, default="LL"
-        Fit objective: ``"LL"``, ``"LOO"``, ``"LMP"``, ``"LLVecchia"``/
-        ``"LLVecchia(m)"`` (Vecchia approximation, for large ``n``), or
-        ``"LLNystrom"``/``"LLNystrom(k)"`` (Nystrom low-rank approximation,
-        also for large ``n``).
+        Fit criterion: ``"LL"``, ``"LOO"`` or ``"LMP"``.
     method : str, default="exact"
-        Prediction / sampling method used by ``predict`` and ``sample_y``:
-        ``"exact"``, ``"vecchia"``/``"vecchia(m)"`` (local Vecchia
-        predictor) or ``"nystrom"`` (requires ``objective="LLNystrom..."``).
-        Nothing is chosen from ``objective``: an ``LLNystrom`` fit needs
-        ``method="nystrom"`` (it holds no exact factorization). The
-        approximate methods give mean / std only (no ``return_cov``).
+        Covariance method used by ``fit``, ``predict`` and ``sample_y``:
+        ``"exact"``, ``"vecchia"``/``"vecchia(m)"`` (Vecchia approximation,
+        for large ``n``) or ``"nystrom"``/``"nystrom(k)"`` (Nystrom low-rank
+        approximation, also for large ``n``). The approximate methods are
+        only available with ``objective="LL"`` and give mean / std only (no
+        ``return_cov``).
     noise : None, "nugget", float, or array-like of shape (n_samples,), default=None
         ``None`` for noise-free (exact interpolation), ``"nugget"`` for
         an estimated homogeneous nugget, or a per-observation variance
@@ -201,6 +198,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
             objective=self.objective,
             parameters=parameters,
             noise=self.noise,
+            method=self.method,
         )
         return self
 
@@ -483,6 +481,10 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
     warping : list of str or None, default=None
         Non-``None`` switches the per-group submodels to `WarpKriging`
         instead of plain `Kriging`.
+    method : str, default="exact"
+        How the common prior is estimated: ``"exact"`` (per-group fits),
+        ``"vecchia(m)"`` or ``"nystrom(k)"`` (one global approximate fit;
+        ``objective="LL"`` and no ``warping``).
 
     Attributes
     ----------
@@ -502,7 +504,8 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
 
     def __init__(self, kernel="matern5_2", nb_groups=10, aggregation="NK",
                  partition="kmeans", seed=123, regmodel="constant",
-                 optim="BFGS", objective="LL", parameters=None, warping=None):
+                 optim="BFGS", objective="LL", parameters=None, warping=None,
+                 method="exact"):
         self.kernel = kernel
         self.nb_groups = nb_groups
         self.aggregation = aggregation
@@ -513,6 +516,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
         self.objective = objective
         self.parameters = parameters
         self.warping = warping
+        self.method = method
 
     def fit(self, X, y):
         X, y = self._validate_X_fit_y(X, y)
@@ -548,6 +552,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
             objective=self.objective,
             parameters=parameters,
             warping=warping,
+            method=self.method,
         )
         return self
 

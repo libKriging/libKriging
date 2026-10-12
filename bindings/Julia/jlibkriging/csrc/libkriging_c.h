@@ -38,7 +38,9 @@ void* lk_kriging_new_fit(const double* y,
                          int beta_n,
                          int is_beta_estim,
                          const double* nugget,
-                         int is_nugget_estim);
+                         int is_nugget_estim,
+                         /* fit method: "exact", "vecchia(m)", "nystrom(k)" (NULL = "exact") */
+                         const char* method);
 void lk_kriging_delete(void* ptr);
 void* lk_kriging_copy(void* ptr);
 
@@ -53,7 +55,8 @@ int lk_kriging_fit(void* ptr,
                    const char* regmodel,
                    int normalize,
                    const char* optim,
-                   const char* objective);
+                   const char* objective,
+                   const char* method);
 
 int lk_kriging_predict(void* ptr,
                        const double* X_n,
@@ -155,10 +158,7 @@ const char* lk_kriging_optim(void* ptr);
 const char* lk_kriging_objective(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
 int lk_kriging_vecchia_neighbors(void* ptr);
-int lk_kriging_set_vecchia_exact_commit(void* ptr, int exact);
-int lk_kriging_vecchia_exact_commit(void* ptr);
-int lk_kriging_is_vecchia_light(void* ptr);
-int lk_kriging_is_nystrom_light(void* ptr);
+const char* lk_kriging_method(void* ptr);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);
@@ -467,7 +467,10 @@ void* lk_nested_kriging_new_fit(const double* y,
                                 int is_theta_estim,
                                 const double* beta,
                                 int beta_n,
-                                int is_beta_estim);
+                                int is_beta_estim,
+                                const char* method);
+const char* lk_nested_kriging_objective(void* ptr);
+const char* lk_nested_kriging_method(void* ptr);
 void lk_nested_kriging_delete(void* ptr);
 int lk_nested_kriging_fit(void* ptr,
                           const double* y,
@@ -488,7 +491,8 @@ int lk_nested_kriging_fit(void* ptr,
                           int is_theta_estim,
                           const double* beta,
                           int beta_n,
-                          int is_beta_estim);
+                          int is_beta_estim,
+                          const char* method);
 int lk_nested_kriging_predict(void* ptr,
                               const double* X_n,
                               int m,

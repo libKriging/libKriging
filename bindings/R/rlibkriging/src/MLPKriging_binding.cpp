@@ -25,7 +25,8 @@ SEXP mlpKriging_new(const arma::vec& y,
                     bool normalize = false,
                     std::string optim = "BFGS+Adam",
                     std::string objective = "LL",
-                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                    std::string method = "exact") {
   std::vector<arma::uword> hd;
   for (int i = 0; i < hidden_dims.size(); ++i)
     hd.push_back(static_cast<arma::uword>(hidden_dims[i]));
@@ -48,7 +49,8 @@ SEXP mlpKriging_new(const arma::vec& y,
                                      normalize,
                                      optim,
                                      objective,
-                                     params);
+                                     params,
+                                     method);
 
   return MLPKrigingPtr(model, true);
 }
@@ -65,7 +67,8 @@ void mlpKriging_fit(SEXP model_ptr,
                     bool normalize = false,
                     std::string optim = "BFGS+Adam",
                     std::string objective = "LL",
-                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                    Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                    std::string method = "exact") {
   MLPKrigingPtr model(model_ptr);
 
   std::map<std::string, std::string> params;
@@ -76,7 +79,7 @@ void mlpKriging_fit(SEXP model_ptr,
       params[Rcpp::as<std::string>(names[i])] = Rcpp::as<std::string>(plist[i]);
   }
 
-  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params);
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, params, method);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +185,18 @@ arma::vec mlpKriging_theta(SEXP model_ptr) {
 double mlpKriging_sigma2(SEXP model_ptr) {
   MLPKrigingPtr model(model_ptr);
   return model->sigma2();
+}
+
+// [[Rcpp::export]]
+std::string mlpKriging_objective(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->objective();
+}
+
+// [[Rcpp::export]]
+std::string mlpKriging_method(SEXP model_ptr) {
+  MLPKrigingPtr model(model_ptr);
+  return model->method();
 }
 
 // [[Rcpp::export]]

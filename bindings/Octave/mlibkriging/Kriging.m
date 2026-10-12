@@ -28,15 +28,24 @@ classdef Kriging < handle
             end
         end
         
+        % fit(y, X, regmodel, normalize, optim, objective, parameters [, method])
+        % (heterogeneous noise: fit(y, noise, X, ...)); constructor:
+        % Kriging(y, X, kernel, regmodel, normalize, optim, objective,
+        % parameters, noise_model, noise [, method]). method: "exact"
+        % (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
+        % neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k
+        % Nystrom, default 50); an approximate fit keeps no exact
+        % factorization, and only objective "LL" has approximate versions.
+        % "LLVecchia(m)" / "LLNystrom(k)" objectives are deprecated aliases.
         function fit(obj, varargin)
             mLibKriging("Kriging::fit", obj.ref, varargin{:});
         end
         
         % predict(X, return_stdev, return_cov, return_deriv [, method]) and
         % simulate(nsim, seed, X, will_update [, method]): method "exact"
-        % (default, needs the exact factorization), "vecchia" / "vecchia(m)"
-        % (local Vecchia, usable after any fit) or "nystrom" (needs an
-        % LLNystrom fit); nothing is chosen implicitly.
+        % (default, needs a method "exact" fit), "vecchia" / "vecchia(m)"
+        % (local Vecchia, usable after any fit) or "nystrom" (needs a
+        % method "nystrom" fit); nothing is chosen implicitly.
         function varargout = predict(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::predict", obj.ref, varargin{:});
         end
@@ -117,25 +126,9 @@ classdef Kriging < handle
             [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_neighbors", obj.ref, varargin{:});
         end
 
-        % With objective "LLVecchia(m)", false skips the final exact O(n^3)
-        % factorization at the next fit ("light" fit, see is_vecchia_light):
-        % the exact predict / simulate (method "exact", the default) then
-        % raise, "vecchia" is passed explicitly; update and save / load stay
-        % available.
-        function set_vecchia_exact_commit(obj, exact)
-            mLibKriging("Kriging::set_vecchia_exact_commit", obj.ref, logical(exact));
-        end
-
-        function varargout = vecchia_exact_commit(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_exact_commit", obj.ref, varargin{:});
-        end
-
-        function varargout = is_vecchia_light(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::is_vecchia_light", obj.ref, varargin{:});
-        end
-
-        function varargout = is_nystrom_light(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::is_nystrom_light", obj.ref, varargin{:});
+        % fit method: "exact", "vecchia(m)" or "nystrom(k)"
+        function varargout = method(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::method", obj.ref, varargin{:});
         end
 
         function varargout = X(obj, varargin)

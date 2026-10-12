@@ -13,7 +13,8 @@ classNestedKriging <- function(nk) {
             "nk$", f, " <- function(...) ", f, "(nk,...)"
             )))
     }
-    for (d in c('kernel', 'aggregation', 'nb_groups', 'groups', 'theta', 'sigma2', 'beta0', 'X', 'y', 'warping')) {
+    for (d in c('kernel', 'aggregation', 'nb_groups', 'groups', 'theta', 'sigma2', 'beta0', 'X', 'y', 'warping',
+                'objective', 'method')) {
         eval(parse(text = paste0(
             "nk$", d, " <- function() nestedkriging_", d, "(nk)"
             )))
@@ -46,13 +47,17 @@ classNestedKriging <- function(nk) {
 #'     \code{"constant"}.
 #' @param optim Character, hyper-parameter optimization method of the
 #'     submodels: \code{"BFGS"} or \code{"none"}.
-#' @param objective Character: \code{"LL"} (default), \code{"LOO"},
-#'     \code{"LMP"}, or \code{"LLVecchia(m)"} — the common prior is then estimated
-#'     by one global Vecchia fit (O(n m^3), cross-group information).
+#' @param objective Character: \code{"LL"} (default), \code{"LOO"} or
+#'     \code{"LMP"} (\code{"LLVecchia(m)"}: deprecated alias of \code{"LL"}
+#'     with \code{method = "vecchia(m)"}).
 #' @param parameters Initial or fixed values for the hyper-parameters
 #'     (named list with \code{"sigma2"}, \code{"theta"}, \code{"beta"}).
 #' @param warping Optional character vector of per-dimension warp specs
 #'     (see \code{WarpKriging}); submodels are then \code{WarpKriging}.
+#' @param method Character: \code{"exact"} (default, per-group fits), or
+#'     \code{"vecchia(m)"} / \code{"nystrom(k)"}: the common prior is then
+#'     estimated by one global Vecchia (O(n m^3)) or Nystrom (O(n k^2)) fit,
+#'     with cross-group information (\code{objective = "LL"}, no warping).
 #'
 #' @return An object with S3 class \code{"NestedKriging"}, to be used with
 #'     its \code{predict} method.
@@ -78,11 +83,12 @@ NestedKriging <- function(y = NULL,
                           optim = "BFGS",
                           objective = "LL",
                           parameters = NULL,
-                          warping = NULL) {
+                          warping = NULL,
+                          method = "exact") {
     stopifnot(!is.null(y), !is.null(X), !is.null(kernel), !is.null(nb_groups))
     nk <- new_NestedKrigingFit(y, X, kernel, nb_groups,
                                aggregation, partition, seed,
-                               regmodel, optim, objective, parameters, warping)
+                               regmodel, optim, objective, parameters, warping, method)
     classNestedKriging(nk)
 }
 
@@ -170,9 +176,11 @@ load.NestedKriging <- function(filename, ...) {
 #' @param nb_groups Number of groups.
 #' @param regmodel Trend: \code{"constant"} (required by NK), \code{"linear"}, ...
 #' @param optim Optimizer for the submodels / common prior (\code{"BFGS"}, \code{"none"}).
-#' @param objective \code{"LL"}, \code{"LOO"}, \code{"LMP"} or \code{"LLVecchia(m)"}.
+#' @param objective \code{"LL"}, \code{"LOO"} or \code{"LMP"}.
 #' @param parameters Optional list of starting / fixed hyperparameters.
 #' @param warping Optional character vector of per-dimension warpings.
+#' @param method \code{"exact"}, \code{"vecchia(m)"} or \code{"nystrom(k)"}
+#'     (see \code{\link{NestedKriging}}).
 #' @param ... Ignored.
 #'
 #' @return No return value (the object is modified in place).
@@ -184,10 +192,11 @@ fit.NestedKriging <- function(object, y, X, nb_groups,
                               optim = "BFGS",
                               objective = "LL",
                               parameters = NULL,
-                              warping = NULL, ...) {
+                              warping = NULL,
+                              method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.matrix(X)) X <- as.matrix(X)
     nestedkriging_fit(object, as.numeric(y), X, nb_groups,
-                      regmodel, optim, objective, parameters, warping)
+                      regmodel, optim, objective, parameters, warping, method)
     invisible(NULL)
 }

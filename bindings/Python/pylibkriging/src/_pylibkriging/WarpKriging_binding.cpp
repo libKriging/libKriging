@@ -67,13 +67,14 @@ PyWarpKriging::PyWarpKriging(const py::array_t<double>& y,
                              const std::string& optim,
                              const std::string& objective,
                              const py::dict& parameters,
-                             py::object noise) {
+                             py::object noise,
+                             const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal = std::make_unique<lk::WarpKriging>(warping, kernel);
   auto [wparams, tuning] = split_warp_parameters(parameters);
   merge_noise_arg(wparams, noise);
-  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
 }
 
 PyWarpKriging::~PyWarpKriging() {}
@@ -89,12 +90,13 @@ void PyWarpKriging::fit(const py::array_t<double>& y,
                         const std::string& optim,
                         const std::string& objective,
                         const py::dict& parameters,
-                        py::object noise) {
+                        py::object noise,
+                        const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   auto [wparams, tuning] = split_warp_parameters(parameters);
   merge_noise_arg(wparams, noise);
-  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
@@ -174,6 +176,10 @@ std::string PyWarpKriging::optim() {
 
 std::string PyWarpKriging::objective() {
   return m_internal->objective();
+}
+
+std::string PyWarpKriging::method() {
+  return m_internal->method();
 }
 
 py::array_t<double> PyWarpKriging::noise() {

@@ -70,7 +70,8 @@ class NestedKriging {
                                   const std::string& optim = "BFGS",
                                   const std::string& objective = "LL",
                                   const Kriging::Parameters& parameters = {},
-                                  const std::vector<std::string>& warping = {});
+                                  const std::vector<std::string>& warping = {},
+                                  const std::string& method = "exact");
 
   /** Fit p independent submodels, then unify hyperparameters into a common
    * prior and refit with optim="none".
@@ -83,13 +84,18 @@ class NestedKriging {
    * sigma2 / beta0 <- weighted means over the seeded submodel fits
    * (sigma2 is profiled per group given the common correlation).
    *
-   * LLVecchia-unified path (objective="LLVecchia(m)", plain submodels only): the common
-   * prior (theta, sigma2, beta) is estimated by ONE global light Vecchia fit
-   * in O(n m^3) — cross-group information, one optimization instead of p —
-   * then every submodel is fitted in closed form on the seeded prior.
+   * Approximate-prior path (method="vecchia(m)" or "nystrom(k)", objective
+   * "LL", plain submodels only): the common prior (theta, sigma2, beta) is
+   * estimated by ONE global Vecchia (O(n m^3)) or Nystrom (O(n k^2)) fit —
+   * cross-group information, one optimization instead of p — then every
+   * (exact) submodel is fitted in closed form on the seeded prior.
    *
    * @param warping per-dimension warp specs (see WarpKriging), empty for
-   *        plain Kriging submodels. */
+   *        plain Kriging submodels.
+   * @param method "exact" (default), "vecchia(m)" or "nystrom(k)": how the
+   *        common prior is estimated (see above). The deprecated objective
+   *        "LLVecchia(m)" is an alias of objective "LL" with method
+   *        "vecchia(m)" (see Kriging::fit_objective_method). */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              arma::uword nb_groups,
@@ -97,7 +103,8 @@ class NestedKriging {
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
                              const Kriging::Parameters& parameters = {},
-                             const std::vector<std::string>& warping = {});
+                             const std::vector<std::string>& warping = {},
+                             const std::string& method = "exact");
 
   /** Aggregated prediction at X_n (q x d).
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
@@ -110,6 +117,9 @@ class NestedKriging {
   [[nodiscard]] const std::vector<arma::uvec>& groups() const { return m_groups; }
   [[nodiscard]] bool warped() const { return !m_warping.empty(); }
   [[nodiscard]] const std::vector<std::string>& warping() const { return m_warping; }
+  /// Fit criterion and covariance method of the common prior (see fit())
+  [[nodiscard]] const std::string& objective() const { return m_objective; }
+  [[nodiscard]] const std::string& method() const { return m_method; }
   /// Plain-path submodel access (throws when warped)
   [[nodiscard]] LIBKRIGING_EXPORT const Kriging& submodel(arma::uword i) const;
   /// Warped-path submodel access (throws when plain)
@@ -157,6 +167,8 @@ class NestedKriging {
   std::vector<std::unique_ptr<Kriging>> m_submodels;                   ///< plain path
   std::vector<std::unique_ptr<libKriging::WarpKriging>> m_wsubmodels;  ///< warped path
   std::vector<std::string> m_warping;                                  ///< empty = plain
+  std::string m_objective = "LL";
+  std::string m_method = "exact";
   arma::uword m_warp_subsample = 1000;                                 ///< subsample size for the warped reference fit
 
   // unified (common prior) hyperparameters

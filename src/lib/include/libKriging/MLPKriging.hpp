@@ -66,7 +66,8 @@ class MLPKriging {
                                bool normalize = false,
                                const std::string& optim = "BFGS+Adam",
                                const std::string& objective = "LL",
-                               const std::map<std::string, std::string>& parameters = {});
+                               const std::map<std::string, std::string>& parameters = {},
+                               const std::string& method = "exact");
 
   // -----------------------------------------------------------------------
   //  Fitting
@@ -78,7 +79,8 @@ class MLPKriging {
                              bool normalize = false,
                              const std::string& optim = "BFGS+Adam",
                              const std::string& objective = "LL",
-                             const std::map<std::string, std::string>& parameters = {});
+                             const std::map<std::string, std::string>& parameters = {},
+                             const std::string& method = "exact");
 
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
@@ -86,7 +88,8 @@ class MLPKriging {
                              bool normalize,
                              const std::string& optim,
                              const std::string& objective,
-                             const Parameters& parameters);
+                             const Parameters& parameters,
+                             const std::string& method = "exact");
 
   // -----------------------------------------------------------------------
   //  Prediction / simulation / update
@@ -134,6 +137,8 @@ class MLPKriging {
   const arma::vec& z() const { return m_impl.z(); }
   const arma::vec& beta() const { return m_impl.beta(); }
   std::string kernel() const { return m_impl.kernel(); }
+  const std::string& objective() const { return m_impl.objective(); }
+  const std::string& method() const { return m_impl.method(); }
   arma::vec theta() const { return m_impl.theta(); }
   double sigma2() const { return m_impl.sigma2(); }
   bool is_fitted() const { return m_impl.is_fitted(); }

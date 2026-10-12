@@ -3,16 +3,14 @@
 ## As an S3 class, it has no formal definition.
 ## ****************************************************************************
 
-# Validate the `objective` argument. Unlike match.arg(), this accepts the
-# Vecchia approximated log-likelihood "LLVecchia" / "LLVecchia(m)" and the
-# Nystrom (low-rank) approximated log-likelihood "LLNystrom" / "LLNystrom(k)",
-# in addition to the classic "LL" / "LOO" / "LMP" (kept consistent with the
-# Python/Julia bindings, which pass `objective` as a free string).
+# Validate the `objective` argument. Unlike match.arg(), this also accepts the
+# deprecated "LLVecchia" / "LLVecchia(m)" and "LLNystrom" / "LLNystrom(k)"
+# objectives (aliases of objective "LL" with method "vecchia(m)" /
+# "nystrom(k)"), in addition to "LL" / "LOO" / "LMP".
 .match_kriging_objective <- function(objective) {
     objective <- objective[[1L]]
     if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
-        stop("'objective' must be one of \"LL\", \"LOO\", \"LMP\", \"LLVecchia\", \"LLVecchia(m)\", ",
-             "\"LLNystrom\" or \"LLNystrom(k)\" (got \"",
+        stop("'objective' must be one of \"LL\", \"LOO\" or \"LMP\" (got \"",
              objective, "\")", call. = FALSE)
     objective
 }
@@ -32,17 +30,11 @@ classKriging <- function(nk) {
             )))
     }
     # This will allow to access kriging data/props using `k$d()`
-    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','vecchia_exact_commit','is_vecchia_light','is_nystrom_light')) {
+    for (d in c('kernel','optim','objective','X','centerX','scaleX','y','centerY','scaleY','regmodel','normalize','F','T','M','z','beta','is_beta_estim','theta','is_theta_estim','sigma2','is_sigma2_estim','noise_model','nugget','is_nugget_estim','noise','nystrom_rank','vecchia_neighbors','method')) {
         eval(parse(text=paste0(
             "nk$", d, " <- function() kriging_", d, "(nk)"
             )))
     }
-    # With objective = "LLVecchia(m)", FALSE skips the final exact O(n^3)
-    # factorization at the next fit ("light" fit, see `k$is_vecchia_light()`):
-    # the exact predict / simulate (method = "exact", the default) then raise,
-    # method = "vecchia" is passed explicitly; update and save / load stay
-    # available.
-    nk$set_vecchia_exact_commit <- function(exact) kriging_set_vecchia_exact_commit(nk, as.logical(exact))
     nk
 }
 
@@ -73,18 +65,10 @@ classKriging <- function(nk) {
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares, \code{"LMP"} for the Log-Marginal Posterior,
-#'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
-#'     log-likelihood with \code{m} conditioning neighbors (default 30):
-#'     each evaluation costs O(n m^3) instead of O(n^3), recommended for
-#'     large designs in low dimension; and \code{"LLNystrom"} or
-#'     \code{"LLNystrom(k)"} for the Nystrom (global low-rank) approximated
-#'     log-likelihood with rank \code{k} (default 50): each evaluation costs
-#'     O(n k^2) instead of O(n^3), also recommended for large designs. The
-#'     objective does not select the prediction method: \code{predict},
-#'     \code{simulate} and \code{logLikelihood} take \code{method}
-#'     (\code{"exact"} by default; \code{"nystrom"} is required after an
-#'     \code{LLNystrom} fit, which holds no exact factorization).
+#'     squares, \code{"LMP"} for the Log-Marginal Posterior.
+#'     \code{"LLVecchia(m)"} and \code{"LLNystrom(k)"} are deprecated
+#'     aliases of \code{objective = "LL"} with \code{method = "vecchia(m)"}
+#'     and \code{method = "nystrom(k)"}.
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -94,6 +78,18 @@ classKriging <- function(nk) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
+#' @param method Character, how the covariance is evaluated, for the fit
+#'     and for what the model keeps afterwards: \code{"exact"} (default),
+#'     \code{"vecchia"} or \code{"vecchia(m)"} for the Vecchia approximation
+#'     with \code{m} conditioning neighbors (default 30; each likelihood
+#'     evaluation costs O(n m^3) instead of O(n^3), for large designs in low
+#'     dimension), \code{"nystrom"} or \code{"nystrom(k)"} for the Nystrom
+#'     (global low-rank) approximation of rank \code{k} (default 50; O(n k^2)).
+#'     An approximate fit keeps no exact factorization: \code{predict},
+#'     \code{simulate} and \code{logLikelihood} then take the same
+#'     \code{method}, and the exact model at the fitted \code{theta} is a
+#'     separate fit (\code{optim = "none"}). Approximate methods are only
+#'     implemented with \code{objective = "LL"} and without \code{noise}.
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -131,7 +127,8 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
-                    noise = NULL) {
+                    noise = NULL,
+                    method = "exact") {
 
     regmodel <- match.arg(regmodel)
     objective <- .match_kriging_objective(objective)
@@ -168,7 +165,8 @@ Kriging <- function(y=NULL, X=NULL, kernel=NULL,
                       normalize = normalize,
                       optim = optim,
                       objective = objective,
-                      parameters = parameters)
+                      parameters = parameters,
+                      method = method)
     return(classKriging(nk))
 }
 
@@ -262,11 +260,9 @@ print.Kriging <- function(x, ...) {
 #' @param objective Character giving the objective function to
 #'     optimize. Possible values are: \code{"LL"} for the
 #'     Log-Likelihood, \code{"LOO"} for the Leave-One-Out sum of
-#'     squares, \code{"LMP"} for the Log-Marginal Posterior,
-#'     \code{"LLVecchia"} or \code{"LLVecchia(m)"} for the Vecchia approximated
-#'     log-likelihood (see \code{\link{Kriging}}), and \code{"LLNystrom"} or
-#'     \code{"LLNystrom(k)"} for the Nystrom approximated log-likelihood
-#'     (see \code{\link{Kriging}}).
+#'     squares, \code{"LMP"} for the Log-Marginal Posterior
+#'     (\code{"LLVecchia(m)"} / \code{"LLNystrom(k)"}: deprecated aliases,
+#'     see \code{\link{Kriging}}).
 #' @param parameters Initial values for the hyper-parameters. When
 #'     provided this must be named list with elements \code{"sigma2"}
 #'     and \code{"theta"} containing the initial value(s) for the
@@ -276,6 +272,8 @@ print.Kriging <- function(x, ...) {
 #' @param noise Either a numeric vector of per-observation noise variances,
 #'     or \code{"nugget"} to estimate a homogeneous nugget, or
 #'     \code{NULL} (default) for noise-free interpolation.
+#' @param method Character: \code{"exact"} (default), \code{"vecchia(m)"}
+#'     or \code{"nystrom(k)"} (see \code{\link{Kriging}}).
 #' @param ... Ignored.
 #'
 #' @return No return value. Kriging object argument is modified.
@@ -302,7 +300,8 @@ fit.Kriging <- function(object, y, X,
                     optim = c("BFGS", "none"),
                     objective = c("LL", "LOO", "LMP"),
                     parameters = NULL,
-                    noise = NULL, ...) {
+                    noise = NULL,
+                    method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
 
     regmodel <- match.arg(regmodel)
@@ -315,7 +314,8 @@ fit.Kriging <- function(object, y, X,
                     normalize,
                     optim ,
                     objective,
-                    parameters)
+                    parameters,
+                    method)
 
     invisible(NULL)
 }
@@ -338,12 +338,12 @@ fit.Kriging <- function(object, y, X,
 #'     the predictions is returned.
 #' @param return_deriv \code{Logical}. If \code{TRUE} the derivatives of mean and sd
 #'     of the predictions are returned.
-#' @param method \code{Character}: \code{"exact"} (default, needs the exact
-#'     factorization), \code{"vecchia"} / \code{"vecchia(m)"} (local Vecchia
-#'     predictor, usable after any fit) or \code{"nystrom"} (needs an
-#'     \code{LLNystrom} fit). The approximate methods return mean / stdev only.
-#'     Nothing is chosen implicitly: on a light Vecchia or an \code{LLNystrom}
-#'     fit, \code{"exact"} raises an error.
+#' @param method \code{Character}: \code{"exact"} (default, needs a
+#'     \code{method = "exact"} fit), \code{"vecchia"} / \code{"vecchia(m)"}
+#'     (local Vecchia predictor, usable after any fit) or \code{"nystrom"}
+#'     (needs a \code{method = "nystrom"} fit). The approximate methods return
+#'     mean / stdev only. Nothing is chosen implicitly: on a Vecchia or
+#'     Nystrom fit, \code{"exact"} raises an error.
 #' @param ... Ignored.
 #'
 #' @return A list containing the element \code{mean} and possibly
@@ -849,8 +849,8 @@ logLikelihoodFun.Kriging <- function(object, theta,
 #'
 #' @param object An S3 Kriging object.
 #' @param method \code{Character}: \code{"exact"} (default),
-#'     \code{"vecchia"} (requires an \code{LLVecchia} fit) or
-#'     \code{"nystrom"} (requires an \code{LLNystrom} fit).
+#'     \code{"vecchia"} (requires a \code{method = "vecchia"} fit) or
+#'     \code{"nystrom"} (requires a \code{method = "nystrom"} fit).
 #' @param ... Not used.
 #'
 #' @return The log-Likelihood computed for fitted

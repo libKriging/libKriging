@@ -10,6 +10,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void aggregation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void nb_groups(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

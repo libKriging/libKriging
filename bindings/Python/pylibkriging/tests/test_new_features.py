@@ -334,26 +334,47 @@ def test_vecchia_neighbors_and_nystrom_rank():
     rng = np.random.default_rng(5)
     X = rng.uniform(size=(30, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
-    assert lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)").vecchia_neighbors() == 7
-    assert lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)").nystrom_rank() == 5
+    assert lk.Kriging(y, X, "matern5_2", method="vecchia(7)").vecchia_neighbors() == 7
+    assert lk.Kriging(y, X, "matern5_2", method="nystrom(5)").nystrom_rank() == 5
     k = lk.Kriging(y, X, "matern5_2")
     assert k.vecchia_neighbors() == 0
     assert k.nystrom_rank() == 0
+    assert k.method() == "exact"
 
 
-def test_vecchia_light_fit(tmp_path):
+def test_fit_method_and_deprecated_objectives():
+    rng = np.random.default_rng(9)
+    X = rng.uniform(size=(40, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    k = lk.Kriging(y, X, "matern5_2", method="vecchia")
+    assert k.objective() == "LL" and k.method() == "vecchia(30)"
+    assert lk.Kriging(y, X, "matern5_2", method="nystrom").method() == "nystrom(50)"
+    assert k.model()["method"] == "vecchia(30)"
+    # deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)"
+    ka = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
+    assert ka.objective() == "LL" and ka.method() == "vecchia(7)"
+    kb = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)")
+    assert kb.objective() == "LL" and kb.method() == "nystrom(5)"
+    # only LL has approximate versions; no approximation with a noise model
+    with pytest.raises(ValueError):
+        lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia")
+    with pytest.raises(ValueError):
+        lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget")
+    with pytest.raises(ValueError):
+        lk.Kriging(y, X, "matern5_2", method="Vecchia")
+    with pytest.raises(ValueError):
+        lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)", method="nystrom")
+
+
+def test_vecchia_fit(tmp_path):
     rng = np.random.default_rng(6)
     X = rng.uniform(size=(60, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
     Xn = rng.uniform(size=(7, 2))
 
     k = lk.Kriging("matern5_2")
-    assert k.vecchia_exact_commit()
-    k.set_vecchia_exact_commit(False)
-    assert not k.vecchia_exact_commit()
-    k.fit(y, X, "constant", False, "BFGS", "LLVecchia(10)", {})
-    assert k.is_vecchia_light()
-    assert not k.is_nystrom_light()
+    k.fit(y, X, "constant", False, "BFGS", "LL", {}, method="vecchia(10)")
+    assert k.method() == "vecchia(10)"
 
     # explicit method: no implicit switch from the exact predictor
     with pytest.raises(RuntimeError):
@@ -370,28 +391,29 @@ def test_vecchia_light_fit(tmp_path):
     with pytest.raises(ValueError):
         k.predict(Xn, method="unknown")
     assert np.isfinite(k.logLikelihood(method="vecchia"))
+    assert k.logLikelihood(method=k.method()) == k.logLikelihood(method="vecchia")
 
-    # update (Vecchia refit) and save / load on a light fit
+    # update (Vecchia refit) and save / load
     Xu = rng.uniform(size=(5, 2))
     yu = np.sin(3 * Xu[:, 0]) + Xu[:, 1]
     k.update(yu, Xu, False)
-    assert k.is_vecchia_light() and k.X().shape == (65, 2)
+    assert k.method() == "vecchia(10)" and k.X().shape == (65, 2)
     m_u = k.predict(Xu, method="vecchia")[0]
     assert np.max(np.abs(m_u - yu)) < 1e-3
-    fname = str(tmp_path / "light_vecchia_py.json")
+    fname = str(tmp_path / "vecchia_py.json")
     k.save(fname)
     kl = lk.Kriging.load(fname)
-    assert kl.is_vecchia_light() and kl.vecchia_neighbors() == 10
+    assert kl.method() == "vecchia(10)" and kl.vecchia_neighbors() == 10
     np.testing.assert_allclose(kl.predict(Xn, method="vecchia")[0], k.predict(Xn, method="vecchia")[0],
                                atol=1e-12)
 
-    # refit with the exact commit: exact and Vecchia methods both available
-    k.set_vecchia_exact_commit(True)
-    k.fit(y, X, "constant", False, "BFGS", "LLVecchia(10)", {})
-    assert not k.is_vecchia_light()
-    k.predict(Xn, True, True, False)
-    k.predict(Xn, method="vecchia")
-    assert k.logLikelihood() == k.logLikelihood(method="exact")
+    # the exact model at the Vecchia estimate is a separate exact fit
+    ke = lk.Kriging(y, X, "matern5_2", optim="none",
+                    parameters={"theta": np.atleast_2d(k.theta()), "is_theta_estim": False})
+    assert ke.method() == "exact"
+    ke.predict(Xn, True, True, False)
+    ke.predict(Xn, method="vecchia")
+    assert ke.logLikelihood() == ke.logLikelihood(method="exact")
 
 
 def test_nystrom_fit_explicit_method():
@@ -399,17 +421,30 @@ def test_nystrom_fit_explicit_method():
     X = rng.uniform(size=(60, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
     Xn = rng.uniform(size=(7, 2))
-    k = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(8)")
-    assert k.is_nystrom_light()
+    k = lk.Kriging(y, X, "matern5_2", method="nystrom(8)")
+    assert k.method() == "nystrom(8)"
     with pytest.raises(RuntimeError):
         k.predict(Xn)
     mean, stdev, _, _, _ = k.predict(Xn, method="nystrom")
     assert mean.shape == (7,) and np.all(stdev >= 0)
+    np.testing.assert_array_equal(k.predict(Xn, method=k.method())[0], mean)
+    with pytest.raises(ValueError):
+        k.predict(Xn, method="nystrom(3)")  # not the fitted rank
     assert k.simulate(3, 1, Xn, method="nystrom").shape == (7, 3)
     assert np.isfinite(k.logLikelihood(method="nystrom"))
     with pytest.raises(RuntimeError):
-        k.logLikelihood(method="vecchia")  # not an LLVecchia fit
-    assert not lk.Kriging(y, X, "matern5_2").is_nystrom_light()
+        k.logLikelihood(method="vecchia")  # not a Vecchia fit
+
+
+def test_nested_kriging_method():
+    rng = np.random.default_rng(10)
+    X = rng.uniform(size=(200, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    nk = lk.NestedKriging(y, X, "matern5_2", 3, method="vecchia(15)")
+    assert nk.objective() == "LL" and nk.method() == "vecchia(15)"
+    mean, _ = nk.predict(X[:5], True)
+    assert np.max(np.abs(mean - y[:5])) < 1e-3
+    assert lk.NestedKriging(y, X, "matern5_2", 3).method() == "exact"
 
 
 def test_sklearn_regressor_method():
@@ -418,6 +453,7 @@ def test_sklearn_regressor_method():
     rng = np.random.default_rng(8)
     X = rng.uniform(size=(40, 2))
     y = np.sin(3 * X[:, 0]) + X[:, 1]
-    reg = KrigingRegressor(objective="LLNystrom(8)", method="nystrom").fit(X, y)
+    reg = KrigingRegressor(method="nystrom(8)").fit(X, y)
+    assert reg.model_.method() == "nystrom(8)"
     assert reg.predict(X[:3]).shape == (3,)
     assert reg.sample_y(X[:3], n_samples=2).shape == (3, 2)

@@ -31,7 +31,8 @@ class PyKriging {
             const std::string& optim,
             const std::string& objective,
             const py::dict& dict,
-            const py::object& noise);
+            const py::object& noise,
+            const std::string& method);
   ~PyKriging();
 
   PyKriging(const PyKriging& other);
@@ -45,7 +46,8 @@ class PyKriging {
            const std::string& optim,
            const std::string& objective,
            const py::dict& dict,
-           const py::object& noise);
+           const py::object& noise,
+           const std::string& method);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n,
@@ -105,10 +107,7 @@ class PyKriging {
   std::string objective();
   int nystrom_rank();
   int vecchia_neighbors();
-  void set_vecchia_exact_commit(bool b);
-  bool vecchia_exact_commit();
-  bool is_vecchia_light();
-  bool is_nystrom_light();
+  std::string method();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

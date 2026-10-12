@@ -83,7 +83,8 @@ double test_function(const arma::rowvec& x) {
 
 void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iterations) {
   std::cout << "\n";
-  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LLVecchia(30))" << std::endl;
+  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LL, method vecchia(30))"
+            << std::endl;
 
   arma::arma_rng::set_seed(123);
   arma::mat X_train(n_train, d, arma::fill::randu);
@@ -95,31 +96,35 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   const bool with_exact = (n_train <= 1000);
 
   std::vector<double> fit_times, fit_ll_times, vll_eval_times, vll_grad_times, ll_eval_times, ll_grad_times;
-  std::vector<double> predict_times, predict_vecchia_times, fit_light_times;
+  std::vector<double> predict_times, predict_vecchia_times, fit_refit_times;
 
   const arma::uword n_pred = 100;
   arma::mat X_pred(n_pred, d, arma::fill::randu);
 
-  // fitted LLVecchia model reused for the objective-evaluation rows
-  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
+  // fitted Vecchia model reused for the objective-evaluation rows
+  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(30)");
   const arma::vec theta_eval(d, arma::fill::value(0.3));
+  // exact model at the Vecchia estimate (a Vecchia fit holds no exact
+  // factorization): baseline of the exact predict / LL rows
+  Kriging::Parameters exact_params;
+  exact_params.theta = arma::mat(k_eval.theta().t());
+  exact_params.is_theta_estim = false;
+  Kriging k_exact_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "none", "LL", exact_params);
 
   for (int iter = 0; iter < n_iterations; ++iter) {
-    // --- fit with the Vecchia objective ---
+    // --- fit with the Vecchia method (no exact factorization) ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)");
+      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "vecchia(30)");
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
-    // --- light fit: no exact factorization at commit ---
+    // --- exact model at the Vecchia estimate: one O(n^3) factorization ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      Kriging kr("gauss");
-      kr.set_vecchia_exact_commit(false);
-      kr.fit(y_train, X_train, Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(30)", {});
+      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "none", "LL", exact_params);
       auto t1 = std::chrono::high_resolution_clock::now();
-      fit_light_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
+      fit_refit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
     // --- fit with the exact LL (comparison baseline) ---
     if (with_exact) {
@@ -143,7 +148,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     // --- prediction: exact vs Vecchia (local, m neighbors) ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k_eval.predict(X_pred, true, false, false);
+      k_exact_eval.predict(X_pred, true, false, false);
       auto t1 = std::chrono::high_resolution_clock::now();
       predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 
@@ -154,12 +159,12 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     }
     if (with_exact) {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k_eval.logLikelihoodFun(theta_eval, false, false);
+      k_exact_eval.logLikelihoodFun(theta_eval, false, false);
       auto t1 = std::chrono::high_resolution_clock::now();
       ll_eval_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 
       t0 = std::chrono::high_resolution_clock::now();
-      k_eval.logLikelihoodFun(theta_eval, true, false);
+      k_exact_eval.logLikelihoodFun(theta_eval, true, false);
       t1 = std::chrono::high_resolution_clock::now();
       ll_grad_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
@@ -167,7 +172,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 
   print_header();
   print_stats("fit", compute_stats(fit_times));
-  print_stats("fit_light", compute_stats(fit_light_times));
+  print_stats("fit_exact_refit", compute_stats(fit_refit_times));
   if (with_exact)
     print_stats("fit_exact_ll", compute_stats(fit_ll_times));
   print_stats("predict", compute_stats(predict_times));
@@ -181,7 +186,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "Vecchia Benchmark (objective=LLVecchia(30) vs exact LL)" << std::endl;
+  std::cout << "Vecchia Benchmark (LL with method vecchia(30) vs exact LL)" << std::endl;
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;

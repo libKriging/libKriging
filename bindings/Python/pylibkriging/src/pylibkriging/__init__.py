@@ -287,7 +287,8 @@ class WarpKriging:
         return X_enc
 
     def fit(self, y, X, regmodel="constant", normalize=False,
-            optim="BFGS+Adam", objective="LL", parameters=None, noise=None):
+            optim="BFGS+Adam", objective="LL", parameters=None, noise=None,
+            method="exact"):
         if parameters is None:
             parameters = {}
         if _has_string_columns(X):
@@ -296,7 +297,8 @@ class WarpKriging:
         else:
             X = _np.asarray(X, dtype=_np.float64)
         self._impl.fit(_np.asarray(y, dtype=_np.float64), X,
-                       regmodel, normalize, optim, objective, parameters, noise)
+                       regmodel, normalize, optim, objective, parameters, noise,
+                       method)
 
     def predict(self, X, return_stdev=True, return_cov=False, return_deriv=False):
         return self._impl.predict(self._encode_X(X),
@@ -361,5 +363,6 @@ class WarpKriging:
     def warping(self): return self._impl.warping()
     def optim(self): return self._impl.optim()
     def objective(self): return self._impl.objective()
+    def method(self): return self._impl.method()
     def noise(self): return self._impl.noise()
     def warp_params(self): return self._impl.warp_params()

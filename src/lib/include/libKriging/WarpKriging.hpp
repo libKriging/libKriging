@@ -660,7 +660,8 @@ class WarpKriging : protected KrigingImpl {
                                 bool normalize = false,
                                 const std::string& optim = "BFGS+Adam",
                                 const std::string& objective = "LL",
-                                const std::map<std::string, std::string>& parameters = {});
+                                const std::map<std::string, std::string>& parameters = {},
+                                const std::string& method = "exact");
 
   // -----------------------------------------------------------------------
   //  Fitting
@@ -672,12 +673,15 @@ class WarpKriging : protected KrigingImpl {
                              bool normalize = false,
                              const std::string& optim = "BFGS+Adam",
                              const std::string& objective = "LL",
-                             const std::map<std::string, std::string>& parameters = {});
+                             const std::map<std::string, std::string>& parameters = {},
+                             const std::string& method = "exact");
 
   /// Typed-parameters overload: lets callers seed θ / warp params / noise.
   /// @param tuning optional string knobs ("adam_lr", "max_iter_adam",
   ///        "max_iter_bfgs"), applied before optimisation. This lets a caller
   ///        pass both typed seeds and optimiser knobs in a single fit() call.
+  /// @param method covariance evaluation: only "exact" is implemented for
+  ///        WarpKriging (the API matches Kriging::fit); others raise.
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
                              const Trend::RegressionModel& regmodel,
@@ -685,7 +689,8 @@ class WarpKriging : protected KrigingImpl {
                              const std::string& optim,
                              const std::string& objective,
                              const Parameters& parameters,
-                             const std::map<std::string, std::string>& tuning = {});
+                             const std::map<std::string, std::string>& tuning = {},
+                             const std::string& method = "exact");
 
   // -----------------------------------------------------------------------
   //  Prediction
@@ -778,6 +783,7 @@ class WarpKriging : protected KrigingImpl {
 
   // Re-expose the fit-configuration getters from the (protected) base so that
   // WarpKriging carries the same accessor surface as Kriging.
+  using KrigingImpl::method;
   using KrigingImpl::objective;
   using KrigingImpl::optim;
 

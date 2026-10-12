@@ -63,7 +63,8 @@ PyKriging::PyKriging(const py::array_t<double>& y,
                      const std::string& optim,
                      const std::string& objective,
                      const py::dict& dict,
-                     const py::object& noise) {
+                     const py::object& noise,
+                     const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   Kriging::Parameters parameters = params_from_dict(dict);
@@ -71,14 +72,14 @@ PyKriging::PyKriging(const py::array_t<double>& y,
   if (noise.is_none()) {
     // No noise: pure GP (NoiseModel::None)
     m_internal = std::make_unique<Kriging>(
-        mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+        mat_y, mat_X, covType, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": estimated nugget mode
     std::string noise_str = noise.cast<std::string>();
     if (noise_str != "nugget")
       throw std::invalid_argument("noise string must be 'nugget', got '" + noise_str + "'");
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Nugget);
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   } else {
     // noise is array or scalar: heterogeneous noise
     arma::colvec mat_noise;
@@ -89,7 +90,8 @@ PyKriging::PyKriging(const py::array_t<double>& y,
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
     m_internal = std::make_unique<Kriging>(covType, Kriging::NoiseModel::Heterogeneous);
-    m_internal->fit(mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(
+        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   }
 }
 
@@ -111,16 +113,17 @@ void PyKriging::fit(const py::array_t<double>& y,
                     const std::string& optim,
                     const std::string& objective,
                     const py::dict& dict,
-                    const py::object& noise) {
+                    const py::object& noise,
+                    const std::string& method) {
   arma::mat mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   Kriging::Parameters parameters = params_from_dict(dict);
 
   if (noise.is_none()) {
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   } else if (py::isinstance<py::str>(noise)) {
     // noise="nugget": just fit without noise vector (Nugget mode uses the non-noise fit overload)
-    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   } else {
     arma::colvec mat_noise;
     if (py::isinstance<py::float_>(noise) || py::isinstance<py::int_>(noise)) {
@@ -129,7 +132,8 @@ void PyKriging::fit(const py::array_t<double>& y,
     } else {
       mat_noise = carma::arr_to_col_view<double>(noise.cast<py::array_t<double>>());
     }
-    m_internal->fit(mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters);
+    m_internal->fit(
+        mat_y, mat_noise, mat_X, Trend::fromString(regmodel), normalize, optim, objective, parameters, method);
   }
 }
 
@@ -325,20 +329,8 @@ int PyKriging::vecchia_neighbors() {
   return static_cast<int>(m_internal->vecchia_neighbors());
 }
 
-void PyKriging::set_vecchia_exact_commit(bool b) {
-  m_internal->set_vecchia_exact_commit(b);
-}
-
-bool PyKriging::vecchia_exact_commit() {
-  return m_internal->vecchia_exact_commit();
-}
-
-bool PyKriging::is_vecchia_light() {
-  return m_internal->is_vecchia_light();
-}
-
-bool PyKriging::is_nystrom_light() {
-  return m_internal->is_nystrom_light();
+std::string PyKriging::method() {
+  return m_internal->method();
 }
 
 py::array_t<double> PyKriging::X() {
@@ -447,6 +439,7 @@ py::dict PyKriging::model() const {
   d["kernel"] = m_internal->kernel();
   d["optim"] = m_internal->optim();
   d["objective"] = m_internal->objective();
+  d["method"] = m_internal->method();
   d["noise_model"] = noise_model_to_string(m_internal->noise_model());
 
   arma::vec theta = m_internal->theta();

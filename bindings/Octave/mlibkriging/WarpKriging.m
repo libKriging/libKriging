@@ -3,6 +3,8 @@ classdef WarpKriging < handle
     %
     %   wk = WarpKriging(y, X, warping, kernel)
     %   wk = WarpKriging(y, X, warping, kernel, regmodel, normalize, optim, objective)
+    %   wk = WarpKriging(y, X, warping, kernel, regmodel, normalize, optim, objective, ...
+    %                    parameters, noise, method)   % method: only "exact"
     %
     %   warping is a cell array of strings, e.g. {"kumaraswamy", "none", "categorical(5,2)"}
     %
@@ -276,6 +278,10 @@ classdef WarpKriging < handle
 
         function varargout = objective(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("WarpKriging::objective", obj.ref, varargin{:});
+        end
+
+        function varargout = method(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("WarpKriging::method", obj.ref, varargin{:});
         end
 
         function varargout = noise(obj, varargin)

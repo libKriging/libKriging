@@ -99,11 +99,12 @@ static mxArray* stringVecToCell(const std::vector<std::string>& vec) {
 namespace WarpKrigingBinding {
 
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
-  // args: y, X, warping_cell, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct], [noise_vec]
+  // args: y, X, warping_cell, kernel, [regmodel], [normalize], [optim], [objective], [parameters_struct], [noise_vec],
+  // [method] (only "exact" is implemented for WarpKriging)
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 10}};
+                 RequiresArg::Range{3, 11}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto y_vec = input.get<arma::vec>(0, "y vector");
   auto X_mat = input.get<arma::mat>(1, "X matrix");
@@ -114,6 +115,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(9, "noise");
+  auto method = input.getOptional<std::string>(10, "method").value_or("exact");
 
   auto [wparams, tuning] = (nrhs > 8) ? structToWarpParameters(prhs[8])
                                       : std::pair<WarpKriging::Parameters, std::map<std::string, std::string>>{};
@@ -122,7 +124,7 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
 
   auto wk = buildObject<WarpKriging>(warping, kernel);
   auto* wk_ptr = reinterpret_cast<WarpKriging*>(wk);
-  wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  wk_ptr->fit(y_vec, X_mat, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
   output.set(0, wk, "new object reference");
 }
 
@@ -151,13 +153,14 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 9}};
+                 RequiresArg::Range{3, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto regmodel = input.getOptional<std::string>(3, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   auto noise_opt = input.getOptional<arma::vec>(8, "noise");
+  auto method = input.getOptional<std::string>(9, "method").value_or("exact");
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
 
   auto [wparams, tuning] = (nrhs > 7) ? structToWarpParameters(prhs[7])
@@ -172,7 +175,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
           optim,
           objective,
           wparams,
-          tuning);
+          tuning,
+          method);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -450,6 +454,15 @@ void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
   output.set(0, wk->objective(), "objective name");
+}
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* wk = input.getObjectFromRef<WarpKriging>(0, "WarpKriging reference");
+  output.set(0, wk->method(), "method name");
 }
 void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",

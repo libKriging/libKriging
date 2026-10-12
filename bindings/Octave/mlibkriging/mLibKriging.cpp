@@ -141,14 +141,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return KrigingBinding::nystrom_rank(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::vecchia_neighbors"_hash:
       return KrigingBinding::vecchia_neighbors(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::set_vecchia_exact_commit"_hash:
-      return KrigingBinding::set_vecchia_exact_commit(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::vecchia_exact_commit"_hash:
-      return KrigingBinding::vecchia_exact_commit(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::is_vecchia_light"_hash:
-      return KrigingBinding::is_vecchia_light(nlhs, plhs, nrhs - 1, prhs + 1);
-    case "Kriging::is_nystrom_light"_hash:
-      return KrigingBinding::is_nystrom_light(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "Kriging::method"_hash:
+      return KrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::X"_hash:
       return KrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "Kriging::centerX"_hash:
@@ -206,6 +200,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return NestedKrigingBinding::summary(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::kernel"_hash:
       return NestedKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::objective"_hash:
+      return NestedKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "NestedKriging::method"_hash:
+      return NestedKrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::aggregation"_hash:
       return NestedKrigingBinding::aggregation(nlhs, plhs, nrhs - 1, prhs + 1);
     case "NestedKriging::nb_groups"_hash:
@@ -291,6 +289,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return WarpKrigingBinding::optim(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::objective"_hash:
       return WarpKrigingBinding::objective(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "WarpKriging::method"_hash:
+      return WarpKrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::covMat"_hash:
       return WarpKrigingBinding::covMat(nlhs, plhs, nrhs - 1, prhs + 1);
     case "WarpKriging::theta"_hash:
@@ -330,6 +330,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
       return MLPKrigingBinding::logLikelihood(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::kernel"_hash:
       return MLPKrigingBinding::kernel(nlhs, plhs, nrhs - 1, prhs + 1);
+    case "MLPKriging::method"_hash:
+      return MLPKrigingBinding::method(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::X"_hash:
       return MLPKrigingBinding::X(nlhs, plhs, nrhs - 1, prhs + 1);
     case "MLPKriging::y"_hash:

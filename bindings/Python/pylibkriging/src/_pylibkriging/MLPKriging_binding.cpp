@@ -56,7 +56,8 @@ PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                            bool normalize,
                            const std::string& optim,
                            const std::string& objective,
-                           const py::dict& parameters) {
+                           const py::dict& parameters,
+                           const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal = std::make_unique<lk::MLPKriging>(mat_y,
@@ -69,7 +70,8 @@ PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                                                 normalize,
                                                 optim,
                                                 objective,
-                                                dict_to_string_map(parameters));
+                                                dict_to_string_map(parameters),
+                                                method);
 }
 
 PyMLPKriging::~PyMLPKriging() {}
@@ -80,11 +82,12 @@ void PyMLPKriging::fit(const py::array_t<double>& y,
                        bool normalize,
                        const std::string& optim,
                        const std::string& objective,
-                       const py::dict& parameters) {
+                       const py::dict& parameters,
+                       const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal->fit(
-      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters), method);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
@@ -133,6 +136,14 @@ PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool retu
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
   return {ll, vec_to_arr(grad), carma::mat_to_arr(hess)};
+}
+
+std::string PyMLPKriging::objective() {
+  return m_internal->objective();
+}
+
+std::string PyMLPKriging::method() {
+  return m_internal->method();
 }
 
 std::string PyMLPKriging::kernel() {

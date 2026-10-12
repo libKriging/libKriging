@@ -82,7 +82,7 @@ jobs:
           done
 
           # Large-n benchmarks: NestedKriging (divide-and-conquer), Vecchia
-          # (LLVecchia objective) and Nystrom (LLNystrom objective). Their
+          # (method vecchia) and Nystrom (method nystrom). Their
           # point is n beyond the exact-kriging comfort zone, so they get a
           # dedicated size grid.
           for n in 400 1000 2000; do
@@ -186,16 +186,16 @@ jobs:
 
           # --- Vecchia summary (large-n grid; exact-LL columns are skipped
           #     by bench-vecchia beyond n=1000, shown as empty) ---
-          echo "### Vecchia (objective=LLVecchia(30) vs exact LL)" >> "$REPORT"
+          echo "### Vecchia (objective LL, method vecchia(30) vs exact LL)" >> "$REPORT"
           echo "" >> "$REPORT"
-          echo "| n | d | fit LLVecchia (ms) | fit light (ms) | fit LL (ms) | predict exact (ms) | predictVecchia (ms) | LLVecchia eval (ms) | LL eval (ms) |" >> "$REPORT"
+          echo "| n | d | fit vecchia (ms) | exact refit at theta (ms) | fit LL (ms) | predict exact (ms) | predictVecchia (ms) | LLVecchia eval (ms) | LL eval (ms) |" >> "$REPORT"
           echo "|---|---|--------------|----------------|-------------|--------------|---------------------|---------------|--------------|" >> "$REPORT"
           for n in 400 1000 2000; do
             for d in 2 4; do
               logfile="benchmark-results/vecchia_n${n}_d${d}.log"
               if [ -f "$logfile" ]; then
                 fit=$(grep "^fit  " "$logfile" | awk '{print $3}' || echo "N/A")
-                fitl=$(grep "^fit_light" "$logfile" | awk '{print $3}' || echo "N/A")
+                fitl=$(grep "^fit_exact_refit" "$logfile" | awk '{print $3}' || echo "N/A")
                 fite=$(grep "^fit_exact_ll" "$logfile" | awk '{print $3}' || echo "-")
                 pred=$(grep "^predict  " "$logfile" | awk '{print $3}' || echo "N/A")
                 predv=$(grep "^predict_vecchia" "$logfile" | awk '{print $3}' || echo "N/A")
@@ -209,9 +209,9 @@ jobs:
 
           # --- Nystrom summary (large-n grid; exact-LL columns are skipped
           #     by bench-nystrom beyond n=1000, shown as empty) ---
-          echo "### Nystrom (objective=LLNystrom(50) vs exact LL)" >> "$REPORT"
+          echo "### Nystrom (objective LL, method nystrom(50) vs exact LL)" >> "$REPORT"
           echo "" >> "$REPORT"
-          echo "| n | d | fit LLNystrom (ms) | fit LL (ms) | predict exact (ms) | predictNystrom (ms) | simulateNystrom (ms) | LLNystrom eval (ms) | LL eval (ms) |" >> "$REPORT"
+          echo "| n | d | fit nystrom (ms) | fit LL (ms) | predict exact (ms) | predictNystrom (ms) | simulateNystrom (ms) | LLNystrom eval (ms) | LL eval (ms) |" >> "$REPORT"
           echo "|---|---|---------------------|-------------|--------------|----------------------|-----------------------|----------------------|--------------|" >> "$REPORT"
           for n in 400 1000 2000; do
             for d in 2 4; do

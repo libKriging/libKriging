@@ -1,9 +1,11 @@
 classdef NestedKriging < handle
     % Divide-and-conquer Kriging for large designs (see libKriging NestedKriging).
     % k = NestedKriging(y, X, kernel, nb_groups, [aggregation], [partition], [seed],
-    %                   [regmodel], [optim], [objective], [parameters], [warping_cell])
+    %                   [regmodel], [optim], [objective], [parameters], [warping_cell], [method])
     % aggregation: "NK" (optimal, default) | "PoE" | "gPoE" | "BCM" | "rBCM"
-    % objective  : "LL" (default) | "LLVecchia(m)" (common prior from one global Vecchia fit)
+    % objective  : "LL" (default) | "LOO" | "LMP"
+    % method     : "exact" (default) | "vecchia(m)" | "nystrom(k)" (common prior
+    %              from one global Vecchia / Nystrom fit; objective "LL", no warping)
     properties
         ref
     end
@@ -78,6 +80,14 @@ classdef NestedKriging < handle
 
         function varargout = warping(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("NestedKriging::warping", obj.ref, varargin{:});
+        end
+
+        function varargout = objective(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::objective", obj.ref, varargin{:});
+        end
+
+        function varargout = method(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("NestedKriging::method", obj.ref, varargin{:});
         end
 
         function set_predict_chunk(obj, chunk)

@@ -54,7 +54,8 @@ Rcpp::List new_NestedKrigingFit(arma::vec y,
                                 std::string optim = "BFGS",
                                 std::string objective = "LL",
                                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
-                                Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue) {
+                                Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue,
+                                std::string method = "exact") {
   NestedKriging* nk
       = new NestedKriging(y,
                           X,
@@ -68,7 +69,8 @@ Rcpp::List new_NestedKrigingFit(arma::vec y,
                           objective,
                           parameters_from_list(parameters, optim),
                           warping.isNotNull() ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
-                                              : std::vector<std::string>{});
+                                              : std::vector<std::string>{},
+                          method);
 
   Rcpp::XPtr<NestedKriging> impl_ptr(nk);
 
@@ -154,6 +156,24 @@ double nestedkriging_beta0(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
+std::string nestedkriging_objective(Rcpp::List k) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  return impl_ptr->objective();
+}
+
+// [[Rcpp::export]]
+std::string nestedkriging_method(Rcpp::List k) {
+  if (!k.inherits("NestedKriging"))
+    Rcpp::stop("Input must be a NestedKriging object");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<NestedKriging> impl_ptr(impl);
+  return impl_ptr->method();
+}
+
+// [[Rcpp::export]]
 Rcpp::CharacterVector nestedkriging_warping(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<NestedKriging> impl_ptr(impl);
@@ -201,7 +221,8 @@ void nestedkriging_fit(Rcpp::List k,
                        std::string optim = "BFGS",
                        std::string objective = "LL",
                        Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
-                       Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue) {
+                       Rcpp::Nullable<Rcpp::CharacterVector> warping = R_NilValue,
+                       std::string method = "exact") {
   if (!k.inherits("NestedKriging"))
     Rcpp::stop("Input must be a NestedKriging object");
   SEXP impl = k.attr("object");
@@ -214,7 +235,8 @@ void nestedkriging_fit(Rcpp::List k,
                 objective,
                 parameters_from_list(parameters, optim),
                 warping.isNotNull() ? Rcpp::as<std::vector<std::string>>(Rcpp::CharacterVector(warping))
-                                    : std::vector<std::string>{});
+                                    : std::vector<std::string>{},
+                method);
 }
 
 // [[Rcpp::export]]

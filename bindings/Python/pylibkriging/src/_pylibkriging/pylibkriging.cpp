@@ -226,7 +226,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    const py::object&>(),
+                    const py::object&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -235,7 +236,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -247,7 +249,13 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact",
+           R"pbdoc(Fit on (X, y). fit method: "exact" (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
+neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k Nystrom, default 50). An approximate
+fit keeps no exact factorization: predict / simulate / logLikelihood then take the same method.
+Only objective "LL" has approximate versions. objective="LLVecchia(m)" / "LLNystrom(k)" are
+deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),
@@ -255,10 +263,10 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("return_cov") = false,
            py::arg("return_deriv") = false,
            py::arg("method") = "exact",
-           R"pbdoc(Prediction at X. method: "exact" (default, needs the exact factorization),
-"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit) or "nystrom" (needs an
-LLNystrom fit); the approximate methods return mean / stdev only. Nothing is chosen implicitly:
-on a light Vecchia or an LLNystrom fit, "exact" raises.)pbdoc")
+           R"pbdoc(Prediction at X. method: "exact" (default, needs a method="exact" fit),
+"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit) or "nystrom" (needs a
+method="nystrom" fit); the approximate methods return mean / stdev only. Nothing is chosen
+implicitly: on a Vecchia or Nystrom fit, "exact" raises.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -269,7 +277,7 @@ on a light Vecchia or an LLNystrom fit, "exact" raises.)pbdoc")
 centroids snapped to the nearest real point, or a uniform random subsample),
 returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
 for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+the vecchia / nystrom methods (which still use every point), this
 discards n - n_max points outright.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
@@ -307,7 +315,7 @@ discards n - n_max points outright.)pbdoc")
            &PyKriging::logLikelihood,
            py::arg("method") = "exact",
            "Log-likelihood at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
-           "(requires an LLVecchia fit) or \"nystrom\" (requires an LLNystrom fit).")
+           "(requires a method=\"vecchia\" fit) or \"nystrom\" (requires a method=\"nystrom\" fit).")
       .def("logMargPost", &PyKriging::logMargPost)
       .def("leaveOneOut", &PyKriging::leaveOneOut)
       .def("covMat", &PyKriging::covMat)
@@ -316,18 +324,9 @@ discards n - n_max points outright.)pbdoc")
       .def("kernel", &PyKriging::kernel)
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
+      .def("method", &PyKriging::method, "Fit method: \"exact\", \"vecchia(m)\" or \"nystrom(k)\".")
       .def("nystrom_rank", &PyKriging::nystrom_rank)
       .def("vecchia_neighbors", &PyKriging::vecchia_neighbors)
-      .def("set_vecchia_exact_commit",
-           &PyKriging::set_vecchia_exact_commit,
-           py::arg("exact"),
-           "With objective=\"LLVecchia(m)\", False skips the final exact O(n^3) factorization at the "
-           "next fit (\"light\" fit): the exact predict / simulate (method=\"exact\", the default) then "
-           "raise, method=\"vecchia\" is passed explicitly; update and save / load stay available. "
-           "Default True.")
-      .def("vecchia_exact_commit", &PyKriging::vecchia_exact_commit)
-      .def("is_vecchia_light", &PyKriging::is_vecchia_light)
-      .def("is_nystrom_light", &PyKriging::is_nystrom_light)
       .def("X", &PyKriging::X)
       .def("centerX", &PyKriging::centerX)
       .def("scaleX", &PyKriging::scaleX)
@@ -362,8 +361,8 @@ discards n - n_max points outright.)pbdoc")
         The design is partitioned into nb_groups groups (k-means or random), one Kriging
         submodel is fitted per group on a common prior, and predictions are aggregated:
         aggregation="NK" (optimal nested-kriging aggregation, interpolating, default) or
-        "PoE"/"gPoE"/"BCM"/"rBCM". objective="LLVecchia(m)" estimates the common prior with one
-        global Vecchia fit; warping=[...] switches to WarpKriging submodels.
+        "PoE"/"gPoE"/"BCM"/"rBCM". method="vecchia(m)" / "nystrom(k)" estimates the common prior
+        with one global Vecchia / Nystrom fit; warping=[...] switches to WarpKriging submodels.
     )pbdoc")
       .def(py::init<const std::string&>(), py::arg("kernel"))
       .def(py::init<const py::array_t<double>&,
@@ -377,7 +376,8 @@ discards n - n_max points outright.)pbdoc")
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    const std::vector<std::string>&>(),
+                    const std::vector<std::string>&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -389,7 +389,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("warping") = std::vector<std::string>{})
+           py::arg("warping") = std::vector<std::string>{},
+           py::arg("method") = "exact")
       .def("fit",
            &PyNestedKriging::fit,
            py::arg("y"),
@@ -399,11 +400,14 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("warping") = std::vector<std::string>{})
+           py::arg("warping") = std::vector<std::string>{},
+           py::arg("method") = "exact")
       .def("predict", &PyNestedKriging::predict, py::arg("X"), py::arg("return_stdev") = true)
       .def("summary", &PyNestedKriging::summary)
       .def("kernel", &PyNestedKriging::kernel)
       .def("warping", &PyNestedKriging::warping)
+      .def("objective", &PyNestedKriging::objective)
+      .def("method", &PyNestedKriging::method)
       .def("aggregation", &PyNestedKriging::aggregation)
       .def("nb_groups", &PyNestedKriging::nb_groups)
       .def("groups", &PyNestedKriging::groups)
@@ -431,7 +435,8 @@ discards n - n_max points outright.)pbdoc")
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    py::object>(),
+                    py::object,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("warping"),
@@ -441,7 +446,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def("copy", &PyWarpKriging::copy)
       .def("save", &PyWarpKriging::save)
       .def_static("load", &PyWarpKriging::load)
@@ -454,7 +460,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def("predict",
            &PyWarpKriging::predict,
            py::arg("X"),
@@ -489,6 +496,7 @@ discards n - n_max points outright.)pbdoc")
       .def("kernel", &PyWarpKriging::kernel)
       .def("optim", &PyWarpKriging::optim)
       .def("objective", &PyWarpKriging::objective)
+      .def("method", &PyWarpKriging::method)
       .def("noise", &PyWarpKriging::noise)
       .def("warp_params", &PyWarpKriging::warp_params)
       .def("X", &PyWarpKriging::X)
@@ -526,7 +534,8 @@ discards n - n_max points outright.)pbdoc")
                     bool,
                     const std::string&,
                     const std::string&,
-                    const py::dict&>(),
+                    const py::dict&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("hidden_dims"),
@@ -537,7 +546,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("method") = "exact")
       .def("fit",
            &PyMLPKriging::fit,
            py::arg("y"),
@@ -546,7 +556,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("method") = "exact")
       .def("predict",
            &PyMLPKriging::predict,
            py::arg("X"),
@@ -569,6 +580,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("return_grad") = false,
            py::arg("return_hess") = false)
       .def("kernel", &PyMLPKriging::kernel)
+      .def("objective", &PyMLPKriging::objective)
+      .def("method", &PyMLPKriging::method)
       .def("X", &PyMLPKriging::X)
       .def("centerX", &PyMLPKriging::centerX)
       .def("scaleX", &PyMLPKriging::scaleX)

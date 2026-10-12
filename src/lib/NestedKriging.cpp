@@ -78,12 +78,13 @@ NestedKriging::NestedKriging(const arma::vec& y,
                              const std::string& optim,
                              const std::string& objective,
                              const Kriging::Parameters& parameters,
-                             const std::vector<std::string>& warping)
+                             const std::vector<std::string>& warping,
+                             const std::string& method)
     : NestedKriging(covType) {
   m_aggregation = aggregation;
   m_partition_method = partition;
   m_seed = seed;
-  fit(y, X, nb_groups, regmodel, optim, objective, parameters, warping);
+  fit(y, X, nb_groups, regmodel, optim, objective, parameters, warping, method);
 }
 
 // =============================================================================
@@ -179,18 +180,25 @@ void NestedKriging::fit(const arma::vec& y,
                         arma::uword nb_groups,
                         const Trend::RegressionModel& regmodel,
                         const std::string& optim,
-                        const std::string& objective,
+                        const std::string& objective_in,
                         const Kriging::Parameters& parameters,
-                        const std::vector<std::string>& warping) {
+                        const std::vector<std::string>& warping,
+                        const std::string& method_in) {
   if (y.n_elem != X.n_rows)
     throw std::invalid_argument("y and X should have the same number of rows");
   if (nb_groups < 1 || nb_groups > X.n_rows / (X.n_cols + 2))
     throw std::invalid_argument("nb_groups should be in [1, n/(d+2)]");
   if (m_aggregation == Aggregation::NK && regmodel != Trend::RegressionModel::Constant)
     throw std::invalid_argument("NK aggregation requires a Constant trend; use PoE/gPoE/BCM/rBCM otherwise");
-  const bool vll_unified = objective.rfind("LLVecchia", 0) == 0;
-  if (vll_unified && !warping.empty())
-    throw std::invalid_argument("LLVecchia objective is not supported with warping in NestedKriging");
+  // canonical (objective, method): resolves the deprecated "LLVecchia(m)"
+  const auto objective_method = Kriging::fit_objective_method(objective_in, method_in);
+  const std::string& objective = objective_method.first;
+  const std::string& method = objective_method.second;
+  const bool approx_unified = method != "exact";
+  if (approx_unified && !warping.empty())
+    throw std::invalid_argument("method \"" + method + "\" is not supported with warping in NestedKriging");
+  m_objective = objective;
+  m_method = method;
 
   m_X = X;
   m_y = y;
@@ -241,15 +249,14 @@ void NestedKriging::fit(const arma::vec& y,
       wk->recalibrate_warps(m_X);
       m_wsubmodels.push_back(std::move(wk));
     }
-  } else if (vll_unified) {
-    // --- LLVecchia-unified path: ONE global light Vecchia fit estimates the common
-    // prior (theta, sigma2, beta) in O(n m^3) using cross-group information,
-    // then every submodel is fitted in closed form on the seeded prior.
-    // Statistically preferable to averaging p per-group estimates, and
-    // cheaper: one optimization instead of p.
+  } else if (approx_unified) {
+    // --- approximate-prior path: ONE global Vecchia (O(n m^3)) or Nystrom
+    // (O(n k^2)) fit estimates the common prior (theta, sigma2, beta) using
+    // cross-group information, then every submodel is fitted in closed form
+    // on the seeded prior. Statistically preferable to averaging p per-group
+    // estimates, and cheaper: one optimization instead of p.
     Kriging ref(m_covType);
-    ref.set_vecchia_exact_commit(false);  // light: no O(n^3) factorization
-    ref.fit(m_y, m_X, regmodel, /*normalize=*/false, optim, objective, parameters);
+    ref.fit(m_y, m_X, regmodel, /*normalize=*/false, optim, objective, parameters, method);
 
     m_theta = ref.theta();
     m_sigma2 = ref.sigma2();
@@ -281,8 +288,8 @@ void NestedKriging::fit(const arma::vec& y,
   }
 
   // --- 2. unify hyperparameters (common prior) ------------------------------
-  // (already done by the global reference fit on the LLVecchia-unified path)
-  if (!vll_unified || warped())
+  // (already done by the global reference fit on the approximate-prior path)
+  if (!approx_unified || warped())
     unify_hyperparameters(objective);
 
   // --- 3. NK precomputations -------------------------------------------------
@@ -554,6 +561,8 @@ void NestedKriging::save(const std::string filename) const {
   j["warp_subsample"] = m_warp_subsample;
   j["regmodel"] = Trend::toString(m_regmodel);
   j["warping"] = m_warping;
+  j["objective"] = m_objective;
+  j["method"] = m_method;
   j["X"] = to_json(m_X);
   j["y"] = to_json(m_y);
   nlohmann::json groups = nlohmann::json::array();
@@ -607,6 +616,10 @@ NestedKriging NestedKriging::load(const std::string filename) {
   nk.m_warp_subsample = j["warp_subsample"].template get<arma::uword>();
   nk.m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
   nk.m_warping = j["warping"].template get<std::vector<std::string>>();
+  if (j.contains("objective"))
+    nk.m_objective = j["objective"].template get<std::string>();
+  if (j.contains("method"))
+    nk.m_method = j["method"].template get<std::string>();
   nk.m_X = mat_from_json(j["X"]);
   nk.m_y = colvec_from_json(j["y"]);
   for (const auto& g : j["groups"])

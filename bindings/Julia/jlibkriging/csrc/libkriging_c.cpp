@@ -100,7 +100,8 @@ void* lk_kriging_new_fit(const double* y,
                          int beta_n,
                          int is_beta_estim,
                          const double* nugget,
-                         int is_nugget_estim) {
+                         int is_nugget_estim,
+                         const char* method) {
   try {
     auto nm = parse_noise_model(noise_model_str);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
@@ -130,7 +131,8 @@ void* lk_kriging_new_fit(const double* y,
               normalize != 0,
               optim ? optim : "BFGS",
               objective ? objective : "LL",
-              params);
+              params,
+              method ? method : "exact");
     } else {
       kr->fit(y_v,
               X_m,
@@ -138,7 +140,8 @@ void* lk_kriging_new_fit(const double* y,
               normalize != 0,
               optim ? optim : "BFGS",
               objective ? objective : "LL",
-              params);
+              params,
+              method ? method : "exact");
     }
     return kr;
   }
@@ -168,7 +171,8 @@ int lk_kriging_fit(void* ptr,
                    const char* regmodel,
                    int normalize,
                    const char* optim,
-                   const char* objective) {
+                   const char* objective,
+                   const char* method) {
   try {
     auto* k = static_cast<Kriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
@@ -181,14 +185,18 @@ int lk_kriging_fit(void* ptr,
              Trend::fromString(regmodel ? regmodel : "constant"),
              normalize != 0,
              optim ? optim : "BFGS",
-             objective ? objective : "LL");
+             objective ? objective : "LL",
+             Kriging::Parameters{},
+             method ? method : "exact");
     } else {
       k->fit(y_v,
              X_m,
              Trend::fromString(regmodel ? regmodel : "constant"),
              normalize != 0,
              optim ? optim : "BFGS",
-             objective ? objective : "LL");
+             objective ? objective : "LL",
+             Kriging::Parameters{},
+             method ? method : "exact");
     }
     return 0;
   }
@@ -514,33 +522,11 @@ int lk_kriging_vecchia_neighbors(void* ptr) {
   CATCH_RETURN
 }
 
-int lk_kriging_set_vecchia_exact_commit(void* ptr, int exact) {
+const char* lk_kriging_method(void* ptr) {
   try {
-    static_cast<Kriging*>(ptr)->set_vecchia_exact_commit(exact != 0);
-    return 0;
+    return static_cast<Kriging*>(ptr)->method().c_str();
   }
-  CATCH_RETURN
-}
-
-int lk_kriging_vecchia_exact_commit(void* ptr) {
-  try {
-    return static_cast<Kriging*>(ptr)->vecchia_exact_commit() ? 1 : 0;
-  }
-  CATCH_RETURN
-}
-
-int lk_kriging_is_vecchia_light(void* ptr) {
-  try {
-    return static_cast<Kriging*>(ptr)->is_vecchia_light() ? 1 : 0;
-  }
-  CATCH_RETURN
-}
-
-int lk_kriging_is_nystrom_light(void* ptr) {
-  try {
-    return static_cast<Kriging*>(ptr)->is_nystrom_light() ? 1 : 0;
-  }
-  CATCH_RETURN
+  CATCH_RETURN_NULL
 }
 
 int lk_kriging_is_normalize(void* ptr) {
@@ -1943,7 +1929,8 @@ void* lk_nested_kriging_new_fit(const double* y,
                                 int is_theta_estim,
                                 const double* beta,
                                 int beta_n,
-                                int is_beta_estim) {
+                                int is_beta_estim,
+                                const char* method) {
   try {
     arma::vec y_v(const_cast<double*>(y), n, false, true);
     arma::mat X_m(const_cast<double*>(X), nX, d, false, true);
@@ -1959,13 +1946,28 @@ void* lk_nested_kriging_new_fit(const double* y,
         optim ? optim : "BFGS",
         objective ? objective : "LL",
         lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
-        lk_nested_make_warping(warping, n_warping));
+        lk_nested_make_warping(warping, n_warping),
+        method ? method : "exact");
   }
   CATCH_RETURN_NULL
 }
 
 void lk_nested_kriging_delete(void* ptr) {
   delete static_cast<NestedKriging*>(ptr);
+}
+
+const char* lk_nested_kriging_objective(void* ptr) {
+  try {
+    return static_cast<NestedKriging*>(ptr)->objective().c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
+const char* lk_nested_kriging_method(void* ptr) {
+  try {
+    return static_cast<NestedKriging*>(ptr)->method().c_str();
+  }
+  CATCH_RETURN_NULL
 }
 
 int lk_nested_kriging_fit(void* ptr,
@@ -1987,7 +1989,8 @@ int lk_nested_kriging_fit(void* ptr,
                           int is_theta_estim,
                           const double* beta,
                           int beta_n,
-                          int is_beta_estim) {
+                          int is_beta_estim,
+                          const char* method) {
   try {
     auto* k = static_cast<NestedKriging*>(ptr);
     arma::vec y_v(const_cast<double*>(y), n, false, true);
@@ -1999,7 +2002,8 @@ int lk_nested_kriging_fit(void* ptr,
            optim ? optim : "BFGS",
            objective ? objective : "LL",
            lk_nested_make_params(sigma2, is_sigma2_estim, theta, theta_n, is_theta_estim, beta, beta_n, is_beta_estim),
-           lk_nested_make_warping(warping, n_warping));
+           lk_nested_make_warping(warping, n_warping),
+           method ? method : "exact");
     return 0;
   }
   CATCH_RETURN

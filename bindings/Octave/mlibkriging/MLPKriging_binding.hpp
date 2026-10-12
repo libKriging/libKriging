@@ -16,6 +16,7 @@ void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);

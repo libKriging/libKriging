@@ -42,7 +42,8 @@ Rcpp::List new_KrigingFit(arma::vec y,
                           bool normalize = false,
                           std::string optim = "BFGS",
                           std::string objective = "LL",
-                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                          std::string method = "exact") {
   Kriging::NoiseModel nm = Kriging::NoiseModel::None;
   if (noise_model == "nugget")
     nm = Kriging::NoiseModel::Nugget;
@@ -137,9 +138,10 @@ Rcpp::List new_KrigingFit(arma::vec y,
             normalize,
             optim,
             objective,
-            kparams);
+            kparams,
+            method);
   } else {
-    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams, method);
   }
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
@@ -159,7 +161,8 @@ void kriging_fit(Rcpp::List k,
                  bool normalize = false,
                  std::string optim = "BFGS",
                  std::string objective = "LL",
-                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                 std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -243,9 +246,11 @@ void kriging_fit(Rcpp::List k,
                   normalize,
                   optim,
                   objective,
-                  kparams);
+                  kparams,
+                  method);
   } else {
-    impl_ptr->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    impl_ptr->fit(
+        std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams, method);
   }
 }
 
@@ -276,6 +281,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
   ret["kernel"] = impl_ptr->kernel();
   ret["optim"] = impl_ptr->optim();
   ret["objective"] = impl_ptr->objective();
+  ret["method"] = impl_ptr->method();
 
   // noise model info
   auto nm = impl_ptr->noise_model();
@@ -652,39 +658,12 @@ int kriging_vecchia_neighbors(Rcpp::List k) {
 }
 
 // [[Rcpp::export]]
-void kriging_set_vecchia_exact_commit(Rcpp::List k, bool exact) {
+std::string kriging_method(Rcpp::List k) {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
-  impl_ptr->set_vecchia_exact_commit(exact);
-}
-
-// [[Rcpp::export]]
-bool kriging_vecchia_exact_commit(Rcpp::List k) {
-  if (!k.inherits("Kriging"))
-    Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = k.attr("object");
-  Rcpp::XPtr<Kriging> impl_ptr(impl);
-  return impl_ptr->vecchia_exact_commit();
-}
-
-// [[Rcpp::export]]
-bool kriging_is_vecchia_light(Rcpp::List k) {
-  if (!k.inherits("Kriging"))
-    Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = k.attr("object");
-  Rcpp::XPtr<Kriging> impl_ptr(impl);
-  return impl_ptr->is_vecchia_light();
-}
-
-// [[Rcpp::export]]
-bool kriging_is_nystrom_light(Rcpp::List k) {
-  if (!k.inherits("Kriging"))
-    Rcpp::stop("Input must be a Kriging object.");
-  SEXP impl = k.attr("object");
-  Rcpp::XPtr<Kriging> impl_ptr(impl);
-  return impl_ptr->is_nystrom_light();
+  return impl_ptr->method();
 }
 
 // [[Rcpp::export]]

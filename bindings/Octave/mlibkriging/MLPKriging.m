@@ -3,7 +3,8 @@ classdef MLPKriging < handle
     %
     %   mk = MLPKriging(y, X, hidden_dims, d_out, activation, kernel)
     %   mk = MLPKriging(y, X, hidden_dims, d_out, activation, kernel, ...
-    %                   regmodel, normalize, optim, objective)
+    %                   regmodel, normalize, optim, objective [, parameters, method])
+    %   method: only "exact" is implemented for MLPKriging.
     %
     %   hidden_dims is a numeric vector of hidden layer sizes, e.g. [16 8].
     %
@@ -62,6 +63,10 @@ classdef MLPKriging < handle
 
         function varargout = kernel(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("MLPKriging::kernel", obj.ref, varargin{:});
+        end
+
+        function varargout = method(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("MLPKriging::method", obj.ref, varargin{:});
         end
 
         function varargout = X(obj, varargin)
