@@ -66,6 +66,11 @@ catch_discover_tests(KrigingFitTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(KrigingNormalizeScaleTest KrigingNormalizeScaleTest.cpp)
+target_link_libraries(KrigingNormalizeScaleTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingNormalizeScaleTest)
+catch_discover_tests(KrigingNormalizeScaleTest)
+
 add_executable(KrigingUpdateTest KrigingUpdateTest.cpp)
 target_link_libraries(KrigingUpdateTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingUpdateTest)

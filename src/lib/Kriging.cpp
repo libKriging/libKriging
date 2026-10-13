@@ -190,6 +190,80 @@ arma::vec Kriging::current_gamma() const {
   return g;
 }
 
+// -----------------------------------------------------------------------------
+// Public API in the original scale of X and y (see Kriging.hpp). Internally the
+// model is held on normalized data when normalize=true; these helpers convert.
+// With normalize=false every conversion below is skipped (bit-for-bit identity).
+// -----------------------------------------------------------------------------
+
+LIBKRIGING_EXPORT arma::vec Kriging::theta() const {
+  if (!m_normalize || m_theta.n_elem != m_scaleX.n_elem)
+    return m_theta;
+  return m_theta % m_scaleX.t();
+}
+
+LIBKRIGING_EXPORT double Kriging::sigma2() const {
+  return m_normalize ? m_sigma2 * m_scaleY * m_scaleY : m_sigma2;
+}
+
+LIBKRIGING_EXPORT arma::vec Kriging::beta() const {
+  return beta_to_original(m_beta);
+}
+
+LIBKRIGING_EXPORT double Kriging::nugget() const {
+  return m_normalize ? m_nugget * m_scaleY * m_scaleY : m_nugget;
+}
+
+LIBKRIGING_EXPORT arma::vec Kriging::noise() const {
+  return m_normalize ? arma::vec(m_noise * (m_scaleY * m_scaleY)) : m_noise;
+}
+
+LIBKRIGING_EXPORT arma::mat Kriging::covMat(const arma::mat& X1, const arma::mat& X2) {
+  arma::mat C = KrigingImpl::covMat(X1, X2);  // inputs normalized inside, internal sigma2
+  if (m_normalize)
+    C *= m_scaleY * m_scaleY;
+  return C;
+}
+
+arma::vec Kriging::gamma_from_original(const arma::vec& gamma) const {
+  if (!m_normalize)
+    return gamma;
+  arma::vec g = gamma;
+  const arma::uword d = std::min<arma::uword>(m_scaleX.n_elem, g.n_elem);
+  for (arma::uword k = 0; k < d; k++)
+    g.at(k) /= m_scaleX.at(k);
+  if (m_noise_model == NoiseModel::Heterogeneous && g.n_elem > m_scaleX.n_elem)
+    g.at(m_scaleX.n_elem) /= m_scaleY * m_scaleY;  // sigma2; a Nugget alpha is scale-free
+  return g;
+}
+
+void Kriging::grad_to_original(arma::vec& grad) const {
+  if (!m_normalize)
+    return;
+  // F(theta_n = theta / scaleX): dF/dtheta_i = dF/dtheta_n_i / scaleX_i
+  const arma::uword d = std::min<arma::uword>(m_scaleX.n_elem, grad.n_elem);
+  for (arma::uword k = 0; k < d; k++)
+    grad.at(k) /= m_scaleX.at(k);
+  if (m_noise_model == NoiseModel::Heterogeneous && grad.n_elem > m_scaleX.n_elem)
+    grad.at(m_scaleX.n_elem) /= m_scaleY * m_scaleY;
+}
+
+double Kriging::ll_offset() const {
+  // y = centerY + scaleY * y_n: log p(y) = log p(y_n) - n log(scaleY)
+  return m_normalize ? -static_cast<double>(m_y.n_elem) * std::log(m_scaleY) : 0.0;
+}
+
+double Kriging::lmp_offset() const {
+  if (!m_normalize)
+    return 0.0;
+  // log_marginal_lik = -log|L| - log|LX| - (n-p)/2 log(S2): R is unchanged,
+  // S2 scales by scaleY^2 and F' R^-1 F by A^-T . A^-1 (F_n = F A); the
+  // reference prior only involves range(X) / theta, which is scale-free.
+  const double n = static_cast<double>(m_y.n_elem);
+  const double p = static_cast<double>(m_F.n_cols);
+  return -(n - p) * std::log(m_scaleY) + trend_log_abs_det_to_original();
+}
+
 LIBKRIGING_EXPORT Kriging::Kriging(const arma::vec& y,
                                    const arma::mat& X,
                                    const std::string& covType,
@@ -397,9 +471,15 @@ double Kriging::_logLikelihood(const arma::vec& _gamma,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodFun(const arma::vec& _theta,
                                                                           const bool _grad,
                                                                           const bool _bench) {
-  return eval_objective(_theta.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
-    return _logLikelihood(_theta, g, nullptr, b);
+  const arma::vec gamma_n = gamma_from_original(_theta);
+  auto res = eval_objective(gamma_n.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
+    return _logLikelihood(gamma_n, g, nullptr, b);
   });
+  if (m_normalize) {
+    std::get<0>(res) += ll_offset();
+    grad_to_original(std::get<1>(res));
+  }
+  return res;
 }
 
 // Objective function for fit : -LOO
@@ -524,17 +604,30 @@ double Kriging::_leaveOneOut(const arma::vec& _theta,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::leaveOneOutFun(const arma::vec& _theta,
                                                                         const bool _grad,
                                                                         const bool _bench) {
-  return eval_objective(_theta.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
-    return _leaveOneOut(_theta, g, nullptr, nullptr, b);
+  const arma::vec theta_n = gamma_from_original(_theta);
+  auto res = eval_objective(theta_n.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
+    return _leaveOneOut(theta_n, g, nullptr, nullptr, b);
   });
+  if (m_normalize) {
+    // mean squared LOO error, in y units: (scaleY * e_n)^2
+    const double s2 = m_scaleY * m_scaleY;
+    std::get<0>(res) *= s2;
+    std::get<1>(res) *= s2;
+    grad_to_original(std::get<1>(res));
+  }
+  return res;
 }
 
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::leaveOneOutVec(const arma::vec& _theta) {
-  double loo = -1;
   arma::mat yhat = arma::mat(m_y.n_elem, 2, arma::fill::none);
-  loo = _leaveOneOut(_theta, nullptr, &yhat, nullptr, nullptr);
-
-  return std::make_tuple(std::move(yhat.col(0)), std::move(yhat.col(1) * std::sqrt(m_sigma2)));
+  _leaveOneOut(gamma_from_original(_theta), nullptr, &yhat, nullptr, nullptr);
+  arma::vec mean = yhat.col(0);
+  arma::vec stdev = yhat.col(1) * std::sqrt(m_sigma2);
+  if (m_normalize) {  // back to the original scale of y, like predict()
+    mean = mean * m_scaleY + m_centerY;
+    stdev *= m_scaleY;
+  }
+  return std::make_tuple(std::move(mean), std::move(stdev));
 }
 
 // Objective function for fit: bayesian-like approach fromm RobustGaSP
@@ -701,28 +794,45 @@ double Kriging::_logMargPost(const arma::vec& _gamma,
   return (log_marginal_lik + log_approx_ref_prior);
 }
 
+double Kriging::_logMargPostAt(const arma::vec& gamma_n,
+                               arma::vec* grad_out,
+                               std::map<std::string, double>* bench) const {
+  // For Nugget mode, gamma may be d-dim (theta only); augment with current alpha
+  if (m_noise_model == NoiseModel::Nugget && gamma_n.n_elem == m_X.n_cols)
+    return _logMargPost(arma::join_cols(gamma_n, arma::vec{m_alpha}), grad_out, nullptr, bench);
+  return _logMargPost(gamma_n, grad_out, nullptr, bench);
+}
+
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logMargPostFun(const arma::vec& _theta,
                                                                         const bool _grad,
                                                                         const bool _bench) {
-  // For Nugget mode, _theta may be d-dim; augment with current alpha
-  arma::vec _gamma = _theta;
-  if (m_noise_model == NoiseModel::Nugget && _theta.n_elem == m_X.n_cols)
-    _gamma = arma::join_cols(_theta, arma::vec{m_alpha});
-  return eval_objective(_gamma.n_elem, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
-    return _logMargPost(_gamma, g, nullptr, b);
+  const arma::vec gamma_n = gamma_from_original(_theta);
+  const arma::uword n_params
+      = (m_noise_model == NoiseModel::Nugget && gamma_n.n_elem == m_X.n_cols) ? gamma_n.n_elem + 1 : gamma_n.n_elem;
+  auto res = eval_objective(n_params, _grad, _bench, [&](arma::vec* g, std::map<std::string, double>* b) {
+    return _logMargPostAt(gamma_n, g, b);
   });
+  if (m_normalize) {
+    std::get<0>(res) += lmp_offset();
+    grad_to_original(std::get<1>(res));
+  }
+  return res;
 }
 
+// The no-argument objectives evaluate the internal implementation at the
+// committed (internal-scale) parameters, then apply the same value offset as
+// the public *Fun: logLikelihood() == logLikelihoodFun(theta()) etc.
 LIBKRIGING_EXPORT double Kriging::logLikelihood() {
-  return std::get<0>(Kriging::logLikelihoodFun(current_gamma(), false, false));
+  return _logLikelihood(current_gamma(), nullptr, nullptr, nullptr) + ll_offset();
 }
 
 LIBKRIGING_EXPORT double Kriging::leaveOneOut() {
-  return std::get<0>(Kriging::leaveOneOutFun(m_theta, false, false));
+  const double loo = _leaveOneOut(m_theta, nullptr, nullptr, nullptr, nullptr);
+  return m_normalize ? loo * m_scaleY * m_scaleY : loo;
 }
 
 LIBKRIGING_EXPORT double Kriging::logMargPost() {
-  return std::get<0>(Kriging::logMargPostFun(m_theta, false, false));
+  return _logMargPostAt(m_theta, nullptr, nullptr) + lmp_offset();
 }
 
 // alpha reparametrization for Nugget mode:
@@ -1051,10 +1161,16 @@ LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
       if (am.m != 0 && am.m != m_vecchia_m)
         throw std::invalid_argument("logLikelihood: the Vecchia likelihood uses the fitted m ("
                                     + std::to_string(m_vecchia_m) + "): use method \"vecchia\"");
-      return std::get<0>(logLikelihoodVecchiaFun(m_theta, false));
+      if (m_vecchia_m == 0)
+        throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with method=\"vecchia(m)\"");
+      if (m_vecchia_order.n_elem != m_X.n_rows)
+        make_vecchia_sets();  // not stored by save(): rebuilt on demand after load
+      return _logLikelihoodVecchia(m_theta, nullptr) + ll_offset();
     case ApproxMethod::Nystrom:
       check_nystrom_rank(am, m_nystrom_k, "logLikelihood");
-      return std::get<0>(logLikelihoodNystromFun(m_theta, false));
+      if (m_nystrom_k == 0)
+        throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
+      return _logLikelihoodNystrom(m_theta) + ll_offset();
     case ApproxMethod::Exact:
     default:
       return logLikelihood();
@@ -1067,13 +1183,15 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun
     throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with method=\"vecchia(m)\"");
   if (m_vecchia_order.n_elem != m_X.n_rows)
     make_vecchia_sets();  // not stored by save(): rebuilt on demand after load
+  const arma::vec theta_n = gamma_from_original(theta);
   arma::vec grad;
   if (return_grad) {
-    grad.set_size(theta.n_elem);
-    const double vll = _logLikelihoodVecchia(theta, &grad);
+    grad.set_size(theta_n.n_elem);
+    const double vll = _logLikelihoodVecchia(theta_n, &grad) + ll_offset();
+    grad_to_original(grad);
     return {vll, grad};
   }
-  return {_logLikelihoodVecchia(theta, nullptr), grad};
+  return {_logLikelihoodVecchia(theta_n, nullptr) + ll_offset(), grad};
 }
 
 /* Vecchia (local) prediction: condition each prediction point on its m
@@ -1466,13 +1584,15 @@ LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun
                                                                                  bool return_grad) {
   if (m_nystrom_k == 0)
     throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
+  const arma::vec theta_n = gamma_from_original(theta);
   arma::vec grad;
   if (return_grad) {
-    grad.set_size(theta.n_elem);
-    const double ll = _logLikelihoodNystrom(theta, &grad);
+    grad.set_size(theta_n.n_elem);
+    const double ll = _logLikelihoodNystrom(theta_n, &grad) + ll_offset();
+    grad_to_original(grad);
     return {ll, grad};
   }
-  return {_logLikelihoodNystrom(theta), grad};
+  return {_logLikelihoodNystrom(theta_n) + ll_offset(), grad};
 }
 
 void Kriging::check_not_nystrom_light(const char* what) const {
@@ -2009,10 +2129,28 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const Trend::RegressionModel& regmodel,
                                     bool normalize,
                                     const std::string& optim,
-                                    const std::string& objective_in,
+                                    const std::string& objective,
                                     const Parameters& parameters,
                                     const std::string& method) {
+  fit_impl(y, nullptr, X, regmodel, normalize, optim, objective, parameters, method);
+}
+
+void Kriging::fit_impl(const arma::vec& y,
+                       const arma::vec* noise,
+                       const arma::mat& X,
+                       const Trend::RegressionModel& regmodel,
+                       bool normalize,
+                       const std::string& optim,
+                       const std::string& objective_in,
+                       const Parameters& parameters,
+                       const std::string& method) {
   const arma::uword n = X.n_rows;
+  // Heterogeneous noise in the ORIGINAL scale of y: the given one, or (refit
+  // without new noise) the current one, read before the normalization
+  // constants change below.
+  arma::vec noise_orig;
+  if (m_noise_model == NoiseModel::Heterogeneous)
+    noise_orig = (noise != nullptr) ? *noise : this->noise();
   const arma::uword d = X.n_cols;
 
   // public (objective, method) pair; `objective` below is the internal name of
@@ -2030,6 +2168,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   const bool build_dX = !approx;
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
+  // The per-observation noise variances live in the same (normalized-y)
+  // space as sigma2 in R = C + diag(noise / sigma2).
+  if (m_noise_model == NoiseModel::Heterogeneous)
+    m_noise = m_normalize ? arma::vec(noise_orig / (m_scaleY * m_scaleY)) : noise_orig;
 
   m_vecchia_light = false;
   m_nystrom_light = false;
@@ -2328,7 +2470,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
         if (parameters.sigma2.has_value()) {
           extra0 = arma::vec{parameters.sigma2.value()};
           if (m_normalize)
-            extra0 /= scaleY;
+            extra0 /= (scaleY * scaleY);
         } else {
           extra0 = extra_lower_val + (extra_upper_val - extra_lower_val) * Random::randu_vec(theta0.n_rows);
         }
@@ -2771,8 +2913,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
     throw std::runtime_error("fit(y, noise, X, ...) requires NoiseModel::Heterogeneous");
   if (noise.n_elem != y.n_elem)
     throw std::runtime_error("noise vector must have the same length as y");
-  m_noise = noise;
-  fit(y, X, regmodel, normalize, optim, objective, parameters, method);
+  fit_impl(y, &noise, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 /** Compute the prediction for given points X'
@@ -3008,14 +3149,15 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
     if (m_est_beta && m_est_nugget && m_est_sigma2 && m_est_theta) {
       // All estimated: use default (null) starting points → full multistart BFGS
     } else {
-      params.sigma2 = m_sigma2 * m_scaleY * m_scaleY;
+      // Parameters are read in the original scale: use the accessors
+      params.sigma2 = sigma2();
       params.is_sigma2_estim = m_est_sigma2;
-      params.theta = arma::trans(m_theta) % m_scaleX;
+      params.theta = arma::trans(theta());
       params.is_theta_estim = m_est_theta;
-      params.nugget = m_nugget * m_scaleY * m_scaleY;
+      params.nugget = nugget();
       params.is_nugget_estim = m_est_nugget;
       if (!m_est_beta) {
-        params.beta = m_beta * m_scaleY;
+        params.beta = beta();
         params.is_beta_estim = false;
       }
     }
@@ -3193,23 +3335,26 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
     throw std::runtime_error("noise_u must have the same length as y_u");
   // Rebuild de-normalized data and call fit() with the joined dataset
   const arma::vec y_all = arma::join_cols(m_y * m_scaleY + m_centerY, y_u);
-  const arma::vec noise_all = arma::join_cols(m_noise * m_scaleY * m_scaleY, noise_u);
+  const arma::vec noise_all = arma::join_cols(noise(), noise_u);
   const arma::mat X_all = arma::join_cols((m_X.each_row() % m_scaleX).each_row() + m_centerX, X_u);
+  // Parameters are read in the original scale: use the accessors
   Kriging::Parameters params;
-  params.sigma2 = m_sigma2 * m_scaleY * m_scaleY;
+  params.sigma2 = sigma2();
   params.is_sigma2_estim = m_est_sigma2;
-  params.theta = trans(m_theta) % m_scaleX;
+  params.theta = arma::trans(theta());
   params.is_theta_estim = m_est_theta;
-  params.beta = m_est_beta ? std::optional<arma::vec>{} : std::optional<arma::vec>(trans(m_beta) * m_scaleY);
+  params.beta = m_est_beta ? std::optional<arma::vec>{} : std::optional<arma::vec>(beta());
   params.is_beta_estim = m_est_beta;
   fit(y_all, noise_all, X_all, m_regmodel, m_normalize, refit ? m_optim : "none", m_objective, params, m_method);
 }
 
 LIBKRIGING_EXPORT std::string Kriging::summary() const {
   std::ostringstream oss;
-  if (summary_top(oss)) {
+  // parameters displayed in the original scale, like the accessors
+  const SummaryValues values{beta(), sigma2(), theta(), noise()};
+  if (summary_top(oss, nullptr, &values)) {
     if (m_noise_model == NoiseModel::Nugget)
-      oss << "  * nugget" << (m_est_nugget ? " (est.): " : ": ") << m_nugget << "\n";
+      oss << "  * nugget" << (m_est_nugget ? " (est.): " : ": ") << nugget() << "\n";
     else if (m_noise_model == NoiseModel::Heterogeneous)
       oss << "  * noise (heterogeneous): " << m_noise.n_elem << " obs\n";
     summary_bottom(oss);

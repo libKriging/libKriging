@@ -61,6 +61,13 @@ This document lists all methods exposed by each language binding for accessing t
 | **Pre-fit data reduction** | | | | | |
 | `subsetOfData` | `kriging_subsetOfData(X,n_max,method,seed)` | `subsetOfData(X,n_max,method,seed)` (plain function) | `Kriging.subsetOfData(X,n_max,method,seed)` (static) | `Kriging.subsetOfData(X,int32(n_max),method,int32(seed))` (static) | `subsetOfData(X,n_max;method,seed)` |
 
+With `normalize=true`, `Kriging`'s parameter accessors (`theta`, `sigma2`, `nugget`, `noise`, `beta`), `covMat` and
+the objective functions (`logLikelihoodFun`, `leaveOneOutFun`, `logMargPostFun`, `leaveOneOutVec`, their Vecchia /
+Nystrom variants: `theta` argument, value and gradient) are all in the original scale of `X` and `y`, like the
+`parameters` given to `fit`: they round-trip, and agree with a `normalize=false` model on the same data. `X`, `y`,
+`F`, `T`, `M`, `z` are the internal (normalized) data and factorization, with `centerX`/`scaleX`/`centerY`/`scaleY`.
+(`WarpKriging` / `MLPKriging` keep their parameters in the warped feature space.)
+
 `subsetOfData` picks `n_max` representative rows of `X` (`method="kmeans"`, default: k-means centroids snapped to the
 nearest real observation; or `"random"`) to fit on a reduced design; see [docs/math/SubsetOfData.md](../docs/math/SubsetOfData.md).
 It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and Octave/Matlab**; the Python result is a

@@ -291,6 +291,20 @@ class KrigingImpl {
                            const std::optional<arma::mat>& theta,
                            bool build_dX = true);
 
+  /// Trend coefficients between the internal (normalized) scale and the
+  /// original scale of X and y: `beta_o` is such that, for every x,
+  ///   F(x) * beta_o == scaleY * F((x - centerX) / scaleX) * beta_n + centerY
+  /// (exact affine basis change, available for every trend; identity when
+  /// `normalize` is false). The None trend has no coefficient: with
+  /// normalize=true its (implicit) mean is centerY in the original scale.
+  /// Throw std::invalid_argument if the length does not match the trend.
+  [[nodiscard]] arma::vec beta_to_original(const arma::vec& beta_n) const;
+  [[nodiscard]] arma::vec beta_from_original(const arma::vec& beta_o) const;
+  /// log|det A| of the trend basis change F(x_n) = F(x) * A (0 when not
+  /// normalized): the constant relating the normalized and original-scale
+  /// log marginal posteriors (det of F' R^-1 F).
+  [[nodiscard]] double trend_log_abs_det_to_original() const;
+
   /// Dump the inherited GP state to a JSON object using the
   /// Kriging/NuggetKriging/NoiseKriging schema. Used by `save()` in those
   /// three classes; WarpKriging/MLPKriging use a different schema and roll
@@ -313,7 +327,19 @@ class KrigingImpl {
   /// covariance extras (NuggetKriging: nugget line) and call
   /// `summary_bottom`. Returns `false` if the unfitted short form was written
   /// and the caller should stop.
-  [[nodiscard]] bool summary_top(std::ostringstream& oss, const arma::mat* X_display_override = nullptr) const;
+  ///
+  /// `values`, when given, replaces the displayed beta / sigma2 / theta /
+  /// noise (Kriging displays them in the original scale of X and y, like its
+  /// accessors; the default shows the internal members).
+  struct SummaryValues {
+    arma::vec beta;
+    double sigma2;
+    arma::vec theta;
+    arma::vec noise;
+  };
+  [[nodiscard]] bool summary_top(std::ostringstream& oss,
+                                 const arma::mat* X_display_override = nullptr,
+                                 const SummaryValues* values = nullptr) const;
 
   /// Write the shared lower portion of `summary()` to `oss`: the
   /// `* fit:` block (objective + optim).
