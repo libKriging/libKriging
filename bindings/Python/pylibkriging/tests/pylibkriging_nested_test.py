@@ -79,3 +79,21 @@ def test_warped_nested(data):
     mean, stdev = nk.predict(X, True)
     np.testing.assert_allclose(mean, y, atol=1e-3)  # NK interpolates under warping
     assert np.all(stdev >= 0)
+
+
+@pytest.mark.parametrize("agg", ["NK", "gPoE"])
+def test_save_load_roundtrip(data, agg, tmp_path):
+    X, y = data
+    nk = lk.NestedKriging(y, X, "matern5_2", 4, aggregation=agg)
+    filename = str(tmp_path / "nk.json")
+    nk.save(filename)
+    for nk2 in (lk.NestedKriging.load(filename), lk.load(filename)):
+        assert isinstance(nk2, lk.NestedKriging)
+        assert nk2.aggregation() == agg
+        assert nk2.nb_groups() == nk.nb_groups()
+        np.testing.assert_array_equal(nk2.theta(), nk.theta())
+        Xt = np.random.default_rng(456).uniform(size=(30, 2))
+        m1, s1 = nk.predict(Xt, True)
+        m2, s2 = nk2.predict(Xt, True)
+        np.testing.assert_allclose(m2, m1, rtol=0, atol=1e-10)
+        np.testing.assert_allclose(s2, s1, rtol=0, atol=1e-10)

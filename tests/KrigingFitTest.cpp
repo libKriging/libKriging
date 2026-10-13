@@ -168,3 +168,88 @@ TEST_CASE("KrigingFitTest - BFGS finds better LL/LOO/LMP than grid search", "[fi
     CHECK(lmp_bfgs >= best_lmp_grid - std::abs(best_lmp_grid) * 1e-3);  // Relax tolerance for wider theta range
   }
 }
+
+// y in the span of the trend (constant y with a constant trend, affine y with a
+// linear one): the residual is zero for every theta, sigma2 = 0 and theta is
+// not identifiable. The fit used to drive theta to a bound where R is singular
+// and fail ("All 1 optimization attempts failed"); it now commits the model
+// without optimization: trend predictions, zero variance.
+TEST_CASE("KrigingFitTest - y in the span of the trend", "[fit][kriging]") {
+  const arma::vec x = arma::linspace(0.01, 0.99, 10);
+  const arma::mat X = x;
+  const arma::mat Xt = arma::linspace(0.05, 0.95, 4);
+
+  auto check = [&](Kriging& k, const arma::vec& expected_mean) {
+    CHECK_FALSE(k.is_theta_estim());
+    CHECK(arma::all(k.theta() > 0));
+    CHECK(std::abs(k.sigma2()) < 1e-20);
+    auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+    CHECK(arma::abs(mean - expected_mean).max() < 1e-8);
+    CHECK(arma::abs(stdev).max() < 1e-8);
+    const arma::mat sims = k.simulate(5, 1, Xt);
+    CHECK(sims.is_finite());
+    CHECK(arma::abs(sims.each_col() - expected_mean).max() < 1e-6);
+  };
+
+  const std::string objective = GENERATE(as<std::string>{}, "LL", "LOO", "LMP");
+  const bool normalize = GENERATE(false, true);
+  CAPTURE(objective, normalize);
+
+  SECTION("constant y, constant trend") {
+    const arma::vec y(10, arma::fill::value(3.0));
+    Kriging k(y, X, "gauss", Trend::RegressionModel::Constant, normalize, "BFGS", objective);
+    check(k, arma::vec(4, arma::fill::value(3.0)));
+  }
+  SECTION("affine y, linear trend") {
+    Kriging k(1 + 2 * x, X, "matern5_2", Trend::RegressionModel::Linear, normalize, "BFGS", objective);
+    check(k, 1 + 2 * arma::vec(Xt));
+  }
+  SECTION("given theta is kept") {
+    Kriging::Parameters params;
+    params.theta = arma::mat(1, 1, arma::fill::value(0.3));
+    Kriging k(arma::vec(10, arma::fill::ones),
+              X,
+              "gauss",
+              Trend::RegressionModel::Constant,
+              normalize,
+              "BFGS",
+              objective,
+              params);
+    check(k, arma::vec(4, arma::fill::ones));
+    if (!normalize)
+      CHECK(k.theta()(0) == 0.3);
+  }
+}
+
+TEST_CASE("KrigingFitTest - y in the span of the trend, noise models", "[fit][kriging]") {
+  const arma::mat X = arma::linspace(0.01, 0.99, 10);
+  const arma::vec y(10, arma::fill::ones);
+
+  Kriging knug("gauss", Kriging::NoiseModel::Nugget);
+  knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {});
+  CHECK(knug.sigma2() == 0.0);
+  CHECK(knug.nugget() == 0.0);
+  auto [mean, stdev, cov, dm, ds] = knug.predict(X.rows(0, 2), true, false, false);
+  CHECK(arma::abs(mean - 1.0).max() < 1e-8);
+  CHECK(stdev.is_finite());
+
+  // known heterogeneous noise: sigma2 = 0 is not representable -> explicit error
+  Kriging khet("gauss", Kriging::NoiseModel::Heterogeneous);
+  CHECK_THROWS_AS(
+      khet.fit(y, arma::vec(10, arma::fill::value(0.01)), X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}),
+      std::invalid_argument);
+}
+
+TEST_CASE("KrigingFitTest - constant input column", "[fit][kriging]") {
+  arma::arma_rng::set_seed(7);
+  arma::mat X(20, 2, arma::fill::randu);
+  X.col(1).fill(0.5);  // zero range: [0, 0] theta bounds, and a division by zero with normalize
+  const arma::vec y = arma::sin(3 * X.col(0));
+  const bool normalize = GENERATE(false, true);
+  CAPTURE(normalize);
+  Kriging k(y, X, "gauss", Trend::RegressionModel::Constant, normalize, "BFGS", "LL");
+  CHECK(k.theta().is_finite());
+  CHECK(k.theta()(1) == 1.0);  // not identifiable: pinned, not driven out of its bounds
+  auto [mean, stdev, cov, dm, ds] = k.predict(X.rows(0, 4), true, false, false);
+  CHECK(arma::abs(mean - y.head(5)).max() < 1e-4);
+}

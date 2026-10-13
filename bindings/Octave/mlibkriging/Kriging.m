@@ -7,11 +7,16 @@ classdef Kriging < handle
     methods
         function obj = Kriging(varargin)
             % fprintf("New Kriging\n");
-            obj.ref = mLibKriging("Kriging::new", varargin{:});
+            if nargin == 2 && ischar(varargin{1}) && strcmp(varargin{1}, '__ref__')
+                obj.ref = varargin{2};  % wrap an existing mex reference (see load)
+            else
+                obj.ref = mLibKriging("Kriging::new", varargin{:});
+            end
         end
 
-        function varargout = copy(obj, varargin)
-            [varargout{1:nargout}] = mLibKriging("Kriging::copy", obj.ref, varargin{:});
+        function k2 = copy(obj)
+            ref_copy = mLibKriging("Kriging::copy", obj.ref);
+            k2 = Kriging('__ref__', ref_copy);
         end
         
         function delete(obj, varargin)
@@ -23,10 +28,24 @@ classdef Kriging < handle
             end
         end
         
+        % fit(y, X, regmodel, normalize, optim, objective, parameters [, method])
+        % (heterogeneous noise: fit(y, noise, X, ...)); constructor:
+        % Kriging(y, X, kernel, regmodel, normalize, optim, objective,
+        % parameters, noise_model, noise [, method]). method: "exact"
+        % (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
+        % neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k
+        % Nystrom, default 50); an approximate fit keeps no exact
+        % factorization, and only objective "LL" has approximate versions.
+        % "LLVecchia(m)" / "LLNystrom(k)" objectives are deprecated aliases.
         function fit(obj, varargin)
             mLibKriging("Kriging::fit", obj.ref, varargin{:});
         end
         
+        % predict(X, return_stdev, return_cov, return_deriv [, method]) and
+        % simulate(nsim, seed, X, will_update [, method]): method "exact"
+        % (default, needs a method "exact" fit), "vecchia" / "vecchia(m)"
+        % (local Vecchia, usable after any fit) or "nystrom" (needs a
+        % method "nystrom" fit); nothing is chosen implicitly.
         function varargout = predict(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::predict", obj.ref, varargin{:});
         end
@@ -101,6 +120,15 @@ classdef Kriging < handle
 
         function varargout = nystrom_rank(obj, varargin)
             [varargout{1:nargout}] = mLibKriging("Kriging::nystrom_rank", obj.ref, varargin{:});
+        end
+
+        function varargout = vecchia_neighbors(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::vecchia_neighbors", obj.ref, varargin{:});
+        end
+
+        % fit method: "exact", "vecchia(m)" or "nystrom(k)"
+        function varargout = method(obj, varargin)
+            [varargout{1:nargout}] = mLibKriging("Kriging::method", obj.ref, varargin{:});
         end
 
         function varargout = X(obj, varargin)
@@ -195,8 +223,8 @@ classdef Kriging < handle
 
     methods (Static = true)
         function obj = load(varargin)
-            obj = Kriging([1], [1], "gauss") % TODO should find a more straightforward default ctor
-            obj.ref = mLibKriging("Kriging::load", varargin{:});
+            ref = mLibKriging("Kriging::load", varargin{:});
+            obj = Kriging('__ref__', ref);
         end
 
         % Subset-of-data pre-fit reduction: select n_max rows of X

@@ -3,6 +3,7 @@
 #define _USE_MATH_DEFINES // required for Visual Studio
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 // clang-format on
 
@@ -99,7 +100,8 @@ namespace {
 void libkriging_atfork_quiesce() {
 #if !defined(__APPLE__) || !defined(__arm64__)
   auto fn = get_openblas_set_num_threads();
-  if (fn) fn(1);
+  if (fn)
+    fn(1);
 #endif
 #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -108,9 +110,9 @@ void libkriging_atfork_quiesce() {
 
 struct ForkSafeRegistrar {
   ForkSafeRegistrar() {
-    pthread_atfork(libkriging_atfork_quiesce,  // prepare: quiesce before fork
-                   nullptr,                    // parent:  restored by next fit()
-                   libkriging_atfork_quiesce); // child:   ensure clean state
+    pthread_atfork(libkriging_atfork_quiesce,   // prepare: quiesce before fork
+                   nullptr,                     // parent:  restored by next fit()
+                   libkriging_atfork_quiesce);  // child:   ensure clean state
   }
 };
 static ForkSafeRegistrar fork_safe_registrar;
@@ -195,13 +197,14 @@ LIBKRIGING_EXPORT Kriging::Kriging(const arma::vec& y,
                                    bool normalize,
                                    const std::string& optim,
                                    const std::string& objective,
-                                   const Parameters& parameters) {
+                                   const Parameters& parameters,
+                                   const std::string& method) {
   if (y.n_elem != X.n_rows)
     throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X.n_rows) + "x"
                              + std::to_string(X.n_cols) + "), y: (" + std::to_string(y.n_elem) + ")");
 
   make_Cov(covType);
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 LIBKRIGING_EXPORT Kriging::Kriging(const Kriging& other, ExplicitCopySpecifier) : Kriging{other} {}
@@ -753,7 +756,7 @@ static arma::vec nugget_reparam_from_deriv(const arma::vec& _theta_alpha, const 
 }
 
 // =============================================================================
-// Vecchia approximated log-likelihood (objective="LLVecchia(m)")
+// Vecchia approximated log-likelihood (fit method "vecchia(m)", internal objective "LLVecchia(m)")
 //
 // Vecchia (1988): log p(y) = sum_i log p(y_i | y_{N(i)}) where N(i) is the set
 // of (at most) m nearest previously-ordered neighbors in a maxmin ordering.
@@ -974,17 +977,96 @@ double Kriging::_logLikelihoodVecchia(const arma::vec& _theta,
   return vll;
 }
 
+bool Kriging::y_in_trend_span() const {
+  arma::vec r = m_y;
+  if (m_F.n_cols > 0) {
+    arma::vec b;
+    if (!arma::solve(b, m_F, m_y, arma::solve_opts::no_approx))
+      return false;
+    r = m_y - m_F * b;
+  }
+  return arma::norm(r, "inf") <= 1e-10 * arma::norm(m_y, "inf");
+}
+
 void Kriging::check_not_vecchia_light(const char* what) const {
   if (m_vecchia_light)
     throw std::runtime_error(std::string(what)
-                             + ": not available on a light Vecchia fit "
-                               "(refit with set_vecchia_exact_commit(true))");
+                             + ": not available on a Vecchia fit "
+                               "(fit with method=\"exact\")");
+}
+
+void Kriging::check_exact_available(const char* what, const char* alternative) const {
+  if (m_vecchia_light)
+    throw std::runtime_error(std::string(what) + ": no exact factorization on a Vecchia fit; use method \"vecchia\" ("
+                             + alternative + "Vecchia), or fit with method=\"exact\"");
+  if (m_nystrom_light)
+    throw std::runtime_error(std::string(what) + ": no exact factorization on a Nystrom fit; use method \"nystrom\" ("
+                             + alternative + "Nystrom), or fit with method=\"exact\"");
+}
+
+namespace {
+// Explicit prediction / simulation / likelihood method: "exact", "vecchia",
+// "vecchia(m)", "nystrom" or "nystrom(k)" (no implicit choice from the fit).
+struct ApproxMethod {
+  enum Kind { Exact, Vecchia, Nystrom } kind;
+  arma::uword m;  // Vecchia neighbors / Nystrom rank (0 = default / fitted)
+};
+
+ApproxMethod parse_approx_method(const std::string& method, const char* what) {
+  if (method == "exact")
+    return {ApproxMethod::Exact, 0};
+  for (const auto kind : {ApproxMethod::Vecchia, ApproxMethod::Nystrom}) {
+    const std::string name = (kind == ApproxMethod::Vecchia) ? "vecchia" : "nystrom";
+    if (method == name)
+      return {kind, 0};
+    if (method.rfind(name + "(", 0) == 0 && method.back() == ')') {
+      try {
+        const long m = std::stol(method.substr(name.size() + 1, method.size() - name.size() - 2));
+        if (m >= 1)
+          return {kind, static_cast<arma::uword>(m)};
+      } catch (const std::exception&) {
+        // fall through to the throw below
+      }
+    }
+  }
+  throw std::invalid_argument(std::string(what) + ": unknown method '" + method
+                              + "': expected \"exact\", \"vecchia\", \"vecchia(m)\", \"nystrom\" or "
+                                "\"nystrom(k)\" (m, k >= 1)");
+}
+
+// The Nystrom predictor / simulator / likelihood use the fitted rank-k
+// factors: "nystrom(k)" is accepted only with the fitted k (so that the string
+// returned by method() can be passed back as is).
+void check_nystrom_rank(const ApproxMethod& am, arma::uword fitted_k, const char* what) {
+  if (am.kind == ApproxMethod::Nystrom && am.m != 0 && am.m != fitted_k)
+    throw std::invalid_argument(std::string(what) + ": the Nystrom method uses the fitted rank ("
+                                + std::to_string(fitted_k) + "): use method \"nystrom\"");
+}
+}  // namespace
+
+LIBKRIGING_EXPORT double Kriging::logLikelihood(const std::string& method) {
+  const ApproxMethod am = parse_approx_method(method, "logLikelihood");
+  switch (am.kind) {
+    case ApproxMethod::Vecchia:
+      if (am.m != 0 && am.m != m_vecchia_m)
+        throw std::invalid_argument("logLikelihood: the Vecchia likelihood uses the fitted m ("
+                                    + std::to_string(m_vecchia_m) + "): use method \"vecchia\"");
+      return std::get<0>(logLikelihoodVecchiaFun(m_theta, false));
+    case ApproxMethod::Nystrom:
+      check_nystrom_rank(am, m_nystrom_k, "logLikelihood");
+      return std::get<0>(logLikelihoodNystromFun(m_theta, false));
+    case ApproxMethod::Exact:
+    default:
+      return logLikelihood();
+  }
 }
 
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodVecchiaFun(const arma::vec& theta,
                                                                                  bool return_grad) {
-  if (m_vecchia_m == 0 || m_vecchia_order.n_elem != m_X.n_rows)
-    throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with objective=\"LLVecchia(m)\"");
+  if (m_vecchia_m == 0)
+    throw std::runtime_error("logLikelihoodVecchiaFun: model was not fitted with method=\"vecchia(m)\"");
+  if (m_vecchia_order.n_elem != m_X.n_rows)
+    make_vecchia_sets();  // not stored by save(): rebuilt on demand after load
   arma::vec grad;
   if (return_grad) {
     grad.set_size(theta.n_elem);
@@ -1073,7 +1155,118 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictVecchia(const
 }
 
 // =============================================================================
-// Nystrom approximated log-likelihood (objective="LLNystrom(k)")
+/* Vecchia (local) simulation: sequential conditional simulation in the row
+ * order of X_n. Point t is drawn from its simple-kriging conditional given
+ * its m nearest neighbors among the observations and the points 0..t-1
+ * already simulated (same draw shared by all nsim trajectories for the
+ * neighbor selection and kriging weights; only the conditioning values
+ * differ per trajectory). Chain rule => exact joint (beta known) as soon as
+ * every point conditions on all its predecessors (m >= n + q - 1). */
+LIBKRIGING_EXPORT arma::mat Kriging::simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m) {
+  const arma::uword n = m_X.n_rows;
+  const arma::uword d = m_X.n_cols;
+  const arma::uword q = X_n.n_rows;
+  if (X_n.n_cols != d)
+    throw std::invalid_argument("simulateVecchia: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
+                                + " instead of " + std::to_string(d));
+  if (m_noise_model != NoiseModel::None)
+    throw std::runtime_error("simulateVecchia: only available for NoiseModel::None (no nugget/noise channel)");
+  if (nsim <= 0)
+    throw std::invalid_argument("simulateVecchia: nsim should be > 0");
+  if (m == 0)
+    m = (m_vecchia_m > 0) ? m_vecchia_m : 30;
+  const arma::uword m_obs = std::min<arma::uword>(m, n);
+
+  arma::mat Xn_n = X_n;
+  Xn_n.each_row() -= m_centerX;
+  Xn_n.each_row() /= m_scaleX;
+  const arma::mat F_n = Trend::regressionModelMatrix(m_regmodel, Xn_n);
+
+  // 1) m nearest OBSERVATIONS of each simulation point: independent across
+  //    points, hence parallel (same search as predictVecchia).
+  arma::umat Nobs(m_obs, q);
+  arma::mat Dobs(m_obs, q);
+  const arma::mat Xt = m_X.t();
+  const double* xp = Xt.memptr();
+#if defined(_OPENMP) && !defined(LK_NESTED_NO_OMP)
+#pragma omp parallel for schedule(dynamic, 16) if (q > 32 && n * m_obs >= 40000)
+#endif
+  for (arma::sword t = 0; t < static_cast<arma::sword>(q); ++t) {
+    std::vector<std::pair<double, arma::uword>> cand(n);
+    const arma::rowvec x_t = Xn_n.row(static_cast<arma::uword>(t));
+    for (arma::uword j = 0; j < n; ++j) {
+      double s = 0;
+      for (arma::uword k = 0; k < d; ++k) {
+        const double dk = x_t(k) - xp[j * d + k];
+        s += dk * dk;
+      }
+      cand[j] = {s, j};
+    }
+    if (m_obs < n)
+      std::nth_element(cand.begin(), cand.begin() + m_obs, cand.end());
+    for (arma::uword j = 0; j < m_obs; ++j) {
+      Nobs(j, static_cast<arma::uword>(t)) = cand[j].second;
+      Dobs(j, static_cast<arma::uword>(t)) = cand[j].first;
+    }
+  }
+
+  // 2) sequential pass: the m nearest of (observations U previous simulation
+  //    points) are among (m nearest observations U previous simulation points).
+  //    Candidate index c < n is observation c, c >= n is simulation point c-n.
+  const arma::vec resid_o = m_y - m_F * m_beta;  // observed residuals (shared by all trajectories)
+  arma::mat Z(q, nsim, arma::fill::zeros);       // simulated residuals (normalized scale)
+  Random::reset_seed(seed);
+  const arma::mat eps = Random::randn_mat(q, nsim);
+  const double sigma = std::sqrt(m_sigma2);
+
+  auto row_of = [&](arma::uword c) -> arma::rowvec { return (c < n) ? m_X.row(c) : Xn_n.row(c - n); };
+
+  std::vector<std::pair<double, arma::uword>> cand;
+  for (arma::uword t = 0; t < q; ++t) {
+    cand.clear();
+    for (arma::uword j = 0; j < m_obs; ++j)
+      cand.emplace_back(Dobs(j, t), Nobs(j, t));
+    const arma::rowvec x_t = Xn_n.row(t);
+    for (arma::uword s = 0; s < t; ++s)
+      cand.emplace_back(arma::accu(arma::square(x_t - Xn_n.row(s))), n + s);
+    const arma::uword mt = std::min<arma::uword>(m, cand.size());
+    if (mt < cand.size())
+      std::nth_element(cand.begin(), cand.begin() + mt, cand.end());
+
+    double cond_var = 1.0;
+    arma::rowvec cond_mean(nsim, arma::fill::zeros);
+    if (mt > 0) {
+      arma::mat RN(mt, mt, arma::fill::ones);
+      arma::vec r(mt);
+      arma::mat ZN(mt, nsim);
+      for (arma::uword a = 0; a < mt; ++a) {
+        const arma::uword ca = cand[a].second;
+        const arma::rowvec xa = row_of(ca);
+        for (arma::uword b = a + 1; b < mt; ++b) {
+          const arma::vec dx = (xa - row_of(cand[b].second)).t();
+          RN(a, b) = RN(b, a) = _Cov(dx, m_theta);
+        }
+        r(a) = _Cov((xa - x_t).t(), m_theta);
+        if (ca < n)
+          ZN.row(a).fill(resid_o(ca));
+        else
+          ZN.row(a) = Z.row(ca - n);
+      }
+      RN.diag() += LinearAlgebra::num_nugget;
+      const arma::mat LN = LinearAlgebra::safe_chol_lower(RN);
+      const arma::vec a_vec = arma::solve(arma::trimatu(LN.t()), arma::solve(arma::trimatl(LN), r));
+      cond_mean = a_vec.t() * ZN;
+      cond_var = std::max(0.0, 1.0 - arma::dot(r, a_vec));
+    }
+    Z.row(t) = cond_mean + sigma * std::sqrt(cond_var) * eps.row(t);
+  }
+
+  arma::mat y_n = Z;
+  y_n.each_col() += F_n * m_beta;
+  return m_centerY + m_scaleY * y_n;
+}
+
+// Nystrom approximated log-likelihood (fit method "nystrom(k)", internal objective "LLNystrom(k)")
 //
 // Global low-rank alternative to Vecchia: R ~= R_ns * R_ss^-1 * R_ns.t(),
 // where S is a set of k landmark rows of X, chosen ONCE (make_nystrom_landmarks,
@@ -1272,7 +1465,7 @@ double Kriging::_logLikelihoodNystrom(const arma::vec& _theta,
 LIBKRIGING_EXPORT std::tuple<double, arma::vec> Kriging::logLikelihoodNystromFun(const arma::vec& theta,
                                                                                  bool return_grad) {
   if (m_nystrom_k == 0)
-    throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with objective=\"LLNystrom(k)\"");
+    throw std::runtime_error("logLikelihoodNystromFun: model was not fitted with method=\"nystrom(k)\"");
   arma::vec grad;
   if (return_grad) {
     grad.set_size(theta.n_elem);
@@ -1295,7 +1488,7 @@ void Kriging::check_not_nystrom_light(const char* what) const {
  * simple-kriging one (beta treated as known, like predictVecchia). */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const arma::mat& X_n, bool return_stdev) {
   if (m_nystrom_U.is_empty())
-    throw std::runtime_error("predictNystrom: model was not fitted with objective=\"LLNystrom(k)\"");
+    throw std::runtime_error("predictNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
   if (X_n.n_cols != d)
     throw std::invalid_argument("predictNystrom: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
@@ -1326,7 +1519,7 @@ LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> Kriging::predictNystrom(const
 
 LIBKRIGING_EXPORT arma::mat Kriging::simulateNystrom(int nsim, int seed, const arma::mat& X_n) {
   if (m_nystrom_U.is_empty())
-    throw std::runtime_error("simulateNystrom: model was not fitted with objective=\"LLNystrom(k)\"");
+    throw std::runtime_error("simulateNystrom: model was not fitted with method=\"nystrom(k)\"");
   const arma::uword d = m_X.n_cols;
   if (X_n.n_cols != d)
     throw std::invalid_argument("simulateNystrom: X_n has wrong dimension: " + std::to_string(X_n.n_cols)
@@ -1412,7 +1605,7 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     // (fixed) landmark set -- landmarks are only re-picked by a full fit(),
     // which is what keeps this O((n_old+n_new)*k^2) rather than paying the
     // O(n*k) landmark-ranking pass (and losing the warm start) again.
-    const FitOfn fit_ofn = make_fit_objective(m_objective);
+    const FitOfn fit_ofn = make_fit_objective(internal_objective());
     const arma::uword d = m_X.n_cols;
 
     // theta bounds from the per-dimension range of the extended data --
@@ -1460,6 +1653,81 @@ void Kriging::update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool re
     m_sigma2 = sigma2_v;
   m_nystrom_U = std::move(U_v);
   m_nystrom_D = std::move(D_v);
+}
+
+void Kriging::update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, bool refit) {
+  if (y_u.n_elem != X_u.n_rows)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (" + std::to_string(X_u.n_rows) + "x"
+                             + std::to_string(X_u.n_cols) + "), y: (" + std::to_string(y_u.n_elem) + ")");
+  if (X_u.n_cols != m_X.n_cols)
+    throw std::runtime_error("Dimension of new data should be the same:\n X: (...x" + std::to_string(m_X.n_cols)
+                             + "), new X: (...x" + std::to_string(X_u.n_cols) + ")");
+
+  arma::mat Xn_u = X_u;
+  Xn_u.each_row() -= m_centerX;
+  Xn_u.each_row() /= m_scaleX;
+  const arma::vec yn_u = (y_u - m_centerY) / m_scaleY;
+
+  m_X = arma::join_cols(m_X, Xn_u);
+  m_y = arma::join_cols(m_y, yn_u);
+  m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
+  make_vecchia_sets();  // ordering / neighbor sets over the extended design
+
+  if (refit && m_optim != "none" && m_est_theta) {
+    // Warm restart: single BFGS on the LLVecchia objective from the current
+    // theta; bounds from the per-dimension range of the extended data (O(n*d),
+    // as update_nystrom: no O(n^2) pairwise-difference cube).
+    const FitOfn fit_ofn = make_fit_objective(internal_objective());
+    const arma::uword d = m_X.n_cols;
+    const arma::vec maxdX_local = arma::trans(arma::max(m_X, 0) - arma::min(m_X, 0));
+    arma::vec theta_lower = arma::min(m_theta, Optim::theta_lower_factor * maxdX_local);
+    arma::vec theta_upper = arma::max(m_theta, Optim::theta_upper_factor * maxdX_local);
+
+    arma::vec gamma_start = m_theta;
+    arma::vec gamma_lower = theta_lower;
+    arma::vec gamma_upper = theta_upper;
+    if (Optim::reparametrize) {
+      gamma_start = Optim::reparam_to(gamma_start);
+      gamma_lower = Optim::reparam_to(gamma_lower);
+      gamma_upper = Optim::reparam_to(gamma_upper);
+    }
+
+    lbfgsb::Optimizer optimizer{static_cast<unsigned int>(d)};
+    optimizer.iprint = Optim::log_level - 2;
+    optimizer.max_iter = Optim::max_iteration;
+    optimizer.pgtol = Optim::gradient_tolerance;
+    optimizer.factr = Optim::objective_rel_tolerance / 1E-13;
+    const arma::ivec bounds_type{d, arma::fill::value(2)};
+
+    optimizer.minimize([&fit_ofn](const arma::vec& vals_inp,
+                                  arma::vec& grad_out) -> double { return fit_ofn(vals_inp, &grad_out, nullptr); },
+                       gamma_start,
+                       gamma_lower.memptr(),
+                       gamma_upper.memptr(),
+                       bounds_type.memptr());
+
+    m_theta = Optim::reparametrize ? Optim::reparam_from(gamma_start) : gamma_start;
+  }
+
+  // light commit, as in fit(): beta / sigma2 profiled by the Vecchia likelihood
+  arma::vec beta_v;
+  double sigma2_v = -1;
+  _logLikelihoodVecchia(m_theta, nullptr, &beta_v, &sigma2_v);
+  if (m_est_beta)
+    m_beta = beta_v;
+  if (m_est_sigma2)
+    m_sigma2 = sigma2_v;
+  // drop a legacy exact factorization (now stale): the model is a light Vecchia fit
+  m_vecchia_light = true;
+  m_is_empty = true;
+  m_T.reset();
+  m_R.reset();
+  m_M.reset();
+  m_circ.reset();
+  m_star.reset();
+  m_Rinv.reset();
+  m_z.reset();
+  m_dX.reset();
 }
 
 Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const {
@@ -1574,26 +1842,19 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
   } else if (objective.rfind("LLVecchia", 0) == 0) {
     parse_vll_m(objective);  // validate the spec early (throws on malformed)
     if (m_noise_model != NoiseModel::None)
-      throw std::invalid_argument("LLVecchia objective not supported for Nugget/Heterogeneous noise modes");
-    // Protocol: during optimization the caller passes grad_out != nullptr and
-    // we evaluate the O(n m^3) Vecchia likelihood without touching km_data.
-    // The single final call (grad_out == nullptr, km_data != nullptr) performs
-    // ONE exact O(n^3) factorization at theta* so that the committed model
-    // (and thus predict/simulate/update) behaves exactly as after an "LL" fit.
+      throw std::invalid_argument("method \"vecchia\" not supported for Nugget/Heterogeneous noise models");
+    // km_data (the dense O(n^3) KModel) is never populated: a Vecchia fit
+    // commits theta* with Vecchia-profiled beta/sigma2 only (see fit()).
     if (Optim::reparametrize) {
-      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
         const arma::vec _theta = Optim::reparam_from(_gamma);
-        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
-          return -this->_logLikelihood(_theta, nullptr, km_data, nullptr);
         double vll = this->_logLikelihoodVecchia(_theta, grad_out);
         if (grad_out != nullptr)
           *grad_out = -Optim::reparam_from_deriv(_theta, *grad_out);
         return -vll;
       };
     } else {
-      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel* km_data) {
-        if (grad_out == nullptr && km_data != nullptr && m_vecchia_exact_commit)
-          return -this->_logLikelihood(_gamma, nullptr, km_data, nullptr);
+      return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
         double vll = this->_logLikelihoodVecchia(_gamma, grad_out);
         if (grad_out != nullptr)
           *grad_out = -*grad_out;
@@ -1603,9 +1864,8 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
   } else if (objective.rfind("LLNystrom", 0) == 0) {
     parse_nystrom_k(objective);  // validate the spec early (throws on malformed)
     if (m_noise_model != NoiseModel::None)
-      throw std::invalid_argument("LLNystrom objective not supported for Nugget/Heterogeneous noise modes");
-    // Unlike LLVecchia, there is no exact-commit branch here: km_data (the dense
-    // O(n^3) KModel) is never populated for this objective, by design.
+      throw std::invalid_argument("method \"nystrom\" not supported for Nugget/Heterogeneous noise models");
+    // km_data (the dense O(n^3) KModel) is never populated, by design.
     if (Optim::reparametrize) {
       return [this](const arma::vec& _gamma, arma::vec* grad_out, Kriging::KModel*) {
         const arma::vec _theta = Optim::reparam_from(_gamma);
@@ -1624,8 +1884,112 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
       };
     }
   } else
-    throw std::invalid_argument("Unsupported fit objective: " + objective
-                                + " (supported are: LL, LOO, LMP, LLVecchia, LLVecchia(m), LLNystrom, LLNystrom(k))");
+    throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
+}
+
+namespace {
+// Receiver of deprecation messages. Function-local static: safe to set from
+// another translation unit's static initializer (bindings).
+Kriging::DeprecationHandler& deprecation_handler() {
+  static Kriging::DeprecationHandler handler;
+  return handler;
+}
+
+// Default receiver: printed once per process
+void print_deprecation_once(const std::string& message) {
+  static std::atomic<bool> warned{false};
+  if (!warned.exchange(true))
+    arma::cout << "Warning: " << message << arma::endl;
+}
+
+// Canonical method string with its default size made explicit
+std::string canonical_fit_method(const std::string& method) {
+  if (method == "exact")
+    return method;
+  for (const char* name : {"vecchia", "nystrom"}) {
+    const std::string nm(name);
+    const arma::uword dflt = (nm == "vecchia") ? 30 : 50;
+    if (method == nm)
+      return nm + "(" + std::to_string(dflt) + ")";
+    if (method.rfind(nm + "(", 0) == 0 && method.back() == ')') {
+      try {
+        const long k = std::stol(method.substr(nm.size() + 1, method.size() - nm.size() - 2));
+        if (k >= 1)
+          return nm + "(" + std::to_string(k) + ")";
+      } catch (const std::exception&) {
+        // fall through to the throw below
+      }
+    }
+  }
+  throw std::invalid_argument("fit: unknown method '" + method
+                              + "': expected \"exact\", \"vecchia\", \"vecchia(m)\", \"nystrom\" or \"nystrom(k)\" "
+                                "(m, k >= 1)");
+}
+}  // namespace
+
+LIBKRIGING_EXPORT std::string Kriging::deprecated_objective_message(const std::string& objective) {
+  const bool vll = objective.rfind("LLVecchia", 0) == 0;
+  const bool nll = objective.rfind("LLNystrom", 0) == 0;
+  if (!vll && !nll)
+    return "";
+  const std::string method = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
+                                 : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
+  return "objective \"" + objective + "\" is deprecated; use objective=\"LL\", method=\"" + method + "\"";
+}
+
+LIBKRIGING_EXPORT void Kriging::set_deprecation_handler(DeprecationHandler handler) {
+  deprecation_handler() = std::move(handler);
+}
+
+LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_method(const std::string& objective,
+                                                                                    const std::string& method) {
+  std::string objective_out = objective;
+  std::string method_out = canonical_fit_method(method);
+  // deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)"
+  const bool vll = objective.rfind("LLVecchia", 0) == 0;
+  const bool nll = objective.rfind("LLNystrom", 0) == 0;
+  if (vll || nll) {
+    const std::string alias_method = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
+                                         : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
+    if (method_out != "exact" && method_out != alias_method)
+      throw std::invalid_argument("fit: objective \"" + objective + "\" (deprecated alias of method \"" + alias_method
+                                  + "\") conflicts with method \"" + method + "\"");
+    const DeprecationHandler& handler = deprecation_handler();
+    const std::string message = deprecated_objective_message(objective);
+    if (handler)
+      handler(message);
+    else
+      print_deprecation_once(message);
+    objective_out = "LL";
+    method_out = alias_method;
+  }
+  if (objective_out != "LL" && objective_out != "LOO" && objective_out != "LMP")
+    throw std::invalid_argument("Unsupported fit objective: " + objective + " (supported are: LL, LOO, LMP)");
+  if (method_out != "exact" && objective_out != "LL")
+    throw std::invalid_argument("fit: objective \"" + objective_out + "\" is not implemented with method \""
+                                + method_out + "\" (only \"LL\" is); use method \"exact\"");
+  return {objective_out, method_out};
+}
+
+std::string Kriging::internal_fit_objective(const std::string& objective, const std::string& method) const {
+  if (method == "exact")
+    return objective;
+  if (m_noise_model != NoiseModel::None)
+    throw std::invalid_argument("fit: method \"" + method
+                                + "\" is not implemented for Nugget/Heterogeneous noise models; use method \"exact\"");
+  // internal objective name of the approximate likelihood
+  return (method.rfind("vecchia", 0) == 0 ? "LLVecchia" : "LLNystrom") + method.substr(7);
+}
+
+std::string Kriging::internal_objective() const {
+  return internal_fit_objective(m_objective, m_method.empty() ? std::string("exact") : m_method);
+}
+
+LIBKRIGING_EXPORT void Kriging::set_vecchia_exact_commit(bool b) {
+  if (b)
+    throw std::invalid_argument(
+        "set_vecchia_exact_commit(true) is no longer supported: a Vecchia fit never keeps the exact factorization; "
+        "fit the exact model with method=\"exact\" (optim=\"none\" and the Vecchia theta to reuse it)");
 }
 
 /** Fit the kriging object on (X,y):
@@ -1634,33 +1998,36 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
  * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
  * @param normalize is a boolean to enforce inputs/output normalization
  * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
- * @param objective is 'LL' (default), 'LOO', 'LMP', or 'LLVecchia'/'LLVecchia(m)' for the
- *        Vecchia approximated log-likelihood with m conditioning neighbors
- *        (default m=30). Ignored if optim=='none'.
+ * @param objective is 'LL' (default), 'LOO' or 'LMP' ('LLVecchia(m)' / 'LLNystrom(k)':
+ *        deprecated aliases of 'LL' with method 'vecchia(m)' / 'nystrom(k)').
+ *        Ignored if optim=='none'.
  * @param parameters starting values for hyper-parameters for optim, or final values if optim=='none'.
+ * @param method 'exact' (default), 'vecchia(m)' or 'nystrom(k)': see Kriging.hpp.
  */
 LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     const arma::mat& X,
                                     const Trend::RegressionModel& regmodel,
                                     bool normalize,
                                     const std::string& optim,
-                                    const std::string& objective,
-                                    const Parameters& parameters) {
+                                    const std::string& objective_in,
+                                    const Parameters& parameters,
+                                    const std::string& method) {
   const arma::uword n = X.n_rows;
   const arma::uword d = X.n_cols;
 
+  // public (objective, method) pair; `objective` below is the internal name of
+  // the evaluated criterion ("LLVecchia(m)" / "LLNystrom(k)" for approximate LL)
+  const auto objective_method = fit_objective_method(objective_in, method);
+  const std::string objective = internal_fit_objective(objective_method.first, objective_method.second);
   m_optim = optim;
-  m_objective = objective;
+  m_objective = objective_method.first;
+  m_method = objective_method.second;
   FitOfn fit_ofn = make_fit_objective(objective);
 
-  // Nystrom never touches m_dX (it works straight from m_X via
-  // covMat_sym_X/covMat_rect); a light Vecchia fit (exact_commit=false) skips
-  // the exact factorization that would otherwise need it. Both are only true
-  // when optim != "none": that path always does one exact make_Model call
-  // regardless of objective (see below), so it always needs m_dX.
-  const bool build_dX = (optim == "none")
-                        || !((objective.rfind("LLNystrom", 0) == 0)
-                             || (objective.rfind("LLVecchia", 0) == 0 && !m_vecchia_exact_commit));
+  // Nystrom and Vecchia never touch m_dX (they work straight from m_X) and
+  // never build the exact factorization that would need it.
+  const bool approx = (objective.rfind("LLNystrom", 0) == 0) || (objective.rfind("LLVecchia", 0) == 0);
+  const bool build_dX = !approx;
   arma::mat theta0 = fit_setup_impl(
       y, X, regmodel, normalize, parameters.is_beta_estim, parameters.beta, parameters.theta, build_dX);
 
@@ -1683,11 +2050,44 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
   const double scaleY = m_scaleY;
   const arma::rowvec& scaleX = m_scaleX;
 
-  if (optim == "none") {  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
-    if (!parameters.theta.has_value())
+  // Degenerate data: y is (to rounding) in the span of the trend (e.g. a
+  // constant y with a constant trend). The residual y - F*beta is then zero
+  // for every theta, so sigma2 = 0 and the likelihood is unbounded: theta is
+  // not identifiable and an optimizer only drives it to a bound where R is
+  // singular. Skip the optimization instead and commit the model at the given
+  // theta (or the default starting point): beta = least squares, sigma2 = 0,
+  // i.e. predictions equal to the trend with zero variance.
+  // With a nugget, the estimated total variance is zero too (sigma2 = nugget
+  // = 0). With a known heterogeneous noise, the sigma2 estimate is 0, which
+  // the R = C + diag(noise / sigma2) parameterization cannot represent:
+  // reject such data explicitly rather than with an opaque optimizer failure.
+  const bool degenerate
+      = (optim != "none") && (m_noise_model != NoiseModel::Heterogeneous) && !parameters.sigma2.has_value()
+        && !(m_noise_model == NoiseModel::Nugget && parameters.nugget.has_value()) && y_in_trend_span();
+  if (optim != "none" && m_noise_model == NoiseModel::Heterogeneous && !parameters.sigma2.has_value()
+      && y_in_trend_span())
+    throw std::invalid_argument(
+        "fit: y lies in the span of the trend (no residual variability), so the process variance sigma2 is 0, "
+        "which a heterogeneous-noise model cannot represent; use noise=\"nugget\" or no noise, or give sigma2");
+  if (degenerate && Optim::log_level > Optim::log_none)
+    arma::cout << "Warning: y lies in the span of the trend (no residual variability): theta is not identifiable; "
+                  "fit skips the optimization (sigma2 = 0)"
+               << arma::endl;
+
+  // just keep given theta, no optimisation of ll (but estim sigma2  &beta still possible)
+  if (optim == "none" || degenerate) {
+    if (!parameters.theta.has_value() && !degenerate)
       throw std::runtime_error("Theta should be given (1x" + std::to_string(d) + ") matrix, when optim=none");
 
-    m_theta = trans(theta0.row(0));
+    if (!theta0.is_empty()) {
+      m_theta = trans(theta0.row(0));
+    } else {  // degenerate data, no theta given: deterministic default (typical
+              // inter-point spacing, which keeps R well conditioned); theta has
+              // no effect on predictions since sigma2 = 0
+      const double n_pow = std::pow(static_cast<double>(n), -1.0 / static_cast<double>(d));
+      m_theta = arma::vec(m_maxdX) * n_pow;
+      m_theta.replace(0.0, 1.0);
+    }
     m_est_theta = false;
 
     double sigma2 = -1;
@@ -1728,15 +2128,10 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       return;
     }
 
-    if (m_vecchia_m > 0 && !m_vecchia_exact_commit) {
-      // LLVecchia objective with optim="none", light mode requested
-      // (set_vecchia_exact_commit(false)): same rationale as the LLNystrom
+    if (m_vecchia_m > 0) {
+      // method "vecchia" with optim="none": same rationale as the Nystrom
       // branch above -- commit beta/sigma2 from the Vecchia likelihood at
-      // the given (fixed) theta instead of silently falling through to an
-      // exact dense fit below. When m_vecchia_exact_commit is true (the
-      // default), an exact commit at the given theta IS the documented
-      // behavior (see docs/math/Vecchia.md), so that case intentionally
-      // falls through unchanged.
+      // the given (fixed) theta, without any exact factorization.
       arma::vec beta_v;
       double sigma2_v = -1;
       _logLikelihoodVecchia(m_theta, nullptr, &beta_v, &sigma2_v);
@@ -1826,17 +2221,20 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           active = true;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(static_cast<int>(n));
+          if (fn)
+            fn(static_cast<int>(n));
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(static_cast<int>(n));
 #endif
         }
         ~ThreadCountGuard() {
-          if (!active) return;
+          if (!active)
+            return;
 #if !defined(__APPLE__) || !defined(__arm64__)
           auto fn = get_openblas_set_num_threads();
-          if (fn) fn(1);
+          if (fn)
+            fn(1);
 #endif
 #ifdef _OPENMP
           omp_set_num_threads(1);
@@ -1990,7 +2388,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                    << arma::endl;
       }
 
-      for (int i = 0; i < multistart; i++) {
+      // approximate methods never use the dense KModel: no n x n allocation
+      for (int i = 0; i < multistart && build_dX; i++) {
         auto& m = preallocated_models[i];
         m.R = arma::mat(n_data, n_data, arma::fill::none);
         m.L = arma::mat(n_data, n_data, arma::fill::none);
@@ -2069,12 +2468,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
           Kriging::KModel& m = preallocated_models[start_idx];
           // This "warm-up" populate_Model call primes `m` before the BFGS
           // loop; its result is unconditionally overwritten by the first
-          // fit_ofn evaluation for objectives that touch km_data (LL/LOO/LMP,
-          // and LLVecchia at its final exact-commit call). It always builds a dense
-          // R via m_dX, so it must be skipped whenever m_dX was never built
-          // (LLNystrom, and a light -- exact_commit=false -- LLVecchia fit): both
-          // ignore km_data entirely, so skipping this call changes nothing
-          // for them beyond avoiding the now-empty m_dX.
+          // fit_ofn evaluation for objectives that touch km_data (exact
+          // LL/LOO/LMP). It always builds a dense R via m_dX, so it must be
+          // skipped whenever m_dX was never built (methods "vecchia" and
+          // "nystrom"): both ignore km_data entirely, so skipping this call
+          // changes nothing for them beyond avoiding the now-empty m_dX.
           if (build_dX) {
             if (m_noise_model != NoiseModel::None)
               populate_Model(m, theta_start, extra0[start_idx % extra0.n_elem], nullptr);
@@ -2136,8 +2534,15 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                        ? (m_noise_model == NoiseModel::Nugget ? nugget_reparam_from(gamma_tmp).head(d)
                                                                               : Optim::reparam_from(gamma_tmp).head(d))
                                        : (Optim::reparametrize ? Optim::reparam_from(gamma_tmp) : gamma_tmp.head(d));
-            double sol_to_lb = arma::min(arma::abs(theta_part - theta_lower));
-            double sol_to_ub = arma::min(arma::abs(theta_part - theta_upper));
+            // over free dimensions only: a pinned one (lower == upper, e.g. a
+            // constant input) is always "at its bound"
+            const arma::uvec free_dims = arma::find(theta_upper > theta_lower);
+            double sol_to_lb = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_lower(free_dims)));
+            double sol_to_ub = free_dims.is_empty()
+                                   ? arma::datum::inf
+                                   : arma::min(arma::abs(theta_part(free_dims) - theta_upper(free_dims)));
             double sol_to_b = std::min(sol_to_ub, sol_to_lb);
 
             // Check abnormal termination or convergence at bounds to decide on restart
@@ -2154,7 +2559,11 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
               }
 
               // Restart with contracted bounds around initial point (theta part only)
-              arma::vec restart_theta = (theta_start + theta_lower) / pow(2.0, retry + 1);
+              // kept inside [theta_lower, theta_upper]: L-BFGS-B does not
+              // project its starting point, so an outside one gave a theta
+              // outside the bounds
+              arma::vec restart_theta = arma::max(
+                  arma::min(arma::vec((theta_start + theta_lower) / pow(2.0, retry + 1)), theta_upper), theta_lower);
               gamma_tmp.head(d) = restart_theta;
               if (m_noise_model != NoiseModel::None)
                 gamma_tmp.at(d) = extra0[start_idx % extra0.n_elem];
@@ -2254,7 +2663,7 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
       }
 
       // Update member variables with best result
-      if (best_idx >= 0 && m_vecchia_m > 0 && !m_vecchia_exact_commit) {
+      if (best_idx >= 0 && m_vecchia_m > 0) {
         // light Vecchia commit: no exact factorization; theta from the
         // optimizer, beta/sigma2 profiled by the Vecchia likelihood
         const auto& best = results[best_idx];
@@ -2356,13 +2765,14 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
                                     bool normalize,
                                     const std::string& optim,
                                     const std::string& objective,
-                                    const Parameters& parameters) {
+                                    const Parameters& parameters,
+                                    const std::string& method) {
   if (m_noise_model != NoiseModel::Heterogeneous)
     throw std::runtime_error("fit(y, noise, X, ...) requires NoiseModel::Heterogeneous");
   if (noise.n_elem != y.n_elem)
     throw std::runtime_error("noise vector must have the same length as y");
   m_noise = noise;
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 /** Compute the prediction for given points X'
@@ -2374,26 +2784,8 @@ LIBKRIGING_EXPORT void Kriging::fit(const arma::vec& y,
  */
 LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
 Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
-  if (m_vecchia_light) {
-    // light Vecchia fit: no exact factorization available; route mean/stdev
-    // to the local Vecchia predictor
-    if (return_cov || return_deriv)
-      throw std::runtime_error(
-          "predict: return_cov/return_deriv are not available on a light Vecchia fit "
-          "(refit with set_vecchia_exact_commit(true), or use predictVecchia)");
-    auto [mean, stdev] = predictVecchia(X_n, return_stdev);
-    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
-  }
-  if (m_nystrom_light) {
-    // Nystrom fit: no exact factorization available; route mean/stdev to the
-    // Woodbury-based Nystrom predictor
-    if (return_cov || return_deriv)
-      throw std::runtime_error(
-          "predict: return_cov/return_deriv are not available on a Nystrom fit "
-          "(refit with objective=\"LL\", or use predictNystrom)");
-    auto [mean, stdev] = predictNystrom(X_n, return_stdev);
-    return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
-  }
+  // exact prediction only: no implicit switch to an approximate predictor
+  check_exact_available("predict", "predict");
   const arma::uword n_o = m_X.n_rows;
   const double lmp_scale = (m_objective.compare("LMP") == 0) ? (n_o - m_F.n_cols) / (n_o - m_F.n_cols - 2.0) : 1.0;
   if (m_noise_model == NoiseModel::Nugget) {
@@ -2419,6 +2811,38 @@ Kriging::predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool 
                       /*var_scale=*/sigma2);
 }
 
+LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat> Kriging::predict(
+    const arma::mat& X_n,
+    bool return_stdev,
+    bool return_cov,
+    bool return_deriv,
+    const std::string& method) {
+  const ApproxMethod am = parse_approx_method(method, "predict");
+  check_nystrom_rank(am, m_nystrom_k, "predict");
+  if (am.kind == ApproxMethod::Exact)
+    return predict(X_n, return_stdev, return_cov, return_deriv);
+  if (return_cov || return_deriv)
+    throw std::invalid_argument("predict: return_cov / return_deriv are only available with method \"exact\"");
+  auto [mean, stdev] = (am.kind == ApproxMethod::Vecchia) ? predictVecchia(X_n, return_stdev, am.m)
+                                                          : predictNystrom(X_n, return_stdev);
+  return {mean, stdev, arma::mat(), arma::mat(), arma::mat()};
+}
+
+LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
+                                              int seed,
+                                              const arma::mat& X_n,
+                                              const std::string& method,
+                                              const bool will_update) {
+  const ApproxMethod am = parse_approx_method(method, "simulate");
+  check_nystrom_rank(am, m_nystrom_k, "simulate");
+  if (am.kind == ApproxMethod::Exact)
+    return simulate(nsim, seed, X_n, will_update);
+  if (will_update)
+    throw std::invalid_argument(
+        "simulate: will_update=true (for update_simulate) is only available with method \"exact\"");
+  return (am.kind == ApproxMethod::Vecchia) ? simulateVecchia(nsim, seed, X_n, am.m) : simulateNystrom(nsim, seed, X_n);
+}
+
 /** Draw sample trajectories of kriging at given points X'
  * @param X_n is n_n*d matrix of points where to simulate output
  * @param seed is seed for random number generator
@@ -2430,14 +2854,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(const int nsim,
                                               const int seed,
                                               const arma::mat& X_n,
                                               const bool will_update) {
-  check_not_vecchia_light("simulate");
-  if (m_nystrom_light) {
-    if (will_update)
-      throw std::runtime_error(
-          "simulate: will_update=true is not available on a Nystrom fit "
-          "(refit with objective=\"LL\", or call simulate(..., false))");
-    return simulateNystrom(nsim, seed, X_n);
-  }
+  check_exact_available("simulate", "simulate");
   if (m_noise_model == NoiseModel::Nugget)
     return simulate(nsim, seed, X_n, /*with_nugget=*/false, will_update);
   return simulate_impl(nsim,
@@ -2456,6 +2873,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
                                               const arma::mat& X_n,
                                               const bool with_nugget,
                                               const bool will_update) {
+  check_exact_available("simulate", "simulate");
   const double alpha = m_alpha;
   const arma::vec diag_nn = with_nugget ? arma::vec(X_n.n_rows, arma::fill::ones) : arma::vec();
   arma::mat y_n = simulate_impl(nsim,
@@ -2480,6 +2898,7 @@ LIBKRIGING_EXPORT arma::mat Kriging::simulate(int nsim,
   const arma::uword n_n = X_n.n_rows;
   if (with_noise.n_elem > 1 && with_noise.n_elem != n_n)
     throw std::runtime_error("Noise vector should have same length as X_n");
+  check_exact_available("simulate", "simulate");
   arma::mat y_n = simulate_impl(nsim,
                                 seed,
                                 X_n,
@@ -2563,7 +2982,12 @@ LIBKRIGING_EXPORT arma::mat Kriging::update_simulate(const arma::vec& y_u,
  * @param refit is true if we want to re-fit the model
  */
 LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_u, const bool refit) {
-  check_not_vecchia_light("update");
+  // a Vecchia model (including a legacy one still carrying an exact
+  // factorization, see load_from_json) is updated as a Vecchia fit
+  if (m_vecchia_m > 0) {
+    update_vecchia_light(y_u, X_u, refit);
+    return;
+  }
   if (m_nystrom_light) {
     update_nystrom(y_u, X_u, refit);
     return;
@@ -2595,7 +3019,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
         params.is_beta_estim = false;
       }
     }
-    fit(y_all, X_all, m_regmodel, m_normalize, m_optim, m_objective, params);
+    fit(y_all, X_all, m_regmodel, m_normalize, m_optim, m_objective, params, m_method);
     return;
   }
 
@@ -2619,11 +3043,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
 
     // Update trend matrix
     m_F = Trend::regressionModelMatrix(m_regmodel, m_X);
-
-    if (m_objective.rfind("LLVecchia", 0) == 0) {
-      m_vecchia_m = parse_vll_m(m_objective);
-      make_vecchia_sets();  // m_X was just extended
-    }
 
     FitOfn fit_ofn = make_fit_objective(m_objective);
 
@@ -2702,11 +3121,6 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u, const arma::mat& X_
                        gamma_lower.memptr(),
                        gamma_upper.memptr(),
                        bounds_type.memptr());
-
-    // LLVecchia evaluations do not populate km during optimization; perform the
-    // single exact factorization at the optimum before committing the model.
-    if (m_objective.rfind("LLVecchia", 0) == 0)
-      fit_ofn(gamma_tmp, nullptr, &km);
 
     // Extract theta and extra param from optimized gamma
     if (m_noise_model == NoiseModel::Nugget) {
@@ -2788,7 +3202,7 @@ LIBKRIGING_EXPORT void Kriging::update(const arma::vec& y_u,
   params.is_theta_estim = m_est_theta;
   params.beta = m_est_beta ? std::optional<arma::vec>{} : std::optional<arma::vec>(trans(m_beta) * m_scaleY);
   params.is_beta_estim = m_est_beta;
-  fit(y_all, noise_all, X_all, m_regmodel, m_normalize, refit ? m_optim : "none", m_objective, params);
+  fit(y_all, noise_all, X_all, m_regmodel, m_normalize, refit ? m_optim : "none", m_objective, params, m_method);
 }
 
 LIBKRIGING_EXPORT std::string Kriging::summary() const {
@@ -2823,8 +3237,13 @@ static Kriging::NoiseModel noise_model_from_string(const std::string& s) {
 }
 
 void Kriging::save(const std::string filename) const {
-  check_not_vecchia_light("save");
   nlohmann::json j;
+  dump_to_json(j);
+  std::ofstream f(filename);
+  f << std::setw(4) << j;
+}
+
+void Kriging::dump_to_json(nlohmann::json& j) const {
   j["version"] = 2;
   j["content"] = "Kriging";
   dump_common_to_json(j);
@@ -2838,6 +3257,10 @@ void Kriging::save(const std::string filename) const {
   // as empty, harmlessly): the committed low-rank factors/landmarks are the
   // extra state that reconstructs the model, stored only when present so
   // pre-Nystrom save files stay byte-identical.
+  // Light Vecchia fits carry no factorization either: theta / beta / sigma2
+  // (common part) are the whole state; the Vecchia sets are rebuilt on demand.
+  if (m_vecchia_light)
+    j["vecchia_light"] = true;
   j["nystrom_light"] = m_nystrom_light;
   if (m_nystrom_light) {
     j["nystrom_k"] = m_nystrom_k;
@@ -2845,15 +3268,15 @@ void Kriging::save(const std::string filename) const {
     j["nystrom_U"] = to_json(m_nystrom_U);
     j["nystrom_D"] = to_json(m_nystrom_D);
   }
-
-  std::ofstream f(filename);
-  f << std::setw(4) << j;
 }
 
 Kriging Kriging::load(const std::string filename) {
   std::ifstream f(filename);
   nlohmann::json j = nlohmann::json::parse(f);
+  return load_from_json(j, filename);
+}
 
+Kriging Kriging::load_from_json(const nlohmann::json& j, const std::string& filename) {
   uint32_t version = j["version"].template get<uint32_t>();
   if (version != 2)
     throw std::runtime_error(asString("Bad version to load from '", filename, "'; found ", version, ", requires 2"));
@@ -2878,6 +3301,28 @@ Kriging Kriging::load(const std::string filename) {
     kr.m_nystrom_landmarks = arma::uvec(j["nystrom_landmarks"].template get<std::vector<arma::uword>>());
     kr.m_nystrom_U = mat_from_json(j["nystrom_U"]);
     kr.m_nystrom_D = colvec_from_json(j["nystrom_D"]);
+    kr.m_is_empty = true;  // no exact factorization
+  }
+  // Files written before the fit `method` existed store the approximation in
+  // the objective ("LLVecchia(m)" / "LLNystrom(k)"): map it to (LL, method).
+  if (kr.m_objective.rfind("LLVecchia", 0) == 0) {
+    kr.m_method = "vecchia(" + std::to_string(parse_vll_m(kr.m_objective)) + ")";
+    kr.m_objective = "LL";
+  } else if (kr.m_objective.rfind("LLNystrom", 0) == 0) {
+    kr.m_method = "nystrom(" + std::to_string(parse_nystrom_k(kr.m_objective)) + ")";
+    kr.m_objective = "LL";
+  }
+  // Vecchia neighbor count (vecchia_neighbors(), logLikelihood("vecchia");
+  // the sets themselves are rebuilt on demand)
+  if (kr.m_method.rfind("vecchia", 0) == 0) {
+    kr.m_vecchia_m = parse_vll_m("LLVecchia" + kr.m_method.substr(7));
+    // A Vecchia file without exact factorization is a light fit. Files of
+    // libKriging <= 1.2 (exact commit) keep their factorization, hence the
+    // exact methods, until the next update (a light Vecchia refit).
+    if (kr.m_T.is_empty()) {
+      kr.m_vecchia_light = true;
+      kr.m_is_empty = true;  // no exact factorization
+    }
   }
   return kr;
 }

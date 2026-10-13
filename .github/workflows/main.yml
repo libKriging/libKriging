@@ -186,6 +186,11 @@ jobs:
           echo "ENABLE_COVERAGE=${{matrix.enable_coverage}}"     >> $GITHUB_ENV
           echo "ENABLE_MEMCHECK=${{matrix.enable_memcheck}}"     >> $GITHUB_ENV
           echo "DISABLE_OPENMP=${{matrix.disable_openmp}}"       >> $GITHUB_ENV
+          # GCC ships its own OpenMP runtime (libgomp, omp.h): removing packages
+          # cannot hide it, so tell CMake not to look for OpenMP at all.
+          if [ "${{matrix.disable_openmp}}" == "on" ]; then
+            echo "EXTRA_CMAKE_OPTIONS=-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON" >> $GITHUB_ENV
+          fi
 
       - name: Define local variables Unix Like
         shell: bash
@@ -215,14 +220,11 @@ jobs:
           if [ "${{matrix.force_update}}" == "on" ]; then
             sudo apt update
           fi
-          # Remove OpenMP packages if requested to test builds without OpenMP
+          # Builds without OpenMP: see EXTRA_CMAKE_OPTIONS in "Define local variables"
+          # (CMAKE_DISABLE_FIND_PACKAGE_OpenMP); libomp-dev is removed too so that
+          # a clang build cannot pick it up either.
           if [ "${DISABLE_OPENMP}" == "on" ]; then
-            echo "=== Removing OpenMP packages to test build without OpenMP ==="
-            # Remove OpenMP development packages (but keep runtime libs that GCC depends on)
             sudo apt-get remove -y libomp-dev libomp5-dev || true
-            # Verify OpenMP is not available for CMake
-            echo "Checking for OpenMP availability:"
-            echo '#include <omp.h>' | gcc -fopenmp -E - 2>&1 || echo "OpenMP headers not found (expected)"
           fi
           sudo apt install liblapack-dev python3-pip
           if [ "${ENABLE_OCTAVE_BINDING}" == "on" ]; then
@@ -269,6 +271,16 @@ jobs:
       - name: script
         shell: bash
         run: tools/${BUILD_NAME}/build.sh
+
+      - name: check OpenMP is disabled
+        shell: bash
+        run: |
+          ls "${BUILD_DIR:-build}"/installed/lib/libKriging.* # fails if the library is not where expected
+          if for f in "${BUILD_DIR:-build}"/installed/lib/libKriging.*; do nm -A "$f" 2>/dev/null; nm -D -A "$f" 2>/dev/null; done | grep -E "[[:space:]](omp_|GOMP_)"; then
+            echo "libKriging still references OpenMP symbols"
+            exit 1
+          fi
+        if: matrix.disable_openmp == 'on'
 
       - name: test
         shell: bash

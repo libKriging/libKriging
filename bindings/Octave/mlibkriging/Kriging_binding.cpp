@@ -52,8 +52,15 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 10}};
+                 RequiresArg::Range{1, 11}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  if (nrhs <= 2) {
+    // Kriging(kernel [, noise_model]): unfitted model, fitted later by fit()
+    const auto noise_model = parseNoiseModel(input.getOptional<std::string>(1, "noise_model").value_or("none"));
+    auto km = buildObject<Kriging>(input.get<std::string>(0, "kernel"), noise_model);
+    output.set(0, km, "new object reference");
+    return;
+  }
   const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
   const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
@@ -62,6 +69,8 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto noise_model_str = input.getOptional<std::string>(8, "noise_model").value_or("none");
   const auto noise_model = parseNoiseModel(noise_model_str);
   const auto noise = input.getOptional<arma::vec>(9, "noise");
+  // method: "exact" (default), "vecchia(m)" or "nystrom(k)"
+  const auto method = input.getOptional<std::string>(10, "method").value_or("exact");
 
   auto y = input.get<arma::vec>(0, "vector");
   auto X = input.get<arma::mat>(1, "matrix");
@@ -69,9 +78,9 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
 
   Kriging km_obj(kernel, noise_model);
   if (noise_model == Kriging::NoiseModel::Heterogeneous && noise) {
-    km_obj.fit(y, noise.value(), X, regmodel, normalize, optim, objective, parameters);
+    km_obj.fit(y, noise.value(), X, regmodel, normalize, optim, objective, parameters, method);
   } else {
-    km_obj.fit(y, X, regmodel, normalize, optim, objective, parameters);
+    km_obj.fit(y, X, regmodel, normalize, optim, objective, parameters, method);
   }
   auto km = buildObject<Kriging>(std::move(km_obj));
   output.set(0, km, "new object reference");
@@ -102,16 +111,17 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 9}};
+                 RequiresArg::Range{3, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   if (km->noise_model() == Kriging::NoiseModel::Heterogeneous) {
-    // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters])
+    // Heterogeneous: fit(ref, y, noise, X, [regmodel], [normalize], [optim], [objective], [parameters], [method])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(5, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(6, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(7, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(8, "parameters"));
+    const auto method = input.getOptional<std::string>(9, "method").value_or("exact");
     km->fit(input.get<arma::vec>(1, "vector"),
             input.get<arma::vec>(2, "noise"),
             input.get<arma::mat>(3, "matrix"),
@@ -119,21 +129,24 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
             normalize,
             optim,
             objective,
-            parameters);
+            parameters,
+            method);
   } else {
-    // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters])
+    // None/Nugget: fit(ref, y, X, [regmodel], [normalize], [optim], [objective], [parameters], [method])
     const auto regmodel = Trend::fromString(input.getOptional<std::string>(3, "regression model").value_or("constant"));
     const auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
     const auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS");
     const auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
     const auto parameters = makeParameters(input.getOptionalObject<Params>(7, "parameters"));
+    const auto method = input.getOptional<std::string>(8, "method").value_or("exact");
     km->fit(input.get<arma::vec>(1, "vector"),
             input.get<arma::mat>(2, "matrix"),
             regmodel,
             normalize,
             optim,
             objective,
-            parameters);
+            parameters,
+            method);
   }
 }
 
@@ -141,14 +154,16 @@ void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{2, 5}};
+                 RequiresArg::Range{2, 6}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Range{1, 5}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const bool return_stdev = flag_output_compliance(input, 2, "return_stdev", output, 1);
   const bool return_cov = flag_output_compliance(input, 3, "return_cov", output, 2);
   const bool return_deriv = flag_output_compliance(input, 4, "return_deriv", output, 3);
+  // method: "exact" (default), "vecchia", "vecchia(m)" or "nystrom"
+  const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
   auto [y_pred, stderr_v, cov_m, mean_deriv_m, stderr_deriv_m]
-      = km->predict(input.get<arma::mat>(1, "matrix"), return_stdev, return_cov, return_deriv);
+      = km->predict(input.get<arma::mat>(1, "matrix"), return_stdev, return_cov, return_deriv, method);
   output.set(0, y_pred, "predicted response");
   output.setOptional(1, stderr_v, "stderr vector");
   output.setOptional(2, cov_m, "cov matrix");
@@ -186,8 +201,10 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const auto seed = input.get<int>(2, "seed");
   const auto X_n = input.get<arma::mat>(3, "X_n");
   if (km->noise_model() == Kriging::NoiseModel::None) {
-    // simulate(nsim, seed, X_n, will_update)
-    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "will_update"));
+    // simulate(nsim, seed, X_n, will_update [, method]); method: "exact"
+    // (default), "vecchia", "vecchia(m)" or "nystrom"
+    const auto method = input.getOptional<std::string>(5, "method").value_or("exact");
+    auto result = km->simulate(nsim, seed, X_n, method, input.get<bool>(4, "will_update"));
     output.set(0, result, "simulated response");
   } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
     // simulate(nsim, seed, X_n, with_nugget, will_update)
@@ -324,10 +341,12 @@ void logLikelihood(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{1, 2}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  output.set(0, km->logLikelihood(), "Model logLikelihood");
+  // method: "exact" (default), "vecchia" or "nystrom"
+  const auto method = input.getOptional<std::string>(1, "method").value_or("exact");
+  output.set(0, km->logLikelihood(method), "Model logLikelihood");
 }
 
 void logMargPostFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -374,6 +393,7 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   const char* fieldnames[] = {"kernel",
                               "optim",
                               "objective",
+                              "method",
                               "noise_model",
                               "theta",
                               "is_theta_estim",
@@ -396,7 +416,7 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                               "T",
                               "M",
                               "z"};
-  mxArray* model_struct = mxCreateStructMatrix(1, 1, 25, fieldnames);
+  mxArray* model_struct = mxCreateStructMatrix(1, 1, 26, fieldnames);
 
   // Helper lambda to create mxArray* from arma types using setter
   auto createMxArray = [](const auto& value) -> mxArray* {
@@ -408,6 +428,7 @@ void model(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   mxSetField(model_struct, 0, "kernel", mxCreateString(km->kernel().c_str()));
   mxSetField(model_struct, 0, "optim", mxCreateString(km->optim().c_str()));
   mxSetField(model_struct, 0, "objective", mxCreateString(km->objective().c_str()));
+  mxSetField(model_struct, 0, "method", mxCreateString(km->method().c_str()));
   mxSetField(model_struct, 0, "noise_model", mxCreateString(noiseModelToString(km->noise_model()).c_str()));
   mxSetField(model_struct, 0, "theta", createMxArray(km->theta()));
   mxSetField(model_struct, 0, "is_theta_estim", mxCreateLogicalScalar(km->is_theta_estim()));
@@ -472,6 +493,26 @@ void nystrom_rank(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   output.set(0, static_cast<int>(km->nystrom_rank()), "nystrom_rank");
+}
+
+void vecchia_neighbors(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, static_cast<int>(km->vecchia_neighbors()), "vecchia_neighbors");
+}
+
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
+  output.set(0, km->method(), "method");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

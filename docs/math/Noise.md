@@ -20,16 +20,15 @@ of treating observation noise, selected by `NoiseModel` /
   sizes, or a simulator that reports its own numerical error per run).
 
 ```r
-k <- Kriging(y, X, kernel = "matern5_2", noise_model = "nugget")
-k2 <- Kriging(y, X, kernel = "matern5_2", noise_model = "heterogeneous",
-              parameters = list(), noise = noise_variances)
+k <- Kriging(y, X, kernel = "matern5_2", noise = "nugget")          # noise_model "nugget"
+k2 <- Kriging(y, X, kernel = "matern5_2", noise = noise_variances)  # noise_model "heterogeneous"
 ```
 
 `NuggetKriging(...)` / `NoiseKriging(...)` constructor calls have been
-removed from every binding — use `Kriging(..., noise=...)` /
-`noise_model=` instead (`noise=NULL` ⟹ `none`, `noise="nugget"` ⟹
-`nugget`, `noise=<vector>` ⟹ `heterogeneous`, matching the per-language
-convenience wrappers described in `bindings/README.md`).
+removed from every binding — use `Kriging(..., noise=...)` instead (the
+resulting `noise_model()` is: `noise=NULL` ⟹ `none`, `noise="nugget"` ⟹
+`nugget`, `noise=<vector>` ⟹ `heterogeneous`, as in every binding (see
+`bindings/README.md`).
 
 ## Mathematical description
 

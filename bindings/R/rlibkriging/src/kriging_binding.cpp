@@ -32,6 +32,17 @@ Rcpp::List new_Kriging(std::string kernel, std::string noise_model = "none") {
   return obj;
 }
 
+// Deprecated fit objectives are reported by the R wrappers as R warnings
+// (class "deprecatedWarning", see .warn_deprecated_objective): the C++
+// default print is silenced.
+[[maybe_unused]] static const bool cpp_deprecation_silenced
+    = (Kriging::set_deprecation_handler([](const std::string&) {}), true);
+
+// [[Rcpp::export]]
+std::string kriging_deprecation_message(std::string objective) {
+  return Kriging::deprecated_objective_message(objective);
+}
+
 // [[Rcpp::export]]
 Rcpp::List new_KrigingFit(arma::vec y,
                           arma::mat X,
@@ -42,7 +53,8 @@ Rcpp::List new_KrigingFit(arma::vec y,
                           bool normalize = false,
                           std::string optim = "BFGS",
                           std::string objective = "LL",
-                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                          Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                          std::string method = "exact") {
   Kriging::NoiseModel nm = Kriging::NoiseModel::None;
   if (noise_model == "nugget")
     nm = Kriging::NoiseModel::Nugget;
@@ -137,9 +149,10 @@ Rcpp::List new_KrigingFit(arma::vec y,
             normalize,
             optim,
             objective,
-            kparams);
+            kparams,
+            method);
   } else {
-    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    ok->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams, method);
   }
 
   Rcpp::XPtr<Kriging> impl_ptr(ok);
@@ -159,7 +172,8 @@ void kriging_fit(Rcpp::List k,
                  bool normalize = false,
                  std::string optim = "BFGS",
                  std::string objective = "LL",
-                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue) {
+                 Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
+                 std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -243,9 +257,11 @@ void kriging_fit(Rcpp::List k,
                   normalize,
                   optim,
                   objective,
-                  kparams);
+                  kparams,
+                  method);
   } else {
-    impl_ptr->fit(std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams);
+    impl_ptr->fit(
+        std::move(y), std::move(X), Trend::fromString(regmodel), normalize, optim, objective, kparams, method);
   }
 }
 
@@ -276,6 +292,7 @@ Rcpp::List kriging_model(Rcpp::List k) {
   ret["kernel"] = impl_ptr->kernel();
   ret["optim"] = impl_ptr->optim();
   ret["objective"] = impl_ptr->objective();
+  ret["method"] = impl_ptr->method();
 
   // noise model info
   auto nm = impl_ptr->noise_model();
@@ -329,7 +346,8 @@ Rcpp::List kriging_predict(Rcpp::List k,
                            arma::mat X_n,
                            bool return_stdev = true,
                            bool return_cov = false,
-                           bool return_deriv = false) {
+                           bool return_deriv = false,
+                           std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -340,7 +358,7 @@ Rcpp::List kriging_predict(Rcpp::List k,
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
-  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv);
+  auto pred = impl_ptr->predict(X_n, return_stdev, return_cov, return_deriv, method);
 
   Rcpp::List ret = Rcpp::List::create(Rcpp::Named("mean") = std::get<0>(pred));
   if (return_stdev) {
@@ -371,7 +389,8 @@ arma::mat kriging_simulate(Rcpp::List k,
                            int seed,
                            arma::mat X_n,
                            Rcpp::Nullable<Rcpp::NumericVector> with_noise = R_NilValue,
-                           bool will_update = false) {
+                           bool will_update = false,
+                           std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
@@ -381,6 +400,13 @@ arma::mat kriging_simulate(Rcpp::List k,
   int d = impl_ptr->X().n_cols;
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
+
+  if (method != "exact") {
+    // approximate simulators: NoiseModel::None only, no noise to add
+    if (with_noise.isNotNull())
+      Rcpp::stop("simulate: with_noise is only available with method = \"exact\"");
+    return impl_ptr->simulate(nsim, seed, X_n, method, will_update);
+  }
 
   if (with_noise.isNotNull()) {
     Rcpp::NumericVector wn(with_noise);
@@ -508,14 +534,14 @@ Rcpp::List kriging_logLikelihoodFun(Rcpp::List k,
 }
 
 // [[Rcpp::export]]
-double kriging_logLikelihood(Rcpp::List k) {
+double kriging_logLikelihood(Rcpp::List k, std::string method = "exact") {
   if (!k.inherits("Kriging"))
     Rcpp::stop("Input must be a Kriging object.");
   SEXP impl = k.attr("object");
 
   Rcpp::XPtr<Kriging> impl_ptr(impl);
 
-  return impl_ptr->logLikelihood();
+  return impl_ptr->logLikelihood(method);
 }
 
 // [[Rcpp::export]]
@@ -631,6 +657,24 @@ int kriging_nystrom_rank(Rcpp::List k) {
   SEXP impl = k.attr("object");
   Rcpp::XPtr<Kriging> impl_ptr(impl);
   return static_cast<int>(impl_ptr->nystrom_rank());
+}
+
+// [[Rcpp::export]]
+int kriging_vecchia_neighbors(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return static_cast<int>(impl_ptr->vecchia_neighbors());
+}
+
+// [[Rcpp::export]]
+std::string kriging_method(Rcpp::List k) {
+  if (!k.inherits("Kriging"))
+    Rcpp::stop("Input must be a Kriging object.");
+  SEXP impl = k.attr("object");
+  Rcpp::XPtr<Kriging> impl_ptr(impl);
+  return impl_ptr->method();
 }
 
 // [[Rcpp::export]]

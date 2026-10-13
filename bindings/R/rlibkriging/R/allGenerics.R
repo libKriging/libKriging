@@ -209,7 +209,7 @@ fit <- function(object, ...) {
 ##' 
 ##' @export
 save <- function(object=NULL, filename=NULL, ...) {
-    if (is.null(object) || !isTRUE(class(object) %in% c("Kriging","WarpKriging","MLPKriging"))) {# back to base::save
+    if (is.null(object) || !isTRUE(class(object) %in% c("Kriging","WarpKriging","MLPKriging","NestedKriging"))) {# back to base::save
         # warning("Using base::save")
         if (!is.null(filename)) {
             if (!is.null(object)) {
@@ -250,6 +250,8 @@ save <- function(object=NULL, filename=NULL, ...) {
             return(save.WarpKriging(object, filename))
         else if (k_class=="MLPKriging")
             return(save.MLPKriging(object, filename))
+        else if (k_class=="NestedKriging")
+            return(save.NestedKriging(object, filename))
         else 
             stop("Unknown Kriging class: ",k_class)
     }
@@ -327,6 +329,8 @@ load <- function(filename, ...) {
                 return(load.WarpKriging(filename))
             else if (k_class=="MLPKriging")
                 return(load.MLPKriging(filename))
+            else if (k_class=="NestedKriging")
+                return(load.NestedKriging(filename))
             else 
                 stop("Unknown Kriging class: ",k_class)
         }

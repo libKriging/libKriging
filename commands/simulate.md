@@ -13,10 +13,15 @@ Simulate sample paths from a fitted libKriging model. Context / arguments: $ARGU
 2. Open `skills/libkriging/references/<language>.md` for the exact
    `simulate` signature. Pass `nsim` and `seed` with the language's integer
    type: `int32(...)` in Octave/MATLAB, `Int`/`Int32` in Julia — a plain
-   double raises a low-level error far from the call site.
+   double raises a low-level error far from the call site. For `Kriging`,
+   the method is explicit: `method="exact"` (default); after a
+   `method="nystrom(k)"` fit pass `method="nystrom"`, after a
+   `method="vecchia(m)"` fit `method="vecchia"`
+   (`"vecchia(m)"`, sequential local conditioning, also usable after any
+   fit for many points) — no `will_update` with the approximate methods.
 
-3. Result is `nsim × npred` (one row per path, or per that file's stated
-   orientation). For a smooth path picture, use a dense ordered `Xnew`.
+3. Result is `npred × nsim` in every binding (one row per point of `Xnew`,
+   one column per path). For a smooth path picture, use a dense ordered `Xnew`.
 
 4. Report the result shape and a summary (per-point mean and an empirical
    band across paths). If the user then wants to condition on further

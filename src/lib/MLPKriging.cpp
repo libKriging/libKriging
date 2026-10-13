@@ -53,9 +53,10 @@ MLPKriging::MLPKriging(const arma::vec& y,
                        bool normalize,
                        const std::string& optim,
                        const std::string& objective,
-                       const std::map<std::string, std::string>& parameters)
+                       const std::map<std::string, std::string>& parameters,
+                       const std::string& method)
     : MLPKriging(hidden_dims, d_out, activation, kernel) {
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 // -------------------------------------------------------------------------
@@ -67,8 +68,9 @@ void MLPKriging::fit(const arma::vec& y,
                      bool normalize,
                      const std::string& optim,
                      const std::string& objective,
-                     const std::map<std::string, std::string>& parameters) {
-  m_impl.fit(y, X, regmodel, normalize, optim, objective, parameters);
+                     const std::map<std::string, std::string>& parameters,
+                     const std::string& method) {
+  m_impl.fit(y, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 void MLPKriging::fit(const arma::vec& y,
@@ -77,11 +79,12 @@ void MLPKriging::fit(const arma::vec& y,
                      bool normalize,
                      const std::string& optim,
                      const std::string& objective,
-                     const Parameters& parameters) {
+                     const Parameters& parameters,
+                     const std::string& method) {
   WarpKrigingParameters wp;
   wp.theta = parameters.theta;
   wp.warp_params = parameters.warp_params;
-  m_impl.fit(y, X, regmodel, normalize, optim, objective, wp);
+  m_impl.fit(y, X, regmodel, normalize, optim, objective, wp, {}, method);
 }
 
 // -------------------------------------------------------------------------

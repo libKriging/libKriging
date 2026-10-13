@@ -10,11 +10,21 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void summary(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void aggregation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void nb_groups(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void theta(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void sigma2(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 void beta0(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void groups(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void warping(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_predict_chunk(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void set_warp_subsample(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs);
 }  // namespace NestedKrigingBinding
 
 #endif  // LIBKRIGING_BINDINGS_OCTAVE_NESTEDKRIGING_BINDING_HPP

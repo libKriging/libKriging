@@ -83,7 +83,8 @@ double test_function(const arma::rowvec& x) {
 
 void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iterations) {
   std::cout << "\n";
-  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LLNystrom(50))" << std::endl;
+  std::cout << "n=" << n_train << " d=" << d << " iterations=" << n_iterations << " (LL, method nystrom(50))"
+            << std::endl;
 
   arma::arma_rng::set_seed(123);
   arma::mat X_train(n_train, d, arma::fill::randu);
@@ -100,15 +101,23 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
   const arma::uword n_pred = 100;
   arma::mat X_pred(n_pred, d, arma::fill::randu);
 
-  // fitted LLNystrom model reused for the objective-evaluation/predict/simulate rows
-  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)");
+  // fitted Nystrom model reused for the objective-evaluation/predict/simulate rows
+  Kriging k_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(50)");
   const arma::vec theta_eval(d, arma::fill::value(0.3));
+  // exact model at the same parameters: baseline of the exact predict row
+  // (a Nystrom fit holds no exact factorization)
+  Kriging::Parameters exact_params;
+  exact_params.theta = arma::mat(k_eval.theta().t());
+  exact_params.is_theta_estim = false;
+  exact_params.sigma2 = k_eval.sigma2();
+  exact_params.is_sigma2_estim = false;
+  Kriging k_exact_eval(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "none", "LL", exact_params);
 
   for (int iter = 0; iter < n_iterations; ++iter) {
-    // --- fit with the Nystrom objective ---
+    // --- fit with the Nystrom method ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(50)");
+      Kriging kr(y_train, X_train, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(50)");
       auto t1 = std::chrono::high_resolution_clock::now();
       fit_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
     }
@@ -134,7 +143,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
     // --- prediction: exact vs Nystrom (Woodbury, committed rank-k factors) ---
     {
       auto t0 = std::chrono::high_resolution_clock::now();
-      k_eval.predict(X_pred, true, false, false);
+      k_exact_eval.predict(X_pred, true, false, false);
       auto t1 = std::chrono::high_resolution_clock::now();
       predict_times.push_back(std::chrono::duration<double, std::milli>(t1 - t0).count());
 
@@ -179,7 +188,7 @@ void benchmark_configuration(arma::uword n_train, arma::uword d, int n_iteration
 }
 
 int main(int argc, char* argv[]) {
-  std::cout << "Nystrom Benchmark (objective=LLNystrom(50) vs exact LL)" << std::endl;
+  std::cout << "Nystrom Benchmark (LL with method nystrom(50) vs exact LL)" << std::endl;
   int n_iterations = 10;
   arma::uword n_points = 100;
   arma::uword d_dims = 4;

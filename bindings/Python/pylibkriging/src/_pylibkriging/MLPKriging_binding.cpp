@@ -3,6 +3,7 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include "vec_to_arr.hpp"
 
 #include <libKriging/MLPKriging.hpp>
 #include <libKriging/Trend.hpp>
@@ -55,7 +56,8 @@ PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                            bool normalize,
                            const std::string& optim,
                            const std::string& objective,
-                           const py::dict& parameters) {
+                           const py::dict& parameters,
+                           const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal = std::make_unique<lk::MLPKriging>(mat_y,
@@ -68,7 +70,8 @@ PyMLPKriging::PyMLPKriging(const py::array_t<double>& y,
                                                 normalize,
                                                 optim,
                                                 objective,
-                                                dict_to_string_map(parameters));
+                                                dict_to_string_map(parameters),
+                                                method);
 }
 
 PyMLPKriging::~PyMLPKriging() {}
@@ -79,19 +82,20 @@ void PyMLPKriging::fit(const py::array_t<double>& y,
                        bool normalize,
                        const std::string& optim,
                        const std::string& objective,
-                       const py::dict& parameters) {
+                       const py::dict& parameters,
+                       const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal->fit(
-      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters));
+      mat_y, mat_X, Trend::fromString(regmodel), normalize, optim, objective, dict_to_string_map(parameters), method);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
 PyMLPKriging::predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
   auto [mean, stdev, cov, mean_deriv, stdev_deriv] = m_internal->predict(mat_X, return_stdev, return_cov, return_deriv);
-  return std::make_tuple(carma::col_to_arr(mean, true),
-                         carma::col_to_arr(stdev, true),
+  return std::make_tuple(vec_to_arr(mean),
+                         vec_to_arr(stdev),
                          carma::mat_to_arr(cov, true),
                          carma::mat_to_arr(mean_deriv, true),
                          carma::mat_to_arr(stdev_deriv, true));
@@ -131,7 +135,15 @@ std::tuple<double, py::array_t<double>, py::array_t<double>>
 PyMLPKriging::logLikelihoodFun(const py::array_t<double>& theta, const bool return_grad, const bool return_hess) {
   arma::vec vec_theta = carma::arr_to_col<double>(theta);
   auto [ll, grad, hess] = m_internal->logLikelihoodFun(vec_theta, return_grad, return_hess);
-  return {ll, carma::col_to_arr(grad), carma::mat_to_arr(hess)};
+  return {ll, vec_to_arr(grad), carma::mat_to_arr(hess)};
+}
+
+std::string PyMLPKriging::objective() {
+  return m_internal->objective();
+}
+
+std::string PyMLPKriging::method() {
+  return m_internal->method();
 }
 
 std::string PyMLPKriging::kernel() {
@@ -143,15 +155,15 @@ py::array_t<double> PyMLPKriging::X() {
 }
 
 py::array_t<double> PyMLPKriging::centerX() {
-  return carma::row_to_arr(m_internal->centerX());
+  return vec_to_arr(m_internal->centerX());
 }
 
 py::array_t<double> PyMLPKriging::scaleX() {
-  return carma::row_to_arr(m_internal->scaleX());
+  return vec_to_arr(m_internal->scaleX());
 }
 
 py::array_t<double> PyMLPKriging::y() {
-  return carma::col_to_arr(m_internal->y());
+  return vec_to_arr(m_internal->y());
 }
 
 double PyMLPKriging::centerY() {
@@ -183,15 +195,15 @@ py::array_t<double> PyMLPKriging::M() {
 }
 
 py::array_t<double> PyMLPKriging::z() {
-  return carma::col_to_arr(m_internal->z());
+  return vec_to_arr(m_internal->z());
 }
 
 py::array_t<double> PyMLPKriging::beta() {
-  return carma::col_to_arr(m_internal->beta());
+  return vec_to_arr(m_internal->beta());
 }
 
 py::array_t<double> PyMLPKriging::theta() {
-  return carma::col_to_arr(m_internal->theta());
+  return vec_to_arr(m_internal->theta());
 }
 
 double PyMLPKriging::sigma2() {

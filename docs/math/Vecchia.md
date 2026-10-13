@@ -1,4 +1,4 @@
-# Vecchia approximation (`objective="LLVecchia(m)"`)
+# Vecchia approximation (`method="vecchia(m)"`)
 
 ## Idea
 
@@ -11,13 +11,15 @@ instead of on all the others. This turns an O(n³) factorization into
 n independent O(m³) factorizations — cheap, parallelizable, and exact
 in the limit m → n−1.
 
-libKriging exposes it as an alternative fitting objective,
-`objective="LLVecchia"` (default m = 30 neighbors) or `objective="LLVecchia(m)"`
-for an explicit m, usable from any binding since `objective` is just a
-string forwarded to the C++ core.
+libKriging exposes it as a fit method of the log-likelihood objective,
+`method="vecchia"` (default m = 30 neighbors) or `method="vecchia(m)"`
+for an explicit m (with `objective="LL"`, the default), in C++ and every
+binding. `method()` then returns `"vecchia(m)"`, `objective()` `"LL"`.
+`objective="LLVecchia(m)"` is a deprecated alias of
+`objective="LL", method="vecchia(m)"` (deprecation warning).
 
 ```r
-k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")   # or "LLVecchia"
+k <- Kriging(y, X, "matern5_2", method = "vecchia(30)")   # or "vecchia"
 ```
 
 ## Mathematical description
@@ -45,14 +47,18 @@ subset N(i) ⊂ {1, …, i−1} of size at most m:
   β is profiled by generalized least squares per-conditional (constant,
   linear and quadratic trends are supported); the gradient in θ is
   analytic (envelope theorem handles β̂).
-- **Prediction**: after fitting, `predict` uses one exact O(n³)
-  factorization at the fitted θ* by default (small/medium n). For
-  large n, a local Vecchia predictor (Katzfuss & Guinness 2021,
-  response-only) conditions each prediction point on its own m nearest
-  neighbors — O(q·m³), embarrassingly parallel, usable after any fit.
-  It gives the universal-kriging mean with the fitted β but a
+- **No exact factorization**: a Vecchia fit never builds the exact
+  O(n³) factorization: θ* comes from the optimizer, β/σ² from the
+  Vecchia profile.
+- **Prediction**: the method is always explicit.
+  `predict(…, method="vecchia")` (or `"vecchia(m)"`; C++
+  `predictVecchia`) is a local Vecchia predictor (Katzfuss & Guinness
+  2021, response-only): each prediction point is conditioned on its own
+  m nearest neighbors — O(q·m³), embarrassingly parallel, usable after
+  any fit. It gives the universal-kriging mean with the fitted β but a
   simple-kriging variance (no cross-covariance between prediction
-  points — use the exact `predict` for the joint distribution).
+  points — use method `"exact"`, on an exact fit, for the joint
+  distribution).
 - **Screening**: the approximation degrades in higher input dimension
   because nearest neighbors become less informative; it is recommended
   for d ≲ 5, and complements `NestedKriging` (which is dimension-robust)
@@ -69,34 +75,82 @@ X <- matrix(runif(2 * n), ncol = 2)
 y <- sin(3 * X[, 1]) * cos(3 * X[, 2]) + rnorm(n, sd = 0.05)
 
 # Exact objective would cost O(n^3) ~ 8e9 ops; Vecchia costs O(n*m^3).
-k <- Kriging(y, X, "matern5_2", objective = "LLVecchia(30)")
+k <- Kriging(y, X, "matern5_2", method = "vecchia(30)")
 
 Xnew <- matrix(runif(2 * 10), ncol = 2)
-pred <- predict(k, Xnew, stdev = TRUE)
+pred <- predict(k, Xnew, return_stdev = TRUE, method = "vecchia")
 ```
 
-For n large enough that even the final exact commit (O(n³)) is too
-costly, calling `set_vecchia_exact_commit(false)` before fitting skips it
-entirely (**C++ API only**: no binding exposes this method, nor `predictVecchia`,
-so the light mode cannot be used from Python, R, Julia or Octave/Matlab): θ* comes from the optimizer, β/σ² from the LLVecchia profile, and
-`predict` automatically routes through the local Vecchia predictor
-(mean/stdev only — `return_cov`/`return_deriv`, `simulate`, `update`
-and `save` raise a clear error on such a "light" model).
+Nothing switches implicitly after a Vecchia fit: the exact methods that
+need the factorization (`predict` / `simulate` with method `"exact"`, the
+default, and `update_simulate`) raise an error naming the alternative, and
+method `"vecchia"` (or the string returned by `method()`) is passed
+explicitly (mean / stdev only). `logLikelihood(method="vecchia")` gives
+the fitted Vecchia objective; `logLikelihood()` (method `"exact"`)
+recomputes the exact log-likelihood at the fitted θ (O(n³), O(n²) memory); `update` refits with the Vecchia likelihood
+(still without exact factorization) and `save` / `load` keep the method.
+
+| Step | `method="vecchia(m)"` fit |
+|---|---|
+| `predict` / `simulate` / `logLikelihood`, method `"exact"` | error |
+| `predict` / `simulate` / `logLikelihood`, method `"vecchia"` | yes |
+| `update` | Vecchia refit |
+| `update_simulate` | error |
+| `save` / `load` | yes |
+
+The exact model at the Vecchia estimate (e.g. for the joint predictive
+covariance, or to compare with the exact likelihood) is a separate exact
+fit with `optim="none"` and the fitted θ:
+
+```r
+ke <- Kriging(y, X, "matern5_2", optim = "none",
+              parameters = list(theta = matrix(k$theta(), nrow = 1), is_theta_estim = FALSE))
+```
+
+Old save files (libKriging ≤ 1.2) with objective `"LLVecchia(m)"` load
+as `method="vecchia(m)"`, keeping their stored exact factorization until
+the next `update`.
+
+## Vecchia simulation (`simulate(…, method="vecchia")`, C++ `simulateVecchia`)
+
+`simulateVecchia(nsim, seed, X_n, m)` draws joint trajectories at the
+q rows of `X_n` by sequential conditioning, in the row order of `X_n`
+("response-first" ordering, Katzfuss et al. 2020): the t-th point is
+drawn from its simple-kriging conditional law (β treated as known, as in
+`predictVecchia`) given its m nearest neighbors among the n observations
+**and** the t−1 points already simulated:
+
+$$
+Z_t \mid Z_{N(t)} \sim \mathcal{N}\big(f_t^\top\beta + r_t^\top R_{N}^{-1}(z_{N} - F_{N}\beta),\;
+\sigma^2 (1 - r_t^\top R_{N}^{-1} r_t)\big).
+$$
+
+- Cost O(q (n + q) d) for the neighbor search plus O(q m³) for the local
+  solves (shared by the nsim trajectories), instead of O(q³) for the
+  exact joint factorization: usable for large n **and** large q.
+- Exact (β known) when every point conditions on all its predecessors,
+  i.e. m ≥ n + q − 1 (chain rule). For smaller m, correlations beyond the
+  m nearest neighbors are truncated, and the trajectories depend on the
+  row order of `X_n`.
+- Usable after any `NoiseModel::None` fit (m defaults to
+  `vecchia_neighbors()` after a Vecchia fit, 30 otherwise; method
+  `"vecchia(m)"` sets it); no `will_update` / `update_simulate`.
 
 ## Current limitations
 
 - `NoiseModel::None` only (no nugget/noise channel).
-- The default exact commit after optimization is still O(n³)
-  time/memory — practical up to n ~ 2·10⁴; use the "light" mode above
-  beyond that.
-- Vecchia neighbor sets are not serialized (rebuilt on refit).
+- `objective="LL"` only (no LOO / LMP Vecchia version).
+- The exact model at the Vecchia θ* (separate `optim="none"` exact fit
+  above) is still O(n³) time/memory — practical up to n ~ 2·10⁴.
+- Vecchia neighbor sets are not serialized (rebuilt on refit, and on
+  demand by `logLikelihood(method="vecchia")` after `load`).
 
 ## See also
 
 [llvecchia_vs_cholesky.ipynb](llvecchia_vs_cholesky.ipynb) for a worked,
 executed notebook: the math above illustrated on a running example, with
 convergence/accuracy/timing plots and references.
-[Scalability.md](Scalability.md) for how this compares to `LLNystrom`
+[Scalability.md](Scalability.md) for how this compares to `method="nystrom(k)"`
 and `NestedKriging`, and how to pick between them.
 
 ## References

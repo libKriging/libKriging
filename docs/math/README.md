@@ -22,8 +22,8 @@ and a notebook that runs it against exact Cholesky.
 
 | Method | Page | Notebook |
 |---|---|---|
-| `objective="LLVecchia(m)"` | [Vecchia.md](Vecchia.md) | [llvecchia_vs_cholesky.ipynb](llvecchia_vs_cholesky.ipynb) |
-| `objective="LLNystrom(k)"` | [Nystrom.md](Nystrom.md) | [llnystrom_vs_cholesky.ipynb](llnystrom_vs_cholesky.ipynb) |
+| `method="vecchia(m)"` | [Vecchia.md](Vecchia.md) | [llvecchia_vs_cholesky.ipynb](llvecchia_vs_cholesky.ipynb) |
+| `method="nystrom(k)"` | [Nystrom.md](Nystrom.md) | [llnystrom_vs_cholesky.ipynb](llnystrom_vs_cholesky.ipynb) |
 | `NestedKriging` | [Nested.md](Nested.md) | [nested_vs_cholesky.ipynb](nested_vs_cholesky.ipynb) |
 | `subsetOfData` | [SubsetOfData.md](SubsetOfData.md) | [subsetofdata_vs_cholesky.ipynb](subsetofdata_vs_cholesky.ipynb) |
 

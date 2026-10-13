@@ -40,6 +40,8 @@ class KrigingImpl {
   [[nodiscard]] const std::string& kernel() const { return m_covType; };
   [[nodiscard]] const std::string& optim() const { return m_optim; };
   [[nodiscard]] const std::string& objective() const { return m_objective; };
+  /// How the fit evaluated the covariance: "exact", "vecchia(m)" or "nystrom(k)"
+  [[nodiscard]] const std::string& method() const { return m_method; };
   [[nodiscard]] const arma::mat& X() const { return m_X; };
   [[nodiscard]] const arma::rowvec& centerX() const { return m_centerX; };
   [[nodiscard]] const arma::rowvec& scaleX() const { return m_scaleX; };
@@ -93,6 +95,7 @@ class KrigingImpl {
   Trend::RegressionModel m_regmodel;
   std::string m_optim;
   std::string m_objective;
+  std::string m_method = "exact";
 
   // Auxiliary data
   arma::mat m_dX;

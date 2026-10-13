@@ -7,6 +7,7 @@
 #include "libKriging/WarpKriging.hpp"
 #include "libKriging/AdamBFGS.hpp"
 #include "libKriging/Covariance.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/LinearAlgebra.hpp"
 #include "libKriging/Optim.hpp"
 #include "libKriging/Random.hpp"
@@ -1813,9 +1814,10 @@ WarpKriging::WarpKriging(const arma::vec& y,
                          bool normalize,
                          const std::string& optim,
                          const std::string& objective,
-                         const std::map<std::string, std::string>& parameters) {
+                         const std::map<std::string, std::string>& parameters,
+                         const std::string& method) {
   init_from_specs(parse_warp_strings(warping), kernel);
-  fit(y, X, regmodel, normalize, optim, objective, parameters);
+  fit(y, X, regmodel, normalize, optim, objective, parameters, method);
 }
 
 // -------------------------------------------------------------------------
@@ -2674,8 +2676,9 @@ void WarpKriging::fit(const arma::vec& y,
                       bool normalize,
                       const std::string& optim,
                       const std::string& objective,
-                      const std::map<std::string, std::string>& parameters) {
-  fit(y, X, regmodel, normalize, optim, objective, Parameters{}, parameters);
+                      const std::map<std::string, std::string>& parameters,
+                      const std::string& method) {
+  fit(y, X, regmodel, normalize, optim, objective, Parameters{}, parameters, method);
 }
 
 // -------------------------------------------------------------------------
@@ -2687,9 +2690,12 @@ void WarpKriging::fit(const arma::vec& y,
                       const Trend::RegressionModel& regmodel,
                       bool normalize,
                       const std::string& optim,
-                      const std::string& /*objective*/,
+                      const std::string& objective,
                       const Parameters& parameters,
-                      const std::map<std::string, std::string>& tuning) {
+                      const std::map<std::string, std::string>& tuning,
+                      const std::string& method) {
+  if (Kriging::fit_objective_method(objective, method).second != "exact")
+    throw std::invalid_argument("WarpKriging::fit: method \"" + method + "\" is not implemented (only \"exact\" is)");
   for (const auto& [key, val] : tuning) {
     if (key == "adam_lr")
       m_adam_lr = std::stod(val);

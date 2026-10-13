@@ -18,10 +18,17 @@ Update a fitted libKriging model with new observations. Context / arguments: $AR
      Bayesian optimization / active learning inner loop) where a full
      re-optimization each step is too costly; re-fit periodically.
 
+   The fit method is kept: an exact fit is refitted exactly, a
+   `method="vecchia(m)"` fit is refitted with the Vecchia likelihood (still
+   no exact factorization), a `method="nystrom(k)"` fit goes through the
+   Nystrom update (same landmarks). Keep passing `method=` to later
+   `predict` / `simulate` / `logLikelihood` calls (check `model.method()`).
+
 3. `NestedKriging` has no in-place update path and no `noise=` channel —
    if the model is a `NestedKriging`, say so and re-fit instead.
 
 4. After updating, report how the fit changed: new `theta` / `sigma2` /
-   `beta` vs. the previous values, and the new objective value. Note if
+   `beta` vs. the previous values, and the new objective value
+   (`logLikelihood(method=model.method())` after an approximate fit). Note if
    any new point lay outside the previous design range (it extends the
    region the model interpolates).

@@ -168,3 +168,85 @@ f_test(x) = 1.0 - 0.5 * (sin(12.0 * x) / (1.0 + x) + 2.0 * cos(7.0 * x) * x^5 + 
         @test all(loo_vec.stderr .>= 0.0)
     end
 end
+
+@testset "vecchia_neighbors / nystrom_rank" begin
+    X = reshape(collect(range(0.01, 0.99; length=20)), :, 1)
+    y = [f_test(x) for x in X[:, 1]]
+    @test vecchia_neighbors(Kriging(y, X, "matern5_2"; method="vecchia(5)")) == 5
+    @test nystrom_rank(Kriging(y, X, "matern5_2"; method="nystrom(4)")) == 4
+    k = Kriging(y, X, "matern5_2")
+    @test vecchia_neighbors(k) == 0
+    @test nystrom_rank(k) == 0
+    @test jlibkriging.method(k) == "exact"
+end
+
+@testset "Fit method: explicit exact / Vecchia / Nystrom" begin
+    X = [mod.(0.3819660 .* (1:60), 1.0) mod.(0.7548777 .* (1:60), 1.0)]  # Kronecker design
+    y = [f_test(x) for x in X[:, 1]] .+ X[:, 2]
+    Xn = [0.15 0.3; 0.45 0.6; 0.75 0.2]
+
+    # method stored with its explicit size; deprecated objective aliases
+    @test jlibkriging.method(Kriging(y, X, "matern5_2"; method="vecchia")) == "vecchia(30)"
+    ka = @test_logs (:warn, r"objective \"LLVecchia\(7\)\" is deprecated") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLVecchia(7)")
+    @test objective(ka) == "LL"
+    @test jlibkriging.method(ka) == "vecchia(7)"
+    kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
+    @test jlibkriging.method(kb) == "nystrom(5)"
+    @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia")
+    @test_throws ErrorException Kriging(y, X, "matern5_2"; method="vecchia", noise="nugget")
+
+    k = Kriging("matern5_2")
+    fit!(k, y, X; method="vecchia(10)")
+    @test jlibkriging.method(k) == "vecchia(10)"
+
+    # explicit method: no implicit switch from the exact predictor
+    @test_throws ErrorException predict(k, Xn)
+    @test_throws ErrorException simulate(k, 4, 123, Xn)
+    p = predict(k, Xn; return_stdev=true, method="vecchia")
+    @test length(p.mean) == 3
+    @test all(isfinite, p.mean)
+    @test all(p.stdev .>= 0)
+    @test size(simulate(k, 4, 123, Xn; method="vecchia")) == (3, 4)
+    @test size(simulate(k, 4, 123, Xn; method="vecchia(5)")) == (3, 4)
+    @test_throws ErrorException predict(k, Xn; return_cov=true, method="vecchia")
+    @test_throws ErrorException predict(k, Xn; method="unknown")
+    @test isfinite(log_likelihood(k; method="vecchia"))
+    @test log_likelihood(k; method=jlibkriging.method(k)) == log_likelihood(k; method="vecchia")
+
+    # update (Vecchia refit) and save / load
+    Xu = [0.12 0.81; 0.52 0.33]
+    yu = [f_test(x) for x in Xu[:, 1]] .+ Xu[:, 2]
+    update!(k, yu, Xu; refit=false)
+    @test jlibkriging.method(k) == "vecchia(10)"
+    @test size(jlibkriging.X(k), 1) == 62  # local X is the design matrix
+    @test maximum(abs.(predict(k, Xu; method="vecchia").mean .- yu)) < 1e-3
+    f = tempname() * ".json"
+    save(k, f)
+    kl = load_kriging(f)
+    @test jlibkriging.method(kl) == "vecchia(10)"
+    @test vecchia_neighbors(kl) == 10
+    @test maximum(abs.(predict(kl, Xn; method="vecchia").mean .- predict(k, Xn; method="vecchia").mean)) < 1e-12
+
+    # the exact model at the Vecchia estimate is a separate exact fit
+    ke = Kriging(y, X, "matern5_2"; optim="none", theta=jlibkriging.theta(k), is_theta_estim=false)
+    @test jlibkriging.method(ke) == "exact"
+    @test size(predict(ke, Xn; return_cov=true).cov) == (3, 3)
+    @test length(predict(ke, Xn; method="vecchia").mean) == 3
+    @test log_likelihood(ke) == log_likelihood(ke; method="exact")
+
+    # Nystrom fits need method="nystrom"
+    kn = Kriging(y, X, "matern5_2"; method="nystrom(8)")
+    @test jlibkriging.method(kn) == "nystrom(8)"
+    @test_throws ErrorException predict(kn, Xn)
+    @test length(predict(kn, Xn; method="nystrom").mean) == 3
+    @test size(simulate(kn, 3, 1, Xn; method="nystrom")) == (3, 3)
+    @test isfinite(log_likelihood(kn; method="nystrom"))
+    @test_throws ErrorException log_likelihood(kn; method="vecchia")
+
+    # NestedKriging: common prior from one global Vecchia fit
+    Xl = [mod.(0.3819660 .* (1:200), 1.0) mod.(0.7548777 .* (1:200), 1.0)]
+    yl = [f_test(x) for x in Xl[:, 1]] .+ Xl[:, 2]
+    nk = NestedKriging(yl, Xl, "matern5_2", 3; method="vecchia(15)")
+    @test objective(nk) == "LL"
+    @test jlibkriging.method(nk) == "vecchia(15)"
+end

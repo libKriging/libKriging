@@ -33,6 +33,11 @@ classWarpKriging <- function(obj) {
     # `optim` does not mask stats::optim), matching the Kriging binding style.
     obj$optim <- function() warpKriging_optim(obj$ptr)
     obj$objective <- function() warpKriging_objective(obj$ptr)
+    obj$method <- function() warpKriging_method(obj$ptr)
+    # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
+    # as not to mask base::F / base::T)
+    obj$F <- function() F_(obj)
+    obj$T <- function() T_(obj)
     obj
 }
 
@@ -256,6 +261,8 @@ warp_knots <- function(n_knots = 3, knot_positions = NULL) {
 #'   or \code{NULL} (default) for noise-free interpolation. When set, the GP
 #'   uses the NoiseKriging likelihood \eqn{diag(C) = \sigma^2 + noise_i}.
 #'   (Homogeneous-nugget \emph{estimation} is not available for WarpKriging.)
+#' @param method covariance method: only \code{"exact"} is implemented for
+#'   WarpKriging (same argument as \code{\link{Kriging}}).
 #'
 #' @return An S3 object of class "WarpKriging".
 #'
@@ -283,7 +290,8 @@ WarpKriging <- function(y, X, warping,
                         optim = "BFGS+Adam",
                         objective = "LL",
                         parameters = NULL,
-                        noise = NULL) {
+                        noise = NULL,
+                        method = "exact") {
   y <- as.numeric(y)
   warping <- as.character(warping)
 
@@ -301,7 +309,7 @@ WarpKriging <- function(y, X, warping,
 
   ptr <- warpKriging_new(y, X, warping, kernel,
                          regmodel, normalize, optim, objective,
-                         parameters, noise)
+                         parameters, noise, method)
   obj <- list(ptr = ptr)
   return(classWarpKriging(obj))
 }
@@ -342,6 +350,7 @@ summary.WarpKriging <- function(object, ...) {
 #'   \code{\link{WarpKriging}}.
 #' @param noise numeric vector of per-observation noise variances (length n),
 #'   or \code{NULL} (default) for noise-free interpolation.
+#' @param method covariance method: only \code{"exact"} is implemented.
 #' @param ... ignored
 #'
 #' @return No return value. WarpKriging object argument is modified.
@@ -354,13 +363,14 @@ fit.WarpKriging <- function(object, y, X,
                             optim = "BFGS+Adam",
                             objective = "LL",
                             parameters = NULL,
-                            noise = NULL, ...) {
+                            noise = NULL,
+                            method = "exact", ...) {
   warping <- warpKriging_warping(object$ptr)
   X <- .encode_X_from_warping(X, warping)
   warpKriging_fit(object$ptr,
                   as.numeric(y), X,
                   regmodel, normalize, optim, objective,
-                  parameters, noise)
+                  parameters, noise, method)
   invisible(NULL)
 }
 

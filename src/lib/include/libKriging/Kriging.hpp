@@ -1,6 +1,7 @@
 #ifndef LIBKRIGING_KRIGING_HPP
 #define LIBKRIGING_KRIGING_HPP
 
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -111,9 +112,32 @@ class Kriging : public KrigingImpl {
                             bool normalize = false,
                             const std::string& optim = "BFGS",
                             const std::string& objective = "LL",
-                            const Parameters& parameters = {});
+                            const Parameters& parameters = {},
+                            const std::string& method = "exact");
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
+
+  /** Deprecation message of a deprecated fit objective ("LLVecchia(m)",
+   * "LLNystrom(k)"), empty if `objective` is not deprecated (malformed
+   * specs throw std::invalid_argument). */
+  LIBKRIGING_EXPORT static std::string deprecated_objective_message(const std::string& objective);
+
+  /** Receiver of deprecation messages (deprecated objective aliases), called
+   * at every fit using one. Default (empty handler): printed once per process
+   * on arma::cout. The bindings route the messages to their native warning
+   * mechanism (Python DeprecationWarning, R warning, Julia depwarn, Octave
+   * warning). A handler may throw to turn the warning into an error. */
+  using DeprecationHandler = std::function<void(const std::string&)>;
+  LIBKRIGING_EXPORT static void set_deprecation_handler(DeprecationHandler handler);
+
+  /** Canonical (objective, method) pair of a fit: method gets its explicit
+   * size ("vecchia" -> "vecchia(30)", "nystrom" -> "nystrom(50)"), the
+   * deprecated objectives "LLVecchia(m)" / "LLNystrom(k)" become ("LL",
+   * "vecchia(m)") / ("LL", "nystrom(k)") (with a deprecation warning), and
+   * unknown names or unimplemented combinations (approximate method with
+   * an objective other than "LL") raise std::invalid_argument. */
+  LIBKRIGING_EXPORT static std::pair<std::string, std::string> fit_objective_method(const std::string& objective,
+                                                                                    const std::string& method);
 
   [[nodiscard]] NoiseModel noise_model() const { return m_noise_model; }
   [[nodiscard]] double nugget() const { return m_nugget; }
@@ -125,14 +149,25 @@ class Kriging : public KrigingImpl {
    * @param X is n*d matrix of input
    * @param regmodel is the regression model to be used for the GP mean (choice between contant, linear, quadratic)
    * @param optim is an optimizer name from OptimLib, or 'none' to keep parameters unchanged
-   * @param objective is 'LL' (log-likelihood, default), 'LOO' (leave-one-out;
-   *        see docs/math/LOO.md), 'LMP' (log-marginal posterior; see
-   *        docs/math/LMP.md), or 'LLVecchia'/'LLVecchia(m)' for the Vecchia
-   *        approximated log-likelihood with m conditioning neighbors (default
-   *        m=30): O(n m^3) per evaluation instead of O(n^3), recommended for
-   *        large n in low dimension (see docs/math/Vecchia.md). Ignored if
-   *        optim=='none'.
+   * @param objective is the criterion: 'LL' (log-likelihood, default), 'LOO'
+   *        (leave-one-out; see docs/math/LOO.md) or 'LMP' (log-marginal
+   *        posterior; see docs/math/LMP.md). Ignored if optim=='none'.
+   *        'LLVecchia(m)' / 'LLNystrom(k)' are deprecated aliases of
+   *        objective='LL' with method='vecchia(m)' / 'nystrom(k)'.
    * @param parameters starting paramteters for optim, or final values if optim=='none'.
+   * @param method is how the covariance is evaluated, for the fit AND for
+   *        what the model keeps afterwards: 'exact' (default: O(n^3) dense
+   *        Cholesky, every exact method available afterwards),
+   *        'vecchia'/'vecchia(m)' (Vecchia approximation with m conditioning
+   *        neighbors, default 30: O(n m^3), no O(n^2) matrix; see
+   *        docs/math/Vecchia.md) or 'nystrom'/'nystrom(k)' (rank-k Nystrom
+   *        approximation, default 50: O(n k^2); see docs/math/Nystrom.md).
+   *        An approximate fit keeps no exact factorization: predict /
+   *        simulate / logLikelihood then need the same method, and the
+   *        exact model at the fitted theta is a separate fit
+   *        (objective='LL', method='exact', optim='none', theta given).
+   *        Approximate methods are only implemented with objective 'LL' and
+   *        noise model None: other combinations raise std::invalid_argument.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
@@ -140,7 +175,8 @@ class Kriging : public KrigingImpl {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = {});
+                             const Parameters& parameters = {},
+                             const std::string& method = "exact");
 
   // Heterogeneous-noise variant: noise is known per-observation
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
@@ -150,7 +186,8 @@ class Kriging : public KrigingImpl {
                              bool normalize = false,
                              const std::string& optim = "BFGS",
                              const std::string& objective = "LL",
-                             const Parameters& parameters = {});
+                             const Parameters& parameters = {},
+                             const std::string& method = "exact");
 
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
                                                                    bool return_grad,
@@ -161,28 +198,33 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logMargPostFun(const arma::vec& theta, bool return_grad, bool bench);
 
   LIBKRIGING_EXPORT double logLikelihood();
+  /** Log-likelihood at the committed parameters, computed with an explicit
+   * method: "exact" (= logLikelihood()), "vecchia" (logLikelihoodVecchiaFun,
+   * requires a method="vecchia(m)" fit) or "nystrom" (logLikelihoodNystromFun,
+   * requires a method="nystrom(k)" fit). */
+  LIBKRIGING_EXPORT double logLikelihood(const std::string& method);
   LIBKRIGING_EXPORT double leaveOneOut();
   LIBKRIGING_EXPORT double logMargPost();
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
 
-  /** Vecchia approximated log-likelihood at given theta (objective="LLVecchia(m)").
-   * Requires the Vecchia sets to be built, i.e. the model to have been fitted
-   * with objective="LLVecchia" or "LLVecchia(m)".
+  /** Vecchia approximated log-likelihood at given theta.
+   * Requires the model to have been fitted with method="vecchia" or
+   * "vecchia(m)" (the Vecchia sets are rebuilt on demand, e.g. after load).
    * @return (vll, gradient) ; gradient empty if return_grad=false. */
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodVecchiaFun(const arma::vec& theta, bool return_grad);
 
-  /// Number of Vecchia conditioning neighbors (0 = not fitted with LLVecchia)
+  /// Number of Vecchia conditioning neighbors (0 = not fitted with method "vecchia")
   [[nodiscard]] arma::uword vecchia_neighbors() const { return m_vecchia_m; }
 
-  /** Large-n mode: when set to false BEFORE a fit with objective="LLVecchia(m)",
-   * the final exact O(n^3) factorization is skipped. The model then stores
-   * theta* plus LLVecchia-profiled beta/sigma2, and `predict` transparently routes
-   * to `predictVecchia` (mean/stdev only); return_cov/return_deriv, simulate,
-   * update and save are not available on such a "light" model. */
-  LIBKRIGING_EXPORT void set_vecchia_exact_commit(bool b) { m_vecchia_exact_commit = b; }
-  [[nodiscard]] bool vecchia_exact_commit() const { return m_vecchia_exact_commit; }
-  /// True when the current fit skipped the exact factorization (light mode)
+  /** Deprecated: a method="vecchia(m)" fit never keeps the exact O(n^3)
+   * factorization any more (the model is "light"); fit the exact model with
+   * method="exact" instead. set_vecchia_exact_commit(false) is a no-op,
+   * set_vecchia_exact_commit(true) raises std::invalid_argument. */
+  [[deprecated("a Vecchia fit is always light: fit with method=\"exact\" for the exact model")]] LIBKRIGING_EXPORT void
+  set_vecchia_exact_commit(bool b);
+  [[deprecated("a Vecchia fit is always light")]] [[nodiscard]] bool vecchia_exact_commit() const { return false; }
+  /// True when the model is a Vecchia fit without exact factorization
   [[nodiscard]] bool is_vecchia_light() const { return m_vecchia_light; }
 
   /** Vecchia (local) prediction: each point of X_n is kriged on its m nearest
@@ -190,32 +232,48 @@ class Kriging : public KrigingImpl {
    * Mean is universal-kriging-style with the committed beta; variance is the
    * simple-kriging one (beta treated as known). Usable after any fit.
    * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
-   *          fitted with LLVecchia, else 30)
+   *          fitted with method "vecchia", else 30)
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictVecchia(const arma::mat& X_n,
                                                                     bool return_stdev = true,
                                                                     arma::uword m = 0);
 
+  /** Vecchia (local, sequential) simulation: draws joint sample trajectories
+   * at X_n by sequential conditioning, in the given row order of X_n: the
+   * t-th simulation point is drawn from its simple-kriging conditional
+   * (beta treated as known, like predictVecchia) given its m nearest
+   * neighbors among the observations AND the t-1 points already simulated
+   * (response-first Vecchia, Katzfuss et al. 2020). O(q (n + q) d + q m^3)
+   * instead of O(q^3): usable for large n AND large q, after any fit
+   * (including a Vecchia fit, where the exact simulate is not). Exact (up to beta known) when
+   * m >= n + q - 1; otherwise long-range correlations are truncated and
+   * the result depends on the row order of X_n. NoiseModel::None only; no
+   * `will_update` (no update_simulate on top of it).
+   * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
+   *          fitted with method "vecchia", else 30)
+   * @return output is n_n*nsim matrix of simulations at X_n */
+  LIBKRIGING_EXPORT arma::mat simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m = 0);
+
   /** Nystrom (global low-rank) approximated log-likelihood at given theta
-   * (objective="LLNystrom(k)"). Requires the model to have been fitted with
-   * objective="LLNystrom" or "LLNystrom(k)".
+   * (fit method "nystrom(k)"). Requires the model to have been fitted with
+   * method="nystrom" or "nystrom(k)".
    * @return (ll, gradient) ; gradient empty if return_grad=false. Gradient is
    *         analytic (envelope theorem + Woodbury trace identities, same
    *         principle as the Vecchia gradient) -- see the derivation inside
    *         _logLikelihoodNystrom's grad_out block in Kriging.cpp. */
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodNystromFun(const arma::vec& theta, bool return_grad);
 
-  /// Nystrom rank used at fit time (0 = not fitted with LLNystrom)
+  /// Nystrom rank used at fit time (0 = not fitted with method "nystrom")
   [[nodiscard]] arma::uword nystrom_rank() const { return m_nystrom_k; }
   /// True when the current fit is a Nystrom (no exact O(n^3) factorization) fit
   [[nodiscard]] bool is_nystrom_light() const { return m_nystrom_light; }
 
   /** Nystrom (global low-rank) prediction: uses the committed rank-k factors
-   * (U, D) from the LLNystrom(k) fit via the Woodbury identity instead of the
+   * (U, D) from the method="nystrom(k)" fit via the Woodbury identity instead of the
    * exact O(n^2) triangular solve — O(n*k*q) instead of O(n^2*q) for q
    * prediction points. Mean is universal-kriging-style with the committed
    * beta; variance is the simple-kriging one (beta treated as known, like
-   * predictVecchia). Only usable after an "LLNystrom(k)" fit.
+   * predictVecchia). Only usable after a method="nystrom(k)" fit.
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> predictNystrom(const arma::mat& X_n, bool return_stdev = true);
 
@@ -224,12 +282,14 @@ class Kriging : public KrigingImpl {
    * and the (dense, but only n_n x n_n -- X_n is expected to be small) joint
    * predictive covariance among the SIMULATION points. Like predictNystrom,
    * the covariance is the simple-kriging one (beta treated as known). Only
-   * usable after an "LLNystrom(k)" fit; does not support `will_update` (no
+   * usable after a method="nystrom(k)" fit; does not support `will_update` (no
    * update_simulate for Nystrom fits).
    * @return output is n_n*nsim matrix of simulations at X_n */
   LIBKRIGING_EXPORT arma::mat simulateNystrom(int nsim, int seed, const arma::mat& X_n);
 
-  /** Compute the prediction for given points X'
+  /** Compute the (exact) prediction for given points X'. Requires the exact
+   * factorization: on a Vecchia or Nystrom fit it raises an
+   * error (use the `method` overload, or predictVecchia / predictNystrom).
    * @param X_n is m*d matrix of points where to predict output
    * @param return_stdev is true if return also stdev column vector
    * @param return_cov is true if return also cov matrix between X_n
@@ -240,8 +300,16 @@ class Kriging : public KrigingImpl {
                                                                                               bool return_stdev,
                                                                                               bool return_cov,
                                                                                               bool return_deriv);
+  /** Prediction with an explicit method: "exact" (predict above), "vecchia"
+   * or "vecchia(m)" (predictVecchia, m = 0 -> vecchia_neighbors() or 30),
+   * "nystrom" (predictNystrom, requires a method="nystrom" fit). The approximate
+   * methods return mean / stdev only: return_cov / return_deriv raise. */
+  LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec, arma::mat, arma::mat, arma::mat>
+  predict(const arma::mat& X_n, bool return_stdev, bool return_cov, bool return_deriv, const std::string& method);
 
-  /** Draw observed trajectories of kriging at given points X_n
+  /** Draw observed trajectories of kriging at given points X_n (exact
+   * simulation; raises on a Vecchia or Nystrom fit, see the
+   * `method` overload)
    * @param X_n is m*d matrix of points where to simulate output
    * @param nsim is number of simulations to draw
    * @param seed random seed setup for simulations
@@ -261,6 +329,23 @@ class Kriging : public KrigingImpl {
                                        const arma::mat& X_n,
                                        const arma::vec& with_noise,
                                        const bool will_update = false);
+  /** Simulation with an explicit method: "exact" (simulate above), "vecchia"
+   * or "vecchia(m)" (simulateVecchia), "nystrom" (simulateNystrom, requires an
+   * method="nystrom" fit). will_update=true is only available with "exact". */
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const std::string& method,
+                                       const bool will_update = false);
+  // const char* overload: without it, a string literal method would bind to
+  // the (with_nugget) bool overload above through the pointer->bool conversion
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const char* method,
+                                       const bool will_update = false) {
+    return simulate(nsim, seed, X_n, std::string(method), will_update);
+  }
 
   /** Temporary assimilate new conditional data points to already conditioned (X,y), then re-simulate to previous X_n
    * @param y_u is m length column vector of new output
@@ -298,6 +383,13 @@ class Kriging : public KrigingImpl {
   LIBKRIGING_EXPORT static Kriging load(const std::string filename);
 
  private:
+  // JSON (de)serialization behind save()/load(), also used by NestedKriging
+  // to embed its submodels in its own save file.
+  friend class NestedKriging;
+  void dump_to_json(nlohmann::json& j) const;
+  /// @param filename only used in error messages
+  static Kriging load_from_json(const nlohmann::json& j, const std::string& filename);
+
   NoiseModel m_noise_model = NoiseModel::None;
   double m_nugget = 0.0;
   bool m_est_nugget = false;
@@ -308,8 +400,14 @@ class Kriging : public KrigingImpl {
 
   using FitOfn = std::function<double(const arma::vec&, arma::vec*, KModel*)>;
   FitOfn make_fit_objective(const std::string& objective) const;
+  /// Validates the noise model against the canonical (objective, method)
+  /// pair, and returns the internal objective name evaluated by
+  /// make_fit_objective ("LL", "LOO", "LMP", "LLVecchia(m)", "LLNystrom(k)").
+  std::string internal_fit_objective(const std::string& objective, const std::string& method) const;
+  /// Internal objective name of the committed (m_objective, m_method) pair
+  [[nodiscard]] std::string internal_objective() const;
 
-  // --- Vecchia approximated likelihood (objective="LLVecchia(m)") -----------------
+  // --- Vecchia approximated likelihood (method="vecchia(m)") -----------------
   // Built once per fit (maxmin ordering + m nearest previously-ordered
   // neighbors on normalized inputs), then reused for every LLVecchia evaluation.
   arma::uword m_vecchia_m = 0;                  ///< 0 = Vecchia mode off
@@ -327,17 +425,26 @@ class Kriging : public KrigingImpl {
                                arma::vec* grad_out,
                                arma::vec* beta_out = nullptr,
                                double* sigma2_out = nullptr) const;
-  bool m_vecchia_exact_commit = true;  ///< false = skip the exact factorization at commit
-  bool m_vecchia_light = false;        ///< current fit is a light (non-factorized) Vecchia fit
-  /// Throw if the model is a light Vecchia fit (used by simulate/update/save)
+  bool m_vecchia_light = false;  ///< current fit is a Vecchia fit without exact factorization
+  /// Throw if the model is a light Vecchia fit (used by update_simulate)
   void check_not_vecchia_light(const char* what) const;
+  /// Throw if the model has no exact factorization (light Vecchia or Nystrom
+  /// fit): `what` is the exact method called, `alternative` the method to use
+  void check_exact_available(const char* what, const char* alternative) const;
+  /// Light-Vecchia incremental update: extends m_X/m_y/m_F, rebuilds the
+  /// Vecchia sets, optionally re-optimizes theta (single warm-start BFGS on
+  /// the LLVecchia objective), then re-profiles beta/sigma2 -- no exact
+  /// factorization and no O(n^2) matrix, like update_nystrom.
+  void update_vecchia_light(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+  /// True when the (normalized) output is, to rounding, in the span of the
+  /// trend matrix: zero residual whatever theta (see fit()).
+  [[nodiscard]] bool y_in_trend_span() const;
 
-  // --- Nystrom approximated likelihood (objective="LLNystrom(k)") ---------------
-  // Unlike Vecchia (which by default still performs one exact O(n^3)
-  // factorization at commit), Nystrom NEVER factorizes R exactly: the
-  // committed model only carries the rank-k factors (m_nystrom_U, m_nystrom_D)
-  // from the last likelihood evaluation at theta*, so predict/simulate/update
-  // behave like a permanent "light" fit (see m_nystrom_light below).
+  // --- Nystrom approximated likelihood (method="nystrom(k)") ---------------
+  // Like Vecchia, Nystrom NEVER factorizes R exactly: the committed model
+  // only carries the rank-k factors (m_nystrom_U, m_nystrom_D) from the last
+  // likelihood evaluation at theta*, so predict/simulate/update behave like a
+  // permanent "light" fit (see m_nystrom_light below).
   arma::uword m_nystrom_k = 0;  ///< rank k (0 = Nystrom mode off)
   arma::mat m_nystrom_U;        ///< committed low-rank factor (n x k): R ~= U*U.t() + diag(D)
   arma::vec m_nystrom_D;        ///< committed residual diagonal (n), jittered to stay > 0

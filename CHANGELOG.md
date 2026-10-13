@@ -11,7 +11,189 @@ past release, see the corresponding entry on the
 
 ## [Unreleased]
 
+### Changed
+- **Python (breaking):** every vector-valued output of `Kriging`,
+  `WarpKriging` and `MLPKriging` is now a 1-D numpy array of shape `(n,)`
+  instead of `(n, 1)` (or `(1, d)` for `centerX` / `scaleX`): `predict` mean
+  and stdev, `theta`, `beta`, `y`, `z`, `noise`, `warp_params`, gradients of
+  `logLikelihoodFun` / `leaveOneOutFun` / `logMargPostFun`, `leaveOneOutVec`,
+  `subsetOfData` indices and the matching `model()` entries. This matches
+  `NestedKriging` and scikit-learn; matrices (`X`, `F`, `T`, `M`, covariances,
+  derivatives, simulations) are unchanged. Code indexing `[:, 0]` on those
+  outputs must drop the index; `ravel()` / `flatten()` / `reshape(...)` keep
+  working.
+- **Kriging (breaking): exact / Vecchia / Nystrom methods are explicit at
+  every step, fit included, never inferred.**
+  - `fit` (and the fitting constructors) take a `method`: `"exact"` (the
+    default), `"vecchia"` / `"vecchia(m)"` (Vecchia approximation, m
+    neighbors, default 30) or `"nystrom"` / `"nystrom(k)"` (rank-k
+    Nystrom, default 50). `objective` is now only the criterion (`"LL"`,
+    `"LOO"`, `"LMP"`); the approximate methods exist for `"LL"` without a
+    noise model, other combinations raise. `method()` returns the fitted
+    method with its explicit size (`"vecchia(30)"`), and is saved / loaded.
+    C++ trailing `method` argument of `fit` and of the constructor; Python /
+    R / Julia `method=` keyword; Octave/Matlab trailing argument.
+  - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
+    `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`; a
+    conflicting `method` raises. Save files of earlier versions load with the
+    matching method. Using an alias raises the native deprecation warning of
+    each language: Python `DeprecationWarning`, R `warning` of class
+    `deprecatedWarning`, Julia `Base.depwarn` (shown without `--depwarn`),
+    Octave/Matlab warning `mLibKriging:deprecated`. They follow each
+    language's filters (`warnings.simplefilter("error")`, `options(warn = 2)`,
+    `--depwarn=error`, `warning("error", ...)`). In C++, the message goes to
+    `Kriging::set_deprecation_handler` (default: printed once on
+    `arma::cout`), and `Kriging::deprecated_objective_message` gives it.
+  - A Vecchia fit no longer performs the final exact O(n³) factorization:
+    like a Nystrom fit, it keeps theta and the Vecchia-profiled beta /
+    sigma2 only, so a large-n Vecchia fit no longer needs an n × n matrix.
+    The exact model at the Vecchia (or Nystrom) estimate is a separate fit
+    (`method="exact"`, `optim="none"`, fitted theta given). In 1.2, an
+    `LLVecchia` fit kept that factorization by default and its beta / sigma2
+    came from the exact likelihood; they now come from the Vecchia one.
+    Save files of 1.2 keep their stored factorization until the next
+    `update`.
+  - `predict` and `simulate` used to switch silently to `predictNystrom` /
+    `simulateNystrom` after an `LLNystrom` fit. They now take a `method`
+    (`"exact"`, the default, `"vecchia"` / `"vecchia(m)"` or `"nystrom"`,
+    also the fitted `"nystrom(k)"`): C++ `predict(X, stdev, cov, deriv,
+    method)` / `simulate(nsim, seed, X, method, will_update)`. Method
+    `"exact"` on a Vecchia or Nystrom fit raises an error naming the method
+    to use, instead of answering with an approximation.
+    `logLikelihood(method)` gives the Vecchia / Nystrom objective of such a
+    fit.
+  - Code predicting after an `LLNystrom` / `LLVecchia` fit must pass
+    `method="nystrom"` / `"vecchia"`; the scikit-learn `KrigingRegressor`
+    `method` parameter applies to `fit`, `predict` and `sample_y`.
+  - `set_vecchia_exact_commit(false)` is a deprecated no-op in C++ and
+    `set_vecchia_exact_commit(true)` raises; `vecchia_exact_commit()` is
+    deprecated.
+  - NestedKriging: `method="vecchia(m)"` or `"nystrom(k)"` (after
+    `warping`) estimates the common prior with one global Vecchia or Nystrom
+    fit (formerly only `objective="LLVecchia(m)"`); `objective()` and
+    `method()` accessors. WarpKriging and MLPKriging accept `method` for a
+    uniform API (only `"exact"` is implemented).
+
+### Added
+- `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
+  (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
+  instead of O(q³), exact when m ≥ n + q − 1; `simulate(…, method=
+  "vecchia")` in every binding (usable after any fit, including a Vecchia
+  fit, where the exact `simulate` is not available).
+- NestedKriging API parity across bindings: `X`, `y`, `groups`, `warping`,
+  `set_predict_chunk` and `set_warp_subsample` in Julia
+  (`set_predict_chunk!` / `set_warp_subsample!`) and Octave/Matlab; `fit` on
+  an existing object (refit), `set_predict_chunk` and `set_warp_subsample` in
+  R. `groups` are 1-based in R, Julia and Octave/Matlab, 0-based in Python.
+- `vecchia_neighbors()` in every binding (Python, R, Julia, Octave/Matlab),
+  alongside the already exposed `nystrom_rank()`: number `m` of conditioning
+  neighbors of a `method="vecchia(m)"` fit, 0 otherwise.
+- A Vecchia fit (without exact factorization) supports `update` (Vecchia
+  refit) and `save` / `load` (both used to raise on the 1.2 "light" fit);
+  the Vecchia sets are rebuilt on demand after `load`, and
+  `vecchia_neighbors()` is restored.
+- Octave/Matlab: `Kriging(kernel)` / `Kriging(kernel, noise_model)` build an
+  unfitted model (fitted later by `fit`), as `Kriging(kernel)` already did
+  in Python, R and Julia.
+- Python: `pickle` support for `Kriging`, `WarpKriging`, `MLPKriging` and
+  `NestedKriging` (through their JSON save/load), so the scikit-learn
+  wrappers can be cloned, cached and sent to worker processes.
+- `NestedKriging::save` / `NestedKriging::load` (C++, Python, R, Julia,
+  Octave/Matlab): configuration, data, partition, common prior and submodels
+  (`Kriging` or `WarpKriging`) in one JSON file; the NK precomputations are
+  rebuilt at load. `KrigingLoader::describe` reports
+  `KrigingType::NestedKriging`, so the generic `load` of each binding
+  dispatches to it.
+
 ### Fixed
+- `Kriging::simulate` nugget (`with_nugget`) and heterogeneous-noise
+  (`with_noise`) overloads skipped the light-fit checks: on a Nystrom or
+  Vecchia fit without factorization they went to the exact simulator, which has no
+  factorization to use. They now raise a clear error there, like the base
+  overload (see the explicit `method` entry above).
+- Python `pylibkriging.load()` and Octave/Matlab `class_saved` /
+  `load_kriging` failed on a saved `Kriging` with a nugget or noise channel
+  (described as `NuggetKriging` / `NoiseKriging` by the loader, which these
+  two bindings did not map back to `Kriging`).
+- Python: deadlock in code paths where libKriging allocates from worker
+  threads while the calling Python thread holds the GIL: NestedKriging NK
+  `predict` (OpenMP pair loop) and WarpKriging parallel multistart
+  (`BFGS<k>`). The numpy allocator handed to libKriging reports to
+  tracemalloc, which takes the GIL; it is now used only from threads holding
+  the GIL, other threads use `std::malloc` (each block is freed by the C
+  runtime that allocated it). The NestedKriging Python tests are now
+  registered in CTest, with a subprocess/timeout regression test.
+- Octave/Matlab `Kriging.load` built and printed a throw-away
+  `Kriging([1], [1], "gauss")` model, whose mex reference was then
+  overwritten and never released. It now wraps the loaded reference directly,
+  like `WarpKriging.load` / `MLPKriging.load`.
+- `Kriging::fit` on degenerate data:
+  - `y` in the span of the trend (constant `y` with a constant trend, affine
+    `y` with a linear one, ...): the residual is zero for every theta, so
+    sigma2 = 0 and theta is not identifiable; the optimizer drove theta to a
+    bound where R is singular and failed ("All 1 optimization attempts
+    failed"). The fit now skips the optimization and commits the model at the
+    given theta (or a deterministic default): least-squares trend, sigma2 = 0
+    (and nugget = 0), i.e. trend predictions with zero variance. With a known
+    heterogeneous noise, sigma2 = 0 is not representable: explicit error.
+  - a constant input column got [0, 0] theta bounds (theta = 0: division by
+    zero in the kernel); its theta is now pinned to 1.
+  - `normalize = true` divided by a zero range for a constant output or input
+    column (shared by Kriging, WarpKriging, MLPKriging); it is now only
+    centered.
+  - BFGS restarts started from `(theta_start + theta_lower) / 2^k`, which can
+    lie below `theta_lower`; L-BFGS-B does not project its starting point, so
+    the returned theta could be outside its bounds. The restart point is now
+    clamped to the bounds, and the "stuck at a bound" test ignores pinned
+    dimensions.
+- R: `WarpKriging` and `MLPKriging` had no `k$F()` / `k$T()` (only
+  `k$F_()` / `k$T_()`), although `bindings/README.md` documents `obj$F()`,
+  and `Kriging` had no `F_()` / `T_()`. All three classes now provide both
+  `k$F()` / `k$T()` and `F_(k)` / `T_(k)` (the S3 generics stay named `F_` /
+  `T_` so as not to mask `base::F` / `base::T`).
+- Python scikit-learn wrapper `NestedKrigingRegressor`: `nb_groups` is
+  capped to `n // (d + 2)` (value used stored in `nb_groups_`, with a warning)
+  and fewer than `d + 2` samples raise a clear `ValueError`, instead of the
+  native "nb_groups should be in [1, n/(d+2)]" error on small samples.
+- Python tests `test_new_features.py`, `sklearn_estimator_test.py` and
+  `sklearn_multimodel_test.py` were never run by CTest (and the scikit-learn
+  ones failed); they are now registered and pass.
+- CI: the "Linux Debug without OpenMP" and "R Linux without OpenMP" jobs
+  built with OpenMP. They only removed `libomp-dev` (LLVM's runtime), while
+  GCC ships its own (`libgomp`, `omp.h`), so `find_package(OpenMP)` still
+  found `-fopenmp`. They now configure with
+  `-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=ON`, and a new step fails if the
+  installed libKriging references any `omp_*` / `GOMP_*` symbol.
+- Documentation, skills and plugin commands checked against the bindings
+  code (calls, argument names, return shapes; Python snippets executed, C++
+  snippets compiled):
+  - `bindings/README.md`: Octave/Matlab constructors are `Kriging(...)`,
+    `WarpKriging(...)`, ... (not `build(...)`); Python loads are
+    `Kriging.load(f)` / `pylibkriging.load(f)` (no `load_kriging`); R object
+    methods are `feature_dim()`, `is_fitted()`, `hidden_dims()`; Python
+    `subsetOfData` returns a 1-D array; the "C++ only" list now has
+    `simulateVecchia` and no longer `vecchia_neighbors`.
+  - `predict` unpacked as a pair for `Kriging` / `WarpKriging` /
+    `MLPKriging` (5-tuple) in `docs/math/Kriging.md`,
+    `Warping-MLPJoint.md`, `Warping-NeuralMono.md` and the C++ reference;
+    Python `logLikelihoodFun` returns `(ll, grad, hess)`.
+  - R examples passed `stdev = TRUE` (argument is `return_stdev`),
+    `noise_model =` (argument is `noise`) and `simulate(..., X = )`
+    (argument is `x`); Julia README examples passed `stdev=` / `cov=`
+    (keywords are `return_stdev` / `return_cov`).
+  - C++ reference: `WarpKriging` lives in `libKriging::`, its `fit` takes no
+    warping list, and the `NestedKriging` constructor takes the aggregation,
+    partition and seed before the trend.
+  - `docs/math/Nystrom.md` said `predict` used an exact factorization after
+    an `LLNystrom` fit; there is none (see the explicit `method` entry above).
+  - `commands/simulate.md`: results are `npred × nsim` (one column per
+    path) in every binding.
+  - Every language reference now shows save / load and
+    `simulate(..., will_update)` + `update_simulate`.
+- Octave/Matlab `Kriging.copy` returned the raw mex reference of the copy
+  instead of a `Kriging` object (and leaked it when the result was not
+  assigned). It now returns a `Kriging` object, like `WarpKriging.copy` /
+  `MLPKriging.copy`.
 - R: `utils` moves from `Suggests` to `Imports` in `rlibkriging`'s
   `DESCRIPTION`, since the `NAMESPACE` imports it (`@importFrom utils methods`);
   `R CMD check` reported a NOTE ("Base package in Suggests/Enhances imported in

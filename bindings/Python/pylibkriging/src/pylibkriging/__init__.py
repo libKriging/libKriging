@@ -51,6 +51,33 @@ NestedKriging = WrappedPyNestedKriging
 MLPKriging = WrappedPyMLPKriging
 
 import warnings as _warnings
+import os as _os
+import tempfile as _tempfile
+
+
+# --- pickle support -----------------------------------------------------
+# Native models are (de)serialized through their JSON save()/load(), which
+# store every fitted quantity exactly (matrices are base64-encoded).
+def _lk_unpickle(cls, content):
+    with _tempfile.TemporaryDirectory() as d:
+        path = _os.path.join(d, "model.json")
+        with open(path, "w") as f:
+            f.write(content)
+        return cls.load(path)
+
+
+def _lk_reduce(self):
+    with _tempfile.TemporaryDirectory() as d:
+        path = _os.path.join(d, "model.json")
+        self.save(path)
+        with open(path) as f:
+            content = f.read()
+    return (_lk_unpickle, (type(self), content))
+
+
+for _cls in (WrappedPyKriging, WrappedPyWarpKriging, WrappedPyMLPKriging, WrappedPyNestedKriging):
+    _cls.__reduce__ = _lk_reduce
+del _cls
 
 import re as _re
 import numpy as _np
@@ -260,7 +287,8 @@ class WarpKriging:
         return X_enc
 
     def fit(self, y, X, regmodel="constant", normalize=False,
-            optim="BFGS+Adam", objective="LL", parameters=None, noise=None):
+            optim="BFGS+Adam", objective="LL", parameters=None, noise=None,
+            method="exact"):
         if parameters is None:
             parameters = {}
         if _has_string_columns(X):
@@ -269,7 +297,8 @@ class WarpKriging:
         else:
             X = _np.asarray(X, dtype=_np.float64)
         self._impl.fit(_np.asarray(y, dtype=_np.float64), X,
-                       regmodel, normalize, optim, objective, parameters, noise)
+                       regmodel, normalize, optim, objective, parameters, noise,
+                       method)
 
     def predict(self, X, return_stdev=True, return_cov=False, return_deriv=False):
         return self._impl.predict(self._encode_X(X),
@@ -334,5 +363,6 @@ class WarpKriging:
     def warping(self): return self._impl.warping()
     def optim(self): return self._impl.optim()
     def objective(self): return self._impl.objective()
+    def method(self): return self._impl.method()
     def noise(self): return self._impl.noise()
     def warp_params(self): return self._impl.warp_params()

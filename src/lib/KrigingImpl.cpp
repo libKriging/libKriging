@@ -616,6 +616,9 @@ void KrigingImpl::dump_common_to_json(nlohmann::json& j) const {
   j["regmodel"] = Trend::toString(m_regmodel);
   j["optim"] = m_optim;
   j["objective"] = m_objective;
+  // Only emit `method` when approximate so exact save files stay byte-identical
+  if (m_method != "exact")
+    j["method"] = m_method;
   // Auxiliary data
   j["dX"] = to_json(m_dX);
   j["maxdX"] = to_json(m_maxdX);
@@ -650,6 +653,7 @@ void KrigingImpl::load_common_from_json(const nlohmann::json& j) {
   m_regmodel = Trend::fromString(j["regmodel"].template get<std::string>());
   m_optim = j["optim"].template get<decltype(m_optim)>();
   m_objective = j["objective"].template get<decltype(m_objective)>();
+  m_method = j.contains("method") ? j["method"].template get<std::string>() : std::string("exact");
   m_dX = mat_from_json(j["dX"]);
   m_maxdX = colvec_from_json(j["maxdX"]);
   m_F = mat_from_json(j["F"]);
@@ -719,6 +723,8 @@ bool KrigingImpl::summary_top(std::ostringstream& oss, const arma::mat* X_displa
 void KrigingImpl::summary_bottom(std::ostringstream& oss) const {
   oss << "  * fit:\n";
   oss << "    * objective: " << m_objective << "\n";
+  if (m_method != "exact")
+    oss << "    * method: " << m_method << "\n";
   oss << "    * optim: " << m_optim << "\n";
 }
 
@@ -743,6 +749,11 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
     scaleX = max(X, 0) - min(X, 0);
     centerY = min(y);
     scaleY = max(y) - min(y);
+    // a constant column / output has a zero range: keep it unscaled (only
+    // centered) instead of dividing by zero
+    scaleX.replace(0.0, 1.0);
+    if (scaleY == 0.0)
+      scaleY = 1.0;
   } else {
     centerX = arma::rowvec(d, arma::fill::zeros);
     scaleX = arma::rowvec(d, arma::fill::ones);
@@ -792,11 +803,12 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
     theta0 = theta.value();
     if ((theta0.n_cols != d) && (theta0.n_rows == d))
       theta0 = theta0.t();
+    if (theta0.n_cols != d)
+      throw std::runtime_error("Dimension of theta should be kx" + std::to_string(d)
+                               + " (one starting point per row, one column per input) instead of "
+                               + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
     if (m_normalize)
       theta0.each_row() /= scaleX;
-    if (theta0.n_cols != d)
-      throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
-                               + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
   }
   return theta0;
 }

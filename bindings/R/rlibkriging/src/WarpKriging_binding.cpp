@@ -70,7 +70,8 @@ SEXP warpKriging_new(const arma::vec& y,
                      std::string optim = "BFGS+Adam",
                      std::string objective = "LL",
                      Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
-                     Rcpp::Nullable<arma::vec> noise = R_NilValue) {
+                     Rcpp::Nullable<arma::vec> noise = R_NilValue,
+                     std::string method = "exact") {
   // Convert R CharacterVector → std::vector<std::string>
   std::vector<std::string> warp_strs;
   for (int i = 0; i < warping.size(); ++i)
@@ -81,7 +82,7 @@ SEXP warpKriging_new(const arma::vec& y,
   auto [wparams, tuning] = wk_split_parameters(parameters);
   if (noise.isNotNull())  // explicit `noise=` argument takes precedence
     wparams.noise = Rcpp::as<arma::vec>(noise);
-  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
 
   return WarpKrigingPtr(model, true);
 }
@@ -99,13 +100,14 @@ void warpKriging_fit(SEXP model_ptr,
                      std::string optim = "BFGS+Adam",
                      std::string objective = "LL",
                      Rcpp::Nullable<Rcpp::List> parameters = R_NilValue,
-                     Rcpp::Nullable<arma::vec> noise = R_NilValue) {
+                     Rcpp::Nullable<arma::vec> noise = R_NilValue,
+                     std::string method = "exact") {
   WarpKrigingPtr model(model_ptr);
 
   auto [wparams, tuning] = wk_split_parameters(parameters);
   if (noise.isNotNull())  // explicit `noise=` argument takes precedence
     wparams.noise = Rcpp::as<arma::vec>(noise);
-  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning);
+  model->fit(y, X, Trend::fromString(regmodel), normalize, optim, objective, wparams, tuning, method);
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +345,12 @@ arma::vec warpKriging_warpParams(SEXP model_ptr) {
 std::string warpKriging_optim(SEXP model_ptr) {
   WarpKrigingPtr model(model_ptr);
   return model->optim();
+}
+
+// [[Rcpp::export]]
+std::string warpKriging_method(SEXP model_ptr) {
+  WarpKrigingPtr model(model_ptr);
+  return model->method();
 }
 
 // [[Rcpp::export]]

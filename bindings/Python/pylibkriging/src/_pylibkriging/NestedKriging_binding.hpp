@@ -15,6 +15,9 @@
 namespace py = pybind11;
 
 class PyNestedKriging {
+ private:
+  explicit PyNestedKriging(std::unique_ptr<NestedKriging>&& internal) : m_internal(std::move(internal)) {}
+
  public:
   // Kernel-only constructor (no data)
   explicit PyNestedKriging(const std::string& kernel);
@@ -31,8 +34,10 @@ class PyNestedKriging {
                   const std::string& optim,
                   const std::string& objective,
                   const py::dict& dict,
-                  const std::vector<std::string>& warping);
+                  const std::vector<std::string>& warping,
+                  const std::string& method);
   ~PyNestedKriging();
+  PyNestedKriging(PyNestedKriging&&) = default;
 
   void fit(const py::array_t<double>& y,
            const py::array_t<double>& X,
@@ -41,7 +46,8 @@ class PyNestedKriging {
            const std::string& optim,
            const std::string& objective,
            const py::dict& dict,
-           const std::vector<std::string>& warping);
+           const std::vector<std::string>& warping,
+           const std::string& method);
 
   std::tuple<py::array_t<double>, py::array_t<double>> predict(const py::array_t<double>& X_n, bool return_stdev);
 
@@ -50,6 +56,8 @@ class PyNestedKriging {
   // accessors
   [[nodiscard]] std::string kernel() const;
   [[nodiscard]] std::vector<std::string> warping() const;
+  [[nodiscard]] std::string objective() const;
+  [[nodiscard]] std::string method() const;
   [[nodiscard]] std::string aggregation() const;
   [[nodiscard]] unsigned long nb_groups() const;
   [[nodiscard]] py::list groups() const;
@@ -61,6 +69,9 @@ class PyNestedKriging {
 
   void set_predict_chunk(unsigned long chunk);
   void set_warp_subsample(unsigned long m);
+
+  void save(const std::string filename) const;
+  static PyNestedKriging load(const std::string filename);
 
  private:
   std::unique_ptr<NestedKriging> m_internal;

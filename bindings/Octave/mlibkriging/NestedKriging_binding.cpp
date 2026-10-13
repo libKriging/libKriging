@@ -51,12 +51,12 @@ static NestedKriging::Partition parsePartition(const std::string& s) {
 namespace NestedKrigingBinding {
 
 // NestedKriging::new(y, X, kernel, nb_groups, [aggregation], [partition], [seed],
-//                    [regmodel], [optim], [objective], [parameters], [warping_cell])
+//                    [regmodel], [optim], [objective], [parameters], [warping_cell], [method])
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{4, 12}};
+                 RequiresArg::Range{4, 13}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
 
   auto y = input.get<arma::vec>(0, "vector");
@@ -74,9 +74,10 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   std::vector<std::string> warping;
   if (nrhs > 11 && !mxIsEmpty(prhs[11]))
     warping = cellToStringVec(prhs[11], "warping");
+  const auto method = input.getOptional<std::string>(12, "method").value_or("exact");
 
   NestedKriging nk_obj(
-      y, X, kernel, nb_groups, aggregation, partition, seed, regmodel, optim, objective, parameters, warping);
+      y, X, kernel, nb_groups, aggregation, partition, seed, regmodel, optim, objective, parameters, warping, method);
   auto nk = buildObject<NestedKriging>(std::move(nk_obj));
   output.set(0, nk, "new object reference");
 }
@@ -91,12 +92,13 @@ void destroy(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   output.set(0, EmptyObject{}, "deleted object reference");
 }
 
-// NestedKriging::fit(ref, y, X, nb_groups, [regmodel], [optim], [objective], [parameters], [warping_cell])
+// NestedKriging::fit(ref, y, X, nb_groups, [regmodel], [optim], [objective], [parameters], [warping_cell],
+//                    [method])
 void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{4, 9}};
+                 RequiresArg::Range{4, 10}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto* nk = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference");
   const auto regmodel = Trend::fromString(input.getOptional<std::string>(4, "regression model").value_or("constant"));
@@ -106,6 +108,7 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   std::vector<std::string> warping;
   if (nrhs > 8 && !mxIsEmpty(prhs[8]))
     warping = cellToStringVec(prhs[8], "warping");
+  const auto method = input.getOptional<std::string>(9, "method").value_or("exact");
   nk->fit(input.get<arma::vec>(1, "vector"),
           input.get<arma::mat>(2, "matrix"),
           static_cast<arma::uword>(input.get<double>(3, "nb_groups")),
@@ -113,7 +116,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
           optim,
           objective,
           parameters,
-          warping);
+          warping,
+          method);
 }
 
 // [mean, [stdev]] = NestedKriging::predict(ref, X)
@@ -147,6 +151,24 @@ void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->kernel(), "kernel");
+}
+
+void objective(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->objective(), "objective");
+}
+
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->method(), "method");
 }
 
 void aggregation(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -197,6 +219,104 @@ void beta0(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                  RequiresArg::Exactly{1}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->beta0(), "beta0");
+}
+
+void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->X(), "X");
+}
+
+void y(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  output.set(0, input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->y(), "y");
+}
+
+// cell array (1 x p) of 1-based row-index column vectors
+void groups(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  if (nlhs < 1)
+    throw MxException(LOCATION(), "mLibKriging:badOutput", "groups requires one output");
+  const auto& groups = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->groups();
+  mxArray* cell = mxCreateCellMatrix(1, groups.size());
+  for (size_t g = 0; g < groups.size(); ++g) {
+    mxArray* idx = mxCreateDoubleMatrix(groups[g].n_elem, 1, mxREAL);
+    double* p = mxGetPr(idx);
+    for (arma::uword i = 0; i < groups[g].n_elem; ++i)
+      p[i] = static_cast<double>(groups[g](i) + 1);
+    mxSetCell(cell, g, idx);
+  }
+  plhs[0] = cell;
+}
+
+void warping(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  if (nlhs < 1)
+    throw MxException(LOCATION(), "mLibKriging:badOutput", "warping requires one output");
+  const auto& warping = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->warping();
+  mxArray* cell = mxCreateCellMatrix(1, warping.size());
+  for (size_t i = 0; i < warping.size(); ++i)
+    mxSetCell(cell, i, mxCreateString(warping[i].c_str()));
+  plhs[0] = cell;
+}
+
+void set_predict_chunk(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  const auto chunk = input.get<int>(1, "chunk");
+  if (chunk < 1)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "chunk must be >= 1");
+  input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->set_predict_chunk(chunk);
+}
+
+void set_warp_subsample(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  const auto m = input.get<int>(1, "m");
+  if (m < 1)
+    throw MxException(LOCATION(), "mLibKriging:badArgument", "m must be >= 1");
+  input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference")->set_warp_subsample(m);
+}
+
+void save(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{2}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
+  auto* nk = input.getObjectFromRef<NestedKriging>(0, "NestedKriging reference");
+  const auto filename = input.get<std::string>(1, "filename");
+  nk->save(filename);
+}
+
+void load(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  const auto filename = input.get<std::string>(0, "filename");
+  auto nk = buildObject<NestedKriging>(NestedKriging::load(filename));
+  output.set(0, nk, "new object reference");
 }
 
 }  // namespace NestedKrigingBinding

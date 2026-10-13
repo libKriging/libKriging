@@ -9,9 +9,18 @@ X <- as.matrix(runif(12))
 f <- function(x) 1 - 1 / 2 * (sin(12 * x) / (1 + x) + 2 * cos(7 * x) * x^5 + 0.7)
 y <- f(X)
 
-test_that("objective = 'LLVecchia(m)' is accepted (Vecchia log-likelihood)", {
-  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), NA)
-  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia"), NA)
+test_that("method = 'vecchia(m)' is accepted, and the deprecated objective 'LLVecchia(m)'", {
+  expect_error(Kriging(y, X, "matern5_2", method = "vecchia(3)"), NA)
+  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), class = "deprecatedWarning")
+  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia"), class = "deprecatedWarning")
+})
+
+test_that("vecchia_neighbors / nystrom_rank report the approximation size", {
+  expect_equal(Kriging(y, X, "matern5_2", method = "vecchia(3)")$vecchia_neighbors(), 3)
+  expect_equal(Kriging(y, X, "matern5_2", method = "nystrom(4)")$nystrom_rank(), 4)
+  k <- Kriging(y, X, "matern5_2")
+  expect_equal(k$vecchia_neighbors(), 0)
+  expect_equal(k$nystrom_rank(), 0)
 })
 
 test_that("objective still accepts LL / LOO / LMP and rejects unknown values", {
@@ -24,7 +33,7 @@ test_that("regmodel = 'quadratic' is available", {
   expect_error(Kriging(y, X, "matern3_2", regmodel = "quadratic"), NA)
 })
 
-test_that("noise is the last argument (aligned with Python / WarpKriging)", {
+test_that("noise comes after parameters, before method (aligned with Python / WarpKriging)", {
   # named form (recommended) keeps working
   expect_error(Kriging(y, X, "gauss", noise = "nugget"), NA)
   # positional form: noise is now after parameters

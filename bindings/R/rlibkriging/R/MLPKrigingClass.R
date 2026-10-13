@@ -26,6 +26,12 @@ classMLPKriging <- function(obj) {
                 'normalize','regmodel','F_','T_','M','z','beta')) {
         eval(parse(text=paste0("obj$", d, " <- function() ", d, "(obj)")))
     }
+    obj$objective <- function() mlpKriging_objective(obj$ptr)
+    obj$method <- function() mlpKriging_method(obj$ptr)
+    # `k$F()` / `k$T()` as for Kriging (the S3 generics are named F_ / T_ so
+    # as not to mask base::F / base::T)
+    obj$F <- function() F_(obj)
+    obj$T <- function() T_(obj)
     obj
 }
 
@@ -48,6 +54,8 @@ classMLPKriging <- function(obj) {
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters, e.g.
 #'   \code{list(max_iter_adam = "300", adam_lr = "0.001", max_iter_bfgs = "50")}
+#' @param method covariance method: only \code{"exact"} is implemented for
+#'   MLPKriging (same argument as \code{\link{Kriging}}).
 #'
 #' @return An S3 object of class "MLPKriging".
 #'
@@ -68,14 +76,15 @@ MLPKriging <- function(y, X, hidden_dims,
                        normalize = FALSE,
                        optim = "BFGS+Adam",
                        objective = "LL",
-                       parameters = NULL) {
+                       parameters = NULL,
+                       method = "exact") {
   y <- as.numeric(y)
   X <- as.matrix(X)
   hidden_dims <- as.integer(hidden_dims)
 
   ptr <- mlpKriging_new(y, X, hidden_dims, as.integer(d_out),
                         activation, kernel, regmodel, normalize,
-                        optim, objective, parameters)
+                        optim, objective, parameters, method)
   obj <- list(ptr = ptr)
   return(classMLPKriging(obj))
 }
@@ -110,6 +119,7 @@ summary.MLPKriging <- function(object, ...) {
 #' @param optim optimiser
 #' @param objective "LL" (log-likelihood)
 #' @param parameters optional named list of tuning parameters
+#' @param method covariance method: only \code{"exact"} is implemented.
 #' @param ... ignored
 #'
 #' @return No return value. MLPKriging object argument is modified.
@@ -121,11 +131,12 @@ fit.MLPKriging <- function(object, y, X,
                            normalize = FALSE,
                            optim = "BFGS+Adam",
                            objective = "LL",
-                           parameters = NULL, ...) {
+                           parameters = NULL,
+                           method = "exact", ...) {
   mlpKriging_fit(object$ptr,
                  as.numeric(y), as.matrix(X),
                  regmodel, normalize, optim, objective,
-                 parameters)
+                 parameters, method)
   invisible(NULL)
 }
 

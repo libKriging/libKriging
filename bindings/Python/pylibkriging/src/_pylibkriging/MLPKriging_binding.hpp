@@ -32,7 +32,8 @@ class PyMLPKriging {
                bool normalize,
                const std::string& optim,
                const std::string& objective,
-               const py::dict& parameters);
+               const py::dict& parameters,
+               const std::string& method);
   ~PyMLPKriging();
   PyMLPKriging(PyMLPKriging&&) = default;
 
@@ -42,7 +43,8 @@ class PyMLPKriging {
            bool normalize,
            const std::string& optim,
            const std::string& objective,
-           const py::dict& parameters);
+           const py::dict& parameters,
+           const std::string& method);
 
   std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>
   predict(const py::array_t<double>& X_n, bool return_stdev, bool return_cov, bool return_deriv = false);
@@ -65,6 +67,8 @@ class PyMLPKriging {
                                                                                 const bool return_hess);
 
   std::string kernel();
+  std::string objective();
+  std::string method();
   py::array_t<double> X();
   py::array_t<double> centerX();
   py::array_t<double> scaleX();

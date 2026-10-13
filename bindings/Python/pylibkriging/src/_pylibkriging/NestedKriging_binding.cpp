@@ -43,7 +43,8 @@ PyNestedKriging::PyNestedKriging(const py::array_t<double>& y,
                                  const std::string& optim,
                                  const std::string& objective,
                                  const py::dict& dict,
-                                 const std::vector<std::string>& warping) {
+                                 const std::vector<std::string>& warping,
+                                 const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal = std::make_unique<NestedKriging>(mat_y,
@@ -57,7 +58,8 @@ PyNestedKriging::PyNestedKriging(const py::array_t<double>& y,
                                                optim,
                                                objective,
                                                params_from_dict(dict),
-                                               warping);
+                                               warping,
+                                               method);
 }
 
 PyNestedKriging::~PyNestedKriging() {}
@@ -69,11 +71,12 @@ void PyNestedKriging::fit(const py::array_t<double>& y,
                           const std::string& optim,
                           const std::string& objective,
                           const py::dict& dict,
-                          const std::vector<std::string>& warping) {
+                          const std::vector<std::string>& warping,
+                          const std::string& method) {
   arma::colvec mat_y = carma::arr_to_col_view<double>(y);
   arma::mat mat_X = carma::arr_to_mat_view<double>(X);
   m_internal->fit(
-      mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping);
+      mat_y, mat_X, nb_groups, Trend::fromString(regmodel), optim, objective, params_from_dict(dict), warping, method);
 }
 
 std::tuple<py::array_t<double>, py::array_t<double>> PyNestedKriging::predict(const py::array_t<double>& X_n,
@@ -91,6 +94,14 @@ std::string PyNestedKriging::summary() const {
 
 std::string PyNestedKriging::kernel() const {
   return m_internal->kernel();
+}
+
+std::string PyNestedKriging::objective() const {
+  return m_internal->objective();
+}
+
+std::string PyNestedKriging::method() const {
+  return m_internal->method();
 }
 
 std::vector<std::string> PyNestedKriging::warping() const {
@@ -143,4 +154,12 @@ void PyNestedKriging::set_predict_chunk(unsigned long chunk) {
 
 void PyNestedKriging::set_warp_subsample(unsigned long m) {
   m_internal->set_warp_subsample(m);
+}
+
+void PyNestedKriging::save(const std::string filename) const {
+  m_internal->save(filename);
+}
+
+PyNestedKriging PyNestedKriging::load(const std::string filename) {
+  return PyNestedKriging(std::make_unique<NestedKriging>(NestedKriging::load(filename)));
 }

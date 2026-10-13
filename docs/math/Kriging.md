@@ -4,8 +4,8 @@
 
 `Kriging` is the core model every other class in libKriging builds on
 (`NestedKriging` fits many of them, `WarpKriging`/`MLPKriging` wrap
-them with a learned input feature map, `objective="LLVecchia(m)"` /
-`objective="LLNystrom(k)"` swap the likelihood for a scalable
+them with a learned input feature map, `method="vecchia(m)"` /
+`method="nystrom(k)"` evaluate the likelihood with a scalable
 approximation — see [Scalability.md](Scalability.md) for the full
 inventory of large-n methods and how to pick one, or individually:
 [Vecchia.md](Vecchia.md), [Nystrom.md](Nystrom.md), [Nested.md](Nested.md),
@@ -17,7 +17,7 @@ Gaussian-process-regression setup (Rasmussen & Williams, 2006).
 
 ```r
 k <- Kriging(y, X, kernel = "matern5_2", regmodel = "constant", objective = "LL")
-p <- predict(k, Xnew, stdev = TRUE)
+p <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
 ## Mathematical description
@@ -74,10 +74,25 @@ differences needed) via the envelope theorem for β̂.
   that discourages θ from drifting into numerically-degenerate regions
   (θ → 0 or θ → ∞) that the pure likelihood alone can favour with
   sparse data. See [LMP.md](LMP.md) for the full derivation.
-- **`"LLVecchia"` / `"LLVecchia(m)"`**: Vecchia approximation for large n — see
-  [Vecchia.md](Vecchia.md).
-- **`"LLNystrom"` / `"LLNystrom(k)"`**: Nystrom (global low-rank)
-  approximation for large n — see [Nystrom.md](Nystrom.md).
+
+### Fit method (`method=`)
+
+Independently of the criterion, `method` says how the covariance is
+evaluated, for the fit and for what the model keeps afterwards:
+
+- **`"exact"`** (default): dense O(n³) Cholesky, as above, for every
+  objective.
+- **`"vecchia"` / `"vecchia(m)"`**: Vecchia approximation for large n
+  (m = 30 neighbors by default) — see [Vecchia.md](Vecchia.md).
+- **`"nystrom"` / `"nystrom(k)"`**: Nystrom (global low-rank, k = 50
+  landmarks by default) approximation for large n — see
+  [Nystrom.md](Nystrom.md).
+
+The approximate methods exist only for `objective="LL"` without noise
+model, and keep no exact factorization. `method()` returns the canonical
+string (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`). The former
+objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
+`objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
 
 ### Prediction
 
@@ -88,7 +103,10 @@ the same trend uncertainty term as the concentrated likelihood. See
 [Update.md](Update.md) for the exact formulas shared
 by `predict`, `simulate`, `update` and `update_simulate`, all
 implemented via the same cached Cholesky/QR factorization rather than
-independent from-scratch computations.
+independent from-scratch computations. This is `method="exact"` (the
+default, after an exact fit); the approximate predictors / simulators
+are requested explicitly, also after a Vecchia / Nystrom fit (`method="vecchia"` or `"nystrom"`,
+see [Vecchia.md](Vecchia.md) and [Nystrom.md](Nystrom.md)).
 
 ## Simple example
 
@@ -102,7 +120,7 @@ y = np.sin(3 * X[:, 0]) + rng.normal(scale=0.02, size=20)
 
 model = lk.Kriging(y, X, "matern5_2", regmodel="constant", objective="LL")
 Xnew = np.linspace(0, 1, 50).reshape(-1, 1)
-mean, stdev = model.predict(Xnew, return_stdev=True)
+mean, stdev, _, _, _ = model.predict(Xnew, return_stdev=True)
 print(model.theta(), model.sigma2())
 ```
 

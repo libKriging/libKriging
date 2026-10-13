@@ -18,6 +18,8 @@ of pylibkriging (see the ``sklearn`` extra in ``setup.py``) -- importing
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 try:
@@ -114,10 +116,14 @@ class KrigingRegressor(_BaseKrigingEstimator):
         k random restarts (e.g. ``"BFGS10"``), or ``"none"`` to keep
         `parameters` fixed rather than estimate them.
     objective : str, default="LL"
-        Fit objective: ``"LL"``, ``"LOO"``, ``"LMP"``, ``"LLVecchia"``/
-        ``"LLVecchia(m)"`` (Vecchia approximation, for large ``n``), or
-        ``"LLNystrom"``/``"LLNystrom(k)"`` (Nystrom low-rank approximation,
-        also for large ``n``).
+        Fit criterion: ``"LL"``, ``"LOO"`` or ``"LMP"``.
+    method : str, default="exact"
+        Covariance method used by ``fit``, ``predict`` and ``sample_y``:
+        ``"exact"``, ``"vecchia"``/``"vecchia(m)"`` (Vecchia approximation,
+        for large ``n``) or ``"nystrom"``/``"nystrom(k)"`` (Nystrom low-rank
+        approximation, also for large ``n``). The approximate methods are
+        only available with ``objective="LL"`` and give mean / std only (no
+        ``return_cov``).
     noise : None, "nugget", float, or array-like of shape (n_samples,), default=None
         ``None`` for noise-free (exact interpolation), ``"nugget"`` for
         an estimated homogeneous nugget, or a per-observation variance
@@ -155,7 +161,8 @@ class KrigingRegressor(_BaseKrigingEstimator):
     """
 
     def __init__(self, kernel="matern5_2", regmodel="constant", normalize=False,
-                 optim="BFGS", objective="LL", noise=None, parameters=None):
+                 optim="BFGS", objective="LL", noise=None, parameters=None,
+                 method="exact"):
         # sklearn convention: __init__ must only assign parameters to
         # identically-named attributes, with no validation or other
         # logic -- see scikit-learn's "Developing scikit-learn estimators"
@@ -167,6 +174,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
         self.objective = objective
         self.noise = noise
         self.parameters = parameters
+        self.method = method
 
     def fit(self, X, y):
         """Fit a Kriging model to (X, y).
@@ -190,6 +198,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
             objective=self.objective,
             parameters=parameters,
             noise=self.noise,
+            method=self.method,
         )
         return self
 
@@ -224,7 +233,8 @@ class KrigingRegressor(_BaseKrigingEstimator):
         # return_cov flags only control whether those entries are
         # actually computed, not how many are returned.
         mean, stdev, cov, _mean_deriv, _stdev_deriv = self.model_.predict(
-            X, return_stdev=return_std, return_cov=return_cov, return_deriv=False)
+            X, return_stdev=return_std, return_cov=return_cov, return_deriv=False,
+            method=self.method)
         if return_cov:
             return mean, cov
         if return_std:
@@ -250,7 +260,7 @@ class KrigingRegressor(_BaseKrigingEstimator):
         check_is_fitted(self, "model_")
         X = self._validate_X_predict(X)
         seed = int(random_state) if random_state is not None else 123
-        return self.model_.simulate(nsim=n_samples, seed=seed, X=X)
+        return self.model_.simulate(nsim=n_samples, seed=seed, X=X, method=self.method)
 
 
 class WarpKrigingRegressor(_BaseKrigingEstimator):
@@ -471,6 +481,10 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
     warping : list of str or None, default=None
         Non-``None`` switches the per-group submodels to `WarpKriging`
         instead of plain `Kriging`.
+    method : str, default="exact"
+        How the common prior is estimated: ``"exact"`` (per-group fits),
+        ``"vecchia(m)"`` or ``"nystrom(k)"`` (one global approximate fit;
+        ``objective="LL"`` and no ``warping``).
 
     Attributes
     ----------
@@ -490,7 +504,8 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
 
     def __init__(self, kernel="matern5_2", nb_groups=10, aggregation="NK",
                  partition="kmeans", seed=123, regmodel="constant",
-                 optim="BFGS", objective="LL", parameters=None, warping=None):
+                 optim="BFGS", objective="LL", parameters=None, warping=None,
+                 method="exact"):
         self.kernel = kernel
         self.nb_groups = nb_groups
         self.aggregation = aggregation
@@ -501,6 +516,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
         self.objective = objective
         self.parameters = parameters
         self.warping = warping
+        self.method = method
 
     def fit(self, X, y):
         X, y = self._validate_X_fit_y(X, y)
@@ -512,8 +528,22 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
                 "('PoE'/'gPoE'/'BCM'/'rBCM').")
         parameters = {} if self.parameters is None else dict(self.parameters)
         warping = [] if self.warping is None else list(self.warping)
+        # NestedKriging needs groups of at least d+2 points: cap nb_groups for
+        # small samples (cross-validation folds, sklearn's estimator checks)
+        # instead of failing; the value actually used is nb_groups_.
+        n, d = X.shape
+        if n < d + 2:
+            raise ValueError(
+                f"NestedKrigingRegressor needs at least d + 2 = {d + 2} samples; "
+                f"got n_samples={n}.")
+        self.nb_groups_ = max(1, min(int(self.nb_groups), n // (d + 2)))
+        if self.nb_groups_ != self.nb_groups:
+            warnings.warn(
+                f"nb_groups={self.nb_groups} is too large for n={n}, d={d} "
+                f"(at most n // (d + 2) = {n // (d + 2)} groups); "
+                f"using nb_groups={self.nb_groups_}.")
         self.model_ = _NestedKriging(
-            y, X, self.kernel, self.nb_groups,
+            y, X, self.kernel, self.nb_groups_,
             aggregation=self.aggregation,
             partition=self.partition,
             seed=self.seed,
@@ -522,6 +552,7 @@ class NestedKrigingRegressor(_BaseKrigingEstimator):
             objective=self.objective,
             parameters=parameters,
             warping=warping,
+            method=self.method,
         )
         return self
 

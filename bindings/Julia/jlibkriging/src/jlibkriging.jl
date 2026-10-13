@@ -51,6 +51,17 @@ function _check_error(ret::Cint)
     end
 end
 
+# Deprecated fit objectives ("LLVecchia(m)", "LLNystrom(k)"): Julia
+# deprecation warning (message from libKriging), shown even without
+# --depwarn=yes, an error with --depwarn=error.
+function _warn_deprecated_objective(objective::String, funcsym::Symbol)
+    ptr = ccall(dlsym(_lk(), :lk_deprecated_objective_message), Cstring, (Cstring,), objective)
+    ptr == C_NULL && return nothing  # malformed spec: the fit raises the error
+    msg = unsafe_string(ptr)
+    isempty(msg) || Base.depwarn(msg, funcsym; force=true)
+    return nothing
+end
+
 function _check_ptr(ptr::Ptr{Nothing})
     if ptr == C_NULL
         msg = unsafe_string(ccall(dlsym(_lk(), :lk_get_last_error), Cstring, ()))
@@ -83,16 +94,20 @@ function Kriging(kernel::String; noise::Union{Nothing,String}=nothing)
 end
 
 """
-    Kriging(y, X, kernel; regmodel="constant", optim="BFGS", objective="LL", ...)
+    Kriging(y, X, kernel; regmodel="constant", optim="BFGS", objective="LL", method="exact", ...)
 
 Fit a Kriging model. `objective` selects the fit criterion: `"LL"`
-(log-likelihood, default), `"LOO"` (leave-one-out), `"LMP"` (log-marginal
-posterior), `"LLVecchia"`/`"LLVecchia(m)"` for the Vecchia approximated log-likelihood
-with `m` conditioning neighbors (default 30) — O(n m^3) per evaluation instead
-of O(n^3), recommended for large designs in low dimension — or
-`"LLNystrom"`/`"LLNystrom(k)"` for the Nystrom (global low-rank) approximated
-log-likelihood with rank `k` (default 50) — O(n k^2) per evaluation instead
-of O(n^3), also recommended for large designs.
+(log-likelihood, default), `"LOO"` (leave-one-out) or `"LMP"` (log-marginal
+posterior). `method` selects how the covariance is evaluated, for the fit
+and for what the model keeps afterwards: `"exact"` (default), `"vecchia"` /
+`"vecchia(m)"` (Vecchia approximation with `m` conditioning neighbors,
+default 30: O(n m^3) per evaluation instead of O(n^3), for large designs in
+low dimension) or `"nystrom"` / `"nystrom(k)"` (Nystrom global low-rank
+approximation of rank `k`, default 50: O(n k^2)). An approximate fit keeps
+no exact factorization: `predict`, `simulate` and `log_likelihood` then take
+the same `method`. Approximate methods exist only for `objective="LL"` and
+without `noise`. `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated
+aliases of `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`.
 
 Initial or fixed hyper-parameters can be passed either via the `sigma2`,
 `theta`, `beta`, `nugget` keywords, or as a `parameters` dict with the same
@@ -104,6 +119,7 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  normalize::Bool=false,
                  optim::String="BFGS",
                  objective::String="LL",
+                 method::String="exact",
                  parameters::Union{Nothing,AbstractDict}=nothing,
                  sigma2::Union{Nothing,Float64}=nothing,
                  is_sigma2_estim::Bool=true,
@@ -113,6 +129,7 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  is_beta_estim::Bool=true,
                  nugget::Union{Nothing,Float64}=nothing,
                  is_nugget_estim::Bool=true)
+    _warn_deprecated_objective(objective, :Kriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -170,7 +187,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                          Ptr{Float64}, Cint,
                          Ptr{Float64}, Cint, Cint,
                          Ptr{Float64}, Cint, Cint,
-                         Ptr{Float64}, Cint),
+                         Ptr{Float64}, Cint,
+                         Cstring),
                         y, n,
                         noise_ptr, noise_n,
                         X, n, d,
@@ -178,7 +196,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                         sigma2_ptr, is_sigma2_estim ? 1 : 0,
                         theta_ptr, theta_n, is_theta_estim ? 1 : 0,
                         beta_ptr, beta_n, is_beta_estim ? 1 : 0,
-                        nugget_ptr, is_nugget_estim ? 1 : 0)
+                        nugget_ptr, is_nugget_estim ? 1 : 0,
+                        method)
         end
     else
         ptr = ccall(dlsym(_lk(), :lk_kriging_new_fit), Ptr{Nothing},
@@ -189,7 +208,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                      Ptr{Float64}, Cint,
                      Ptr{Float64}, Cint, Cint,
                      Ptr{Float64}, Cint, Cint,
-                     Ptr{Float64}, Cint),
+                     Ptr{Float64}, Cint,
+                     Cstring),
                     y, n,
                     noise_ptr, noise_n,
                     X, n, d,
@@ -197,7 +217,8 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                     sigma2_ptr, is_sigma2_estim ? 1 : 0,
                     theta_ptr, theta_n, is_theta_estim ? 1 : 0,
                     beta_ptr, beta_n, is_beta_estim ? 1 : 0,
-                    nugget_ptr, is_nugget_estim ? 1 : 0)
+                    nugget_ptr, is_nugget_estim ? 1 : 0,
+                    method)
     end
     return Kriging(_check_ptr(ptr))
 end
@@ -212,7 +233,9 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               regmodel::String="constant",
               normalize::Bool=false,
               optim::String="BFGS",
-              objective::String="LL")
+              objective::String="LL",
+              method::String="exact")
+    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     noise_ptr = noise === nothing ? C_NULL : pointer(noise)
@@ -221,18 +244,28 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
                 (Ptr{Nothing}, Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint, Cint,
-                 Cstring, Cint, Cstring, Cstring),
+                 Cstring, Cint, Cstring, Cstring, Cstring),
                 k.ptr, y, n,
                 noise_ptr, noise_n,
-                X, n, d, regmodel, normalize ? 1 : 0, optim, objective)
+                X, n, d, regmodel, normalize ? 1 : 0, optim, objective, method)
     _check_error(ret)
     return k
 end
 
+"""
+    predict(k::Kriging, X_n; return_stdev=true, return_cov=false, return_deriv=false, method="exact")
+
+`method`: `"exact"` (default, needs a `method="exact"` fit), `"vecchia"` /
+`"vecchia(m)"` (local Vecchia predictor, usable after any fit) or `"nystrom"`
+(needs a `method="nystrom"` fit). The approximate methods return mean / stdev
+only. Nothing is chosen implicitly: on a Vecchia or Nystrom fit, `"exact"`
+raises.
+"""
 function predict(k::Kriging, X_n::Matrix{Float64};
                  return_stdev::Bool=true,
                  return_cov::Bool=false,
-                 return_deriv::Bool=false)
+                 return_deriv::Bool=false,
+                 method::String="exact")
     m, d = size(X_n)
     mean_out = Vector{Float64}(undef, m)
     stdev_out = return_stdev ? Vector{Float64}(undef, m) : Float64[]
@@ -243,14 +276,15 @@ function predict(k::Kriging, X_n::Matrix{Float64};
     ret = ccall(dlsym(_lk(), :lk_kriging_predict), Cint,
                 (Ptr{Nothing}, Ptr{Float64}, Cint, Cint,
                  Cint, Cint, Cint,
-                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}),
+                 Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Cstring),
                 k.ptr, X_n, m, d,
                 return_stdev ? 1 : 0, return_cov ? 1 : 0, return_deriv ? 1 : 0,
                 mean_out,
                 return_stdev ? stdev_out : C_NULL,
                 return_cov ? cov_out : C_NULL,
                 return_deriv ? mean_deriv_out : C_NULL,
-                return_deriv ? stdev_deriv_out : C_NULL)
+                return_deriv ? stdev_deriv_out : C_NULL,
+                method)
     _check_error(ret)
     return (mean=mean_out,
             stdev=return_stdev ? stdev_out : nothing,
@@ -267,7 +301,7 @@ centroids snapped to the nearest real point, or a uniform random
 subsample), returned as 0-based row-indices into `X` (`Vector{Int}`).
 Meant as a cheap pre-fit reduction for large designs: fit on
 `X[idx.+1, :], y[idx.+1]` instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+the vecchia / nystrom methods (which still use every point), this
 discards `n - n_max` points outright. If `n_max >= size(X, 1)`, returns all
 indices (no-op).
 """
@@ -285,20 +319,27 @@ function subsetOfData(X::Matrix{Float64}, n_max::Int; method::String="kmeans", s
     return Int.(idx_out[1:ret])
 end
 
+"""
+    simulate(k::Kriging, nsim, seed, X_n; with_nugget=true, with_noise=nothing, will_update=false, method="exact")
+
+`method`: `"exact"` (default), `"vecchia"` / `"vecchia(m)"` or `"nystrom"`
+(see `predict`); `will_update` and `with_noise` need `"exact"`.
+"""
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Bool=true,
                   with_noise::Union{Nothing,Vector{Float64}}=nothing,
-                  will_update::Bool=false)
+                  will_update::Bool=false,
+                  method::String="exact")
     m, d = size(X_n)
     sim_out = Matrix{Float64}(undef, m, nsim)
     noise_ptr = with_noise === nothing ? C_NULL : pointer(with_noise)
     noise_n = with_noise === nothing ? 0 : length(with_noise)
     ret = ccall(dlsym(_lk(), :lk_kriging_simulate), Cint,
                 (Ptr{Nothing}, Cint, Cint, Ptr{Float64}, Cint, Cint,
-                 Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}),
+                 Cint, Ptr{Float64}, Cint, Cint, Ptr{Float64}, Cstring),
                 k.ptr, nsim, seed, X_n, m, d,
                 with_nugget ? 1 : 0, noise_ptr, noise_n,
-                will_update ? 1 : 0, sim_out)
+                will_update ? 1 : 0, sim_out, method)
     _check_error(ret)
     return sim_out
 end
@@ -370,6 +411,8 @@ function load(filename::String)
         return load_warp_kriging(filename)
     elseif content == "MLPKriging"
         return load_mlp_kriging(filename)
+    elseif content == "NestedKriging"
+        return load_nested_kriging(filename)
     else
         error("Unknown Kriging type in file: $filename")
     end
@@ -427,8 +470,18 @@ function log_marg_post_fun(k::Kriging, theta::Vector{Float64};
     return (lmp=lmp[], grad=return_grad ? grad : nothing)
 end
 
-function log_likelihood(k::Kriging)
-    return ccall(dlsym(_lk(), :lk_kriging_log_likelihood), Float64, (Ptr{Nothing},), k.ptr)
+"""
+    log_likelihood(k::Kriging; method="exact")
+
+Log-likelihood at the fitted parameters; `method`: `"exact"` (default),
+`"vecchia"` (requires a `method="vecchia"` fit) or `"nystrom"` (requires a
+`method="nystrom"` fit).
+"""
+function log_likelihood(k::Kriging; method::String="exact")
+    ll = Ref{Float64}(0.0)
+    _check_error(ccall(dlsym(_lk(), :lk_kriging_log_likelihood_method), Cint,
+                       (Ptr{Nothing}, Cstring, Ptr{Float64}), k.ptr, method, ll))
+    return ll[]
 end
 
 function leave_one_out(k::Kriging)
@@ -482,6 +535,19 @@ end
 
 function nystrom_rank(k::Kriging)
     return Int(ccall(dlsym(_lk(), :lk_kriging_nystrom_rank), Cint, (Ptr{Nothing},), k.ptr))
+end
+
+function vecchia_neighbors(k::Kriging)
+    return Int(ccall(dlsym(_lk(), :lk_kriging_vecchia_neighbors), Cint, (Ptr{Nothing},), k.ptr))
+end
+
+"""
+    method(k::Kriging) -> String
+
+Fit method of the model: `"exact"`, `"vecchia(m)"` or `"nystrom(k)"`.
+"""
+function method(k::Kriging)
+    return unsafe_string(ccall(dlsym(_lk(), :lk_kriging_method), Cstring, (Ptr{Nothing},), k.ptr))
 end
 
 function normalize(k::Kriging)
@@ -600,6 +666,13 @@ function _wk_param_dict(parameters, theta, warp_params)
     return d
 end
 
+# WarpKriging / MLPKriging take `method` for API consistency with Kriging,
+# but only the exact covariance is implemented for them.
+function _check_exact_method(method::String, cls::String)
+    method == "exact" || throw(ArgumentError("$cls: method \"$method\" is not implemented (only \"exact\" is)"))
+    return nothing
+end
+
 function WarpKriging(y::Vector{Float64}, X::Matrix{Float64},
                      warping::Vector{String}, kernel::String="gauss";
                      regmodel::String="constant",
@@ -609,7 +682,9 @@ function WarpKriging(y::Vector{Float64}, X::Matrix{Float64},
                      parameters::Union{Nothing,AbstractDict}=nothing,
                      theta::Union{Nothing,AbstractVector}=nothing,
                      warp_params::Union{Nothing,AbstractVector}=nothing,
-                     noise::Union{Nothing,Vector{Float64}}=nothing)
+                     noise::Union{Nothing,Vector{Float64}}=nothing,
+                     method::String="exact")
+    _check_exact_method(method, "WarpKriging")
     n, d = size(X)
     @assert length(y) == n
     @assert length(warping) == d || length(warping) == 1
@@ -707,7 +782,9 @@ function fit!(wk::WarpKriging, y::Vector{Float64}, X::Matrix{Float64};
               parameters::Union{Nothing,AbstractDict}=nothing,
               theta::Union{Nothing,AbstractVector}=nothing,
               warp_params::Union{Nothing,AbstractVector}=nothing,
-              noise::Union{Nothing,Vector{Float64}}=nothing)
+              noise::Union{Nothing,Vector{Float64}}=nothing,
+              method::String="exact")
+    _check_exact_method(method, "WarpKriging")
     n, d = size(X)
     @assert length(y) == n
     parameters = _wk_param_dict(parameters, theta, warp_params)
@@ -892,6 +969,7 @@ noise(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_noise, wk.ptr)
 warp_params(wk::WarpKriging) = _get_vec(:lk_warp_kriging_get_warp_params, wk.ptr)
 optim(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_optim), Cstring, (Ptr{Nothing},), wk.ptr))
 objective(wk::WarpKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_warp_kriging_get_objective), Cstring, (Ptr{Nothing},), wk.ptr))
+method(::WarpKriging) = "exact"  # only the exact covariance is implemented
 
 function cov_mat(wk::WarpKriging, X1::Matrix{Float64}, X2::Matrix{Float64})
     n1, d1 = size(X1)
@@ -1051,7 +1129,9 @@ function MLPKriging(y::Vector{Float64}, X::Matrix{Float64},
                     normalize::Bool=false,
                     optim::String="BFGS+Adam",
                     objective::String="LL",
-                    parameters::Union{Nothing,Dict{String,String}}=nothing)
+                    parameters::Union{Nothing,Dict{String,String}}=nothing,
+                    method::String="exact")
+    _check_exact_method(method, "MLPKriging")
     n, d = size(X)
     @assert length(y) == n
     c_dims = Cint.(hidden_dims)
@@ -1097,7 +1177,9 @@ function fit!(mk::MLPKriging, y::Vector{Float64}, X::Matrix{Float64};
               normalize::Bool=false,
               optim::String="BFGS+Adam",
               objective::String="LL",
-              parameters::Union{Nothing,Dict{String,String}}=nothing)
+              parameters::Union{Nothing,Dict{String,String}}=nothing,
+              method::String="exact")
+    _check_exact_method(method, "MLPKriging")
     n, d = size(X)
     @assert length(y) == n
     n_params = parameters === nothing ? 0 : length(parameters)
@@ -1223,6 +1305,7 @@ function log_likelihood_fun(mk::MLPKriging, theta::Vector{Float64};
 end
 
 kernel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_kernel), Cstring, (Ptr{Nothing},), mk.ptr))
+method(::MLPKriging) = "exact"  # only the exact covariance is implemented
 activation(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_activation), Cstring, (Ptr{Nothing},), mk.ptr))
 normalize(mk::MLPKriging) = ccall(dlsym(_lk(), :lk_mlp_kriging_get_normalize), Cint, (Ptr{Nothing},), mk.ptr) != 0
 regmodel(mk::MLPKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_mlp_kriging_get_regmodel), Cstring, (Ptr{Nothing},), mk.ptr))
@@ -1306,7 +1389,9 @@ Divide-and-conquer Kriging for large designs: the data are partitioned in
 `nb_groups` groups, one `Kriging` submodel is fitted per group (all sharing a
 common prior after hyperparameter unification), and predictions are aggregated
 with `aggregation` in `"NK"` (optimal nested-kriging aggregation, default),
-`"PoE"`, `"gPoE"`, `"BCM"` or `"rBCM"`.
+`"PoE"`, `"gPoE"`, `"BCM"` or `"rBCM"`. `method="vecchia(m)"` /
+`"nystrom(k)"` (with `objective="LL"`, no warping) estimates the common
+prior with one global Vecchia / Nystrom fit.
 """
 function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, nb_groups::Int;
                        aggregation::String="NK",
@@ -1316,6 +1401,7 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        regmodel::String="constant",
                        optim::String="BFGS",
                        objective::String="LL",
+                       method::String="exact",
                        parameters::Union{Nothing,AbstractDict}=nothing,
                        sigma2::Union{Nothing,Float64}=nothing,
                        is_sigma2_estim::Bool=true,
@@ -1323,6 +1409,7 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        is_theta_estim::Bool=true,
                        beta::Union{Nothing,Vector{Float64}}=nothing,
                        is_beta_estim::Bool=true)
+    _warn_deprecated_objective(objective, :NestedKriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -1349,7 +1436,8 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                  Cstring, Cstring, Cstring,
                  Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint, Cint,
-                 Ptr{Float64}, Cint, Cint),
+                 Ptr{Float64}, Cint, Cint,
+                 Cstring),
                 y, n,
                 X, n, d,
                 kernel, nb_groups, aggregation, partition, seed,
@@ -1357,7 +1445,8 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                 regmodel, optim, objective,
                 sigma2_ptr, is_sigma2_estim ? 1 : 0,
                 theta_ptr, theta_n, is_theta_estim ? 1 : 0,
-                beta_ptr, beta_n, is_beta_estim ? 1 : 0)
+                beta_ptr, beta_n, is_beta_estim ? 1 : 0,
+                method)
     return NestedKriging(_check_ptr(ptr))
 end
 
@@ -1366,12 +1455,14 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
               regmodel::String="constant",
               optim::String="BFGS",
               objective::String="LL",
+              method::String="exact",
               sigma2::Union{Nothing,Float64}=nothing,
               is_sigma2_estim::Bool=true,
               theta::Union{Nothing,Vector{Float64}}=nothing,
               is_theta_estim::Bool=true,
               beta::Union{Nothing,Vector{Float64}}=nothing,
               is_beta_estim::Bool=true)
+    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)
@@ -1386,7 +1477,8 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
                  Cint, Ptr{Cstring}, Cint, Cstring, Cstring, Cstring,
                  Ptr{Float64}, Cint,
                  Ptr{Float64}, Cint, Cint,
-                 Ptr{Float64}, Cint, Cint),
+                 Ptr{Float64}, Cint, Cint,
+                 Cstring),
                 k.ptr,
                 y, n,
                 X, n, d,
@@ -1394,7 +1486,8 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
                 regmodel, optim, objective,
                 sigma2_ptr, is_sigma2_estim ? 1 : 0,
                 theta_ptr, theta_n, is_theta_estim ? 1 : 0,
-                beta_ptr, beta_n, is_beta_estim ? 1 : 0)
+                beta_ptr, beta_n, is_beta_estim ? 1 : 0,
+                method)
     _check_error(ret)
     return k
 end
@@ -1419,6 +1512,8 @@ end
 
 kernel(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_kernel), Cstring, (Ptr{Nothing},), k.ptr))
 aggregation(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_aggregation), Cstring, (Ptr{Nothing},), k.ptr))
+objective(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_objective), Cstring, (Ptr{Nothing},), k.ptr))
+method(k::NestedKriging) = unsafe_string(ccall(dlsym(_lk(), :lk_nested_kriging_method), Cstring, (Ptr{Nothing},), k.ptr))
 nb_groups(k::NestedKriging) = Int(ccall(dlsym(_lk(), :lk_nested_kriging_nb_groups), Cint, (Ptr{Nothing},), k.ptr))
 theta(k::NestedKriging) = _get_vec(:lk_nested_kriging_get_theta, k.ptr)
 sigma2(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_sigma2), Float64, (Ptr{Nothing},), k.ptr)
@@ -1426,16 +1521,73 @@ beta0(k::NestedKriging) = ccall(dlsym(_lk(), :lk_nested_kriging_get_beta0), Floa
 
 Base.show(io::IO, k::NestedKriging) = print(io, summary(k))
 
+X(k::NestedKriging) = _get_mat(:lk_nested_kriging_get_X, k.ptr)
+y(k::NestedKriging) = _get_vec(:lk_nested_kriging_get_y, k.ptr)
+
+"""
+    groups(k::NestedKriging) -> Vector{Vector{Int}}
+
+Partition of the rows of `X(k)`: one vector of 1-based row indices per group.
+"""
+function groups(k::NestedKriging)
+    out = Vector{Vector{Int}}(undef, nb_groups(k))
+    for g in 1:length(out)
+        n = Ref{Cint}(0)
+        ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_group), Cint,
+                    (Ptr{Nothing}, Cint, Ptr{Cint}, Ptr{Cint}), k.ptr, g - 1, C_NULL, n)
+        _check_error(ret)
+        idx = Vector{Cint}(undef, n[])
+        ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_group), Cint,
+                    (Ptr{Nothing}, Cint, Ptr{Cint}, Ptr{Cint}), k.ptr, g - 1, idx, n)
+        _check_error(ret)
+        out[g] = Int.(idx) .+ 1
+    end
+    return out
+end
+
+function warping(k::NestedKriging)
+    n_ref = Ref{Cint}(0)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}), k.ptr, C_NULL, n_ref)
+    _check_error(ret)
+    ptrs = Vector{Ptr{Cchar}}(undef, n_ref[])
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_get_warping), Cint,
+                (Ptr{Nothing}, Ptr{Ptr{Cchar}}, Ptr{Cint}), k.ptr, ptrs, n_ref)
+    _check_error(ret)
+    return [unsafe_string(p) for p in ptrs]
+end
+
+function set_predict_chunk!(k::NestedKriging, chunk::Integer)
+    _check_error(ccall(dlsym(_lk(), :lk_nested_kriging_set_predict_chunk), Cint, (Ptr{Nothing}, Cint), k.ptr, chunk))
+    return k
+end
+
+function set_warp_subsample!(k::NestedKriging, m::Integer)
+    _check_error(ccall(dlsym(_lk(), :lk_nested_kriging_set_warp_subsample), Cint, (Ptr{Nothing}, Cint), k.ptr, m))
+    return k
+end
+
+function save(k::NestedKriging, filename::String)
+    ret = ccall(dlsym(_lk(), :lk_nested_kriging_save), Cint, (Ptr{Nothing}, Cstring), k.ptr, filename)
+    _check_error(ret)
+end
+
+function load_nested_kriging(filename::String)
+    ptr = ccall(dlsym(_lk(), :lk_nested_kriging_load), Ptr{Nothing}, (Cstring,), filename)
+    return NestedKriging(_check_ptr(ptr))
+end
+
 
 export Kriging, WarpKriging, MLPKriging, NestedKriging
-export nb_groups, aggregation, beta0
+export nb_groups, aggregation, beta0, groups, set_predict_chunk!, set_warp_subsample!
 export fit!, predict, subsetOfData, simulate, update!, update_simulate, save, summary
-export load, load_kriging, load_warp_kriging, load_mlp_kriging
+export load, load_kriging, load_warp_kriging, load_mlp_kriging, load_nested_kriging
 export log_likelihood_fun, leave_one_out_fun, log_marg_post_fun
 export log_likelihood, leave_one_out, log_marg_post
 export leave_one_out_vec, cov_mat
 export kernel, optim, objective, normalize, regmodel, noise_model
-export nystrom_rank
+export nystrom_rank, vecchia_neighbors
+export method
 export X, centerX, scaleX, y, centerY, scaleY
 export F, T, M, z, beta, theta, sigma2, warp_params
 export is_beta_estim, is_theta_estim, is_sigma2_estim

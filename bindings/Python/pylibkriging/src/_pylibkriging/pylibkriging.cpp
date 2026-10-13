@@ -4,9 +4,13 @@
 #include "libKriging/utils/lk_armadillo.hpp"
 
 #include <carma>
+#include <cstdlib>
 #include <iostream>
 #include <libKriging/KrigingLoader.hpp>
 #include <libKriging/Optim.hpp>
+#include <mutex>
+#include <unordered_set>
+#include <vector>
 
 // Should be included Only in Debug build
 #include "ArrayBindingTest.hpp"
@@ -47,15 +51,85 @@ constexpr bool strings_equal(char const* a, char const* b) {
 
 namespace py = pybind11;
 
+// Allocator handed to libKriging (lkalloc), hence used by every Armadillo
+// allocation of the library and of this module.
+//
+// numpy's PyDataMem_NEW/FREE (cnalloc::npy_malloc/npy_free) report to
+// tracemalloc, which takes the GIL. libKriging also allocates from worker
+// threads (OpenMP regions, multistart std::threads) while the calling Python
+// thread still holds the GIL and waits for them: routing those allocations to
+// numpy deadlocks (e.g. NestedKriging NK predict, WarpKriging "BFGS<k>").
+//
+// So numpy is only used from a thread holding the GIL; other threads use
+// std::malloc/std::free. A pointer is always released by the C runtime that
+// allocated it (they can differ on Windows, e.g. a debug module next to a
+// release numpy): blocks from std::malloc are registered, and a numpy block
+// released without the GIL is queued, then freed at the next call made with
+// the GIL.
+namespace {
+std::mutex g_alloc_mutex;
+std::unordered_set<void*> g_raw_blocks;  // from std::malloc, without the GIL
+std::vector<void*> g_deferred_npy_free;  // numpy blocks released without the GIL
+
+void flush_deferred_npy_free() {  // GIL held
+  std::vector<void*> todo;
+  {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    if (g_deferred_npy_free.empty())
+      return;
+    todo.swap(g_deferred_npy_free);
+  }
+  for (void* ptr : todo)
+    cnalloc::npy_free(ptr);
+}
+
+void* gil_aware_malloc(size_t n_bytes) {
+  if (PyGILState_Check()) {
+    flush_deferred_npy_free();
+    return cnalloc::npy_malloc(n_bytes);
+  }
+  void* ptr = std::malloc(n_bytes);
+  if (ptr != nullptr) {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    g_raw_blocks.insert(ptr);
+  }
+  return ptr;
+}
+
+void gil_aware_free(void* ptr) {
+  if (ptr == nullptr)
+    return;
+  {
+    std::lock_guard<std::mutex> lock(g_alloc_mutex);
+    auto it = g_raw_blocks.find(ptr);
+    if (it != g_raw_blocks.end()) {
+      g_raw_blocks.erase(it);
+      std::free(ptr);
+      return;
+    }
+    if (!PyGILState_Check()) {
+      g_deferred_npy_free.push_back(ptr);
+      return;
+    }
+  }
+  cnalloc::npy_free(ptr);
+  flush_deferred_npy_free();
+}
+}  // namespace
+
 static py::object load_any(const std::string& filename) {
   auto ktype = KrigingLoader::describe(filename);
   switch (ktype) {
     case KrigingLoader::KrigingType::Kriging:
+    case KrigingLoader::KrigingType::NuggetKriging:  // Kriging(noise="nugget")
+    case KrigingLoader::KrigingType::NoiseKriging:   // Kriging(noise=noise_vector)
       return py::cast(PyKriging::load(filename));
     case KrigingLoader::KrigingType::WarpKriging:
       return py::cast(PyWarpKriging::load(filename));
     case KrigingLoader::KrigingType::MLPKriging:
       return py::cast(PyMLPKriging::load(filename));
+    case KrigingLoader::KrigingType::NestedKriging:
+      return py::cast(PyNestedKriging::load(filename));
     default:
       throw std::runtime_error("Unknown Kriging type in file: " + filename);
   }
@@ -63,7 +137,15 @@ static py::object load_any(const std::string& filename) {
 
 PYBIND11_MODULE(_pylibkriging, m) {
   // to avoid mixing allocators from default libKriging and Python
-  lkalloc::set_allocation_functions(cnalloc::npy_malloc, cnalloc::npy_free);
+  lkalloc::set_allocation_functions(gil_aware_malloc, gil_aware_free);
+
+  // deprecated fit objectives ("LLVecchia(m)", ...) raise a native
+  // DeprecationWarning (an error if the warnings filter says so)
+  Kriging::set_deprecation_handler([](const std::string& message) {
+    py::gil_scoped_acquire gil;
+    if (PyErr_WarnEx(PyExc_DeprecationWarning, message.c_str(), 1) < 0)
+      throw py::error_already_set();
+  });
 
   m.doc() = R"pbdoc(
         pylibkriging example plugin
@@ -152,7 +234,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    const py::object&>(),
+                    const py::object&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -161,7 +244,8 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def(py::init<const PyKriging&>())
       .def("copy", &PyKriging::copy)
       .def("fit",
@@ -173,13 +257,24 @@ PYBIND11_MODULE(_pylibkriging, m) {
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact",
+           R"pbdoc(Fit on (X, y). fit method: "exact" (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
+neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k Nystrom, default 50). An approximate
+fit keeps no exact factorization: predict / simulate / logLikelihood then take the same method.
+Only objective "LL" has approximate versions. objective="LLVecchia(m)" / "LLNystrom(k)" are
+deprecated aliases of objective="LL" with method="vecchia(m)" / "nystrom(k)".)pbdoc")
       .def("predict",
            &PyKriging::predict,
            py::arg("X"),
            py::arg("return_stdev") = true,
            py::arg("return_cov") = false,
-           py::arg("return_deriv") = false)
+           py::arg("return_deriv") = false,
+           py::arg("method") = "exact",
+           R"pbdoc(Prediction at X. method: "exact" (default, needs a method="exact" fit),
+"vecchia" / "vecchia(m)" (local Vecchia predictor, usable after any fit) or "nystrom" (needs a
+method="nystrom" fit); the approximate methods return mean / stdev only. Nothing is chosen
+implicitly: on a Vecchia or Nystrom fit, "exact" raises.)pbdoc")
       .def_static("subsetOfData",
                   &PyKriging::subsetOfData,
                   py::arg("X"),
@@ -190,7 +285,7 @@ PYBIND11_MODULE(_pylibkriging, m) {
 centroids snapped to the nearest real point, or a uniform random subsample),
 returned as 0-based row-indices into X. Meant as a cheap pre-fit reduction
 for large designs: fit on X[idx], y[idx] instead of the full data. Unlike
-LLVecchia/LLNystrom (which still use every point), this
+the vecchia / nystrom methods (which still use every point), this
 discards n - n_max points outright.)pbdoc")
       .def("simulate",
            &PyKriging::simulate,
@@ -198,7 +293,10 @@ discards n - n_max points outright.)pbdoc")
            py::arg("seed") = 123,
            py::arg("X"),
            py::arg("will_update") = false,
-           py::arg("with_noise") = py::none())
+           py::arg("with_noise") = py::none(),
+           py::arg("method") = "exact",
+           R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
+"vecchia(m)" or "nystrom" (see predict); will_update and with_noise need "exact".)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),
@@ -221,7 +319,11 @@ discards n - n_max points outright.)pbdoc")
            py::arg("return_grad") = false,
            py::arg("want_hess") = false)
       .def("logMargPostFun", &PyKriging::logMargPostFun)
-      .def("logLikelihood", &PyKriging::logLikelihood)
+      .def("logLikelihood",
+           &PyKriging::logLikelihood,
+           py::arg("method") = "exact",
+           "Log-likelihood at the fitted parameters; method: \"exact\" (default), \"vecchia\" "
+           "(requires a method=\"vecchia\" fit) or \"nystrom\" (requires a method=\"nystrom\" fit).")
       .def("logMargPost", &PyKriging::logMargPost)
       .def("leaveOneOut", &PyKriging::leaveOneOut)
       .def("covMat", &PyKriging::covMat)
@@ -230,7 +332,9 @@ discards n - n_max points outright.)pbdoc")
       .def("kernel", &PyKriging::kernel)
       .def("optim", &PyKriging::optim)
       .def("objective", &PyKriging::objective)
+      .def("method", &PyKriging::method, "Fit method: \"exact\", \"vecchia(m)\" or \"nystrom(k)\".")
       .def("nystrom_rank", &PyKriging::nystrom_rank)
+      .def("vecchia_neighbors", &PyKriging::vecchia_neighbors)
       .def("X", &PyKriging::X)
       .def("centerX", &PyKriging::centerX)
       .def("scaleX", &PyKriging::scaleX)
@@ -265,8 +369,8 @@ discards n - n_max points outright.)pbdoc")
         The design is partitioned into nb_groups groups (k-means or random), one Kriging
         submodel is fitted per group on a common prior, and predictions are aggregated:
         aggregation="NK" (optimal nested-kriging aggregation, interpolating, default) or
-        "PoE"/"gPoE"/"BCM"/"rBCM". objective="LLVecchia(m)" estimates the common prior with one
-        global Vecchia fit; warping=[...] switches to WarpKriging submodels.
+        "PoE"/"gPoE"/"BCM"/"rBCM". method="vecchia(m)" / "nystrom(k)" estimates the common prior
+        with one global Vecchia / Nystrom fit; warping=[...] switches to WarpKriging submodels.
     )pbdoc")
       .def(py::init<const std::string&>(), py::arg("kernel"))
       .def(py::init<const py::array_t<double>&,
@@ -280,7 +384,8 @@ discards n - n_max points outright.)pbdoc")
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    const std::vector<std::string>&>(),
+                    const std::vector<std::string>&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("kernel"),
@@ -292,7 +397,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("warping") = std::vector<std::string>{})
+           py::arg("warping") = std::vector<std::string>{},
+           py::arg("method") = "exact")
       .def("fit",
            &PyNestedKriging::fit,
            py::arg("y"),
@@ -302,11 +408,14 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("warping") = std::vector<std::string>{})
+           py::arg("warping") = std::vector<std::string>{},
+           py::arg("method") = "exact")
       .def("predict", &PyNestedKriging::predict, py::arg("X"), py::arg("return_stdev") = true)
       .def("summary", &PyNestedKriging::summary)
       .def("kernel", &PyNestedKriging::kernel)
       .def("warping", &PyNestedKriging::warping)
+      .def("objective", &PyNestedKriging::objective)
+      .def("method", &PyNestedKriging::method)
       .def("aggregation", &PyNestedKriging::aggregation)
       .def("nb_groups", &PyNestedKriging::nb_groups)
       .def("groups", &PyNestedKriging::groups)
@@ -317,6 +426,8 @@ discards n - n_max points outright.)pbdoc")
       .def("y", &PyNestedKriging::y)
       .def("set_predict_chunk", &PyNestedKriging::set_predict_chunk, py::arg("chunk"))
       .def("set_warp_subsample", &PyNestedKriging::set_warp_subsample, py::arg("m"))
+      .def("save", &PyNestedKriging::save, py::arg("filename"))
+      .def_static("load", &PyNestedKriging::load, py::arg("filename"))
       .def("__repr__", [](const PyNestedKriging& k) { return k.summary(); });
 
   py::class_<PyWarpKriging>(m, "WrappedPyWarpKriging")
@@ -332,7 +443,8 @@ discards n - n_max points outright.)pbdoc")
                     const std::string&,
                     const std::string&,
                     const py::dict&,
-                    py::object>(),
+                    py::object,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("warping"),
@@ -342,7 +454,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def("copy", &PyWarpKriging::copy)
       .def("save", &PyWarpKriging::save)
       .def_static("load", &PyWarpKriging::load)
@@ -355,7 +468,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
            py::arg("parameters") = py::dict{},
-           py::arg("noise") = py::none())
+           py::arg("noise") = py::none(),
+           py::arg("method") = "exact")
       .def("predict",
            &PyWarpKriging::predict,
            py::arg("X"),
@@ -390,6 +504,7 @@ discards n - n_max points outright.)pbdoc")
       .def("kernel", &PyWarpKriging::kernel)
       .def("optim", &PyWarpKriging::optim)
       .def("objective", &PyWarpKriging::objective)
+      .def("method", &PyWarpKriging::method)
       .def("noise", &PyWarpKriging::noise)
       .def("warp_params", &PyWarpKriging::warp_params)
       .def("X", &PyWarpKriging::X)
@@ -427,7 +542,8 @@ discards n - n_max points outright.)pbdoc")
                     bool,
                     const std::string&,
                     const std::string&,
-                    const py::dict&>(),
+                    const py::dict&,
+                    const std::string&>(),
            py::arg("y"),
            py::arg("X"),
            py::arg("hidden_dims"),
@@ -438,7 +554,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("method") = "exact")
       .def("fit",
            &PyMLPKriging::fit,
            py::arg("y"),
@@ -447,7 +564,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("normalize") = default_normalize,
            py::arg("optim") = default_warp_optim,
            py::arg("objective") = default_objective,
-           py::arg("parameters") = py::dict{})
+           py::arg("parameters") = py::dict{},
+           py::arg("method") = "exact")
       .def("predict",
            &PyMLPKriging::predict,
            py::arg("X"),
@@ -470,6 +588,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("return_grad") = false,
            py::arg("return_hess") = false)
       .def("kernel", &PyMLPKriging::kernel)
+      .def("objective", &PyMLPKriging::objective)
+      .def("method", &PyMLPKriging::method)
       .def("X", &PyMLPKriging::X)
       .def("centerX", &PyMLPKriging::centerX)
       .def("scaleX", &PyMLPKriging::scaleX)

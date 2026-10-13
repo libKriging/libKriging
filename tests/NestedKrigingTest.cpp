@@ -358,12 +358,22 @@ TEST_CASE("NestedKriging warped hyperparameters come from a subsample fit", "[ne
   CHECK(arma::abs(m2 - y).max() < 1e-3);
 }
 
-TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[nested][vecchia]") {
+TEST_CASE("NestedKriging with an approximate method: globally unified prior", "[nested][vecchia]") {
   arma::mat X;
   arma::vec y;
   make_data(600, 2, X, y);
 
-  // the common prior comes from ONE global light Vecchia fit
+  arma::mat Xt;
+  arma::vec yt;
+  make_data(150, 2, Xt, yt, 456);
+  NestedKriging nk_ll(y, X, "matern5_2", 3, NestedKriging::Aggregation::NK);
+  auto [m_l, s_l] = nk_ll.predict(Xt, true);
+  const double rmse_l = std::sqrt(arma::mean(arma::square(m_l - yt)));
+  CHECK(nk_ll.method() == "exact");
+
+  // the common prior comes from ONE global Vecchia or Nystrom fit
+  const std::string method = GENERATE(as<std::string>{}, "vecchia(20)", "nystrom(60)");
+  CAPTURE(method);
   NestedKriging nk(y,
                    X,
                    "matern5_2",
@@ -373,7 +383,12 @@ TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[
                    123,
                    Trend::RegressionModel::Constant,
                    "BFGS",
-                   "LLVecchia(20)");
+                   "LL",
+                   Kriging::Parameters{},
+                   std::vector<std::string>{},
+                   method);
+  CHECK(nk.objective() == "LL");
+  CHECK(nk.method() == method);
 
   // all submodels carry the globally estimated prior
   for (arma::uword g = 0; g < nk.nb_groups(); ++g) {
@@ -387,18 +402,12 @@ TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[
   CHECK(arma::abs(mean - y.head(100)).max() < 1e-3);
 
   // accuracy comparable to the LL-unified path
-  arma::mat Xt;
-  arma::vec yt;
-  make_data(150, 2, Xt, yt, 456);
-  NestedKriging nk_ll(y, X, "matern5_2", 3, NestedKriging::Aggregation::NK);
   auto [m_v, s_v] = nk.predict(Xt, true);
-  auto [m_l, s_l] = nk_ll.predict(Xt, true);
   const double rmse_v = std::sqrt(arma::mean(arma::square(m_v - yt)));
-  const double rmse_l = std::sqrt(arma::mean(arma::square(m_l - yt)));
-  INFO("rmse LLVecchia-unified = " << rmse_v << " vs LL-unified = " << rmse_l);
+  INFO("rmse " << method << "-unified = " << rmse_v << " vs LL-unified = " << rmse_l);
   CHECK(rmse_v < 2.0 * rmse_l + 0.05 * arma::stddev(y));
 
-  // LLVecchia + warping is not supported
+  // an approximate method + warping is not supported
   CHECK_THROWS_AS(NestedKriging(y,
                                 X,
                                 "gauss",
@@ -408,8 +417,121 @@ TEST_CASE("NestedKriging with a LLVecchia objective: globally unified prior", "[
                                 123,
                                 Trend::RegressionModel::Constant,
                                 "BFGS",
-                                "LLVecchia(20)",
+                                "LL",
                                 Kriging::Parameters{},
-                                std::vector<std::string>{"kumaraswamy", "kumaraswamy"}),
+                                std::vector<std::string>{"kumaraswamy", "kumaraswamy"},
+                                method),
                   std::invalid_argument);
+}
+
+TEST_CASE("NestedKriging: deprecated LLVecchia objective is an alias of method vecchia", "[nested][vecchia]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(300, 2, X, y);
+  NestedKriging nk(y,
+                   X,
+                   "matern5_2",
+                   3,
+                   NestedKriging::Aggregation::NK,
+                   NestedKriging::Partition::KMeans,
+                   123,
+                   Trend::RegressionModel::Constant,
+                   "BFGS",
+                   "LLVecchia(20)");
+  CHECK(nk.objective() == "LL");
+  CHECK(nk.method() == "vecchia(20)");
+  // approximate methods only exist for the LL objective
+  CHECK_THROWS_AS(NestedKriging(y,
+                                X,
+                                "matern5_2",
+                                3,
+                                NestedKriging::Aggregation::NK,
+                                NestedKriging::Partition::KMeans,
+                                123,
+                                Trend::RegressionModel::Constant,
+                                "BFGS",
+                                "LOO",
+                                Kriging::Parameters{},
+                                std::vector<std::string>{},
+                                "vecchia"),
+                  std::invalid_argument);
+}
+
+#include "libKriging/KrigingLoader.hpp"
+
+TEST_CASE("NestedKriging save & load", "[nested][kriging][save]") {
+  arma::mat X;
+  arma::vec y;
+  make_data(120, 2, X, y);
+  arma::mat Xt(25, 2, arma::fill::randu);
+
+  auto check_roundtrip = [&](NestedKriging& nk, const std::string& filename) {
+    nk.save(filename);
+    CHECK(KrigingLoader::describe(filename) == KrigingLoader::KrigingType::NestedKriging);
+    NestedKriging nk2 = NestedKriging::load(filename);
+    CHECK(nk2.kernel() == nk.kernel());
+    CHECK(nk2.aggregation() == nk.aggregation());
+    CHECK(nk2.nb_groups() == nk.nb_groups());
+    CHECK(nk2.warping() == nk.warping());
+    CHECK(arma::approx_equal(nk2.theta(), nk.theta(), "absdiff", 0.0));
+    CHECK(nk2.sigma2() == nk.sigma2());
+    CHECK(nk2.beta0() == nk.beta0());
+    CHECK(arma::approx_equal(nk2.X(), nk.X(), "absdiff", 0.0));
+    CHECK(arma::approx_equal(nk2.y(), nk.y(), "absdiff", 0.0));
+    for (arma::uword g = 0; g < nk.nb_groups(); ++g)
+      CHECK(arma::all(nk2.groups()[g] == nk.groups()[g]));
+    auto [m1, s1] = nk.predict(Xt, true);
+    auto [m2, s2] = nk2.predict(Xt, true);
+    CHECK(arma::abs(m1 - m2).max() < 1e-10);
+    CHECK(arma::abs(s1 - s2).max() < 1e-10);
+  };
+
+  SECTION("plain submodels, every aggregation") {
+    for (auto agg : {NestedKriging::Aggregation::NK,
+                     NestedKriging::Aggregation::PoE,
+                     NestedKriging::Aggregation::gPoE,
+                     NestedKriging::Aggregation::BCM,
+                     NestedKriging::Aggregation::rBCM}) {
+      INFO("aggregation = " << NestedKriging::aggregationToString(agg));
+      NestedKriging nk(y, X, "matern5_2", /*nb_groups=*/3, agg);
+      check_roundtrip(nk, "nested_dump.json");
+    }
+  }
+
+  SECTION("plain submodels, linear trend (PoE family)") {
+    NestedKriging nk(y,
+                     X,
+                     "matern3_2",
+                     3,
+                     NestedKriging::Aggregation::gPoE,
+                     NestedKriging::Partition::Random,
+                     7,
+                     Trend::RegressionModel::Linear);
+    check_roundtrip(nk, "nested_dump_linear.json");
+  }
+
+  SECTION("warped submodels") {
+    const std::vector<std::string> warping{"kumaraswamy", "kumaraswamy"};
+    NestedKriging nk(y,
+                     X,
+                     "gauss",
+                     /*nb_groups=*/3,
+                     NestedKriging::Aggregation::NK,
+                     NestedKriging::Partition::KMeans,
+                     123,
+                     Trend::RegressionModel::Constant,
+                     "BFGS",
+                     "LL",
+                     {},
+                     warping);
+    check_roundtrip(nk, "nested_dump_warp.json");
+  }
+
+  SECTION("not fitted / wrong content") {
+    NestedKriging empty("gauss");
+    CHECK_THROWS_AS(empty.save("nested_dump_empty.json"), std::runtime_error);
+    Kriging k(y, X, "gauss");
+    k.save("kriging_dump_for_nested.json");
+    CHECK_THROWS_AS(NestedKriging::load("kriging_dump_for_nested.json"), std::runtime_error);
+  }
 }

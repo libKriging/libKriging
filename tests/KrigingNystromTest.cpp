@@ -22,14 +22,35 @@ static void make_data(arma::uword n, arma::mat& X, arma::vec& y, unsigned seed =
 
 // -----------------------------------------------------------------------------
 
-TEST_CASE("LLNystrom objective spec parsing and validation", "[nystrom][kriging]") {
+TEST_CASE("Nystrom method spec parsing and validation", "[nystrom][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(60, X, y);
 
   // valid specs fit fine
-  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom"));
-  CHECK_NOTHROW(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)"));
+  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom").method()
+        == "nystrom(50)");
+  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)").method()
+        == "nystrom(10)");
+  for (const std::string bad : {"nystrom()", "nystrom(x)", "nystrom(0)", "nystrom(-3)", "nystrom(10", "Nystrom"}) {
+    CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, bad),
+                    std::invalid_argument);
+  }
+  // only the LL objective has a Nystrom version
+  CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO", {}, "nystrom"),
+                  std::invalid_argument);
+
+  // deprecated alias: objective "LLNystrom(k)" = objective "LL", method "nystrom(k)"
+  Kriging k_alias(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)");
+  Kriging k_method(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)");
+  CHECK(k_alias.objective() == "LL");
+  CHECK(k_alias.method() == "nystrom(10)");
+  CHECK(arma::approx_equal(k_alias.theta(), k_method.theta(), "absdiff", 0.0));
+  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom").method()
+        == "nystrom(50)");
+  CHECK_THROWS_AS(
+      Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)", {}, "vecchia"),
+      std::invalid_argument);
 
   // malformed specs throw
   for (const std::string bad : {"LLNystrom()", "LLNystrom(x)", "LLNystrom(0)", "LLNystrom(-3)", "LLNystrom(10"}) {
@@ -39,6 +60,8 @@ TEST_CASE("LLNystrom objective spec parsing and validation", "[nystrom][kriging]
 
   // LLNystrom is not available with a nugget/noise channel
   Kriging knug("matern5_2", Kriging::NoiseModel::Nugget);
+  CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(10)"),
+                  std::invalid_argument);
   CHECK_THROWS_AS(knug.fit(y, X, Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)", {}),
                   std::invalid_argument);
 }
@@ -50,7 +73,7 @@ TEST_CASE("LLNystrom(n) matches the exact concentrated log-likelihood", "[nystro
 
   // full rank (k=n): the Nystrom factorization is exact, so LLNystrom(n) must
   // reproduce the exact concentrated log-likelihood at any theta
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(60)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(60)");
 
   for (const arma::vec theta : {arma::vec{0.2, 0.2}, arma::vec{0.4, 0.3}}) {
     auto [llnys, gv] = k.logLikelihoodNystromFun(theta, false);
@@ -65,7 +88,7 @@ TEST_CASE("LLNystrom analytic gradient points in an ascending direction", "[nyst
   arma::vec y;
   make_data(100, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(25)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(25)");
 
   // The fixed-landmark Nystrom log-likelihood is smooth in theta (that's what
   // make_nystrom_landmarks buys us), but near small-theta / near-singular-R
@@ -96,7 +119,7 @@ TEST_CASE("LLNystrom analytic gradient matches finite differences", "[nystrom][k
   // Moderate theta, away from the near-singular-R region that makes a tight
   // FD comparison unreliable regardless of correctness (see the previous
   // test's comment) -- here both sides should agree closely.
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
 
   // h=1e-3, not smaller: ll's magnitude here is in the hundreds (near-fit
   // sigma2 makes n*log(sigma2) steep), so central-difference ROUNDOFF (not
@@ -122,30 +145,41 @@ TEST_CASE("LLNystrom analytic gradient matches finite differences", "[nystrom][k
   }
 }
 
-TEST_CASE("LLNystrom fit is a permanent light fit: predict routes to predictNystrom", "[nystrom][kriging]") {
+TEST_CASE("Nystrom fit is a permanent light fit: method nystrom, no exact methods", "[nystrom][kriging]") {
   arma::mat X;
   arma::vec y;
   make_data(150, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
   CHECK(k.is_nystrom_light());
   CHECK(k.nystrom_rank() == 30);
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false, "nystrom");
   auto [m_nys, s_nys] = k.predictNystrom(X, true);
   CHECK(arma::abs(mean - m_nys).max() == 0.0);  // same code path
   CHECK(arma::abs(stdev - s_nys).max() == 0.0);
+  // the fitted method string is accepted as is; another rank is not
+  auto [mean_k, sd_k, cov_k, dm_k, ds_k] = k.predict(X, true, false, false, k.method());
+  CHECK(arma::abs(mean_k - m_nys).max() == 0.0);
+  CHECK_THROWS_AS(k.predict(X, true, false, false, "nystrom(7)"), std::invalid_argument);
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), "nystrom(7)"), std::invalid_argument);
+  CHECK(k.logLikelihood(k.method()) == k.logLikelihood("nystrom"));
 
-  // return_cov/return_deriv are not supported on a Nystrom fit
-  CHECK_THROWS_AS(k.predict(X, true, true, false), std::runtime_error);
-  CHECK_THROWS_AS(k.predict(X, true, false, true), std::runtime_error);
-
-  // simulate() IS available (routes to simulateNystrom), but not with
-  // will_update=true (no update_simulate for Nystrom fits); update()/save()
-  // ARE available -- see the dedicated tests below
-  CHECK_NOTHROW(k.simulate(3, 123, X.rows(0, 4), false));
-  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), true), std::runtime_error);
+  // no exact factorization: the exact methods raise (no implicit routing)
+  CHECK_THROWS_AS(k.predict(X, true, false, false), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), false), std::runtime_error);
+  // return_cov/return_deriv / will_update only exist for method "exact"
+  CHECK_THROWS_AS(k.predict(X, true, true, false, "nystrom"), std::invalid_argument);
+  CHECK_THROWS_AS(k.predict(X, true, false, true, "nystrom"), std::invalid_argument);
+  CHECK(arma::approx_equal(
+      k.simulate(3, 123, X.rows(0, 4), "nystrom"), k.simulateNystrom(3, 123, X.rows(0, 4)), "absdiff", 0.0));
+  CHECK_THROWS_AS(k.simulate(3, 123, X.rows(0, 4), "nystrom", true), std::invalid_argument);
   CHECK_THROWS_AS(k.update_simulate(y.head(5), X.rows(0, 4)), std::runtime_error);
+  // the Vecchia predictor needs only theta / beta / sigma2: usable here too
+  CHECK_NOTHROW(k.predict(X, true, false, false, "vecchia(10)"));
+  // the Nystrom log-likelihood is the fitted objective
+  CHECK(k.logLikelihood("nystrom") == std::get<0>(k.logLikelihoodNystromFun(k.theta(), false)));
+  CHECK_THROWS_AS(k.logLikelihood("vecchia"), std::runtime_error);
 }
 
 TEST_CASE("LLNystrom(k) with k close to n interpolates the training data", "[nystrom][kriging]") {
@@ -155,9 +189,9 @@ TEST_CASE("LLNystrom(k) with k close to n interpolates the training data", "[nys
 
   // at k=n-1 the Nystrom approximation is near-exact for a smooth kernel, so
   // the fit should recover the training data closely (like the exact "LL" fit)
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(79)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(79)");
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(X, true, false, false, "nystrom");
   CHECK(arma::abs(mean - y).max() < 5e-2 * arma::stddev(y));
 }
 
@@ -171,11 +205,11 @@ TEST_CASE("LLNystrom(k) estimation is consistent with the exact MLE", "[nystrom]
   make_data(150, Xt, yt, 456);
 
   Kriging k_ll(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL");
-  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(40)");
+  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(40)");
   CHECK(k_n.nystrom_rank() == 40);
 
   auto [m_ll, s1, c1, d1, e1] = k_ll.predict(Xt, false, false, false);
-  auto [m_n, s2, c2, d2, e2] = k_n.predict(Xt, false, false, false);
+  auto [m_n, s2, c2, d2, e2] = k_n.predict(Xt, false, false, false, "nystrom");
   const double rmse_ll = std::sqrt(arma::mean(arma::square(m_ll - yt)));
   const double rmse_n = std::sqrt(arma::mean(arma::square(m_n - yt)));
   INFO("theta LL = " << k_ll.theta().t() << " theta LLNystrom = " << k_n.theta().t());
@@ -203,7 +237,7 @@ TEST_CASE("predictNystrom matches exact predict after an LLNystrom fit close to 
   Kriging::Parameters params;
   params.theta = arma::mat(1, 2, arma::fill::value(0.3));
   params.is_theta_estim = false;
-  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LLNystrom(190)", params);
+  Kriging k_n(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params, "nystrom(190)");
   Kriging k_exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
 
   arma::mat Xt;
@@ -239,7 +273,7 @@ TEST_CASE("LLNystrom update(refit=false) extends data at fixed theta/landmarks",
   arma::vec y;
   make_data(150, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
   const arma::vec theta_before = k.theta();
 
   arma::mat Xu;
@@ -257,7 +291,7 @@ TEST_CASE("LLNystrom update(refit=false) extends data at fixed theta/landmarks",
   arma::mat Xt;
   arma::vec yt;
   make_data(100, Xt, yt, 789);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -273,7 +307,7 @@ TEST_CASE("LLNystrom update(refit=true) warm-restarts theta over the same landma
   arma::vec y;
   make_data(150, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
   const arma::uword rank_before = k.nystrom_rank();
 
   arma::mat Xu;
@@ -288,7 +322,7 @@ TEST_CASE("LLNystrom update(refit=true) warm-restarts theta over the same landma
   arma::mat Xt;
   arma::vec yt;
   make_data(100, Xt, yt, 789);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -300,7 +334,7 @@ TEST_CASE("LLNystrom update(refit=false) rejects mismatched dimensions", "[nystr
   arma::vec y;
   make_data(100, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(20)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(20)");
 
   arma::vec yu(5, arma::fill::randu);
   arma::mat Xu_wrong_dim(5, 3, arma::fill::randu);
@@ -316,7 +350,7 @@ TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNys
   arma::vec y;
   make_data(150, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
 
   arma::mat Xt;
   arma::vec yt;
@@ -325,7 +359,7 @@ TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNys
   auto [mean, stdev] = k.predictNystrom(Xt, true);
 
   const int nsim = 20000;
-  arma::mat sims = k.simulate(nsim, 42, Xt, false);
+  arma::mat sims = k.simulate(nsim, 42, Xt, "nystrom");
   REQUIRE(sims.n_rows == 20);
   REQUIRE(sims.n_cols == static_cast<arma::uword>(nsim));
 
@@ -351,7 +385,7 @@ TEST_CASE("simulateNystrom mean/marginal-variance are consistent with predictNys
   CHECK(arma::abs(sim_sd - stdev).max() < 0.5 * noise_scale);
 
   // interpolation: simulating exactly at a training point collapses to (near) zero variance
-  arma::mat sims_at_X = k.simulate(2000, 7, X.row(0), false);
+  arma::mat sims_at_X = k.simulate(2000, 7, X.row(0), "nystrom");
   CHECK(arma::stddev(sims_at_X.row(0).t()) < 0.05 * noise_scale);
   CHECK(std::abs(arma::mean(sims_at_X.row(0).t()) - y(0)) < 0.05 * arma::stddev(y));
 }
@@ -361,12 +395,13 @@ TEST_CASE("LLNystrom save/load round-trip", "[nystrom][kriging]") {
   arma::vec y;
   make_data(120, X, y);
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(25)");
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(25)");
   CHECK_NOTHROW(k.save("dump_nystrom_test.json"));
 
   Kriging k2 = Kriging::load("dump_nystrom_test.json");
   CHECK(k2.is_nystrom_light());
   CHECK(k2.nystrom_rank() == 25);
+  CHECK(k2.method() == "nystrom(25)");
   CHECK(arma::abs(k2.theta() - k.theta()).max() == 0.0);
   CHECK(k2.sigma2() == k.sigma2());
 
@@ -374,13 +409,13 @@ TEST_CASE("LLNystrom save/load round-trip", "[nystrom][kriging]") {
   arma::vec yt;
   make_data(60, Xt, yt, 456);
 
-  auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false);
-  auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false);
+  auto [m1, s1, c1, d1, e1] = k.predict(Xt, true, false, false, "nystrom");
+  auto [m2, s2, c2, d2, e2] = k2.predict(Xt, true, false, false, "nystrom");
   CHECK(arma::abs(m1 - m2).max() == 0.0);
   CHECK(arma::abs(s1 - s2).max() == 0.0);
 
   // the reloaded model supports the same light-fit operations
-  CHECK_NOTHROW(k2.simulate(2, 123, Xt.rows(0, 4), false));
+  CHECK_NOTHROW(k2.simulate(2, 123, Xt.rows(0, 4), "nystrom"));
   arma::mat Xu;
   arma::vec yu;
   make_data(10, Xu, yu, 789);
@@ -396,12 +431,12 @@ TEST_CASE("LLNystrom large-n smoke test", "[nystrom][kriging][intensive]") {
   Kriging::Parameters params;
   params.theta = arma::mat(1, 2, arma::fill::value(0.3));
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(80)", params);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", params, "nystrom(80)");
 
   arma::mat Xt;
   arma::vec yt;
   make_data(200, Xt, yt, 456);
-  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, c, d, e] = k.predict(Xt, true, false, false, "nystrom");
   CHECK(mean.is_finite());
   const double rmse = std::sqrt(arma::mean(arma::square(mean - yt)));
   INFO("rmse = " << rmse << " vs sd(y) = " << arma::stddev(y));
@@ -435,15 +470,15 @@ TEST_CASE("LLNystrom honors optim=none identically to optim=BFGS", "[nystrom][kr
   params.theta = arma::mat(1, X.n_cols, arma::fill::value(0.3));
   params.is_theta_estim = (optim != "none");  // optim="none" requires a fixed theta
 
-  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LLNystrom(30)", params);
+  Kriging k(y, X, "matern5_2", Trend::RegressionModel::Constant, false, optim, "LL", params, "nystrom(30)");
   CHECK(k.is_nystrom_light());
   CHECK(k.nystrom_rank() == 30);
 
-  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false);
+  auto [mean, stdev, cov, dm, ds] = k.predict(Xt, true, false, false, "nystrom");
   auto [m_nys, s_nys] = k.predictNystrom(Xt, true);
   CHECK(arma::abs(mean - m_nys).max() == 0.0);
   CHECK(arma::abs(stdev - s_nys).max() == 0.0);
-  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), true), std::runtime_error);
+  CHECK_THROWS_AS(k.simulate(3, 123, Xt.rows(0, 2), "nystrom", true), std::invalid_argument);
   CHECK_THROWS_AS(k.update_simulate(y.head(3), X.rows(0, 2)), std::runtime_error);
 }
 
@@ -453,10 +488,10 @@ TEST_CASE("LLNystrom benchmark", "[.benchmark]") {
   make_data(400, X, y);
   const arma::vec theta{0.3, 0.3};
 
-  Kriging k_eval(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+  Kriging k_eval(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
 
   BENCHMARK("Kriging::fit LLNystrom(30) n=400") {
-    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(30)");
+    return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, "nystrom(30)");
   };
   BENCHMARK("Kriging::fit LL n=400") {
     return Kriging(y, X, "gauss", Trend::RegressionModel::Constant, false, "BFGS", "LL");

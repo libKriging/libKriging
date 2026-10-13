@@ -11,7 +11,7 @@ Gaussian process / Kriging modelling:
   Kriging-Based Metamodeling and Optimization. *Journal of Statistical
   Software*, 51(1), 1–55. doi:10.18637/jss.v051.i01
 
-Large-scale approximations (as used by libKriging's `NestedKriging`, `LLVecchia`, `LLNystrom` and `subsetOfData` paths; see [docs/math/Scalability.md](../math/Scalability.md)):
+Large-scale approximations (as used by libKriging's `NestedKriging`, `method="vecchia(m)"`, `method="nystrom(k)"` and `subsetOfData` paths; see [docs/math/Scalability.md](../math/Scalability.md)):
 
 * Rullière, D., Durrande, N., Bachoc, F. and Chevalier, C. (2018). Nested
   Kriging predictions for datasets with a large number of observations.
@@ -29,10 +29,10 @@ Large-scale approximations (as used by libKriging's `NestedKriging`, `LLVecchia`
   (PoE / BCM / rBCM aggregation used by `NestedKriging`). *Proceedings of the
   32nd ICML*, PMLR 37, 1481–1490.
 * Williams, C. K. I. and Seeger, M. (2001). Using the Nystrom Method to Speed Up
-  Kernel Machines (`LLNystrom`). *Advances in Neural Information Processing
+  Kernel Machines (`method="nystrom(k)"`). *Advances in Neural Information Processing
   Systems 13*, 682–688.
 * Drineas, P. and Mahoney, M. W. (2005). On the Nystrom Method for Approximating
-  a Gram Matrix for Improved Kernel-Based Learning (`LLNystrom`). *Journal of
+  a Gram Matrix for Improved Kernel-Based Learning (`method="nystrom(k)"`). *Journal of
   Machine Learning Research*, 6, 2153–2175.
 * Lloyd, S. P. (1982). Least Squares Quantization in PCM (k-means, used by
   `subsetOfData`). *IEEE Transactions on Information Theory*, 28(2), 129–137.

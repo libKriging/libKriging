@@ -18,14 +18,21 @@ k = Kriging(y, X, "matern5_2";
             regmodel="constant",   # "constant" | "linear" | "interactive" | "quadratic" | "none"
             normalize=false,
             optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
-            objective="LL",        # "LL" | "LOO" | "LMP" | "LLVecchia" | "LLVecchia(m)" | "LLNystrom" | "LLNystrom(k)"
-            noise=nothing)         # nothing | "nugget" | Float64 | Vector{Float64}
+            objective="LL",        # "LL" | "LOO" | "LMP"
+            noise=nothing,         # nothing | "nugget" | Float64 | Vector{Float64}
+            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL, noise=nothing only)
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
+#   predict / simulate / log_likelihood also take method="exact" (default) |
+#   "vecchia" | "vecchia(m)" | "nystrom" -- see "Large designs" below
 # p.mean, p.stdev, p.cov, p.mean_deriv, p.stdev_deriv
 
-s = simulate(k, 10, 123, Xnew; will_update=false)   # (k, nsim, seed, X)
+s = simulate(k, 10, 123, Xnew; will_update=true)   # (k, nsim, seed, X) -> size(Xnew,1) x nsim
+s_u = update_simulate(k, y_u, X_u)   # condition those paths on new observations
 update!(k, y_u, X_u; refit=true)
+
+save(k, "k.json")              # JSON, any libKriging class
+k = jlibkriging.load("k.json")  # auto-detects the class
 
 log_likelihood(k)
 leave_one_out(k)
@@ -50,7 +57,8 @@ wk = WarpKriging(y, X, ["kumaraswamy", "categorical(5,2)", "none"], "gauss";
                  normalize=false,
                  optim="BFGS+Adam",   # different default from Kriging
                  objective="LL",     # only "LL": any other value is ignored
-                 noise=nothing)      # nothing | Vector{Float64} of variances (no "nugget" mode)
+                 noise=nothing,      # nothing | Vector{Float64} of variances (no "nugget" mode)
+                 method="exact")     # only "exact" is implemented (same for MLPKriging)
 predict(wk, Xnew; return_stdev=true)
 ```
 
@@ -79,14 +87,32 @@ issue, not a bug).
 idx = subsetOfData(X, 2000; method="kmeans", seed=123) .+ 1
 k = Kriging(y[idx], X[idx, :], "matern5_2")
 
-# Or keep every point and approximate the objective (noise-free Kriging only)
-k = Kriging(y, X, "matern5_2"; objective="LLVecchia(30)")   # d <~ 5
-k = Kriging(y, X, "matern5_2"; objective="LLNystrom(50)")   # higher d
-nystrom_rank(k)   # 50 (0 if the model was not fitted with LLNystrom)
+# Or keep every point and approximate the likelihood (objective="LL", noise-free Kriging only)
+k = Kriging(y, X, "matern5_2"; method="vecchia(30)")   # d <~ 5
+k = Kriging(y, X, "matern5_2"; method="nystrom(50)")   # higher d
+jlibkriging.method(k)   # "nystrom(50)" (exported as `method`); objective(k) is "LL"
+nystrom_rank(k)   # 50 (0 if the model was not fitted with method="nystrom")
+vecchia_neighbors(k)   # 30 for a method="vecchia(30)" fit (0 otherwise)
 ```
-`predict` is the only prediction entry point from Julia: `predictVecchia`,
-`predictNystrom`, `simulateNystrom` and `set_vecchia_exact_commit` (the "light"
-Vecchia mode) exist in C++ only.
+An approximate fit keeps no exact factorization, and the method is explicit at every step
+(`method="exact"` by default, never inferred from the fit):
+```julia
+kn = Kriging(y, X, "matern5_2"; method="nystrom(50)")
+p = predict(kn, Xnew; method="nystrom")                       # "exact" would raise
+s = simulate(kn, 10, 123, Xnew; method="nystrom")
+log_likelihood(kn; method="nystrom")                          # the fitted objective
+kv = Kriging(y, X, "matern5_2"; method="vecchia(30)")
+p = predict(kv, Xnew; method="vecchia")                       # or method=jlibkriging.method(kv)
+update!(kv, y_u, X_u)                                         # Vecchia refit, still approximate
+# the exact model at the Vecchia estimate: a separate exact fit, theta fixed
+ke = Kriging(y, X, "matern5_2"; optim="none", theta=theta(kv), is_theta_estim=false)
+predict(ke, Xnew; return_cov=true)                            # exact, with covariance
+```
+The Vecchia predictor (`method="vecchia"`) is also usable after an exact fit. Approximate
+methods return mean / stdev only (`return_cov`, `return_deriv`, `will_update` raise).
+`objective="LLVecchia(m)"` / `"LLNystrom(k)"` are **deprecated** aliases of
+`objective="LL", method="vecchia(m)"` / `"nystrom(k)"`.
+`predictVecchia`, `predictNystrom`, `simulateVecchia` and `simulateNystrom` (behind `method`) exist in C++ only.
 
 ## NestedKriging
 
@@ -98,11 +124,14 @@ nk = NestedKriging(y, X, "matern5_2", 20;   # nb_groups
                    warping=String[],         # non-empty -> WarpKriging submodels
                    regmodel="constant",
                    optim="BFGS",
-                   objective="LL")
+                   objective="LL",
+                   method="exact")           # "vecchia(m)" / "nystrom(k)": common prior from one global approximate fit
 predict(nk, Xnew; return_stdev=true)
+jlibkriging.method(nk), objective(nk)
 ```
 `aggregation="NK"` requires `regmodel="constant"`. No `noise=`, no
-`normalize=`, no save/load yet on `NestedKriging`.
+`normalize=`. `save(nk, "nk.json")` / `load("nk.json")` (or
+`load_nested_kriging`) work as for the other classes.
 
 ## Common pitfalls to flag in review
 

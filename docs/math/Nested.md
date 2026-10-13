@@ -15,7 +15,7 @@ groups and, for the `NK` variant, across pairs of groups.
 ```r
 nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
                      aggregation = "NK", partition = "kmeans")
-pred <- predict(nk, Xnew, stdev = TRUE)
+pred <- predict(nk, Xnew, return_stdev = TRUE)
 ```
 
 ## Mathematical description
@@ -26,7 +26,7 @@ The n design points are split into p groups (`partition = "kmeans"` or
 `"random"`). Each group g fits an ordinary/simple-kriging submodel on
 its own points, but all p submodels share one common set of
 hyperparameters (θ, σ², β) — either refit jointly by profiling a
-common likelihood, or (when combined with the Vecchia objective, see
+common likelihood, or (with `method="vecchia(m)"` / `"nystrom(k)"`, see
 below) taken directly from one global fit. Fixing the hyperparameters
 before per-group refits means each submodel's Cholesky factor Lg only
 needs to be computed once, closed-form, at those shared parameters.
@@ -76,14 +76,18 @@ them:
   parallelized over the p(p−1)/2 group pairs, so effectively O(q·n²/p)
   wall-clock with p-way parallelism.
 
-### Combination with the Vecchia objective
+### Common prior from a Vecchia / Nystrom fit
 
-`NestedKriging(..., objective="LLVecchia(m)")` estimates the shared prior
-(θ, σ², β) with a single global Vecchia-light fit (O(n·m³), see
-[Vecchia.md](Vecchia.md)) instead of averaging p local MLEs — this
-uses inter-group information the purely-local estimate discards, and
-is statistically preferable at any group size. It is not supported
-together with `warping`.
+`NestedKriging(..., method="vecchia(m)")` (or `method="nystrom(k)"`)
+estimates the shared prior (θ, σ², β) with a single global Vecchia fit
+(O(n·m³), see [Vecchia.md](Vecchia.md)) or Nystrom fit (O(n·k²), see
+[Nystrom.md](Nystrom.md)), with `objective="LL"`, instead of averaging
+p local MLEs — this uses inter-group information the purely-local
+estimate discards, and is statistically preferable at any group size.
+The submodels are then exact. The default `method="exact"` keeps the
+per-group fits; `method()` / `objective()` report the choice. It is not
+supported together with `warping`. `objective="LLVecchia(m)"` /
+`"LLNystrom(k)"` are deprecated aliases.
 
 ## Simple example
 
@@ -113,7 +117,10 @@ same n (which would not fit in memory anyway).
 
 - `NoiseModel::None` only — no nugget/noise channel.
 - `normalize` is not supported.
-- `save`/`load` are not yet implemented.
+- `save`/`load` store the configuration, the data, the partition, the
+  common prior and every submodel (JSON, `"content": "NestedKriging"`); the
+  NK precomputations (one Cholesky per group) are rebuilt at load time, at
+  the same O(p (n/p)³) cost as the end of `fit`.
 - Combined with `warping`: NK aggregation requires evaluating the
   warped kernel between arbitrary points (supported since `WarpKriging`
   exposes a public `covMat`); the common (θ, warp) prior is estimated
@@ -124,8 +131,8 @@ same n (which would not fit in memory anyway).
 
 ## See also
 
-[Scalability.md](Scalability.md) for how this compares to `LLVecchia`
-and `LLNystrom`, and how to pick between them.
+[Scalability.md](Scalability.md) for how this compares to the Vecchia
+and Nystrom methods, and how to pick between them.
 
 ## References
 

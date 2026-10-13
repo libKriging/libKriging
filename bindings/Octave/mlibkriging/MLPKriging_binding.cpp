@@ -64,11 +64,11 @@ namespace MLPKrigingBinding {
 
 void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   // args: y, X, hidden_dims, d_out, activation, kernel, [regmodel], [normalize], [optim], [objective],
-  // [parameters_struct]
+  // [parameters_struct], [method] (only "exact" is implemented for MLPKriging)
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 11}};
+                 RequiresArg::Range{3, 12}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto y_vec = input.get<arma::vec>(0, "y vector");
   auto X_mat = input.get<arma::mat>(1, "X matrix");
@@ -81,8 +81,9 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   auto optim = input.getOptional<std::string>(8, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(9, "objective").value_or("LL");
   std::map<std::string, std::string> params;
-  if (nrhs > 10)
+  if (nrhs > 10 && !mxIsEmpty(prhs[10]))
     params = structToStringMap(prhs[10]);
+  auto method = input.getOptional<std::string>(11, "method").value_or("exact");
   auto mk = buildObject<MLPKriging>(y_vec,
                                     X_mat,
                                     hidden_dims,
@@ -93,7 +94,8 @@ void build(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
                                     normalize,
                                     optim,
                                     objective,
-                                    params);
+                                    params,
+                                    method);
   output.set(0, mk, "new object reference");
 }
 
@@ -111,15 +113,16 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{3, 8}};
+                 RequiresArg::Range{3, 9}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{0}};
   auto regmodel = input.getOptional<std::string>(3, "regression model").value_or("constant");
   auto normalize = input.getOptional<bool>(4, "normalize").value_or(false);
   auto optim = input.getOptional<std::string>(5, "optim").value_or("BFGS+Adam");
   auto objective = input.getOptional<std::string>(6, "objective").value_or("LL");
   std::map<std::string, std::string> params;
-  if (nrhs > 7)
+  if (nrhs > 7 && !mxIsEmpty(prhs[7]))
     params = structToStringMap(prhs[7]);
+  auto method = input.getOptional<std::string>(8, "method").value_or("exact");
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   mk->fit(input.get<arma::vec>(1, "y vector"),
           input.get<arma::mat>(2, "X matrix"),
@@ -127,7 +130,8 @@ void fit(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
           normalize,
           optim,
           objective,
-          params);
+          params,
+          method);
 }
 
 void predict(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -237,6 +241,16 @@ void kernel(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
   output.set(0, mk->kernel(), "kernel name");
+}
+
+void method(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
+  MxMapper input{"Input",
+                 nrhs,
+                 const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+                 RequiresArg::Exactly{1}};
+  MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
+  auto* mk = input.getObjectFromRef<MLPKriging>(0, "MLPKriging reference");
+  output.set(0, mk->method(), "method name");
 }
 
 void X(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
