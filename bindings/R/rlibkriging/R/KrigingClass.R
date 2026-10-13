@@ -68,7 +68,11 @@ classKriging <- function(nk) {
 #'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
-#'     values in the interval \eqn{[0, 1]}.
+#'     values in the interval \eqn{[0, 1]} internally. The
+#'     \code{parameters} and every parameter accessor
+#'     (\code{theta()}, \code{sigma2()}, \code{beta()}, ...) or
+#'     objective function (\code{logLikelihoodFun()}, ...) stay in the
+#'     original scale of \code{X} and \code{y}.
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and
 #'     \code{"none"}, the later simply keeping the values given in
@@ -264,7 +268,11 @@ print.Kriging <- function(x, ...) {
 #'     \code{"linear"}, \code{"interactive"}, \code{"quadratic"}.
 #' @param normalize Logical. If \code{TRUE} both the input matrix
 #'     \code{X} and the response \code{y} in normalized to take
-#'     values in the interval \eqn{[0, 1]}.
+#'     values in the interval \eqn{[0, 1]} internally. The
+#'     \code{parameters} and every parameter accessor
+#'     (\code{theta()}, \code{sigma2()}, \code{beta()}, ...) or
+#'     objective function (\code{logLikelihoodFun()}, ...) stay in the
+#'     original scale of \code{X} and \code{y}.
 #' @param optim Character giving the Optimization method used to fit
 #'     hyper-parameters. Possible values are: \code{"BFGS"} and
 #'     \code{"none"}, the later simply keeping the values given in

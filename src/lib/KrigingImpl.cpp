@@ -32,6 +32,100 @@ inline int get_optimal_threads(int max_default = 2) {
 }  // namespace
 #endif
 
+namespace {
+// Basis change of a polynomial trend under an affine change of its input:
+// returns the p x p matrix A such that, for every x (row vector),
+//   F(a + b % x) = F(x) * A
+// where F is Trend::regressionModelMatrix(regmodel, .) (same column layout).
+// Exact (no solve): constant, linear, interactive (x_i x_j, j < i) and
+// quadratic (x_i x_j, j <= i) bases are all closed under affine maps.
+arma::mat trend_affine_map(const Trend::RegressionModel& regmodel,
+                           const arma::uword d,
+                           const arma::rowvec& a,
+                           const arma::rowvec& b) {
+  using RM = Trend::RegressionModel;
+  if (regmodel == RM::None)
+    return arma::mat(0, 0);
+  if (regmodel == RM::Constant)
+    return arma::mat(1, 1, arma::fill::ones);
+  // column index of each basis function, replicating regressionModelMatrix's layout
+  const bool interactive = (regmodel == RM::Interactive);
+  const bool quadratic = (regmodel == RM::Quadratic);
+  arma::uvec lin_idx(d);
+  arma::umat quad_idx(d, d, arma::fill::zeros);  // quad_idx(i, j), j <= i (j < i for interactive)
+  arma::uword count = 1;
+  for (arma::uword i = 0; i < d; i++) {
+    lin_idx(i) = count++;
+    if (interactive || quadratic) {
+      const arma::uword jmax = quadratic ? i + 1 : i;
+      for (arma::uword j = 0; j < jmax; j++)
+        quad_idx(i, j) = count++;
+    }
+  }
+  const arma::uword p = count;
+  arma::mat A(p, p, arma::fill::zeros);
+  A(0, 0) = 1.0;
+  for (arma::uword i = 0; i < d; i++) {
+    // z_i = a_i + b_i x_i
+    const arma::uword k = lin_idx(i);
+    A(0, k) += a(i);
+    A(lin_idx(i), k) += b(i);
+    if (interactive || quadratic) {
+      const arma::uword jmax = quadratic ? i + 1 : i;
+      for (arma::uword j = 0; j < jmax; j++) {
+        // z_i z_j = a_i a_j + a_i b_j x_j + b_i a_j x_i + b_i b_j x_i x_j
+        const arma::uword kk = quad_idx(i, j);
+        A(0, kk) += a(i) * a(j);
+        A(lin_idx(j), kk) += a(i) * b(j);
+        A(lin_idx(i), kk) += b(i) * a(j);
+        A(quad_idx(i, j), kk) += b(i) * b(j);
+      }
+    }
+  }
+  return A;
+}
+}  // namespace
+
+arma::vec KrigingImpl::beta_to_original(const arma::vec& beta_n) const {
+  if (!m_normalize || beta_n.is_empty())
+    return beta_n;
+  // F(x_n) = F(x) * A with x_n = (x - centerX) / scaleX, hence
+  // F(x) * beta_o = scaleY * F(x_n) * beta_n + centerY  <=>  beta_o = scaleY * A * beta_n + centerY * e_0
+  const arma::uword d = m_scaleX.n_elem;
+  const arma::mat A = trend_affine_map(m_regmodel, d, -m_centerX / m_scaleX, 1.0 / m_scaleX);
+  if (A.n_cols != beta_n.n_elem)
+    throw std::invalid_argument("beta has " + std::to_string(beta_n.n_elem) + " coefficients, the "
+                                + Trend::toString(m_regmodel) + " trend needs " + std::to_string(A.n_cols));
+  arma::vec beta_o = m_scaleY * (A * beta_n);
+  beta_o(0) += m_centerY;
+  return beta_o;
+}
+
+arma::vec KrigingImpl::beta_from_original(const arma::vec& beta_o) const {
+  if (!m_normalize || beta_o.is_empty())
+    return beta_o;
+  // F(x) = F(x_n) * B with x = centerX + scaleX % x_n, hence
+  // beta_n = (B * beta_o - centerY * e_0) / scaleY
+  const arma::uword d = m_scaleX.n_elem;
+  const arma::mat B = trend_affine_map(m_regmodel, d, m_centerX, m_scaleX);
+  if (B.n_cols != beta_o.n_elem)
+    throw std::invalid_argument("beta has " + std::to_string(beta_o.n_elem) + " coefficients, the "
+                                + Trend::toString(m_regmodel) + " trend needs " + std::to_string(B.n_cols));
+  arma::vec beta_n = B * beta_o;
+  beta_n(0) -= m_centerY;
+  return beta_n / m_scaleY;
+}
+
+double KrigingImpl::trend_log_abs_det_to_original() const {
+  if (!m_normalize || m_regmodel == Trend::RegressionModel::None)
+    return 0.0;
+  const arma::uword d = m_scaleX.n_elem;
+  const arma::mat A = trend_affine_map(m_regmodel, d, -m_centerX / m_scaleX, 1.0 / m_scaleX);
+  double val = 0.0, sign = 0.0;
+  arma::log_det(val, sign, A);
+  return val;
+}
+
 // Sentinel used with LinearAlgebra::cholCov / update_cholCov when no
 // per-point diagonal override is required (plain Kriging, or Nugget/Noise
 // when the diagonal is uniform and baked into the cov factor).
@@ -675,7 +769,13 @@ void KrigingImpl::load_common_from_json(const nlohmann::json& j) {
   m_is_empty = false;
 }
 
-bool KrigingImpl::summary_top(std::ostringstream& oss, const arma::mat* X_display_override) const {
+bool KrigingImpl::summary_top(std::ostringstream& oss,
+                              const arma::mat* X_display_override,
+                              const SummaryValues* values) const {
+  const arma::vec& beta_disp = values ? values->beta : m_beta;
+  const double sigma2_disp = values ? values->sigma2 : m_sigma2;
+  const arma::vec& theta_disp = values ? values->theta : m_theta;
+  const arma::vec& noise_disp = values ? values->noise : m_noise;
   const arma::mat& X_disp = X_display_override ? *X_display_override : m_X;
   if (X_disp.is_empty() || X_disp.n_rows == 0) {
     oss << "* covariance:\n";
@@ -701,21 +801,21 @@ bool KrigingImpl::summary_top(std::ostringstream& oss, const arma::mat* X_displa
       oss << ",";
   }
   oss << " -> " << m_y.n_elem << "x[" << arma::min(m_y) << "," << arma::max(m_y) << "]\n";
-  if (!m_noise.is_empty())
-    oss << "  * noise: " << m_noise.n_elem << "x[" << arma::min(m_noise) << "," << arma::max(m_noise) << "]\n";
+  if (!noise_disp.is_empty())
+    oss << "  * noise: " << noise_disp.n_elem << "x[" << arma::min(noise_disp) << "," << arma::max(noise_disp) << "]\n";
   oss << "* trend " << Trend::toString(m_regmodel);
   oss << ((m_est_beta) ? " (est.): " : ": ");
-  vec_printer(m_beta);
+  vec_printer(beta_disp);
   oss << "\n";
   oss << "* variance";
   oss << ((m_est_sigma2) ? " (est.): " : ": ");
-  oss << m_sigma2;
+  oss << sigma2_disp;
   oss << "\n";
   oss << "* covariance:\n";
   oss << "  * kernel: " << m_covType << "\n";
   oss << "  * range";
   oss << ((m_est_theta) ? " (est.): " : ": ");
-  vec_printer(m_theta);
+  vec_printer(theta_disp);
   oss << "\n";
   return true;
 }
@@ -791,9 +891,9 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
   m_est_beta = is_beta_estim && (m_regmodel != Trend::RegressionModel::None);
   if (!m_est_beta && beta.has_value() && beta.value().n_elem > 0) {  // Force beta fixed (not estimated, no variance)
     m_est_beta = false;
-    m_beta = beta.value();
-    if (m_normalize)
-      m_beta /= scaleY;
+    // given in the original scale: exact affine transform to the normalized one
+    // (needs m_regmodel and the normalization constants, both set above)
+    m_beta = beta_from_original(beta.value());
   } else
     m_est_beta = true;
 

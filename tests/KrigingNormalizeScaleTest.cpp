@@ -1,0 +1,408 @@
+// clang-format off
+// Must be first
+#define CATCH_CONFIG_MAIN
+#include "libKriging/utils/lk_armadillo.hpp"
+
+#include <catch2/catch.hpp>
+#include "libKriging/Kriging.hpp"
+#include "libKriging/KrigingImpl.hpp"
+#include "libKriging/Trend.hpp"
+// clang-format on
+
+// With normalize=true, Kriging reads its Parameters in the original scale of
+// X and y and must give every public output (accessors, objective functions
+// and their gradients) in that same original scale: input and output
+// round-trip, and a normalize=true model agrees with a normalize=false one
+// fitted on the same data with the same (original-scale) parameters.
+
+namespace {
+
+using RM = Trend::RegressionModel;
+using NM = Kriging::NoiseModel;
+
+// anisotropic, far-from-unit-scale design and output
+struct Data {
+  arma::mat X;
+  arma::vec y;
+  arma::vec noise;
+};
+
+Data make_data(arma::uword n = 25) {
+  arma::arma_rng::set_seed(4321);
+  Data D;
+  D.X = arma::mat(n, 2, arma::fill::randu);
+  D.X.col(0) = 10.0 + 20.0 * D.X.col(0);  // [10, 30]
+  D.X.col(1) = -2.0 + 5.0 * D.X.col(1);   // [-2, 3]
+  D.y = arma::vec(n);
+  for (arma::uword i = 0; i < n; i++) {
+    const double u = (D.X(i, 0) - 10.0) / 20.0, v = (D.X(i, 1) + 2.0) / 5.0;
+    D.y(i) = 100.0 + 50.0 * (std::sin(5.0 * u) * std::cos(3.0 * v) + 0.5 * u * v);
+  }
+  D.noise = 0.5 + 0.5 * arma::vec(n, arma::fill::randu);  // original-scale noise variances
+  return D;
+}
+
+arma::uword trend_size(RM rm, arma::uword d) {
+  switch (rm) {
+    case RM::None:
+      return 0;
+    case RM::Constant:
+      return 1;
+    case RM::Linear:
+      return 1 + d;
+    case RM::Interactive:
+      return 1 + d + d * (d - 1) / 2;
+    case RM::Quadratic:
+      return 1 + 2 * d + d * (d - 1) / 2;
+  }
+  return 0;
+}
+
+Kriging make_model(NM nm, const std::string& kernel = "matern5_2") {
+  return Kriging(kernel, nm);
+}
+
+void fit(Kriging& k,
+         const Data& D,
+         RM rm,
+         bool normalize,
+         const std::string& optim,
+         const std::string& objective,
+         const Kriging::Parameters& p) {
+  if (k.noise_model() == NM::Heterogeneous)
+    k.fit(D.y, D.noise, D.X, rm, normalize, optim, objective, p);
+  else
+    k.fit(D.y, D.X, rm, normalize, optim, objective, p);
+}
+
+void require_close(const arma::vec& a, const arma::vec& b, double rel) {
+  REQUIRE(a.n_elem == b.n_elem);
+  for (arma::uword i = 0; i < a.n_elem; i++) {
+    CAPTURE(i, a(i), b(i));
+    CHECK(a(i) == Approx(b(i)).epsilon(rel).margin(rel));
+  }
+}
+
+// gamma = [theta] / [theta, alpha] / [theta, sigma2] of a fitted model, original scale
+arma::vec public_gamma(const Kriging& k) {
+  if (k.noise_model() == NM::None)
+    return k.theta();
+  const double extra = (k.noise_model() == NM::Nugget) ? k.sigma2() / (k.sigma2() + k.nugget()) : k.sigma2();
+  return arma::join_cols(k.theta(), arma::vec{extra});
+}
+
+// central finite-difference gradient of f at x (relative steps)
+template <typename F>
+arma::vec fd_grad(F&& f, const arma::vec& x, double rel_step = 1e-5) {
+  arma::vec g(x.n_elem);
+  for (arma::uword i = 0; i < x.n_elem; i++) {
+    const double h = rel_step * std::max(std::abs(x(i)), 1e-3);
+    arma::vec xp = x, xm = x;
+    xp(i) += h;
+    xm(i) -= h;
+    g(i) = (f(xp) - f(xm)) / (2 * h);
+  }
+  return g;
+}
+
+}  // namespace
+
+TEST_CASE("normalize=true: fixed parameters round-trip through the accessors", "[normalize][kriging]") {
+  const Data D = make_data();
+  const arma::uword d = D.X.n_cols;
+  const RM rm = GENERATE(RM::None, RM::Constant, RM::Linear, RM::Interactive, RM::Quadratic);
+  const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm));
+
+  Kriging::Parameters p;
+  p.theta = arma::mat{{7.0, 1.3}};
+  p.is_theta_estim = false;
+  p.sigma2 = 321.0;
+  p.is_sigma2_estim = false;
+  const arma::uword np = trend_size(rm, d);
+  arma::vec beta_given = arma::linspace(-3.0, 5.0, np) + 0.37;
+  if (np > 0) {
+    p.beta = beta_given;
+    p.is_beta_estim = false;
+  }
+  if (nm == NM::Nugget) {
+    p.nugget = 12.5;
+    p.is_nugget_estim = false;
+  }
+
+  Kriging k = make_model(nm);
+  fit(k, D, rm, /*normalize=*/true, "none", "LL", p);
+
+  require_close(k.theta(), arma::vec{7.0, 1.3}, 1e-12);
+  CHECK(k.sigma2() == Approx(321.0).epsilon(1e-12));
+  if (np > 0)
+    require_close(k.beta(), beta_given, 1e-12);
+  else
+    CHECK(k.beta().is_empty());
+  if (nm == NM::Nugget)
+    CHECK(k.nugget() == Approx(12.5).epsilon(1e-12));
+  if (nm == NM::Heterogeneous)
+    require_close(k.noise(), D.noise, 1e-12);
+
+  // internal storage is the normalized one
+  const KrigingImpl& impl = k;
+  require_close(impl.theta() % k.scaleX().t(), k.theta(), 1e-14);
+  CHECK(impl.sigma2() * k.scaleY() * k.scaleY() == Approx(k.sigma2()).epsilon(1e-14));
+
+  // the fixed trend is the given one, in the original scale: F(x) * beta
+  // (None trend: implicit centerY)
+  if (np > 0) {
+    // predict far from the data so that the kriging correction vanishes
+    const arma::mat Xfar{{1e4, -1e4}, {-5e3, 2e3}};
+    const arma::vec mean = std::get<0>(k.predict(Xfar, false, false, false));
+    const arma::vec trend = Trend::regressionModelMatrix(rm, Xfar) * beta_given;
+    require_close(mean, trend, 1e-9);
+  }
+}
+
+TEST_CASE("normalize=true agrees with normalize=false at the same original-scale parameters", "[normalize][kriging]") {
+  const Data D = make_data();
+  // None trend excluded: with normalize=true its (implicit) mean is centerY,
+  // a different model from the zero mean of normalize=false.
+  const RM rm = GENERATE(RM::Constant, RM::Linear, RM::Interactive, RM::Quadratic);
+  const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);
+  const bool fixed_beta = GENERATE(false, true);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm), fixed_beta);
+
+  Kriging::Parameters p;
+  p.theta = arma::mat{{9.0, 2.1}};
+  p.is_theta_estim = false;
+  if (nm != NM::None) {  // sigma2 must be given for heterogeneous noise / both for nugget
+    p.sigma2 = 450.0;
+    p.is_sigma2_estim = false;
+  }
+  if (nm == NM::Nugget) {
+    p.nugget = 3.0;
+    p.is_nugget_estim = false;
+  }
+  if (fixed_beta) {
+    p.beta = arma::linspace(1.0, 2.0, trend_size(rm, D.X.n_cols)) * 10.0;
+    p.is_beta_estim = false;
+  }
+
+  Kriging kn = make_model(nm), ko = make_model(nm);
+  fit(kn, D, rm, /*normalize=*/true, "none", "LL", p);
+  fit(ko, D, rm, /*normalize=*/false, "none", "LL", p);
+
+  const double tol = 1e-7;
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  if (nm == NM::Nugget)
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(tol));
+  if (nm == NM::Heterogeneous)
+    require_close(kn.noise(), ko.noise(), tol);
+
+  arma::mat Xn = D.X.rows(0, 4) + 0.3;
+  auto [mn, sn, cn, dmn, dsn] = kn.predict(Xn, true, true, false);
+  auto [mo, so, co, dmo, dso] = ko.predict(Xn, true, true, false);
+  require_close(mn, mo, tol);
+  require_close(sn, so, tol);
+  require_close(arma::vectorise(cn), arma::vectorise(co), tol);
+  require_close(arma::vectorise(kn.covMat(Xn, D.X)), arma::vectorise(ko.covMat(Xn, D.X)), tol);
+
+  // objective values and gradients, original scale
+  CHECK(kn.logLikelihood() == Approx(ko.logLikelihood()).epsilon(tol));
+  const arma::vec g = public_gamma(ko);
+  auto [lln, gln] = kn.logLikelihoodFun(g, true, false);
+  auto [llo, glo] = ko.logLikelihoodFun(g, true, false);
+  CHECK(lln == Approx(llo).epsilon(tol));
+  require_close(gln, glo, 1e-6);
+
+  CHECK(kn.leaveOneOut() == Approx(ko.leaveOneOut()).epsilon(tol));
+  auto [loon, gloon] = kn.leaveOneOutFun(ko.theta(), true, false);
+  auto [looo, glooo] = ko.leaveOneOutFun(ko.theta(), true, false);
+  CHECK(loon == Approx(looo).epsilon(tol));
+  require_close(gloon, glooo, 1e-6);
+  auto [loovm_n, loovs_n] = kn.leaveOneOutVec(ko.theta());
+  auto [loovm_o, loovs_o] = ko.leaveOneOutVec(ko.theta());
+  require_close(loovm_n, loovm_o, tol);
+  require_close(loovs_n, loovs_o, tol);
+
+  if (nm != NM::Heterogeneous) {  // LMP is not defined with a heterogeneous noise
+    CHECK(kn.logMargPost() == Approx(ko.logMargPost()).epsilon(tol));
+    auto [lmpn, glmpn] = kn.logMargPostFun(ko.theta(), true, false);
+    auto [lmpo, glmpo] = ko.logMargPostFun(ko.theta(), true, false);
+    CHECK(lmpn == Approx(lmpo).epsilon(tol));
+    if (nm == NM::None)  // (Nugget: alpha component from finite differences)
+      require_close(glmpn, glmpo, 1e-6);
+    else  // fixed sigma2/nugget: finite-difference theta gradient (internal step)
+      require_close(glmpn.head(D.X.n_cols), glmpo.head(D.X.n_cols), 1e-3);
+  }
+}
+
+TEST_CASE("normalize=true BFGS fit agrees with normalize=false", "[normalize][kriging]") {
+  const Data D = make_data(30);
+  const RM rm = GENERATE(RM::Constant, RM::Linear);
+  const NM nm = GENERATE(NM::None, NM::Nugget);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm));
+
+  Kriging kn = make_model(nm), ko = make_model(nm);
+  fit(kn, D, rm, /*normalize=*/true, "BFGS10", "LL", {});
+  fit(ko, D, rm, /*normalize=*/false, "BFGS10", "LL", {});
+
+  // same optimum up to the optimizer tolerance
+  CHECK(kn.logLikelihood() == Approx(ko.logLikelihood()).epsilon(1e-5));
+  const double tol = 2e-2;
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  if (nm == NM::Nugget)
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(0.1).margin(1e-3 * ko.sigma2()));
+
+  arma::mat Xn = D.X.rows(0, 9) + 0.5;
+  auto pn = kn.predict(Xn, true, false, false);
+  auto po = ko.predict(Xn, true, false, false);
+  require_close(std::get<0>(pn), std::get<0>(po), 1e-3);
+  require_close(std::get<1>(pn), std::get<1>(po), 2e-2);
+}
+
+TEST_CASE("normalize=true: objectives at theta() are the committed ones, gradients are original-scale",
+          "[normalize][kriging]") {
+  const Data D = make_data();
+  const RM rm = GENERATE(RM::Constant, RM::Linear);
+  const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm));
+
+  Kriging k = make_model(nm);
+  fit(k, D, rm, /*normalize=*/true, "BFGS", "LL", {});
+
+  const arma::vec g = public_gamma(k);
+  CHECK(std::get<0>(k.logLikelihoodFun(g, false, false)) == Approx(k.logLikelihood()).epsilon(1e-10));
+  CHECK(std::get<0>(k.leaveOneOutFun(k.theta(), false, false)) == Approx(k.leaveOneOut()).epsilon(1e-10));
+  if (nm != NM::Heterogeneous)
+    CHECK(std::get<0>(k.logMargPostFun(k.theta(), false, false)) == Approx(k.logMargPost()).epsilon(1e-10));
+
+  // analytic gradients vs finite differences, in the original scale, at a
+  // point away from the optimum (where the gradient is ~0)
+  arma::vec g1 = g;
+  g1.head(D.X.n_cols) %= arma::vec{1.3, 0.8};
+  if (nm == NM::Nugget)
+    g1(D.X.n_cols) = 0.9;  // alpha
+  {
+    auto [v, grad] = k.logLikelihoodFun(g1, true, false);
+    const arma::vec fd
+        = fd_grad([&](const arma::vec& x) { return std::get<0>(k.logLikelihoodFun(x, false, false)); }, g1);
+    CAPTURE(grad, fd);
+    require_close(grad, fd, 1e-4);
+  }
+  {
+    const arma::vec t1 = g1.head(D.X.n_cols);
+    auto [v, grad] = k.leaveOneOutFun(t1, true, false);
+    const arma::vec fd
+        = fd_grad([&](const arma::vec& x) { return std::get<0>(k.leaveOneOutFun(x, false, false)); }, t1);
+    CAPTURE(grad, fd);
+    require_close(grad, fd, 1e-4);
+  }
+  if (nm == NM::None) {
+    const arma::vec t1 = g1.head(D.X.n_cols);
+    auto [v, grad] = k.logMargPostFun(t1, true, false);
+    const arma::vec fd
+        = fd_grad([&](const arma::vec& x) { return std::get<0>(k.logMargPostFun(x, false, false)); }, t1);
+    CAPTURE(grad, fd);
+    require_close(grad, fd, 1e-4);
+  }
+}
+
+TEST_CASE("normalize=true: Vecchia / Nystrom log-likelihoods in the original scale", "[normalize][kriging]") {
+  const Data D = make_data(40);
+  const std::string method = GENERATE(std::string("vecchia(10)"), std::string("nystrom(15)"));
+  const bool vecchia = method.rfind("vecchia", 0) == 0;
+  CAPTURE(method);
+
+  Kriging k("matern5_2");
+  k.fit(D.y, D.X, RM::Constant, /*normalize=*/true, "BFGS", "LL", {}, method);
+  auto fun = [&](const arma::vec& t, bool grad) {
+    return vecchia ? k.logLikelihoodVecchiaFun(t, grad) : k.logLikelihoodNystromFun(t, grad);
+  };
+  const std::string m = vecchia ? "vecchia" : "nystrom";
+  // The Nystrom likelihood is only smooth up to ~1e-7 relative (its jittered
+  // low-rank factorization; same with normalize=false): looser tolerances.
+  const double val_tol = vecchia ? 1e-10 : 1e-6;
+  CHECK(std::get<0>(fun(k.theta(), false)) == Approx(k.logLikelihood(m)).epsilon(val_tol));
+
+  const arma::vec t1 = k.theta() % arma::vec{1.2, 0.7};
+  auto [v, grad] = fun(t1, true);
+  const arma::vec fd
+      = fd_grad([&](const arma::vec& x) { return std::get<0>(fun(x, false)); }, t1, vecchia ? 1e-5 : 1e-2);
+  CAPTURE(grad, fd);
+  require_close(grad, fd, vecchia ? 1e-4 : 5e-2);
+}
+
+TEST_CASE("normalize=false: accessors are the internal members, bit for bit", "[normalize][kriging]") {
+  const Data D = make_data();
+  const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);
+  CAPTURE(static_cast<int>(nm));
+  Kriging k = make_model(nm);
+  fit(k, D, RM::Linear, /*normalize=*/false, "BFGS", "LL", {});
+  const KrigingImpl& impl = k;
+  CHECK(arma::approx_equal(k.theta(), impl.theta(), "absdiff", 0.0));
+  CHECK(k.sigma2() == impl.sigma2());
+  CHECK(arma::approx_equal(k.beta(), impl.beta(), "absdiff", 0.0));
+  CHECK(std::get<0>(k.logLikelihoodFun(public_gamma(k), false, false)) == k.logLikelihood());
+  if (nm == NM::Heterogeneous)
+    CHECK(arma::approx_equal(k.noise(), D.noise, "absdiff", 0.0));
+
+  // fixed parameters are kept exactly
+  Kriging::Parameters p;
+  p.theta = arma::mat{{7.0, 1.3}};
+  p.sigma2 = 321.0;
+  p.is_sigma2_estim = false;
+  p.beta = arma::vec{1.0, 2.0, 3.0};
+  p.is_beta_estim = false;
+  if (nm == NM::Nugget) {
+    p.nugget = 12.5;
+    p.is_nugget_estim = false;
+  }
+  Kriging kf = make_model(nm);
+  fit(kf, D, RM::Linear, /*normalize=*/false, "none", "LL", p);
+  CHECK(arma::approx_equal(kf.theta(), arma::vec{7.0, 1.3}, "absdiff", 0.0));
+  CHECK(kf.sigma2() == 321.0);
+  CHECK(arma::approx_equal(kf.beta(), arma::vec{1.0, 2.0, 3.0}, "absdiff", 0.0));
+  if (nm == NM::Nugget)
+    CHECK(kf.nugget() == 12.5);
+}
+
+TEST_CASE("normalize=true: a fixed beta of the wrong length is rejected", "[normalize][kriging]") {
+  const Data D = make_data();
+  Kriging::Parameters p;
+  p.theta = arma::mat{{7.0, 1.3}};
+  p.beta = arma::vec{1.0, 2.0};  // linear trend in d=2 needs 3
+  p.is_beta_estim = false;
+  Kriging k("matern5_2");
+  CHECK_THROWS_AS(k.fit(D.y, D.X, RM::Linear, true, "none", "LL", p), std::invalid_argument);
+}
+
+TEST_CASE("normalize=true: save/load keeps the original-scale accessors", "[normalize][kriging]") {
+  const Data D = make_data();
+  Kriging k("matern5_2", NM::Heterogeneous);
+  k.fit(D.y, D.noise, D.X, RM::Linear, true, "BFGS", "LL", {});
+  const std::string f = "KrigingNormalizeScaleTest_saved.json";
+  k.save(f);
+  Kriging l = Kriging::load(f);
+  require_close(l.theta(), k.theta(), 1e-14);
+  CHECK(l.sigma2() == Approx(k.sigma2()).epsilon(1e-14));
+  require_close(l.beta(), k.beta(), 1e-14);
+  require_close(l.noise(), D.noise, 1e-12);
+  CHECK(l.logLikelihood() == Approx(k.logLikelihood()).epsilon(1e-12));
+  std::remove(f.c_str());
+}
+
+TEST_CASE("normalize=true: summary prints original-scale parameters", "[normalize][kriging]") {
+  const Data D = make_data();
+  Kriging::Parameters p;
+  p.theta = arma::mat{{7.25, 1.5}};
+  p.sigma2 = 321.0;
+  p.is_sigma2_estim = false;
+  Kriging k("matern5_2");
+  k.fit(D.y, D.X, RM::Constant, true, "none", "LL", p);
+  const std::string s = k.summary();
+  CAPTURE(s);
+  CHECK(s.find("7.25") != std::string::npos);
+  CHECK(s.find("321") != std::string::npos);
+}

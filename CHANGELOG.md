@@ -12,6 +12,49 @@ past release, see the corresponding entry on the
 ## [Unreleased]
 
 ### Changed
+- **Kriging (breaking): with `normalize=true`, every parameter accessor and
+  objective function is in the ORIGINAL scale of `X` and `y`**, like the
+  `parameters` given to `fit` (which already were), so that input and output
+  round-trip and a `normalize=true` model reports the same values as a
+  `normalize=false` one on the same data:
+  - `theta()` = internal theta × `scaleX`; `sigma2()`, `nugget()` and the
+    heterogeneous `noise()` = internal value × `scaleY²`; `beta()` = the
+    coefficients `b` such that `F(x) b = scaleY · F(x_n) b_n + centerY`
+    (exact affine basis change for every trend: constant, linear,
+    interactive and quadratic; the `"none"` trend has no coefficient, its
+    implicit mean is `centerY`); `covMat()` is scaled by `scaleY²`;
+    `summary()` prints these values. Previously they were the internal,
+    normalized ones (e.g. a fixed `theta = [0.3, 0.5]` read back as
+    `[0.3096, 0.5112]`).
+  - `logLikelihoodFun`, `leaveOneOutFun`, `logMargPostFun`,
+    `logLikelihoodVecchiaFun`, `logLikelihoodNystromFun` and
+    `leaveOneOutVec` take an original-scale `theta` (and an original-scale
+    `sigma2` as the last component with a heterogeneous noise; the nugget
+    `alpha` is scale-free) and return original-scale gradients (chain rule,
+    `d/dθ_i = d/dθ_n,i / scaleX_i`). Their values are those of the original
+    data: log-likelihood (all methods) − n·log(scaleY) relative to the
+    normalized one, leave-one-out error × scaleY², log marginal posterior
+    − (n−p)·log(scaleY) + log|det A| (A the trend basis change), so they
+    match a `normalize=false` model at the same parameters, and
+    `logLikelihood()` == `logLikelihoodFun(theta())` (same for LOO / LMP).
+    `leaveOneOutVec` returns mean / stdev in the scale of `y`.
+  - Fixed: a fixed `parameters.beta` with `normalize=true` was only divided
+    by `scaleY` (ignoring `centerY` and, for non-constant trends, the `X`
+    normalization); it now uses the exact inverse transform (a wrong length
+    raises `std::invalid_argument`). The heterogeneous `noise` given to `fit`
+    was not normalized (`R = C + diag(noise / sigma2)` mixed an original-scale
+    noise with a normalized `sigma2`, which could even crash the fit); it is
+    now stored as `noise / scaleY²`, consistently with `update` /
+    `update_simulate`. A given heterogeneous-noise `sigma2` starting value is
+    now normalized by `scaleY²` (was `scaleY`).
+  - `normalize=false` is unchanged, bit for bit. The save format is
+    unchanged (internal, normalized members); a heterogeneous-noise model
+    saved by an earlier version with `normalize=true` loads with the same
+    predictions, but its `noise()` now reports the stored noise × `scaleY²`.
+    `X()`, `y()`, `F()`, `T()`, `M()`, `z()` (and the matching `model()`
+    entries) still expose the internal normalized data and factorization.
+  - Out of scope: `WarpKriging` / `MLPKriging` (their `theta` lives in the
+    warped feature space) are unchanged; `NestedKriging` has no `normalize`.
 - **Python (breaking):** every vector-valued output of `Kriging`,
   `WarpKriging` and `MLPKriging` is now a 1-D numpy array of shape `(n,)`
   instead of `(n, 1)` (or `(1, d)` for `centerX` / `scaleX`): `predict` mean

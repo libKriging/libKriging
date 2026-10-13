@@ -140,9 +140,29 @@ class Kriging : public KrigingImpl {
                                                                                     const std::string& method);
 
   [[nodiscard]] NoiseModel noise_model() const { return m_noise_model; }
-  [[nodiscard]] double nugget() const { return m_nugget; }
   [[nodiscard]] bool is_nugget_estim() const { return m_est_nugget; }
-  [[nodiscard]] const arma::vec& noise() const { return m_noise; }
+
+  /** Parameter accessors, always in the ORIGINAL scale of X and y, so that
+   * they round-trip with `Parameters` (which are read in the original scale
+   * too), whatever `normalize`. With normalize=true the model is held
+   * internally on normalized data (X -> (X - centerX) / scaleX,
+   * y -> (y - centerY) / scaleY); these accessors convert back:
+   *   theta  = theta_n % scaleX,
+   *   sigma2 = sigma2_n * scaleY^2, nugget = nugget_n * scaleY^2,
+   *   noise  = noise_n * scaleY^2,
+   *   beta   such that F(x) * beta == scaleY * F(x_n) * beta_n + centerY
+   *          (exact for every trend; the None trend has no coefficient, its
+   *          implicit mean is centerY).
+   * With normalize=false they return the fitted values unchanged. */
+  [[nodiscard]] LIBKRIGING_EXPORT arma::vec theta() const;
+  [[nodiscard]] LIBKRIGING_EXPORT double sigma2() const;
+  [[nodiscard]] LIBKRIGING_EXPORT arma::vec beta() const;
+  [[nodiscard]] LIBKRIGING_EXPORT double nugget() const;
+  [[nodiscard]] LIBKRIGING_EXPORT arma::vec noise() const;
+
+  /** Covariance sigma2 * C(X1, X2) between two sets of points, in the
+   * original scale of X (inputs) and y (sigma2). */
+  LIBKRIGING_EXPORT arma::mat covMat(const arma::mat& X1, const arma::mat& X2);
 
   /** Fit the kriging object on (X,y):
    * @param y is n length column vector of output
@@ -189,6 +209,20 @@ class Kriging : public KrigingImpl {
                              const Parameters& parameters = {},
                              const std::string& method = "exact");
 
+  /** Objective functions at a given theta (gamma = [theta] without noise,
+   * [theta, alpha] with a nugget, [theta, sigma2] with a heterogeneous
+   * noise), all in the ORIGINAL scale of X and y, like the accessors: with
+   * normalize=true, theta (and a heterogeneous-noise sigma2) are converted
+   * to the internal scale and the gradient is chain-ruled back
+   * (d/dtheta_i = d/dtheta_n_i / scaleX_i, d/dsigma2 = d/dsigma2_n /
+   * scaleY^2; alpha is scale-free). Values are those of the original data:
+   *   logLikelihood: log-density of the original y (= normalized one
+   *     - n * log(scaleY)), same for the Vecchia / Nystrom variants;
+   *   leaveOneOut: mean squared LOO error in y units (= normalized * scaleY^2);
+   *   logMargPost: normalized one - (n - p) * log(scaleY) + log|det A| (A the
+   *     trend basis change), i.e. the value a normalize=false fit gives.
+   * So logLikelihood() == logLikelihoodFun(theta()), and both agree with a
+   * normalize=false model at the same (original) parameters. */
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodFun(const arma::vec& gamma,
                                                                    bool return_grad,
                                                                    bool bench);
@@ -489,6 +523,28 @@ class Kriging : public KrigingImpl {
   /// O((n_old+n_new)*k^2): no O(n^2) matrix or pairwise-difference cube is
   /// built, unlike the exact/Vecchia update() paths.
   void update_nystrom(const arma::vec& y_u, const arma::mat& X_u, bool refit);
+
+  // --- original <-> internal (normalized) scale of the public API ----------
+  /// gamma (theta [, alpha | sigma2]) from the original to the internal scale
+  [[nodiscard]] arma::vec gamma_from_original(const arma::vec& gamma) const;
+  /// chain rule: internal-scale gradient -> original-scale gradient (in place)
+  void grad_to_original(arma::vec& grad) const;
+  /// original-data log-likelihood minus normalized one (-n log(scaleY))
+  [[nodiscard]] double ll_offset() const;
+  /// original-scale log marginal posterior minus normalized one
+  [[nodiscard]] double lmp_offset() const;
+  /// internal-scale value of logMargPost at gamma (augments alpha in Nugget mode)
+  double _logMargPostAt(const arma::vec& gamma_n, arma::vec* grad_out, std::map<std::string, double>* bench) const;
+  /// fit body; `noise` (original scale) is the heterogeneous noise, or nullptr
+  void fit_impl(const arma::vec& y,
+                const arma::vec* noise,
+                const arma::mat& X,
+                const Trend::RegressionModel& regmodel,
+                bool normalize,
+                const std::string& optim,
+                const std::string& objective,
+                const Parameters& parameters,
+                const std::string& method);
 
   // Returns dimension of the optimization parameter vector (d for None, d+1 for Nugget/Heterogeneous)
   arma::uword gamma_dim() const;

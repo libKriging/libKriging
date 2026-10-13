@@ -117,6 +117,7 @@ add_python_test(NAME MLPKriging FILENAME MLPKriging_test.py)
 add_python_test(NAME NestedKriging FILENAME pylibkriging_nested_test.py)
 add_python_test(NAME threading FILENAME threading_test.py)
 add_python_test(NAME NewFeatures FILENAME test_new_features.py)
+add_python_test(NAME NormalizeScale FILENAME normalize_scale_test.py)
 add_python_test(NAME sklearn_estimator FILENAME sklearn_estimator_test.py)
 add_python_test(NAME sklearn_multimodel FILENAME sklearn_multimodel_test.py)
 # Without scikit-learn these modules are skipped as a whole (importorskip) and
