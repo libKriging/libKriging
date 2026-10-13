@@ -1,6 +1,7 @@
 #ifndef LIBKRIGING_KRIGING_HPP
 #define LIBKRIGING_KRIGING_HPP
 
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -116,10 +117,23 @@ class Kriging : public KrigingImpl {
 
   LIBKRIGING_EXPORT Kriging(const Kriging& other, ExplicitCopySpecifier);
 
+  /** Deprecation message of a deprecated fit objective ("LLVecchia(m)",
+   * "LLNystrom(k)"), empty if `objective` is not deprecated (malformed
+   * specs throw std::invalid_argument). */
+  LIBKRIGING_EXPORT static std::string deprecated_objective_message(const std::string& objective);
+
+  /** Receiver of deprecation messages (deprecated objective aliases), called
+   * at every fit using one. Default (empty handler): printed once per process
+   * on arma::cout. The bindings route the messages to their native warning
+   * mechanism (Python DeprecationWarning, R warning, Julia depwarn, Octave
+   * warning). A handler may throw to turn the warning into an error. */
+  using DeprecationHandler = std::function<void(const std::string&)>;
+  LIBKRIGING_EXPORT static void set_deprecation_handler(DeprecationHandler handler);
+
   /** Canonical (objective, method) pair of a fit: method gets its explicit
    * size ("vecchia" -> "vecchia(30)", "nystrom" -> "nystrom(50)"), the
    * deprecated objectives "LLVecchia(m)" / "LLNystrom(k)" become ("LL",
-   * "vecchia(m)") / ("LL", "nystrom(k)") (with a one-time warning), and
+   * "vecchia(m)") / ("LL", "nystrom(k)") (with a deprecation warning), and
    * unknown names or unimplemented combinations (approximate method with
    * an objective other than "LL") raise std::invalid_argument. */
   LIBKRIGING_EXPORT static std::pair<std::string, std::string> fit_objective_method(const std::string& objective,

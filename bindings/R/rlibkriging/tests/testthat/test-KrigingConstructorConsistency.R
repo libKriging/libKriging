@@ -11,8 +11,8 @@ y <- f(X)
 
 test_that("method = 'vecchia(m)' is accepted, and the deprecated objective 'LLVecchia(m)'", {
   expect_error(Kriging(y, X, "matern5_2", method = "vecchia(3)"), NA)
-  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), NA)
-  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia"), NA)
+  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia(3)"), class = "deprecatedWarning")
+  expect_warning(Kriging(y, X, "matern5_2", objective = "LLVecchia"), class = "deprecatedWarning")
 })
 
 test_that("vecchia_neighbors / nystrom_rank report the approximation size", {

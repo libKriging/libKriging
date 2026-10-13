@@ -350,11 +350,20 @@ def test_fit_method_and_deprecated_objectives():
     assert k.objective() == "LL" and k.method() == "vecchia(30)"
     assert lk.Kriging(y, X, "matern5_2", method="nystrom").method() == "nystrom(50)"
     assert k.model()["method"] == "vecchia(30)"
-    # deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)"
-    ka = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
+    # deprecated aliases: objective "LLVecchia(m)" / "LLNystrom(k)", with a
+    # native DeprecationWarning (an error under a "error" warnings filter)
+    with pytest.warns(DeprecationWarning, match=r'objective "LLVecchia\(7\)" is deprecated'):
+        ka = lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
     assert ka.objective() == "LL" and ka.method() == "vecchia(7)"
-    kb = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)")
+    with pytest.warns(DeprecationWarning, match='method="nystrom\\(5\\)"'):
+        kb = lk.Kriging(y, X, "matern5_2", objective="LLNystrom(5)")
     assert kb.objective() == "LL" and kb.method() == "nystrom(5)"
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning):
+            lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
+        lk.Kriging(y, X, "matern5_2", method="vecchia(7)")  # no warning
     # only LL has approximate versions; no approximation with a noise model
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia")
@@ -362,7 +371,7 @@ def test_fit_method_and_deprecated_objectives():
         lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget")
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", method="Vecchia")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # conflict: raised before any warning
         lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)", method="nystrom")
 
 

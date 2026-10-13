@@ -32,6 +32,17 @@ Rcpp::List new_Kriging(std::string kernel, std::string noise_model = "none") {
   return obj;
 }
 
+// Deprecated fit objectives are reported by the R wrappers as R warnings
+// (class "deprecatedWarning", see .warn_deprecated_objective): the C++
+// default print is silenced.
+[[maybe_unused]] static const bool cpp_deprecation_silenced
+    = (Kriging::set_deprecation_handler([](const std::string&) {}), true);
+
+// [[Rcpp::export]]
+std::string kriging_deprecation_message(std::string objective) {
+  return Kriging::deprecated_objective_message(objective);
+}
+
 // [[Rcpp::export]]
 Rcpp::List new_KrigingFit(arma::vec y,
                           arma::mat X,

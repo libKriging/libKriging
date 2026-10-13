@@ -159,6 +159,8 @@ const char* lk_kriging_objective(void* ptr);
 int lk_kriging_nystrom_rank(void* ptr);
 int lk_kriging_vecchia_neighbors(void* ptr);
 const char* lk_kriging_method(void* ptr);
+/* Deprecation message of a deprecated fit objective ("" if none, NULL on error) */
+const char* lk_deprecated_objective_message(const char* objective);
 int lk_kriging_is_normalize(void* ptr);
 const char* lk_kriging_regmodel(void* ptr);
 int lk_kriging_get_X(void* ptr, double* out, int* n, int* d);

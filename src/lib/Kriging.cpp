@@ -1888,12 +1888,18 @@ Kriging::FitOfn Kriging::make_fit_objective(const std::string& objective) const 
 }
 
 namespace {
-// Deprecated objective aliases are reported once per process
-void warn_deprecated_objective(const std::string& objective, const std::string& replacement) {
+// Receiver of deprecation messages. Function-local static: safe to set from
+// another translation unit's static initializer (bindings).
+Kriging::DeprecationHandler& deprecation_handler() {
+  static Kriging::DeprecationHandler handler;
+  return handler;
+}
+
+// Default receiver: printed once per process
+void print_deprecation_once(const std::string& message) {
   static std::atomic<bool> warned{false};
   if (!warned.exchange(true))
-    arma::cout << "Warning: objective \"" << objective << "\" is deprecated; use objective=\"LL\", method=\""
-               << replacement << "\"" << arma::endl;
+    arma::cout << "Warning: " << message << arma::endl;
 }
 
 // Canonical method string with its default size made explicit
@@ -1921,6 +1927,20 @@ std::string canonical_fit_method(const std::string& method) {
 }
 }  // namespace
 
+LIBKRIGING_EXPORT std::string Kriging::deprecated_objective_message(const std::string& objective) {
+  const bool vll = objective.rfind("LLVecchia", 0) == 0;
+  const bool nll = objective.rfind("LLNystrom", 0) == 0;
+  if (!vll && !nll)
+    return "";
+  const std::string method = vll ? "vecchia(" + std::to_string(parse_vll_m(objective)) + ")"
+                                 : "nystrom(" + std::to_string(parse_nystrom_k(objective)) + ")";
+  return "objective \"" + objective + "\" is deprecated; use objective=\"LL\", method=\"" + method + "\"";
+}
+
+LIBKRIGING_EXPORT void Kriging::set_deprecation_handler(DeprecationHandler handler) {
+  deprecation_handler() = std::move(handler);
+}
+
 LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_method(const std::string& objective,
                                                                                     const std::string& method) {
   std::string objective_out = objective;
@@ -1934,7 +1954,12 @@ LIBKRIGING_EXPORT std::pair<std::string, std::string> Kriging::fit_objective_met
     if (method_out != "exact" && method_out != alias_method)
       throw std::invalid_argument("fit: objective \"" + objective + "\" (deprecated alias of method \"" + alias_method
                                   + "\") conflicts with method \"" + method + "\"");
-    warn_deprecated_objective(objective, alias_method);
+    const DeprecationHandler& handler = deprecation_handler();
+    const std::string message = deprecated_objective_message(objective);
+    if (handler)
+      handler(message);
+    else
+      print_deprecation_once(message);
     objective_out = "LL";
     method_out = alias_method;
   }

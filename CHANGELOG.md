@@ -34,9 +34,16 @@ past release, see the corresponding entry on the
     C++ trailing `method` argument of `fit` and of the constructor; Python /
     R / Julia `method=` keyword; Octave/Matlab trailing argument.
   - `objective="LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of
-    `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"` (one-time
-    warning; a conflicting `method` raises). Save files of earlier versions
-    load with the matching method.
+    `objective="LL"` with `method="vecchia(m)"` / `"nystrom(k)"`; a
+    conflicting `method` raises. Save files of earlier versions load with the
+    matching method. Using an alias raises the native deprecation warning of
+    each language: Python `DeprecationWarning`, R `warning` of class
+    `deprecatedWarning`, Julia `Base.depwarn` (shown without `--depwarn`),
+    Octave/Matlab warning `mLibKriging:deprecated`. They follow each
+    language's filters (`warnings.simplefilter("error")`, `options(warn = 2)`,
+    `--depwarn=error`, `warning("error", ...)`). In C++, the message goes to
+    `Kriging::set_deprecation_handler` (default: printed once on
+    `arma::cout`), and `Kriging::deprecated_objective_message` gives it.
   - A Vecchia fit no longer performs the final exact O(n³) factorization:
     like a Nystrom fit, it keeps theta and the Vecchia-profiled beta /
     sigma2 only, so a large-n Vecchia fit no longer needs an n × n matrix.

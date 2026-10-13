@@ -4,6 +4,7 @@
 #include "Optim_binding.hpp"
 #include "Params_binding.hpp"
 #include "WarpKriging_binding.hpp"
+#include "libKriging/Kriging.hpp"
 #include "libKriging/KrigingLoader.hpp"
 #include "mex.h"  // cf https://fr.mathworks.com/help/
 #include "tools/MxException.hpp"
@@ -35,6 +36,13 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) try
   mexPrintf("  with %d inputs and %d outputs\n", nrhs, nlhs);
   // mexCallMATLAB(0, NULL, 1, (mxArray**)&prhs[0], "disp");
 #endif
+  // deprecated fit objectives ("LLVecchia(m)", ...): Octave/Matlab warning
+  // with identifier "mLibKriging:deprecated" (silenced with
+  // warning("off", "mLibKriging:deprecated"))
+  [[maybe_unused]] static const bool deprecation_routed
+      = (Kriging::set_deprecation_handler(
+             [](const std::string& m) { mexWarnMsgIdAndTxt("mLibKriging:deprecated", "%s", m.c_str()); }),
+         true);
   if (std::strcmp(nm, "mLibKriging") != 0) {
     throw MxException(LOCATION(), "mLibKriging:badMexFunction", "you call mLibKriging with an illegal name");
   }

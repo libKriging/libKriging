@@ -51,6 +51,17 @@ function _check_error(ret::Cint)
     end
 end
 
+# Deprecated fit objectives ("LLVecchia(m)", "LLNystrom(k)"): Julia
+# deprecation warning (message from libKriging), shown even without
+# --depwarn=yes, an error with --depwarn=error.
+function _warn_deprecated_objective(objective::String, funcsym::Symbol)
+    ptr = ccall(dlsym(_lk(), :lk_deprecated_objective_message), Cstring, (Cstring,), objective)
+    ptr == C_NULL && return nothing  # malformed spec: the fit raises the error
+    msg = unsafe_string(ptr)
+    isempty(msg) || Base.depwarn(msg, funcsym; force=true)
+    return nothing
+end
+
 function _check_ptr(ptr::Ptr{Nothing})
     if ptr == C_NULL
         msg = unsafe_string(ccall(dlsym(_lk(), :lk_get_last_error), Cstring, ()))
@@ -118,6 +129,7 @@ function Kriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String;
                  is_beta_estim::Bool=true,
                  nugget::Union{Nothing,Float64}=nothing,
                  is_nugget_estim::Bool=true)
+    _warn_deprecated_objective(objective, :Kriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -223,6 +235,7 @@ function fit!(k::Kriging, y::Vector{Float64}, X::Matrix{Float64};
               optim::String="BFGS",
               objective::String="LL",
               method::String="exact")
+    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     noise_ptr = noise === nothing ? C_NULL : pointer(noise)
@@ -1396,6 +1409,7 @@ function NestedKriging(y::Vector{Float64}, X::Matrix{Float64}, kernel::String, n
                        is_theta_estim::Bool=true,
                        beta::Union{Nothing,Vector{Float64}}=nothing,
                        is_beta_estim::Bool=true)
+    _warn_deprecated_objective(objective, :NestedKriging)
     n, d = size(X)
     @assert length(y) == n
 
@@ -1448,6 +1462,7 @@ function fit!(k::NestedKriging, y::Vector{Float64}, X::Matrix{Float64}, nb_group
               is_theta_estim::Bool=true,
               beta::Union{Nothing,Vector{Float64}}=nothing,
               is_beta_estim::Bool=true)
+    _warn_deprecated_objective(objective, :fit!)
     n, d = size(X)
     @assert length(y) == n
     sigma2_ptr = sigma2 === nothing ? C_NULL : Ref(sigma2)

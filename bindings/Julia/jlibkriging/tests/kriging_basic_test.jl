@@ -187,10 +187,11 @@ end
 
     # method stored with its explicit size; deprecated objective aliases
     @test jlibkriging.method(Kriging(y, X, "matern5_2"; method="vecchia")) == "vecchia(30)"
-    ka = Kriging(y, X, "matern5_2"; objective="LLVecchia(7)")
+    ka = @test_logs (:warn, r"objective \"LLVecchia\(7\)\" is deprecated") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLVecchia(7)")
     @test objective(ka) == "LL"
     @test jlibkriging.method(ka) == "vecchia(7)"
-    @test jlibkriging.method(Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")) == "nystrom(5)"
+    kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
+    @test jlibkriging.method(kb) == "nystrom(5)"
     @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia")
     @test_throws ErrorException Kriging(y, X, "matern5_2"; method="vecchia", noise="nugget")
 

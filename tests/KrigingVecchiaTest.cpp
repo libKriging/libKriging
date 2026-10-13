@@ -10,6 +10,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 static double f2d(double x1, double x2) {
   return std::sin(3.0 * x1) + std::cos(5.0 * x2) + x1 * x2;
@@ -98,6 +99,22 @@ TEST_CASE("deprecated LLVecchia objective is an alias of method vecchia", "[vecc
   CHECK_THROWS_AS(
       Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)", {}, "nystrom"),
       std::invalid_argument);
+
+  // the deprecation goes through the handler (bindings: native warnings)
+  std::vector<std::string> messages;
+  Kriging::set_deprecation_handler([&messages](const std::string& m) { messages.push_back(m); });
+  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)");
+  Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom");
+  fit_method(y, X, "vecchia(15)");  // no deprecation
+  REQUIRE(messages.size() == 2);
+  CHECK(messages[0] == "objective \"LLVecchia(15)\" is deprecated; use objective=\"LL\", method=\"vecchia(15)\"");
+  CHECK(messages[1] == "objective \"LLNystrom\" is deprecated; use objective=\"LL\", method=\"nystrom(50)\"");
+  CHECK(Kriging::deprecated_objective_message("LL").empty());
+  // a throwing handler turns the deprecation into an error
+  Kriging::set_deprecation_handler([](const std::string& m) { throw std::runtime_error(m); });
+  CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLVecchia(15)"),
+                  std::runtime_error);
+  Kriging::set_deprecation_handler(nullptr);  // default: printed once
 
   // set_vecchia_exact_commit is deprecated: false is a no-op, true raises
 #if defined(__GNUC__) || defined(__clang__)

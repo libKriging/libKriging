@@ -522,6 +522,20 @@ int lk_kriging_vecchia_neighbors(void* ptr) {
   CATCH_RETURN
 }
 
+// Deprecated fit objectives are reported on the Julia side (Base.depwarn,
+// see _warn_deprecated_objective): the C++ default print is silenced.
+[[maybe_unused]] static const bool cpp_deprecation_silenced
+    = (Kriging::set_deprecation_handler([](const std::string&) {}), true);
+
+const char* lk_deprecated_objective_message(const char* objective) {
+  static thread_local std::string message;
+  try {
+    message = Kriging::deprecated_objective_message(objective ? objective : "");
+    return message.c_str();
+  }
+  CATCH_RETURN_NULL
+}
+
 const char* lk_kriging_method(void* ptr) {
   try {
     return static_cast<Kriging*>(ptr)->method().c_str();

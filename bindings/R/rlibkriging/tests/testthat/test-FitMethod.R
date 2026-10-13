@@ -21,12 +21,15 @@ test_that("method is stored with its explicit size; objective stays the criterio
 })
 
 test_that("deprecated LLVecchia / LLNystrom objectives are aliases", {
-  ka <- Kriging(y, X, "matern5_2", objective = "LLVecchia(10)")
+  expect_warning(ka <- Kriging(y, X, "matern5_2", objective = "LLVecchia(10)"),
+                 class = "deprecatedWarning", regexp = 'method="vecchia\\(10\\)"')
   expect_equal(ka$objective(), "LL")
   expect_equal(ka$method(), "vecchia(10)")
-  kb <- Kriging(y, X, "matern5_2", objective = "LLNystrom(8)")
+  expect_warning(kb <- Kriging(y, X, "matern5_2", objective = "LLNystrom(8)"),
+                 class = "deprecatedWarning")
   expect_equal(kb$method(), "nystrom(8)")
-  expect_error(Kriging(y, X, "matern5_2", objective = "LLVecchia(10)", method = "nystrom"))
+  expect_error(suppressWarnings(Kriging(y, X, "matern5_2", objective = "LLVecchia(10)", method = "nystrom")))
+  expect_no_warning(Kriging(y, X, "matern5_2", method = "vecchia(10)"))
 })
 
 k <- Kriging(kernel = "matern5_2")

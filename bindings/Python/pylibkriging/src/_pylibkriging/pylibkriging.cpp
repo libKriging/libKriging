@@ -139,6 +139,14 @@ PYBIND11_MODULE(_pylibkriging, m) {
   // to avoid mixing allocators from default libKriging and Python
   lkalloc::set_allocation_functions(gil_aware_malloc, gil_aware_free);
 
+  // deprecated fit objectives ("LLVecchia(m)", ...) raise a native
+  // DeprecationWarning (an error if the warnings filter says so)
+  Kriging::set_deprecation_handler([](const std::string& message) {
+    py::gil_scoped_acquire gil;
+    if (PyErr_WarnEx(PyExc_DeprecationWarning, message.c_str(), 1) < 0)
+      throw py::error_already_set();
+  });
+
   m.doc() = R"pbdoc(
         pylibkriging example plugin
         -----------------------

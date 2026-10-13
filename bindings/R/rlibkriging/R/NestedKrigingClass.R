@@ -86,6 +86,7 @@ NestedKriging <- function(y = NULL,
                           warping = NULL,
                           method = "exact") {
     stopifnot(!is.null(y), !is.null(X), !is.null(kernel), !is.null(nb_groups))
+    .warn_deprecated_objective(objective)
     nk <- new_NestedKrigingFit(y, X, kernel, nb_groups,
                                aggregation, partition, seed,
                                regmodel, optim, objective, parameters, warping, method)
@@ -196,6 +197,7 @@ fit.NestedKriging <- function(object, y, X, nb_groups,
                               method = "exact", ...) {
     if (length(L <- list(...)) > 0) warnOnDots(L)
     if (!is.matrix(X)) X <- as.matrix(X)
+    .warn_deprecated_objective(objective)
     nestedkriging_fit(object, as.numeric(y), X, nb_groups,
                       regmodel, optim, objective, parameters, warping, method)
     invisible(NULL)

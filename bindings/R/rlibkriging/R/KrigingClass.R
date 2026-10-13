@@ -12,7 +12,20 @@
     if (!grepl("^(LL|LOO|LMP|LLVecchia(\\([0-9]+\\))?|LLNystrom(\\([0-9]+\\))?)$", objective))
         stop("'objective' must be one of \"LL\", \"LOO\" or \"LMP\" (got \"",
              objective, "\")", call. = FALSE)
+    .warn_deprecated_objective(objective)
     objective
+}
+
+# Deprecated objectives ("LLVecchia(m)", "LLNystrom(k)") raise an R warning of
+# class "deprecatedWarning" (message from libKriging), e.g. to be caught with
+# withCallingHandlers(..., deprecatedWarning = ...) or made an error by
+# options(warn = 2).
+.warn_deprecated_objective <- function(objective) {
+    msg <- kriging_deprecation_message(objective)
+    if (nzchar(msg))
+        warning(structure(class = c("deprecatedWarning", "warning", "condition"),
+                          list(message = msg, call = NULL)))
+    invisible(NULL)
 }
 
 #' Shortcut to provide functions to the S3 class "Kriging"

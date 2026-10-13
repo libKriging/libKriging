@@ -80,8 +80,9 @@ conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKri
 `"exact"` is implemented.
 
 > **Deprecated aliases**: `objective="LLVecchia(m)"` is `objective="LL", method="vecchia(m)"` and
-> `objective="LLNystrom(k)"` is `objective="LL", method="nystrom(k)"` (still accepted, with a one-time warning; a
-> conflicting explicit `method` raises). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
+> `objective="LLNystrom(k)"` is `objective="LL", method="nystrom(k)"` (still accepted, with the native deprecation
+> warning of each language: Python `DeprecationWarning`, R `warning` of class `deprecatedWarning`, Julia
+> `Base.depwarn`, Octave/Matlab warning id `mLibKriging:deprecated`; a conflicting explicit `method` raises). `"VLL"` / `"VLL(m)"`, the pre-1.2 spelling of the Vecchia objective, is no
 > longer accepted.
 
 **Exact / Vecchia / Nystrom methods — always explicit.** The method is passed at each step, never inferred from the
