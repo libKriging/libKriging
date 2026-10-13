@@ -20,7 +20,7 @@ k = Kriging(y, X, "matern5_2";
             optim="BFGS",          # "BFGS", "BFGS10" (10 restarts), "none"
             objective="LL",        # "LL" | "LOO" | "LMP"
             noise=nothing,         # nothing | "nugget" | Float64 | Vector{Float64}
-            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL, noise=nothing only)
+            method="exact")        # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise=nothing only)
 
 p = predict(k, Xnew; return_stdev=true, return_cov=false, return_deriv=false)
 #   predict / simulate / log_likelihood also take method="exact" (default) |

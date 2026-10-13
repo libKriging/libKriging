@@ -334,6 +334,166 @@ TEST_CASE("normalize=true: Vecchia / Nystrom log-likelihoods in the original sca
   require_close(grad, fd, vecchia ? 1e-4 : 5e-2);
 }
 
+TEST_CASE("normalize=true: Vecchia noise models agree with normalize=false", "[normalize][kriging][vecchia]") {
+  const Data D = make_data();
+  const arma::uword n = D.X.n_rows;
+  // m >= n - 1 (even after the update below, which adds nu points): every
+  // observation conditions on all its predecessors, so the Vecchia likelihood
+  // is the exact one. With fewer neighbors the two models differ by design:
+  // neighbors are searched in the internal (normalized) input space.
+  const arma::uword nu = 6;
+  const std::string method = "vecchia(" + std::to_string(n + nu - 1) + ")";
+  const RM rm = GENERATE(RM::Constant, RM::Linear);
+  const NM nm = GENERATE(NM::Nugget, NM::Heterogeneous);
+  const bool est_sigma2 = GENERATE(false, true);
+  CAPTURE(Trend::toString(rm), static_cast<int>(nm), est_sigma2);
+
+  Kriging::Parameters p;
+  p.theta = arma::mat{{9.0, 2.1}};
+  p.is_theta_estim = false;
+  p.sigma2 = 450.0;
+  p.is_sigma2_estim = est_sigma2;
+  if (nm == NM::Nugget) {
+    p.nugget = 3.0;
+    p.is_nugget_estim = est_sigma2;
+  }
+
+  auto vfit = [&](bool normalize) {
+    Kriging k = make_model(nm);
+    if (nm == NM::Heterogeneous)
+      k.fit(D.y, D.noise, D.X, rm, normalize, "none", "LL", p, method);
+    else
+      k.fit(D.y, D.X, rm, normalize, "none", "LL", p, method);
+    return k;
+  };
+  Kriging kn = vfit(true), ko = vfit(false);
+  REQUIRE(kn.is_vecchia_light());
+  REQUIRE(ko.is_vecchia_light());
+
+  const double tol = 1e-7;
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  if (nm == NM::Nugget) {
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(tol));
+    CHECK(kn.alpha() == Approx(ko.alpha()).epsilon(tol));  // scale-free
+    CHECK(kn.alpha() == Approx(kn.sigma2() / (kn.sigma2() + kn.nugget())).epsilon(tol));
+  } else {
+    require_close(kn.noise(), ko.noise(), tol);
+    require_close(kn.noise(), D.noise, 1e-12);  // round-trip of the given noise
+  }
+
+  // likelihood value and gradient at original-scale gamma
+  CHECK(kn.logLikelihood("vecchia") == Approx(ko.logLikelihood("vecchia")).epsilon(tol));
+  const arma::vec g0 = public_gamma(ko);
+  CHECK(std::get<0>(kn.logLikelihoodVecchiaFun(g0, false)) == Approx(kn.logLikelihood("vecchia")).epsilon(1e-10));
+  for (const arma::vec& g : {g0, arma::vec(g0 % arma::vec{1.3, 0.8, nm == NM::Nugget ? 0.97 : 1.5})}) {
+    CAPTURE(g);
+    auto [vn, gn] = kn.logLikelihoodVecchiaFun(g, true);
+    auto [vo, go] = ko.logLikelihoodVecchiaFun(g, true);
+    CHECK(vn == Approx(vo).epsilon(tol));
+    require_close(gn, go, 1e-6);
+    // theta-only argument: the committed alpha / sigma2
+    CHECK(std::get<0>(kn.logLikelihoodVecchiaFun(g.head(2), false))
+          == Approx(std::get<0>(ko.logLikelihoodVecchiaFun(g.head(2), false))).epsilon(tol));
+    // finite differences of the original-scale objective
+    const arma::vec fd
+        = fd_grad([&](const arma::vec& x) { return std::get<0>(kn.logLikelihoodVecchiaFun(x, false)); }, g);
+    require_close(gn, fd, 1e-4);
+  }
+
+  // exact model at the same parameters: Vecchia(n-1) is exact
+  Kriging ke = make_model(nm);
+  fit(ke, D, rm, /*normalize=*/true, "none", "LL", p);
+  CHECK(std::get<0>(kn.logLikelihoodVecchiaFun(g0, false))
+        == Approx(std::get<0>(ke.logLikelihoodFun(g0, false, false))).epsilon(1e-8));
+
+  // predictions (all neighbors) and simulations (all predecessors)
+  const arma::mat Xn = arma::join_cols(D.X.rows(0, 3) + 0.3, D.X.rows(5, 6));
+  auto [mn, sn] = kn.predictVecchia(Xn, true, n);
+  auto [mo, so] = ko.predictVecchia(Xn, true, n);
+  require_close(mn, mo, tol);
+  require_close(sn, so, tol);
+  const arma::uword m_all = n + Xn.n_rows;
+  const arma::vec sdn = arma::linspace(0.5, 2.0, Xn.n_rows);  // original-scale standard deviations
+  for (bool with_nugget : {false, true}) {
+    if (with_nugget && nm != NM::Nugget)
+      continue;
+    const arma::mat sim_n = kn.simulateVecchia(7, 123, Xn, m_all, with_nugget, sdn);
+    const arma::mat sim_o = ko.simulateVecchia(7, 123, Xn, m_all, with_nugget, sdn);
+    CAPTURE(with_nugget);
+    require_close(arma::vectorise(sim_n), arma::vectorise(sim_o), 1e-6);
+  }
+  // with_noise is in the original scale, as for the exact simulate(): the
+  // added noise does not depend on normalize
+  const arma::mat s0 = kn.simulateVecchia(4, 5, Xn, m_all);
+  const arma::mat s1 = kn.simulateVecchia(4, 5, Xn, m_all, false, sdn);
+  arma::mat eps = s1 - s0;
+  eps.each_col() /= sdn;
+  Kriging ko2 = vfit(false);
+  arma::mat eps_o = ko2.simulateVecchia(4, 5, Xn, m_all, false, sdn) - ko2.simulateVecchia(4, 5, Xn, m_all);
+  eps_o.each_col() /= sdn;
+  require_close(arma::vectorise(eps), arma::vectorise(eps_o), 1e-6);
+
+  // update without refit (new data in the original scale): both stay equal
+  const Data U = make_data(nu);
+  const arma::mat Xu = U.X + 0.7;
+  if (nm == NM::Heterogeneous) {
+    kn.update(U.y, U.noise, Xu, false);
+    ko.update(U.y, U.noise, Xu, false);
+    require_close(kn.noise(), ko.noise(), tol);
+    require_close(kn.noise(), arma::join_cols(D.noise, U.noise), 1e-12);
+  } else {
+    kn.update(U.y, Xu, false);
+    ko.update(U.y, Xu, false);
+    CHECK(kn.nugget() == Approx(ko.nugget()).epsilon(tol));
+    CHECK(kn.alpha() == Approx(ko.alpha()).epsilon(tol));
+  }
+  REQUIRE(kn.is_vecchia_light());
+  require_close(kn.theta(), ko.theta(), tol);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  require_close(kn.beta(), ko.beta(), tol);
+  CHECK(kn.logLikelihood("vecchia") == Approx(ko.logLikelihood("vecchia")).epsilon(tol));
+  auto [mun, sun] = kn.predictVecchia(Xn, true, n + nu);
+  auto [muo, suo] = ko.predictVecchia(Xn, true, n + nu);
+  require_close(mun, muo, tol);
+  require_close(sun, suo, tol);
+}
+
+TEST_CASE("normalize=true: Vecchia noise-model BFGS fit, objective at the accessors", "[normalize][kriging][vecchia]") {
+  const Data D = make_data(40);
+  const NM nm = GENERATE(NM::Nugget, NM::Heterogeneous);
+  CAPTURE(static_cast<int>(nm));
+  Kriging k = make_model(nm);
+  if (nm == NM::Heterogeneous)
+    k.fit(D.y, D.noise, D.X, RM::Constant, /*normalize=*/true, "BFGS", "LL", {}, "vecchia(10)");
+  else
+    k.fit(D.y, D.X, RM::Constant, /*normalize=*/true, "BFGS", "LL", {}, "vecchia(10)");
+  const arma::vec g = public_gamma(k);
+  CHECK(std::get<0>(k.logLikelihoodVecchiaFun(g, false)) == Approx(k.logLikelihood("vecchia")).epsilon(1e-9));
+  // the original-scale optimum: (near) zero gradient in theta, and no
+  // better value nearby
+  const arma::vec g1 = g % arma::vec{1.2, 0.8, nm == NM::Nugget ? 0.99 : 1.3};
+  auto [v1, grad1] = k.logLikelihoodVecchiaFun(g1, true);
+  const arma::vec fd
+      = fd_grad([&](const arma::vec& x) { return std::get<0>(k.logLikelihoodVecchiaFun(x, false)); }, g1);
+  CAPTURE(grad1, fd);
+  require_close(grad1, fd, 1e-4);
+  CHECK(v1 <= k.logLikelihood("vecchia") + 1e-6);
+
+  // save / load keeps the original-scale accessors and objective
+  const std::string f = "KrigingNormalizeScaleTest_vecchia_saved.json";
+  k.save(f);
+  Kriging kl = Kriging::load(f);
+  require_close(kl.theta(), k.theta(), 1e-12);
+  CHECK(kl.sigma2() == Approx(k.sigma2()).epsilon(1e-12));
+  if (nm == NM::Heterogeneous)
+    require_close(kl.noise(), D.noise, 1e-12);
+  else
+    CHECK(kl.nugget() == Approx(k.nugget()).epsilon(1e-12));
+  CHECK(std::get<0>(kl.logLikelihoodVecchiaFun(g, false)) == Approx(k.logLikelihood("vecchia")).epsilon(1e-9));
+}
+
 TEST_CASE("normalize=false: accessors are the internal members, bit for bit", "[normalize][kriging]") {
   const Data D = make_data();
   const NM nm = GENERATE(NM::None, NM::Nugget, NM::Heterogeneous);

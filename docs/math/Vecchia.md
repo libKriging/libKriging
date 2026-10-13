@@ -132,13 +132,112 @@ $$
   i.e. m ≥ n + q − 1 (chain rule). For smaller m, correlations beyond the
   m nearest neighbors are truncated, and the trajectories depend on the
   row order of `X_n`.
-- Usable after any `NoiseModel::None` fit (m defaults to
-  `vecchia_neighbors()` after a Vecchia fit, 30 otherwise; method
-  `"vecchia(m)"` sets it); no `will_update` / `update_simulate`.
+- Usable after any fit (m defaults to `vecchia_neighbors()` after a
+  Vecchia fit, 30 otherwise; method `"vecchia(m)"` sets it); no
+  `will_update` / `update_simulate`. Noise models: see below.
+
+## Noise models (`NoiseModel::Nugget`, `NoiseModel::Heterogeneous`)
+
+`method="vecchia(m)"` also fits the two noise models of
+[Noise.md](Noise.md) (`noise="nugget"` or a vector of known noise
+variances in the bindings). libKriging uses **response Vecchia**
+(Katzfuss & Guinness 2021): the conditionals are those of the *noisy*
+observations y, so the m×m blocks are blocks of the same noisy
+correlation matrix R̃ as the exact likelihood, in units of a scale s:
+
+| Noise model | R̃ (off-diagonal / diagonal) | scale s | γ optimized |
+|---|---|---|---|
+| None | C_ij / 1 | σ² | θ |
+| Nugget | α C_ij / 1, i.e. α C + (1−α) I | σ² + τ² = σ²/α | (θ, α) |
+| Heterogeneous | C_ij / 1 + νᵢ/σ², i.e. C + diag(ν/σ²) | σ² | (θ, σ²) |
+
+For the i-th point of the maxmin ordering with neighbors N = N(i):
+
+$$
+a_i = \tilde R_{NN}^{-1} \tilde r_{Ni},\quad
+v_i = \tilde R_{ii} - \tilde r_{Ni}^\top a_i,\quad
+u_i = y_i - a_i^\top y_N,\quad
+w_i = f_i - F_N^\top a_i,
+$$
+
+$$
+\log \tilde p(y) = -\frac n2 \log(2\pi s) - \frac12 \sum_i \log v_i - \frac{Q}{2s},
+\qquad Q = \sum_i \frac{(u_i - w_i^\top \beta)^2}{v_i},
+$$
+
+with β profiled by GLS over (wᵢ, uᵢ, vᵢ) as for `NoiseModel::None`, and
+s handled exactly as by the exact likelihood (`_logLikelihood`):
+
+- Nugget, σ² and τ² estimated: s = Q/n (concentrated), so
+  log p̃ = −n/2 log(2π Q/n) − ½ Σ log vᵢ − n/2, then σ² = α s, τ² = (1−α) s;
+- Nugget, τ² fixed: s = τ²/(1−α); σ² fixed: s = σ²/α; both fixed:
+  s = σ² + τ² and α = σ²/(σ²+τ²) is forced;
+- Heterogeneous: s = σ² is a free parameter (not concentrated), as in
+  the exact model, and enters R̃ through the diagonal νᵢ/σ².
+
+The gradient is analytic in θ **and** in the extra parameter (α or σ²):
+for any direction k, with the derivatives of the noisy blocks
+(∂R̃_NN, ∂r̃, ∂R̃_ii) — θ: (α ∂C_NN, α ∂c, 0) (α = 1 without nugget);
+α: (C_NN with zero diagonal, c, 0); σ² (Heterogeneous):
+(−diag(ν_N)/σ⁴, 0, −νᵢ/σ⁴) —
+
+$$
+\partial a = \tilde R_{NN}^{-1}(\partial \tilde r - \partial \tilde R_{NN}\, a),\quad
+\partial v = \partial \tilde R_{ii} - \partial \tilde r^\top a - \tilde r^\top \partial a,\quad
+\partial u = -\partial a^\top y_N,\quad \partial w = -F_N^\top \partial a,
+$$
+
+$$
+\partial Q = \sum_i \Big(\frac{2 e_i\, \partial e_i}{v_i} - \frac{e_i^2\, \partial v_i}{v_i^2}\Big),\quad
+\partial \log\tilde p = -\tfrac12 \sum_i \frac{\partial v_i}{v_i} - \frac{\partial Q}{2s}
+  + \Big(\frac{Q}{2s^2} - \frac{n}{2s}\Big)\partial s
+$$
+
+(eᵢ = uᵢ − wᵢᵀβ; ∂s ≠ 0 only along α or σ² when s is not concentrated;
+in the concentrated case ∂log p̃ = −n ∂Q/(2Q) − ½ Σ ∂vᵢ/vᵢ). The
+optimizer uses the same reparametrizations as the exact noise-model
+objectives (log θ, and −log(1 + α_min − α) for α, log σ²). For m = n − 1
+the Vecchia likelihood equals the exact one (tested), and the committed
+θ, α, τ², σ², β follow the exact noise-model conventions without any
+exact factorization.
+
+**Prediction and simulation** follow the exact noise-model semantics:
+
+- Nugget: `predict(…, method="vecchia")` predicts a noisy observation
+  (variance scale σ² + τ², cross correlation α C; a prediction point at
+  an observed location returns that observation, as `predict`);
+  `simulate(…, method="vecchia")` draws the latent process by default
+  (as `simulate(nsim, seed, X)`), or the noisy response with
+  `with_nugget=true` (C++ `simulate(nsim, seed, X, with_nugget,
+  will_update, "vecchia")` / `simulateVecchia(nsim, seed, X, m, true)`).
+- Heterogeneous: prediction and simulation are those of the latent
+  process (variance scale σ², cross correlation C), `with_noise`
+  (standard deviations) adding independent noise to the simulations, as
+  the exact `simulate(…, with_noise, …)`.
+- `predictVecchia` / `simulateVecchia` are also usable after an exact
+  noise-model fit (then exact for m = n, resp. m ≥ n + q − 1, with no
+  trend: tested).
+- `update` (Nugget: warm-start refit of (θ, α); Heterogeneous:
+  `update(y_u, noise_u, X_u)`, a Vecchia fit of the extended data with the current θ, σ² as starting / fixed values),
+  `save` / `load` and `logLikelihood(method="vecchia")` work as without
+  noise.
+
+**Accuracy caveat.** Response Vecchia conditions on noisy neighbors: the
+noise dilutes the information each neighbor carries about the latent
+field, so for a given m the approximation of the likelihood (and of the
+predictor) degrades as the noise variance grows relative to the signal
+variance (large τ²/σ², i.e. small α, or large νᵢ/σ²). It stays accurate
+when the noise is small to moderate compared with σ²; for large noise,
+*latent* Vecchia (conditioning on the latent field, with a sparse
+Cholesky of the joint latent-plus-noise precision, Katzfuss & Guinness
+2021) would be needed: it is not implemented here (out of scope). Check
+by increasing m, or against an exact fit on a subsample.
 
 ## Current limitations
 
-- `NoiseModel::None` only (no nugget/noise channel).
+- Noise models by response Vecchia only (accuracy degrades for noise
+  large relative to the signal; latent Vecchia is not implemented), see
+  above.
 - `objective="LL"` only (no LOO / LMP Vecchia version).
 - The exact model at the Vecchia θ* (separate `optim="none"` exact fit
   above) is still O(n³) time/memory — practical up to n ~ 2·10⁴.

@@ -97,9 +97,9 @@ fit:
 
 | Step | exact | Vecchia | Nystrom |
 |---|---|---|---|
-| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, `objective="LL"`: Vecchia estimation, no exact factorization is kept | `"nystrom(k)"`, `objective="LL"`: no exact factorization is kept |
+| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, `objective="LL"`, any `noise` (none, `"nugget"`, known variances: response Vecchia): Vecchia estimation, no exact factorization is kept | `"nystrom(k)"`, `objective="LL"`, no `noise`: no exact factorization is kept |
 | `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
-| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit | `"nystrom"`: after a Nystrom fit |
+| `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit |
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
 | `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks) |
 | `update_simulate` | yes | — | — |
@@ -114,8 +114,13 @@ Old save files (libKriging ≤ 1.2) with objective `"LLVecchia(m)"` load as `met
 exact factorization until the next `update`. Argument names: Python / R `method="…"` keyword, Julia `method="…"`
 keyword, Octave/Matlab trailing positional argument (constructor 11th argument
 `Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise, method)`, `fit` 8th
-argument, `predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, will_update, "vecchia")`,
-`logLikelihood("vecchia")`).
+argument, `predict(X, stdev, cov, deriv, "vecchia")`, `simulate(nsim, seed, X, will_update, "vecchia")` -- for a
+noise model `simulate(nsim, seed, X, with_nugget, will_update, "vecchia")` /
+`simulate(nsim, seed, X, with_noise, will_update, "vecchia")` --, `logLikelihood("vecchia")`). With a noise model
+the Vecchia predictor / simulator follow the exact noise-model conventions (nugget: noisy-observation prediction,
+latent simulation unless `with_nugget` / `with_noise=TRUE`; heterogeneous: latent process, `with_noise` adds noise);
+response Vecchia loses accuracy when the noise is large relative to the signal (see
+[docs/math/Vecchia.md](../docs/math/Vecchia.md)).
 
 > **C++ only**: `predictVecchia`, `predictNystrom`, `simulateVecchia`, `simulateNystrom` (the methods behind
 > `method=`), `logLikelihoodVecchiaFun` and `logLikelihoodNystromFun` (at a given θ).

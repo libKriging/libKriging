@@ -194,7 +194,7 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Range{5, 6}};
+                 RequiresArg::Range{5, 7}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
   const auto nsim = input.get<int>(1, "nsim");
@@ -207,13 +207,17 @@ void simulate(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
     auto result = km->simulate(nsim, seed, X_n, method, input.get<bool>(4, "will_update"));
     output.set(0, result, "simulated response");
   } else if (km->noise_model() == Kriging::NoiseModel::Nugget) {
-    // simulate(nsim, seed, X_n, with_nugget, will_update)
-    auto result = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"));
+    // simulate(nsim, seed, X_n, with_nugget, will_update [, method]); method:
+    // "exact" (default), "vecchia" or "vecchia(m)"
+    const auto method = input.getOptional<std::string>(6, "method").value_or("exact");
+    auto result
+        = km->simulate(nsim, seed, X_n, input.get<bool>(4, "with_nugget"), input.get<bool>(5, "will_update"), method);
     output.set(0, result, "simulated response");
   } else {
-    // Heterogeneous: simulate(nsim, seed, X_n, with_noise, will_update)
-    auto result
-        = km->simulate(nsim, seed, X_n, input.get<arma::vec>(4, "with_noise"), input.get<bool>(5, "will_update"));
+    // Heterogeneous: simulate(nsim, seed, X_n, with_noise, will_update [, method])
+    const auto method = input.getOptional<std::string>(6, "method").value_or("exact");
+    auto result = km->simulate(
+        nsim, seed, X_n, input.get<arma::vec>(4, "with_noise"), input.get<bool>(5, "will_update"), method);
     output.set(0, result, "simulated response");
   }
 }

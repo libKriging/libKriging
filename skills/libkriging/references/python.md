@@ -20,7 +20,7 @@ model = lk.Kriging(
     objective="LL",            # "LL" | "LOO" | "LMP"
     parameters={},
     noise=None,                 # None | "nugget" | per-observation variance vector
-    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL, noise=None only)
+    method="exact",            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise=None only)
 )
 
 mean, stdev, cov, mean_deriv, stdev_deriv = model.predict(

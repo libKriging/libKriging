@@ -81,7 +81,9 @@ correct; this is an optimization-landscape issue, not a bug).
 idx = Kriging.subsetOfData(X, int32(2000), "kmeans", int32(123));
 k = Kriging(y(idx), X(idx, :), "matern5_2");
 
-% Or keep every point and approximate the likelihood (objective "LL", noise-free Kriging only):
+% Or keep every point and approximate the likelihood (objective "LL"; vecchia also with
+% noise_model "nugget" / "heterogeneous", e.g. Kriging(y, X, k, "constant", false, "BFGS", "LL", [],
+% "nugget", [], "vecchia(30)"), then simulate(nsim, seed, X, with_nugget, will_update, "vecchia")):
 % method is the 11th constructor argument ([] for unused parameters / noise)
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "vecchia(30)");   % d <~ 5
 k = Kriging(y, X, "matern5_2", "constant", false, "BFGS", "LL", [], "none", [], "nystrom(50)");   % higher d

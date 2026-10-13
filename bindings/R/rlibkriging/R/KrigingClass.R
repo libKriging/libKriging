@@ -106,7 +106,9 @@ classKriging <- function(nk) {
 #'     \code{simulate} and \code{logLikelihood} then take the same
 #'     \code{method}, and the exact model at the fitted \code{theta} is a
 #'     separate fit (\code{optim = "none"}). Approximate methods are only
-#'     implemented with \code{objective = "LL"} and without \code{noise}.
+#'     implemented with \code{objective = "LL"}; \code{"vecchia"} supports
+#'     \code{noise} (response Vecchia, accurate while the noise stays small
+#'     relative to the signal), \code{"nystrom"} does not.
 #'
 #' @return An object with S3 class \code{"Kriging"}. Should be used
 #'     with its \code{predict}, \code{simulate}, \code{update}
@@ -463,7 +465,9 @@ subsetOfData <- function(X, n_max, method = "kmeans", seed = 123) {
 #'     \code{update_simulate()} later (only with \code{method = "exact"}).
 #' @param method \code{Character}: \code{"exact"} (default),
 #'     \code{"vecchia"} / \code{"vecchia(m)"} or \code{"nystrom"} (see
-#'     \code{predict.Kriging}); \code{with_noise} needs \code{"exact"}.
+#'     \code{predict.Kriging}); \code{with_noise} needs \code{"exact"} or
+#'     \code{"vecchia"} (for a nugget model, \code{with_noise} defaults to
+#'     \code{TRUE} with both).
 #' @param ... Ignored.
 #'
 #' @return a matrix with \code{nrow(x)} rows and \code{nsim}
@@ -512,7 +516,7 @@ simulate.Kriging <- function(object, nsim = 1, seed = 123, x, with_noise = NULL,
         # (which uses alpha-scaled correlations).  Passing FALSE would trigger
         # the hetero path with noise=0 and wrong (non-alpha) correlation factors.
         with_noise <- NULL
-    } else if (is.null(with_noise) && is_nugget && method == "exact") {
+    } else if (is.null(with_noise) && is_nugget && !startsWith(method, "nystrom")) {
         # For nugget models, default to including the nugget noise
         # (backward compat: old simulate.NuggetKriging defaulted to with_nugget=TRUE)
         with_noise <- TRUE

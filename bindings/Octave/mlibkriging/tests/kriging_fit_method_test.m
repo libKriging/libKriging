@@ -129,3 +129,43 @@ yl = sin(3 * Xl(:, 1)) + Xl(:, 2);
 nk = NestedKriging(yl, Xl, "matern5_2", 3, "NK", "kmeans", 123, "constant", "BFGS", "LL", [], {}, "vecchia(15)");
 assert(strcmp(nk.objective(), "LL"));
 assert(strcmp(nk.method(), "vecchia(15)"));
+
+% method "vecchia(m)" with noise models (response Vecchia)
+% Kriging(y, X, kernel, regmodel, normalize, optim, objective, parameters, noise_model, noise, method)
+noise = 0.005 + 0.02 * X(:, 1);
+yn = y + sqrt(noise) .* sin(37 * (1:n)');  % deterministic pseudo-noise
+kg = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "vecchia(15)");
+assert(strcmp(kg.method(), "vecchia(15)"));
+failed = false;
+try
+  [m_, s_] = kg.predict(Xn, true, false, false);
+catch
+  failed = true;
+end
+assert(failed, "exact predict should raise on a Vecchia nugget fit");
+[mg, sg] = kg.predict(Xn, true, false, false, "vecchia");
+assert(all(isfinite(mg)));
+assert(all(sg > 0));
+assert(isfinite(kg.logLikelihood("vecchia")));
+% simulate(nsim, seed, X_n, with_nugget, will_update, method)
+assert(isequal(size(kg.simulate(int32(4), int32(123), Xn, true, false, "vecchia")), [3, 4]));
+assert(isequal(size(kg.simulate(int32(4), int32(123), Xn, false, false, "vecchia(10)")), [3, 4]));
+kg.update(yn(1:3), X(1:3, :) + 0.01, false);
+assert(size(kg.X(), 1) == n + 3);
+
+kh = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "heterogeneous", noise, "vecchia(15)");
+assert(strcmp(kh.method(), "vecchia(15)"));
+[mh, sh] = kh.predict(Xn, true, false, false, "vecchia");
+assert(all(isfinite(mh)));
+assert(all(sh > 0));
+% simulate(nsim, seed, X_n, with_noise, will_update, method)
+assert(isequal(size(kh.simulate(int32(4), int32(123), Xn, [0.1; 0.1; 0.1], false, "vecchia")), [3, 4]));
+kh.update(yn(1:3), noise(1:3), X(1:3, :) + 0.01, false);
+assert(size(kh.X(), 1) == n + 3);
+failed = false;
+try
+  kx = Kriging(yn, X, "matern5_2", "constant", false, "BFGS", "LL", [], "nugget", [], "nystrom(8)");
+catch
+  failed = true;
+end
+assert(failed, "method nystrom has no noise model");

@@ -18,7 +18,7 @@ k <- Kriging(y, X, kernel = "matern5_2",
              objective = "LL",            # "LL" | "LOO" | "LMP"
              parameters = NULL,
              noise = NULL,                # NULL | "nugget" | numeric vector
-             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL, noise = NULL only)
+             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise = NULL only)
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
 #   predict / simulate / logLikelihood also take method = "exact" (default) |

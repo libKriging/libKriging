@@ -83,8 +83,15 @@ params.theta = arma::mat(model.theta().t());
 params.is_theta_estim = false;
 Kriging exact(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "none", "LL", params);
 ```
-Approximate methods: `objective="LL"` and `NoiseModel::None` only (else
-`std::invalid_argument`); `update` keeps the method, `save` / `load` too.
+Approximate methods: `objective="LL"` only; `"vecchia(m)"` with any
+`NoiseModel` (response Vecchia), `"nystrom(k)"` with `NoiseModel::None`
+only (else `std::invalid_argument`); `update` keeps the method (a
+Heterogeneous model needs `update(y_u, noise_u, X_u, refit)`), `save` /
+`load` too. Noise-model Vecchia simulation: `simulate(nsim, seed, X_n,
+with_nugget, will_update, "vecchia")` (Nugget) /
+`simulate(nsim, seed, X_n, with_noise, will_update, "vecchia")`
+(Heterogeneous), or `simulateVecchia(nsim, seed, X_n, m, with_nugget,
+with_noise)`.
 `Kriging::fit_objective_method(objective, method)` returns the canonical
 (objective, method) pair. Deprecated: objective `"LLVecchia(m)"` /
 `"LLNystrom(k)"` (aliases of `"LL"` + `"vecchia(m)"` / `"nystrom(k)"`).

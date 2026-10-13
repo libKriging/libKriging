@@ -176,25 +176,18 @@ py::array_t<double> PyKriging::simulate(const int nsim,
                                         const std::string& method) {
   arma::mat mat_X = carma::arr_to_mat_view<double>(X_n);
 
-  if (method != "exact") {
-    // approximate simulators: NoiseModel::None only, no noise to add
-    if (!with_noise.is_none())
-      throw std::invalid_argument("simulate: with_noise is only available with method=\"exact\"");
+  if (with_noise.is_none()) {
+    // Plain simulate (latent process for noise models); method: "exact",
+    // "vecchia", "vecchia(m)" or "nystrom"
     auto result = m_internal->simulate(nsim, seed, mat_X, method, will_update);
     return carma::mat_to_arr(result, true);
-  }
-
-  if (with_noise.is_none()) {
-    // Plain simulate (NoiseModel::None)
-    auto result = m_internal->simulate(nsim, seed, mat_X, will_update);
-    return carma::mat_to_arr(result, true);
   } else if (py::isinstance<py::bool_>(with_noise)) {
-    // Nugget mode: simulate(nsim, seed, X_n, with_nugget, will_update)
+    // Nugget mode: simulate(nsim, seed, X_n, with_nugget, will_update, method)
     bool flag = with_noise.cast<bool>();
-    auto result = m_internal->simulate(nsim, seed, mat_X, flag, will_update);
+    auto result = m_internal->simulate(nsim, seed, mat_X, flag, will_update, method);
     return carma::mat_to_arr(result, true);
   } else {
-    // Heterogeneous mode: simulate(nsim, seed, X_n, noise_vec, will_update)
+    // Heterogeneous mode: simulate(nsim, seed, X_n, noise_vec, will_update, method)
     arma::colvec noise_vec;
     if (py::isinstance<py::float_>(with_noise) || py::isinstance<py::int_>(with_noise)) {
       double noise_val = with_noise.cast<double>();
@@ -202,7 +195,7 @@ py::array_t<double> PyKriging::simulate(const int nsim,
     } else {
       noise_vec = carma::arr_to_col_view<double>(with_noise.cast<py::array_t<double>>());
     }
-    auto result = m_internal->simulate(nsim, seed, mat_X, noise_vec, will_update);
+    auto result = m_internal->simulate(nsim, seed, mat_X, noise_vec, will_update, method);
     return carma::mat_to_arr(result, true);
   }
 }

@@ -364,11 +364,12 @@ def test_fit_method_and_deprecated_objectives():
         with pytest.raises(DeprecationWarning):
             lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
         lk.Kriging(y, X, "matern5_2", method="vecchia(7)")  # no warning
-    # only LL has approximate versions; no approximation with a noise model
+    # only LL has approximate versions; Nystrom has no noise model
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia")
     with pytest.raises(ValueError):
-        lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget")
+        lk.Kriging(y, X, "matern5_2", method="nystrom", noise="nugget")
+    assert lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget").method() == "vecchia(30)"
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", method="Vecchia")
     with pytest.raises(ValueError):  # conflict: raised before any warning
@@ -423,6 +424,52 @@ def test_vecchia_fit(tmp_path):
     ke.predict(Xn, True, True, False)
     ke.predict(Xn, method="vecchia")
     assert ke.logLikelihood() == ke.logLikelihood(method="exact")
+
+
+def test_vecchia_noise_models(tmp_path):
+    rng = np.random.default_rng(11)
+    n = 80
+    X = rng.uniform(size=(n, 2))
+    noise = 0.005 + 0.02 * X[:, 0]
+    y = np.sin(3 * X[:, 0]) + X[:, 1] + np.sqrt(noise) * rng.standard_normal(n)
+    Xn = rng.uniform(size=(6, 2))
+
+    # Nugget: response Vecchia fit, light (no exact factorization)
+    k = lk.Kriging(y, X, "matern5_2", noise="nugget", method="vecchia(15)")
+    assert k.method() == "vecchia(15)"
+    assert k.nugget() > 0 and k.sigma2() > 0
+    with pytest.raises(RuntimeError):
+        k.predict(Xn)
+    mean, stdev, _, _, _ = k.predict(Xn, method="vecchia")
+    assert np.all(np.isfinite(mean)) and np.all(stdev > 0)
+    assert np.isfinite(k.logLikelihood(method="vecchia"))
+    s = k.simulate(5, 123, Xn, method="vecchia")
+    assert s.shape == (6, 5)
+    s_nug = k.simulate(5, 123, Xn, with_noise=True, method="vecchia")
+    assert s_nug.shape == (6, 5) and not np.array_equal(s, s_nug)
+    with pytest.raises(ValueError):
+        k.simulate(5, 123, Xn, with_noise=True, method="nystrom")
+    k.update(y[:5] + 0.01, X[:5] + 0.01, False)
+    assert k.X().shape == (n + 5, 2)
+    fname = str(tmp_path / "vecchia_nugget_py.json")
+    k.save(fname)
+    kl = lk.Kriging.load(fname)
+    assert kl.method() == "vecchia(15)"
+    np.testing.assert_allclose(kl.predict(Xn, method="vecchia")[0], k.predict(Xn, method="vecchia")[0],
+                               atol=1e-12)
+
+    # Heterogeneous (known noise variances)
+    kh = lk.Kriging(y, X, "matern5_2", noise=noise, method="vecchia(15)")
+    assert kh.method() == "vecchia(15)"
+    mean_h, stdev_h, _, _, _ = kh.predict(Xn, method="vecchia")
+    assert np.all(np.isfinite(mean_h)) and np.all(stdev_h > 0)
+    assert kh.simulate(5, 123, Xn, with_noise=np.full(6, 0.1), method="vecchia").shape == (6, 5)
+    kh.update(y[:5], X[:5] + 0.01, False, noise[:5])
+    assert kh.X().shape == (n + 5, 2)
+
+    # same theta as the exact fit, roughly
+    ke = lk.Kriging(y, X, "matern5_2", noise=noise)
+    assert np.max(np.abs(np.log(kh.theta().ravel()) - np.log(ke.theta().ravel()))) < 1.0
 
 
 def test_nystrom_fit_explicit_method():

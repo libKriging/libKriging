@@ -141,6 +141,9 @@ class Kriging : public KrigingImpl {
 
   [[nodiscard]] NoiseModel noise_model() const { return m_noise_model; }
   [[nodiscard]] bool is_nugget_estim() const { return m_est_nugget; }
+  /// Nugget mode: alpha = sigma2 / (sigma2 + nugget) used by the noisy
+  /// correlation (scale-free: identical with normalize=true or false)
+  [[nodiscard]] double alpha() const { return m_alpha; }
 
   /** Parameter accessors, always in the ORIGINAL scale of X and y, so that
    * they round-trip with `Parameters` (which are read in the original scale
@@ -186,8 +189,10 @@ class Kriging : public KrigingImpl {
    *        simulate / logLikelihood then need the same method, and the
    *        exact model at the fitted theta is a separate fit
    *        (objective='LL', method='exact', optim='none', theta given).
-   *        Approximate methods are only implemented with objective 'LL' and
-   *        noise model None: other combinations raise std::invalid_argument.
+   *        Approximate methods are only implemented with objective 'LL';
+   *        'vecchia(m)' supports the Nugget / Heterogeneous noise models
+   *        (response Vecchia), 'nystrom(k)' only noise model None: other
+   *        combinations raise std::invalid_argument.
    */
   LIBKRIGING_EXPORT void fit(const arma::vec& y,
                              const arma::mat& X,
@@ -242,10 +247,18 @@ class Kriging : public KrigingImpl {
 
   LIBKRIGING_EXPORT std::tuple<arma::vec, arma::vec> leaveOneOutVec(const arma::vec& theta);
 
-  /** Vecchia approximated log-likelihood at given theta.
-   * Requires the model to have been fitted with method="vecchia" or
+  /** Vecchia approximated log-likelihood at given theta (d values) or,
+   * with a noise model, gamma = [theta, alpha] (Nugget) / [theta, sigma2]
+   * (Heterogeneous) like logLikelihoodFun (theta alone: the committed alpha /
+   * sigma2). Requires the model to have been fitted with method="vecchia" or
    * "vecchia(m)" (the Vecchia sets are rebuilt on demand, e.g. after load).
-   * @return (vll, gradient) ; gradient empty if return_grad=false. */
+   * Original scale, as logLikelihoodFun: with normalize=true theta and a
+   * heterogeneous sigma2 are read in the original scale of X and y (alpha
+   * is scale-free), the value is the log-density of the original y and the
+   * gradient is chain-ruled back. (The Vecchia ordering and neighbor sets
+   * are built in the internal, normalized input space.)
+   * @return (vll, gradient) ; gradient (same size as theta) empty if
+   *         return_grad=false. */
   LIBKRIGING_EXPORT std::tuple<double, arma::vec> logLikelihoodVecchiaFun(const arma::vec& theta, bool return_grad);
 
   /// Number of Vecchia conditioning neighbors (0 = not fitted with method "vecchia")
@@ -264,7 +277,10 @@ class Kriging : public KrigingImpl {
   /** Vecchia (local) prediction: each point of X_n is kriged on its m nearest
    * observations only — O(q m^3) instead of O(q n^2), embarrassingly parallel.
    * Mean is universal-kriging-style with the committed beta; variance is the
-   * simple-kriging one (beta treated as known). Usable after any fit.
+   * simple-kriging one (beta treated as known). Usable after any fit. Noise
+   * models follow predict(): the neighborhood block is the noisy correlation;
+   * Nugget predicts a noisy observation (variance sigma2 + nugget, an observed
+   * location returns its observation), Heterogeneous the latent process.
    * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
    *          fitted with method "vecchia", else 30)
    * @return (mean [q], stdev [q]) ; stdev empty if return_stdev=false. */
@@ -281,12 +297,25 @@ class Kriging : public KrigingImpl {
    * instead of O(q^3): usable for large n AND large q, after any fit
    * (including a Vecchia fit, where the exact simulate is not). Exact (up to beta known) when
    * m >= n + q - 1; otherwise long-range correlations are truncated and
-   * the result depends on the row order of X_n. NoiseModel::None only; no
-   * `will_update` (no update_simulate on top of it).
+   * the result depends on the row order of X_n. No `will_update` (no
+   * update_simulate on top of it). Noise models follow the exact simulate()
+   * conventions: the observations are noisy responses, the simulated values
+   * are the latent process unless `with_nugget` (Nugget: noisy response, as
+   * simulate(..., with_nugget, ...)); `with_noise` adds independent noise
+   * afterwards (standard deviations, as simulate(..., with_noise, ...)).
    * @param m number of conditioning neighbors (0 = vecchia_neighbors() if
    *          fitted with method "vecchia", else 30)
+   * @param with_nugget Nugget model only: simulate the noisy response
+   * @param with_noise empty, a scalar or one standard deviation per row of
+   *          X_n, in the original scale of y (whatever normalize): Gaussian
+   *          noise added to the simulations
    * @return output is n_n*nsim matrix of simulations at X_n */
-  LIBKRIGING_EXPORT arma::mat simulateVecchia(int nsim, int seed, const arma::mat& X_n, arma::uword m = 0);
+  LIBKRIGING_EXPORT arma::mat simulateVecchia(int nsim,
+                                              int seed,
+                                              const arma::mat& X_n,
+                                              arma::uword m = 0,
+                                              bool with_nugget = false,
+                                              const arma::vec& with_noise = arma::vec());
 
   /** Nystrom (global low-rank) approximated log-likelihood at given theta
    * (fit method "nystrom(k)"). Requires the model to have been fitted with
@@ -371,6 +400,22 @@ class Kriging : public KrigingImpl {
                                        const arma::mat& X_n,
                                        const std::string& method,
                                        const bool will_update = false);
+  /// Nugget-mode simulation with an explicit method ("exact": simulate with
+  /// with_nugget above; "vecchia" / "vecchia(m)": simulateVecchia)
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const bool with_nugget,
+                                       const bool will_update,
+                                       const std::string& method);
+  /// Heterogeneous-mode simulation with an explicit method ("exact": simulate
+  /// with with_noise above; "vecchia" / "vecchia(m)": simulateVecchia)
+  LIBKRIGING_EXPORT arma::mat simulate(int nsim,
+                                       int seed,
+                                       const arma::mat& X_n,
+                                       const arma::vec& with_noise,
+                                       const bool will_update,
+                                       const std::string& method);
   // const char* overload: without it, a string literal method would bind to
   // the (with_nugget) bool overload above through the pointer->bool conversion
   LIBKRIGING_EXPORT arma::mat simulate(int nsim,
@@ -453,12 +498,22 @@ class Kriging : public KrigingImpl {
   /// Build m_vecchia_order / m_vecchia_neighbors from m_X (call after fit_setup_impl).
   void make_vecchia_sets();
   /// Vecchia log-likelihood with profiled sigma2 and (GLS-profiled) beta;
-  /// analytic gradient in theta via the envelope theorem. Optional out-params
-  /// expose the profiled beta/sigma2 (used by the light-mode commit).
-  double _logLikelihoodVecchia(const arma::vec& _theta,
+  /// analytic gradient via the envelope theorem. _gamma = [theta] (None),
+  /// [theta, alpha] (Nugget) or [theta, sigma2] (Heterogeneous; a d-vector
+  /// uses the committed alpha / sigma2), noise models by "response" Vecchia
+  /// (blocks of the noisy correlation, see docs/math/Vecchia.md). Optional
+  /// out-params expose the profiled beta, the scale s of the noisy
+  /// correlation (sigma2 for None / Heterogeneous, sigma2 + nugget for
+  /// Nugget) and Q/n (the concentrated scale), used by the light-mode commit.
+  double _logLikelihoodVecchia(const arma::vec& _gamma,
                                arma::vec* grad_out,
                                arma::vec* beta_out = nullptr,
-                               double* sigma2_out = nullptr) const;
+                               double* sigma2_out = nullptr,
+                               double* q_over_n_out = nullptr) const;
+  /// Light Vecchia commit at (theta, extra = alpha / sigma2, ignored for
+  /// None): beta, sigma2 (and nugget, alpha) profiled by the Vecchia
+  /// likelihood with the exact noise-model fit conventions; no factorization.
+  void commit_vecchia(const arma::vec& theta, double extra);
   bool m_vecchia_light = false;  ///< current fit is a Vecchia fit without exact factorization
   /// Throw if the model is a light Vecchia fit (used by update_simulate)
   void check_not_vecchia_light(const char* what) const;
