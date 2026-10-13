@@ -18,6 +18,14 @@ nk <- NestedKriging(y, X, kernel = "matern5_2", nb_groups = 20,
 pred <- predict(nk, Xnew, return_stdev = TRUE)
 ```
 
+## Illustration
+
+![nested](images/scalability_nested.png)
+
+At fit time each group is an exact submodel: R̃ is block-diagonal and the error is exactly the cross-group correlation, largest at group boundaries. The NK aggregation re-couples the groups at prediction time, which this fit-time view does not show.
+
+(a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
+
 ## Mathematical description
 
 ### Partitioning and submodels

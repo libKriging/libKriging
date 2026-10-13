@@ -19,6 +19,14 @@ It's a standalone utility, not a fit objective or predict method — call
 it once before fitting, then fit however you like on the reduced
 `(X[idx], y[idx])`.
 
+## Illustration
+
+![subsetofdata](images/scalability_subsetofdata.png)
+
+No approximation on the kept points, but the discarded rows and columns are not modelled at all — information loss rather than approximation error.
+
+(a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
+
 ## Mathematical description
 
 - **Selection**: `method="kmeans"` (default) runs `n_max` k-means

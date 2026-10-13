@@ -36,6 +36,14 @@ of needing k large enough to capture the process' effective rank —
 which grows with how short the correlation range is relative to the
 domain.
 
+## Illustration
+
+![nystrom](images/scalability_nystrom.png)
+
+Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks spread-out points, often on the border). R̃ is rank k plus a diagonal correction: long-range structure is kept, short-range correlation between points far from any landmark is lost — the error sits near the diagonal.
+
+(a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
+
 ## Mathematical description
 
 - **Landmarks**: a fixed set S of k points, chosen ONCE (before
