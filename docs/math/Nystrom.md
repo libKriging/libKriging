@@ -40,7 +40,27 @@ domain.
 
 ![nystrom](images/scalability_nystrom.png)
 
-Every point is coupled to the same k landmarks (greedy pivoted Cholesky picks spread-out points, often on the border). R̃ is rank k plus a diagonal correction: long-range structure is kept, short-range correlation between points far from any landmark is lost — the error sits near the diagonal.
+How to read it:
+
+- (a) Nystrom never uses the correlation between two data points
+  directly: R̃(x_i, x_j) = r_iᵀ R_ss⁻¹ r_j, where r_i is the correlation
+  of x_i with the k landmarks (stars; line width ∝ correlation). Two
+  close points are seen as correlated only if some landmark is close to
+  both. Here x_i and its nearest neighbor x_j have R = 0.89 but
+  R̃ = 0.44: their closest landmark is too far (correlation ≈ 0.5).
+- (b) R̃ (rank k, plus a diagonal reset to 1) in the same ordering as
+  the exact R: the cluster blocks are still there but faded. Only the
+  n×k block R_ns and the k×k block R_ss are computed; R̃ itself is never
+  formed (Woodbury identity, O(n·k²)).
+- (c) The error is on close pairs (near-diagonal blocks), not on distant
+  pairs, whose correlation is ≈ 0 in both R and R̃.
+
+The landmarks are chosen once, by greedy pivoted Cholesky on a reference
+kernel whose range is the data extent: each new landmark is the point
+worst explained by the previous ones, which favors the domain's border
+and corners first. Shorter ranges θ (relative to the landmark spacing)
+make the error grow: k must grow with the number of correlation lengths
+that fit in the domain.
 
 (a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
 

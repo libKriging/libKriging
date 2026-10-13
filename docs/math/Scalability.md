@@ -46,8 +46,9 @@ ordering; (c) |R̃ − R| for the covariance the fit implicitly assumes,
 with the same color scale and spatial ordering on every row.
 
 Reading (c) across rows: Vecchia keeps the short range and spreads a
-small error over mid-range pairs; Nystrom keeps the long range and loses
-short-range correlation away from its landmarks; NestedKriging drops
+small error over mid-range pairs; Nystrom rebuilds every correlation
+through its k landmarks, so close pairs that no landmark is near lose
+part of their correlation; NestedKriging drops
 exactly the cross-group terms (re-coupled by the NK aggregation at
 predict time only); subsetOfData has no error on what it keeps and
 ignores the rest. These patterns depend on θ relative to the point
