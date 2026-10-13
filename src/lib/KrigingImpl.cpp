@@ -803,11 +803,12 @@ arma::mat KrigingImpl::fit_setup_impl(const arma::vec& y,
     theta0 = theta.value();
     if ((theta0.n_cols != d) && (theta0.n_rows == d))
       theta0 = theta0.t();
+    if (theta0.n_cols != d)
+      throw std::runtime_error("Dimension of theta should be kx" + std::to_string(d)
+                               + " (one starting point per row, one column per input) instead of "
+                               + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
     if (m_normalize)
       theta0.each_row() /= scaleX;
-    if (theta0.n_cols != d)
-      throw std::runtime_error("Dimension of theta should be nx" + std::to_string(d) + " instead of "
-                               + std::to_string(theta0.n_rows) + "x" + std::to_string(theta0.n_cols));
   }
   return theta0;
 }
