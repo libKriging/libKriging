@@ -323,7 +323,8 @@ end
     simulate(k::Kriging, nsim, seed, X_n; with_nugget=true, with_noise=nothing, will_update=false, method="exact")
 
 `method`: `"exact"` (default), `"vecchia"` / `"vecchia(m)"` or `"nystrom"`
-(see `predict`); `will_update` and `with_noise` need `"exact"`.
+(see `predict`); `will_update` needs `"exact"`, `with_nugget` / `with_noise`
+(noise standard deviations) need `"exact"` or `"vecchia"`.
 """
 function simulate(k::Kriging, nsim::Int, seed::Int, X_n::Matrix{Float64};
                   with_nugget::Bool=true,

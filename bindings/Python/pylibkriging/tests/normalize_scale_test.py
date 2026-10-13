@@ -76,3 +76,39 @@ def test_objective_at_theta_and_gradient():
         tm[i] -= h
         fd[i] = (k.logLikelihoodFun(tp)[0] - k.logLikelihoodFun(tm)[0]) / (2 * h)
     np.testing.assert_allclose(g, fd, rtol=1e-4)
+
+
+@pytest.mark.parametrize("noise", ["nugget", "vector"])
+def test_vecchia_noise_normalize_true_matches_false(noise):
+    # vecchia(n - 1): every observation conditions on all its predecessors,
+    # so the normalize=True and False models are the same one
+    X, y, nvec = make_data()
+    n = X.shape[0]
+    params = {"theta": np.array([[9.0, 2.1]]), "is_theta_estim": False,
+              "sigma2": 450.0, "is_sigma2_estim": False}
+    if noise == "nugget":
+        params.update({"nugget": 3.0, "is_nugget_estim": False})
+    nz = nvec if noise == "vector" else noise
+    ks = [lk.Kriging(y, X, "matern5_2", regmodel="linear", normalize=norm, optim="none",
+                     parameters=params, noise=nz, method="vecchia(%d)" % (n - 1)) for norm in (True, False)]
+    kn, ko = ks
+    np.testing.assert_allclose(kn.theta(), [9.0, 2.1], rtol=1e-12)
+    np.testing.assert_allclose(kn.sigma2(), ko.sigma2(), rtol=1e-10)
+    np.testing.assert_allclose(kn.beta(), ko.beta(), rtol=1e-8)
+    if noise == "nugget":
+        np.testing.assert_allclose(kn.nugget(), 3.0, rtol=1e-12)
+    else:
+        np.testing.assert_allclose(kn.noise(), nvec, rtol=1e-12)
+    np.testing.assert_allclose(kn.logLikelihood(method="vecchia"), ko.logLikelihood(method="vecchia"), rtol=1e-9)
+    Xn = X[:4] + 0.3
+    pm = "vecchia(%d)" % n
+    mn, sn, _, _, _ = kn.predict(Xn, method=pm)
+    mo, so, _, _, _ = ko.predict(Xn, method=pm)
+    np.testing.assert_allclose(mn, mo, rtol=1e-8)
+    np.testing.assert_allclose(sn, so, rtol=1e-8)
+    sm = "vecchia(%d)" % (n + Xn.shape[0])
+    if noise == "nugget":
+        sim = [k.simulate(3, 7, Xn, with_noise=True, method=sm) for k in ks]
+    else:
+        sim = [k.simulate(3, 7, Xn, with_noise=np.full(4, 0.7), method=sm) for k in ks]
+    np.testing.assert_allclose(sim[0], sim[1], rtol=1e-7)

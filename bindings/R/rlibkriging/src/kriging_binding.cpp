@@ -401,25 +401,20 @@ arma::mat kriging_simulate(Rcpp::List k,
   if (d != X_n.n_cols)
     Rcpp::stop("Dimension of arg data should be " + std::to_string(d) + ")");
 
-  if (method != "exact") {
-    // approximate simulators: NoiseModel::None only, no noise to add
-    if (with_noise.isNotNull())
-      Rcpp::stop("simulate: with_noise is only available with method = \"exact\"");
-    return impl_ptr->simulate(nsim, seed, X_n, method, will_update);
-  }
-
+  // method: "exact", "vecchia", "vecchia(m)" or "nystrom"; with_noise needs
+  // "exact" or "vecchia"
   if (with_noise.isNotNull()) {
     Rcpp::NumericVector wn(with_noise);
     if (wn.length() == 1 && Rcpp::as<bool>(wn)) {
       // with_noise = TRUE means "include nugget" (nugget mode)
-      return impl_ptr->simulate(nsim, seed, X_n, true, will_update);
+      return impl_ptr->simulate(nsim, seed, X_n, true, will_update, method);
     } else {
       // with_noise is a numeric vector (heterogeneous noise)
       arma::vec noise_vec = Rcpp::as<arma::vec>(with_noise);
-      return impl_ptr->simulate(nsim, seed, X_n, noise_vec, will_update);
+      return impl_ptr->simulate(nsim, seed, X_n, noise_vec, will_update, method);
     }
   }
-  return impl_ptr->simulate(nsim, seed, X_n, will_update);
+  return impl_ptr->simulate(nsim, seed, X_n, method, will_update);
 }
 
 // [[Rcpp::export]]

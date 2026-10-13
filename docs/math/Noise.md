@@ -88,6 +88,17 @@ noise_var = rng.uniform(0.01, 0.1, size=n) ** 2
 k_hetero = lk.Kriging(y, X, "matern5_2", noise=noise_var)
 ```
 
+## Large n: `method="vecchia(m)"`
+
+Both noise models can be fitted with the Vecchia approximation
+(`method="vecchia(m)"`, response Vecchia: O(n m³) per likelihood
+evaluation, no n×n matrix), with the same parametrization (α or σ²),
+profiling and prediction / simulation conventions as above; see
+[Vecchia.md](Vecchia.md#noise-models-noisemodelnugget-noisemodelheterogeneous)
+for the formulas and the accuracy caveat (the approximation degrades
+when the noise is large relative to the signal). `method="nystrom(k)"`
+is not available with a noise model.
+
 ## References
 
 - Gramacy, R. B., & Lee, H. K. H. (2012). *Cases for the nugget in

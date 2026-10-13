@@ -193,7 +193,26 @@ end
     kb = @test_logs (:warn, r"method=\"nystrom\(5\)\"") match_mode=:any Kriging(y, X, "matern5_2"; objective="LLNystrom(5)")
     @test jlibkriging.method(kb) == "nystrom(5)"
     @test_throws ErrorException Kriging(y, X, "matern5_2"; objective="LOO", method="vecchia")
-    @test_throws ErrorException Kriging(y, X, "matern5_2"; method="vecchia", noise="nugget")
+    @test_throws ErrorException Kriging(y, X, "matern5_2"; method="nystrom", noise="nugget")
+
+    # method="vecchia" with noise models (response Vecchia)
+    noise = 0.005 .+ 0.02 .* X[:, 1]
+    yn = y .+ sqrt.(noise) .* sin.(37.0 .* (1:60))  # deterministic pseudo-noise
+    kg = Kriging(yn, X, "matern5_2"; noise="nugget", method="vecchia(15)")
+    @test jlibkriging.method(kg) == "vecchia(15)"
+    @test_throws ErrorException predict(kg, Xn)
+    pg = predict(kg, Xn; return_stdev=true, method="vecchia")
+    @test all(isfinite.(pg.mean)) && all(pg.stdev .> 0)
+    @test isfinite(log_likelihood(kg; method="vecchia"))
+    @test size(simulate(kg, 4, 123, Xn; method="vecchia")) == (3, 4)
+    @test size(simulate(kg, 4, 123, Xn; with_nugget=false, method="vecchia")) == (3, 4)
+    kh = Kriging(yn, X, "matern5_2"; noise=noise, method="vecchia(15)")
+    @test jlibkriging.method(kh) == "vecchia(15)"
+    ph = predict(kh, Xn; return_stdev=true, method="vecchia")
+    @test all(isfinite.(ph.mean)) && all(ph.stdev .> 0)
+    @test size(simulate(kh, 4, 123, Xn; with_noise=[0.1, 0.1, 0.1], method="vecchia")) == (3, 4)
+    update!(kh, yn[1:3], X[1:3, :] .+ 0.01; noise_u=noise[1:3], refit=false)
+    @test size(jlibkriging.X(kh), 1) == 63
 
     k = Kriging("matern5_2")
     fit!(k, y, X; method="vecchia(10)")

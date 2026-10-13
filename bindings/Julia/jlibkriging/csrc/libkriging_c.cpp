@@ -267,18 +267,15 @@ int lk_kriging_simulate(void* ptr,
     arma::mat X_m(const_cast<double*>(X_n), m, d, false, true);
     arma::mat sim;
     const std::string meth = method ? method : "exact";
-    if (meth != "exact") {
-      // approximate simulators: NoiseModel::None only, no noise to add
-      if (with_noise && noise_n > 0)
-        throw std::invalid_argument("simulate: with_noise is only available with method \"exact\"");
-      sim = k->simulate(nsim, seed, X_m, meth, will_update != 0);
-    } else if (with_noise && noise_n > 0) {
+    // method: "exact", "vecchia", "vecchia(m)" or "nystrom"; with_noise and
+    // with_nugget need "exact" or "vecchia"
+    if (with_noise && noise_n > 0) {
       arma::vec noise_v(const_cast<double*>(with_noise), noise_n, false, true);
-      sim = k->simulate(nsim, seed, X_m, noise_v, will_update != 0);
+      sim = k->simulate(nsim, seed, X_m, noise_v, will_update != 0, meth);
     } else if (k->noise_model() == Kriging::NoiseModel::Nugget) {
-      sim = k->simulate(nsim, seed, X_m, with_nugget != 0, will_update != 0);
+      sim = k->simulate(nsim, seed, X_m, with_nugget != 0, will_update != 0, meth);
     } else {
-      sim = k->simulate(nsim, seed, X_m, will_update != 0);
+      sim = k->simulate(nsim, seed, X_m, meth, will_update != 0);
     }
     if (sim_out)
       std::memcpy(sim_out, sim.memptr(), sim.n_elem * sizeof(double));

@@ -118,6 +118,29 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- Kriging: `method="vecchia(m)"` with the noise models (`NoiseModel::Nugget`
+  / `noise="nugget"` and `NoiseModel::Heterogeneous` / known noise
+  variances), by response Vecchia (Katzfuss & Guinness 2021): Vecchia
+  likelihood on the noisy correlation blocks with the exact noise-model
+  profiling of sigma2 / nugget, analytic gradient in theta and in alpha /
+  sigma2, light commit (no exact factorization), `predict` / `simulate` /
+  `logLikelihood` with `method="vecchia"`, `update` and `save` / `load`.
+  `predictVecchia` / `simulateVecchia` follow the exact noise-model
+  conventions (also after an exact noise-model fit); `simulateVecchia` takes
+  `with_nugget` / `with_noise`, and C++ `simulate(nsim, seed, X_n,
+  with_nugget | with_noise, will_update, method)` overloads (used by every
+  binding) accept `"vecchia"`. New C++ accessor `Kriging::alpha()`
+  (scale-free). With `normalize=true` these follow the original-scale
+  convention above: `logLikelihoodVecchiaFun` takes an original-scale
+  `[theta, alpha]` / `[theta, sigma2]`, `with_noise` standard deviations are
+  in the scale of `y`, and a Vecchia noise-model fit with all predecessors as
+  neighbors reports the same parameters, likelihood, gradient, predictions
+  and simulations as a `normalize=false` one (with fewer neighbors they
+  differ by design: the neighbors are searched in the normalized inputs).
+  Accuracy degrades when the noise is large relative to the signal (latent
+  Vecchia is not implemented); `method="nystrom(k)"` still has no noise
+  model. `predictVecchia` now also applies the LMP variance rescaling of
+  `predict` after an exact LMP fit.
 - `Kriging::simulateVecchia(nsim, seed, X_n, m)` (C++): sequential
   (response-first) Vecchia conditional simulation, O(q (n + q) d + q m³)
   instead of O(q³), exact when m ≥ n + q − 1; `simulate(…, method=

@@ -14,9 +14,10 @@ test_that("method is stored with its explicit size; objective stays the criterio
   expect_equal(kv$method(), "vecchia(30)")
   expect_equal(Kriging(y, X, "matern5_2", method = "nystrom")$method(), "nystrom(50)")
   expect_equal(as.list(kv)$method, "vecchia(30)")
-  # only LL has approximate versions; no approximation with a noise model
+  # only LL has approximate versions; Nystrom has no noise model
   expect_error(Kriging(y, X, "matern5_2", objective = "LOO", method = "vecchia"))
-  expect_error(Kriging(y, X, "matern5_2", method = "vecchia", noise = "nugget"))
+  expect_error(Kriging(y, X, "matern5_2", method = "nystrom", noise = "nugget"))
+  expect_equal(Kriging(y, X, "matern5_2", method = "vecchia", noise = "nugget")$method(), "vecchia(30)")
   expect_error(Kriging(y, X, "matern5_2", method = "Vecchia"))
 })
 
@@ -98,4 +99,34 @@ test_that("NestedKriging: the common prior from one approximate fit", {
   expect_equal(nk$method(), "vecchia(15)")
   expect_true(max(abs(predict(nk, Xl[1:5, , drop = FALSE])$mean - yl[1:5])) < 1e-3)
   expect_equal(NestedKriging(yl, Xl, "matern5_2", nb_groups = 3)$method(), "exact")
+})
+
+test_that("method vecchia with noise models (nugget, heterogeneous)", {
+  set.seed(11)
+  n <- 80
+  Xs <- matrix(runif(2 * n), ncol = 2)
+  noise <- 0.005 + 0.02 * Xs[, 1]
+  ys <- sin(3 * Xs[, 1]) + Xs[, 2] + sqrt(noise) * rnorm(n)
+  Xp <- matrix(runif(12), ncol = 2)
+
+  kn <- Kriging(ys, Xs, "matern5_2", noise = "nugget", method = "vecchia(15)")
+  expect_equal(kn$method(), "vecchia(15)")
+  expect_true(kn$nugget() > 0)
+  expect_error(kn$predict(Xp))
+  p <- kn$predict(Xp, return_stdev = TRUE, method = "vecchia")
+  expect_true(all(is.finite(p$mean)) && all(p$stdev > 0))
+  expect_true(is.finite(kn$logLikelihood(method = "vecchia")))
+  expect_equal(dim(kn$simulate(nsim = 5, seed = 1, x = Xp, method = "vecchia")), c(6, 5))
+  expect_equal(dim(kn$simulate(nsim = 5, seed = 1, x = Xp, with_noise = FALSE, method = "vecchia")), c(6, 5))
+  kn$update(ys[1:5] + 0.01, Xs[1:5, , drop = FALSE] + 0.01, refit = FALSE)
+  expect_equal(nrow(kn$X()), n + 5)
+
+  kh <- Kriging(ys, Xs, "matern5_2", noise = noise, method = "vecchia(15)")
+  expect_equal(kh$method(), "vecchia(15)")
+  ph <- kh$predict(Xp, return_stdev = TRUE, method = "vecchia")
+  expect_true(all(is.finite(ph$mean)) && all(ph$stdev > 0))
+  expect_equal(dim(kh$simulate(nsim = 5, seed = 1, x = Xp, with_noise = rep(0.1, 6), method = "vecchia")),
+               c(6, 5))
+  kh$update(ys[1:5], noise[1:5], Xs[1:5, , drop = FALSE] + 0.01, FALSE)
+  expect_equal(nrow(kh$X()), n + 5)
 })

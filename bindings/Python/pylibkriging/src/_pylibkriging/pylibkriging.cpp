@@ -296,7 +296,8 @@ discards n - n_max points outright.)pbdoc")
            py::arg("with_noise") = py::none(),
            py::arg("method") = "exact",
            R"pbdoc(Conditional simulations at X. method: "exact" (default), "vecchia" /
-"vecchia(m)" or "nystrom" (see predict); will_update and with_noise need "exact".)pbdoc")
+"vecchia(m)" or "nystrom" (see predict); will_update needs "exact", with_noise
+(True: nugget, array: noise standard deviations) needs "exact" or "vecchia".)pbdoc")
       .def("update",
            &PyKriging::update,
            py::arg("y_u"),
