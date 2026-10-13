@@ -20,6 +20,14 @@ k <- Kriging(y, X, kernel = "matern5_2", regmodel = "constant", objective = "LL"
 p <- predict(k, Xnew, return_stdev = TRUE)
 ```
 
+## Illustration
+
+![exact](images/scalability_exact.png)
+
+Reference for the large-n methods: every point is coupled to all others, R is dense and factorized whole, no approximation error.
+
+(a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
+
 ## Mathematical description
 
 ### Model

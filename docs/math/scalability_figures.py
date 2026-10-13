@@ -1,0 +1,391 @@
+#!/usr/bin/env python3
+"""Comparative figures of libKriging's large-n methods (docs/math/images/).
+
+One figure per method (exact, vecchia, nystrom, nested, subsetofdata), each
+made of three panels on the same 2D design:
+
+  (a) input space  -- which points a given point x_i is coupled to;
+  (b) structure    -- what is actually factorized / kept of the n x n
+                      correlation matrix R, in the method's own ordering;
+  (c) error        -- |R_approx - R|, where R_approx is the covariance the
+                      fitted objective implicitly assumes; same color scale
+                      (square-root) and same spatial ordering (k-means
+                      clusters) for every method, so that rows compare.
+
+plus one matrix figure stacking the five rows (scalability_matrix.png).
+
+The selection rules mirror the C++ implementation (src/lib/Kriging.cpp,
+src/lib/LinearAlgebra.cpp) but are re-implemented here in numpy, so that the
+figures can be regenerated without a libKriging build:
+
+  - vecchia : greedy maxmin ordering starting from the point closest to the
+              centroid, m nearest previously-ordered neighbors;
+  - nystrom : k landmarks from greedy pivoted Cholesky on a reference kernel
+              whose range is the data extent; R_approx = U U^T + diag(1 -
+              diag(U U^T)) (unit diagonal, as in _logLikelihoodNystrom);
+  - nested  : k-means partition in p groups, block-diagonal R at fit time
+              (the NK aggregation re-couples the groups at predict time,
+              which a fit-time covariance cannot show);
+  - subsetOfData : k-means centroids snapped to the nearest data point.
+
+Sizes (n, m, k, p, n_max) are deliberately small so that the matrix
+structures stay readable; they are not the library defaults.
+
+Usage:  python3 docs/math/scalability_figures.py [output_dir]
+Requires numpy and matplotlib.
+"""
+
+import os
+import sys
+
+import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap, PowerNorm  # noqa: E402
+
+# --- setup -----------------------------------------------------------------
+N = 160          # design size
+THETA = 0.15     # Matern 5/2 range (both dimensions)
+M = 8            # vecchia neighbors
+K = 16           # nystrom landmarks
+P = 6            # nested groups
+N_MAX = 40       # subsetOfData kept points
+SEED = 123
+
+# Sequential one-hue ramps (blue for correlation, orange for error), light->dark.
+CMAP_R = LinearSegmentedColormap.from_list(
+    "r", ["#ffffff", "#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"])
+CMAP_ERR = LinearSegmentedColormap.from_list(
+    "err", ["#ffffff", "#fbdccd", "#f4a983", "#eb6834", "#b8461c", "#7a2a0c"])
+CMAP_R.set_bad("#e6e6e3")
+CMAP_ERR.set_bad("#e6e6e3")
+GROUP_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"]
+INK = "#2b2b29"
+MUTED = "#9a9a94"
+HILITE = "#eb6834"
+
+
+def matern52(D, theta=THETA):
+    h = np.sqrt(5.0) * D / theta
+    return (1.0 + h + h * h / 3.0) * np.exp(-h)
+
+
+def cdist(A, B):
+    return np.sqrt(((A[:, None, :] - B[None, :, :]) ** 2).sum(-1))
+
+
+def corr(X, theta=THETA):
+    return matern52(cdist(X, X), theta)
+
+
+def kmeans(X, p, rng, iters=50):
+    C = X[rng.choice(len(X), p, replace=False)]
+    for _ in range(iters):
+        lab = cdist(X, C).argmin(1)
+        C = np.array([X[lab == g].mean(0) if np.any(lab == g) else C[g] for g in range(p)])
+    return cdist(X, C).argmin(1), C
+
+
+# --- methods -----------------------------------------------------------------
+def maxmin_order(X):
+    n = len(X)
+    order = [int(((X - X.mean(0)) ** 2).sum(1).argmin())]
+    mind = ((X - X[order[0]]) ** 2).sum(1)
+    mind[order[0]] = -np.inf
+    for _ in range(1, n):
+        nxt = int(mind.argmax())
+        order.append(nxt)
+        mind = np.where(np.isinf(mind), mind, np.minimum(mind, ((X - X[nxt]) ** 2).sum(1)))
+        mind[nxt] = -np.inf
+    return np.array(order)
+
+
+def vecchia(X, m):
+    """Ordering, neighbors (in ordered positions) and implied covariance."""
+    order = maxmin_order(X)
+    Xo = X[order]
+    n = len(X)
+    Ro = corr(Xo)
+    nbrs = [np.array([], dtype=int)]
+    for t in range(1, n):
+        d = ((Xo[:t] - Xo[t]) ** 2).sum(1)
+        nbrs.append(np.sort(np.argsort(d)[: min(m, t)]))
+    # Q = B^T D^-1 B, B unit lower triangular with -kriging weights
+    B = np.eye(n)
+    Dv = np.ones(n)
+    for t in range(1, n):
+        Nb = nbrs[t]
+        w = np.linalg.solve(Ro[np.ix_(Nb, Nb)], Ro[Nb, t])
+        B[t, Nb] = -w
+        Dv[t] = 1.0 - Ro[Nb, t] @ w
+    Q = B.T @ np.diag(1.0 / Dv) @ B
+    Sigma = np.linalg.inv(Q)
+    return order, nbrs, B, Ro, Sigma
+
+
+def nystrom(X, k):
+    """Landmarks (pivot order) and implied covariance U U^T + diag residual."""
+    n = len(X)
+    ref = np.ptp(X, axis=0).max()  # reference range = data extent
+    Rref = corr(X, ref)
+    d = np.ones(n)
+    U = np.zeros((n, k))
+    land = []
+    for t in range(k):
+        piv = int(d.argmax())
+        land.append(piv)
+        col = Rref[:, piv] - U[:, :t] @ U[piv, :t]
+        U[:, t] = col / np.sqrt(d[piv])
+        d = np.clip(d - U[:, t] ** 2, 0, None)
+        d[piv] = 0
+    land = np.array(land)
+    R = corr(X)
+    Rss = R[np.ix_(land, land)] + 1e-10 * np.eye(k)
+    L = np.linalg.cholesky(Rss)
+    Uk = np.linalg.solve(L, R[land]).T             # R_ns L_ss^-T
+    low = Uk @ Uk.T
+    Rapprox = low + np.diag(1.0 - np.diag(low))
+    # order: landmarks first, then the others grouped by nearest landmark
+    rest = np.setdiff1d(np.arange(n), land)
+    near = cdist(X[rest], X[land]).argmin(1)
+    order = np.concatenate([land, rest[np.argsort(near, kind="stable")]])
+    return land, order, Rapprox
+
+
+def nested(X, p, rng):
+    lab, _ = kmeans(X, p, rng)
+    order = np.argsort(lab, kind="stable")
+    R = corr(X)
+    Rblock = np.where(lab[:, None] == lab[None, :], R, 0.0)
+    return lab, order, Rblock
+
+
+def subset(X, n_max, rng):
+    _, C = kmeans(X, n_max, rng)
+    idx = np.unique(cdist(C, X).argmin(1))
+    return idx
+
+
+# --- drawing -----------------------------------------------------------------
+def style_space(ax, title):
+    ax.set_xlim(-0.03, 1.03)
+    ax.set_ylim(-0.03, 1.03)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_color(MUTED)
+        s.set_linewidth(0.6)
+    ax.set_title(title, fontsize=9, color=INK, loc="left")
+
+
+def style_mat(ax, title, n):
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_color(MUTED)
+        s.set_linewidth(0.6)
+    ax.set_title(title, fontsize=9, color=INK, loc="left")
+    ax.set_xlim(-0.5, n - 0.5)
+    ax.set_ylim(n - 0.5, -0.5)
+
+
+def links(ax, x0, pts, color=HILITE, alpha=0.8, lw=0.8):
+    for q in pts:
+        ax.plot([x0[0], q[0]], [x0[1], q[1]], color=color, alpha=alpha, lw=lw, zorder=1)
+
+
+def target_marker(ax, x0):
+    ax.scatter([x0[0]], [x0[1]], s=70, c=HILITE, edgecolor="white", linewidth=1.5, zorder=5,
+               marker="D")
+
+
+def enorm(c):
+    return PowerNorm(gamma=0.5, vmin=0, vmax=c.emax)
+
+
+class Ctx:
+    pass
+
+
+def build():
+    rng = np.random.default_rng(SEED)
+    X = rng.random((N, 2))
+    c = Ctx()
+    c.X = X
+    c.R = corr(X)
+    c.vo, c.vn, c.vB, c.vRo, c.vS = vecchia(X, M)
+    c.land, c.no, c.nR = nystrom(X, K)
+    c.lab, c.go, c.gR = nested(X, P, np.random.default_rng(SEED + 1))
+    c.keep = subset(X, N_MAX, np.random.default_rng(SEED + 2))
+    # common target point: the design point closest to (0.62, 0.55)
+    c.i0 = int(((X - [0.62, 0.55]) ** 2).sum(1).argmin())
+    inv = np.empty(N, dtype=int)
+    inv[c.vo] = np.arange(N)
+    c.vS = c.vS[np.ix_(inv, inv)]  # implied Vecchia covariance, original row order
+    errs = [np.abs(c.vS - c.R), np.abs(c.nR - c.R), np.abs(c.gR - c.R)]
+    c.emax = max(e.max() for e in errs)
+    return c
+
+
+def row_exact(axs, c):
+    X, i0 = c.X, c.i0
+    ax = axs[0]
+    links(ax, X[i0], np.delete(X, i0, 0), color=MUTED, alpha=0.25, lw=0.5)
+    ax.scatter(X[:, 0], X[:, 1], s=9, c=INK, zorder=3)
+    target_marker(ax, X[i0])
+    style_space(ax, f"(a) x_i coupled to all n-1 = {N - 1} points")
+    o = c.go
+    im = axs[1].imshow(c.R[np.ix_(o, o)], cmap=CMAP_R, vmin=0, vmax=1, interpolation="nearest")
+    style_mat(axs[1], "(b) dense R, Cholesky O(n³)", N)
+    e = axs[2].imshow(np.zeros((N, N)), cmap=CMAP_ERR, norm=enorm(c), interpolation="nearest")
+    style_mat(axs[2], "(c) |R̃ - R| = 0", N)
+    return im, e
+
+
+def row_vecchia(axs, c):
+    X, order, nbrs = c.X, c.vo, c.vn
+    t0 = int(np.where(order == c.i0)[0][0])
+    rank = np.empty(N, dtype=int)
+    rank[order] = np.arange(N)
+    ax = axs[0]
+    prev = rank < t0
+    ax.scatter(X[~prev, 0], X[~prev, 1], s=9, facecolor="none", edgecolor=MUTED, linewidth=0.6, zorder=2)
+    ax.scatter(X[prev, 0], X[prev, 1], s=9, c=INK, zorder=3)
+    nb = order[nbrs[t0]]
+    links(ax, X[c.i0], X[nb])
+    ax.scatter(X[nb, 0], X[nb, 1], s=26, c=HILITE, zorder=4)
+    target_marker(ax, X[c.i0])
+    style_space(ax, f"(a) x_i (rank {t0} in maxmin order):\n    m={M} nearest among the {t0} previous (filled)")
+    # (b) conditioning pattern of B (ordered), faint lower triangle = exact
+    ax = axs[1]
+    tri = np.tril(np.ones((N, N)), -1)
+    pat = np.where(tri > 0, 0.08, np.nan)
+    pat[np.abs(c.vB) > 0] = 1.0
+    np.fill_diagonal(pat, 1.0)
+    im = ax.imshow(pat, cmap=CMAP_R, vmin=0, vmax=1, interpolation="nearest")
+    ax.axhline(t0, color=HILITE, lw=0.6, alpha=0.7)
+    style_mat(ax, f"(b) row t conditions on N(t), |N(t)| ≤ m (dark);\n    light: dropped vs exact. O(n·m³)", N)
+    err = np.abs(c.vS - c.R)
+    e = axs[2].imshow(err[np.ix_(c.go, c.go)], cmap=CMAP_ERR, norm=enorm(c), interpolation="nearest")
+    style_mat(axs[2], f"(c) |R̃ - R|, max {err.max():.2f}\n    (diffuse, mid-range pairs)", N)
+    return im, e
+
+
+def row_nystrom(axs, c):
+    X, land = c.X, c.land
+    ax = axs[0]
+    ax.scatter(X[:, 0], X[:, 1], s=9, c=INK, zorder=3)
+    links(ax, X[c.i0], X[land])
+    ax.scatter(X[land, 0], X[land, 1], s=60, marker="*", c=HILITE, edgecolor="white", linewidth=0.5, zorder=4)
+    target_marker(ax, X[c.i0])
+    style_space(ax, f"(a) every x_i coupled to the same\n    k={K} landmarks (stars)")
+    o = c.no
+    im = axs[1].imshow(c.nR[np.ix_(o, o)], cmap=CMAP_R, vmin=0, vmax=1, interpolation="nearest")
+    axs[1].axhline(K - 0.5, color=HILITE, lw=0.6)
+    axs[1].axvline(K - 0.5, color=HILITE, lw=0.6)
+    style_mat(axs[1], f"(b) R̃ = R_ns R_ss⁻¹ R_sn + diag, rank k\n    Woodbury: O(n·k²)", N)
+    err = np.abs(c.nR - c.R)
+    e = axs[2].imshow(err[np.ix_(c.go, c.go)], cmap=CMAP_ERR, norm=enorm(c), interpolation="nearest")
+    style_mat(axs[2], f"(c) |R̃ - R|, max {err.max():.2f}\n    (short-range pairs away from landmarks)", N)
+    return im, e
+
+
+def row_nested(axs, c):
+    X, lab = c.X, c.lab
+    ax = axs[0]
+    for g in range(P):
+        s = lab == g
+        ax.scatter(X[s, 0], X[s, 1], s=9, c=GROUP_COLORS[g], zorder=3)
+    same = np.where((lab == lab[c.i0]) & (np.arange(N) != c.i0))[0]
+    links(ax, X[c.i0], X[same], color=INK, alpha=0.35, lw=0.6)
+    target_marker(ax, X[c.i0])
+    style_space(ax, f"(a) p={P} groups (k-means): x_i coupled to\n    its own group only (at fit time)")
+    o = c.go
+    blk = c.gR[np.ix_(o, o)].copy()
+    l_o = lab[o]
+    blk[l_o[:, None] != l_o[None, :]] = np.nan
+    im = axs[1].imshow(blk, cmap=CMAP_R, vmin=0, vmax=1, interpolation="nearest")
+    style_mat(axs[1], f"(b) p exact blocks: O(n³/p²)\n    + NK aggregation at predict", N)
+    err = np.abs(c.gR - c.R)
+    e = axs[2].imshow(err[np.ix_(o, o)], cmap=CMAP_ERR, norm=enorm(c), interpolation="nearest")
+    style_mat(axs[2], f"(c) |R̃ - R|, max {err.max():.2f}\n    (cross-group pairs, at boundaries)", N)
+    return im, e
+
+
+def row_subset(axs, c):
+    X, keep = c.X, c.keep
+    nk = len(keep)
+    ax = axs[0]
+    drop = np.setdiff1d(np.arange(N), keep)
+    ax.scatter(X[drop, 0], X[drop, 1], s=9, facecolor="none", edgecolor=MUTED, linewidth=0.6, zorder=2)
+    ax.scatter(X[keep, 0], X[keep, 1], s=18, c=INK, zorder=3)
+    style_space(ax, f"(a) n_max={nk} kept (filled), {N - nk} discarded")
+    o = np.concatenate([keep, drop])
+    Rm = c.R[np.ix_(o, o)].copy()
+    Rm[nk:, :] = np.nan
+    Rm[:, nk:] = np.nan
+    im = axs[1].imshow(Rm, cmap=CMAP_R, vmin=0, vmax=1, interpolation="nearest")
+    style_mat(axs[1], f"(b) exact R on the subset only\n    O(n_max³)", N)
+    em = np.zeros((N, N))
+    em[nk:, :] = np.nan
+    em[:, nk:] = np.nan
+    e = axs[2].imshow(em, cmap=CMAP_ERR, norm=enorm(c), interpolation="nearest")
+    style_mat(axs[2], "(c) no error on the subset,\n    discarded rows/columns not modelled (gray)", N)
+    return im, e
+
+
+ROWS = [
+    ("exact", 'method="exact"', row_exact),
+    ("vecchia", f'method="vecchia({M})"', row_vecchia),
+    ("nystrom", f'method="nystrom({K})"', row_nystrom),
+    ("nested", f"NestedKriging(nb_groups={P})", row_nested),
+    ("subsetofdata", f"subsetOfData(X, {N_MAX})", row_subset),
+]
+
+
+def colorbars(fig, im, e, axs):
+    cb = fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.02)
+    cb.ax.tick_params(labelsize=7, colors=INK)
+    cb.set_label("R", fontsize=7, color=INK)
+    cb = fig.colorbar(e, ax=axs[2], fraction=0.046, pad=0.02)
+    cb.ax.tick_params(labelsize=7, colors=INK)
+    cb.set_label("|R̃ - R|", fontsize=7, color=INK)
+
+
+FOOT = (f"n={N}, d=2, Matérn 5/2, θ={THETA}. (b): each method's own ordering (exact: k-means "
+        "clusters, vecchia: maxmin, nystrom: landmarks first, nested: groups, subset: kept first). "
+        "(c): k-means cluster ordering, square-root color scale, same on every row.\n"
+        "Generated by docs/math/scalability_figures.py")
+
+
+def main(outdir):
+    os.makedirs(outdir, exist_ok=True)
+    plt.rcParams.update({"font.size": 8, "text.color": INK})
+    c = build()
+    for name, label, fn in ROWS:
+        fig, axs = plt.subplots(1, 3, figsize=(12, 4.1), facecolor="white")
+        im, e = fn(axs, c)
+        colorbars(fig, im, e, axs)
+        fig.suptitle(label, x=0.01, ha="left", fontsize=11, color=INK, fontweight="bold")
+        fig.text(0.01, 0.01, FOOT, fontsize=6.5, color=MUTED)
+        fig.subplots_adjust(left=0.01, right=0.955, top=0.80, bottom=0.08, wspace=0.12)
+        fig.savefig(os.path.join(outdir, f"scalability_{name}.png"), dpi=130, facecolor="white")
+        plt.close(fig)
+    fig, axs = plt.subplots(len(ROWS), 3, figsize=(12, 4.0 * len(ROWS)), facecolor="white")
+    for r, (name, label, fn) in enumerate(ROWS):
+        im, e = fn(axs[r], c)
+        colorbars(fig, im, e, axs[r])
+        axs[r, 0].text(-0.02, 1.24, label, transform=axs[r, 0].transAxes, fontsize=11,
+                       fontweight="bold", color=INK, ha="left", va="bottom")
+    fig.text(0.01, 0.003, FOOT, fontsize=7, color=MUTED)
+    fig.subplots_adjust(left=0.01, right=0.955, top=0.95, bottom=0.02, wspace=0.12, hspace=0.62)
+    fig.savefig(os.path.join(outdir, "scalability_matrix.png"), dpi=110, facecolor="white")
+    plt.close(fig)
+
+
+if __name__ == "__main__":
+    here = os.path.dirname(os.path.abspath(__file__))
+    main(sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "images"))

@@ -22,6 +22,14 @@ binding. `method()` then returns `"vecchia(m)"`, `objective()` `"LL"`.
 k <- Kriging(y, X, "matern5_2", method = "vecchia(30)")   # or "vecchia"
 ```
 
+## Illustration
+
+![vecchia](images/scalability_vecchia.png)
+
+Points are ordered (maxmin) and each conditions only on its m nearest *previous* points: a sparse lower-triangular pattern instead of the full triangle. The error is small but diffuse, on pairs at mid range that no conditioning set links directly.
+
+(a) input space: which points a given x_i is coupled to; (b) what is factorized or kept of the n×n correlation matrix R; (c) |R̃ − R|, the error of the covariance the fit implicitly assumes (same scale and ordering for every method — compare with the other methods in [Scalability.md](Scalability.md#visual-comparison)). Toy sizes (n = 160), not the defaults; regenerate with `python3 docs/math/scalability_figures.py`.
+
 ## Mathematical description
 
 For a Gaussian vector y = (y₁, …, yₙ), the joint density factors exactly
