@@ -18,7 +18,7 @@ k <- Kriging(y, X, kernel = "matern5_2",
              objective = "LL",            # "LL" | "LOO" | "LMP"
              parameters = NULL,
              noise = NULL,                # NULL | "nugget" | numeric vector
-             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (LL only; nystrom: noise = NULL only)
+             method = "exact")            # "exact" | "vecchia" | "vecchia(m)" | "nystrom" | "nystrom(k)" (noise: vecchia + LL only)
 
 p <- predict(k, x = Xnew, return_stdev = TRUE, return_cov = FALSE)
 #   predict / simulate / logLikelihood also take method = "exact" (default) |
@@ -31,8 +31,8 @@ save(k, "k.json")      # JSON, any libKriging class
 k <- load("k.json")    # auto-detects the class
 
 logLikelihood(k)
-leaveOneOut(k)
-logMargPost(k)
+leaveOneOut(k)                 # method = "exact" (default) | "vecchia" | "nystrom"
+logMargPost(k)                 # idem
 ```
 
 Do **not** call `NuggetKriging(...)`/`NoiseKriging(...)` for new models —
@@ -87,7 +87,7 @@ still correct — this is an optimization-landscape issue, not a bug).
 idx <- subsetOfData(X, n_max = 2000, method = "kmeans", seed = 123)
 k <- Kriging(y[idx], X[idx, , drop = FALSE], "matern5_2")
 
-# Or keep every point and approximate the likelihood (objective = "LL", noise-free Kriging only)
+# Or keep every point and approximate the criterion (any objective, noise-free Kriging only)
 k <- Kriging(y, X, "matern5_2", method = "vecchia(30)")   # d <~ 5
 k <- Kriging(y, X, "matern5_2", method = "nystrom(50)")   # higher d
 k$method()         # "nystrom(50)"; k$objective() is "LL"

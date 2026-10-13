@@ -385,6 +385,12 @@ catch_discover_tests(KrigingNystromTest EXTRA_ARGS ${AdditionalCatchParameters})
 unset(AdditionalCatchParameters)
 
 
+add_executable(KrigingApproxObjectivesTest KrigingApproxObjectivesTest.cpp)
+target_link_libraries(KrigingApproxObjectivesTest LINK_PUBLIC Kriging Catch2)
+add_dependencies(all_test_binaries KrigingApproxObjectivesTest)
+catch_discover_tests(KrigingApproxObjectivesTest)
+
+
 add_executable(KrigingSubsetOfDataTest KrigingSubsetOfDataTest.cpp)
 target_link_libraries(KrigingSubsetOfDataTest LINK_PUBLIC Kriging Catch2)
 add_dependencies(all_test_binaries KrigingSubsetOfDataTest)

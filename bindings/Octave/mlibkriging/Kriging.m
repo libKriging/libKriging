@@ -35,7 +35,8 @@ classdef Kriging < handle
         % (default), "vecchia" / "vecchia(m)" (Vecchia approximation, m
         % neighbors, default 30) or "nystrom" / "nystrom(k)" (rank-k
         % Nystrom, default 50); an approximate fit keeps no exact
-        % factorization, and only objective "LL" has approximate versions.
+        % factorization; objectives "LL", "LOO" and "LMP" all have
+        % approximate versions (noise-free models only).
         % "LLVecchia(m)" / "LLNystrom(k)" objectives are deprecated aliases.
         function fit(obj, varargin)
             mLibKriging("Kriging::fit", obj.ref, varargin{:});

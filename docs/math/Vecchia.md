@@ -245,8 +245,14 @@ by increasing m, or against an exact fit on a subsample.
 
 - Noise models by response Vecchia only (accuracy degrades for noise
   large relative to the signal; latent Vecchia is not implemented), see
-  above.
-- `objective="LL"` only (no LOO / LMP Vecchia version).
+  above; with `objective="LL"` only.
+- `objective="LOO"` and `"LMP"` have Vecchia versions (noise model None),
+  evaluated with the Vecchia precision P = BᵀD⁻¹B (log det R = Σ log vᵢ;
+  see [LOO.md](LOO.md) and [LMP.md](LMP.md)). The Vecchia LOO is the
+  leave-one-out error of the Vecchia *joint law* (yᵢ conditioned on all
+  other observations through P), not that of the local Vecchia
+  predictor, and, like the Vecchia likelihood, it depends on the maxmin
+  ordering unless m = n − 1.
 - The exact model at the Vecchia θ* (separate `optim="none"` exact fit
   above) is still O(n³) time/memory — practical up to n ~ 2·10⁴.
 - Vecchia neighbor sets are not serialized (rebuilt on refit, and on

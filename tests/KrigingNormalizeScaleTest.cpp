@@ -334,6 +334,153 @@ TEST_CASE("normalize=true: Vecchia / Nystrom log-likelihoods in the original sca
   require_close(grad, fd, vecchia ? 1e-4 : 5e-2);
 }
 
+TEST_CASE("normalize=true: approximate LOO / LMP in the original scale", "[normalize][kriging][vecchia][nystrom]") {
+  const Data D = make_data(30);
+  // Vecchia with m = n-1 (all predecessors: the maxmin ordering, built in the
+  // normalized inputs, then only changes roundoff; and the criterion is the
+  // exact one) and Nystrom (landmarks ranked with a reference range scaled to
+  // the data extent: the same rows with normalize=true and false), so
+  // normalize=true and false coincide at the same original-scale theta
+  const std::string method = GENERATE(std::string("vecchia(29)"), std::string("nystrom(15)"));
+  const std::string objective = GENERATE(std::string("LOO"), std::string("LMP"));
+  const RM rm = GENERATE(RM::Constant, RM::Linear);
+  const bool fixed_sigma2 = GENERATE(false, true);
+  const bool vecchia = method.rfind("vecchia", 0) == 0;
+  const std::string m = vecchia ? "vecchia" : "nystrom";
+  CAPTURE(method, objective, Trend::toString(rm), fixed_sigma2);
+
+  Kriging::Parameters p;
+  p.theta = arma::mat{{9.0, 2.1}};
+  p.is_theta_estim = false;
+  if (fixed_sigma2) {
+    p.sigma2 = 450.0;
+    p.is_sigma2_estim = false;
+  }
+  Kriging kn("matern5_2"), ko("matern5_2"), ke("matern5_2");
+  kn.fit(D.y, D.X, rm, /*normalize=*/true, "none", objective, p, method);
+  ko.fit(D.y, D.X, rm, /*normalize=*/false, "none", objective, p, method);
+  ke.fit(D.y, D.X, rm, /*normalize=*/false, "none", objective, p);  // exact reference
+  REQUIRE(kn.method() == method);
+
+  // roundoff of the different Vecchia orderings / of the jittered Nystrom
+  // factorization (smooth to ~1e-7 relative only)
+  const double tol = vecchia ? 1e-6 : 1e-5;
+  require_close(kn.theta(), ko.theta(), 1e-12);
+  CHECK(kn.sigma2() == Approx(ko.sigma2()).epsilon(tol));
+  // (the Nystrom GLS beta of a linear trend is less stable: ~1e-4, as for LL)
+  require_close(kn.beta(), ko.beta(), vecchia ? tol : 1e-3);
+
+  auto loo_fun = [&](Kriging& k, const arma::vec& t, bool g) {
+    return vecchia ? k.leaveOneOutVecchiaFun(t, g) : k.leaveOneOutNystromFun(t, g);
+  };
+  auto lmp_fun = [&](Kriging& k, const arma::vec& t, bool g) {
+    return vecchia ? k.logMargPostVecchiaFun(t, g) : k.logMargPostNystromFun(t, g);
+  };
+
+  // committed values: no double conversion, == *Fun(theta())
+  CHECK(kn.leaveOneOut(m) == Approx(std::get<0>(loo_fun(kn, kn.theta(), false))).epsilon(1e-12));
+  CHECK(kn.logMargPost(m) == Approx(std::get<0>(lmp_fun(kn, kn.theta(), false))).epsilon(1e-12));
+  CHECK(kn.leaveOneOut(kn.method()) == Approx(ko.leaveOneOut(m)).epsilon(tol));
+  CHECK(kn.logMargPost(kn.method()) == Approx(ko.logMargPost(m)).epsilon(tol));
+  // Vecchia m = n-1 is exact, in the original scale
+  if (vecchia) {
+    CHECK(kn.leaveOneOut(m) == Approx(ke.leaveOneOut()).epsilon(1e-6));
+    CHECK(kn.logMargPost(m) == Approx(ke.logMargPost()).epsilon(1e-6));
+  }
+
+  // values and gradients at an original-scale theta away from the fit
+  const arma::vec t1{12.0, 1.4};
+  auto [loon, gloon] = loo_fun(kn, t1, true);
+  auto [looo, glooo] = loo_fun(ko, t1, true);
+  CHECK(loon == Approx(looo).epsilon(tol));
+  require_close(gloon, glooo, vecchia ? 1e-5 : 1e-3);
+  auto [lmpn, glmpn] = lmp_fun(kn, t1, true);
+  auto [lmpo, glmpo] = lmp_fun(ko, t1, true);
+  CHECK(lmpn == Approx(lmpo).epsilon(tol));
+  require_close(glmpn, glmpo, vecchia ? 1e-5 : 1e-3);
+  // the gradients are those of the original-scale theta (the Nystrom
+  // criteria are only smooth to ~1e-7 relative: larger steps, as above)
+  const double step = vecchia ? 1e-5 : 1e-2;
+  const arma::vec fd_loo = fd_grad([&](const arma::vec& x) { return std::get<0>(loo_fun(kn, x, false)); }, t1, step);
+  const arma::vec fd_lmp = fd_grad([&](const arma::vec& x) { return std::get<0>(lmp_fun(kn, x, false)); }, t1, step);
+  CAPTURE(gloon, fd_loo, glmpn, fd_lmp);
+  require_close(gloon, fd_loo, vecchia ? 1e-4 : 1e-2);
+  require_close(glmpn, fd_lmp, vecchia ? 1e-4 : 1e-2);
+  if (vecchia) {  // exact reference values and gradients at t1
+    auto [looe, glooe] = ke.leaveOneOutFun(t1, true, false);
+    CHECK(loon == Approx(looe).epsilon(1e-6));
+    require_close(gloon, glooe, 1e-5);
+    auto [lmpe, glmpe] = ke.logMargPostFun(t1, true, false);
+    CHECK(lmpn == Approx(lmpe).epsilon(1e-6));
+    require_close(glmpn, glmpe, 1e-5);
+  }
+
+  // LOO predictions, original scale of y
+  auto [mn, sn] = kn.leaveOneOutVec(t1, m);
+  auto [mo, so] = ko.leaveOneOutVec(t1, m);
+  require_close(mn, mo, tol);
+  require_close(sn, so, tol);
+  if (vecchia) {
+    auto [me, se] = ke.leaveOneOutVec(t1);
+    require_close(mn, me, 1e-6);
+    require_close(sn, se, 1e-6);
+  }
+}
+
+TEST_CASE("normalize=true: approximate LMP fit commits sigma2 = SSE/(n-p) and predict rescales once",
+          "[normalize][kriging][vecchia][nystrom]") {
+  const Data D = make_data(30);
+  const double n = 30.0;
+  const double p = 3.0;  // linear trend in d = 2
+  const std::string method = GENERATE(std::string("vecchia(29)"), std::string("nystrom(15)"));
+  const bool vecchia = method.rfind("vecchia", 0) == 0;
+  // (prediction conditions on every observation: m = n for Vecchia)
+  const std::string mp = vecchia ? "vecchia(30)" : "nystrom";
+  CAPTURE(method);
+  const arma::mat Xn = D.X.rows(0, 4) + 0.3;
+
+  // BFGS LMP fit: sigma2 = SSE / (n-p), vs SSE / n for the optim="none"
+  // commit at the same theta (same normalization: same numerics)
+  Kriging kb("matern5_2");
+  kb.fit(D.y, D.X, RM::Linear, /*normalize=*/true, "BFGS", "LMP", {}, method);
+  Kriging::Parameters par;
+  par.theta = arma::mat(kb.theta().t());
+  par.is_theta_estim = false;
+  Kriging kf("matern5_2");
+  kf.fit(D.y, D.X, RM::Linear, /*normalize=*/true, "none", "LMP", par, method);
+  require_close(kb.theta(), kf.theta(), 1e-12);
+  CHECK(kb.sigma2() == Approx(kf.sigma2() * n / (n - p)).epsilon(1e-10));
+  require_close(kb.beta(), kf.beta(), 1e-10);
+  {
+    auto [mb, sb, cb, dmb, dsb] = kb.predict(Xn, true, false, false, mp);
+    auto [mf, sf, cf, dmf, dsf] = kf.predict(Xn, true, false, false, mp);
+    require_close(mb, mf, 1e-10);
+    require_close(sb, sf * std::sqrt(n / (n - p)), 1e-8);
+  }
+
+  // fixed parameters: the approximate LMP predictor of a normalize=true model
+  // applies the LMP variance factor (n-p)/(n-p-2) once (vs the same model
+  // with objective LL), and agrees with normalize=false
+  Kriging::Parameters pf;
+  pf.theta = arma::mat{{4.0, 1.0}};
+  pf.is_theta_estim = false;
+  pf.sigma2 = 450.0;
+  pf.is_sigma2_estim = false;
+  Kriging kn("matern5_2"), kl("matern5_2"), ko("matern5_2");
+  kn.fit(D.y, D.X, RM::Linear, /*normalize=*/true, "none", "LMP", pf, method);
+  kl.fit(D.y, D.X, RM::Linear, /*normalize=*/true, "none", "LL", pf, method);
+  ko.fit(D.y, D.X, RM::Linear, /*normalize=*/false, "none", "LMP", pf, method);
+  CHECK(kn.sigma2() == Approx(450.0).epsilon(1e-12));
+  auto [mn, sn, cn, dmn, dsn] = kn.predict(Xn, true, false, false, mp);
+  auto [ml, sl, cl, dml, dsl] = kl.predict(Xn, true, false, false, mp);
+  auto [mo, so, co, dmo, dso] = ko.predict(Xn, true, false, false, mp);
+  require_close(mn, ml, 1e-12);
+  require_close(sn, sl * std::sqrt((n - p) / (n - p - 2.0)), 1e-10);
+  // (the Nystrom GLS beta / factorization are stable to ~1e-5 only)
+  require_close(mn, mo, vecchia ? 1e-6 : 1e-4);
+  require_close(sn, so, vecchia ? 1e-5 : 1e-3);
+}
+
 TEST_CASE("normalize=true: Vecchia noise models agree with normalize=false", "[normalize][kriging][vecchia]") {
   const Data D = make_data();
   const arma::uword n = D.X.n_rows;

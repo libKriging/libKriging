@@ -96,7 +96,8 @@ evaluated, for the fit and for what the model keeps afterwards:
   landmarks by default) approximation for large n — see
   [Nystrom.md](Nystrom.md).
 
-The approximate methods exist only for `objective="LL"` without noise
+The approximate methods exist for every objective (`"LL"`, `"LOO"`,
+`"LMP"`; see [LOO.md](LOO.md), [LMP.md](LMP.md)) without noise
 model, and keep no exact factorization. `method()` returns the canonical
 string (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`). The former
 objectives `"LLVecchia(m)"` / `"LLNystrom(k)"` are deprecated aliases of

@@ -309,10 +309,12 @@ void leaveOneOutVec(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{2, 3}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{2}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  auto [yhat_mean, yhat_sd] = km->leaveOneOutVec(input.get<arma::vec>(1, "theta"));
+  // method: "exact" (default), "vecchia" or "nystrom"
+  const auto method = input.getOptional<std::string>(2, "method").value_or("exact");
+  auto [yhat_mean, yhat_sd] = km->leaveOneOutVec(input.get<arma::vec>(1, "theta"), method);
   output.set(0, yhat_mean, "mean");  // FIXME better name
   output.set(1, yhat_sd, "stdev");   // FIXME better name
 }
@@ -321,10 +323,12 @@ void leaveOneOut(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{1, 2}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  output.set(0, km->leaveOneOut(), "Model leaveOneOut");
+  // method: "exact" (default), "vecchia" or "nystrom"
+  const auto method = input.getOptional<std::string>(1, "method").value_or("exact");
+  output.set(0, km->leaveOneOut(method), "Model leaveOneOut");
 }
 
 void logLikelihoodFun(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
@@ -370,10 +374,12 @@ void logMargPost(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {
   MxMapper input{"Input",
                  nrhs,
                  const_cast<mxArray**>(prhs),  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-                 RequiresArg::Exactly{1}};
+                 RequiresArg::Range{1, 2}};
   MxMapper output{"Output", nlhs, plhs, RequiresArg::Exactly{1}};
   auto* km = input.getObjectFromRef<Kriging>(0, "Kriging reference");
-  output.set(0, km->logMargPost(), "Model logMargPost");
+  // method: "exact" (default), "vecchia" or "nystrom"
+  const auto method = input.getOptional<std::string>(1, "method").value_or("exact");
+  output.set(0, km->logMargPost(method), "Model logMargPost");
 }
 
 void covMat(int nlhs, mxArray** plhs, int nrhs, const mxArray** prhs) {

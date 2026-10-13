@@ -36,9 +36,9 @@ TEST_CASE("Nystrom method spec parsing and validation", "[nystrom][kriging]") {
     CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LL", {}, bad),
                     std::invalid_argument);
   }
-  // only the LL objective has a Nystrom version
-  CHECK_THROWS_AS(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO", {}, "nystrom"),
-                  std::invalid_argument);
+  // LOO and LMP have a Nystrom version too (see KrigingApproxObjectivesTest.cpp)
+  CHECK(Kriging(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LOO", {}, "nystrom(10)").method()
+        == "nystrom(10)");
 
   // deprecated alias: objective "LLNystrom(k)" = objective "LL", method "nystrom(k)"
   Kriging k_alias(y, X, "matern5_2", Trend::RegressionModel::Constant, false, "BFGS", "LLNystrom(10)");

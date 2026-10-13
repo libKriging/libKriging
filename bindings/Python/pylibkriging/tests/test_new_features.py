@@ -364,9 +364,10 @@ def test_fit_method_and_deprecated_objectives():
         with pytest.raises(DeprecationWarning):
             lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)")
         lk.Kriging(y, X, "matern5_2", method="vecchia(7)")  # no warning
-    # only LL has approximate versions; Nystrom has no noise model
+    # LOO / LMP have approximate versions too (without noise model); Nystrom has no noise model
+    assert lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia(10)").objective() == "LOO"
     with pytest.raises(ValueError):
-        lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia")
+        lk.Kriging(y, X, "matern5_2", objective="LOO", method="vecchia", noise="nugget")
     with pytest.raises(ValueError):
         lk.Kriging(y, X, "matern5_2", method="nystrom", noise="nugget")
     assert lk.Kriging(y, X, "matern5_2", method="vecchia", noise="nugget").method() == "vecchia(30)"
@@ -374,6 +375,43 @@ def test_fit_method_and_deprecated_objectives():
         lk.Kriging(y, X, "matern5_2", method="Vecchia")
     with pytest.raises(ValueError):  # conflict: raised before any warning
         lk.Kriging(y, X, "matern5_2", objective="LLVecchia(7)", method="nystrom")
+
+
+@pytest.mark.parametrize("method", ["vecchia(10)", "nystrom(20)"])
+def test_loo_lmp_objectives_with_approximate_method(method, tmp_path):
+    rng = np.random.default_rng(11)
+    X = rng.uniform(size=(60, 2))
+    y = np.sin(3 * X[:, 0]) + X[:, 1]
+    am = method[:7]
+
+    kl = lk.Kriging(y, X, "matern5_2", objective="LOO", method=method)
+    assert kl.objective() == "LOO" and kl.method() == method
+    loo = kl.leaveOneOut(method=am)
+    assert np.isfinite(loo)
+    assert kl.leaveOneOut(method=method) == loo
+    assert np.isfinite(kl.leaveOneOut())  # exact LOO at the approximate theta
+    mean, stdev = kl.leaveOneOutVec(kl.theta(), method=am)
+    assert mean.shape == (60,) and np.all(stdev > 0)
+    np.testing.assert_allclose(np.mean((mean - y) ** 2), loo, rtol=1e-8)
+    with pytest.raises(ValueError):
+        kl.leaveOneOut(method="unknown")
+
+    kp = lk.Kriging(y, X, "matern5_2", objective="LMP", method=method)
+    assert kp.objective() == "LMP" and kp.method() == method
+    lmp = kp.logMargPost(method=am)
+    assert np.isfinite(lmp)
+    fname = str(tmp_path / "approx_lmp_py.json")
+    kp.save(fname)
+    kpl = lk.Kriging.load(fname)
+    assert kpl.objective() == "LMP" and kpl.method() == method
+    np.testing.assert_allclose(kpl.logMargPost(method=am), lmp, rtol=1e-10)
+
+    # with m = n - 1 (k = n) the approximate criteria are the exact ones
+    full = "vecchia(59)" if am == "vecchia" else "nystrom(60)"
+    ke = lk.Kriging(y, X, "matern5_2", optim="none", objective="LOO", method=full,
+                    parameters={"theta": np.array([[0.3, 0.3]]), "is_theta_estim": False})
+    np.testing.assert_allclose(ke.leaveOneOut(method=am), ke.leaveOneOut(), rtol=1e-2)
+    np.testing.assert_allclose(ke.logMargPost(method=am), ke.logMargPost(), rtol=1e-3)
 
 
 def test_vecchia_fit(tmp_path):

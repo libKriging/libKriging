@@ -32,10 +32,10 @@ This document lists all methods exposed by each language binding for accessing t
 | Covariance matrix | `kriging_covMat(obj,x1,x2)` | `obj$covMat(x1,x2)` | `obj.covMat(x1,x2)` | `covMat(obj,x1,x2)` | `cov_mat(obj,X1,X2)` |
 | Log-likelihood | `kriging_logLikelihood(obj,method)` | `obj$logLikelihood(method=)` | `obj.logLikelihood(method=)` | `logLikelihood(obj[,method])` | `log_likelihood(obj;method=)` |
 | Log-likelihood function | `kriging_logLikelihoodFun(obj,theta,…)` | `obj$logLikelihoodFun(theta,…)` | `obj.logLikelihoodFun(theta,…)` | `logLikelihoodFun(obj,theta,…)` | `log_likelihood_fun(obj,theta;…)` |
-| Leave-one-out | `kriging_leaveOneOut(obj)` | `obj$leaveOneOut()` | `obj.leaveOneOut()` | `leaveOneOut(obj)` | `leave_one_out(obj)` |
+| Leave-one-out | `kriging_leaveOneOut(obj,method)` | `obj$leaveOneOut(method=)` | `obj.leaveOneOut(method=)` | `leaveOneOut(obj[,method])` | `leave_one_out(obj;method=)` |
 | Leave-one-out function | `kriging_leaveOneOutFun(obj,theta,…)` | `obj$leaveOneOutFun(theta,…)` | `obj.leaveOneOutFun(theta,…)` | `leaveOneOutFun(obj,theta,…)` | `leave_one_out_fun(obj,theta;…)` |
-| Leave-one-out vec | `kriging_leaveOneOutVec(obj,theta)` | `obj$leaveOneOutVec(theta)` | `obj.leaveOneOutVec(theta)` | `leaveOneOutVec(obj,theta)` | `leave_one_out_vec(obj,theta)` |
-| Log-marginal-post | `kriging_logMargPost(obj)` | `obj$logMargPost()` | `obj.logMargPost()` | `logMargPost(obj)` | `log_marg_post(obj)` |
+| Leave-one-out vec | `kriging_leaveOneOutVec(obj,theta,method)` | `obj$leaveOneOutVec(theta,method=)` | `obj.leaveOneOutVec(theta,method=)` | `leaveOneOutVec(obj,theta[,method])` | `leave_one_out_vec(obj,theta;method=)` |
+| Log-marginal-post | `kriging_logMargPost(obj,method)` | `obj$logMargPost(method=)` | `obj.logMargPost(method=)` | `logMargPost(obj[,method])` | `log_marg_post(obj;method=)` |
 | Log-marginal-post function | `kriging_logMargPostFun(obj,theta,…)` | `obj$logMargPostFun(theta,…)` | `obj.logMargPostFun(theta,…)` | `logMargPostFun(obj,theta,…)` | `log_marg_post_fun(obj,theta;…)` |
 | Model info | `kriging_model(obj)` | `obj$kernel()`, `obj$theta()`, … | `obj.model()` | `model(obj)` | `kernel(obj)`, `optim(obj)`, … |
 | **Parameters** | | | | | |
@@ -79,9 +79,11 @@ It returns row indices into `X`, **0-based in Python and Julia, 1-based in R and
 covariance is evaluated, for the fit and for what the model keeps afterwards): `"exact"` (default, dense O(n³)
 Cholesky), `"vecchia"` / `"vecchia(m)"` (Vecchia, m conditioning neighbors, default 30, O(n·m³), see
 [docs/math/Vecchia.md](../docs/math/Vecchia.md)) or `"nystrom"` / `"nystrom(k)"` (rank-k Nystrom, default 50, O(n·k²),
-see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). The approximate methods exist only with `objective="LL"` and the
-noise-free model (`noise_model` `none`); other combinations raise. `method()` returns the canonical string with its
-size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`), `objective()` returns `"LL"` for an approximate fit;
+see [docs/math/Nystrom.md](../docs/math/Nystrom.md)). Every objective has approximate versions (`"LOO"`: leave-one-out
+of the approximate joint law, `"LMP"`: approximate log det R and R⁻¹, see [docs/math/LOO.md](../docs/math/LOO.md) and
+[docs/math/LMP.md](../docs/math/LMP.md)), with the noise-free model only (`noise_model` `none`; a nugget / noise model
+raises). `method()` returns the canonical string with its size (`"exact"`, `"vecchia(30)"`, `"nystrom(50)"`),
+`objective()` returns the criterion (`"LL"` for a deprecated `"LLVecchia(m)"` alias);
 `nystrom_rank()` returns the rank `k` of a Nystrom fit (0 otherwise), `vecchia_neighbors()` the number `m` of
 conditioning neighbors of a Vecchia fit (0 otherwise). `WarpKriging` and `MLPKriging` take `method` too, but only
 `"exact"` is implemented.
@@ -97,10 +99,11 @@ fit:
 
 | Step | exact | Vecchia | Nystrom |
 |---|---|---|---|
-| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, `objective="LL"`, any `noise` (none, `"nugget"`, known variances: response Vecchia): Vecchia estimation, no exact factorization is kept | `"nystrom(k)"`, `objective="LL"`, no `noise`: no exact factorization is kept |
+| fit (`method=`) | `"exact"` (default), any `objective` | `"vecchia(m)"`, any `objective`: Vecchia estimation, no exact factorization is kept; `noise` (none, `"nugget"`, known variances: response Vecchia) with `objective="LL"` only | `"nystrom(k)"`, any `objective`, no `noise`: no exact factorization is kept |
 | `predict(…, method=)` | `"exact"` (default): after an exact fit | `"vecchia"` / `"vecchia(m)"`: after any fit (m = fitted m, or 30) | `"nystrom"` / fitted `"nystrom(k)"`: after a Nystrom fit |
 | `simulate(…, method=)` | `"exact"` (default); `will_update`, `with_noise` / nugget | `"vecchia"` / `"vecchia(m)"`: after any fit; `with_noise` / nugget | `"nystrom"`: after a Nystrom fit |
 | `logLikelihood(method=)` | `"exact"` (default; after an approximate fit, recomputed in O(n³) at the fitted θ) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
+| `leaveOneOut(method=)`, `leaveOneOutVec(θ, method=)`, `logMargPost(method=)` | `"exact"` (default; O(n³), on any fit) | `"vecchia"`: after a Vecchia fit | `"nystrom"`: after a Nystrom fit |
 | `update` | exact refit | Vecchia refit (still no exact factorization) | Nystrom update (same landmarks) |
 | `update_simulate` | yes | — | — |
 | `save` / `load` | yes | yes (`"method"` saved) | yes (`"method"` saved) |
@@ -226,7 +229,7 @@ response Vecchia loses accuracy when the noise is large relative to the signal (
 
 > `method` (after `warping`; Octave/Matlab 13th constructor / 9th `fit` argument): `"exact"` (default, per-group
 > fits), or `"vecchia(m)"` / `"nystrom(k)"`: the common prior is estimated by one global Vecchia / Nystrom fit
-> (`objective="LL"`, no warping), then exact submodels are fitted.
+> (with the given `objective`, no warping), then exact submodels are fitted.
 
 > No `noise=`, no `normalize=` on `NestedKriging` — see [docs/math/Nested.md](../docs/math/Nested.md) for current limitations.
 

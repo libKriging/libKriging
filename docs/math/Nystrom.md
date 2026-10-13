@@ -117,8 +117,10 @@ pred <- predict(k, Xnew, return_stdev = TRUE, method = "nystrom")  # explicit: n
 
 ## Current limitations
 
-- `objective="LL"` and `NoiseModel::None` only (no LOO / LMP version,
-  no nugget/noise channel).
+- `NoiseModel::None` only (no nugget/noise channel). `objective="LOO"`
+  and `"LMP"` have Nystrom versions (LOO under the low-rank joint law,
+  Woodbury log-determinant; see [LOO.md](LOO.md) and [LMP.md](LMP.md)):
+  they inherit the smoothing bias of R̂ for small k.
 - Landmarks are not serialized (rebuilt on refit).
 - Rank k is a fixed hyperparameter chosen by the caller; there is no
   automatic rank selection based on a target approximation accuracy.

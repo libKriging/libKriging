@@ -71,8 +71,8 @@ past release, see the corresponding entry on the
     default), `"vecchia"` / `"vecchia(m)"` (Vecchia approximation, m
     neighbors, default 30) or `"nystrom"` / `"nystrom(k)"` (rank-k
     Nystrom, default 50). `objective` is now only the criterion (`"LL"`,
-    `"LOO"`, `"LMP"`); the approximate methods exist for `"LL"` without a
-    noise model, other combinations raise. `method()` returns the fitted
+    `"LOO"`, `"LMP"`); the approximate methods exist for every objective
+    (see Added) without a noise model, a noise model raises. `method()` returns the fitted
     method with its explicit size (`"vecchia(30)"`), and is saved / loaded.
     C++ trailing `method` argument of `fit` and of the constructor; Python /
     R / Julia `method=` keyword; Octave/Matlab trailing argument.
@@ -118,6 +118,26 @@ past release, see the corresponding entry on the
     uniform API (only `"exact"` is implemented).
 
 ### Added
+- **Kriging: `objective="LOO"` and `"LMP"` with `method="vecchia(m)"` /
+  `"nystrom(k)"`** (noise-free models). The LOO criterion is the virtual
+  leave-one-out of the approximate joint law (Vecchia precision BᵀD⁻¹B,
+  Nystrom precision by Woodbury), O(n m³) / O(n k²); the LMP criterion uses
+  log det R = Σ log Dᵢ (Vecchia) or the determinant lemma (Nystrom). Both
+  have analytic gradients (finite-difference verified) and are exact for
+  m = n − 1 / k = n. Fits commit β (GLS under the approximation) and σ²
+  (SSE/n, SSE/(n − p) for LMP) like the exact ones, keep no exact
+  factorization, and survive `update` and `save` / `load`. New
+  `leaveOneOut(method)`, `logMargPost(method)`, `leaveOneOutVec(theta,
+  method)` overloads (C++ also `leaveOneOutVecchiaFun`,
+  `leaveOneOutNystromFun`, `logMargPostVecchiaFun`,
+  `logMargPostNystromFun`); `method` argument in every binding (Python /
+  R / Julia keyword, Octave/Matlab trailing argument). With
+  `normalize=true` they follow the original-scale convention: θ in the
+  units of X, LOO in squared y units, LMP of the original y, chain-ruled
+  gradients, so `leaveOneOut("vecchia") == leaveOneOutVecchiaFun(theta())`
+  and they match a `normalize=false` model at the same θ (Vecchia with all
+  predecessors as neighbors; Nystrom up to its numerical jitter). See
+  docs/math/LOO.md and docs/math/LMP.md.
 - Kriging: `method="vecchia(m)"` with the noise models (`NoiseModel::Nugget`
   / `noise="nugget"` and `NoiseModel::Heterogeneous` / known noise
   variances), by response Vecchia (Katzfuss & Guinness 2021): Vecchia
